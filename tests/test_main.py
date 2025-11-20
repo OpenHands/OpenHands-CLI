@@ -153,3 +153,29 @@ def test_help_and_invalid(monkeypatch, argv, expected_exit_code):
     with pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == expected_exit_code
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        (["openhands", "--version"]),
+        (["openhands", "-v"]),
+    ],
+)
+def test_version_flag(monkeypatch, capsys, argv):
+    """Test that --version and -v flags print version and exit."""
+    monkeypatch.setattr(sys, "argv", argv, raising=False)
+
+    with pytest.raises(SystemExit) as exc:
+        main()
+
+    # Version flag should exit with code 0
+    assert exc.value.code == 0
+
+    # Check that version string is in the output
+    captured = capsys.readouterr()
+    assert "OpenHands CLI" in captured.out
+    # Should contain a version number (matches format like 1.2.1 or 0.0.0)
+    import re
+
+    assert re.search(r"\d+\.\d+\.\d+", captured.out)
