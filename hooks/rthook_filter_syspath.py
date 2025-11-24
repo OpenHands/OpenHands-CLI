@@ -11,5 +11,6 @@ with PyInstaller's module collection.
 
 import sys
 
+
 # Filter out /openhands/code from sys.path to avoid namespace conflicts
-sys.path = [p for p in sys.path if '/openhands/code' not in p]
+sys.path = [p for p in sys.path if "/openhands/code" not in p]
