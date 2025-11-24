@@ -13,9 +13,9 @@ from acp.schema import (
 ACPMCPServerType = StdioMcpServer | HttpMcpServer | SseMcpServer
 
 
-def _transform_env_to_dict(env: Sequence[dict[str, str]]) -> dict[str, str]:
+def _convert_env_to_dict(env: Sequence[dict[str, str]]) -> dict[str, str]:
     """
-    Transform environment variables from serialized EnvVariable format to a dictionary.
+    Convert environment variables from serialized EnvVariable format to a dictionary.
 
     When Pydantic models are dumped to dict, EnvVariable objects become dicts
     with 'name' and 'value' keys.
@@ -32,11 +32,11 @@ def _transform_env_to_dict(env: Sequence[dict[str, str]]) -> dict[str, str]:
     return env_dict
 
 
-def transform_acp_mcp_servers_to_agent_format(
+def convert_acp_mcp_servers_to_agent_format(
     mcp_servers: Sequence[ACPMCPServerType],
 ) -> dict[str, dict[str, Any]]:
     """
-    Transform MCP servers from ACP format to Agent format.
+    Convert MCP servers from ACP format to Agent format.
 
     ACP and Agent use different formats for MCP server configurations:
     - ACP: List of Pydantic server models with 'name' field, env as array of EnvVariable
@@ -48,7 +48,7 @@ def transform_acp_mcp_servers_to_agent_format(
     Returns:
         Dictionary of MCP servers in Agent format (keyed by name)
     """
-    transformed_servers: dict[str, dict[str, Any]] = {}
+    converted_servers: dict[str, dict[str, Any]] = {}
 
     for server in mcp_servers:
         server_dict = server.model_dump()
@@ -57,10 +57,10 @@ def transform_acp_mcp_servers_to_agent_format(
             k: v for k, v in server_dict.items() if k != "name"
         }
 
-        # Transform env from array to dict format if present
+        # Convert env from array to dict format if present
         # ACP sends env as array of EnvVariable objects, but Agent expects dict
         if "env" in server_config:
-            server_config["env"] = _transform_env_to_dict(server_config["env"])
-        transformed_servers[server_name] = server_config
+            server_config["env"] = _convert_env_to_dict(server_config["env"])
+        converted_servers[server_name] = server_config
 
-    return transformed_servers
+    return converted_servers

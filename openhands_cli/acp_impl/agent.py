@@ -49,8 +49,8 @@ from openhands_cli import __version__
 from openhands_cli.acp_impl.event import EventSubscriber
 from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
+    convert_acp_mcp_servers_to_agent_format,
     convert_acp_prompt_to_message_content,
-    transform_acp_mcp_servers_to_agent_format,
 )
 from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
@@ -235,10 +235,10 @@ class OpenHandsACPAgent(ACPAgent):
         session_id = str(uuid.uuid4())
 
         try:
-            # Transform ACP MCP servers to Agent format
+            # Convert ACP MCP servers to Agent format
             mcp_servers_dict = None
             if params.mcpServers:
-                mcp_servers_dict = transform_acp_mcp_servers_to_agent_format(
+                mcp_servers_dict = convert_acp_mcp_servers_to_agent_format(
                     params.mcpServers
                 )
 

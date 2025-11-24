@@ -2,7 +2,7 @@
 
 from acp.schema import EnvVariable, StdioMcpServer
 
-from openhands_cli.acp_impl.utils import transform_acp_mcp_servers_to_agent_format
+from openhands_cli.acp_impl.utils import convert_acp_mcp_servers_to_agent_format
 from openhands_cli.utils import should_set_litellm_extra_body
 
 
@@ -24,14 +24,14 @@ def test_should_not_set_litellm_extra_body_for_other_models():
     assert not should_set_litellm_extra_body("litellm_proxy/gpt-4")
 
 
-def test_transform_acp_mcp_servers_empty_list():
-    """Test transforming empty list of MCP servers."""
-    result = transform_acp_mcp_servers_to_agent_format([])
+def test_convert_acp_mcp_servers_empty_list():
+    """Test converting empty list of MCP servers."""
+    result = convert_acp_mcp_servers_to_agent_format([])
     assert result == {}
 
 
-def test_transform_acp_mcp_servers_with_empty_env():
-    """Test transforming MCP server with empty env array."""
+def test_convert_acp_mcp_servers_with_empty_env():
+    """Test converting MCP server with empty env array."""
     servers = [
         StdioMcpServer(
             name="test-server",
@@ -40,7 +40,7 @@ def test_transform_acp_mcp_servers_with_empty_env():
             env=[],
         )
     ]
-    result = transform_acp_mcp_servers_to_agent_format(servers)
+    result = convert_acp_mcp_servers_to_agent_format(servers)
 
     assert "test-server" in result
     assert result["test-server"]["command"] == "/usr/bin/node"
@@ -50,8 +50,8 @@ def test_transform_acp_mcp_servers_with_empty_env():
     assert "name" not in result["test-server"]
 
 
-def test_transform_acp_mcp_servers_with_env_variables():
-    """Test transforming MCP server with env variables."""
+def test_convert_acp_mcp_servers_with_env_variables():
+    """Test converting MCP server with env variables."""
     servers = [
         StdioMcpServer(
             name="test-server",
@@ -63,7 +63,7 @@ def test_transform_acp_mcp_servers_with_env_variables():
             ],
         )
     ]
-    result = transform_acp_mcp_servers_to_agent_format(servers)
+    result = convert_acp_mcp_servers_to_agent_format(servers)
 
     assert "test-server" in result
     assert result["test-server"]["env"] == {
@@ -72,8 +72,8 @@ def test_transform_acp_mcp_servers_with_env_variables():
     }
 
 
-def test_transform_acp_mcp_servers_multiple_servers():
-    """Test transforming multiple MCP servers."""
+def test_convert_acp_mcp_servers_multiple_servers():
+    """Test converting multiple MCP servers."""
     servers = [
         StdioMcpServer(
             name="server1",
@@ -88,7 +88,7 @@ def test_transform_acp_mcp_servers_multiple_servers():
             env=[EnvVariable(name="KEY", value="value")],
         ),
     ]
-    result = transform_acp_mcp_servers_to_agent_format(servers)
+    result = convert_acp_mcp_servers_to_agent_format(servers)
 
     assert len(result) == 2
     assert "server1" in result
