@@ -1,6 +1,11 @@
 """Tests for utility functions."""
 
-from openhands_cli.utils import should_set_litellm_extra_body
+from argparse import Namespace
+
+from openhands_cli.utils import (
+    create_seeded_instructions_from_args,
+    should_set_litellm_extra_body,
+)
 
 
 def test_should_set_litellm_extra_body_for_openhands():
@@ -19,3 +24,20 @@ def test_should_not_set_litellm_extra_body_for_other_models():
     assert not should_set_litellm_extra_body("vllm/model")
     assert not should_set_litellm_extra_body("dummy-model")
     assert not should_set_litellm_extra_body("litellm_proxy/gpt-4")
+
+
+def test_seeded_instructions_task_only():
+    args = Namespace(command=None, task="Do something", file=None)
+    assert create_seeded_instructions_from_args(args) == ["Do something"]
+
+
+def test_seeded_instructions_file_only(tmp_path):
+    path = tmp_path / "context.txt"
+    path.write_text("hello", encoding="utf-8")
+
+    args = Namespace(command=None, task=None, file=str(path))
+    queued = create_seeded_instructions_from_args(args)
+
+    assert isinstance(queued, list)
+    assert len(queued) == 1
+    assert "File path:" in queued[0]

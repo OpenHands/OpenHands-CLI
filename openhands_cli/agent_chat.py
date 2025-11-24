@@ -61,7 +61,7 @@ def _print_exit_hint(conversation_id: str) -> None:
 
 def run_cli_entry(
     resume_conversation_id: str | None = None,
-    initial_message: str | None = None
+    queued_inputs: list[str] | None = None,
 ) -> None:
     """Run the agent chat session using the agent SDK.
 
@@ -71,6 +71,9 @@ def run_cli_entry(
         KeyboardInterrupt: If user interrupts the session
         EOFError: If EOF is encountered
     """
+
+    # Normalize queued_inputs to a local copy to prevent mutating the caller's list
+    pending_inputs = list(queued_inputs) if queued_inputs else []
 
     conversation_id = uuid.uuid4()
     if resume_conversation_id:
@@ -104,27 +107,17 @@ def run_cli_entry(
     conversation = None
     session = get_session_prompter()
 
-    # Seed initial message (from --task/--file) BEFORE interactive loop
-    if initial_message:
-        if not runner or not conversation:
-            conversation = setup_conversation(conversation_id)
-            runner = ConversationRunner(conversation)
-
-        seed_message = Message(
-            role="user",
-            content=[TextContent(text=initial_message)],
-        )
-        runner.process_message(seed_message)
-        print()
-
     # Main chat loop
     while True:
         try:
             # Get user input
-            user_input = session.prompt(
-                HTML("<gold>> </gold>"),
-                multiline=False,
-            )
+            if pending_inputs:
+                user_input = pending_inputs.pop(0)
+            else:
+                user_input = session.prompt(
+                    HTML("<gold>> </gold>"),
+                    multiline=False,
+                )
 
             if not user_input.strip():
                 continue

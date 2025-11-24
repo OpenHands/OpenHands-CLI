@@ -12,7 +12,6 @@ from openhands_cli.simple_main import main
 
 
 def test_main_parser_accepts_task_and_file_flags():
-
     parser = create_main_parser()
 
     # --task only
@@ -51,7 +50,7 @@ class TestMainEntryPoint:
         mock_run_agent_chat.assert_called_once()
         kwargs = mock_run_agent_chat.call_args.kwargs
         assert kwargs["resume_conversation_id"] is None
-        assert kwargs["initial_message"] is None
+        assert kwargs["queued_inputs"] is None
 
     @patch("openhands_cli.agent_chat.run_cli_entry")
     @patch("sys.argv", ["openhands"])
@@ -115,14 +114,20 @@ class TestMainEntryPoint:
         mock_run_agent_chat.assert_called_once()
         kwargs = mock_run_agent_chat.call_args.kwargs
         assert kwargs["resume_conversation_id"] == "test-conversation-id"
-        assert kwargs["initial_message"] is None
+        assert kwargs["queued_inputs"] is None
 
 
 @pytest.mark.parametrize(
     "argv,expected_kwargs",
     [
-        (["openhands"], {"resume_conversation_id": None, "initial_message": None},),
-        (["openhands", "--resume", "test-id"], {"resume_conversation_id": "test-id", "initial_message": None},),
+        (
+            ["openhands"],
+            {"resume_conversation_id": None, "queued_inputs": None},
+        ),
+        (
+            ["openhands", "--resume", "test-id"],
+            {"resume_conversation_id": "test-id", "queued_inputs": None},
+        ),
     ],
 )
 def test_main_cli_calls_run_cli_entry(monkeypatch, argv, expected_kwargs):
@@ -140,8 +145,9 @@ def test_main_cli_calls_run_cli_entry(monkeypatch, argv, expected_kwargs):
     main()
     assert called["kwargs"] == expected_kwargs
 
-def test_main_cli_task_sets_initial_message(monkeypatch):
-    """task should populate initial_message and not set resume_conversation_id."""
+
+def test_main_cli_task_sets_queued_inputs(monkeypatch):
+    """task should populate queued_inputs and not set resume_conversation_id."""
     monkeypatch.setattr(
         sys,
         "argv",
@@ -159,10 +165,11 @@ def test_main_cli_task_sets_initial_message(monkeypatch):
     main()
 
     assert called["kwargs"]["resume_conversation_id"] is None
-    assert called["kwargs"]["initial_message"] == "Summarize the README"
+    assert called["kwargs"]["queued_inputs"] == ["Summarize the README"]
 
-def test_main_cli_file_sets_initial_message(monkeypatch, tmp_path):
-    """--file should build an initial_message with path + contents."""
+
+def test_main_cli_file_sets_queued_inputs(monkeypatch, tmp_path):
+    """--file should build an queued_inputs with path + contents."""
     file_path = tmp_path / "context.txt"
     file_content = "Hello from test file"
     file_path.write_text(file_content, encoding="utf-8")
@@ -185,7 +192,11 @@ def test_main_cli_file_sets_initial_message(monkeypatch, tmp_path):
 
     assert called["kwargs"]["resume_conversation_id"] is None
 
-    msg = called["kwargs"]["initial_message"]
+    queued = called["kwargs"]["queued_inputs"]
+    assert isinstance(queued, list)
+    assert len(queued) == 1
+
+    msg = queued[0]
     assert isinstance(msg, str)
     assert "Starting this session with file context." in msg
     assert f"File path: {file_path}" in msg
@@ -220,7 +231,11 @@ def test_main_cli_file_takes_precedence_over_task(monkeypatch, tmp_path):
 
     main()
 
-    msg = called["kwargs"]["initial_message"]
+    queued = called["kwargs"]["queued_inputs"]
+    assert isinstance(queued, list)
+    assert len(queued) == 1
+
+    msg = queued[0]
     assert isinstance(msg, str)
     assert file_content in msg
     assert "this should be ignored" not in msg

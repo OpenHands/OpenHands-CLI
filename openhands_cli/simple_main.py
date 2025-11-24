@@ -6,13 +6,13 @@ This is a simplified version that demonstrates the TUI functionality.
 
 import logging
 import os
-from pathlib import Path
 import warnings
 
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 
 from openhands_cli.argparsers.main_parser import create_main_parser
+from openhands_cli.utils import create_seeded_instructions_from_args
 
 
 debug_env = os.getenv("DEBUG", "false").lower()
@@ -31,30 +31,6 @@ def main() -> None:
     parser = create_main_parser()
     args = parser.parse_args()
 
-    initial_message: str | None = None
-    if args.command != "serve":
-        # --file takes precedence over --task
-        if getattr(args, "file", None):
-            path = Path(args.file).expanduser()
-            try:
-                content = path.read_text(encoding="utf-8")
-            except OSError as exc:
-                print_formatted_text(
-                    HTML(f"<red>Failed to read file {path}: {exc}</red>")
-                )
-                raise SystemExit(1)
-
-            initial_message = (
-                "Starting this session with file context.\n\n"
-                f"File path: {path}\n\n"
-                "File contents:\n"
-                "--------------------\n"
-                f"{content}\n"
-                "--------------------\n"
-            )
-        elif getattr(args, "task", None):
-            initial_message = args.task
-
     try:
         if args.command == "serve":
             # Import gui_launcher only when needed
@@ -66,10 +42,12 @@ def main() -> None:
             # Import agent_chat only when needed
             from openhands_cli.agent_chat import run_cli_entry
 
+            queued_inputs = create_seeded_instructions_from_args(args)
+
             # Start agent chat
             run_cli_entry(
                 resume_conversation_id=args.resume,
-                initial_message=initial_message,
+                queued_inputs=queued_inputs,
             )
     except KeyboardInterrupt:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
