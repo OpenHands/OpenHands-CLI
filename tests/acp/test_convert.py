@@ -113,7 +113,7 @@ def test_convert_empty_text():
 
 
 def test_convert_image_with_different_mime_types():
-    """Test converting images with various MIME types."""
+    """Test converting images with various supported MIME types."""
     mime_types = ["image/png", "image/jpeg", "image/gif", "image/webp"]
     test_data = "dGVzdGRhdGE="  # base64 encoded "testdata"
 
@@ -131,3 +131,30 @@ def test_convert_image_with_different_mime_types():
         assert len(result) == 1
         assert isinstance(result[0], ImageContent)
         assert result[0].image_urls[0].startswith(f"data:{mime_type};base64,")
+
+
+def test_convert_unsupported_image_mime_type():
+    """Test that unsupported image formats fall back to disk storage."""
+
+    # Test with unsupported image formats
+    unsupported_types = ["image/tiff", "image/svg+xml", "image/bmp"]
+    test_data = "dGVzdGRhdGE="  # base64 encoded "testdata"
+
+    for mime_type in unsupported_types:
+        acp_prompt: list = [
+            ImageContentBlock(
+                type="image",
+                data=test_data,
+                mimeType=mime_type,
+            )
+        ]
+
+        result = convert_acp_prompt_to_message_content(acp_prompt)
+
+        assert len(result) == 1
+        assert isinstance(result[0], TextContent)
+        assert "unsupported format" in result[0].text
+        assert mime_type in result[0].text
+        assert "Saved to file:" in result[0].text
+        # Verify the file path is mentioned
+        assert "image_" in result[0].text

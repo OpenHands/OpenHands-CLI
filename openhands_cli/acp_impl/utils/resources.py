@@ -36,6 +36,14 @@ RESOURCE_SKILL = Skill(
 ACP_CACHE_DIR = Path.home() / ".openhands" / "cache" / "acp"
 ACP_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
+# LLM API supported image MIME types (Anthropic/Claude compatible)
+SUPPORTED_IMAGE_MIME_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+}
+
 
 def _materialize_embedded_resource(
     block: ACPEmbeddedResourceContentBlock,
@@ -63,12 +71,14 @@ def _materialize_embedded_resource(
     elif isinstance(res, ACPBlobResourceContents):
         mime_type = res.mimeType or ""
 
-        # 1. If it's an image, directly return ImageContent
-        if mime_type.startswith("image/"):
+        # 1. If it's a supported image type, directly return ImageContent
+        if mime_type in SUPPORTED_IMAGE_MIME_TYPES:
             data_uri = f"data:{mime_type};base64,{res.blob}"
             return ImageContent(image_urls=[data_uri])
 
         # 2. Otherwise fallback to saving to disk
+        # This includes unsupported image types (e.g., image/tiff, image/svg+xml)
+        # and other binary blobs
         data = base64.b64decode(res.blob)
 
         ext = ""
@@ -79,10 +89,19 @@ def _materialize_embedded_resource(
         target = ACP_CACHE_DIR / filename
         target.write_bytes(data)
 
+        # Provide appropriate message based on content type
+        if mime_type.startswith("image/"):
+            description = (
+                f"User provided image with unsupported format ({mime_type}).\n"
+                f"Supported formats: {', '.join(sorted(SUPPORTED_IMAGE_MIME_TYPES))}\n"
+            )
+        else:
+            description = "User provided binary context (non-image).\n"
+
         return TextContent(
             text=(
                 "\n[BEGIN USER PROVIDED ADDITIONAL CONTEXT]\n"
-                "User provided binary context (non-image).\n"
+                f"{description}"
                 f"Saved to file: {str(target)}\n"
                 "[END USER PROVIDED ADDITIONAL CONTEXT]\n"
             )
