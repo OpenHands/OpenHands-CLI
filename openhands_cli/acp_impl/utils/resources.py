@@ -19,7 +19,16 @@ from openhands.sdk.context import Skill
 RESOURCE_SKILL = Skill(
     name="user_provided_resources",
     content=(
-        "You may encounter sections labeled as user-provided additional context or resources. These blocks contain files or data that the user referenced in their message. They may include plain text, images, code snippets, or binary content saved to a temporary file. Treat these blocks as part of the user’s input. Read them carefully and use their contents when forming your reasoning or answering the query. If a block points to a saved file, assume it contains relevant binary data that could not be displayed directly."  # noqa: E501,
+        "You may encounter sections labeled as user-provided additional "
+        "context or resources. "
+        "These blocks contain files or data that the user referenced in their message. "
+        "They may include plain text, images, code snippets, or binary "
+        "content saved to a temporary file. "
+        "Treat these blocks as part of the user’s input. "
+        "Read them carefully and use their contents when forming your "
+        "reasoning or answering the query. "
+        "If a block points to a saved file, assume it contains relevant "
+        "binary data that could not be displayed directly."
     ),
     trigger=None,
 )
