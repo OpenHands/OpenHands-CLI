@@ -59,7 +59,10 @@ def _print_exit_hint(conversation_id: str) -> None:
     )
 
 
-def run_cli_entry(resume_conversation_id: str | None = None) -> None:
+def run_cli_entry(
+    resume_conversation_id: str | None = None,
+    initial_message: str | None = None
+) -> None:
     """Run the agent chat session using the agent SDK.
 
 
@@ -100,6 +103,19 @@ def run_cli_entry(resume_conversation_id: str | None = None) -> None:
     runner = None
     conversation = None
     session = get_session_prompter()
+
+    # Seed initial message (from --task/--file) BEFORE interactive loop
+    if initial_message:
+        if not runner or not conversation:
+            conversation = setup_conversation(conversation_id)
+            runner = ConversationRunner(conversation)
+
+        seed_message = Message(
+            role="user",
+            content=[TextContent(text=initial_message)],
+        )
+        runner.process_message(seed_message)
+        print()
 
     # Main chat loop
     while True:
