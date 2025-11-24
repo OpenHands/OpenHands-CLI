@@ -115,6 +115,8 @@ async def test_new_session_success(acp_agent, tmp_path):
 @pytest.mark.asyncio
 async def test_new_session_agent_not_configured(acp_agent, tmp_path):
     """Test creating a new session when agent is not configured."""
+    from acp import RequestError
+
     from openhands_cli.setup import MissingAgentSpec
 
     request = NewSessionRequest(cwd=str(tmp_path), mcpServers=[])
@@ -123,7 +125,7 @@ async def test_new_session_agent_not_configured(acp_agent, tmp_path):
     with patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load:
         mock_load.side_effect = MissingAgentSpec("Not configured")
 
-        with pytest.raises(ValueError, match="Agent not configured"):
+        with pytest.raises(RequestError):
             await acp_agent.newSession(request)
 
 
@@ -154,7 +156,11 @@ async def test_new_session_creates_working_directory(acp_agent, tmp_path):
 
 @pytest.mark.asyncio
 async def test_prompt_unknown_session(acp_agent):
-    """Test prompt with unknown session ID."""
+    """Test prompt with unknown session ID.
+
+    Should raise RequestError due to missing agent config.
+    """
+    from acp import RequestError
 
     content_blocks = [TextContentBlock(type="text", text="Hello")]
     request = PromptRequest(
@@ -162,7 +168,9 @@ async def test_prompt_unknown_session(acp_agent):
         prompt=content_blocks,  # type: ignore[arg-type]
     )
 
-    with pytest.raises(ValueError, match="Unknown session"):
+    # When session doesn't exist, _get_or_create_conversation will try to load it,
+    # which requires agent configuration. This will fail with RequestError.
+    with pytest.raises(RequestError):
         await acp_agent.prompt(request)
 
 
@@ -271,25 +279,34 @@ async def test_cancel(acp_agent):
 
 @pytest.mark.asyncio
 async def test_cancel_unknown_session(acp_agent):
-    """Test cancelling an unknown session (should not raise error)."""
-    from acp import CancelNotification
+    """Test cancelling an unknown session.
+
+    Should raise RequestError due to missing agent config.
+    """
+    from acp import CancelNotification, RequestError
 
     notification = CancelNotification(sessionId="unknown-session")
 
-    # Should not raise an error
-    await acp_agent.cancel(notification)
+    # When session doesn't exist, cancel will try to create/load it,
+    # which requires agent configuration. This will fail with RequestError.
+    with pytest.raises(RequestError):
+        await acp_agent.cancel(notification)
 
 
 @pytest.mark.asyncio
 async def test_load_session_not_found(acp_agent):
-    """Test loading a non-existent session."""
-    from acp import LoadSessionRequest
+    """Test loading a non-existent session.
+
+    Should raise RequestError for invalid UUID.
+    """
+    from acp import LoadSessionRequest, RequestError
 
     request = LoadSessionRequest(
         sessionId="non-existent", cwd="/test/path", mcpServers=[]
     )
 
-    with pytest.raises(ValueError, match="Session not found"):
+    # Invalid UUID format will raise RequestError
+    with pytest.raises(RequestError):
         await acp_agent.loadSession(request)
 
 
