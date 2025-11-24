@@ -1,9 +1,13 @@
 """Tests for ACP conversion utilities."""
 
+import base64
+import io
+
 from acp.schema import (
     ImageContentBlock,
     TextContentBlock,
 )
+from PIL import Image
 
 from openhands.sdk import ImageContent, TextContent
 from openhands_cli.acp_impl.utils.convert import convert_acp_prompt_to_message_content
@@ -133,28 +137,48 @@ def test_convert_image_with_different_mime_types():
         assert result[0].image_urls[0].startswith(f"data:{mime_type};base64,")
 
 
-def test_convert_unsupported_image_mime_type():
-    """Test that unsupported image formats fall back to disk storage."""
+def test_convert_unsupported_image_mime_type_with_conversion():
+    """Test that unsupported image formats are automatically converted."""
+    # Create a real BMP image
+    img = Image.new("RGB", (10, 10), color="green")
+    buffer = io.BytesIO()
+    img.save(buffer, format="BMP")
+    buffer.seek(0)
+    bmp_data = base64.b64encode(buffer.read()).decode("utf-8")
 
-    # Test with unsupported image formats
-    unsupported_types = ["image/tiff", "image/svg+xml", "image/bmp"]
-    test_data = "dGVzdGRhdGE="  # base64 encoded "testdata"
+    acp_prompt: list = [
+        ImageContentBlock(
+            type="image",
+            data=bmp_data,
+            mimeType="image/bmp",
+        )
+    ]
 
-    for mime_type in unsupported_types:
-        acp_prompt: list = [
-            ImageContentBlock(
-                type="image",
-                data=test_data,
-                mimeType=mime_type,
-            )
-        ]
+    result = convert_acp_prompt_to_message_content(acp_prompt)
 
-        result = convert_acp_prompt_to_message_content(acp_prompt)
+    assert len(result) == 1
+    assert isinstance(result[0], ImageContent)
+    assert result[0].image_urls[0].startswith("data:image/png;base64,")
 
-        assert len(result) == 1
-        assert isinstance(result[0], TextContent)
-        assert "unsupported format" in result[0].text
-        assert mime_type in result[0].text
-        assert "Saved to file:" in result[0].text
-        # Verify the file path is mentioned
-        assert "image_" in result[0].text
+
+def test_convert_corrupted_image_falls_back():
+    """Test that corrupted image data falls back to disk storage."""
+    # Use invalid image data that can't be converted
+    invalid_data = base64.b64encode(b"not_a_real_image").decode("utf-8")
+
+    acp_prompt: list = [
+        ImageContentBlock(
+            type="image",
+            data=invalid_data,
+            mimeType="image/bmp",
+        )
+    ]
+
+    result = convert_acp_prompt_to_message_content(acp_prompt)
+
+    assert len(result) == 1
+    assert isinstance(result[0], TextContent)
+    assert "unsupported format" in result[0].text
+    assert "image/bmp" in result[0].text
+    assert "conversion failed" in result[0].text.lower()
+    assert "Saved to file:" in result[0].text
