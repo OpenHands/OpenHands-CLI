@@ -52,7 +52,7 @@ from openhands.tools.task_tracker.definition import (
     TaskTrackerObservation,
     TaskTrackerStatusType,
 )
-from openhands.tools.terminal.definition import ExecuteBashAction
+from openhands.tools.terminal.definition import TerminalAction
 
 
 logger = get_logger(__name__)
@@ -223,7 +223,7 @@ class EventSubscriber:
                     else:
                         tool_kind = "edit"
                         title = f"Editing {event.action.path}"
-                elif isinstance(event.action, ExecuteBashAction):
+                elif isinstance(event.action, TerminalAction):
                     title = f"{event.action.command}"
                 elif isinstance(event.action, TaskTrackerAction):
                     title = "Plan updated"
