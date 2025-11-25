@@ -44,9 +44,5 @@ if [ "$INSTALL_PYINSTALLER" = true ]; then
     fi
 fi
 
-# Clean PYTHONPATH to avoid conflicts with /openhands/code
-# This prevents namespace conflicts between the OpenHands main repo and openhands-sdk packages
-export PYTHONPATH=""
-
 # Run the Python build script using uv
 uv run python build.py "${PYTHON_ARGS[@]}"
