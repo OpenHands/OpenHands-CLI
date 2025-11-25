@@ -20,6 +20,51 @@ from openhands_cli.acp_impl.utils.resources import (
 )
 
 
+def _convert_image_block(block: ACPImageContentBlock) -> TextContent | ImageContent:
+    """
+    Convert an ACP image content block to SDK format.
+
+    Handles:
+    1. Supported image formats -> ImageContent
+    2. Unsupported but convertible formats -> ImageContent with converted data
+    3. Unsupported and non-convertible formats -> TextContent with file path
+
+    Args:
+        block: ACP image content block
+
+    Returns:
+        ImageContent if format is supported or convertible, TextContent otherwise
+    """
+    # Handle supported formats directly
+    if block.mimeType in SUPPORTED_IMAGE_MIME_TYPES:
+        return ImageContent(image_urls=[f"data:{block.mimeType};base64,{block.data}"])
+
+    # Try to convert unsupported formats
+    data = base64.b64decode(block.data)
+    converted = _convert_image_to_supported_format(data, block.mimeType)
+
+    if converted is not None:
+        target_mime, converted_data = converted
+        return ImageContent(image_urls=[f"data:{target_mime};base64,{converted_data}"])
+
+    # Conversion failed - save to disk and return explanatory text
+    filename = f"image_{uuid4().hex}"
+    target = ACP_CACHE_DIR / filename
+    target.write_bytes(data)
+    supported = ", ".join(sorted(SUPPORTED_IMAGE_MIME_TYPES))
+
+    return TextContent(
+        text=(
+            "\n[BEGIN USER PROVIDED ADDITIONAL CONTEXT]\n"
+            f"User provided image with unsupported format ({block.mimeType}).\n"
+            "Attempted automatic conversion failed.\n"
+            f"Supported formats: {supported}\n"
+            f"Saved to file: {str(target)}\n"
+            "[END USER PROVIDED ADDITIONAL CONTEXT]\n"
+        )
+    )
+
+
 def convert_acp_prompt_to_message_content(
     acp_prompt: list[
         ACPTextContentBlock
@@ -48,46 +93,7 @@ def convert_acp_prompt_to_message_content(
         if isinstance(block, ACPTextContentBlock):
             message_content.append(TextContent(text=block.text))
         elif isinstance(block, ACPImageContentBlock):
-            # Only pass supported image types to ImageContent
-            # Try to convert unsupported types, fall back to disk storage if that fails
-            if block.mimeType in SUPPORTED_IMAGE_MIME_TYPES:
-                message_content.append(
-                    ImageContent(
-                        image_urls=[f"data:{block.mimeType};base64,{block.data}"]
-                    )
-                )
-            else:
-                # Try to convert unsupported image format
-                data = base64.b64decode(block.data)
-                converted = _convert_image_to_supported_format(data, block.mimeType)
-
-                if converted is not None:
-                    # Conversion succeeded
-                    target_mime, converted_data = converted
-                    message_content.append(
-                        ImageContent(
-                            image_urls=[f"data:{target_mime};base64,{converted_data}"]
-                        )
-                    )
-                else:
-                    # Conversion failed, save to disk
-                    filename = f"image_{uuid4().hex}"
-                    target = ACP_CACHE_DIR / filename
-                    target.write_bytes(data)
-                    supported = ", ".join(sorted(SUPPORTED_IMAGE_MIME_TYPES))
-                    message_content.append(
-                        TextContent(
-                            text=(
-                                "\n[BEGIN USER PROVIDED ADDITIONAL CONTEXT]\n"
-                                f"User provided image with unsupported format "
-                                f"({block.mimeType}).\n"
-                                "Attempted automatic conversion failed.\n"
-                                f"Supported formats: {supported}\n"
-                                f"Saved to file: {str(target)}\n"
-                                "[END USER PROVIDED ADDITIONAL CONTEXT]\n"
-                            )
-                        )
-                    )
+            message_content.append(_convert_image_block(block))
         elif isinstance(
             block, ACPResourceContentBlock | ACPEmbeddedResourceContentBlock
         ):
