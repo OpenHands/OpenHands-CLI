@@ -9,7 +9,7 @@ description = "OpenHands CLI - Terminal User Interface for OpenHands AI Agent"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [ { name = "OpenHands Team", email = "contact@all-hands.dev" } ]
-requires-python = ">=3.12,<3.14"
+requires-python = "==3.12.*"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.12",
