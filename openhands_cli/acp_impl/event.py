@@ -383,18 +383,6 @@ class EventSubscriber:
             if event.llm_message.role == "user":
                 # NOTE: Zed UI will render user messages when it is sent
                 # if we update it again, they will be duplicated
-                # await self.conn.sessionUpdate(
-                #     SessionNotification(
-                #         sessionId=self.session_id,
-                #         update=UserMessageChunk(
-                #             sessionUpdate="user_message_chunk",
-                #             content=TextContentBlock(
-                #                 type="text",
-                #                 text=viz_text,
-                #             ),
-                #         ),
-                #     )
-                # )
                 pass
             else:  # assistant or other roles
                 await self.conn.sessionUpdate(
