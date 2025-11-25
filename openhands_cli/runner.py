@@ -16,6 +16,8 @@ from openhands_cli.setup import setup_conversation
 from openhands_cli.user_actions import ask_user_confirmation
 from openhands_cli.user_actions.types import UserConfirmation
 
+import asyncio
+
 
 class ConversationRunner:
     """Handles the conversation state machine logic cleanly."""
@@ -188,3 +190,42 @@ class ConversationRunner:
         # Accept action without changing existing policies
         assert decision == UserConfirmation.ACCEPT
         return decision
+
+    # openhands_cli/runner.py
+    def set_input_manager(self, input_manager):
+        self.input_manager = input_manager
+        
+    async def _step_agent_safe(self):
+        if hasattr(self.conversation, 'step_async'):
+            await self.conversation.step_async()
+        else:
+            # Roda código bloqueante em outra thread
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, self.conversation.step)
+            
+        
+    async def run_concurrent_loop(self):
+        input_task = asyncio.create_task(self.input_manager.read_input())
+        
+        while self.conversation.state.execution_status == "RUNNING":
+            agent_task = asyncio.create_task(self._step_agent_safe())
+            
+            done, _ = await asyncio.wait(
+                [input_task, agent_task], 
+                return_when=asyncio.FIRST_COMPLETED
+            )
+
+            if input_task in done:
+                cmd = input_task.result()
+                
+                if cmd == "/exit":
+                    break
+                
+                
+                self.conversation.send_message(cmd)
+                
+                input_task = asyncio.create_task(self.input_manager.read_input())
+            
+            
+            if agent_task in done:
+                pass
