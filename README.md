@@ -1,6 +1,6 @@
 # OpenHands V1 CLI
 
-A **lightweight, modern CLI** to interact with the OpenHands agent (powered by [OpenHands software-agent-sdk](https://github.com/OpenHands/software-agent-sdk)).
+A **lightweight, modern CLI** to interact with the OpenHands agent (powered by [OpenHands Software Agent SDK](https://github.com/OpenHands/software-agent-sdk)).
 
 ---
 
