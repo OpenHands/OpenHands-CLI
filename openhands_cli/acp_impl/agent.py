@@ -350,7 +350,13 @@ class OpenHandsACPAgent(ACPAgent):
             except asyncio.CancelledError:
                 pass
         except Exception as e:
-            logger.warning(f"Error while waiting for conversation to stop: {e}")
+            logger.error(f"Error while waiting for conversation to stop: {e}")
+            raise RequestError.internal_error(
+                {
+                    "reason": "Error during conversation cancellation",
+                    "details": str(e),
+                }
+            )
 
     async def cancel(self, params: CancelNotification) -> None:
         """Cancel the current operation."""
