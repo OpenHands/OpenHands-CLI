@@ -6,22 +6,22 @@ Provides a conversation interface with an AI agent using OpenHands patterns.
 
 import os
 import sys
-from datetime import datetime
 import uuid
+from datetime import datetime
+
+from prompt_toolkit import print_formatted_text
+from prompt_toolkit.formatted_text import HTML
 
 from openhands.sdk import (
     Message,
     TextContent,
 )
 from openhands.sdk.conversation.state import ConversationExecutionStatus
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import HTML
-
 from openhands_cli.runner import ConversationRunner
 from openhands_cli.setup import (
     MissingAgentSpec,
     setup_conversation,
-    verify_agent_exists_or_setup_agent
+    verify_agent_exists_or_setup_agent,
 )
 from openhands_cli.tui.settings.mcp_screen import MCPScreen
 from openhands_cli.tui.settings.settings_screen import SettingsScreen
@@ -37,50 +37,50 @@ from openhands_cli.user_actions.utils import get_session_prompter
 def _should_skip_terminal_check() -> tuple[bool, str | None]:
     """Determine if the terminal compatibility check should be bypassed."""
 
-    skip_env = os.environ.get('OPENHANDS_CLI_SKIP_TTY_CHECK')
-    if skip_env and skip_env.lower() not in ('0', 'false', 'no'):
-        return True, 'OPENHANDS_CLI_SKIP_TTY_CHECK'
+    skip_env = os.environ.get("OPENHANDS_CLI_SKIP_TTY_CHECK")
+    if skip_env and skip_env.lower() not in ("0", "false", "no"):
+        return True, "OPENHANDS_CLI_SKIP_TTY_CHECK"
 
-    if os.environ.get('CI', '').lower() in ('1', 'true', 'yes'):
-        return True, 'CI'
+    if os.environ.get("CI", "").lower() in ("1", "true", "yes"):
+        return True, "CI"
 
     return False, None
 
 
 def check_terminal_compatibility() -> bool:
     """Check if the terminal supports interactive prompts.
-    
+
     Returns:
         bool: True if terminal is compatible, False otherwise.
     """
     skip_check, reason = _should_skip_terminal_check()
     if skip_check:
         message = (
-            '<grey>Skipping terminal compatibility check '
-            f'(detected {reason} environment variable).</grey>'
+            "<grey>Skipping terminal compatibility check "
+            f"(detected {reason} environment variable).</grey>"
         )
         try:
             print_formatted_text(HTML(message))
         except Exception:
             print(message)
         return True
-    
+
     # Check if stdin/stdout are TTY
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         return False
-    
+
     # Check TERM environment variable
-    term = os.environ.get('TERM', '')
-    if term in ('dumb', '', 'unknown'):
+    term = os.environ.get("TERM", "")
+    if term in ("dumb", "", "unknown"):
         return False
-    
+
     # Try to create prompt_toolkit I/O
     try:
         from prompt_toolkit.input import create_input
         from prompt_toolkit.output import create_output
-        
-        input_obj = create_input()
-        output_obj = create_output()
+
+        create_input()
+        create_output()
         return True
     except Exception:
         return False
@@ -93,7 +93,7 @@ def _restore_tty() -> None:
     - Turn off bracketed paste: ESC[?2004l
     """
     try:
-        sys.stdout.write('\x1b[?1l\x1b[?2004l')
+        sys.stdout.write("\x1b[?1l\x1b[?2004l")
         sys.stdout.flush()
     except Exception:
         pass
@@ -102,12 +102,12 @@ def _restore_tty() -> None:
 def _print_exit_hint(conversation_id: str) -> None:
     """Print a resume hint with the current conversation ID."""
     print_formatted_text(
-        HTML(f'<grey>Conversation ID:</grey> <yellow>{conversation_id}</yellow>')
+        HTML(f"<grey>Conversation ID:</grey> <yellow>{conversation_id}</yellow>")
     )
     print_formatted_text(
         HTML(
-            f'<grey>Hint:</grey> run <gold>openhands --resume {conversation_id}</gold> '
-            'to resume this conversation.'
+            f"<grey>Hint:</grey> run <gold>openhands --resume {conversation_id}</gold> "
+            "to resume this conversation."
         )
     )
 
@@ -123,24 +123,30 @@ def run_cli_entry(
         KeyboardInterrupt: If user interrupts the session
         EOFError: If EOF is encountered
     """
-    
+
     # Check terminal compatibility early
     if not check_terminal_compatibility():
-        print_formatted_text(HTML('<red>❌ Interactive terminal not detected</red>'))
-        print_formatted_text(HTML('<yellow>OpenHands CLI requires an interactive terminal.</yellow>'))
-        print_formatted_text('')
-        print_formatted_text(HTML('<b>Requirements:</b>'))
-        print_formatted_text('• Run in an interactive shell (not piped)')
-        print_formatted_text('• Ensure TERM is set (e.g., TERM=xterm-256color)')
-        print_formatted_text('• Use TTY allocation with Docker: docker run -it ...')
-        print_formatted_text('• Use PTY allocation with SSH: ssh -t user@host ...')
-        print_formatted_text('')
-        print_formatted_text(HTML('<b>Current environment:</b>'))
-        print_formatted_text(f'• TERM: {os.environ.get("TERM", "not set")}')
-        print_formatted_text(f'• stdin is TTY: {sys.stdin.isatty()}')
-        print_formatted_text(f'• stdout is TTY: {sys.stdout.isatty()}')
-        print_formatted_text('')
-        print_formatted_text(HTML('<grey>For troubleshooting, see: https://docs.openhands.dev/cli-troubleshooting</grey>'))
+        print_formatted_text(HTML("<red>❌ Interactive terminal not detected</red>"))
+        print_formatted_text(
+            HTML("<yellow>OpenHands CLI requires an interactive terminal.</yellow>")
+        )
+        print_formatted_text("")
+        print_formatted_text(HTML("<b>Requirements:</b>"))
+        print_formatted_text("• Run in an interactive shell (not piped)")
+        print_formatted_text("• Ensure TERM is set (e.g., TERM=xterm-256color)")
+        print_formatted_text("• Use TTY allocation with Docker: docker run -it ...")
+        print_formatted_text("• Use PTY allocation with SSH: ssh -t user@host ...")
+        print_formatted_text("")
+        print_formatted_text(HTML("<b>Current environment:</b>"))
+        print_formatted_text(f"• TERM: {os.environ.get('TERM', 'not set')}")
+        print_formatted_text(f"• stdin is TTY: {sys.stdin.isatty()}")
+        print_formatted_text(f"• stdout is TTY: {sys.stdout.isatty()}")
+        print_formatted_text("")
+        print_formatted_text(
+            HTML(
+                "<grey>For troubleshooting, see: https://docs.openhands.dev/cli-troubleshooting</grey>"
+            )
+        )
         return
 
     # Normalize queued_inputs to a local copy to prevent mutating the caller's list
@@ -153,7 +159,8 @@ def run_cli_entry(
         except ValueError:
             print_formatted_text(
                 HTML(
-                    f'<yellow>Warning: \'{resume_conversation_id}\' is not a valid UUID.</yellow>'
+                    f"<yellow>Warning: '{resume_conversation_id}' is not a valid "
+                    f"UUID.</yellow>"
                 )
             )
             return
@@ -161,8 +168,10 @@ def run_cli_entry(
     try:
         initialized_agent = verify_agent_exists_or_setup_agent()
     except MissingAgentSpec:
-        print_formatted_text(HTML('\n<yellow>Setup is required to use OpenHands CLI.</yellow>'))
-        print_formatted_text(HTML('\n<yellow>Goodbye! 👋</yellow>'))
+        print_formatted_text(
+            HTML("\n<yellow>Setup is required to use OpenHands CLI.</yellow>")
+        )
+        print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
         return
 
     display_welcome(conversation_id, bool(resume_conversation_id))
@@ -183,7 +192,7 @@ def run_cli_entry(
                 user_input = pending_inputs.pop(0)
             else:
                 user_input = session.prompt(
-                    HTML('<gold>> </gold>'),
+                    HTML("<gold>> </gold>"),
                     multiline=False,
                 )
 
@@ -194,32 +203,34 @@ def run_cli_entry(
             command = user_input.strip().lower()
 
             message = Message(
-                role='user',
+                role="user",
                 content=[TextContent(text=user_input)],
             )
 
-            if command == '/exit':
+            if command == "/exit":
                 exit_confirmation = exit_session_confirmation()
                 if exit_confirmation == UserConfirmation.ACCEPT:
-                    print_formatted_text(HTML('\n<yellow>Goodbye! 👋</yellow>'))
+                    print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
                     _print_exit_hint(str(conversation_id))
                     break
 
-            elif command == '/settings':
-                settings_screen = SettingsScreen(runner.conversation if runner else None)
+            elif command == "/settings":
+                settings_screen = SettingsScreen(
+                    runner.conversation if runner else None
+                )
                 settings_screen.display_settings()
                 continue
 
-            elif command == '/mcp':
+            elif command == "/mcp":
                 mcp_screen = MCPScreen()
                 mcp_screen.display_mcp_info(initialized_agent)
                 continue
 
-            elif command == '/clear':
+            elif command == "/clear":
                 display_welcome(conversation_id)
                 continue
 
-            elif command == '/new':
+            elif command == "/new":
                 try:
                     # Start a fresh conversation (no resume ID = new conversation)
                     conversation_id = uuid.uuid4()
@@ -227,56 +238,57 @@ def run_cli_entry(
                     conversation = None
                     display_welcome(conversation_id, resume=False)
                     print_formatted_text(
-                        HTML('<green>✓ Started fresh conversation</green>')
+                        HTML("<green>✓ Started fresh conversation</green>")
                     )
                     continue
                 except Exception as e:
                     print_formatted_text(
-                        HTML(f'<red>Error starting fresh conversation: {e}</red>')
+                        HTML(f"<red>Error starting fresh conversation: {e}</red>")
                     )
                     continue
 
-            elif command == '/help':
+            elif command == "/help":
                 display_help()
                 continue
 
-            elif command == '/status':
+            elif command == "/status":
                 if conversation is not None:
                     display_status(conversation, session_start_time=session_start_time)
                 else:
                     print_formatted_text(
-                        HTML('<yellow>No active conversation</yellow>')
+                        HTML("<yellow>No active conversation</yellow>")
                     )
                 continue
 
-            elif command == '/confirm':
+            elif command == "/confirm":
                 if runner is not None:
                     runner.toggle_confirmation_mode()
                     new_status = (
-                        'enabled' if runner.is_confirmation_mode_active else 'disabled'
+                        "enabled" if runner.is_confirmation_mode_active else "disabled"
                     )
                 else:
-                    new_status = 'disabled (no active conversation)'
+                    new_status = "disabled (no active conversation)"
                 print_formatted_text(
-                    HTML(f'<yellow>Confirmation mode {new_status}</yellow>')
+                    HTML(f"<yellow>Confirmation mode {new_status}</yellow>")
                 )
                 continue
 
-            elif command == '/resume':
+            elif command == "/resume":
                 if not runner:
                     print_formatted_text(
-                        HTML('<yellow>No active conversation running...</yellow>')
+                        HTML("<yellow>No active conversation running...</yellow>")
                     )
                     continue
 
                 conversation = runner.conversation
                 if not (
-                    conversation.state.execution_status == ConversationExecutionStatus.PAUSED
+                    conversation.state.execution_status
+                    == ConversationExecutionStatus.PAUSED
                     or conversation.state.execution_status
                     == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
                 ):
                     print_formatted_text(
-                        HTML('<red>No paused conversation to resume...</red>')
+                        HTML("<red>No paused conversation to resume...</red>")
                     )
                     continue
 
@@ -293,7 +305,7 @@ def run_cli_entry(
         except KeyboardInterrupt:
             exit_confirmation = exit_session_confirmation()
             if exit_confirmation == UserConfirmation.ACCEPT:
-                print_formatted_text(HTML('\n<yellow>Goodbye! 👋</yellow>'))
+                print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
                 _print_exit_hint(str(conversation_id))
                 break
 

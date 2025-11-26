@@ -11,9 +11,10 @@ from openhands_cli.setup import MissingAgentSpec, verify_agent_exists_or_setup_a
 from openhands_cli.user_actions import UserConfirmation
 
 
-pytestmark = pytest.mark.usefixtures('skip_terminal_check_env')
+pytestmark = pytest.mark.usefixtures("skip_terminal_check_env")
 
-@patch('openhands_cli.setup.load_agent_specs')
+
+@patch("openhands_cli.setup.load_agent_specs")
 def test_verify_agent_exists_or_setup_agent_success(mock_load_agent_specs):
     """Test that verify_agent_exists_or_setup_agent returns agent successfully."""
     # Mock the agent object

@@ -1,11 +1,10 @@
 import os
 
-from openhands.sdk import LLM, BaseConversation, LLMSummarizingCondenser, LocalFileStore
 from prompt_toolkit import HTML, print_formatted_text
 from prompt_toolkit.shortcuts import print_container
 from prompt_toolkit.widgets import Frame, TextArea
 
-from openhands_cli.utils import get_default_cli_agent, get_llm_metadata
+from openhands.sdk import LLM, BaseConversation, LLMSummarizingCondenser, LocalFileStore
 from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
 from openhands_cli.pt_style import COLOR_GREY
 from openhands_cli.tui.settings.store import AgentStore
@@ -21,13 +20,14 @@ from openhands_cli.user_actions.settings_action import (
     save_settings_confirmation,
     settings_type_confirmation,
 )
+from openhands_cli.utils import get_default_cli_agent, get_llm_metadata
 
 
 def _strip_step_prefix(value: str) -> str:
     """Remove leading step annotations such as '(Step 2/3)'."""
     cleaned = value.strip()
-    if cleaned.lower().startswith('(step'):
-        parts = cleaned.split(')', 1)
+    if cleaned.lower().startswith("(step"):
+        parts = cleaned.split(")", 1)
         if len(parts) == 2:
             cleaned = parts[1].strip()
     return cleaned
@@ -44,7 +44,7 @@ def _select_identifier_token(value: str) -> str:
         return value
 
     for token in reversed(tokens):
-        if any(symbol in token for symbol in ('-', '_', '.', '/', ':')):
+        if any(symbol in token for symbol in ("-", "_", ".", "/", ":")):
             return token
     return tokens[-1]
 
@@ -60,13 +60,13 @@ def _sanitize_model_identifier(raw_value: str) -> str:
         return raw_value
 
     cleaned = _strip_step_prefix(raw_value)
-    cleaned = ' '.join(cleaned.split())
+    cleaned = " ".join(cleaned.split())
 
-    if '/' in cleaned:
-        provider, remainder = cleaned.split('/', 1)
+    if "/" in cleaned:
+        provider, remainder = cleaned.split("/", 1)
         provider = _select_identifier_token(_strip_step_prefix(provider))
         remainder = _select_identifier_token(_strip_step_prefix(remainder))
-        return f'{provider}/{remainder}'
+        return f"{provider}/{remainder}"
 
     return _select_identifier_token(cleaned)
 
@@ -89,44 +89,47 @@ class SettingsScreen:
         labels_and_values = []
         if not advanced_llm_settings:
             # Attempt to determine provider, fallback if not directly available
-            provider = llm.model.split('/')[0] if '/' in llm.model else 'Unknown'
+            provider = llm.model.split("/")[0] if "/" in llm.model else "Unknown"
 
             labels_and_values.extend(
                 [
-                    ('   LLM Provider', str(provider)),
-                    ('   LLM Model', str(llm.model)),
+                    ("   LLM Provider", str(provider)),
+                    ("   LLM Model", str(llm.model)),
                 ]
             )
         else:
             labels_and_values.extend(
                 [
-                    ('   Custom Model', llm.model),
-                    ('   Base URL', llm.base_url),
+                    ("   Custom Model", llm.model),
+                    ("   Base URL", llm.base_url),
                 ]
             )
         labels_and_values.extend(
             [
-                ('   API Key', '********' if llm.api_key else 'Not Set'),
+                ("   API Key", "********" if llm.api_key else "Not Set"),
             ]
         )
 
         if self.conversation:
-                labels_and_values.extend([
-                (
-                    '   Confirmation Mode',
-                    'Enabled'
-                    if self.conversation.is_confirmation_mode_active
-                    else 'Disabled',
-                )
-                ])
+            labels_and_values.extend(
+                [
+                    (
+                        "   Confirmation Mode",
+                        "Enabled"
+                        if self.conversation.is_confirmation_mode_active
+                        else "Disabled",
+                    )
+                ]
+            )
 
-        labels_and_values.extend([
+        labels_and_values.extend(
+            [
                 (
-                    '   Memory Condensation',
-                    'Enabled' if agent_spec.condenser else 'Disabled',
+                    "   Memory Condensation",
+                    "Enabled" if agent_spec.condenser else "Disabled",
                 ),
                 (
-                    '   Configuration File',
+                    "   Configuration File",
                     os.path.join(PERSISTENCE_DIR, AGENT_SETTINGS_PATH),
                 ),
             ]
@@ -145,10 +148,10 @@ class SettingsScreen:
 
         # Construct the summary text with aligned columns
         settings_lines = [
-            f'{label + ":":<{max_label_width + 1}} {value:<}'  # Changed value alignment to left (<)
+            f"{label + ':':<{max_label_width + 1}} {value:<}"  # Changed value alignment to left (<)
             for label, value in str_labels_and_values
         ]
-        settings_text = '\n'.join(settings_lines)
+        settings_text = "\n".join(settings_lines)
 
         container = Frame(
             TextArea(
@@ -157,8 +160,8 @@ class SettingsScreen:
                 style=COLOR_GREY,
                 wrap_lines=True,
             ),
-            title='Settings',
-            style=f'fg:{COLOR_GREY}',
+            title="Settings",
+            style=f"fg:{COLOR_GREY}",
         )
 
         print_container(container)
@@ -191,11 +194,11 @@ class SettingsScreen:
             )
             save_settings_confirmation()
         except KeyboardInterrupt:
-            print_formatted_text(HTML('\n<red>Cancelled settings change.</red>'))
+            print_formatted_text(HTML("\n<red>Cancelled settings change.</red>"))
             return
 
         # Store the collected settings for persistence
-        self._save_llm_settings(f'{provider}/{llm_model}', api_key)
+        self._save_llm_settings(f"{provider}/{llm_model}", api_key)
 
     def handle_advanced_settings(self, escapable=True):
         """Handle advanced settings configuration with clean step-by-step flow."""
@@ -205,8 +208,10 @@ class SettingsScreen:
             base_url = prompt_base_url(step_counter)
             api_key = prompt_api_key(
                 step_counter,
-                custom_model.split('/')[0] if len(custom_model.split('/')) > 1 else '',
-                self.conversation.state.agent.llm.api_key if self.conversation else None,
+                custom_model.split("/")[0] if len(custom_model.split("/")) > 1 else "",
+                self.conversation.state.agent.llm.api_key
+                if self.conversation
+                else None,
                 escapable=escapable,
             )
             memory_condensation = choose_memory_condensation(step_counter)
@@ -214,7 +219,7 @@ class SettingsScreen:
             # Confirm save
             save_settings_confirmation()
         except KeyboardInterrupt:
-            print_formatted_text(HTML('\n<red>Cancelled settings change.</red>'))
+            print_formatted_text(HTML("\n<red>Cancelled settings change.</red>"))
             return
 
         # Store the collected settings for persistence
@@ -229,10 +234,10 @@ class SettingsScreen:
             model=normalized_model,
             api_key=api_key,
             base_url=base_url,
-            usage_id='agent',
+            usage_id="agent",
             litellm_extra_body={
                 "metadata": get_llm_metadata(
-                    model_name=normalized_model, llm_type='agent'
+                    model_name=normalized_model, llm_type="agent"
                 )
             },
         )
@@ -242,13 +247,11 @@ class SettingsScreen:
             agent = get_default_cli_agent(llm=llm)
 
         # Must update all LLMs
-        agent = agent.model_copy(update={'llm': llm})
+        agent = agent.model_copy(update={"llm": llm})
         condenser = LLMSummarizingCondenser(
-            llm=llm.model_copy(
-                update={"usage_id": "condenser"}
-            )
+            llm=llm.model_copy(update={"usage_id": "condenser"})
         )
-        agent = agent.model_copy(update={'condenser': condenser})
+        agent = agent.model_copy(update={"condenser": condenser})
         self.agent_store.save(agent)
 
     def _save_advanced_settings(
@@ -261,6 +264,6 @@ class SettingsScreen:
             return
 
         if not memory_condensation:
-            agent_spec.model_copy(update={'condenser': None})
+            agent_spec.model_copy(update={"condenser": None})
 
         self.agent_store.save(agent_spec)
