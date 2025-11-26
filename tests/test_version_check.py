@@ -3,8 +3,6 @@
 import json
 import unittest.mock as mock
 
-import pytest
-
 from openhands_cli import __version__
 from openhands_cli.version_check import VersionInfo, check_for_updates, parse_version
 
@@ -46,7 +44,9 @@ class TestCheckForUpdates:
 
     def test_network_error_handling(self):
         """Test graceful handling of network errors."""
-        with mock.patch("urllib.request.urlopen", side_effect=Exception("Network error")):
+        with mock.patch(
+            "urllib.request.urlopen", side_effect=Exception("Network error")
+        ):
             result = check_for_updates()
             assert result.current_version == __version__
             assert result.latest_version is None
@@ -113,7 +113,9 @@ class TestCheckForUpdates:
         mock_response.__enter__ = mock.MagicMock(return_value=mock_response)
         mock_response.__exit__ = mock.MagicMock(return_value=False)
 
-        with mock.patch("urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
+        with mock.patch(
+            "urllib.request.urlopen", return_value=mock_response
+        ) as mock_urlopen:
             check_for_updates(timeout=5.0)
             # Verify that urlopen was called with the timeout parameter
             args, kwargs = mock_urlopen.call_args

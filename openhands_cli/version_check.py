@@ -38,7 +38,7 @@ def check_for_updates(timeout: float = 2.0) -> VersionInfo:
         VersionInfo with update information
     """
     current = __version__
-    
+
     # Handle dev versions or special cases
     if current == "0.0.0" or "dev" in current:
         return VersionInfo(
@@ -53,11 +53,11 @@ def check_for_updates(timeout: float = 2.0) -> VersionInfo:
         url = "https://pypi.org/pypi/openhands/json"
         req = urllib.request.Request(url)
         req.add_header("User-Agent", f"openhands-cli/{current}")
-        
+
         with urllib.request.urlopen(req, timeout=timeout) as response:
             data = json.loads(response.read().decode("utf-8"))
             latest = data["info"]["version"]
-            
+
         # Compare versions
         try:
             current_tuple = parse_version(current)
@@ -66,7 +66,7 @@ def check_for_updates(timeout: float = 2.0) -> VersionInfo:
         except (ValueError, AttributeError):
             # If we can't parse versions, assume no update needed
             needs_update = False
-            
+
         return VersionInfo(
             current_version=current,
             latest_version=latest,
