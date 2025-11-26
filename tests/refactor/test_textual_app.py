@@ -270,7 +270,8 @@ class TestOpenHandsApp:
         # Check custom variables
         assert "input-placeholder-foreground" in OPENHANDS_THEME.variables
         assert OPENHANDS_THEME.variables["input-placeholder-foreground"] == "#727987"
-        assert OPENHANDS_THEME.variables["input-cursor-foreground"] == "#ffe165"
+        assert OPENHANDS_THEME.variables["input-cursor-background"] == "#ffe165"
+        assert OPENHANDS_THEME.variables["input-cursor-foreground"] == "#222222"
         assert OPENHANDS_THEME.variables["input-selection-background"] == "#ffe165 20%"
 
     def test_theme_registration_and_activation(self):

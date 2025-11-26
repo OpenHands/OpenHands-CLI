@@ -1,6 +1,5 @@
 """Tests for the OpenHands theme module."""
 
-import pytest
 from textual.theme import Theme
 
 from openhands_cli.refactor.theme import OPENHANDS_THEME, create_openhands_theme
@@ -12,7 +11,7 @@ class TestOpenHandsTheme:
     def test_create_openhands_theme(self):
         """Test that create_openhands_theme returns a valid Theme object."""
         theme = create_openhands_theme()
-        
+
         assert isinstance(theme, Theme)
         assert theme.name == "openhands"
         assert theme.dark is True
@@ -20,32 +19,35 @@ class TestOpenHandsTheme:
     def test_theme_colors(self):
         """Test that theme has correct color values."""
         theme = create_openhands_theme()
-        
+
         # Test main colors
-        assert theme.primary == "#ffe165"      # Logo, cursor color
-        assert theme.secondary == "#ffffff"    # Borders, plain text
-        assert theme.accent == "#277dff"       # Special text
-        assert theme.foreground == "#ffffff"   # Default text color
-        assert theme.background == "#222222"   # Background color
-        assert theme.surface == "#222222"      # Surface color
-        assert theme.panel == "#222222"        # Panel color
-        
+        assert theme.primary == "#ffe165"  # Logo, cursor color
+        assert theme.secondary == "#ffffff"  # Borders, plain text
+        assert theme.accent == "#277dff"  # Special text
+        assert theme.foreground == "#ffffff"  # Default text color
+        assert theme.background == "#222222"  # Background color
+        assert theme.surface == "#222222"  # Surface color
+        assert theme.panel == "#222222"  # Panel color
+
         # Test status colors
-        assert theme.success == "#ffe165"      # Success messages
-        assert theme.warning == "#ffe165"      # Warning messages
-        assert theme.error == "#ffe165"        # Error messages
+        assert theme.success == "#ffe165"  # Success messages
+        assert theme.warning == "#ffe165"  # Warning messages
+        assert theme.error == "#ffe165"  # Error messages
 
     def test_theme_variables(self):
         """Test that theme has correct custom variables."""
         theme = create_openhands_theme()
-        
+
         # Test custom variables
         assert "input-placeholder-foreground" in theme.variables
         assert theme.variables["input-placeholder-foreground"] == "#727987"
-        
+
+        assert "input-cursor-background" in theme.variables
+        assert theme.variables["input-cursor-background"] == "#ffe165"
+
         assert "input-cursor-foreground" in theme.variables
-        assert theme.variables["input-cursor-foreground"] == "#ffe165"
-        
+        assert theme.variables["input-cursor-foreground"] == "#222222"
+
         assert "input-selection-background" in theme.variables
         assert theme.variables["input-selection-background"] == "#ffe165 20%"
 
@@ -53,7 +55,7 @@ class TestOpenHandsTheme:
         """Test that OPENHANDS_THEME constant is properly initialized."""
         assert isinstance(OPENHANDS_THEME, Theme)
         assert OPENHANDS_THEME.name == "openhands"
-        
+
         # Should be the same as calling create_openhands_theme()
         created_theme = create_openhands_theme()
         assert OPENHANDS_THEME.name == created_theme.name
@@ -65,12 +67,12 @@ class TestOpenHandsTheme:
     def test_theme_is_dark(self):
         """Test that theme is configured as a dark theme."""
         assert OPENHANDS_THEME.dark is True
-        
+
     def test_theme_consistency(self):
-        """Test that multiple calls to create_openhands_theme return consistent themes."""
+        """Test that multiple calls to create_openhands_theme are consistent."""
         theme1 = create_openhands_theme()
         theme2 = create_openhands_theme()
-        
+
         # Should have same properties
         assert theme1.name == theme2.name
         assert theme1.primary == theme2.primary

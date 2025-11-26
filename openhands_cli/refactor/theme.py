@@ -7,25 +7,26 @@ def create_openhands_theme() -> Theme:
     """Create and return the custom OpenHands theme."""
     return Theme(
         name="openhands",
-        primary="#ffe165",      # Logo, cursor color
-        secondary="#ffffff",    # Borders, plain text
-        accent="#277dff",       # Special text like "initialize conversation"
-        foreground="#ffffff",   # Default text color
-        background="#222222",   # Background color
-        surface="#222222",      # Surface color (same as background)
-        panel="#222222",        # Panel color (same as background)
-        success="#ffe165",      # Success messages (use logo color)
-        warning="#ffe165",      # Warning messages (use logo color)
-        error="#ffe165",        # Error messages (use logo color)
-        dark=True,              # This is a dark theme
+        primary="#ffe165",  # Logo, cursor color
+        secondary="#ffffff",  # Borders, plain text
+        accent="#277dff",  # Special text like "initialize conversation"
+        foreground="#ffffff",  # Default text color
+        background="#222222",  # Background color
+        surface="#222222",  # Surface color (same as background)
+        panel="#222222",  # Panel color (same as background)
+        success="#ffe165",  # Success messages (use logo color)
+        warning="#ffe165",  # Warning messages (use logo color)
+        error="#ffe165",  # Error messages (use logo color)
+        dark=True,  # This is a dark theme
         variables={
             # Placeholder text color
             "input-placeholder-foreground": "#727987",
-            # Cursor color
-            "input-cursor-foreground": "#ffe165",
+            # Cursor colors - the cursor itself should be primary color
+            "input-cursor-background": "#ffe165",
+            "input-cursor-foreground": "#222222",  # Text color on cursor
             # Selection colors
             "input-selection-background": "#ffe165 20%",
-        }
+        },
     )
 
 
