@@ -10,9 +10,17 @@ It creates a basic app with:
 from textual.app import App, ComposeResult
 from textual.containers import Container
 from textual.widgets import Input, RichLog
+from textual_autocomplete import AutoComplete, DropdownItem
 
 from openhands_cli.refactor.splash import get_welcome_message
 from openhands_cli.refactor.theme import OPENHANDS_THEME
+
+
+# Available commands with descriptions (starting with basic set)
+COMMANDS = [
+    DropdownItem(main="/help", prefix="🤖"),
+    DropdownItem(main="/exit", prefix="🚪"),
+]
 
 
 class OpenHandsApp(App):
@@ -87,6 +95,9 @@ class OpenHandsApp(App):
             )
             yield text_input
 
+            # Add autocomplete for the input
+            yield AutoComplete(text_input, candidates=COMMANDS)
+
     def on_mount(self) -> None:
         """Called when app starts."""
         # Add the splash screen content to the main display
@@ -99,14 +110,58 @@ class OpenHandsApp(App):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle when user submits input."""
-        user_message = event.value
-        if user_message.strip():
+        user_message = event.value.strip()
+        if user_message:
             # Add the user message to the main display
             main_display = self.query_one("#main_display", RichLog)
             main_display.write(f"\n> {user_message}")
 
+            # Handle commands
+            if user_message.startswith("/"):
+                self._handle_command(user_message)
+            else:
+                # Handle regular messages (placeholder for now)
+                main_display.write("Regular message handling not implemented yet.")
+
             # Clear the input
             event.input.value = ""
+
+    def _handle_command(self, command: str) -> None:
+        """Handle command execution."""
+        main_display = self.query_one("#main_display", RichLog)
+
+        if command == "/help":
+            self._show_help()
+        elif command == "/exit":
+            self._handle_exit()
+        else:
+            main_display.write(f"Unknown command: {command}")
+
+    def _show_help(self) -> None:
+        """Display help information."""
+        main_display = self.query_one("#main_display", RichLog)
+
+        help_text = """
+[bold yellow]🤖 OpenHands CLI Help[/bold yellow]
+[dim]Available commands:[/dim]
+
+  [white]/help[/white] - Display available commands
+  [white]/exit[/white] - Exit the application
+
+[dim]Tips:[/dim]
+  • Type / and press Tab to see command suggestions
+  • Use arrow keys to navigate through suggestions
+  • Press Enter to select a command
+"""
+        main_display.write(help_text)
+
+    def _handle_exit(self) -> None:
+        """Handle exit command with confirmation."""
+        # For now, just show a message and exit
+        # TODO: Add proper confirmation dialog
+        main_display = self.query_one("#main_display", RichLog)
+        main_display.write("\n[yellow]Goodbye! 👋[/yellow]")
+        self.exit()
 
 
 def main():

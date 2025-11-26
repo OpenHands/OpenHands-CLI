@@ -4,8 +4,9 @@ import unittest.mock as mock
 
 import pytest
 from textual.widgets import Input, RichLog
+from textual_autocomplete import AutoComplete
 
-from openhands_cli.refactor.textual_app import OpenHandsApp
+from openhands_cli.refactor.textual_app import COMMANDS, OpenHandsApp
 
 
 class TestOpenHandsApp:
@@ -155,9 +156,17 @@ class TestOpenHandsApp:
         # Call the method
         app.on_input_submitted(mock_event)
 
-        # RichLog.write should be called with formatted message
+        # RichLog.write should be called twice: user message + placeholder
+        assert mock_richlog.write.call_count == 2
+
+        # First call should be the user message
         expected_message = f"\n> {user_input}"
-        mock_richlog.write.assert_called_once_with(expected_message)
+        first_call = mock_richlog.write.call_args_list[0][0][0]
+        assert first_call == expected_message
+
+        # Second call should be the placeholder message
+        second_call = mock_richlog.write.call_args_list[1][0][0]
+        assert "not implemented yet" in second_call
 
         # Input value should be cleared
         assert mock_event.input.value == ""
@@ -178,10 +187,10 @@ class TestOpenHandsApp:
         # Call the method
         app.on_input_submitted(mock_event)
 
-        # Check the exact format of the message
-        call_args = mock_richlog.write.call_args[0][0]
-        assert call_args == "\n> test message"
-        assert call_args.startswith("\n> ")
+        # Check the exact format of the first message (user input)
+        first_call = mock_richlog.write.call_args_list[0][0][0]
+        assert first_call == "\n> test message"
+        assert first_call.startswith("\n> ")
 
     @mock.patch("openhands_cli.refactor.textual_app.get_welcome_message")
     async def test_input_functionality_integration(self, mock_welcome):
@@ -287,3 +296,152 @@ class TestOpenHandsApp:
         assert "Input .input--cursor" in app.CSS
         assert "background: $primary" in app.CSS
         assert "color: $background" in app.CSS
+
+
+class TestCommandsAndAutocomplete:
+    """Tests for command handling and autocomplete functionality."""
+
+    def test_commands_list_exists(self):
+        """Test that COMMANDS list is defined with correct structure."""
+        assert isinstance(COMMANDS, list)
+        assert len(COMMANDS) == 2
+
+        # Check command names
+        command_names = [str(cmd.main) for cmd in COMMANDS]
+        assert "/help" in command_names
+        assert "/exit" in command_names
+
+    @mock.patch("openhands_cli.refactor.textual_app.get_welcome_message")
+    async def test_autocomplete_widget_exists(self, mock_welcome):
+        """Test that AutoComplete widget is created."""
+        mock_welcome.return_value = "test"
+
+        app = OpenHandsApp()
+        async with app.run_test() as pilot:
+            # Check that AutoComplete widget exists
+            autocomplete = pilot.app.query_one(AutoComplete)
+            assert isinstance(autocomplete, AutoComplete)
+
+    def test_handle_command_help(self):
+        """Test that /help command displays help information."""
+        app = OpenHandsApp()
+
+        # Mock the query_one method
+        mock_richlog = mock.MagicMock(spec=RichLog)
+        app.query_one = mock.MagicMock(return_value=mock_richlog)
+
+        # Call the command handler
+        app._handle_command("/help")
+
+        # Check that help text was written
+        mock_richlog.write.assert_called_once()
+        help_text = mock_richlog.write.call_args[0][0]
+        assert "OpenHands CLI Help" in help_text
+        assert "/help" in help_text
+        assert "/exit" in help_text
+
+    def test_handle_command_exit(self):
+        """Test that /exit command exits the app."""
+        app = OpenHandsApp()
+
+        # Mock the query_one method and exit method
+        mock_richlog = mock.MagicMock(spec=RichLog)
+        app.query_one = mock.MagicMock(return_value=mock_richlog)
+        app.exit = mock.MagicMock()
+
+        # Call the command handler
+        app._handle_command("/exit")
+
+        # Check that goodbye message was written and app exits
+        mock_richlog.write.assert_called_once()
+        goodbye_text = mock_richlog.write.call_args[0][0]
+        assert "Goodbye!" in goodbye_text
+        app.exit.assert_called_once()
+
+    def test_handle_command_unknown(self):
+        """Test that unknown commands show error message."""
+        app = OpenHandsApp()
+
+        # Mock the query_one method
+        mock_richlog = mock.MagicMock(spec=RichLog)
+        app.query_one = mock.MagicMock(return_value=mock_richlog)
+
+        # Call the command handler with unknown command
+        app._handle_command("/unknown")
+
+        # Check that error message was written
+        mock_richlog.write.assert_called_once_with("Unknown command: /unknown")
+
+    def test_on_input_submitted_handles_commands(self):
+        """Test that commands are routed to command handler."""
+        app = OpenHandsApp()
+
+        # Mock the query_one method and command handler
+        mock_richlog = mock.MagicMock(spec=RichLog)
+        app.query_one = mock.MagicMock(return_value=mock_richlog)
+        app._handle_command = mock.MagicMock()
+
+        # Create mock event with command input
+        mock_event = mock.MagicMock()
+        mock_event.value = "/help"
+        mock_event.input.value = "/help"
+
+        # Call the method
+        app.on_input_submitted(mock_event)
+
+        # Check that command handler was called
+        app._handle_command.assert_called_once_with("/help")
+
+        # Input should be cleared
+        assert mock_event.input.value == ""
+
+    def test_on_input_submitted_handles_regular_messages(self):
+        """Test that non-command messages are handled appropriately."""
+        app = OpenHandsApp()
+
+        # Mock the query_one method
+        mock_richlog = mock.MagicMock(spec=RichLog)
+        app.query_one = mock.MagicMock(return_value=mock_richlog)
+
+        # Create mock event with regular message
+        mock_event = mock.MagicMock()
+        mock_event.value = "hello world"
+        mock_event.input.value = "hello world"
+
+        # Call the method
+        app.on_input_submitted(mock_event)
+
+        # Check that both user message and placeholder response were written
+        assert mock_richlog.write.call_count == 2
+
+        # First call should be the user message
+        first_call = mock_richlog.write.call_args_list[0][0][0]
+        assert first_call == "\n> hello world"
+
+        # Second call should be the placeholder message
+        second_call = mock_richlog.write.call_args_list[1][0][0]
+        assert "not implemented yet" in second_call
+
+        # Input should be cleared
+        assert mock_event.input.value == ""
+
+    def test_show_help_content(self):
+        """Test that help content contains expected information."""
+        app = OpenHandsApp()
+
+        # Mock the query_one method
+        mock_richlog = mock.MagicMock(spec=RichLog)
+        app.query_one = mock.MagicMock(return_value=mock_richlog)
+
+        # Call the help method
+        app._show_help()
+
+        # Check help content
+        help_text = mock_richlog.write.call_args[0][0]
+        assert "OpenHands CLI Help" in help_text
+        assert "/help" in help_text
+        assert "/exit" in help_text
+        assert "Display available commands" in help_text
+        assert "Exit the application" in help_text
+        assert "Tips:" in help_text
+        assert "Type / and press Tab" in help_text

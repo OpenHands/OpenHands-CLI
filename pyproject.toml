@@ -25,6 +25,7 @@ dependencies = [
   "typer>=0.17.4",
   "agent-client-protocol>=0.6.3",
   "pydantic>=2.7",
+  "textual-autocomplete>=4.0.6",
 ]
 
 scripts = { openhands = "openhands_cli.simple_main:main", "openhands-acp" = "openhands_cli.acp:main" }
