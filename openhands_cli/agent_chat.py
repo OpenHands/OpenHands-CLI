@@ -22,6 +22,7 @@ from openhands_cli.setup import (
     setup_conversation,
     verify_agent_exists_or_setup_agent,
 )
+from openhands_cli.tui.conversation_list_screen import ConversationListScreen
 from openhands_cli.tui.settings.mcp_screen import MCPScreen
 from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.tui.status import display_status
@@ -194,6 +195,13 @@ def run_cli_entry(
                 print_formatted_text(
                     HTML(f"<yellow>Confirmation mode {new_status}</yellow>")
                 )
+                continue
+
+            elif command == "/conv":
+                conv_screen = ConversationListScreen()
+                conv_screen.display_conversations()
+                # Redisplay the welcome banner after returning from conversation list
+                display_welcome(conversation_id, bool(resume_conversation_id))
                 continue
 
             elif command == "/resume":

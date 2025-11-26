@@ -80,6 +80,7 @@ def test_commands_dict() -> None:
         "/resume",
         "/settings",
         "/mcp",
+        "/conv",
     }
     assert set(COMMANDS.keys()) == expected_commands
 
