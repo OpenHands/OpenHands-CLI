@@ -33,6 +33,10 @@ class AgentStore:
         except Exception:
             return {}
 
+    def load_project_skills(self) -> list:
+        """Load skills project-specific directories."""
+        all_skills = []
+
     def load(
         self,
         session_id: str | None = None,
