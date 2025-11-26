@@ -270,8 +270,6 @@ class TestOpenHandsApp:
         # Check custom variables
         assert "input-placeholder-foreground" in OPENHANDS_THEME.variables
         assert OPENHANDS_THEME.variables["input-placeholder-foreground"] == "#727987"
-        assert OPENHANDS_THEME.variables["input-cursor-background"] == "#ffe165"
-        assert OPENHANDS_THEME.variables["input-cursor-foreground"] == "#222222"
         assert OPENHANDS_THEME.variables["input-selection-background"] == "#ffe165 20%"
 
     def test_theme_registration_and_activation(self):
@@ -280,3 +278,12 @@ class TestOpenHandsApp:
 
         # Check that theme is set as active
         assert app.theme == "openhands"
+
+    def test_cursor_css_styling(self):
+        """Test that CSS includes cursor styling."""
+        app = OpenHandsApp()
+
+        # Check that CSS includes cursor styling
+        assert "Input .input--cursor" in app.CSS
+        assert "background: $primary" in app.CSS
+        assert "color: $background" in app.CSS

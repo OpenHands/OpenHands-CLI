@@ -62,6 +62,12 @@ class OpenHandsApp(App):
         border: solid $primary;
         background: $background;
     }
+
+    /* Style the cursor to use primary color */
+    Input .input--cursor {
+        background: $primary;
+        color: $background;
+    }
     """
 
     def compose(self) -> ComposeResult:

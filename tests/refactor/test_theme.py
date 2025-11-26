@@ -42,12 +42,6 @@ class TestOpenHandsTheme:
         assert "input-placeholder-foreground" in theme.variables
         assert theme.variables["input-placeholder-foreground"] == "#727987"
 
-        assert "input-cursor-background" in theme.variables
-        assert theme.variables["input-cursor-background"] == "#ffe165"
-
-        assert "input-cursor-foreground" in theme.variables
-        assert theme.variables["input-cursor-foreground"] == "#222222"
-
         assert "input-selection-background" in theme.variables
         assert theme.variables["input-selection-background"] == "#ffe165 20%"
 

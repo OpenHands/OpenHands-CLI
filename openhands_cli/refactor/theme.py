@@ -21,9 +21,6 @@ def create_openhands_theme() -> Theme:
         variables={
             # Placeholder text color
             "input-placeholder-foreground": "#727987",
-            # Cursor colors - the cursor itself should be primary color
-            "input-cursor-background": "#ffe165",
-            "input-cursor-foreground": "#222222",  # Text color on cursor
             # Selection colors
             "input-selection-background": "#ffe165 20%",
         },
