@@ -50,10 +50,15 @@ class TestGetWelcomeMessage:
 
             # Check basic structure
             assert isinstance(message, str)
-            assert "Welcome to OpenHands CLI!" in message
-            assert "Version: 1.0.0" in message
-            assert "Let's start building!" in message
-            assert "Press any key to continue..." in message
+            assert "OpenHands CLI v1.0.0" in message
+            assert "All set up!" in message
+            assert "What do you want to build?" in message
+            assert "1. Ask questions, edit files, or run commands." in message
+            assert "2. Use @ to look up a file in the folder structure" in message
+            assert (
+                "3. Type /help for help or / to immediately scroll through "
+                "available commands" in message
+            )
 
             # Should not contain conversation ID
             assert "Initialized conversation" not in message
@@ -76,8 +81,9 @@ class TestGetWelcomeMessage:
             # Check conversation ID is included
             assert f"Initialized conversation {conversation_id}" in message
 
-            # Should not contain generic welcome
-            assert "Welcome to OpenHands CLI!" not in message
+            # Should still contain the main structure
+            assert "OpenHands CLI v1.0.0" in message
+            assert "All set up!" in message
 
     def test_welcome_message_with_update_available(self):
         """Test welcome message when update is available."""
@@ -94,7 +100,7 @@ class TestGetWelcomeMessage:
             message = get_welcome_message(theme=OPENHANDS_THEME)
 
             # Check update notification is included
-            assert "Version: 1.0.0" in message
+            assert "OpenHands CLI v1.0.0" in message
             assert "⚠ Update available: 1.1.0" in message
             assert "Run 'uv tool upgrade openhands' to update" in message
 
@@ -113,7 +119,7 @@ class TestGetWelcomeMessage:
             message = get_welcome_message(theme=OPENHANDS_THEME)
 
             # Check no update notification
-            assert "Version: 1.0.0" in message
+            assert "OpenHands CLI v1.0.0" in message
             assert "⚠ Update available" not in message
             assert "Run 'uv tool upgrade openhands' to update" not in message
 
@@ -142,16 +148,15 @@ class TestGetWelcomeMessage:
             message = get_welcome_message(conversation_id, theme=OPENHANDS_THEME)
 
             # Basic structure should always be present
-            assert "Let's start building!" in message
-            assert "Press any key to continue..." in message
-            assert "Version: 1.0.0" in message
+            assert "What do you want to build?" in message
+            assert "1. Ask questions, edit files, or run commands." in message
+            assert "OpenHands CLI v1.0.0" in message
+            assert "All set up!" in message
 
             # Check conversation ID handling
             if conversation_id:
                 assert f"Initialized conversation {conversation_id}" in message
-                assert "Welcome to OpenHands CLI!" not in message
             else:
-                assert "Welcome to OpenHands CLI!" in message
                 assert "Initialized conversation" not in message
 
     def test_welcome_message_includes_banner(self):
@@ -193,8 +198,12 @@ class TestGetWelcomeMessage:
             # Should contain empty lines for spacing
             assert "" in lines
 
-            # Should end with the continue prompt
-            assert lines[-1] == "Press any key to continue..."
+            # Should end with the help instruction
+            expected_last_line = (
+                "3. Type /help for help or / to immediately scroll through "
+                "available commands"
+            )
+            assert lines[-1] == expected_last_line
 
     def test_welcome_message_with_colors(self):
         """Test that welcome message includes Rich markup for colors."""
@@ -221,9 +230,8 @@ class TestGetWelcomeMessage:
                 f"[{OPENHANDS_THEME.primary}]" in message_with_id
             )  # Banner should be colored
             assert (
-                f"[{OPENHANDS_THEME.accent}]Initialized conversation test-123[/]"
-                in message_with_id
-            )
+                "Initialized conversation test-123" in message_with_id
+            )  # Conversation ID should be present
 
             # Test that theme parameter is required
             with pytest.raises(TypeError):
