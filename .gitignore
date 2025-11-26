@@ -193,3 +193,4 @@ $RECYCLE.BIN/
 *.log
 .coverage
 .pytest_cache/
+software-agent-sdk/

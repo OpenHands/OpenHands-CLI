@@ -175,7 +175,6 @@ def get_session_prompter(
     session = PromptSession(
         completer=CommandCompleter(),
         key_bindings=bindings,
-        prompt_continuation=lambda width, line_number, is_soft_wrap: "...",  # noqa: ARG005
         multiline=True,
         input=input,
         output=output,
