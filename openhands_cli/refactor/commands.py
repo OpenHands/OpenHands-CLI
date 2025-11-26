@@ -17,16 +17,16 @@ COMMANDS = [
 
 def show_help(main_display: RichLog) -> None:
     """Display help information in the main display.
-    
+
     Args:
         main_display: The RichLog widget to write help content to
     """
     help_text = """
-[bold yellow]OpenHands CLI Help[/bold yellow]
+[bold $primary]OpenHands CLI Help[/bold $primary]
 [dim]Available commands:[/dim]
 
-  [white]/help[/white] - Display available commands
-  [white]/exit[/white] - Exit the application
+  [$secondary]/help[/$secondary] - Display available commands
+  [$secondary]/exit[/$secondary] - Exit the application
 
 [dim]Tips:[/dim]
   • Type / and press Tab to see command suggestions

@@ -136,7 +136,7 @@ class OpenHandsApp(App):
         # For now, just show a message and exit
         # TODO: Add proper confirmation dialog
         main_display = self.query_one("#main_display", RichLog)
-        main_display.write("\n[yellow]Goodbye! 👋[/yellow]")
+        main_display.write("\n[$primary]Goodbye! 👋[/$primary]")
         self.exit()
 
 
