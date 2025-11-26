@@ -66,7 +66,7 @@ class TestTerminalDetection:
         with patch('sys.stdin.isatty', return_value=True), \
              patch('sys.stdout.isatty', return_value=True), \
              patch.dict(os.environ, {'TERM': 'xterm'}), \
-             patch('openhands_cli.agent_chat.create_input', side_effect=Exception('Failed')):
+             patch('prompt_toolkit.input.create_input', side_effect=Exception('Failed')):
             assert check_terminal_compatibility() is False
 
     def test_xterm_terminal_works(self):

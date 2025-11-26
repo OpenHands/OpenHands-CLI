@@ -1,4 +1,5 @@
-from prompt_toolkit import HTML, PromptSession
+from prompt_toolkit import PromptSession
+from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.application import Application
 from prompt_toolkit.completion import Completer
 from prompt_toolkit.input.base import Input
@@ -190,7 +191,6 @@ def get_session_prompter(
         return session
     except Exception as e:
         from prompt_toolkit import print_formatted_text
-        from prompt_toolkit.formatted_text import HTML
         
         print_formatted_text(HTML('<red>❌ Failed to create terminal session</red>'))
         print_formatted_text(HTML(f'<grey>Error: {e}</grey>'))

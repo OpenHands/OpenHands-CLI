@@ -110,24 +110,50 @@ def _print_exit_hint(conversation_id: str) -> None:
             'to resume this conversation.'
         )
     )
-    
-    """Run the agent chat session using the agent SDK.
 
+
+def run_cli_entry(
+    resume_conversation_id: str | None = None,
+    queued_inputs: list[str] | None = None,
+) -> None:
+    """Run the agent chat session using the agent SDK.
 
     Raises:
         AgentSetupError: If agent setup fails
         KeyboardInterrupt: If user interrupts the session
         EOFError: If EOF is encountered
     """
+    
+    # Check terminal compatibility early
+    if not check_terminal_compatibility():
+        print_formatted_text(HTML('<red>❌ Interactive terminal not detected</red>'))
+        print_formatted_text(HTML('<yellow>OpenHands CLI requires an interactive terminal.</yellow>'))
+        print_formatted_text('')
+        print_formatted_text(HTML('<b>Requirements:</b>'))
+        print_formatted_text('• Run in an interactive shell (not piped)')
+        print_formatted_text('• Ensure TERM is set (e.g., TERM=xterm-256color)')
+        print_formatted_text('• Use TTY allocation with Docker: docker run -it ...')
+        print_formatted_text('• Use PTY allocation with SSH: ssh -t user@host ...')
+        print_formatted_text('')
+        print_formatted_text(HTML('<b>Current environment:</b>'))
+        print_formatted_text(f'• TERM: {os.environ.get("TERM", "not set")}')
+        print_formatted_text(f'• stdin is TTY: {sys.stdin.isatty()}')
+        print_formatted_text(f'• stdout is TTY: {sys.stdout.isatty()}')
+        print_formatted_text('')
+        print_formatted_text(HTML('<grey>For troubleshooting, see: https://docs.openhands.dev/cli-troubleshooting</grey>'))
+        return
+
+    # Normalize queued_inputs to a local copy to prevent mutating the caller's list
+    pending_inputs = list(queued_inputs) if queued_inputs else []
 
     conversation_id = uuid.uuid4()
     if resume_conversation_id:
         try:
             conversation_id = uuid.UUID(resume_conversation_id)
-        except ValueError as e:
+        except ValueError:
             print_formatted_text(
                 HTML(
-                    f"<yellow>Warning: '{resume_conversation_id}' is not a valid UUID.</yellow>"
+                    f'<yellow>Warning: \'{resume_conversation_id}\' is not a valid UUID.</yellow>'
                 )
             )
             return
@@ -139,7 +165,6 @@ def _print_exit_hint(conversation_id: str) -> None:
         print_formatted_text(HTML('\n<yellow>Goodbye! 👋</yellow>'))
         return
 
-
     display_welcome(conversation_id, bool(resume_conversation_id))
 
     # Track session start time for uptime calculation
@@ -147,12 +172,21 @@ def _print_exit_hint(conversation_id: str) -> None:
 
     # Create conversation runner to handle state machine logic
     runner = None
+    conversation = None
     session = get_session_prompter()
 
     # Main chat loop
     while True:
         try:
             # Get user input
+            if pending_inputs:
+                user_input = pending_inputs.pop(0)
+            else:
+                user_input = session.prompt(
+                    HTML('<gold>> </gold>'),
+                    multiline=False,
+                )
+
             if not user_input.strip():
                 continue
 
@@ -168,7 +202,7 @@ def _print_exit_hint(conversation_id: str) -> None:
                 exit_confirmation = exit_session_confirmation()
                 if exit_confirmation == UserConfirmation.ACCEPT:
                     print_formatted_text(HTML('\n<yellow>Goodbye! 👋</yellow>'))
-                    _print_exit_hint(conversation_id)
+                    _print_exit_hint(str(conversation_id))
                     break
 
             elif command == '/settings':
@@ -207,14 +241,22 @@ def _print_exit_hint(conversation_id: str) -> None:
                 continue
 
             elif command == '/status':
-                display_status(conversation, session_start_time=session_start_time)
+                if conversation is not None:
+                    display_status(conversation, session_start_time=session_start_time)
+                else:
+                    print_formatted_text(
+                        HTML('<yellow>No active conversation</yellow>')
+                    )
                 continue
 
             elif command == '/confirm':
-                runner.toggle_confirmation_mode()
-                new_status = (
-                    'enabled' if runner.is_confirmation_mode_active else 'disabled'
-                )
+                if runner is not None:
+                    runner.toggle_confirmation_mode()
+                    new_status = (
+                        'enabled' if runner.is_confirmation_mode_active else 'disabled'
+                    )
+                else:
+                    new_status = 'disabled (no active conversation)'
                 print_formatted_text(
                     HTML(f'<yellow>Confirmation mode {new_status}</yellow>')
                 )
@@ -252,7 +294,7 @@ def _print_exit_hint(conversation_id: str) -> None:
             exit_confirmation = exit_session_confirmation()
             if exit_confirmation == UserConfirmation.ACCEPT:
                 print_formatted_text(HTML('\n<yellow>Goodbye! 👋</yellow>'))
-                _print_exit_hint(conversation_id)
+                _print_exit_hint(str(conversation_id))
                 break
 
     # Clean up terminal state
