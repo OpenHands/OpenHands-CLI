@@ -97,9 +97,7 @@ def display_welcome(conversation_id: UUID, resume: bool = False) -> None:
 
     # Check for updates and display version info
     version_info = check_for_updates()
-    print_formatted_text(
-        HTML(f"<grey>Version:</grey> <white>{version_info.current_version}</white>")
-    )
+    print_formatted_text(HTML(f"<grey>Version: {version_info.current_version}</grey>"))
 
     if version_info.needs_update and version_info.latest_version:
         print_formatted_text(
