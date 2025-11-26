@@ -1,5 +1,7 @@
 """Welcome message utilities for OpenHands CLI textual app."""
 
+import uuid
+
 from rich.console import Console
 from rich.panel import Panel
 from textual.theme import Theme
@@ -26,6 +28,11 @@ def get_welcome_message(conversation_id: str | None = None, *, theme: Theme) -> 
     """
     # Use theme colors
     primary_color = theme.primary
+    accent_color = theme.accent
+
+    # Generate UUID if no conversation_id provided
+    if conversation_id is None:
+        conversation_id = str(uuid.uuid4())
 
     # Use Rich markup for colored banner
     banner = f"[{primary_color}]{get_openhands_banner()}[/]"
@@ -47,17 +54,17 @@ def get_welcome_message(conversation_id: str | None = None, *, theme: Theme) -> 
         console.print(status_panel)
     message_parts.extend(["", capture.get(), ""])
 
-    # Conversation ID panel (if provided)
-    if conversation_id:
-        conv_panel = Panel(f"Initialized conversation {conversation_id}")
-        with console.capture() as capture:
-            console.print(conv_panel)
-        message_parts.extend([capture.get(), ""])
+    # Conversation ID panel (always show now)
+    conv_text = f"[{accent_color}]Initialized conversation[/] {conversation_id}"
+    conv_panel = Panel(conv_text)
+    with console.capture() as capture:
+        console.print(conv_panel)
+    message_parts.extend([capture.get(), ""])
 
     # Instructions
     message_parts.extend(
         [
-            "What do you want to build?",
+            f"[{primary_color}]What do you want to build?[/]",
             "1. Ask questions, edit files, or run commands.",
             "2. Use @ to look up a file in the folder structure",
             "3. Type /help for help or / to immediately scroll through available "

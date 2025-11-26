@@ -60,8 +60,8 @@ class TestGetWelcomeMessage:
                 "available commands" in message
             )
 
-            # Should not contain conversation ID
-            assert "Initialized conversation" not in message
+            # Should contain generated conversation ID
+            assert "Initialized conversation" in message
 
     def test_welcome_message_with_conversation_id(self):
         """Test welcome message generation with conversation ID."""
@@ -153,11 +153,10 @@ class TestGetWelcomeMessage:
             assert "OpenHands CLI v1.0.0" in message
             assert "All set up!" in message
 
-            # Check conversation ID handling
+            # Check conversation ID handling - always present now
+            assert "Initialized conversation" in message
             if conversation_id:
                 assert f"Initialized conversation {conversation_id}" in message
-            else:
-                assert "Initialized conversation" not in message
 
     def test_welcome_message_includes_banner(self):
         """Test that welcome message includes the OpenHands banner."""
