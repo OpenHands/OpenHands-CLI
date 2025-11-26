@@ -25,10 +25,10 @@ class OpenHandsApp(App):
         # Create custom OpenHands theme
         self.openhands_theme = Theme(
             name="openhands",
-            primary="#fae279",  # Logo, cursor color
-            secondary="#e3e3e3",  # Borders, plain text
-            accent="#417cf7",  # Special text like "initialize conversation"
-            foreground="#e3e3e3",  # Default text color
+            primary="#ffe165",  # Logo, cursor color
+            secondary="#ffffff",  # Borders, plain text
+            accent="#277dff",  # Special text like "initialize conversation"
+            foreground="#ffffff",  # Default text color
             background="#222222",  # Background color
             surface="#222222",  # Surface color (same as background)
             panel="#222222",  # Panel color (same as background)
@@ -38,9 +38,9 @@ class OpenHandsApp(App):
             dark=True,  # This is a dark theme
             variables={
                 # Placeholder text color
-                "input-placeholder-foreground": "#353639",
+                "input-placeholder-foreground": "#727987",
                 # Cursor color
-                "input-cursor-foreground": "#fae279",
+                "input-cursor-foreground": "#ffe165",
                 # Selection colors
                 "input-selection-background": "#fae279 20%",
             },
