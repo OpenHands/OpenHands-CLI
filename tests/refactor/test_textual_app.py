@@ -67,13 +67,15 @@ class TestOpenHandsApp:
     @mock.patch("openhands_cli.refactor.textual_app.get_welcome_message")
     async def test_on_mount_adds_welcome_message(self, mock_welcome):
         """Test that on_mount adds welcome message to display."""
+        from openhands_cli.refactor.theme import OPENHANDS_THEME
+
         welcome_text = "Test welcome message"
         mock_welcome.return_value = welcome_text
 
         app = OpenHandsApp()
         async with app.run_test() as pilot:
-            # Verify welcome message was called
-            mock_welcome.assert_called_once_with()
+            # Verify welcome message was called with theme
+            mock_welcome.assert_called_once_with(theme=OPENHANDS_THEME)
 
             # Verify main display exists (welcome message should be added during mount)
             main_display = pilot.app.query_one("#main_display", RichLog)
@@ -209,12 +211,14 @@ class TestOpenHandsApp:
     @mock.patch("openhands_cli.refactor.textual_app.get_welcome_message")
     async def test_welcome_message_called_on_mount(self, mock_welcome):
         """Test that get_welcome_message is called during on_mount."""
+        from openhands_cli.refactor.theme import OPENHANDS_THEME
+
         mock_welcome.return_value = "Test message"
 
         app = OpenHandsApp()
         async with app.run_test():
-            # Verify get_welcome_message was called during app initialization
-            mock_welcome.assert_called_once_with()
+            # Verify get_welcome_message was called with theme during app initialization
+            mock_welcome.assert_called_once_with(theme=OPENHANDS_THEME)
 
     @mock.patch("openhands_cli.refactor.textual_app.get_welcome_message")
     async def test_widget_ids_are_set_correctly(self, mock_welcome):
@@ -250,27 +254,24 @@ class TestOpenHandsApp:
             assert main_display.markup is True
             assert main_display.can_focus is False
 
-    def test_custom_theme_creation(self):
-        """Test that custom OpenHands theme is created with correct colors."""
-        app = OpenHandsApp()
+    def test_custom_theme_properties(self):
+        """Test that custom OpenHands theme has correct colors."""
+        from openhands_cli.refactor.theme import OPENHANDS_THEME
 
-        # Check theme exists and has correct properties
-        assert hasattr(app, "openhands_theme")
-        theme = app.openhands_theme
-
-        assert theme.name == "openhands"
-        assert theme.primary == "#fae279"  # Logo, cursor color
-        assert theme.secondary == "#e3e3e3"  # Borders, plain text
-        assert theme.accent == "#417cf7"  # Special text
-        assert theme.foreground == "#e3e3e3"  # Default text color
-        assert theme.background == "#222222"  # Background color
-        assert theme.dark is True
+        # Check theme has correct properties
+        assert OPENHANDS_THEME.name == "openhands"
+        assert OPENHANDS_THEME.primary == "#ffe165"  # Logo, cursor color
+        assert OPENHANDS_THEME.secondary == "#ffffff"  # Borders, plain text
+        assert OPENHANDS_THEME.accent == "#277dff"  # Special text
+        assert OPENHANDS_THEME.foreground == "#ffffff"  # Default text color
+        assert OPENHANDS_THEME.background == "#222222"  # Background color
+        assert OPENHANDS_THEME.dark is True
 
         # Check custom variables
-        assert "input-placeholder-foreground" in theme.variables
-        assert theme.variables["input-placeholder-foreground"] == "#353639"
-        assert theme.variables["input-cursor-foreground"] == "#fae279"
-        assert theme.variables["input-selection-background"] == "#fae279 20%"
+        assert "input-placeholder-foreground" in OPENHANDS_THEME.variables
+        assert OPENHANDS_THEME.variables["input-placeholder-foreground"] == "#727987"
+        assert OPENHANDS_THEME.variables["input-cursor-foreground"] == "#ffe165"
+        assert OPENHANDS_THEME.variables["input-selection-background"] == "#ffe165 20%"
 
     def test_theme_registration_and_activation(self):
         """Test that theme is registered and set as active."""

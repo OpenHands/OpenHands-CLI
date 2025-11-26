@@ -9,10 +9,10 @@ It creates a basic app with:
 
 from textual.app import App, ComposeResult
 from textual.containers import Container
-from textual.theme import Theme
 from textual.widgets import Input, RichLog
 
 from openhands_cli.refactor.splash import get_welcome_message
+from openhands_cli.refactor.theme import OPENHANDS_THEME
 
 
 class OpenHandsApp(App):
@@ -22,32 +22,8 @@ class OpenHandsApp(App):
         """Initialize the app with custom OpenHands theme."""
         super().__init__(**kwargs)
 
-        # Create custom OpenHands theme
-        self.openhands_theme = Theme(
-            name="openhands",
-            primary="#ffe165",  # Logo, cursor color
-            secondary="#ffffff",  # Borders, plain text
-            accent="#277dff",  # Special text like "initialize conversation"
-            foreground="#ffffff",  # Default text color
-            background="#222222",  # Background color
-            surface="#222222",  # Surface color (same as background)
-            panel="#222222",  # Panel color (same as background)
-            success="#fae279",  # Success messages (use logo color)
-            warning="#fae279",  # Warning messages (use logo color)
-            error="#fae279",  # Error messages (use logo color)
-            dark=True,  # This is a dark theme
-            variables={
-                # Placeholder text color
-                "input-placeholder-foreground": "#727987",
-                # Cursor color
-                "input-cursor-foreground": "#ffe165",
-                # Selection colors
-                "input-selection-background": "#fae279 20%",
-            },
-        )
-
         # Register the custom theme
-        self.register_theme(self.openhands_theme)
+        self.register_theme(OPENHANDS_THEME)
 
         # Set the theme as active
         self.theme = "openhands"
@@ -109,7 +85,7 @@ class OpenHandsApp(App):
         """Called when app starts."""
         # Add the splash screen content to the main display
         main_display = self.query_one("#main_display", RichLog)
-        splash_content = get_welcome_message()
+        splash_content = get_welcome_message(theme=OPENHANDS_THEME)
         main_display.write(splash_content)
 
         # Focus the input widget

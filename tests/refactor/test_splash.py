@@ -5,6 +5,7 @@ import unittest.mock as mock
 import pytest
 
 from openhands_cli.refactor.splash import get_openhands_banner, get_welcome_message
+from openhands_cli.refactor.theme import OPENHANDS_THEME
 from openhands_cli.version_check import VersionInfo
 
 
@@ -45,7 +46,7 @@ class TestGetWelcomeMessage:
                 error=None,
             )
 
-            message = get_welcome_message()
+            message = get_welcome_message(theme=OPENHANDS_THEME)
 
             # Check basic structure
             assert isinstance(message, str)
@@ -70,7 +71,7 @@ class TestGetWelcomeMessage:
             )
 
             conversation_id = "test-conversation-123"
-            message = get_welcome_message(conversation_id)
+            message = get_welcome_message(conversation_id, theme=OPENHANDS_THEME)
 
             # Check conversation ID is included
             assert f"Initialized conversation {conversation_id}" in message
@@ -90,7 +91,7 @@ class TestGetWelcomeMessage:
                 error=None,
             )
 
-            message = get_welcome_message()
+            message = get_welcome_message(theme=OPENHANDS_THEME)
 
             # Check update notification is included
             assert "Version: 1.0.0" in message
@@ -109,7 +110,7 @@ class TestGetWelcomeMessage:
                 error=None,
             )
 
-            message = get_welcome_message()
+            message = get_welcome_message(theme=OPENHANDS_THEME)
 
             # Check no update notification
             assert "Version: 1.0.0" in message
@@ -138,7 +139,7 @@ class TestGetWelcomeMessage:
                 error=None,
             )
 
-            message = get_welcome_message(conversation_id)
+            message = get_welcome_message(conversation_id, theme=OPENHANDS_THEME)
 
             # Basic structure should always be present
             assert "Let's start building!" in message
@@ -165,7 +166,7 @@ class TestGetWelcomeMessage:
                 error=None,
             )
 
-            message = get_welcome_message()
+            message = get_welcome_message(theme=OPENHANDS_THEME)
             banner = get_openhands_banner()
 
             # Banner should be included in the message
@@ -183,7 +184,7 @@ class TestGetWelcomeMessage:
                 error=None,
             )
 
-            message = get_welcome_message()
+            message = get_welcome_message(theme=OPENHANDS_THEME)
             lines = message.split("\n")
 
             # Should have multiple lines
@@ -197,6 +198,8 @@ class TestGetWelcomeMessage:
 
     def test_welcome_message_with_colors(self):
         """Test that welcome message includes Rich markup for colors."""
+        from openhands_cli.refactor.theme import OPENHANDS_THEME
+
         with mock.patch(
             "openhands_cli.refactor.splash.check_for_updates"
         ) as mock_check:
@@ -207,12 +210,21 @@ class TestGetWelcomeMessage:
                 error=None,
             )
 
-            # Test without conversation ID
-            message = get_welcome_message()
-            assert "[#fae279]" in message  # Banner should be colored
+            # Test without conversation ID using theme
+            message = get_welcome_message(theme=OPENHANDS_THEME)
+            assert f"[{OPENHANDS_THEME.primary}]" in message  # Banner should be colored
             assert "[/]" in message  # Color tags should be closed
 
-            # Test with conversation ID
-            message_with_id = get_welcome_message("test-123")
-            assert "[#fae279]" in message_with_id  # Banner should be colored
-            assert "[#417cf7]Initialized conversation test-123[/]" in message_with_id
+            # Test with conversation ID using theme
+            message_with_id = get_welcome_message("test-123", theme=OPENHANDS_THEME)
+            assert (
+                f"[{OPENHANDS_THEME.primary}]" in message_with_id
+            )  # Banner should be colored
+            assert (
+                f"[{OPENHANDS_THEME.accent}]Initialized conversation test-123[/]"
+                in message_with_id
+            )
+
+            # Test that theme parameter is required
+            with pytest.raises(TypeError):
+                get_welcome_message()  # type: ignore[call-arg] # Should fail without theme parameter

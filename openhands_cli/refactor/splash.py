@@ -1,5 +1,7 @@
 """Welcome message utilities for OpenHands CLI textual app."""
 
+from textual.theme import Theme
+
 from openhands_cli.version_check import check_for_updates
 
 
@@ -13,10 +15,19 @@ def get_openhands_banner() -> str:
           |_|"""
 
 
-def get_welcome_message(conversation_id: str | None = None) -> str:
-    """Get the complete welcome message with version info."""
+def get_welcome_message(conversation_id: str | None = None, *, theme: Theme) -> str:
+    """Get the complete welcome message with version info.
+
+    Args:
+        conversation_id: Optional conversation ID to display
+        theme: Theme to use for colors
+    """
+    # Use theme colors
+    primary_color = theme.primary
+    accent_color = theme.accent
+
     # Use Rich markup for colored banner
-    banner = f"[#fae279]{get_openhands_banner()}[/]"
+    banner = f"[{primary_color}]{get_openhands_banner()}[/]"
 
     # Get version information
     version_info = check_for_updates()
@@ -25,7 +36,9 @@ def get_welcome_message(conversation_id: str | None = None) -> str:
 
     if conversation_id:
         # Use accent color for "initialize conversation" text
-        message_parts.append(f"[#417cf7]Initialized conversation {conversation_id}[/]")
+        message_parts.append(
+            f"[{accent_color}]Initialized conversation {conversation_id}[/]"
+        )
     else:
         message_parts.append("Welcome to OpenHands CLI!")
 
