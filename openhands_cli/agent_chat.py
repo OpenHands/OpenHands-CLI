@@ -110,10 +110,7 @@ def _print_exit_hint(conversation_id: str) -> None:
             'to resume this conversation.'
         )
     )
-
-
-
-def run_cli_entry(resume_conversation_id: str | None = None) -> None:
+    
     """Run the agent chat session using the agent SDK.
 
 
@@ -122,26 +119,6 @@ def run_cli_entry(resume_conversation_id: str | None = None) -> None:
         KeyboardInterrupt: If user interrupts the session
         EOFError: If EOF is encountered
     """
-
-    # Check terminal compatibility early to provide helpful error messages
-    if not check_terminal_compatibility():
-        print_formatted_text(HTML('<red>❌ Interactive terminal not detected</red>'))
-        print_formatted_text('')
-        print_formatted_text(HTML('<yellow>OpenHands CLI requires an interactive terminal.</yellow>'))
-        print_formatted_text('')
-        print_formatted_text(HTML('<grey>Requirements:</grey>'))
-        print_formatted_text('  • Run in an interactive shell (not piped)')
-        print_formatted_text('  • Ensure TERM is set (e.g., TERM=xterm-256color)')
-        print_formatted_text('  • Use TTY allocation with Docker: docker run -it ...')
-        print_formatted_text('  • Use PTY allocation with SSH: ssh -t user@host ...')
-        print_formatted_text('')
-        print_formatted_text(HTML('<grey>Current environment:</grey>'))
-        print_formatted_text(f'  • TERM: {os.environ.get("TERM", "not set")}')
-        print_formatted_text(f'  • stdin is TTY: {sys.stdin.isatty()}')
-        print_formatted_text(f'  • stdout is TTY: {sys.stdout.isatty()}')
-        print_formatted_text('')
-        print_formatted_text(HTML('<grey>For more help, visit: https://docs.all-hands.dev/usage/troubleshooting</grey>'))
-        sys.exit(1)
 
     conversation_id = uuid.uuid4()
     if resume_conversation_id:
@@ -176,11 +153,6 @@ def run_cli_entry(resume_conversation_id: str | None = None) -> None:
     while True:
         try:
             # Get user input
-            user_input = session.prompt(
-                HTML('<gold>> </gold>'),
-                multiline=False,
-            )
-
             if not user_input.strip():
                 continue
 

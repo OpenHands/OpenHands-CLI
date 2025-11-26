@@ -36,6 +36,7 @@ a = Analysis(
         *collect_data_files('openhands.sdk'),
         # Include package metadata for importlib.metadata
         *copy_metadata('fastmcp'),
+        *copy_metadata('agent-client-protocol'),
     ],
     hiddenimports=[
         # Explicitly include modules that might not be detected automatically
@@ -48,6 +49,8 @@ a = Analysis(
         *collect_submodules('tiktoken_ext'),
         *collect_submodules('litellm'),
         *collect_submodules('fastmcp'),
+        # Include Agent Client Protocol (ACP) for 'openhands acp' command
+        *collect_submodules('acp'),
         # Include mcp but exclude CLI parts that require typer
         'mcp.types',
         'mcp.client',
