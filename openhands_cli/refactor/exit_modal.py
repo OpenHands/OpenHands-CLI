@@ -19,9 +19,9 @@ class ExitConfirmationModal(ModalScreen):
         grid-gutter: 1 2;
         grid-rows: 1fr 3;
         padding: 0 1;
-        width: 40;
-        height: 9;
-        border: thick $background 80%;
+        width: 25vw;
+        height: 5vw;
+        border: $primary 80%;
         background: $surface;
         margin: 1 1;
     }
