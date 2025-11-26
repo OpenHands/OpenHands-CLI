@@ -58,10 +58,9 @@ def _print_exit_hint(conversation_id: str) -> None:
         )
     )
 
-
-
 def run_cli_entry(
     resume_conversation_id: str | None = None,
+    queued_inputs: list[str] | None = None,
     user_skills: bool = True,
     project_skills: bool = True,
 ) -> None:
@@ -104,16 +103,23 @@ def run_cli_entry(
 
     # Create conversation runner to handle state machine logic
     runner = None
+    conversation = None
     session = get_session_prompter()
+    
+    # Initialize pending inputs from queued_inputs
+    pending_inputs = list(queued_inputs) if queued_inputs else []
 
     # Main chat loop
     while True:
         try:
-            # Get user input
-            user_input = session.prompt(
-                HTML('<gold>> </gold>'),
-                multiline=False,
-            )
+            # Get user input from pending inputs or prompt
+            if pending_inputs:
+                user_input = pending_inputs.pop(0)
+            else:
+                user_input = session.prompt(
+                    HTML('<gold>> </gold>'),
+                    multiline=False,
+                )
 
             if not user_input.strip():
                 continue
@@ -130,7 +136,7 @@ def run_cli_entry(
                 exit_confirmation = exit_session_confirmation()
                 if exit_confirmation == UserConfirmation.ACCEPT:
                     print_formatted_text(HTML('\n<yellow>Goodbye! 👋</yellow>'))
-                    _print_exit_hint(conversation_id)
+                    _print_exit_hint(str(conversation_id))
                     break
 
             elif command == '/settings':
@@ -169,10 +175,20 @@ def run_cli_entry(
                 continue
 
             elif command == '/status':
-                display_status(conversation, session_start_time=session_start_time)
+                if conversation:
+                    display_status(conversation, session_start_time=session_start_time)
+                else:
+                    print_formatted_text(
+                        HTML('<yellow>No active conversation running...</yellow>')
+                    )
                 continue
 
             elif command == '/confirm':
+                if not runner:
+                    print_formatted_text(
+                        HTML('<yellow>No active conversation running...</yellow>')
+                    )
+                    continue
                 runner.toggle_confirmation_mode()
                 new_status = (
                     'enabled' if runner.is_confirmation_mode_active else 'disabled'
@@ -218,7 +234,7 @@ def run_cli_entry(
             exit_confirmation = exit_session_confirmation()
             if exit_confirmation == UserConfirmation.ACCEPT:
                 print_formatted_text(HTML('\n<yellow>Goodbye! 👋</yellow>'))
-                _print_exit_hint(conversation_id)
+                _print_exit_hint(str(conversation_id))
                 break
 
     # Clean up terminal state

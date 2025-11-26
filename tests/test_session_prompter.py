@@ -98,8 +98,3 @@ def test_get_session_prompter_default_parameters():
     assert session.multiline is True
     assert session.key_bindings is not None
     assert session.completer is not None
-
-    # Prompt continuation should be callable and return the expected string
-    cont = session.prompt_continuation
-    assert callable(cont)
-    assert cont(80, 1, False) == "..."

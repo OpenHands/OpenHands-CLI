@@ -1,7 +1,12 @@
 """Utility functions for LLM configuration in OpenHands CLI."""
 
 import os
+from argparse import Namespace
+from pathlib import Path
 from typing import Any
+
+from prompt_toolkit import print_formatted_text
+from prompt_toolkit.formatted_text import HTML
 
 from openhands.sdk import LLM
 from openhands.tools.preset import get_default_agent
@@ -83,3 +88,35 @@ def get_default_cli_agent(llm: LLM):
     agent = get_default_agent(llm=llm, cli_mode=True)
 
     return agent
+
+
+def create_seeded_instructions_from_args(args: Namespace) -> list[str] | None:
+    """
+    Build initial CLI input(s) from parsed arguments.
+    """
+    if getattr(args, "command", None) == "serve":
+        return None
+
+    # --file takes precedence over --task
+    if getattr(args, "file", None):
+        path = Path(args.file).expanduser()
+        try:
+            content = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            print_formatted_text(HTML(f"<red>Failed to read file {path}: {exc}</red>"))
+            raise SystemExit(1)
+
+        initial_message = (
+            "Starting this session with file context.\n\n"
+            f"File path: {path}\n\n"
+            "File contents:\n"
+            "--------------------\n"
+            f"{content}\n"
+            "--------------------\n"
+        )
+        return [initial_message]
+
+    if getattr(args, "task", None):
+        return [args.task]
+
+    return None

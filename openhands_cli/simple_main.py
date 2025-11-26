@@ -41,10 +41,31 @@ def main() -> None:
             # Import agent_chat only when needed
             from openhands_cli.agent_chat import run_cli_entry
 
+            # Build queued inputs from task and file arguments
+            queued_inputs = []
+            if args.task:
+                queued_inputs.append(args.task)
+            if args.file:
+                try:
+                    with open(args.file, 'r', encoding='utf-8') as f:
+                        file_content = f.read()
+                        queued_inputs.append(file_content)
+                except FileNotFoundError:
+                    print_formatted_text(
+                        HTML(f'<red>Error: File not found: {args.file}</red>')
+                    )
+                    return
+                except Exception as e:
+                    print_formatted_text(
+                        HTML(f'<red>Error reading file: {e}</red>')
+                    )
+                    return
+
             # Start agent chat
             # Keep call signature backward-compatible for upstream tests
             run_cli_entry(
                 resume_conversation_id=args.resume,
+                queued_inputs=queued_inputs if queued_inputs else None,
                 user_skills=args.user_skills,
                 project_skills=getattr(args, 'project_skills', True),
             )
@@ -58,7 +79,6 @@ def main() -> None:
 
         traceback.print_exc()
         raise
-
 
 if __name__ == '__main__':
     main()

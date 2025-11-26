@@ -30,6 +30,18 @@ Examples:
         type=str,
         help='Conversation ID to resume'
     )
+    parser.add_argument(
+        '-t',
+        '--task',
+        type=str,
+        help='Initial task text to seed the conversation with',
+    )
+    parser.add_argument(
+        '-f',
+        '--file',
+        type=str,
+        help='Path to a file whose contents will seed the initial conversation',
+    )
     # Control loading of user skills from ~/.openhands
     parser.add_argument(
         '--no-user-skills',

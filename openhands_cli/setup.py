@@ -1,3 +1,5 @@
+from typing import Any
+from uuid import UUID
 import uuid
 
 from openhands.sdk.conversation import visualizer
@@ -5,6 +7,7 @@ from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
+from openhands.sdk.context import AgentContext, Skill
 from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
 from openhands_cli.tui.settings.store import AgentStore
 from openhands.sdk.security.confirmation_policy import (
@@ -73,11 +76,13 @@ def verify_agent_exists_or_setup_agent(
 
 
 def setup_conversation(
-    conversation_id: uuid,
+    conversation_id: UUID,
     include_security_analyzer: bool = True,
     *,
     load_user_skills: bool = True,
     load_project_skills: bool = True,
+    mcp_servers: dict[str, dict[str, Any]] | None = None,
+    skills: list[Skill] | None = None,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
