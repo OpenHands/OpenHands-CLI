@@ -20,6 +20,7 @@ def create_main_parser() -> argparse.ArgumentParser:
 
             Examples:
                 openhands                           # Start CLI mode
+                openhands --exp                     # Start experimental textual UI
                 openhands --resume conversation-id  # Resume a conversation in CLI mode
                 openhands serve                     # Launch GUI server
                 openhands serve --gpu               # Launch GUI server with GPU support
@@ -53,6 +54,11 @@ def create_main_parser() -> argparse.ArgumentParser:
 
     # CLI arguments at top level (default mode)
     parser.add_argument("--resume", type=str, help="Conversation ID to resume")
+    parser.add_argument(
+        "--exp",
+        action="store_true",
+        help="Use experimental textual-based UI instead of the default CLI interface",
+    )
 
     # Subcommands
     subparsers = parser.add_subparsers(dest="command", help="Additional commands")

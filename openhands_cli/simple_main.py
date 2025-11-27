@@ -44,17 +44,24 @@ def main() -> None:
 
             asyncio.run(run_acp_server())
         else:
-            # Default CLI behavior - no subcommand needed
-            # Import agent_chat only when needed
-            from openhands_cli.agent_chat import run_cli_entry
+            # Check if experimental flag is used
+            if args.exp:
+                # Use experimental textual-based UI
+                from openhands_cli.refactor.textual_app import main as textual_main
 
-            queued_inputs = create_seeded_instructions_from_args(args)
+                textual_main()
+            else:
+                # Default CLI behavior - no subcommand needed
+                # Import agent_chat only when needed
+                from openhands_cli.agent_chat import run_cli_entry
 
-            # Start agent chat
-            run_cli_entry(
-                resume_conversation_id=args.resume,
-                queued_inputs=queued_inputs,
-            )
+                queued_inputs = create_seeded_instructions_from_args(args)
+
+                # Start agent chat
+                run_cli_entry(
+                    resume_conversation_id=args.resume,
+                    queued_inputs=queued_inputs,
+                )
     except KeyboardInterrupt:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
     except EOFError:
