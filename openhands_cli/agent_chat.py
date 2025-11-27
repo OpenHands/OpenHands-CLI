@@ -66,7 +66,6 @@ def run_cli_entry(
 ) -> None:
     """Run the agent chat session using the agent SDK.
 
-
     Raises:
         AgentSetupError: If agent setup fails
         KeyboardInterrupt: If user interrupts the session

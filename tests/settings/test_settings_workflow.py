@@ -217,3 +217,32 @@ def test_workflow_cancellation_at_each_step(tmp_path: Path, step_to_cancel: str)
 
     # No settings should be saved on cancel
     mock_save.assert_not_called()
+
+
+def test_verify_agent_exists_or_setup_agent_retries_after_missing_spec():
+    """verify_agent_exists_or_setup_agent should configure settings once when
+    no agent spec exists, then return the agent from a successful reload."""
+
+    from openhands_cli.setup import MissingAgentSpec, verify_agent_exists_or_setup_agent
+
+    mock_agent = MagicMock()
+
+    with (
+        patch("openhands_cli.setup.SettingsScreen") as mock_screen_cls,
+        patch("openhands_cli.setup.load_agent_specs") as mock_load,
+    ):
+        # First load attempt: no spec -> MissingAgentSpec
+        # Second load attempt: returns an agent
+        mock_load.side_effect = [MissingAgentSpec("no spec"), mock_agent]
+
+        result = verify_agent_exists_or_setup_agent()
+
+        # Should have created a settings screen and run first-time configuration
+        mock_screen_cls.assert_called_once_with()
+        mock_screen_cls.return_value.configure_settings.assert_called_once_with(
+            first_time=True
+        )
+
+        # Load should be called twice: before and after configuration
+        assert mock_load.call_count == 2
+        assert result is mock_agent

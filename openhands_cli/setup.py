@@ -1,25 +1,38 @@
 from typing import Any
 from uuid import UUID
-import uuid
 
-from openhands.sdk.conversation import visualizer
-from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
 from openhands.sdk.context import AgentContext, Skill
-from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
-from openhands_cli.tui.settings.store import AgentStore
-from openhands.sdk.security.confirmation_policy import (
-    AlwaysConfirm,
+from openhands.sdk.conversation import (
+    visualizer,  # noqa: F401 (ensures tools registered)
 )
+from openhands.sdk.security.confirmation_policy import AlwaysConfirm
+from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
+from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
 from openhands_cli.tui.settings.settings_screen import SettingsScreen
+from openhands_cli.tui.settings.store import AgentStore
 from openhands_cli.tui.visualizer import CLIVisualizer
 
+
 # register tools
-from openhands.tools.terminal import TerminalTool
-from openhands.tools.file_editor import FileEditorTool
-from openhands.tools.task_tracker import TaskTrackerTool
+try:
+    from openhands.tools.file_editor import (
+        FileEditorTool,  # type: ignore[attr-defined]  # noqa: F401
+    )
+    from openhands.tools.task_tracker import (
+        TaskTrackerTool,  # type: ignore[attr-defined]  # noqa: F401
+    )
+    from openhands.tools.terminal import (
+        TerminalTool,  # type: ignore[attr-defined]  # noqa: F401
+    )
+except ModuleNotFoundError:
+    # Some platforms (e.g., Windows) may not have all low-level deps like fcntl.
+    # The core CLI and tests don't require these tools at import time.
+    TerminalTool = None  # type: ignore[assignment]
+    FileEditorTool = None  # type: ignore[assignment]
+    TaskTrackerTool = None  # type: ignore[assignment]
 
 
 class MissingAgentSpec(Exception):
@@ -28,83 +41,95 @@ class MissingAgentSpec(Exception):
     pass
 
 
-
 def load_agent_specs(
     conversation_id: str | None = None,
-    *,
-    load_user_skills: bool = True,
-    load_project_skills: bool = True,
+    mcp_servers: dict[str, dict[str, Any]] | None = None,
+    skills: list[Skill] | None = None,
 ) -> Agent:
+    """Load agent specifications.
+
+    Args:
+        conversation_id: Optional conversation ID for session tracking
+        mcp_servers: Optional dict of MCP servers to augment agent configuration
+        skills: Optional list of skills to include in the agent configuration
+
+    Returns:
+        Configured Agent instance
+
+    Raises:
+        MissingAgentSpec: If agent specification is not found or invalid
+    """
     agent_store = AgentStore()
-    agent = agent_store.load(
-        session_id=conversation_id,
-        load_user_skills=load_user_skills,
-        load_project_skills=load_project_skills,
-    )
+    agent = agent_store.load(session_id=conversation_id)
     if not agent:
         raise MissingAgentSpec(
-            'Agent specification not found. Please configure your agent settings.'
+            "Agent specification not found. Please configure your agent settings."
         )
+
+    # If MCP servers are provided, augment the agent's MCP configuration
+    if mcp_servers:
+        # Merge with existing MCP configuration (provided servers take precedence)
+        mcp_config: dict[str, Any] = agent.mcp_config or {}
+        existing_servers: dict[str, dict[str, Any]] = mcp_config.get("mcpServers", {})
+        existing_servers.update(mcp_servers)
+        agent = agent.model_copy(
+            update={"mcp_config": {"mcpServers": existing_servers}}
+        )
+
+    if skills:
+        if agent.agent_context is not None:
+            existing_skills = agent.agent_context.skills
+            existing_skills.extend(skills)
+            agent = agent.model_copy(
+                update={
+                    "agent_context": agent.agent_context.model_copy(
+                        update={"skills": existing_skills}
+                    )
+                }
+            )
+        else:
+            agent = agent.model_copy(
+                update={"agent_context": AgentContext(skills=skills)}
+            )
+
     return agent
 
 
-def verify_agent_exists_or_setup_agent(
-    *,
-    load_user_skills: bool = True,
-    load_project_skills: bool = True,
-) -> Agent:
+def verify_agent_exists_or_setup_agent() -> Agent:
     """Verify agent specs exists by attempting to load it.
 
+    If missing, run the settings flow and try once more.
     """
     settings_screen = SettingsScreen()
     try:
-        agent = load_agent_specs(
-            load_user_skills=load_user_skills,
-            load_project_skills=load_project_skills,
-        )
+        agent = load_agent_specs()
         return agent
     except MissingAgentSpec:
-        # For first-time users, show the full settings flow with choice between basic/advanced
+        # For first-time users, show the full settings flow with
+        # choice between basic/advanced
         settings_screen.configure_settings(first_time=True)
 
-
     # Try once again after settings setup attempt
-    return load_agent_specs(
-        load_user_skills=load_user_skills,
-        load_project_skills=load_project_skills,
-    )
+    return load_agent_specs()
 
 
 def setup_conversation(
     conversation_id: UUID,
     include_security_analyzer: bool = True,
-    *,
-    load_user_skills: bool = True,
-    load_project_skills: bool = True,
-    mcp_servers: dict[str, dict[str, Any]] | None = None,
-    skills: list[Skill] | None = None,
 ) -> BaseConversation:
-    """
-    Setup the conversation with agent.
+    """Setup the conversation with agent.
 
     Args:
-        conversation_id: conversation ID to use. If not provided, a random UUID will be generated.
+        conversation_id: conversation ID to use.
+            If not provided, a random UUID will be generated.
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
     """
 
-    print_formatted_text(
-        HTML(f'<white>Initializing agent...</white>')
-    )
+    print_formatted_text(HTML("<white>Initializing agent...</white>"))
 
-    agent = load_agent_specs(
-        str(conversation_id),
-        load_user_skills=load_user_skills,
-        load_project_skills=load_project_skills,
-    )
-
-
+    agent = load_agent_specs(str(conversation_id))
 
     # Create conversation - agent context is now set in AgentStore.load()
     conversation: BaseConversation = Conversation(
@@ -113,7 +138,7 @@ def setup_conversation(
         # Conversation will add /<conversation_id> to this path
         persistence_dir=CONVERSATIONS_DIR,
         conversation_id=conversation_id,
-        visualizer=CLIVisualizer
+        visualizer=CLIVisualizer,
     )
 
     # Security analyzer is set though conversation API now
@@ -124,6 +149,6 @@ def setup_conversation(
         conversation.set_confirmation_policy(AlwaysConfirm())
 
     print_formatted_text(
-        HTML(f'<green>✓ Agent initialized with model: {agent.llm.model}</green>')
+        HTML(f"<green>✓ Agent initialized with model: {agent.llm.model}</green>")
     )
     return conversation

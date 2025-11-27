@@ -1,6 +1,25 @@
 from unittest.mock import patch
 
 import pytest
+from prompt_toolkit.output.base import DummyOutput
+
+
+@pytest.fixture(autouse=True)
+def _force_prompt_toolkit_dummy_output(monkeypatch):
+    """Force prompt_toolkit to use DummyOutput during tests.
+
+    This avoids NoConsoleScreenBufferError on Windows test environments
+    where there is no real console attached.
+    """
+
+    def _create_output() -> DummyOutput:
+        return DummyOutput()
+
+    monkeypatch.setattr(
+        "prompt_toolkit.output.defaults.create_output",
+        _create_output,
+        raising=False,
+    )
 
 
 # Fixture: mock_verified_models - Simplified model data
