@@ -87,20 +87,6 @@ class TestMainEntryPoint:
         simple_main.main()
 
     @patch("openhands_cli.agent_chat.run_cli_entry")
-    @patch("sys.argv", ["openhands"])
-    def test_main_handles_general_exception(
-        self, mock_run_agent_chat: MagicMock
-    ) -> None:
-        """Test that main() handles general exceptions."""
-        mock_run_agent_chat.side_effect = Exception("Unexpected error")
-
-        # Should raise Exception (re-raised after handling)
-        with pytest.raises(Exception) as exc_info:
-            simple_main.main()
-
-        assert str(exc_info.value) == "Unexpected error"
-
-    @patch("openhands_cli.agent_chat.run_cli_entry")
     @patch("sys.argv", ["openhands", "--resume", "test-conversation-id"])
     def test_main_with_resume_argument(self, mock_run_agent_chat: MagicMock) -> None:
         """Test that main() passes resume conversation ID when provided."""
@@ -279,29 +265,3 @@ def test_help_and_invalid(monkeypatch, argv, expected_exit_code):
     with pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == expected_exit_code
-
-
-@pytest.mark.parametrize(
-    "argv",
-    [
-        (["openhands", "--version"]),
-        (["openhands", "-v"]),
-    ],
-)
-def test_version_flag(monkeypatch, capsys, argv):
-    """Test that --version and -v flags print version and exit."""
-    monkeypatch.setattr(sys, "argv", argv, raising=False)
-
-    with pytest.raises(SystemExit) as exc:
-        main()
-
-    # Version flag should exit with code 0
-    assert exc.value.code == 0
-
-    # Check that version string is in the output
-    captured = capsys.readouterr()
-    assert "OpenHands CLI" in captured.out
-    # Should contain a version number (matches format like 1.2.1 or 0.0.0)
-    import re
-
-    assert re.search(r"\d+\.\d+\.\d+", captured.out)

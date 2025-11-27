@@ -59,7 +59,12 @@ class AgentStore:
 
         return all_skills
 
-    def load(self, session_id: str | None = None) -> Agent | None:
+    def load(
+        self,
+        session_id: str | None = None,
+        load_user_skills: bool = True,
+        load_project_skills: bool = True,
+    ) -> Agent | None:
         try:
             str_spec = self.file_store.read(AGENT_SETTINGS_PATH)
             agent = Agent.model_validate_json(str_spec)
@@ -67,13 +72,15 @@ class AgentStore:
             # Update tools with most recent working directory
             updated_tools = get_default_tools(enable_browser=False)
 
-            # Load skills from user directories and project-specific directories
-            skills = self.load_project_skills()
+            # Load skills from project-specific directories if enabled
+            skills = []
+            if load_project_skills:
+                skills = self.load_project_skills()
 
             agent_context = AgentContext(
                 skills=skills,
                 system_message_suffix=f"You current working directory is: {WORK_DIR}",
-                load_user_skills=True,
+                load_user_skills=load_user_skills,
             )
 
             mcp_config: dict = self.load_mcp_configuration()
