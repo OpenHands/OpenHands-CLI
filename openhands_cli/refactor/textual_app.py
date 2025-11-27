@@ -17,6 +17,7 @@ from openhands_cli.refactor.autocomplete import EnhancedAutoComplete
 from openhands_cli.refactor.commands import COMMANDS, is_valid_command, show_help
 from openhands_cli.refactor.conversation_runner import MinimalConversationRunner
 from openhands_cli.refactor.exit_modal import ExitConfirmationModal
+from openhands_cli.refactor.richlog_visualizer import TextualVisualizer
 from openhands_cli.refactor.splash import get_welcome_message
 from openhands_cli.refactor.theme import OPENHANDS_THEME
 
@@ -120,9 +121,9 @@ class OpenHandsApp(App):
         main_display.write(splash_content)
 
         # Initialize conversation runner with write callback to main display
-        self.conversation_runner = MinimalConversationRunner(
-            write_callback=main_display.write
-        )
+        visualizer = TextualVisualizer(main_display, self)
+
+        self.conversation_runner = MinimalConversationRunner(visualizer)
 
         # Focus the input widget
         self.query_one("#user_input", Input).focus()

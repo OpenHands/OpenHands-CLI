@@ -15,6 +15,7 @@ from openhands.tools.file_editor import FileEditorTool  # noqa: F401
 from openhands.tools.task_tracker import TaskTrackerTool  # noqa: F401
 from openhands.tools.terminal import TerminalTool  # noqa: F401
 from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
+from openhands_cli.refactor.richlog_visualizer import TextualVisualizer
 from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.tui.settings.store import AgentStore
 from openhands_cli.tui.visualizer import CLIVisualizer
@@ -98,7 +99,7 @@ def verify_agent_exists_or_setup_agent() -> Agent:
 def setup_conversation(
     conversation_id: UUID,
     include_security_analyzer: bool = True,
-    visualizer: Any | None = None,
+    visualizer: TextualVisualizer | None = None,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.

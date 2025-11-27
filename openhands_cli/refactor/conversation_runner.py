@@ -2,18 +2,16 @@
 
 import asyncio
 import uuid
-from collections.abc import Callable
-from typing import Any
 
 from openhands.sdk import BaseConversation, Message, TextContent
-from openhands_cli.refactor.richlog_visualizer import RichLogVisualizer
+from openhands_cli.refactor.richlog_visualizer import TextualVisualizer
 from openhands_cli.setup import setup_conversation
 
 
 class MinimalConversationRunner:
     """Minimal conversation runner without confirmation mode for the refactored UI."""
 
-    def __init__(self, write_callback: Callable[[Any], None] | None = None):
+    def __init__(self, visualizer: TextualVisualizer | None = None):
         """Initialize the conversation runner.
 
         Args:
@@ -23,23 +21,17 @@ class MinimalConversationRunner:
         self.conversation: BaseConversation | None = None
         self.conversation_id: uuid.UUID | None = None
         self._running = False
-        self._write_callback = write_callback
+        self.visualizer = visualizer
 
     def initialize_conversation(self) -> None:
         """Initialize a new conversation."""
         self.conversation_id = uuid.uuid4()
 
-        # Create custom visualizer if write callback is provided
-        visualizer = None
-        if self._write_callback:
-            visualizer = RichLogVisualizer(
-                write_callback=self._write_callback,
-                skip_user_messages=False,  # Show user messages in the UI
-            )
-
         # Setup conversation without security analyzer (no confirmation mode)
         self.conversation = setup_conversation(
-            self.conversation_id, include_security_analyzer=False, visualizer=visualizer
+            self.conversation_id,
+            include_security_analyzer=False,
+            visualizer=self.visualizer,
         )
 
     async def process_message_async(self, user_input: str) -> None:
