@@ -22,10 +22,10 @@ jobs:
         runs-on: blacksmith-2vcpu-ubuntu-2404
         permissions:
             id-token: write
-    # Run when manually dispatched for "cli" OR for tag pushes that contain '-cli'
+    # Run when manually dispatched for "cli" OR for any tag pushes
         if: |
             (github.event_name == 'workflow_dispatch' && github.event.inputs.reason == 'cli')
-            || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && contains(github.ref, '-cli'))
+            || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4

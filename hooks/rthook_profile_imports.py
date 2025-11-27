@@ -22,7 +22,7 @@ if ENABLE:
     start_time = time.perf_counter()
 
     if _bootstrap is not None:
-        _orig_find_and_load = _bootstrap._find_and_loadn  # type: ignore
+        _orig_find_and_load = _bootstrap._find_and_load  # type: ignore
 
         def _timed_find_and_load(name, import_):
             preloaded = name in sys.modules  # cache hit?

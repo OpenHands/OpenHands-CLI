@@ -293,6 +293,70 @@ def test_version() -> bool:
         return False
 
 
+def test_acp_executable() -> bool:
+    """Test the ACP server in the built executable with JSON-RPC messages."""
+    print("🧪 Testing ACP server in the built executable...")
+
+    # Import test utilities
+    from openhands_cli.acp_impl.test_utils import test_jsonrpc_messages
+
+    exe_path = Path("dist/openhands")
+    if not exe_path.exists():
+        exe_path = Path("dist/openhands.exe")
+        if not exe_path.exists():
+            print("❌ Executable not found!")
+            return False
+
+    if os.name != "nt":
+        os.chmod(exe_path, 0o755)
+
+    # JSON-RPC messages to test
+    test_messages = [
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": 1,
+                "clientCapabilities": {
+                    "fs": {"readTextFile": True, "writeTextFile": True},
+                    "terminal": True,
+                    "_meta": {"terminal_output": True, "terminal-auth": True},
+                },
+                "clientInfo": {"name": "zed", "title": "Zed", "version": "0.212.7"},
+            },
+        },
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "session/new",
+            "params": {
+                "cwd": "/tmp",
+                "mcpServers": [],
+            },
+        },
+    ]
+
+    # Run the test
+    success, responses = test_jsonrpc_messages(
+        str(exe_path),
+        ["acp"],
+        test_messages,
+        timeout_per_message=15.0,  # Increased timeout for CI environments
+        verbose=True,
+    )
+
+    # Print summary
+    print(f"\n{'=' * 60}")
+    print("ACP Test Summary:")
+    print(f"  Messages sent: {len(test_messages)}")
+    print(f"  Responses received: {len(responses)}")
+    print(f"  Test result: {'✅ PASSED' if success else '❌ FAILED'}")
+    print(f"{'=' * 60}")
+
+    return success
+
+
 # =================================================
 # SECTION: Main
 # =================================================
@@ -317,7 +381,7 @@ def main() -> int:
     )
 
     parser.add_argument(
-        "--no-build", action="store_true", help="Skip testing the built executable"
+        "--no-build", action="store_true", help="Skip building the executable"
     )
 
     args = parser.parse_args()
@@ -354,6 +418,11 @@ def main() -> int:
         dummy_agent = get_default_cli_agent(llm=llm)
         if not test_executable(dummy_agent):
             print("❌ Executable test failed, build process failed")
+            return 1
+
+        print("\n" + "=" * 60)
+        if not test_acp_executable():
+            print("❌ ACP test failed, build process failed")
             return 1
 
     print("\n🎉 Build process completed!")

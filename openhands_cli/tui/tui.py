@@ -8,6 +8,7 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import clear
 
 from openhands_cli.pt_style import get_cli_style
+from openhands_cli.version_check import check_for_updates
 
 
 DEFAULT_STYLE = get_cli_style()
@@ -93,6 +94,23 @@ def display_welcome(conversation_id: UUID, resume: bool = False) -> None:
     """Display welcome message."""
     clear()
     display_banner(str(conversation_id), resume)
+
+    # Check for updates and display version info
+    version_info = check_for_updates()
+    print_formatted_text(HTML(f"<grey>Version: {version_info.current_version}</grey>"))
+
+    if version_info.needs_update and version_info.latest_version:
+        print_formatted_text(
+            HTML(f"<yellow>⚠ Update available: {version_info.latest_version}</yellow>")
+        )
+        print_formatted_text(
+            HTML(
+                "<grey>Run</grey> <gold>uv tool upgrade openhands</gold> "
+                "<grey>to update</grey>"
+            )
+        )
+
+    print_formatted_text("")
     print_formatted_text(HTML("<gold>Let's start building!</gold>"))
     print_formatted_text(
         HTML(
