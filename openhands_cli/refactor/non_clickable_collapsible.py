@@ -8,7 +8,7 @@ from typing import ClassVar
 
 from textual import events
 from textual.app import ComposeResult
-from textual.binding import Binding
+from textual.binding import Binding, BindingType
 from textual.containers import Container
 from textual.content import Content, ContentText
 from textual.css.query import NoMatches
@@ -32,7 +32,7 @@ class NonClickableCollapsibleTitle(Static, can_focus=False):
     }
     """
 
-    BINDINGS: ClassVar[list[Binding]] = [
+    BINDINGS: ClassVar[list[BindingType]] = [
         Binding("enter", "toggle_collapsible", "Toggle collapsible", show=False)
     ]
 
@@ -62,12 +62,12 @@ class NonClickableCollapsibleTitle(Static, can_focus=False):
         event.prevent_default()
         # Do nothing - this disables click-to-toggle functionality
 
-    def _on_mouse_down(self, event: events.MouseDown) -> None:
+    async def _on_mouse_down(self, event: events.MouseDown) -> None:
         """Override mouse down to prevent focus and interaction."""
         event.stop()
         event.prevent_default()
 
-    def _on_mouse_up(self, event: events.MouseUp) -> None:
+    async def _on_mouse_up(self, event: events.MouseUp) -> None:
         """Override mouse up to prevent focus and interaction."""
         event.stop()
         event.prevent_default()
@@ -114,7 +114,7 @@ class NonClickableCollapsible(Widget):
         }
 
         &.-collapsed > Contents {
-            display: none;   
+            display: none;
         }
     }
     """
@@ -206,7 +206,7 @@ class NonClickableCollapsible(Widget):
         except NoMatches:
             pass
 
-    def _on_mount(self, _event: events.Mount) -> None:
+    def _on_mount(self, event: events.Mount) -> None:  # noqa: ARG002
         """Initialise collapsed state."""
         self._update_collapsed(self.collapsed)
 
