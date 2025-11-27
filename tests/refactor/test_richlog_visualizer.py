@@ -14,9 +14,7 @@ class TestTextualVisualizer(unittest.TestCase):
         self.mock_container = mock.MagicMock()
         self.mock_app = mock.MagicMock()
         self.visualizer = TextualVisualizer(
-            container=self.mock_container,
-            app=self.mock_app,
-            skip_user_messages=False
+            container=self.mock_container, app=self.mock_app, skip_user_messages=False
         )
 
     def test_visualizer_initialization(self):
@@ -29,9 +27,7 @@ class TestTextualVisualizer(unittest.TestCase):
     def test_visualizer_with_skip_user_messages(self):
         """Test that skip_user_messages option is set correctly."""
         visualizer = TextualVisualizer(
-            container=self.mock_container,
-            app=self.mock_app,
-            skip_user_messages=True
+            container=self.mock_container, app=self.mock_app, skip_user_messages=True
         )
         self.assertTrue(visualizer._skip_user_messages)
 
@@ -42,14 +38,15 @@ class TestTextualVisualizer(unittest.TestCase):
         mock_event.__class__.__name__ = "UnknownEvent"
         mock_event.visualize.plain = "Test content"
         mock_event.source = "test"
-        
+
         # Should not raise an exception
         try:
             self.visualizer.on_event(mock_event)
         except Exception as e:
             self.fail(f"on_event raised an exception: {e}")
-        
-        # Container mount should be called for unknown events (they get a fallback widget)
+
+        # Container mount should be called for unknown events (they get a fallback
+        # widget)
         self.mock_container.mount.assert_called_once()
 
     def test_container_is_stored(self):
@@ -58,7 +55,10 @@ class TestTextualVisualizer(unittest.TestCase):
 
     def test_visualizer_inheritance(self):
         """Test that TextualVisualizer inherits from ConversationVisualizerBase."""
-        from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
+        from openhands.sdk.conversation.visualizer.base import (
+            ConversationVisualizerBase,
+        )
+
         self.assertIsInstance(self.visualizer, ConversationVisualizerBase)
 
 

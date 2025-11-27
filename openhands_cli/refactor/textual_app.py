@@ -11,10 +11,10 @@ from typing import ClassVar
 
 from textual.app import App, ComposeResult
 from textual.containers import Container, VerticalScroll
-from textual.widgets import Collapsible, Input, RichLog, Static
+from textual.widgets import Collapsible, Input, Static
 
 from openhands_cli.refactor.autocomplete import EnhancedAutoComplete
-from openhands_cli.refactor.commands import COMMANDS, is_valid_command, show_help
+from openhands_cli.refactor.commands import COMMANDS, is_valid_command
 from openhands_cli.refactor.conversation_runner import MinimalConversationRunner
 from openhands_cli.refactor.exit_modal import ExitConfirmationModal
 from openhands_cli.refactor.richlog_visualizer import TextualVisualizer
@@ -174,12 +174,16 @@ class OpenHandsApp(App):
 
         if command == "/help":
             # For now, add help as a Static widget - we'll improve this later
-            help_widget = Static("Help: Available commands: /help, /exit", classes="help-message")
+            help_widget = Static(
+                "Help: Available commands: /help, /exit", classes="help-message"
+            )
             main_display.mount(help_widget)
         elif command == "/exit":
             self._handle_exit()
         else:
-            error_widget = Static(f"Unknown command: {command}", classes="error-message")
+            error_widget = Static(
+                f"Unknown command: {command}", classes="error-message"
+            )
             main_display.mount(error_widget)
 
     def _handle_user_message(self, user_message: str) -> None:
@@ -188,17 +192,25 @@ class OpenHandsApp(App):
 
         # Check if conversation runner is initialized
         if self.conversation_runner is None:
-            error_widget = Static("[red]Error: Conversation runner not initialized[/red]", classes="error-message")
+            error_widget = Static(
+                "[red]Error: Conversation runner not initialized[/red]",
+                classes="error-message",
+            )
             main_display.mount(error_widget)
             return
 
         # Show that we're processing the message
         if self.conversation_runner.is_running:
-            status_widget = Static("[yellow]Agent is already processing a message...[/yellow]", classes="status-message")
+            status_widget = Static(
+                "[yellow]Agent is already processing a message...[/yellow]",
+                classes="status-message",
+            )
             main_display.mount(status_widget)
             return
 
-        status_widget = Static("[blue]Processing message...[/blue]", classes="status-message")
+        status_widget = Static(
+            "[blue]Processing message...[/blue]", classes="status-message"
+        )
         main_display.mount(status_widget)
 
         # Process message asynchronously to keep UI responsive
@@ -210,7 +222,10 @@ class OpenHandsApp(App):
             )
         except RuntimeError:
             # In test environment, just show a placeholder message
-            placeholder_widget = Static("[green]Message would be processed by conversation runner[/green]", classes="status-message")
+            placeholder_widget = Static(
+                "[green]Message would be processed by conversation runner[/green]",
+                classes="status-message",
+            )
             main_display.mount(placeholder_widget)
 
     def action_request_quit(self) -> None:
@@ -218,13 +233,14 @@ class OpenHandsApp(App):
         self._handle_exit()
 
     def action_expand_all(self) -> None:
-        """Action to handle Ctrl+E key binding - toggle expand/collapse all collapsible widgets."""
+        """Action to handle Ctrl+E key binding - toggle expand/collapse all
+        collapsible widgets."""
         main_display = self.query_one("#main_display", VerticalScroll)
         collapsibles = main_display.query(Collapsible)
-        
+
         # Check if any are expanded - if so, collapse all; otherwise expand all
         any_expanded = any(not collapsible.collapsed for collapsible in collapsibles)
-        
+
         for collapsible in collapsibles:
             collapsible.collapsed = any_expanded
 

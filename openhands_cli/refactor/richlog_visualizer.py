@@ -57,7 +57,8 @@ DEFAULT_HIGHLIGHT_REGEX = {
 class TextualVisualizer(ConversationVisualizerBase):
     """Handles visualization of conversation events for Textual apps.
 
-    This visualizer creates Collapsible widgets and adds them to a VerticalScroll container.
+    This visualizer creates Collapsible widgets and adds them to a VerticalScroll
+    container.
     """
 
     def __init__(
@@ -120,89 +121,95 @@ class TextualVisualizer(ConversationVisualizerBase):
         return highlighted
 
     def _extract_meaningful_title(self, event, fallback_title: str) -> str:
-        """Extract a meaningful title from an event, with fallback to truncated content."""
+        """Extract a meaningful title from an event, with fallback to truncated
+        content."""
         # Try to extract meaningful information from the event
-        if hasattr(event, 'action') and event.action is not None:
+        if hasattr(event, "action") and event.action is not None:
             # For ActionEvents, try to get action type and details
             action = event.action
-            action_type = action.__class__.__name__.replace('Action', '')
-            
+            action_type = action.__class__.__name__.replace("Action", "")
+
             # Try to get specific details based on action type
-            if hasattr(action, 'command') and action.command:
+            if hasattr(action, "command") and action.command:
                 # For command actions, show the command
                 cmd = str(action.command).strip()
                 if len(cmd) > 50:
                     cmd = cmd[:47] + "..."
                 return f"{action_type}: {cmd}"
-            elif hasattr(action, 'path') and action.path:
+            elif hasattr(action, "path") and action.path:
                 # For file actions, show the path
                 path = str(action.path)
                 if len(path) > 50:
                     path = "..." + path[-47:]  # Show end of path if too long
                 return f"{action_type}: {path}"
-            elif hasattr(action, 'content') and action.content:
+            elif hasattr(action, "content") and action.content:
                 # For content-based actions, show truncated content
-                content = str(action.content).strip().replace('\n', ' ')
+                content = str(action.content).strip().replace("\n", " ")
                 if len(content) > 50:
                     content = content[:47] + "..."
                 return f"{action_type}: {content}"
-            elif hasattr(action, 'message') and action.message:
+            elif hasattr(action, "message") and action.message:
                 # For message actions, show truncated message
-                msg = str(action.message).strip().replace('\n', ' ')
+                msg = str(action.message).strip().replace("\n", " ")
                 if len(msg) > 50:
                     msg = msg[:47] + "..."
                 return f"{action_type}: {msg}"
             else:
                 return f"{action_type} Action"
-        
-        elif hasattr(event, 'observation') and event.observation is not None:
+
+        elif hasattr(event, "observation") and event.observation is not None:
             # For ObservationEvents, try to get observation details
             obs = event.observation
-            obs_type = obs.__class__.__name__.replace('Observation', '')
-            
-            if hasattr(obs, 'content') and obs.content:
-                content = str(obs.content).strip().replace('\n', ' ')
+            obs_type = obs.__class__.__name__.replace("Observation", "")
+
+            if hasattr(obs, "content") and obs.content:
+                content = str(obs.content).strip().replace("\n", " ")
                 if len(content) > 50:
                     content = content[:47] + "..."
                 return f"{obs_type}: {content}"
             else:
                 return f"{obs_type} Observation"
-        
-        elif hasattr(event, 'llm_message') and event.llm_message is not None:
+
+        elif hasattr(event, "llm_message") and event.llm_message is not None:
             # For MessageEvents, show truncated message content
             msg = event.llm_message
-            if hasattr(msg, 'content') and msg.content:
-                content = str(msg.content).strip().replace('\n', ' ')
+            if hasattr(msg, "content") and msg.content:
+                content = str(msg.content).strip().replace("\n", " ")
                 if len(content) > 60:
                     content = content[:57] + "..."
                 role = "User" if msg.role == "user" else "Agent"
                 return f"{role}: {content}"
-        
-        elif hasattr(event, 'message') and event.message:
+
+        elif hasattr(event, "message") and event.message:
             # For events with direct message attribute
-            content = str(event.message).strip().replace('\n', ' ')
+            content = str(event.message).strip().replace("\n", " ")
             if len(content) > 60:
                 content = content[:57] + "..."
             return f"{fallback_title}: {content}"
-        
+
         # If we can't extract meaningful info, try to truncate the visualized content
-        if hasattr(event, 'visualize'):
+        if hasattr(event, "visualize"):
             try:
                 import re
+
                 # Convert Rich content to plain text for title
-                content_str = str(event.visualize).strip().replace('\n', ' ')
+                content_str = str(event.visualize).strip().replace("\n", " ")
                 # Remove ANSI codes and Rich markup
-                content_str = re.sub(r'\[/?[^\]]*\]', '', content_str)  # Remove Rich markup
-                content_str = re.sub(r'\x1b\[[0-9;]*m', '', content_str)  # Remove ANSI codes
-                
+                content_str = re.sub(
+                    r"\[/?[^\]]*\]", "", content_str
+                )  # Remove Rich markup
+                content_str = re.sub(
+                    r"\x1b\[[0-9;]*m", "", content_str
+                )  # Remove ANSI codes
+
                 if len(content_str) > 60:
                     content_str = content_str[:57] + "..."
-                
+
                 if content_str.strip():
                     return f"{fallback_title}: {content_str}"
             except Exception:
                 pass
-        
+
         # Final fallback
         return fallback_title
 
@@ -224,16 +231,18 @@ class TextualVisualizer(ConversationVisualizerBase):
         elif isinstance(event, ActionEvent):
             # Check if action is None (non-executable)
             if event.action is None:
-                title = self._extract_meaningful_title(event, "Agent Action (Not Executed)")
+                title = self._extract_meaningful_title(
+                    event, "Agent Action (Not Executed)"
+                )
             else:
                 title = self._extract_meaningful_title(event, "Agent Action")
-            
+
             # Create content widget with metrics subtitle if available
             content_widget = Static(content)
             metrics = self._format_metrics_subtitle()
             if metrics:
                 content_widget = Static(f"{content}\n\n{metrics}")
-            
+
             return Collapsible(
                 content_widget,
                 title=title,
@@ -263,18 +272,18 @@ class TextualVisualizer(ConversationVisualizerBase):
             ):
                 return None
             assert event.llm_message is not None
-            
+
             if event.llm_message.role == "user":
                 title = self._extract_meaningful_title(event, "User Message")
             else:
                 title = self._extract_meaningful_title(event, "Agent Message")
-            
+
             # Create content widget with metrics if available
             content_widget = Static(content)
             metrics = self._format_metrics_subtitle()
             if metrics and event.llm_message.role == "assistant":
                 content_widget = Static(f"{content}\n\n{metrics}")
-            
+
             return Collapsible(
                 content_widget,
                 title=title,
@@ -286,7 +295,7 @@ class TextualVisualizer(ConversationVisualizerBase):
             metrics = self._format_metrics_subtitle()
             if metrics:
                 content_widget = Static(f"{content}\n\n{metrics}")
-            
+
             return Collapsible(
                 content_widget,
                 title=title,
@@ -306,7 +315,7 @@ class TextualVisualizer(ConversationVisualizerBase):
             metrics = self._format_metrics_subtitle()
             if metrics:
                 content_widget = Static(f"{content}\n\n{metrics}")
-            
+
             return Collapsible(
                 content_widget,
                 title=title,
@@ -314,7 +323,9 @@ class TextualVisualizer(ConversationVisualizerBase):
             )
         else:
             # Fallback for unknown event types
-            title = self._extract_meaningful_title(event, f"UNKNOWN Event: {event.__class__.__name__}")
+            title = self._extract_meaningful_title(
+                event, f"UNKNOWN Event: {event.__class__.__name__}"
+            )
             content_widget = Static(f"{content}\n\nSource: {event.source}")
             return Collapsible(
                 content_widget,
