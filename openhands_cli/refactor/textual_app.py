@@ -4,15 +4,19 @@ This is the starting point for migrating from prompt_toolkit to textual.
 It creates a basic app with:
 - A scrollable main display (RichLog) that shows the splash screen initially
 - An Input widget at the bottom for user messages
+- A status line showing timer and work directory
 - The splash screen content scrolls off as new messages are added
 """
 
+import os
+import time
 from typing import ClassVar
 
 from textual.app import App, ComposeResult
 from textual.containers import Container, VerticalScroll
 from textual.widgets import Collapsible, Input, Static
 
+from openhands_cli.locations import WORK_DIR
 from openhands_cli.refactor.autocomplete import EnhancedAutoComplete
 from openhands_cli.refactor.commands import COMMANDS, is_valid_command, show_help
 from openhands_cli.refactor.conversation_runner import MinimalConversationRunner
@@ -45,6 +49,10 @@ class OpenHandsApp(App):
 
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
+
+        # Timer tracking
+        self.conversation_start_time = None
+        self.timer_update_task = None
 
         # Register the custom theme
         self.register_theme(OPENHANDS_THEME)
@@ -104,6 +112,15 @@ class OpenHandsApp(App):
         background: $background;
     }
 
+    #status_line {
+        height: 1;
+        dock: bottom;
+        background: $background;
+        color: $secondary;
+        padding: 0 1;
+        margin-bottom: 1;
+    }
+
     /* Style the cursor to use primary color */
     Input .input--cursor {
         background: $primary;
@@ -122,7 +139,7 @@ class OpenHandsApp(App):
         with Container(id="input_area"):
             text_input = Input(
                 placeholder=(
-                    "Type your message… (tip: press \\ + Enter to insert a newline)"
+                    "Type your message, @mention a file, or / for commands"
                 ),
                 id="user_input",
             )
@@ -130,6 +147,9 @@ class OpenHandsApp(App):
 
             # Add enhanced autocomplete for the input (commands and file paths)
             yield EnhancedAutoComplete(text_input, command_candidates=COMMANDS)
+
+        # Status line - shows work directory and timer
+        yield Static(id="status_line")
 
     def on_mount(self) -> None:
         """Called when app starts."""
@@ -146,8 +166,54 @@ class OpenHandsApp(App):
 
         self.conversation_runner = MinimalConversationRunner(visualizer)
 
+        # Initialize status line
+        self.update_status_line()
+
         # Focus the input widget
         self.query_one("#user_input", Input).focus()
+
+    def get_work_dir_display(self) -> str:
+        """Get the work directory display string."""
+        work_dir = WORK_DIR
+        
+        # Shorten the path for display
+        if work_dir.startswith(os.path.expanduser("~")):
+            work_dir = work_dir.replace(os.path.expanduser("~"), "~", 1)
+        
+        return work_dir
+
+    def update_status_line(self) -> None:
+        """Update the status line with current information."""
+        status_widget = self.query_one("#status_line", Static)
+        work_dir = self.get_work_dir_display()
+        
+        if self.conversation_runner and self.conversation_runner.is_running and self.conversation_start_time:
+            elapsed = int(time.time() - self.conversation_start_time)
+            status_text = f"{work_dir} ✦ (esc to cancel • {elapsed}s , Ctrl-E to show details)"
+        else:
+            status_text = f"{work_dir} ✦ (esc to cancel , Ctrl-E to show details)"
+        
+        status_widget.update(status_text)
+
+    async def start_timer(self) -> None:
+        """Start the conversation timer."""
+        self.conversation_start_time = time.time()
+        
+        # Cancel any existing timer task
+        if self.timer_update_task:
+            self.timer_update_task.cancel()
+        
+        # Start a new timer task that updates every second
+        self.timer_update_task = self.set_interval(1.0, self.update_status_line)
+
+    def stop_timer(self) -> None:
+        """Stop the conversation timer."""
+        if self.timer_update_task:
+            self.timer_update_task.cancel()
+            self.timer_update_task = None
+        
+        self.conversation_start_time = None
+        self.update_status_line()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle when user submits input."""
@@ -210,11 +276,14 @@ class OpenHandsApp(App):
         )
         main_display.mount(status_widget)
 
+        # Start the timer
+        self.call_later(self.start_timer)
+
         # Process message asynchronously to keep UI responsive
         # Only run worker if we have an active app (not in tests)
         try:
             self.run_worker(
-                self.conversation_runner.process_message_async(user_message),
+                self._process_message_with_timer(user_message),
                 name="process_message",
             )
         except RuntimeError:
@@ -224,6 +293,14 @@ class OpenHandsApp(App):
                 classes="status-message",
             )
             main_display.mount(placeholder_widget)
+
+    async def _process_message_with_timer(self, user_message: str) -> None:
+        """Process message and handle timer lifecycle."""
+        try:
+            await self.conversation_runner.process_message_async(user_message)
+        finally:
+            # Stop the timer when processing is complete
+            self.stop_timer()
 
     def action_request_quit(self) -> None:
         """Action to handle Ctrl+Q key binding."""
