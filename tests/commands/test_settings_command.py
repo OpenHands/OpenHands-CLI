@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from prompt_toolkit.input.defaults import create_pipe_input
-from prompt_toolkit.output.defaults import DummyOutput
+from prompt_toolkit.output.base import DummyOutput
 
 from openhands_cli.agent_chat import run_cli_entry
 from openhands_cli.user_actions import UserConfirmation
@@ -27,7 +27,8 @@ def test_settings_command_works_without_conversation(
     mock_get_session_prompter,
     mock_exit_confirm,
 ):
-    """Test that /settings command works when no conversation is active (bug fix scenario)."""
+    """Test that /settings command works when no conversation is active
+    (bug fix scenario)."""
     # Auto-accept the exit prompt to avoid interactive UI
     mock_exit_confirm.return_value = UserConfirmation.ACCEPT
 

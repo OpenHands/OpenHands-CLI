@@ -96,9 +96,12 @@ def test_model_selection_flows(
     assert result in ["gpt-4o"]
 
     # Choose custom model via input
-    mocks.cli_confirm.return_value = 4  # for provider with >=4 models this would be alt; in our data openai has 3 -> alt index is 3
+    # for provider with >=4 models this would be alt; in our data openai has
+    # 3 -> alt index is 3
+    mocks.cli_confirm.return_value = 4
     mocks.cli_text_input.return_value = "custom-model"
-    # Adjust to actual alt index produced by code (len(models[:4]) yields 3 + 1 alt -> index 3)
+    # Adjust to actual alt index produced by code (len(models[:4]) yields
+    # 3 + 1 alt -> index 3)
     mocks.cli_confirm.return_value = 3
     step_counter2 = StepCounter(1)
     result2 = choose_llm_model(step_counter2, "openai")

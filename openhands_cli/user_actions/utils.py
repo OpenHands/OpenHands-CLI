@@ -108,7 +108,7 @@ def cli_text_input(
     question: str,
     escapable: bool = True,
     completer: Completer | None = None,
-    validator: Validator = None,
+    validator: Validator | None = None,
     is_password: bool = False,
 ) -> str:
     """Prompt user to enter text input with optional validation.

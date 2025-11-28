@@ -5,7 +5,7 @@ from uuid import UUID
 
 import pytest
 from prompt_toolkit.input.defaults import create_pipe_input
-from prompt_toolkit.output.defaults import DummyOutput
+from prompt_toolkit.output.base import DummyOutput
 
 from openhands_cli.setup import MissingAgentSpec, verify_agent_exists_or_setup_agent
 from openhands_cli.user_actions import UserConfirmation
@@ -34,7 +34,8 @@ def test_verify_agent_exists_or_setup_agent_success(mock_load_agent_specs):
 def test_verify_agent_exists_or_setup_agent_missing_agent_spec(
     mock_load_agent_specs, mock_settings_screen_class
 ):
-    """Test that verify_agent_exists_or_setup_agent handles MissingAgentSpec exception."""
+    """Test that verify_agent_exists_or_setup_agent handles
+    MissingAgentSpec exception."""
     # Mock the SettingsScreen instance
     mock_settings_screen = MagicMock()
     mock_settings_screen_class.return_value = mock_settings_screen
@@ -106,6 +107,7 @@ def test_new_command_resets_confirmation_mode(
 
         run_cli_entry(None)
 
-    # Assert we created one runner for the conversation when a message was processed after /new
+    # Assert we created one runner for the conversation when a message was
+    # processed after /new
     assert mock_runner_cls.call_count == 1
     assert mock_runner_cls.call_args_list[0].args[0] is conv1

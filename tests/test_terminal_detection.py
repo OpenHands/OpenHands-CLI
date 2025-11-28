@@ -14,7 +14,7 @@ class TestTerminalDetection:
         with (
             patch("sys.stdin.isatty", return_value=True),
             patch("sys.stdout.isatty", return_value=True),
-            patch.dict(os.environ, {"TERM": "xterm-256color"}),
+            patch.dict(os.environ, {"TERM": "xterm-256color", "CI": "false"}),
         ):
             assert check_terminal_compatibility() is True
 
@@ -23,7 +23,7 @@ class TestTerminalDetection:
         with (
             patch("sys.stdin.isatty", return_value=False),
             patch("sys.stdout.isatty", return_value=True),
-            patch.dict(os.environ, {"TERM": "xterm"}),
+            patch.dict(os.environ, {"TERM": "xterm", "CI": "false"}),
         ):
             assert check_terminal_compatibility() is False
 
@@ -32,7 +32,7 @@ class TestTerminalDetection:
         with (
             patch("sys.stdin.isatty", return_value=True),
             patch("sys.stdout.isatty", return_value=False),
-            patch.dict(os.environ, {"TERM": "xterm"}),
+            patch.dict(os.environ, {"TERM": "xterm", "CI": "false"}),
         ):
             assert check_terminal_compatibility() is False
 
@@ -41,7 +41,7 @@ class TestTerminalDetection:
         with (
             patch("sys.stdin.isatty", return_value=True),
             patch("sys.stdout.isatty", return_value=True),
-            patch.dict(os.environ, {"TERM": "dumb"}),
+            patch.dict(os.environ, {"TERM": "dumb", "CI": "false"}),
         ):
             assert check_terminal_compatibility() is False
 
@@ -50,7 +50,7 @@ class TestTerminalDetection:
         with (
             patch("sys.stdin.isatty", return_value=True),
             patch("sys.stdout.isatty", return_value=True),
-            patch.dict(os.environ, {"TERM": ""}),
+            patch.dict(os.environ, {"TERM": "", "CI": "false"}),
         ):
             assert check_terminal_compatibility() is False
 
@@ -59,7 +59,7 @@ class TestTerminalDetection:
         with (
             patch("sys.stdin.isatty", return_value=True),
             patch("sys.stdout.isatty", return_value=True),
-            patch.dict(os.environ, {"TERM": "unknown"}),
+            patch.dict(os.environ, {"TERM": "unknown", "CI": "false"}),
         ):
             assert check_terminal_compatibility() is False
 
@@ -70,7 +70,8 @@ class TestTerminalDetection:
             patch("sys.stdout.isatty", return_value=True),
         ):
             # Create a clean environment without TERM
-            clean_env = {k: v for k, v in os.environ.items() if k != "TERM"}
+            clean_env = {k: v for k, v in os.environ.items() if k not in {"TERM", "CI"}}
+            clean_env["CI"] = "false"
             with patch.dict(os.environ, clean_env, clear=True):
                 assert check_terminal_compatibility() is False
 
@@ -79,7 +80,7 @@ class TestTerminalDetection:
         with (
             patch("sys.stdin.isatty", return_value=True),
             patch("sys.stdout.isatty", return_value=True),
-            patch.dict(os.environ, {"TERM": "xterm"}),
+            patch.dict(os.environ, {"TERM": "xterm", "CI": "false"}),
             patch("prompt_toolkit.input.create_input", side_effect=Exception("Failed")),
         ):
             assert check_terminal_compatibility() is False
@@ -89,7 +90,7 @@ class TestTerminalDetection:
         with (
             patch("sys.stdin.isatty", return_value=True),
             patch("sys.stdout.isatty", return_value=True),
-            patch.dict(os.environ, {"TERM": "xterm"}),
+            patch.dict(os.environ, {"TERM": "xterm", "CI": "false"}),
         ):
             assert check_terminal_compatibility() is True
 
@@ -98,7 +99,7 @@ class TestTerminalDetection:
         with (
             patch("sys.stdin.isatty", return_value=True),
             patch("sys.stdout.isatty", return_value=True),
-            patch.dict(os.environ, {"TERM": "screen"}),
+            patch.dict(os.environ, {"TERM": "screen", "CI": "false"}),
         ):
             assert check_terminal_compatibility() is True
 
@@ -107,7 +108,7 @@ class TestTerminalDetection:
         with (
             patch("sys.stdin.isatty", return_value=True),
             patch("sys.stdout.isatty", return_value=True),
-            patch.dict(os.environ, {"TERM": "tmux-256color"}),
+            patch.dict(os.environ, {"TERM": "tmux-256color", "CI": "false"}),
         ):
             assert check_terminal_compatibility() is True
 

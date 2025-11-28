@@ -5,7 +5,7 @@ from uuid import UUID
 
 import pytest
 from prompt_toolkit.input.defaults import create_pipe_input
-from prompt_toolkit.output.defaults import DummyOutput
+from prompt_toolkit.output.base import DummyOutput
 
 from openhands.sdk.conversation.state import ConversationExecutionStatus
 from openhands_cli.user_actions import UserConfirmation
@@ -152,7 +152,8 @@ def test_resume_command_successful_resume(agent_status):
     # Verify runner was created and process_message was called
     assert mock_runner_cls.call_count == 1
 
-    # Verify process_message was called twice: once with the initial message, once with None for resume
+    # Verify process_message was called twice: once with the initial message,
+    # once with None for resume
     assert runner.process_message.call_count == 2
 
     # Check the calls to process_message
