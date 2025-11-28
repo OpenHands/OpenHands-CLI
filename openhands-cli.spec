@@ -32,8 +32,8 @@ a = Analysis(
         *collect_data_files('litellm'),
         *collect_data_files('fastmcp'),
         *collect_data_files('mcp'),
-        # Include all data files from openhands.sdk (templates, configs, etc.)
-        *collect_data_files('openhands.sdk'),
+        # Include Jinja prompt templates required by the agent SDK
+        *collect_data_files('openhands.sdk.agent', includes=['prompts/*.j2']),
         # Include package metadata for importlib.metadata
         *copy_metadata('fastmcp'),
         *copy_metadata('agent-client-protocol'),
@@ -56,7 +56,7 @@ a = Analysis(
         'mcp.client',
         'mcp.server',
         'mcp.shared',
-        'openhands.tools.terminal',
+        'openhands.tools.execute_bash',
         'openhands.tools.str_replace_editor',
         'openhands.tools.task_tracker',
     ],
@@ -96,7 +96,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='openhands',
+    name='openhands-cli',
     debug=False,
     bootloader_ignore_signals=False,
     strip=True,  # Strip debug symbols to reduce size

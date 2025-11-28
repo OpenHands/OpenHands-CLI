@@ -138,9 +138,9 @@ def test_executable(dummy_agent) -> bool:
         specs_path.parent.mkdir(parents=True, exist_ok=True)
         specs_path.write_text(dummy_agent.model_dump_json())
 
-    exe_path = Path("dist/openhands")
+    exe_path = Path("dist/openhands-cli")
     if not exe_path.exists():
-        exe_path = Path("dist/openhands.exe")
+        exe_path = Path("dist/openhands-cli.exe")
         if not exe_path.exists():
             print("❌ Executable not found!")
             return False

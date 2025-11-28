@@ -32,6 +32,6 @@ uv run openhands
 ./build.sh --install-pyinstaller
 
 # The binary will be in dist/
-./dist/openhands            # macOS/Linux
-# dist/openhands.exe        # Windows
+./dist/openhands-cli            # macOS/Linux
+# dist/openhands-cli.exe        # Windows
 ```
