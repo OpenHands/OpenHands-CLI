@@ -9,5 +9,5 @@ def test_user_skills_default_true():
 
 def test_user_skills_disable_with_flag():
     parser = create_main_parser()
-    args = parser.parse_args(['--no-user-skills'])
+    args = parser.parse_args(["--no-user-skills"])
     assert args.user_skills is False

@@ -52,23 +52,7 @@ from openhands.tools.task_tracker.definition import (
     TaskTrackerObservation,
     TaskTrackerStatusType,
 )
-
-
-try:
-    from openhands.tools.terminal.definition import TerminalAction
-except ModuleNotFoundError:  # e.g. missing fcntl on Windows
-
-    class _TerminalActionStub:
-        """Fallback TerminalAction stub for platforms without terminal backend.
-
-        This allows ACP event processing code and tests to import on Windows
-        where the underlying openhands terminal implementation depends on
-        fcntl, which is unavailable.
-        """
-
-        command: str | None = None
-
-    TerminalAction = _TerminalActionStub  # type: ignore[assignment]
+from openhands.tools.terminal.definition import TerminalAction
 
 
 logger = get_logger(__name__)

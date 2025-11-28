@@ -10,29 +10,19 @@ from openhands.sdk.conversation import (
 )
 from openhands.sdk.security.confirmation_policy import AlwaysConfirm
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
+from openhands.tools.file_editor import (
+    FileEditorTool,  # type: ignore[attr-defined]  # noqa: F401
+)
+from openhands.tools.task_tracker import (
+    TaskTrackerTool,  # type: ignore[attr-defined]  # noqa: F401
+)
+from openhands.tools.terminal import (
+    TerminalTool,  # type: ignore[attr-defined]  # noqa: F401
+)
 from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
 from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.tui.settings.store import AgentStore
 from openhands_cli.tui.visualizer import CLIVisualizer
-
-
-# register tools
-try:
-    from openhands.tools.file_editor import (
-        FileEditorTool,  # type: ignore[attr-defined]  # noqa: F401
-    )
-    from openhands.tools.task_tracker import (
-        TaskTrackerTool,  # type: ignore[attr-defined]  # noqa: F401
-    )
-    from openhands.tools.terminal import (
-        TerminalTool,  # type: ignore[attr-defined]  # noqa: F401
-    )
-except ModuleNotFoundError:
-    # Some platforms (e.g., Windows) may not have all low-level deps like fcntl.
-    # The core CLI and tests don't require these tools at import time.
-    TerminalTool = None  # type: ignore[assignment]
-    FileEditorTool = None  # type: ignore[assignment]
-    TaskTrackerTool = None  # type: ignore[assignment]
 
 
 class MissingAgentSpec(Exception):
