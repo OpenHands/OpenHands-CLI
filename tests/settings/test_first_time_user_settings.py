@@ -5,6 +5,9 @@ import pytest
 from openhands_cli.agent_chat import run_cli_entry
 
 
+pytestmark = pytest.mark.usefixtures("skip_terminal_check_env")
+
+
 @patch("openhands_cli.agent_chat.print_formatted_text")
 @patch("openhands_cli.tui.settings.settings_screen.save_settings_confirmation")
 @patch("openhands_cli.tui.settings.settings_screen.prompt_api_key")

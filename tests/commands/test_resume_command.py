@@ -11,6 +11,9 @@ from openhands.sdk.conversation.state import ConversationExecutionStatus
 from openhands_cli.user_actions import UserConfirmation
 
 
+pytestmark = pytest.mark.usefixtures("skip_terminal_check_env")
+
+
 # ---------- Fixtures & helpers ----------
 
 

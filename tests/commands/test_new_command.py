@@ -3,14 +3,15 @@
 from unittest.mock import MagicMock, patch
 from uuid import UUID
 
+import pytest
 from prompt_toolkit.input.defaults import create_pipe_input
 from prompt_toolkit.output.base import DummyOutput
 
-from openhands_cli.setup import (
-    MissingAgentSpec,
-    verify_agent_exists_or_setup_agent,
-)
+from openhands_cli.setup import MissingAgentSpec, verify_agent_exists_or_setup_agent
 from openhands_cli.user_actions import UserConfirmation
+
+
+pytestmark = pytest.mark.usefixtures("skip_terminal_check_env")
 
 
 @patch("openhands_cli.setup.load_agent_specs")
@@ -33,8 +34,8 @@ def test_verify_agent_exists_or_setup_agent_success(mock_load_agent_specs):
 def test_verify_agent_exists_or_setup_agent_missing_agent_spec(
     mock_load_agent_specs, mock_settings_screen_class
 ):
-    """Test that verify_agent_exists_or_setup_agent handles MissingAgentSpec
-    exception."""
+    """Test that verify_agent_exists_or_setup_agent handles
+    MissingAgentSpec exception."""
     # Mock the SettingsScreen instance
     mock_settings_screen = MagicMock()
     mock_settings_screen_class.return_value = mock_settings_screen
