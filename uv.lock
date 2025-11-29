@@ -1455,7 +1455,7 @@ dev = [
 [[package]]
 name = "openhands-sdk"
 version = "1.3.0"
-source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=openhands%2Fadd-claude-gemini-support#2626d750f41587a1b3465a0078d8ba42bedb182f" }
+source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=openhands%2Fadd-claude-gemini-support#81fdfe6d774700f33123960638bfd18c66b0cb11" }
 dependencies = [
     { name = "deprecation" },
     { name = "fastmcp" },

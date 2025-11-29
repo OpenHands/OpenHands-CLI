@@ -317,9 +317,11 @@ def test_load_repo_context_files_with_truncation(temp_project_dir_with_large_con
         assert len(claude_skill.content) <= THIRD_PARTY_SKILL_MAX_CHARS
         assert original_size > THIRD_PARTY_SKILL_MAX_CHARS
         
-        # Should contain the truncation notice
+        # Should contain the truncation notice with filepath
         assert "<TRUNCATED>" in claude_skill.content
         assert "exceeded the maximum length" in claude_skill.content
+        assert "claude.md" in claude_skill.content  # Should mention the filename
+        assert "You can read the full file if needed" in claude_skill.content
         
         # Should preserve beginning and end
         assert "Claude Instructions - Start" in claude_skill.content
