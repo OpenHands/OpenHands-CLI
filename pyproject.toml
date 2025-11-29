@@ -18,7 +18,7 @@ classifiers = [
 # Using Git URLs for dependencies so installs from PyPI pull from GitHub
 # TODO: pin package versions once agent-sdk has published PyPI packages
 dependencies = [
-  "openhands-sdk==1.3.0",
+  "openhands-sdk @ git+https://github.com/OpenHands/software-agent-sdk.git@openhands/add-claude-gemini-support#subdirectory=openhands-sdk",
   "openhands-tools==1.3.0",
   "prompt-toolkit>=3",
   "typer>=0.17.4",
