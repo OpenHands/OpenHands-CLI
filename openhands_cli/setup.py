@@ -30,6 +30,7 @@ def load_agent_specs(
     conversation_id: str | None = None,
     mcp_servers: dict[str, dict[str, Any]] | None = None,
     skills: list[Skill] | None = None,
+    user_skills: bool = True,
 ) -> Agent:
     """Load agent specifications.
 
@@ -45,7 +46,7 @@ def load_agent_specs(
         MissingAgentSpec: If agent specification is not found or invalid
     """
     agent_store = AgentStore()
-    agent = agent_store.load(session_id=conversation_id)
+    agent = agent_store.load(session_id=conversation_id, load_user_skills=user_skills)
     if not agent:
         raise MissingAgentSpec(
             "Agent specification not found. Please configure your agent settings."
@@ -80,11 +81,11 @@ def load_agent_specs(
     return agent
 
 
-def verify_agent_exists_or_setup_agent() -> Agent:
+def verify_agent_exists_or_setup_agent(user_skills: bool = True) -> Agent:
     """Verify agent specs exists by attempting to load it."""
     settings_screen = SettingsScreen()
     try:
-        agent = load_agent_specs()
+        agent = load_agent_specs(user_skills=user_skills)
         return agent
     except MissingAgentSpec:
         # For first-time users, show the full settings flow with choice
@@ -92,11 +93,13 @@ def verify_agent_exists_or_setup_agent() -> Agent:
         settings_screen.configure_settings(first_time=True)
 
     # Try once again after settings setup attempt
-    return load_agent_specs()
+    return load_agent_specs(user_skills=user_skills)
 
 
 def setup_conversation(
-    conversation_id: UUID, include_security_analyzer: bool = True
+    conversation_id: UUID,
+    include_security_analyzer: bool = True,
+    user_skills: bool = True,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
@@ -111,7 +114,7 @@ def setup_conversation(
 
     print_formatted_text(HTML("<white>Initializing agent...</white>"))
 
-    agent = load_agent_specs(str(conversation_id))
+    agent = load_agent_specs(str(conversation_id), user_skills=user_skills)
 
     # Create conversation - agent context is now set in AgentStore.load()
     conversation: BaseConversation = Conversation(
