@@ -87,6 +87,19 @@ class TestMainEntryPoint:
         simple_main.main()
 
     @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("sys.argv", ["openhands"])
+    def test_main_handles_general_exception(
+        self, mock_run_agent_chat: MagicMock
+    ) -> None:
+        """Test that main() propagates unexpected exceptions from run_cli_entry."""
+        mock_run_agent_chat.side_effect = Exception("Unexpected error")
+
+        with pytest.raises(Exception) as exc_info:
+            simple_main.main()
+
+        assert str(exc_info.value) == "Unexpected error"
+
+    @patch("openhands_cli.agent_chat.run_cli_entry")
     @patch("sys.argv", ["openhands", "--resume", "test-conversation-id"])
     def test_main_with_resume_argument(self, mock_run_agent_chat: MagicMock) -> None:
         """Test that main() passes resume conversation ID when provided."""
