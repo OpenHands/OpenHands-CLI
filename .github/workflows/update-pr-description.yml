@@ -1,0 +1,43 @@
+---
+# Workflow to update PR descriptions with uvx launch instructions
+name: Update PR Description
+
+on:
+    pull_request:
+        types: [opened, synchronize, reopened]
+        branches: [main]
+
+permissions:
+    contents: read
+    pull-requests: write
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+    cancel-in-progress: true
+
+jobs:
+    update-pr-description:
+        name: Update PR Description with uvx Instructions
+        runs-on: ubuntu-latest
+        if: github.event_name == 'pull_request'
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Get short SHA
+              id: short_sha
+              run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+            - name: Update PR Description
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  PR_NUMBER: ${{ github.event.pull_request.number }}
+                  REPO: ${{ github.repository }}
+                  SHORT_SHA: ${{ steps.short_sha.outputs.SHORT_SHA }}
+              shell: bash
+              run: |-
+                  echo "Updating PR description with uvx commands"
+                  bash ${GITHUB_WORKSPACE}/.github/scripts/update_pr_description.sh

@@ -1,4 +1,36 @@
-.PHONY: help install install-dev test format clean run
+SHELL := /usr/bin/env bash
+.SHELLFLAGS := -eu -o pipefail -c
+
+# Colors for output
+ECHO := printf '%b\n'
+GREEN := \033[32m
+YELLOW := \033[33m
+RED := \033[31m
+CYAN := \033[36m
+RESET := \033[0m
+
+.PHONY: help install install-dev test format clean run check-uv-version build
+
+check-uv-version:
+	@$(ECHO) "$(YELLOW)Checking uv version...$(RESET)"
+	@UV_VERSION=$$(uv --version | cut -d' ' -f2); \
+	REQUIRED_VERSION=$(REQUIRED_UV_VERSION); \
+	if [ "$$(printf '%s\n' "$$REQUIRED_VERSION" "$$UV_VERSION" | sort -V | head -n1)" != "$$REQUIRED_VERSION" ]; then \
+		$(ECHO) "$(RED)Error: uv version $$UV_VERSION is less than required $$REQUIRED_VERSION$(RESET)"; \
+		$(ECHO) "$(YELLOW)Please update uv with: uv self update$(RESET)"; \
+		exit 1; \
+	fi; \
+	$(ECHO) "$(GREEN)uv version $$UV_VERSION meets requirements$(RESET)"
+
+build: check-uv-version
+	@$(ECHO) "$(CYAN)Setting up OpenHands V1 development environment...$(RESET)"
+	@$(ECHO) "$(YELLOW)Installing dependencies with uv sync --dev...$(RESET)"
+	@uv sync --dev
+	@$(ECHO) "$(GREEN)Dependencies installed successfully.$(RESET)"
+	@$(ECHO) "$(YELLOW)Setting up pre-commit hooks...$(RESET)"
+	@uv run pre-commit install
+	@$(ECHO) "$(GREEN)Pre-commit hooks installed successfully.$(RESET)"
+	@$(ECHO) "$(GREEN)Build complete! Development environment is ready.$(RESET)"
 
 # Default target
 help:
