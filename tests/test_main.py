@@ -46,10 +46,12 @@ class TestMainEntryPoint:
         # Should complete without raising an exception (graceful exit)
         simple_main.main()
 
-        # Should call run_cli_entry with no resume conversation ID
+        # Should call run_cli_entry with no resume conversation ID,
+        # no confirmation mode, and no queued inputs
         mock_run_agent_chat.assert_called_once()
         kwargs = mock_run_agent_chat.call_args.kwargs
         assert kwargs["resume_conversation_id"] is None
+        assert kwargs["confirmation_mode"] is None
         assert kwargs["queued_inputs"] is None
 
     @patch("openhands_cli.agent_chat.run_cli_entry")
@@ -114,6 +116,64 @@ class TestMainEntryPoint:
         mock_run_agent_chat.assert_called_once()
         kwargs = mock_run_agent_chat.call_args.kwargs
         assert kwargs["resume_conversation_id"] == "test-conversation-id"
+        assert kwargs["confirmation_mode"] is None
+        assert kwargs["queued_inputs"] is None
+
+    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("sys.argv", ["openhands", "--always-approve"])
+    def test_main_with_always_approve_argument(
+        self, mock_run_agent_chat: MagicMock
+    ) -> None:
+        """Test that main() passes always-approve confirmation mode when provided."""
+        # Mock run_cli_entry to raise KeyboardInterrupt to exit gracefully
+        mock_run_agent_chat.side_effect = KeyboardInterrupt()
+
+        # Should complete without raising an exception (graceful exit)
+        simple_main.main()
+
+        # Should call run_cli_entry with always confirmation mode
+        mock_run_agent_chat.assert_called_once()
+        kwargs = mock_run_agent_chat.call_args.kwargs
+        assert kwargs["resume_conversation_id"] is None
+        assert kwargs["confirmation_mode"] == "always-approve"
+        assert kwargs["queued_inputs"] is None
+
+    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("sys.argv", ["openhands", "--llm-approve"])
+    def test_main_with_llm_approve_argument(
+        self, mock_run_agent_chat: MagicMock
+    ) -> None:
+        """Test that main() passes llm-approve confirmation mode when provided."""
+        # Mock run_cli_entry to raise KeyboardInterrupt to exit gracefully
+        mock_run_agent_chat.side_effect = KeyboardInterrupt()
+
+        # Should complete without raising an exception (graceful exit)
+        simple_main.main()
+
+        # Should call run_cli_entry with llm confirmation mode
+        mock_run_agent_chat.assert_called_once()
+        kwargs = mock_run_agent_chat.call_args.kwargs
+        assert kwargs["resume_conversation_id"] is None
+        assert kwargs["confirmation_mode"] == "llm-approve"
+        assert kwargs["queued_inputs"] is None
+
+    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("sys.argv", ["openhands", "--always-ask"])
+    def test_main_with_always_ask_argument(
+        self, mock_run_agent_chat: MagicMock
+    ) -> None:
+        """Test that main() passes always-ask confirmation mode when provided."""
+        # Mock run_cli_entry to raise KeyboardInterrupt to exit gracefully
+        mock_run_agent_chat.side_effect = KeyboardInterrupt()
+
+        # Should complete without raising an exception (graceful exit)
+        simple_main.main()
+
+        # Should call run_cli_entry with always-ask confirmation mode
+        mock_run_agent_chat.assert_called_once()
+        kwargs = mock_run_agent_chat.call_args.kwargs
+        assert kwargs["resume_conversation_id"] is None
+        assert kwargs["confirmation_mode"] == "always-ask"
         assert kwargs["queued_inputs"] is None
 
 
@@ -122,11 +182,51 @@ class TestMainEntryPoint:
     [
         (
             ["openhands"],
-            {"resume_conversation_id": None, "queued_inputs": None},
+            {
+                "resume_conversation_id": None,
+                "confirmation_mode": None,
+                "queued_inputs": None,
+            },
         ),
         (
             ["openhands", "--resume", "test-id"],
-            {"resume_conversation_id": "test-id", "queued_inputs": None},
+            {
+                "resume_conversation_id": "test-id",
+                "confirmation_mode": None,
+                "queued_inputs": None,
+            },
+        ),
+        (
+            ["openhands", "--always-ask"],
+            {
+                "resume_conversation_id": None,
+                "confirmation_mode": "always-ask",
+                "queued_inputs": None,
+            },
+        ),
+        (
+            ["openhands", "--always-approve"],
+            {
+                "resume_conversation_id": None,
+                "confirmation_mode": "always-approve",
+                "queued_inputs": None,
+            },
+        ),
+        (
+            ["openhands", "--llm-approve"],
+            {
+                "resume_conversation_id": None,
+                "confirmation_mode": "llm-approve",
+                "queued_inputs": None,
+            },
+        ),
+        (
+            ["openhands", "--resume", "test-id", "--always-approve"],
+            {
+                "resume_conversation_id": "test-id",
+                "confirmation_mode": "always-approve",
+                "queued_inputs": None,
+            },
         ),
     ],
 )
@@ -272,6 +372,18 @@ def test_main_serve_calls_launch_gui_server(monkeypatch, argv, expected_kwargs):
         (["openhands", "invalid-command"], 2),  # argparse error
         (["openhands", "--help"], 0),  # top-level help
         (["openhands", "serve", "--help"], 0),  # subcommand help
+        (
+            ["openhands", "--always-approve", "--llm-approve"],
+            2,
+        ),  # mutually exclusive
+        (
+            ["openhands", "--always-ask", "--always-approve"],
+            2,
+        ),  # mutually exclusive
+        (
+            ["openhands", "--always-ask", "--llm-approve"],
+            2,
+        ),  # mutually exclusive
     ],
 )
 def test_help_and_invalid(monkeypatch, argv, expected_exit_code):

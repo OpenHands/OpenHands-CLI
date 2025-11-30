@@ -6,7 +6,6 @@ from openhands.sdk.conversation.state import (
     ConversationState,
 )
 from openhands.sdk.security.confirmation_policy import (
-    AlwaysConfirm,
     ConfirmationPolicyBase,
     ConfirmRisky,
     NeverConfirm,
@@ -30,17 +29,16 @@ class ConversationRunner:
     def toggle_confirmation_mode(self):
         new_confirmation_mode_state = not self.is_confirmation_mode_active
 
-        self.conversation = setup_conversation(
-            self.conversation.id, include_security_analyzer=new_confirmation_mode_state
-        )
-
         if new_confirmation_mode_state:
-            # Enable confirmation mode: set AlwaysConfirm policy
-            self.set_confirmation_policy(AlwaysConfirm())
+            # Enable confirmation mode: recreate conversation with always-ask mode
+            self.conversation = setup_conversation(
+                self.conversation.id, confirmation_mode="always-ask"
+            )
         else:
-            # Disable confirmation mode: set NeverConfirm policy and remove
-            # security analyzer
-            self.set_confirmation_policy(NeverConfirm())
+            # Disable confirmation mode: recreate conversation with always-approve mode
+            self.conversation = setup_conversation(
+                self.conversation.id, confirmation_mode="always-approve"
+            )
 
     def set_confirmation_policy(
         self, confirmation_policy: ConfirmationPolicyBase
