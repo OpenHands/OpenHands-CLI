@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-Simple main entry point for OpenHands CLI.
-This is a simplified version that demonstrates the TUI functionality.
-"""
+"""Simple main entry point for OpenHands CLI."""
 
 import logging
 import os

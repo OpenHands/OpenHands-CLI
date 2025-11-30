@@ -65,27 +65,23 @@ def run_cli_entry(
 ) -> None:
     """Run the agent chat session using the agent SDK.
 
-
     Raises:
         AgentSetupError: If agent setup fails
         KeyboardInterrupt: If user interrupts the session
         EOFError: If EOF is encountered
     """
 
-    # Normalize queued_inputs to a local copy to prevent mutating the caller's list
-    pending_inputs = list(queued_inputs) if queued_inputs else []
-
     conversation_id = uuid.uuid4()
     if resume_conversation_id:
         try:
             conversation_id = uuid.UUID(resume_conversation_id)
         except ValueError:
-            print_formatted_text(
-                HTML(
-                    f"<yellow>Warning: '{resume_conversation_id}' is not a valid "
-                    f"UUID.</yellow>"
-                )
+            warning = (
+                "<yellow>Warning: '"
+                f"{resume_conversation_id}"
+                "' is not a valid UUID.</yellow>"
             )
+            print_formatted_text(HTML(warning))
             return
 
     try:
@@ -107,10 +103,13 @@ def run_cli_entry(
     conversation = None
     session = get_session_prompter()
 
+    # Initialize pending inputs from queued_inputs
+    pending_inputs = list(queued_inputs) if queued_inputs else []
+
     # Main chat loop
     while True:
         try:
-            # Get user input
+            # Get user input from pending inputs or prompt
             if pending_inputs:
                 user_input = pending_inputs.pop(0)
             else:
@@ -175,22 +174,24 @@ def run_cli_entry(
                 continue
 
             elif command == "/status":
-                if conversation is not None:
+                if conversation:
                     display_status(conversation, session_start_time=session_start_time)
                 else:
                     print_formatted_text(
-                        HTML("<yellow>No active conversation</yellow>")
+                        HTML("<yellow>No active conversation running...</yellow>")
                     )
                 continue
 
             elif command == "/confirm":
-                if runner is not None:
-                    runner.toggle_confirmation_mode()
-                    new_status = (
-                        "enabled" if runner.is_confirmation_mode_active else "disabled"
+                if not runner:
+                    print_formatted_text(
+                        HTML("<yellow>No active conversation running...</yellow>")
                     )
-                else:
-                    new_status = "disabled (no active conversation)"
+                    continue
+                runner.toggle_confirmation_mode()
+                new_status = (
+                    "enabled" if runner.is_confirmation_mode_active else "disabled"
+                )
                 print_formatted_text(
                     HTML(f"<yellow>Confirmation mode {new_status}</yellow>")
                 )

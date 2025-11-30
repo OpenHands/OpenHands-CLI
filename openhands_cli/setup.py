@@ -5,15 +5,20 @@ from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
 from openhands.sdk.context import AgentContext, Skill
-from openhands.sdk.security.confirmation_policy import (
-    AlwaysConfirm,
+from openhands.sdk.conversation import (
+    visualizer,  # noqa: F401 (ensures tools registered)
 )
+from openhands.sdk.security.confirmation_policy import AlwaysConfirm
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
-
-# Register tools on import
-from openhands.tools.file_editor import FileEditorTool  # noqa: F401
-from openhands.tools.task_tracker import TaskTrackerTool  # noqa: F401
-from openhands.tools.terminal import TerminalTool  # noqa: F401
+from openhands.tools.file_editor import (
+    FileEditorTool,  # type: ignore[attr-defined]  # noqa: F401
+)
+from openhands.tools.task_tracker import (
+    TaskTrackerTool,  # type: ignore[attr-defined]  # noqa: F401
+)
+from openhands.tools.terminal import (
+    TerminalTool,  # type: ignore[attr-defined]  # noqa: F401
+)
 from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
 from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.tui.settings.store import AgentStore
@@ -81,14 +86,17 @@ def load_agent_specs(
 
 
 def verify_agent_exists_or_setup_agent() -> Agent:
-    """Verify agent specs exists by attempting to load it."""
+    """Verify agent specs exists by attempting to load it.
+
+    If missing, run the settings flow and try once more.
+    """
     settings_screen = SettingsScreen()
     try:
         agent = load_agent_specs()
         return agent
     except MissingAgentSpec:
-        # For first-time users, show the full settings flow with choice
-        # between basic/advanced
+        # For first-time users, show the full settings flow with
+        # choice between basic/advanced
         settings_screen.configure_settings(first_time=True)
 
     # Try once again after settings setup attempt
@@ -96,14 +104,14 @@ def verify_agent_exists_or_setup_agent() -> Agent:
 
 
 def setup_conversation(
-    conversation_id: UUID, include_security_analyzer: bool = True
+    conversation_id: UUID,
+    include_security_analyzer: bool = True,
 ) -> BaseConversation:
-    """
-    Setup the conversation with agent.
+    """Setup the conversation with agent.
 
     Args:
-        conversation_id: conversation ID to use. If not provided, a random UUID
-            will be generated.
+        conversation_id: conversation ID to use.
+            If not provided, a random UUID will be generated.
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
