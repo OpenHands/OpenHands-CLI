@@ -35,7 +35,7 @@ class OpenHandsApp(App):
     # Key bindings
     BINDINGS: ClassVar = [
         ("ctrl+q", "request_quit", "Quit the application"),
-        ("ctrl+e", "expand_all", "Expand the cells"),
+        ("f2", "expand_all", "Expand the cells"),
         ("escape", "pause_conversation", "Pause the conversation"),
     ]
 
@@ -293,7 +293,7 @@ class OpenHandsApp(App):
         ):
             elapsed = int(time.time() - self.conversation_start_time)
             status_text = (
-                f"{work_dir} ✦ (esc to cancel • {elapsed}s , Ctrl-E to show details)"
+                f"{work_dir} ✦ (esc to cancel • {elapsed}s , F2 to show details)"
             )
         else:
             # Just show work directory when not running
