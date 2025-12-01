@@ -16,6 +16,10 @@ from openhands.sdk import (
     TextContent,
 )
 from openhands.sdk.conversation.state import ConversationExecutionStatus
+from openhands.sdk.security.confirmation_policy import (
+    AlwaysConfirm,
+    ConfirmationPolicyBase,
+)
 from openhands_cli.runner import ConversationRunner
 from openhands_cli.setup import (
     MissingAgentSpec,
@@ -30,7 +34,6 @@ from openhands_cli.tui.tui import (
     display_welcome,
 )
 from openhands_cli.user_actions import UserConfirmation, exit_session_confirmation
-from openhands_cli.user_actions.types import ConfirmationMode
 from openhands_cli.user_actions.utils import get_session_prompter
 
 
@@ -62,16 +65,15 @@ def _print_exit_hint(conversation_id: str) -> None:
 
 def run_cli_entry(
     resume_conversation_id: str | None = None,
-    confirmation_mode: ConfirmationMode | None = None,
+    confirmation_policy: ConfirmationPolicyBase = AlwaysConfirm(),
     queued_inputs: list[str] | None = None,
 ) -> None:
     """Run the agent chat session using the agent SDK.
 
     Args:
         resume_conversation_id: ID of conversation to resume
-        confirmation_mode: Confirmation mode to use.
-            Options: None (defaults to "always-ask"), "always-ask",
-            "always-approve", "llm-approve"
+        confirmation_policy: Confirmation policy to use.
+            Options: AlwaysConfirm(), NeverConfirm(), ConfirmRisky()
         queued_inputs: Optional list of input strings to queue at the start
 
     Raises:
@@ -115,16 +117,7 @@ def run_cli_entry(
     conversation = None
     session = get_session_prompter()
 
-    # Display confirmation mode status
-    # Default to "always-ask" if not specified
-    effective_mode = confirmation_mode or "always-ask"
-    mode_display_map = {
-        "always-ask": "always-ask (confirm all actions)",
-        "always-approve": "always-approve (auto-approve all)",
-        "llm-approve": "llm-approve (confirm high-risk only)",
-    }
-    mode_display = mode_display_map.get(effective_mode, effective_mode)
-    print_formatted_text(HTML(f"<yellow>Confirmation mode: {mode_display}</yellow>"))
+    print_formatted_text(HTML(f"<gray>Confirmation mode: {confirmation_policy}</gray>"))
 
     # Main chat loop
     while True:
@@ -239,7 +232,7 @@ def run_cli_entry(
 
             if not runner or not conversation:
                 conversation = setup_conversation(
-                    conversation_id, confirmation_mode=confirmation_mode
+                    conversation_id, confirmation_policy=confirmation_policy
                 )
                 runner = ConversationRunner(conversation)
             runner.process_message(message)

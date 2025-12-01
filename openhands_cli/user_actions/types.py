@@ -1,12 +1,8 @@
 from enum import Enum
-from typing import Literal
 
 from pydantic import BaseModel
 
 from openhands.sdk.security.confirmation_policy import ConfirmationPolicyBase
-
-
-ConfirmationMode = Literal["always-ask", "always-approve", "llm-approve"]
 
 
 class UserConfirmation(Enum):

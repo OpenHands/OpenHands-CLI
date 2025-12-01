@@ -23,15 +23,13 @@ def create_main_parser() -> argparse.ArgumentParser:
 
             Examples:
                 openhands                           # Start CLI mode
-                openhands --resume conversation-id  # Resume conversation
-                openhands --task "Summarize README" # Start with task
-                openhands --file README.md          # Start with file
-                openhands --always-ask              # Always-ask mode
-                openhands --always-approve          # Auto-approve all
-                openhands --llm-approve             # LLM-based approval
+                openhands --resume conversation-id  # Resume conversation in CLI mode
+                openhands --always-approve          # Auto-approve all agent actions
+                openhands --llm-approve             # Auto-approve actions based on LLM risk analysis
                 openhands serve                     # Launch GUI server
-                openhands serve --gpu               # Launch with GPU
-                openhands acp                       # Start as ACP server
+                openhands serve --gpu               # Launch GUI server with GPU support
+                openhands acp                       # Start as Agent-Client Protocol
+                                                      server for clients like Zed IDE
         """,
     )
 
@@ -63,11 +61,6 @@ def create_main_parser() -> argparse.ArgumentParser:
 
     # Confirmation mode options (mutually exclusive)
     confirmation_group = parser.add_mutually_exclusive_group()
-    confirmation_group.add_argument(
-        "--always-ask",
-        action="store_true",
-        help="Always ask for user confirmation before executing actions (default)",
-    )
     confirmation_group.add_argument(
         "--always-approve",
         action="store_true",
