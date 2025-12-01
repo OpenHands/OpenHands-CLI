@@ -225,7 +225,7 @@ class OpenHandsApp(App):
         self.conversation_start_time = None
         self.update_status_line()
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
+    async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle when user submits input."""
         user_message = event.value.strip()
         if user_message:
@@ -239,7 +239,7 @@ class OpenHandsApp(App):
                 self._handle_command(user_message)
             else:
                 # Handle regular messages with conversation runner
-                self._handle_user_message(user_message)
+                await self._handle_user_message(user_message)
 
             # Clear the input
             event.input.value = ""
@@ -258,7 +258,7 @@ class OpenHandsApp(App):
             )
             main_display.mount(error_widget)
 
-    def _handle_user_message(self, user_message: str) -> None:
+    async def _handle_user_message(self, user_message: str) -> None:
         """Handle regular user messages with the conversation runner."""
         main_display = self.query_one("#main_display", VerticalScroll)
 
@@ -273,12 +273,7 @@ class OpenHandsApp(App):
 
         # Show that we're processing the message
         if self.conversation_runner.is_running:
-            status_widget = Static(
-                "Agent is already processing a message...",
-                classes="status-message",
-            )
-            main_display.mount(status_widget)
-            # self.conversation_runner.queue_message(user_message)
+            await self.conversation_runner.queue_message(user_message)
             return
 
         # Start the timer

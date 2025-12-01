@@ -34,16 +34,21 @@ class MinimalConversationRunner:
             visualizer=self.visualizer,
         )
 
-    def queue_message(self, user_input: str) -> None:
+    async def queue_message(self, user_input: str) -> None:
         """Queue a message for a running conversation"""
 
         assert self.conversation is not None, "Conversation should be running"
         assert user_input
-        # self.conversation.send_message(
-        #     Message(role="user", content=[TextContent(text=user_input)])
-        # )
-        # TODO: changes required in agent sdk for queueing messages
-        # while converastion is running
+        message = Message(
+            role="user",
+            content=[TextContent(text=user_input)],
+        )
+
+        # This doesn't block - it just adds the message to the queue
+        # The running conversation will process it when ready
+        loop = asyncio.get_running_loop()
+        # Run send_message in the same thread pool, not on the UI loop
+        await loop.run_in_executor(None, self.conversation.send_message, message)
 
     async def process_message_async(self, user_input: str) -> None:
         """Process a user message asynchronously to keep UI unblocked.
