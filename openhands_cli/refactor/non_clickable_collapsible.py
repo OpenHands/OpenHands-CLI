@@ -340,8 +340,41 @@ class NonClickableCollapsible(Widget):
         # Iterate through all content widgets
         for widget in self._contents_list:
             try:
-                # Try to get renderable content (for Static widgets)
-                if hasattr(widget, "renderable"):
+                # Handle Static widgets specially
+                if widget.__class__.__name__ == "Static":
+                    # Try to get the content attribute (available in Textual Static)
+                    if (
+                        hasattr(widget, "content")
+                        and getattr(widget, "content") is not None
+                    ):
+                        content = getattr(widget, "content")
+                        if hasattr(content, "plain"):
+                            # Rich Text objects have a .plain property
+                            content_parts.append(str(getattr(content, "plain")))
+                        else:
+                            # Fallback to string representation
+                            content_parts.append(str(content))
+                    # Try to get the renderable content
+                    elif (
+                        hasattr(widget, "renderable")
+                        and getattr(widget, "renderable") is not None
+                    ):
+                        renderable = getattr(widget, "renderable")
+                        if hasattr(renderable, "plain"):
+                            # Rich Text objects have a .plain property
+                            content_parts.append(str(getattr(renderable, "plain")))
+                        else:
+                            # Fallback to string representation
+                            content_parts.append(str(renderable))
+                    else:
+                        # Last resort: use widget string representation
+                        content_parts.append(str(widget))
+                # Try custom content extraction method
+                elif hasattr(widget, "get_content_text"):
+                    content_text = getattr(widget, "get_content_text")()
+                    content_parts.append(str(content_text))
+                # Try to get renderable content (for other widgets)
+                elif hasattr(widget, "renderable"):
                     renderable = getattr(widget, "renderable")
                     if hasattr(renderable, "plain"):
                         # Rich Text objects have a .plain property
@@ -349,10 +382,6 @@ class NonClickableCollapsible(Widget):
                     else:
                         # Fallback to string representation
                         content_parts.append(str(renderable))
-                # Try custom content extraction method
-                elif hasattr(widget, "get_content_text"):
-                    content_text = getattr(widget, "get_content_text")()
-                    content_parts.append(str(content_text))
                 else:
                     # Fallback: try to get text representation
                     content_parts.append(str(widget))
