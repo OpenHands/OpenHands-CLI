@@ -20,6 +20,12 @@ from openhands_cli.locations import (
 from openhands_cli.utils import get_llm_metadata, should_set_litellm_extra_body
 
 
+class MCPConfigurationError(Exception):
+    """Raised when MCP configuration file is invalid or malformed."""
+
+    pass
+
+
 class AgentStore:
     """Single source of truth for persisting/retrieving AgentSpec."""
 
@@ -27,12 +33,29 @@ class AgentStore:
         self.file_store = LocalFileStore(root=PERSISTENCE_DIR)
 
     def load_mcp_configuration(self) -> dict[str, Any]:
+        """Load MCP configuration from file.
+
+        Returns:
+            Dictionary of MCP servers configuration, or empty dict if file doesn't exist
+
+        Raises:
+            MCPConfigurationError: If the configuration file exists but is invalid
+        """
         try:
             mcp_config_path = Path(self.file_store.root) / MCP_CONFIG_FILE
+            if not mcp_config_path.exists():
+                return {}
+
             mcp_config = MCPConfig.from_file(mcp_config_path)
             return mcp_config.to_dict()["mcpServers"]
-        except Exception:
+        except FileNotFoundError:
+            # File doesn't exist - this is OK, return empty config
             return {}
+        except Exception as e:
+            # Configuration file exists but is invalid - raise error
+            raise MCPConfigurationError(
+                f"Invalid MCP configuration file: {str(e)}"
+            ) from e
 
     def load_project_skills(self) -> list:
         """Load skills project-specific directories."""
