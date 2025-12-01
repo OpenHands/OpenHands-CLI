@@ -54,6 +54,15 @@ def create_main_parser() -> argparse.ArgumentParser:
     # CLI arguments at top level (default mode)
     parser.add_argument("--resume", type=str, help="Conversation ID to resume")
 
+    # User skills toggle: default on, disable with --no-user-skills
+    parser.add_argument(
+        "--no-user-skills",
+        dest="user_skills",
+        action="store_false",
+        help="Disable loading user skills from ~/.openhands",
+    )
+    parser.set_defaults(user_skills=True)
+
     # Subcommands
     subparsers = parser.add_subparsers(dest="command", help="Additional commands")
 
