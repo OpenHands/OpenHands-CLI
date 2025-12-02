@@ -3,11 +3,9 @@ Textual-compatible visualizer for OpenHands conversation events.
 This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 """
 
-import re
 import threading
 from typing import TYPE_CHECKING
 
-from rich.text import Text
 from textual.widgets import Static
 
 from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
@@ -23,6 +21,7 @@ from openhands.sdk.event import (
 from openhands.sdk.event.base import Event
 from openhands.sdk.event.condenser import Condensation
 from openhands_cli.refactor.non_clickable_collapsible import NonClickableCollapsible
+from openhands_cli.refactor.theme import OPENHANDS_THEME
 
 
 if TYPE_CHECKING:
@@ -31,64 +30,29 @@ if TYPE_CHECKING:
     from openhands_cli.refactor.textual_app import OpenHandsApp
 
 
-# Color scheme matching the original visualizer
-_OBSERVATION_COLOR = "yellow"
-_MESSAGE_USER_COLOR = "gold3"
-_PAUSE_COLOR = "bright_yellow"
-_SYSTEM_COLOR = "magenta"
-_THOUGHT_COLOR = "bright_black"
-_ERROR_COLOR = "red"
-_ACTION_COLOR = "blue"
-_MESSAGE_ASSISTANT_COLOR = _ACTION_COLOR
-
-# CSS-compatible color mapping for borders
-_CSS_COLOR_MAP = {
-    "yellow": "$warning",  # Use theme warning color (yellow)
-    "gold3": "$primary",  # Use theme primary color (gold)
-    "bright_yellow": "$primary",  # Use theme primary color
-    "magenta": "#ff69b4",  # Hot pink for system events
-    "bright_black": "$text-muted",  # Muted text color
-    "red": "$error",  # Use theme error color
-    "blue": "$accent",  # Use theme accent color (blue)
-}
-
-DEFAULT_HIGHLIGHT_REGEX = {
-    r"^Reasoning:": f"bold {_THOUGHT_COLOR}",
-    r"^Thought:": f"bold {_THOUGHT_COLOR}",
-    r"^Action:": f"bold {_ACTION_COLOR}",
-    r"^Arguments:": f"bold {_ACTION_COLOR}",
-    r"^Tool:": f"bold {_OBSERVATION_COLOR}",
-    r"^Result:": f"bold {_OBSERVATION_COLOR}",
-    r"^Rejection Reason:": f"bold {_ERROR_COLOR}",
-    # Markdown-style
-    r"\*\*(.*?)\*\*": "bold",
-    r"\*(.*?)\*": "italic",
-}
-
-
 def _get_event_border_color(event: Event) -> str:
+    DEFAULT_COLOR = "#ffffff"
+
     """Get the CSS border color for an event type."""
     if isinstance(event, ActionEvent):
-        return _CSS_COLOR_MAP.get(_ACTION_COLOR, "$secondary")
+        return OPENHANDS_THEME.accent or DEFAULT_COLOR
     elif isinstance(event, ObservationEvent):
-        return _CSS_COLOR_MAP.get(_OBSERVATION_COLOR, "$secondary")
+        return OPENHANDS_THEME.accent or DEFAULT_COLOR
     elif isinstance(event, UserRejectObservation):
-        return _CSS_COLOR_MAP.get(_ERROR_COLOR, "$secondary")
+        return OPENHANDS_THEME.error or DEFAULT_COLOR
     elif isinstance(event, MessageEvent):
         if event.llm_message and event.llm_message.role == "user":
-            return _CSS_COLOR_MAP.get(_MESSAGE_USER_COLOR, "$secondary")
+            return OPENHANDS_THEME.primary
         else:
-            return _CSS_COLOR_MAP.get(_MESSAGE_ASSISTANT_COLOR, "$secondary")
+            return OPENHANDS_THEME.accent or DEFAULT_COLOR
     elif isinstance(event, AgentErrorEvent):
-        return _CSS_COLOR_MAP.get(_ERROR_COLOR, "$secondary")
+        return OPENHANDS_THEME.error or DEFAULT_COLOR
     elif isinstance(event, PauseEvent):
-        return _CSS_COLOR_MAP.get(_PAUSE_COLOR, "$secondary")
-    elif isinstance(event, SystemPromptEvent):
-        return _CSS_COLOR_MAP.get(_SYSTEM_COLOR, "$secondary")
+        return OPENHANDS_THEME.primary
     elif isinstance(event, Condensation):
-        return "$text-muted"  # Neutral color for condensations
+        return "#727987"
     else:
-        return "$secondary"  # Default color for unknown events
+        return DEFAULT_COLOR
 
 
 class TextualVisualizer(ConversationVisualizerBase):
@@ -102,7 +66,6 @@ class TextualVisualizer(ConversationVisualizerBase):
         self,
         container: "VerticalScroll",
         app: "OpenHandsApp",
-        highlight_regex: dict[str, str] | None = DEFAULT_HIGHLIGHT_REGEX,
         skip_user_messages: bool = False,
     ):
         """Initialize the visualizer.
@@ -117,7 +80,6 @@ class TextualVisualizer(ConversationVisualizerBase):
         self._container = container
         self._app = app
         self._skip_user_messages = skip_user_messages
-        self._highlight_patterns = highlight_regex or {}
         # Store the main thread ID for thread safety checks
         self._main_thread_id = threading.get_ident()
 
@@ -137,25 +99,6 @@ class TextualVisualizer(ConversationVisualizerBase):
     def _add_widget_to_ui(self, widget: NonClickableCollapsible) -> None:
         """Add a widget to the UI (must be called from main thread)."""
         self._container.mount(widget)
-
-    def _apply_highlighting(self, text: Text) -> Text:
-        """Apply regex-based highlighting to text content."""
-        if not self._highlight_patterns:
-            return text
-
-        # Ensure we have a Text object
-        if not isinstance(text, Text):
-            text = Text(str(text))
-
-        # Create a copy to avoid modifying the original
-        highlighted = text.copy()
-
-        # Apply each pattern using Rich's built-in highlight_regex method
-        for pattern, style in self._highlight_patterns.items():
-            pattern_compiled = re.compile(pattern, re.MULTILINE)
-            highlighted.highlight_regex(pattern_compiled, style)
-
-        return highlighted
 
     def _escape_rich_markup(self, text: str) -> str:
         """Escape Rich markup characters in text to prevent markup errors."""
@@ -274,10 +217,6 @@ class TextualVisualizer(ConversationVisualizerBase):
 
         if not content.plain.strip():
             return None
-
-        # Apply highlighting if configured
-        if self._highlight_patterns:
-            content = self._apply_highlighting(content)
 
         # Don't emit system prompt in CLI
         if isinstance(event, SystemPromptEvent):
