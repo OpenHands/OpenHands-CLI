@@ -23,6 +23,7 @@ from textual.widgets import Footer, Input, Static, TextArea
 
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
+    ConfirmationPolicyBase,
     ConfirmRisky,
     NeverConfirm,
 )
@@ -59,8 +60,7 @@ class OpenHandsApp(App):
         exit_confirmation: bool = True,
         resume_conversation_id: uuid.UUID | None = None,
         queued_inputs: list[str] | None = None,
-        always_approve: bool = False,
-        llm_approve: bool = False,
+        initial_confirmation_policy: ConfirmationPolicyBase | None = None,
         **kwargs,
     ):
         """Initialize the app with custom OpenHands theme.
@@ -70,8 +70,8 @@ class OpenHandsApp(App):
                              If False, exit immediately.
             resume_conversation_id: Optional conversation ID to resume.
             queued_inputs: Optional list of input strings to queue at the start.
-            always_approve: If True, auto-approve all actions without confirmation.
-            llm_approve: If True, use LLM-based security analyzer (ConfirmRisky policy).
+            initial_confirmation_policy: Initial confirmation policy to use.
+                                       If None, defaults to AlwaysConfirm.
         """
         super().__init__(**kwargs)
 
@@ -86,9 +86,10 @@ class OpenHandsApp(App):
         # Store queued inputs (copy to prevent mutating caller's list)
         self.pending_inputs = list(queued_inputs) if queued_inputs else []
 
-        # Store confirmation policy settings
-        self.always_approve = always_approve
-        self.llm_approve = llm_approve
+        # Store initial confirmation policy
+        self.initial_confirmation_policy = (
+            initial_confirmation_policy or AlwaysConfirm()
+        )
 
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
@@ -386,15 +387,8 @@ class OpenHandsApp(App):
         # Initialize conversation runner with visualizer that can add widgets
         visualizer = TextualVisualizer(main_display, self)
 
-        # Determine initial confirmation policy from CLI arguments
-        initial_confirmation_policy = AlwaysConfirm()  # Default
-        if self.always_approve:
-            initial_confirmation_policy = NeverConfirm()
-        elif self.llm_approve:
-            initial_confirmation_policy = ConfirmRisky(threshold=SecurityRisk.HIGH)
-
         self.conversation_runner = ConversationRunner(
-            self.conversation_id, visualizer, initial_confirmation_policy
+            self.conversation_id, visualizer, self.initial_confirmation_policy
         )
 
         # Set up confirmation callback
@@ -860,13 +854,19 @@ def main(
         always_approve: If True, auto-approve all actions without confirmation.
         llm_approve: If True, use LLM-based security analyzer (ConfirmRisky policy).
     """
+    # Determine initial confirmation policy from CLI arguments
+    initial_confirmation_policy = AlwaysConfirm()  # Default
+    if always_approve:
+        initial_confirmation_policy = NeverConfirm()
+    elif llm_approve:
+        initial_confirmation_policy = ConfirmRisky(threshold=SecurityRisk.HIGH)
+
     app = OpenHandsApp(
         resume_conversation_id=uuid.UUID(resume_conversation_id)
         if resume_conversation_id
         else None,
         queued_inputs=queued_inputs,
-        always_approve=always_approve,
-        llm_approve=llm_approve,
+        initial_confirmation_policy=initial_confirmation_policy,
     )
     app.run()
 
