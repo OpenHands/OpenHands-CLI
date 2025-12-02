@@ -29,17 +29,17 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.locations import WORK_DIR
-from openhands_cli.refactor.autocomplete import EnhancedAutoComplete
-from openhands_cli.refactor.commands import COMMANDS, is_valid_command, show_help
-from openhands_cli.refactor.confirmation_panel import ConfirmationSidePanel
-from openhands_cli.refactor.conversation_runner import ConversationRunner
-from openhands_cli.refactor.exit_modal import ExitConfirmationModal
-from openhands_cli.refactor.mcp_side_panel import MCPSidePanel
-from openhands_cli.refactor.non_clickable_collapsible import NonClickableCollapsible
-from openhands_cli.refactor.richlog_visualizer import TextualVisualizer
-from openhands_cli.refactor.settings_screen import SettingsScreen
-from openhands_cli.refactor.splash import get_splash_content
-from openhands_cli.refactor.theme import OPENHANDS_THEME
+from openhands_cli.refactor.widgets.autocomplete import EnhancedAutoComplete
+from openhands_cli.refactor.core.commands import COMMANDS, is_valid_command, show_help
+from openhands_cli.refactor.panels.confirmation_panel import ConfirmationSidePanel
+from openhands_cli.refactor.core.conversation_runner import ConversationRunner
+from openhands_cli.refactor.modals.exit_modal import ExitConfirmationModal
+from openhands_cli.refactor.panels.mcp_side_panel import MCPSidePanel
+from openhands_cli.refactor.widgets.non_clickable_collapsible import NonClickableCollapsible
+from openhands_cli.refactor.widgets.richlog_visualizer import TextualVisualizer
+from openhands_cli.refactor.screens.settings_screen import SettingsScreen
+from openhands_cli.refactor.content.splash import get_splash_content
+from openhands_cli.refactor.core.theme import OPENHANDS_THEME
 from openhands_cli.user_actions.types import UserConfirmation
 
 

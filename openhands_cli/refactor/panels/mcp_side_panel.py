@@ -10,7 +10,7 @@ from textual.widgets import Static
 
 from openhands.sdk import Agent
 from openhands_cli.locations import MCP_CONFIG_FILE, PERSISTENCE_DIR
-from openhands_cli.refactor.theme import OPENHANDS_THEME
+from openhands_cli.refactor.core.theme import OPENHANDS_THEME
 
 
 class MCPSidePanel(Vertical):

@@ -12,7 +12,7 @@ from openhands.sdk.security.confirmation_policy import (
     ConfirmRisky,
     NeverConfirm,
 )
-from openhands_cli.refactor.richlog_visualizer import TextualVisualizer
+from openhands_cli.refactor.widgets.richlog_visualizer import TextualVisualizer
 from openhands_cli.setup import setup_conversation
 from openhands_cli.user_actions.types import UserConfirmation
 
