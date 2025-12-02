@@ -60,6 +60,8 @@ def main() -> None:
                 conversation_id = textual_main(
                     resume_conversation_id=args.resume,
                     queued_inputs=queued_inputs,
+                    always_approve=args.always_approve,
+                    llm_approve=args.llm_approve,
                 )
                 print("Goodbye! 👋")
                 print(f"Conversation ID: {conversation_id.hex}")

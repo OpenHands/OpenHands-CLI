@@ -21,19 +21,29 @@ class ConversationRunner:
     """Conversation runner with confirmation mode support for the refactored UI."""
 
     def __init__(
-        self, conversation_id: uuid.UUID, visualizer: TextualVisualizer | None = None
+        self,
+        conversation_id: uuid.UUID,
+        visualizer: TextualVisualizer | None = None,
+        initial_confirmation_policy: ConfirmationPolicyBase | None = None,
     ):
         """Initialize the conversation runner.
 
         Args:
+            conversation_id: UUID for the conversation.
             visualizer: Optional visualizer for output display.
+            initial_confirmation_policy: Initial confirmation policy to use.
+                                        If None, defaults to AlwaysConfirm.
         """
         self.conversation: BaseConversation | None = None
         self.conversation_id: uuid.UUID = conversation_id
         self._running = False
         self.visualizer = visualizer
-        self._confirmation_mode_active = (
-            True  # Always start with security analyzer enabled
+        self.initial_confirmation_policy = (
+            initial_confirmation_policy or AlwaysConfirm()
+        )
+        # Set confirmation mode state based on initial policy
+        self._confirmation_mode_active = not isinstance(
+            self.initial_confirmation_policy, NeverConfirm
         )
         self._confirmation_callback: Callable | None = None
 
@@ -88,20 +98,28 @@ class ConversationRunner:
 
     def initialize_conversation(
         self,
-        include_security_analyzer: bool = False,
+        include_security_analyzer: bool | None = None,
     ) -> None:
         """Initialize a new conversation.
 
         Args:
             include_security_analyzer: Whether to include security analyzer for
-                confirmation mode. Uses AlwaysConfirm policy when enabled.
+                confirmation mode. If None, uses the initial confirmation policy
+                provided in the constructor.
         """
 
-        # Choose confirmation policy based on security analyzer setting
-        if include_security_analyzer:
-            confirmation_policy = AlwaysConfirm()
+        # Choose confirmation policy
+        if include_security_analyzer is not None:
+            # Legacy behavior: use the boolean parameter
+            if include_security_analyzer:
+                confirmation_policy = AlwaysConfirm()
+            else:
+                confirmation_policy = NeverConfirm()
+            self._confirmation_mode_active = include_security_analyzer
         else:
-            confirmation_policy = NeverConfirm()
+            # Use the initial confirmation policy from constructor
+            confirmation_policy = self.initial_confirmation_policy
+            # Confirmation mode state was already set in constructor
 
         # Setup conversation with proper parameters
         self.conversation = setup_conversation(
@@ -110,8 +128,6 @@ class ConversationRunner:
             visualizer=self.visualizer,
         )
 
-        self._confirmation_mode_active = include_security_analyzer
-
     async def process_message_async(self, user_input: str) -> None:
         """Process a user message asynchronously to keep UI unblocked.
 
@@ -119,9 +135,7 @@ class ConversationRunner:
             user_input: The user's message text
         """
         if not self.conversation:
-            self.initialize_conversation(
-                include_security_analyzer=self._confirmation_mode_active
-            )
+            self.initialize_conversation()
 
         # Create message from user input
         message = Message(
