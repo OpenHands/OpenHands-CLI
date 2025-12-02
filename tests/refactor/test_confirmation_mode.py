@@ -164,3 +164,65 @@ class TestConfirmationIntegration:
 
             # Verify that the runner's toggle method was called
             mock_runner.toggle_confirmation_mode.assert_called_once()
+
+    def test_reject_creates_user_reject_observation(self):
+        """Test that rejecting actions creates UserRejectObservation events."""
+        runner = ConfirmationConversationRunner()
+        
+        # Mock conversation with reject_pending_actions method
+        mock_conversation = MagicMock()
+        runner.conversation = mock_conversation
+        
+        # Mock pending actions
+        mock_pending_actions = [MagicMock()]
+        
+        with patch(
+            "openhands.sdk.conversation.state.ConversationState.get_unmatched_actions",
+            return_value=mock_pending_actions
+        ):
+            # Set up callback that returns REJECT
+            def reject_callback(actions):
+                return UserConfirmation.REJECT
+            
+            runner._confirmation_callback = reject_callback
+            
+            # Call the confirmation request handler
+            result = runner._handle_confirmation_request()
+            
+            # Should return REJECT
+            assert result == UserConfirmation.REJECT
+            
+            # Should call reject_pending_actions on the conversation
+            mock_conversation.reject_pending_actions.assert_called_once_with(
+                "User rejected the actions"
+            )
+
+    def test_defer_pauses_conversation(self):
+        """Test that deferring actions pauses the conversation."""
+        runner = ConfirmationConversationRunner()
+        
+        # Mock conversation with pause method
+        mock_conversation = MagicMock()
+        runner.conversation = mock_conversation
+        
+        # Mock pending actions
+        mock_pending_actions = [MagicMock()]
+        
+        with patch(
+            "openhands.sdk.conversation.state.ConversationState.get_unmatched_actions",
+            return_value=mock_pending_actions
+        ):
+            # Set up callback that returns DEFER
+            def defer_callback(actions):
+                return UserConfirmation.DEFER
+            
+            runner._confirmation_callback = defer_callback
+            
+            # Call the confirmation request handler
+            result = runner._handle_confirmation_request()
+            
+            # Should return DEFER
+            assert result == UserConfirmation.DEFER
+            
+            # Should call pause on the conversation
+            mock_conversation.pause.assert_called_once()

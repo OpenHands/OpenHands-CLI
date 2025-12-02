@@ -204,12 +204,25 @@ class ConfirmationConversationRunner:
         if not pending_actions:
             return UserConfirmation.ACCEPT
 
-        # If we have a confirmation callback, use it
+        # Get user decision through callback
         if self._confirmation_callback:
-            return self._confirmation_callback(pending_actions)
+            decision = self._confirmation_callback(pending_actions)
+        else:
+            # Default to accepting if no callback is set
+            decision = UserConfirmation.ACCEPT
 
-        # Default to accepting if no callback is set
-        return UserConfirmation.ACCEPT
+        # Handle the user's decision
+        if decision == UserConfirmation.REJECT:
+            # Reject pending actions - this creates UserRejectObservation events
+            self.conversation.reject_pending_actions(
+                "User rejected the actions"
+            )
+        elif decision == UserConfirmation.DEFER:
+            # Pause the conversation for later resumption
+            self.conversation.pause()
+
+        # For ACCEPT, we just continue normally
+        return decision
 
     @property
     def is_running(self) -> bool:
