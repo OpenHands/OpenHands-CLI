@@ -57,7 +57,12 @@ def main() -> None:
                 from openhands_cli.refactor.textual_app import main as textual_main
 
                 conversation_id = textual_main(resume_conversation_id=args.resume)
+                print("Goodbye! 👋")
                 print(f"Conversation ID: {conversation_id.hex}")
+                print(
+                    f"Hint:</grey> run openhands --resume {conversation_id} "
+                    "to resume this conversation."
+                )
 
             else:
                 # Default CLI behavior - no subcommand needed
