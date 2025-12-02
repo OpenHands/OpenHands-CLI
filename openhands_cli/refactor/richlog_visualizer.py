@@ -41,15 +41,15 @@ _ERROR_COLOR = "red"
 _ACTION_COLOR = "blue"
 _MESSAGE_ASSISTANT_COLOR = _ACTION_COLOR
 
-# CSS-compatible color mapping for borders
+# CSS-compatible color mapping for borders using actual hex colors
 _CSS_COLOR_MAP = {
-    "yellow": "$warning",  # Use theme warning color (yellow)
-    "gold3": "$primary",  # Use theme primary color (gold)
-    "bright_yellow": "$primary",  # Use theme primary color
+    "yellow": "#ffe165",  # Theme primary/warning color (yellow/gold)
+    "gold3": "#ffe165",  # Theme primary color (gold)
+    "bright_yellow": "#ffe165",  # Theme primary color
     "magenta": "#ff69b4",  # Hot pink for system events
-    "bright_black": "$text-muted",  # Muted text color
-    "red": "$error",  # Use theme error color
-    "blue": "$accent",  # Use theme accent color (blue)
+    "bright_black": "#727987",  # Muted text color (from theme variables)
+    "red": "#ff6b6b",  # Theme error color (light red)
+    "blue": "#277dff",  # Theme accent color (blue)
 }
 
 DEFAULT_HIGHLIGHT_REGEX = {
@@ -69,26 +69,26 @@ DEFAULT_HIGHLIGHT_REGEX = {
 def _get_event_border_color(event: Event) -> str:
     """Get the CSS border color for an event type."""
     if isinstance(event, ActionEvent):
-        return _CSS_COLOR_MAP.get(_ACTION_COLOR, "$secondary")
+        return _CSS_COLOR_MAP.get(_ACTION_COLOR, "#ffffff")
     elif isinstance(event, ObservationEvent):
-        return _CSS_COLOR_MAP.get(_OBSERVATION_COLOR, "$secondary")
+        return _CSS_COLOR_MAP.get(_OBSERVATION_COLOR, "#ffffff")
     elif isinstance(event, UserRejectObservation):
-        return _CSS_COLOR_MAP.get(_ERROR_COLOR, "$secondary")
+        return _CSS_COLOR_MAP.get(_ERROR_COLOR, "#ffffff")
     elif isinstance(event, MessageEvent):
         if event.llm_message and event.llm_message.role == "user":
-            return _CSS_COLOR_MAP.get(_MESSAGE_USER_COLOR, "$secondary")
+            return _CSS_COLOR_MAP.get(_MESSAGE_USER_COLOR, "#ffffff")
         else:
-            return _CSS_COLOR_MAP.get(_MESSAGE_ASSISTANT_COLOR, "$secondary")
+            return _CSS_COLOR_MAP.get(_MESSAGE_ASSISTANT_COLOR, "#ffffff")
     elif isinstance(event, AgentErrorEvent):
-        return _CSS_COLOR_MAP.get(_ERROR_COLOR, "$secondary")
+        return _CSS_COLOR_MAP.get(_ERROR_COLOR, "#ffffff")
     elif isinstance(event, PauseEvent):
-        return _CSS_COLOR_MAP.get(_PAUSE_COLOR, "$secondary")
+        return _CSS_COLOR_MAP.get(_PAUSE_COLOR, "#ffffff")
     elif isinstance(event, SystemPromptEvent):
-        return _CSS_COLOR_MAP.get(_SYSTEM_COLOR, "$secondary")
+        return _CSS_COLOR_MAP.get(_SYSTEM_COLOR, "#ffffff")
     elif isinstance(event, Condensation):
-        return "$text-muted"  # Neutral color for condensations
+        return "#727987"  # Neutral muted color for condensations
     else:
-        return "$secondary"  # Default color for unknown events
+        return "#ffffff"  # Default white color for unknown events
 
 
 class TextualVisualizer(ConversationVisualizerBase):
