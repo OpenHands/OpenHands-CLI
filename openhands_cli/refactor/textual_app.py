@@ -11,10 +11,12 @@ It creates a basic app with:
 import asyncio
 import os
 import time
+from collections.abc import Iterable
 from typing import ClassVar
 
-from textual.app import App, ComposeResult
+from textual.app import App, ComposeResult, SystemCommand
 from textual.containers import Container, Horizontal, VerticalScroll
+from textual.screen import Screen
 from textual.timer import Timer
 from textual.widgets import Footer, Input, Static, TextArea
 
@@ -24,7 +26,6 @@ from openhands_cli.refactor.commands import COMMANDS, is_valid_command, show_hel
 from openhands_cli.refactor.confirmation_panel import ConfirmationSidePanel
 from openhands_cli.refactor.conversation_runner import ConversationRunner
 from openhands_cli.refactor.exit_modal import ExitConfirmationModal
-from openhands_cli.refactor.mcp_command_provider import MCPCommandProvider
 from openhands_cli.refactor.mcp_side_panel import MCPSidePanel
 from openhands_cli.refactor.non_clickable_collapsible import NonClickableCollapsible
 from openhands_cli.refactor.richlog_visualizer import TextualVisualizer
@@ -41,13 +42,9 @@ class OpenHandsApp(App):
         ("ctrl+q", "request_quit", "Quit the application"),
         ("f2", "expand_all", "Expand the cells"),
         ("escape", "pause_conversation", "Pause the conversation"),
-        ("ctrl+p", "command_palette", "Open command palette"),
         ("ctrl+m", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
     ]
-
-    # Command providers for the command palette
-    COMMANDS: ClassVar = {MCPCommandProvider}
 
     def __init__(self, exit_confirmation: bool = True, **kwargs):
         """Initialize the app with custom OpenHands theme.
@@ -276,6 +273,12 @@ class OpenHandsApp(App):
 
         # Footer - shows available key bindings
         yield Footer()
+
+    def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
+        yield from super().get_system_commands(screen)
+        yield SystemCommand(
+            "MCP", "View MCP configurations", self.action_toggle_mcp_panel
+        )
 
     def on_mount(self) -> None:
         """Called when app starts."""
@@ -611,18 +614,12 @@ class OpenHandsApp(App):
             # Create and mount the MCP panel
             agent = None
             try:
-                # Load agent directly from AgentStore (faster than waiting for conversation)
                 from openhands_cli.tui.settings.store import AgentStore
+
                 agent_store = AgentStore()
                 agent = agent_store.load()
             except Exception:
-                # Fallback to getting agent from conversation if available
-                if (
-                    self.conversation_runner
-                    and self.conversation_runner.conversation
-                    and hasattr(self.conversation_runner.conversation, "agent")
-                ):
-                    agent = self.conversation_runner.conversation.agent  # type: ignore[attr-defined]
+                pass
 
             self.mcp_panel = MCPSidePanel(agent=agent)
             content_area.mount(self.mcp_panel)
@@ -663,7 +660,7 @@ class OpenHandsApp(App):
             textarea_widget.text = self.stored_content
             textarea_widget.focus()
             self.is_multiline_mode = True
-        
+
         # Update status line to reflect the new mode
         self.update_status_line()
 
@@ -671,12 +668,12 @@ class OpenHandsApp(App):
         """Submit the content from the TextArea."""
         textarea_widget = self.query_one("#user_textarea", TextArea)
         content = textarea_widget.text.strip()
-        
+
         if content:
             # Clear the textarea and switch back to input mode
             textarea_widget.text = ""
             self._toggle_input_mode()
-            
+
             # Process the content using existing message handling logic
             # Note: content here contains actual newlines, which is what we want
             # for processing multi-line input
