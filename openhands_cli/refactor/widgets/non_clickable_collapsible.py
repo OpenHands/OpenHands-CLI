@@ -22,48 +22,7 @@ class NonClickableCollapsibleTitle(Container, can_focus=False):
     """Title and symbol for the NonClickableCollapsible that ignores click events."""
 
     ALLOW_SELECT = False
-    DEFAULT_CSS = """
-    NonClickableCollapsibleTitle {
-        width: 100%;
-        height: auto;
-        padding: 0 1;
-        text-style: $block-cursor-blurred-text-style;
-        color: $block-cursor-blurred-foreground;
-    }
-
-    NonClickableCollapsibleTitle Horizontal {
-        width: 100%;
-        height: auto;
-    }
-
-    NonClickableCollapsibleTitle .title-text {
-        width: 1fr;
-        height: auto;
-    }
-
-    NonClickableCollapsibleTitle .copy-button {
-        width: auto;
-        height: 1;
-        min-width: 4;
-        margin-left: 1;
-        background: transparent;
-        border: none;
-        color: $text-muted;
-        text-style: none;
-    }
-
-    NonClickableCollapsibleTitle .copy-button:hover {
-        background: $surface-lighten-1;
-        color: $text;
-        text-style: bold;
-    }
-
-    NonClickableCollapsibleTitle .copy-button:focus {
-        background: $surface-lighten-2;
-        color: $text;
-        text-style: bold;
-    }
-    """
+    CSS_PATH = "non_clickable_collapsible.tcss"
 
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("enter", "toggle_collapsible", "Toggle collapsible", show=False)
@@ -180,23 +139,7 @@ class NonClickableCollapsible(Widget):
     collapsed = reactive(True, init=False)
     title = reactive("Toggle")
 
-    DEFAULT_CSS = """
-    NonClickableCollapsible {
-        width: 1fr;
-        height: auto;
-        background: $background;
-        padding-bottom: 1;
-        padding-left: 1;
-
-        &:focus-within {
-            background-tint: $foreground 3%;
-        }
-
-        &.-collapsed > Contents {
-            display: none;
-        }
-    }
-    """
+    CSS_PATH = "non_clickable_collapsible.tcss"
 
     class Toggled(Message):
         """Parent class subclassed by `NonClickableCollapsible` messages."""
@@ -217,13 +160,7 @@ class NonClickableCollapsible(Widget):
         """Event sent when the `NonClickableCollapsible` widget is collapsed."""
 
     class Contents(Container):
-        DEFAULT_CSS = """
-        Contents {
-            width: 100%;
-            height: auto;
-            padding: 1 0 0 3;
-        }
-        """
+        CSS_PATH = "non_clickable_collapsible.tcss"
 
     def __init__(
         self,
