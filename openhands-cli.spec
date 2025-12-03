@@ -15,16 +15,14 @@ from PyInstaller.utils.hooks import (
     copy_metadata
 )
 
-# IMPORTANT: Remove /openhands/code from sys.path to avoid namespace conflicts
-# We only want to use the openhands packages from the virtual environment
-sys.path = [p for p in sys.path if '/openhands/code' not in p]
+
 
 # Get the project root directory (current working directory when running PyInstaller)
 project_root = Path.cwd()
 
 a = Analysis(
     ['openhands_cli/simple_main.py'],
-    pathex=[str(project_root), str(project_root / '.venv' / 'lib' / 'python3.12' / 'site-packages')],
+    pathex=[str(project_root)],
     binaries=[],
     datas=[
         # Include any data files that might be needed
@@ -62,9 +60,9 @@ a = Analysis(
         'openhands.tools.str_replace_editor',
         'openhands.tools.task_tracker',
     ],
-    hookspath=[str(project_root / "hooks")],
+    hookspath=[],
     hooksconfig={},
-    runtime_hooks=[str(project_root / "hooks" / "rthook_namespace_fix.py")],
+    runtime_hooks=[],
     # runtime_hooks=[str(project_root / "hooks" / "rthook_profile_imports.py")],
     excludes=[
         # Exclude unnecessary modules to reduce binary size
