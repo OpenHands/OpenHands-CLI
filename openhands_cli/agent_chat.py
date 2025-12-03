@@ -33,6 +33,7 @@ from openhands_cli.tui.tui import (
     display_help,
     display_welcome,
 )
+from openhands_cli.tui.visualizer import get_current_visualizer
 from openhands_cli.user_actions import UserConfirmation, exit_session_confirmation
 from openhands_cli.user_actions.utils import get_session_prompter
 
@@ -110,7 +111,7 @@ def run_cli_entry(
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
         return
 
-    display_welcome(conversation_id, confirmation_policy, bool(resume_conversation_id))
+    display_welcome(conversation_id, resume=bool(resume_conversation_id))
 
     # Track session start time for uptime calculation
     session_start_time = datetime.now()
@@ -207,6 +208,28 @@ def run_cli_entry(
                 print_formatted_text(
                     HTML(f"<yellow>Confirmation mode {new_status}</yellow>")
                 )
+                continue
+
+            elif command == "/full":
+                visualizer = get_current_visualizer()
+                if visualizer is None:
+                    print_formatted_text(
+                        HTML("<yellow>Visualizer not available</yellow>")
+                    )
+                    continue
+
+                full_content = visualizer.get_last_full_content()
+                if full_content is None:
+                    print_formatted_text(
+                        HTML("<yellow>No truncated content available</yellow>")
+                    )
+                    continue
+
+                print_formatted_text("")
+                print_formatted_text(HTML("<gold>Full content:</gold>"))
+                print_formatted_text("")
+                print_formatted_text(HTML(f"<white>{full_content}</white>"))
+                print_formatted_text("")
                 continue
 
             elif command == "/resume":
