@@ -5,7 +5,9 @@ import uuid
 from collections.abc import Callable
 
 from openhands.sdk import BaseConversation, Message, TextContent
+from openhands.sdk.conversation.exceptions import ConversationRunError
 from openhands.sdk.conversation.state import ConversationExecutionStatus
+from openhands.sdk.llm.exceptions.types import LLMBadRequestError
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmationPolicyBase,
@@ -25,6 +27,7 @@ class ConversationRunner:
         conversation_id: uuid.UUID,
         visualizer: TextualVisualizer | None = None,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
+        error_callback: Callable[[str, str], None] | None = None,
     ):
         """Initialize the conversation runner.
 
@@ -33,6 +36,8 @@ class ConversationRunner:
             visualizer: Optional visualizer for output display.
             initial_confirmation_policy: Initial confirmation policy to use.
                                         If None, defaults to AlwaysConfirm.
+            error_callback: Optional callback for handling errors.
+                          Should accept (error_title: str, error_message: str).
         """
         self.conversation: BaseConversation | None = None
         self.conversation_id: uuid.UUID = conversation_id
@@ -46,6 +51,7 @@ class ConversationRunner:
             self.initial_confirmation_policy, NeverConfirm
         )
         self._confirmation_callback: Callable | None = None
+        self._error_callback: Callable[[str, str], None] | None = error_callback
 
     @property
     def is_confirmation_mode_active(self) -> bool:
@@ -166,6 +172,12 @@ class ConversationRunner:
                 self._run_with_confirmation()
             else:
                 self.conversation.run()
+        except ConversationRunError as e:
+            # Handle conversation run errors (includes LLM errors)
+            self._handle_conversation_error(e)
+        except Exception as e:
+            # Handle any other unexpected errors
+            self._handle_unexpected_error(e)
         finally:
             self._running = False
 
@@ -276,3 +288,23 @@ class ConversationRunner:
         """Pause the running conversation."""
         if self.conversation and self._running:
             self.conversation.pause()
+
+    def _handle_conversation_error(self, error: ConversationRunError) -> None:
+        """Handle conversation run errors by passing them to the error callback.
+
+        Args:
+            error: The ConversationRunError that occurred
+        """
+        # Call the error callback if available
+        if self._error_callback:
+            self._error_callback("Conversation Error", str(error))
+
+    def _handle_unexpected_error(self, error: Exception) -> None:
+        """Handle unexpected errors by passing them to the error callback.
+
+        Args:
+            error: The unexpected exception that occurred
+        """
+        # Call the error callback if available
+        if self._error_callback:
+            self._error_callback("Unexpected Error", f"{type(error).__name__}: {error}")

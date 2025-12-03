@@ -241,7 +241,10 @@ class OpenHandsApp(App):
         visualizer = TextualVisualizer(main_display, self)
 
         self.conversation_runner = ConversationRunner(
-            self.conversation_id, visualizer, self.initial_confirmation_policy
+            self.conversation_id, 
+            visualizer, 
+            self.initial_confirmation_policy,
+            error_callback=self._handle_conversation_error
         )
 
         # Set up confirmation callback
@@ -691,6 +694,15 @@ class OpenHandsApp(App):
         else:
             # Handle regular messages with conversation runner
             await self._handle_user_message(content)
+
+    def _handle_conversation_error(self, title: str, message: str) -> None:
+        """Handle conversation errors by showing a notification.
+
+        Args:
+            title: Error title
+            message: Error message
+        """
+        self.notify(f"{title}: {message}", severity="error", timeout=10.0)
 
 
 def main(
