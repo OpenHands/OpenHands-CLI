@@ -7,7 +7,6 @@ from collections.abc import Callable
 from openhands.sdk import BaseConversation, Message, TextContent
 from openhands.sdk.conversation.exceptions import ConversationRunError
 from openhands.sdk.conversation.state import ConversationExecutionStatus
-from openhands.sdk.llm.exceptions.types import LLMBadRequestError
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmationPolicyBase,

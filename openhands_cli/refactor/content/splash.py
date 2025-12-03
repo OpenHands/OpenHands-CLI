@@ -14,15 +14,15 @@ def get_openhands_banner() -> str:
         r"    | | | | '_ \ / _ \ '_ \| |_| |/ _` | '_ \ / _` / __|",
         r"    | |_| | |_) |  __/ | | |  _  | (_| | | | | (_| \__ \ ",
         r"    \___ /| .__/ \___|_| |_|_| |_|\__,_|_| |_|\__,_|___/",
-        r"          |_|                                           "
+        r"          |_|                                           ",
     ]
-    
+
     # Find the maximum line length
     max_length = max(len(line) for line in banner_lines)
-    
+
     # Pad all lines to the same length for consistent alignment
     padded_lines = [line.ljust(max_length) for line in banner_lines]
-    
+
     return "\n".join(padded_lines)
 
 

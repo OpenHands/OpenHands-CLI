@@ -243,8 +243,8 @@ class OpenHandsApp(App):
         self.conversation_runner = ConversationRunner(
             self.conversation_id,
             self._handle_conversation_error,
-            visualizer, 
-            self.initial_confirmation_policy
+            visualizer,
+            self.initial_confirmation_policy,
         )
 
         # Set up confirmation callback
@@ -343,23 +343,8 @@ class OpenHandsApp(App):
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle when user submits input."""
-        user_message = event.value.strip()
-        if user_message:
-            # Add the user message to the main display as a Static widget
-            main_display = self.query_one("#main_display", VerticalScroll)
-            user_message_widget = Static(f"> {user_message}", classes="user-message")
-            main_display.mount(user_message_widget)
-            main_display.scroll_end(animate=False)
-
-            # Handle commands - only exact matches
-            if is_valid_command(user_message):
-                self._handle_command(user_message)
-            else:
-                # Handle regular messages with conversation runner
-                await self._handle_user_message(user_message)
-
-            # Clear the input
-            event.input.value = ""
+        await self._handle_user_input(event.value)
+        event.input.value = ""
 
     def _handle_command(self, command: str) -> None:
         """Handle command execution."""
@@ -377,6 +362,30 @@ class OpenHandsApp(App):
             )
             main_display.mount(error_widget)
             main_display.scroll_end(animate=False)
+
+    async def _handle_user_input(self, raw_input: str) -> None:
+        """Unified pipeline for handling any user-submitted text.
+
+        - Renders the user message into the main display
+        - Routes commands to the command handler
+        - Routes everything else to the conversation runner
+        """
+        content = raw_input.strip()
+        if not content:
+            return
+
+        # Add the user message to the main display as a Static widget
+        main_display = self.query_one("#main_display", VerticalScroll)
+        user_message_widget = Static(f"> {content}", classes="user-message")
+        main_display.mount(user_message_widget)
+        main_display.scroll_end(animate=False)
+
+        # Handle commands - only exact matches
+        if is_valid_command(content):
+            self._handle_command(content)
+        else:
+            # Handle regular messages with conversation runner
+            await self._handle_user_message(content)
 
     async def _handle_user_message(self, user_message: str) -> None:
         """Handle regular user messages with the conversation runner."""
@@ -682,18 +691,7 @@ class OpenHandsApp(App):
 
     async def _handle_textarea_submission(self, content: str) -> None:
         """Handle textarea submission using existing message processing logic."""
-        # Add the user message to the main display
-        main_display = self.query_one("#main_display", VerticalScroll)
-        user_message_widget = Static(f"> {content}", classes="user-message")
-        main_display.mount(user_message_widget)
-        main_display.scroll_end(animate=False)
-
-        # Handle commands - only exact matches
-        if is_valid_command(content):
-            self._handle_command(content)
-        else:
-            # Handle regular messages with conversation runner
-            await self._handle_user_message(content)
+        await self._handle_user_input(content)
 
     def _handle_conversation_error(self, title: str, message: str) -> None:
         """Handle conversation errors by showing a notification.
