@@ -7,6 +7,7 @@ LLM provider, model, API keys, and advanced options.
 
 from typing import Any, ClassVar
 
+from textual import getters
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.screen import ModalScreen
@@ -32,6 +33,21 @@ class SettingsScreen(ModalScreen):
     ]
 
     CSS_PATH = "settings_screen.tcss"
+
+    mode_select: getters.query_one[Select] = getters.query_one("#mode_select")
+    provider_select: getters.query_one[Select] = getters.query_one("#provider_select")
+    model_select: getters.query_one[Select] = getters.query_one("#model_select")
+    custom_model_input: getters.query_one[Input] = getters.query_one(
+        "#custom_model_input"
+    )
+    base_url_input: getters.query_one[Input] = getters.query_one("#base_url_input")
+    api_key_input: getters.query_one[Input] = getters.query_one("#api_key_input")
+    memory_select: getters.query_one[Select] = getters.query_one(
+        "#memory_condensation_select"
+    )
+    basic_section: getters.query_one[Select] = getters.query_one("#basic_section")
+    advanced_section = getters.query_one("#advanced_section")
+    message_area = getters.query_one("#message_area")
 
     def __init__(self, is_initial_setup: bool = False, **kwargs):
         """Initialize the settings screen.
@@ -191,29 +207,15 @@ class SettingsScreen(ModalScreen):
         """Clear all form values before reloading."""
         try:
             # Clear all input fields
-            api_key_input = self.query_one("#api_key_input", Input)
-            api_key_input.value = ""
-            api_key_input.placeholder = "Enter your API key"
+            self.api_key_input.value = ""
+            self.api_key_input.placeholder = "Enter your API key"
 
-            custom_model_input = self.query_one("#custom_model_input", Input)
-            custom_model_input.value = ""
-
-            base_url_input = self.query_one("#base_url_input", Input)
-            base_url_input.value = ""
-
-            # Reset selects to default values
-            mode_select = self.query_one("#mode_select", Select)
-            mode_select.value = "basic"
-
-            provider_select = self.query_one("#provider_select", Select)
-            provider_select.value = Select.BLANK
-
-            model_select = self.query_one("#model_select", Select)
-            model_select.value = Select.BLANK
-
-            memory_select = self.query_one("#memory_condensation_select", Select)
-            memory_select.value = False
-
+            self.custom_model_input.value = ""
+            self.base_url_input.value = ""
+            self.mode_select.value = "basic"
+            self.provider_select.value = Select.BLANK
+            self.model_select.value = Select.BLANK
+            self.memory_select.value = False
         except Exception:
             # If any widget is not found, just continue
             pass
@@ -244,45 +246,36 @@ class SettingsScreen(ModalScreen):
 
             # Determine if we're in advanced mode
             self.is_advanced_mode = bool(llm.base_url)
-            mode_select = self.query_one("#mode_select", Select)
-            mode_select.value = "advanced" if self.is_advanced_mode else "basic"
+            self.mode_select.value = "advanced" if self.is_advanced_mode else "basic"
 
             if self.is_advanced_mode:
                 # Advanced mode - populate custom model and base URL
-                custom_model_input = self.query_one("#custom_model_input", Input)
-                custom_model_input.value = llm.model or ""
-
-                base_url_input = self.query_one("#base_url_input", Input)
-                base_url_input.value = llm.base_url or ""
+                self.custom_model_input.value = llm.model or ""
+                self.base_url_input.value = llm.base_url or ""
             else:
                 # Basic mode - populate provider and model selects
                 if "/" in llm.model:
                     provider, model = llm.model.split("/", 1)
-
-                    provider_select = self.query_one("#provider_select", Select)
-                    provider_select.value = provider
+                    self.provider_select.value = provider
 
                     # Update model options and select current model
                     self._update_model_options(provider)
-                    model_select = self.query_one("#model_select", Select)
-                    model_select.value = llm.model
+                    self.model_select.value = llm.model
 
             # API Key (show masked version)
-            api_key_input = self.query_one("#api_key_input", Input)
             if llm.api_key:
                 # Show masked key as placeholder
                 try:
                     key_value = llm.api_key.get_secret_value()  # type: ignore
                 except AttributeError:
                     key_value = str(llm.api_key)
-                api_key_input.placeholder = f"Current: {key_value[:3]}***"
+                self.api_key_input.placeholder = f"Current: {key_value[:3]}***"
             else:
                 # No API key set
-                api_key_input.placeholder = "Enter your API key"
+                self.api_key_input.placeholder = "Enter your API key"
 
             # Memory Condensation
-            memory_select = self.query_one("#memory_condensation_select", Select)
-            memory_select.value = bool(self.current_agent.condenser)
+            self.memory_select.value = bool(self.current_agent.condenser)
 
             # Update field dependencies after loading all values
             self._update_field_dependencies()
@@ -292,37 +285,32 @@ class SettingsScreen(ModalScreen):
 
     def _update_model_options(self, provider: str) -> None:
         """Update model select options based on provider."""
-        model_select = self.query_one("#model_select", Select)
         model_options = self._get_model_options(provider)
 
         if model_options:
-            model_select.set_options(model_options)
+            self.model_select.set_options(model_options)
         else:
-            model_select.set_options([("No models available", "")])
+            self.model_select.set_options([("No models available", "")])
 
     def _update_advanced_visibility(self) -> None:
         """Show/hide basic and advanced sections based on mode."""
-        basic_section = self.query_one("#basic_section")
-        advanced_section = self.query_one("#advanced_section")
-
         if self.is_advanced_mode:
-            basic_section.display = False
-            advanced_section.display = True
+            self.basic_section.display = False
+            self.advanced_section.display = True
         else:
-            basic_section.display = True
-            advanced_section.display = False
+            self.basic_section.display = True
+            self.advanced_section.display = False
 
     def _update_field_dependencies(self) -> None:
         """Update field enabled/disabled state based on dependency chain."""
         try:
-            # Get current values
-            mode_select = self.query_one("#mode_select", Select)
-            api_key_input = self.query_one("#api_key_input", Input)
-            memory_select = self.query_one("#memory_condensation_select", Select)
-
-            mode = mode_select.value if hasattr(mode_select, "value") else None
+            mode = (
+                self.mode_select.value if hasattr(self.mode_select, "value") else None
+            )
             api_key = (
-                api_key_input.value.strip() if hasattr(api_key_input, "value") else ""
+                self.api_key_input.value.strip()
+                if hasattr(self.api_key_input, "value")
+                else ""
             )
 
             # Dependency chain logic
@@ -332,54 +320,52 @@ class SettingsScreen(ModalScreen):
             # Basic mode fields
             if is_basic_mode:
                 try:
-                    provider_select = self.query_one("#provider_select", Select)
-                    model_select = self.query_one("#model_select", Select)
-
                     provider = (
-                        provider_select.value
-                        if hasattr(provider_select, "value")
+                        self.provider_select.value
+                        if hasattr(self.provider_select, "value")
                         else None
                     )
                     model = (
-                        model_select.value if hasattr(model_select, "value") else None
+                        self.model_select.value
+                        if hasattr(self.model_select, "value")
+                        else None
                     )
 
                     # Provider is always enabled in basic mode
-                    provider_select.disabled = False
+                    self.provider_select.disabled = False
 
                     # Model select: enabled when provider is selected
-                    model_select.disabled = not (provider and provider != Select.BLANK)
+                    self.model_select.disabled = not (
+                        provider and provider != Select.BLANK
+                    )
 
                     # API Key: enabled when model is selected
-                    api_key_input.disabled = not (model and model != Select.BLANK)
+                    self.api_key_input.disabled = not (model and model != Select.BLANK)
                 except Exception:
                     pass
 
             # Advanced mode fields
             elif is_advanced_mode:
                 try:
-                    custom_model_input = self.query_one("#custom_model_input", Input)
-                    base_url_input = self.query_one("#base_url_input", Input)
-
                     custom_model = (
-                        custom_model_input.value.strip()
-                        if hasattr(custom_model_input, "value")
+                        self.custom_model_input.value.strip()
+                        if hasattr(self.custom_model_input, "value")
                         else ""
                     )
 
                     # Custom model: always enabled in Advanced mode
-                    custom_model_input.disabled = False
+                    self.custom_model_input.disabled = False
 
                     # Base URL: enabled when custom model is entered
-                    base_url_input.disabled = not custom_model
+                    self.base_url_input.disabled = not custom_model
 
                     # API Key: enabled when custom model is entered
-                    api_key_input.disabled = not custom_model
+                    self.api_key_input.disabled = not custom_model
                 except Exception:
                     pass
 
             # Memory Condensation: enabled when API key is provided
-            memory_select.disabled = not api_key
+            self.memory_select.disabled = not api_key
 
         except Exception:
             # Silently handle errors during initialization
@@ -454,11 +440,7 @@ class SettingsScreen(ModalScreen):
         """Save the current settings."""
         try:
             # Collect form data
-            mode_select = self.query_one("#mode_select", Select)
-            api_key_input = self.query_one("#api_key_input", Input)
-            memory_select = self.query_one("#memory_condensation_select", Select)
-
-            api_key = api_key_input.value.strip()
+            api_key = self.api_key_input.value.strip()
 
             # If no API key entered, keep existing one
             if not api_key and self.current_agent and self.current_agent.llm.api_key:
@@ -471,13 +453,11 @@ class SettingsScreen(ModalScreen):
                 self._show_message("API Key is required", is_error=True)
                 return
 
-            if mode_select.value == "advanced":
+            if self.mode_select.value == "advanced":
                 # Advanced mode
-                custom_model_input = self.query_one("#custom_model_input", Input)
-                base_url_input = self.query_one("#base_url_input", Input)
 
-                model = custom_model_input.value.strip()
-                base_url = base_url_input.value.strip()
+                model = self.custom_model_input.value.strip()
+                base_url = self.base_url_input.value.strip()
 
                 if not model:
                     self._show_message(
@@ -493,11 +473,8 @@ class SettingsScreen(ModalScreen):
                 self._save_llm_settings(model, api_key, base_url)
             else:
                 # Basic mode
-                provider_select = self.query_one("#provider_select", Select)
-                model_select = self.query_one("#model_select", Select)
-
-                provider = provider_select.value
-                model = model_select.value
+                provider = self.provider_select.value
+                model = self.model_select.value
 
                 if provider is NoSelection or not provider:
                     self._show_message("Please select a provider", is_error=True)
@@ -513,8 +490,8 @@ class SettingsScreen(ModalScreen):
                 self._save_llm_settings(full_model, api_key)
 
             # Handle memory condensation
-            if memory_select.value is not NoSelection:
-                self._update_memory_condensation(memory_select.value == "enabled")
+            if self.memory_select.value is not NoSelection:
+                self._update_memory_condensation(self.memory_select.value == "enabled")
 
             # Close the screen immediately - no delay needed
             self._close_screen()
