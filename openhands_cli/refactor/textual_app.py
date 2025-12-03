@@ -377,24 +377,11 @@ class OpenHandsApp(App):
             try:
                 # Run the blocking pause operation in a thread pool to avoid blocking
                 # the event loop
+                self.app.notify("Pausing conversation, this make take a few seconds...")
                 await asyncio.to_thread(self.conversation_runner.pause)
-
-                # Update UI to show pause completed
-                self._update_pause_status("Conversation paused.")
-            except Exception as e:
+            except Exception:
                 # Handle any errors during pause
-                self._update_pause_status(f"Failed to pause: {e}")
-
-    def _update_pause_status(self, message: str) -> None:
-        """Update the UI with pause status message."""
-        status_widget = Static(
-            f"[green]{message}[/green]"
-            if "paused" in message.lower()
-            else f"[red]{message}[/red]",
-            classes="status-message",
-        )
-        self.main_display.mount(status_widget)
-        self.main_display.scroll_end(animate=False)
+                self.app.notify("Failed to pause: {e}", severity="error")
 
     def _handle_confirm_command(self) -> None:
         """Handle the /confirm command to toggle confirmation mode."""
