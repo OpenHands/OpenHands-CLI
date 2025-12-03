@@ -9,43 +9,7 @@ from textual.widgets import Button, Label
 class ExitConfirmationModal(ModalScreen):
     """Screen with a dialog to confirm exit."""
 
-    DEFAULT_CSS = """
-    ExitConfirmationModal {
-        align: center middle;
-    }
-
-    #dialog {
-        grid-size: 2;
-        grid-gutter: 1 2;
-        grid-rows: 1fr 3;
-        padding: 0 1;
-        width: 25vw;
-        height: 5vw;
-        border: $primary 80%;
-        background: $surface 90%;
-        margin: 1 1;
-    }
-
-    #question {
-        column-span: 2;
-        height: 1fr;
-        width: 1fr;
-        content-align: center middle;
-    }
-
-    Button {
-        width: 100%;
-        margin: 0 1;
-    }
-
-    #yes {
-        content-align: center middle;
-    }
-
-    #no {
-        content-align: center middle;
-    }
-    """
+    CSS_PATH = "exit_modal.tcss"
 
     def compose(self) -> ComposeResult:
         yield Grid(
