@@ -8,7 +8,6 @@ import logging
 import os
 import warnings
 
-# Load environment variables from .env early, if present
 from pathlib import Path
 
 from dotenv import load_dotenv
