@@ -28,12 +28,34 @@ ConfirmationSidePanel {
     border: solid $secondary;
 }
 
-.button-container {
-    height: auto;
-    align: center middle;
+.confirmation-instructions {
+    color: $secondary;
+    text-style: italic;
+    margin-bottom: 1;
+    text-align: center;
 }
 
-.button-container Button {
-    margin: 0 1;
-    min-width: 12;
+.confirmation-options {
+    height: auto;
+    max-height: 8;
+    border: solid $secondary;
+    background: $background;
+}
+
+.confirmation-options > ListItem {
+    padding: 1 2;
+    margin: 0;
+}
+
+.confirmation-options > ListItem:hover {
+    background: $primary-background;
+}
+
+.confirmation-options > ListItem.-highlighted {
+    background: $primary;
+    color: $primary-foreground;
+}
+
+.confirmation-options Static {
+    width: 100%;
 }

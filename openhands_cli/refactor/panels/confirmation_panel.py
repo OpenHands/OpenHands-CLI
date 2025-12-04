@@ -4,8 +4,8 @@ import html
 from collections.abc import Callable
 
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, Vertical
-from textual.widgets import Button, Static
+from textual.containers import Container, Vertical
+from textual.widgets import ListItem, ListView, Static
 
 from openhands_cli.user_actions.types import UserConfirmation
 
@@ -52,27 +52,40 @@ class ConfirmationPanel(Container):
                         classes="action-item",
                     )
 
-            # Buttons
-            with Horizontal(classes="button-container"):
-                yield Button("Yes, proceed", id="btn_accept", variant="success")
-                yield Button("Reject", id="btn_reject", variant="error")
-                yield Button("Always proceed", id="btn_always", variant="primary")
-                yield Button(
-                    "Auto-confirm LOW/MEDIUM", id="btn_risky", variant="default"
-                )
+            # Instructions
+            yield Static(
+                "Use ↑/↓ to navigate, Enter to select:",
+                classes="confirmation-instructions",
+            )
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button press events."""
-        button_id = event.button.id
+            # Options ListView
+            yield ListView(
+                ListItem(Static("✅ Yes, proceed"), id="accept"),
+                ListItem(Static("❌ Reject"), id="reject"),
+                ListItem(Static("🔄 Always proceed"), id="always"),
+                ListItem(Static("⚠️  Auto-confirm LOW/MEDIUM"), id="risky"),
+                classes="confirmation-options",
+                initial_index=0,
+                id="confirmation-listview",
+            )
 
-        if button_id == "btn_accept":
+    def on_mount(self) -> None:
+        """Focus the ListView when the panel is mounted."""
+        listview = self.query_one("#confirmation-listview", ListView)
+        listview.focus()
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        """Handle ListView selection events."""
+        item_id = event.item.id
+
+        if item_id == "accept":
             self.confirmation_callback(UserConfirmation.ACCEPT)
-        elif button_id == "btn_reject":
+        elif item_id == "reject":
             self.confirmation_callback(UserConfirmation.REJECT)
-        elif button_id == "btn_always":
+        elif item_id == "always":
             # Accept and set NeverConfirm policy
             self.confirmation_callback(UserConfirmation.ALWAYS_PROCEED)
-        elif button_id == "btn_risky":
+        elif item_id == "risky":
             # Accept and set ConfirmRisky policy
             self.confirmation_callback(UserConfirmation.CONFIRM_RISKY)
 

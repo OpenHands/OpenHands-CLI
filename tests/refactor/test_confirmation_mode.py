@@ -3,6 +3,8 @@
 import uuid
 from unittest.mock import MagicMock, patch
 
+from textual.widgets import ListView
+
 from openhands.sdk.security.confirmation_policy import AlwaysConfirm
 from openhands_cli.refactor.core.conversation_runner import ConversationRunner
 from openhands_cli.refactor.panels.confirmation_panel import (
@@ -132,43 +134,61 @@ class TestConfirmationPanel:
         assert panel.pending_actions == mock_actions
         assert panel.confirmation_callback == mock_callback
 
-    def test_button_callbacks(self):
-        """Test that button presses call the callback with correct decisions."""
+    def test_listview_auto_focus(self):
+        """Test that ListView is automatically focused when panel is mounted."""
         mock_actions = [MagicMock()]
         mock_callback = MagicMock()
 
         panel = ConfirmationPanel(mock_actions, mock_callback)
 
-        # Mock button events
-        mock_accept_button = MagicMock()
-        mock_accept_button.id = "btn_accept"
+        # Mock the query_one method to return a mock ListView
+        mock_listview = MagicMock()
+        panel.query_one = MagicMock(return_value=mock_listview)
 
-        mock_reject_button = MagicMock()
-        mock_reject_button.id = "btn_reject"
+        # Call on_mount to trigger auto-focus
+        panel.on_mount()
 
-        # Test accept button
+        # Verify that focus was called on the ListView
+        panel.query_one.assert_called_once_with("#confirmation-listview", ListView)
+        mock_listview.focus.assert_called_once()
+
+    def test_listview_callbacks(self):
+        """Test that ListView selections call the callback with correct decisions."""
+        mock_actions = [MagicMock()]
+        mock_callback = MagicMock()
+
+        panel = ConfirmationPanel(mock_actions, mock_callback)
+
+        # Mock ListView selection events
+        mock_accept_item = MagicMock()
+        mock_accept_item.id = "accept"
+
+        mock_reject_item = MagicMock()
+        mock_reject_item.id = "reject"
+
+        # Test accept selection
         mock_event = MagicMock()
-        mock_event.button = mock_accept_button
-        panel.on_button_pressed(mock_event)
+        mock_event.item = mock_accept_item
+        panel.on_list_view_selected(mock_event)
         mock_callback.assert_called_with(UserConfirmation.ACCEPT)
 
-        # Test reject button
-        mock_event.button = mock_reject_button
-        panel.on_button_pressed(mock_event)
+        # Test reject selection
+        mock_event.item = mock_reject_item
+        panel.on_list_view_selected(mock_event)
         mock_callback.assert_called_with(UserConfirmation.REJECT)
 
-        # Test always proceed button
-        mock_always_button = MagicMock()
-        mock_always_button.id = "btn_always"
-        mock_event.button = mock_always_button
-        panel.on_button_pressed(mock_event)
+        # Test always proceed selection
+        mock_always_item = MagicMock()
+        mock_always_item.id = "always"
+        mock_event.item = mock_always_item
+        panel.on_list_view_selected(mock_event)
         mock_callback.assert_called_with(UserConfirmation.ALWAYS_PROCEED)
 
-        # Test confirm risky button
-        mock_risky_button = MagicMock()
-        mock_risky_button.id = "btn_risky"
-        mock_event.button = mock_risky_button
-        panel.on_button_pressed(mock_event)
+        # Test confirm risky selection
+        mock_risky_item = MagicMock()
+        mock_risky_item.id = "risky"
+        mock_event.item = mock_risky_item
+        panel.on_list_view_selected(mock_event)
         mock_callback.assert_called_with(UserConfirmation.CONFIRM_RISKY)
 
 
