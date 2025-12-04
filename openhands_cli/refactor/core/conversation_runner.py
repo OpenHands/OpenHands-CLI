@@ -4,6 +4,8 @@ import asyncio
 import uuid
 from collections.abc import Callable
 
+from textual.notifications import SeverityLevel
+
 from openhands.sdk import BaseConversation, Message, TextContent
 from openhands.sdk.conversation.exceptions import ConversationRunError
 from openhands.sdk.conversation.state import ConversationExecutionStatus
@@ -26,7 +28,7 @@ class ConversationRunner:
         conversation_id: uuid.UUID,
         running_state_callback: Callable[[bool], None],
         confirmation_callback: Callable,
-        error_callback: Callable[[str, str], None],
+        notification_callback: Callable[[str, str, SeverityLevel], None],
         visualizer: TextualVisualizer,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
     ):
@@ -40,20 +42,25 @@ class ConversationRunner:
             initial_confirmation_policy: Initial confirmation policy to use.
                                         If None, defaults to AlwaysConfirm.
         """
-        self.conversation: BaseConversation | None = None
-        self.conversation_id: uuid.UUID = conversation_id
-        self._running = False
-        self.visualizer = visualizer
-        self.initial_confirmation_policy = (
-            initial_confirmation_policy or AlwaysConfirm()
+        starting_confirmation_policy = initial_confirmation_policy or AlwaysConfirm()
+
+        self.conversation: BaseConversation = setup_conversation(
+            conversation_id,
+            confirmation_policy=starting_confirmation_policy,
+            visualizer=visualizer,
         )
+
+        self._running = False
+
         # Set confirmation mode state based on initial policy
         self._confirmation_mode_active = not isinstance(
-            self.initial_confirmation_policy, NeverConfirm
+            starting_confirmation_policy, NeverConfirm
         )
-        self.running_state_callback = running_state_callback
+        self._running_state_callback: Callable = running_state_callback
         self._confirmation_callback: Callable = confirmation_callback
-        self._error_callback: Callable[[str, str], None] = error_callback
+        self._notification_callback: Callable[[str, str, SeverityLevel], None] = (
+            notification_callback
+        )
 
     @property
     def is_confirmation_mode_active(self) -> bool:
@@ -95,47 +102,12 @@ class ConversationRunner:
         # Run send_message in the same thread pool, not on the UI loop
         await loop.run_in_executor(None, self.conversation.send_message, message)
 
-    def initialize_conversation(
-        self,
-        include_security_analyzer: bool | None = None,
-    ) -> None:
-        """Initialize a new conversation.
-
-        Args:
-            include_security_analyzer: Whether to include security analyzer for
-                confirmation mode. If None, uses the initial confirmation policy
-                provided in the constructor.
-        """
-
-        # Choose confirmation policy
-        if include_security_analyzer is not None:
-            # Legacy behavior: use the boolean parameter
-            if include_security_analyzer:
-                confirmation_policy = AlwaysConfirm()
-            else:
-                confirmation_policy = NeverConfirm()
-            self._confirmation_mode_active = include_security_analyzer
-        else:
-            # Use the initial confirmation policy from constructor
-            confirmation_policy = self.initial_confirmation_policy
-            # Confirmation mode state was already set in constructor
-
-        # Setup conversation with proper parameters
-        self.conversation = setup_conversation(
-            self.conversation_id,
-            confirmation_policy=confirmation_policy,
-            visualizer=self.visualizer,
-        )
-
     async def process_message_async(self, user_input: str) -> None:
         """Process a user message asynchronously to keep UI unblocked.
 
         Args:
             user_input: The user's message text
         """
-        if not self.conversation:
-            self.initialize_conversation()
-
         # Create message from user input
         message = Message(
             role="user",
@@ -153,9 +125,6 @@ class ConversationRunner:
         Args:
             message: The message to process
         """
-        if not self.conversation:
-            return
-
         self._update_run_status(True)
         try:
             # Send message and run conversation
@@ -167,10 +136,12 @@ class ConversationRunner:
                 self.conversation.run()
         except ConversationRunError as e:
             # Handle conversation run errors (includes LLM errors)
-            self._handle_conversation_error(e)
+            self._notification_callback("Conversation Error", str(e), "error")
         except Exception as e:
             # Handle any other unexpected errors
-            self._handle_unexpected_error(e)
+            self._notification_callback(
+                "Unexpected Error", f"{type(e).__name__}: {e}", "error"
+            )
         finally:
             self._update_run_status(False)
 
@@ -258,8 +229,8 @@ class ConversationRunner:
         Args:
             new_policy: The new confirmation policy to set
         """
-        if self.conversation:
-            self.conversation.set_confirmation_policy(new_policy)
+
+        self.conversation.set_confirmation_policy(new_policy)
 
         # Update internal state based on the policy type
         if isinstance(new_policy, NeverConfirm):
@@ -272,27 +243,24 @@ class ConversationRunner:
         """Check if conversation is currently running."""
         return self._running
 
-    def pause(self) -> None:
+    async def pause(self) -> None:
         """Pause the running conversation."""
-        if self.conversation and self._running:
-            self.conversation.pause()
-
-    def _handle_conversation_error(self, error: ConversationRunError) -> None:
-        """Handle conversation run errors by passing them to the error callback.
-
-        Args:
-            error: The ConversationRunError that occurred
-        """
-        self._error_callback("Conversation Error", str(error))
-
-    def _handle_unexpected_error(self, error: Exception) -> None:
-        """Handle unexpected errors by passing them to the error callback.
-
-        Args:
-            error: The unexpected exception that occurred
-        """
-        self._error_callback("Unexpected Error", f"{type(error).__name__}: {error}")
+        if self._running:
+            self._notification_callback(
+                "Pausing conversation",
+                "Pausing conversation, this make take a few seconds...",
+                "information",
+            )
+            await asyncio.to_thread(self.conversation.pause)
+        else:
+            self._notification_callback(
+                "No running converastion", "No running conversation to pause", "warning"
+            )
 
     def _update_run_status(self, is_running: bool):
         self._running = is_running
-        self.running_state_callback(is_running)
+        self._running_state_callback(is_running)
+
+    def pause_runner_without_blocking(self):
+        if self.is_running:
+            asyncio.create_task(self.pause())

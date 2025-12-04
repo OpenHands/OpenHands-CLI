@@ -198,10 +198,7 @@ class OpenHandsApp(App):
             return
 
         # Open the settings screen for existing users
-        settings_screen = SettingsScreen(
-            on_settings_saved=lambda: None,  # Just close
-            on_first_time_settings_cancelled=lambda: None,  # Just close
-        )
+        settings_screen = SettingsScreen()
         self.push_screen(settings_screen)
 
     def _initialize_main_ui(self) -> None:
@@ -238,26 +235,24 @@ class OpenHandsApp(App):
         else:
             update_notice_widget.display = False
 
+        # Process any queued inputs
+        self._process_queued_inputs()
+        self.is_ui_initialized = True
+
+    def create_conversation_runner(self) -> ConversationRunner:
         # Initialize conversation runner with visualizer that can add widgets
         visualizer = TextualVisualizer(self.main_display, self)
 
-        self.conversation_runner = ConversationRunner(
+        return ConversationRunner(
             self.conversation_id,
             self.conversation_running_signal.publish,
             self._handle_confirmation_request,
-            lambda title, message: (
-                self.notify(
-                    title=title, message=message, severity="error", timeout=10.0
-                )
+            lambda title, message, severity: (
+                self.notify(title=title, message=message, severity=severity)
             ),
             visualizer,
             self.initial_confirmation_policy,
         )
-
-        # Process any queued inputs
-        self._process_queued_inputs()
-
-        self.is_ui_initialized = True
 
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.
@@ -318,13 +313,7 @@ class OpenHandsApp(App):
         """Handle regular user messages with the conversation runner."""
         # Check if conversation runner is initialized
         if self.conversation_runner is None:
-            error_widget = Static(
-                "[red]Error: Conversation runner not initialized[/red]",
-                classes="error-message",
-            )
-            self.main_display.mount(error_widget)
-            self.main_display.scroll_end(animate=False)
-            return
+            self.conversation_runner = self.create_conversation_runner()
 
         # Show that we're processing the message
         if self.conversation_runner.is_running:
@@ -364,29 +353,11 @@ class OpenHandsApp(App):
 
     def action_pause_conversation(self) -> None:
         """Action to handle Esc key binding - pause the running conversation."""
-        if self.conversation_runner and self.conversation_runner.is_running:
-            # Add a status message immediately to show the pause was triggered
-            pause_widget = Static(
-                "[yellow]Pausing conversation...[/yellow]",
-                classes="status-message",
-            )
-            self.main_display.mount(pause_widget)
-            self.main_display.scroll_end(animate=False)
-
-            # Run the pause operation asynchronously to avoid blocking the UI
-            asyncio.create_task(self._pause_conversation_async())
-
-    async def _pause_conversation_async(self) -> None:
-        """Pause the conversation asynchronously to avoid blocking the UI."""
-        if self.conversation_runner and self.conversation_runner.is_running:
-            try:
-                # Run the blocking pause operation in a thread pool to avoid blocking
-                # the event loop
-                self.app.notify("Pausing conversation, this make take a few seconds...")
-                await asyncio.to_thread(self.conversation_runner.pause)
-            except Exception:
-                # Handle any errors during pause
-                self.app.notify("Failed to pause: {e}", severity="error")
+        # Run the pause operation asynchronously to avoid blocking the UI
+        if self.conversation_runner:
+            self.conversation_runner.pause_runner_without_blocking()
+        else:
+            self.notify(message="No running conversation to pause", severity="error")
 
     def _handle_confirm_command(self) -> None:
         """Handle the /confirm command to toggle confirmation mode."""

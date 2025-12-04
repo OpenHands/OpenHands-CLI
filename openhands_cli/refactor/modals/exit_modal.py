@@ -1,6 +1,6 @@
 """Exit confirmation modal for OpenHands CLI."""
 
-from typing import Callable
+from collections.abc import Callable
 
 from textual.app import ComposeResult
 from textual.containers import Grid
