@@ -235,7 +235,15 @@ class OpenHandsACPAgent(ACPAgent):
 
     async def newSession(self, params: NewSessionRequest) -> NewSessionResponse:
         """Create a new conversation session."""
+        import sys
+
+        print(
+            f"DEBUG: newSession called with params={params}",
+            file=sys.stderr,
+            flush=True,
+        )
         session_id = str(uuid.uuid4())
+        print(f"DEBUG: Generated session_id={session_id}", file=sys.stderr, flush=True)
 
         try:
             # Convert ACP MCP servers to Agent format
