@@ -421,10 +421,10 @@ class SettingsScreen(ModalScreen):
 
     def _handle_cancel(self) -> None:
         """Handle cancel action - delegate to appropriate callback."""
+        self.dismiss(False)
+
         if self.on_first_time_settings_cancelled and self.is_initial_setup:
             self.on_first_time_settings_cancelled()
-
-        self.dismiss(False)
 
     def _save_settings(self) -> None:
         """Save the current settings."""
