@@ -16,7 +16,10 @@ from textual.widgets._select import NoSelection
 
 from openhands.sdk import LLM
 from openhands.sdk.context.condenser import LLMSummarizingCondenser
-from openhands.sdk.llm import UNVERIFIED_MODELS_EXCLUDING_BEDROCK, VERIFIED_MODELS
+from openhands_cli.refactor.modals.settings.choices import (
+    get_model_options,
+    provider_options,
+)
 from openhands_cli.tui.settings.store import AgentStore
 from openhands_cli.utils import (
     get_default_cli_agent,
@@ -90,7 +93,6 @@ class SettingsScreen(ModalScreen):
                         # LLM Provider
                         with Container(classes="form_group"):
                             yield Label("LLM Provider:", classes="form_label")
-                            provider_options = self._get_provider_options()
                             yield Select(
                                 provider_options,
                                 id="provider_select",
@@ -221,20 +223,6 @@ class SettingsScreen(ModalScreen):
             # If any widget is not found, just continue
             pass
 
-    def _get_provider_options(self) -> list[tuple[str, str]]:
-        """Get list of available LLM providers."""
-        providers = list(VERIFIED_MODELS.keys()) + list(
-            UNVERIFIED_MODELS_EXCLUDING_BEDROCK.keys()
-        )
-        return [(provider, provider) for provider in providers]
-
-    def _get_model_options(self, provider: str) -> list[tuple[str, str]]:
-        """Get list of available models for a provider."""
-        models = VERIFIED_MODELS.get(
-            provider, []
-        ) + UNVERIFIED_MODELS_EXCLUDING_BEDROCK.get(provider, [])
-        return [(model, model) for model in models]
-
     def _load_current_settings(self) -> None:
         """Load current agent settings into the form."""
         try:
@@ -286,7 +274,7 @@ class SettingsScreen(ModalScreen):
 
     def _update_model_options(self, provider: str) -> None:
         """Update model select options based on provider."""
-        model_options = self._get_model_options(provider)
+        model_options = get_model_options(provider)
 
         if model_options:
             self.model_select.set_options(model_options)

@@ -31,8 +31,8 @@ from openhands_cli.refactor.content.splash import get_splash_content
 from openhands_cli.refactor.core.commands import is_valid_command, show_help
 from openhands_cli.refactor.core.conversation_runner import ConversationRunner
 from openhands_cli.refactor.core.theme import OPENHANDS_THEME
+from openhands_cli.refactor.modals import SettingsScreen
 from openhands_cli.refactor.modals.exit_modal import ExitConfirmationModal
-from openhands_cli.refactor.modals.settings_screen import SettingsScreen
 from openhands_cli.refactor.panels.confirmation_panel import ConfirmationSidePanel
 from openhands_cli.refactor.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.refactor.widgets.input_field import InputField
