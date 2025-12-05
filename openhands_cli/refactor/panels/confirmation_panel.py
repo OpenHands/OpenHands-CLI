@@ -4,10 +4,13 @@ import html
 from collections.abc import Callable
 
 from textual.app import ComposeResult
-from textual.containers import Container, Vertical
+from textual.containers import Container, Vertical, VerticalScroll
 from textual.widgets import ListItem, ListView, Static
 
 from openhands.sdk.event import ActionEvent
+from openhands_cli.refactor.panels.confirmation_panel_style import (
+    CONFIRMATION_SIDE_PANEL_STYLLE,
+)
 from openhands_cli.user_actions.types import UserConfirmation
 
 
@@ -90,13 +93,13 @@ class ConfirmationPanel(Container):
             self.confirmation_callback(UserConfirmation.CONFIRM_RISKY)
 
 
-class ConfirmationSidePanel(Container):
+class ConfirmationSidePanel(VerticalScroll):
     """A container that shows the confirmation panel on the right side.
 
     Uses a dashed border for visual separation.
     """
 
-    CSS_PATH = "confirmation_panel.tcss"
+    DEFAULT_CSS = CONFIRMATION_SIDE_PANEL_STYLLE
 
     def __init__(
         self,

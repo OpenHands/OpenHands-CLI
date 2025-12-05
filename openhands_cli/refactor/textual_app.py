@@ -140,13 +140,14 @@ class OpenHandsApp(App):
                 yield Static(id="splash_instructions", classes="splash-instruction")
                 yield Static(id="splash_update_notice", classes="splash-update-notice")
 
-        # Input area - docked to bottom
-        with Container(id="input_area"):
-            yield WorkingStatusLine(self)
-            yield InputField(
-                placeholder="Type your message, @mention a file, or / for commands"
-            )
-            yield InfoStatusLine(self)
+            # Input area - docked to bottom
+            with Container(id="input_area"):
+                yield WorkingStatusLine(self)
+                yield InputField(
+                    placeholder="Type your message, @mention a file, or / for commands"
+                )
+
+                yield InfoStatusLine(self)
 
         # Footer - shows available key bindings
         yield Footer()

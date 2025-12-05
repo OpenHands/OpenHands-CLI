@@ -1,9 +1,9 @@
-/* Confirmation Side Panel Styles */
-
+CONFIRMATION_SIDE_PANEL_STYLLE = """
 ConfirmationSidePanel {
-    width: 40%;
+    split: right;
+    width: 33%;
     height: 100%;
-    border-left: dashed $secondary;
+    border-left: vkey $foreground 30%;
     background: $surface;
     padding: 1;
     margin-left: 1;
@@ -37,7 +37,6 @@ ConfirmationSidePanel {
 
 .confirmation-options {
     height: auto;
-    max-height: 8;
     border: solid $secondary;
     background: $background;
 }
@@ -48,14 +47,15 @@ ConfirmationSidePanel {
 }
 
 .confirmation-options > ListItem:hover {
-    background: $primary-background;
+    background: $background;
 }
 
 .confirmation-options > ListItem.-highlighted {
     background: $primary;
-    color: $primary-foreground;
+    color: $foreground;
 }
 
 .confirmation-options Static {
     width: 100%;
 }
+"""
