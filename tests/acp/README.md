@@ -35,33 +35,3 @@ python scripts/acp/debug_client.py
 python scripts/acp/jsonrpc_cli.py
 ```
 
-## Common Issues
-
-### Session ID is null ✅ FIXED
-**Symptom**: `{"jsonrpc":"2.0","id":2,"result":null}` for session/new
-
-**Status**: This issue has been fixed in the current implementation.
-
-**Previous Cause**: Method signature mismatch - agent method didn't match ACP library expectations (used request objects instead of kwargs)
-
-**Solution Applied**: Updated method signature to use kwargs and return proper response object:
-```python
-async def new_session(self, cwd: str, mcp_servers: list[Any], **_kwargs: Any) -> NewSessionResponse:
-    session_id = str(uuid.uuid4())
-    # ... implementation ...
-    return NewSessionResponse(session_id=session_id)  # Uses snake_case in Python
-```
-
-**Verification**: Run `python /tmp/test_acp.py` to verify that session/new returns a valid session ID.
-
-### Parameter naming errors
-**Symptom**: Method receives None or wrong values for parameters
-
-**Cause**: Parameter names don't match what ACP library sends (camelCase vs snake_case)
-
-**Fix**: Use snake_case in Python method signatures:
-- `protocolVersion` → `protocol_version`
-- `mcpServers` → `mcp_servers`
-- `sessionId` → `session_id`
-
-The ACP library handles the conversion automatically.
