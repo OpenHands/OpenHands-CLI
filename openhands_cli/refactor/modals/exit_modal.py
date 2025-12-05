@@ -27,7 +27,7 @@ class ExitConfirmationModal(ModalScreen):
         """
         super().__init__(**kwargs)
         self.on_exit_confirmed = on_exit_confirmed or (lambda: self.app.exit())
-        self.on_exit_cancelled = on_exit_cancelled or (lambda: self.app.pop_screen())
+        self.on_exit_cancelled = on_exit_cancelled
 
     def compose(self) -> ComposeResult:
         yield Grid(
@@ -38,11 +38,16 @@ class ExitConfirmationModal(ModalScreen):
         )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss()
         if event.button.id == "yes":
-            # Dismiss the modal first, then call the callback
-            self.dismiss()
-            self.on_exit_confirmed()
-        else:
-            # Dismiss the modal first, then call the callback
-            self.dismiss()
-            self.on_exit_cancelled()
+            try:
+                self.on_exit_confirmed()
+            except Exception as e:
+                self.notify(f"Error during exit confirmation: {e}", severity="error")
+            return
+
+        if self.on_exit_cancelled:
+            try:
+                self.on_exit_cancelled()
+            except Exception as e:
+                self.notify(f"Error during exit cancellation: {e}", severity="error")
