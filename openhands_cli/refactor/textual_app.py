@@ -20,6 +20,7 @@ from textual.screen import Screen
 from textual.signal import Signal
 from textual.widgets import Footer, Static
 
+from openhands.sdk.event import ActionEvent
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmationPolicyBase,
@@ -380,7 +381,9 @@ class OpenHandsApp(App):
         self.main_display.mount(status_widget)
         self.main_display.scroll_end(animate=False)
 
-    def _handle_confirmation_request(self, pending_actions: list) -> UserConfirmation:
+    def _handle_confirmation_request(
+        self, pending_actions: list[ActionEvent]
+    ) -> UserConfirmation:
         """Handle confirmation request by showing the side panel.
 
         Args:
