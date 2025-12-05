@@ -1,8 +1,9 @@
 """Tests for TextualVisualizer and Chinese character markup handling."""
 
+from typing import TYPE_CHECKING
+
 import pytest
-from rich.console import RenderableType
-from rich.markup import MarkupError
+from rich.errors import MarkupError
 from rich.text import Text
 from textual.app import App
 from textual.containers import VerticalScroll
@@ -14,8 +15,12 @@ from openhands.sdk.tool import Action
 from openhands_cli.refactor.widgets.richlog_visualizer import TextualVisualizer
 
 
-class MockAction(Action):
-    """Mock action for testing."""
+if TYPE_CHECKING:
+    pass
+
+
+class RichLogMockAction(Action):
+    """Mock action for testing rich log visualizer."""
 
     command: str = "test command"
 
@@ -40,14 +45,17 @@ class TestChineseCharacterMarkupHandling:
         # Create a mock app and container for the visualizer
         app = App()
         container = VerticalScroll()
-        visualizer = TextualVisualizer(container, app)
+        visualizer = TextualVisualizer(container, app)  # type: ignore[arg-type]
 
         # Test escaping with various bracket patterns
         test_cases = [
             ("[test]", r"\[test\]"),
             ("处于历史40%分位]", r"处于历史40%分位\]"),
             ("[cyan]colored[/cyan]", r"\[cyan\]colored\[/cyan\]"),
-            ("+0.3%,月变化+0.8%,处于历史40%分位]", r"+0.3%,月变化+0.8%,处于历史40%分位\]"),
+            (
+                "+0.3%,月变化+0.8%,处于历史40%分位]",
+                r"+0.3%,月变化+0.8%,处于历史40%分位\]",
+            ),
         ]
 
         for input_text, expected_output in test_cases:
@@ -58,10 +66,10 @@ class TestChineseCharacterMarkupHandling:
             )
 
     def test_safe_content_string_escapes_problematic_content(self):
-        """Test that _safe_content_string escapes content that would cause MarkupError."""
+        """Test that _safe_content_string escapes MarkupError content."""
         app = App()
         container = VerticalScroll()
-        visualizer = TextualVisualizer(container, app)
+        visualizer = TextualVisualizer(container, app)  # type: ignore[arg-type]
 
         # Example content that caused the original error
         problematic_content = "+0.3%,月变化+0.8%,处于历史40%分位]"
@@ -78,7 +86,6 @@ class TestChineseCharacterMarkupHandling:
 
         This test demonstrates the problem that can occur with unescaped brackets.
         """
-        from rich.text import Text
 
         # Content with close tag but no open tag - this WILL cause an error
         problematic_content = "[/close_without_open]"
@@ -90,13 +97,13 @@ class TestChineseCharacterMarkupHandling:
         assert "closing tag" in str(exc_info.value).lower()
 
     def test_escaped_chinese_content_renders_successfully(self):
-        """Verify that escaped content with Chinese chars and brackets renders correctly.
+        """Verify escaped Chinese chars and brackets render correctly.
 
         This test demonstrates that the fix resolves the issue.
         """
         app = App()
         container = VerticalScroll()
-        visualizer = TextualVisualizer(container, app)
+        visualizer = TextualVisualizer(container, app)  # type: ignore[arg-type]
 
         # Content with Chinese characters and special markup characters
         problematic_content = "+0.3%,月变化+0.8%,处于历史40%分位]"
@@ -116,10 +123,10 @@ class TestChineseCharacterMarkupHandling:
         """Test that visualizer can handle ActionEvent with Chinese content."""
         app = App()
         container = VerticalScroll()
-        visualizer = TextualVisualizer(container, app)
+        visualizer = TextualVisualizer(container, app)  # type: ignore[arg-type]
 
         # Create an action with Chinese content
-        action = MockAction(command="分析数据: [结果+0.3%]")
+        action = RichLogMockAction(command="分析数据: [结果+0.3%]")
         tool_call = create_tool_call("call_1", "test")
 
         action_event = ActionEvent(
@@ -139,7 +146,7 @@ class TestChineseCharacterMarkupHandling:
         """Test that visualizer can handle MessageEvent with Chinese content."""
         app = App()
         container = VerticalScroll()
-        visualizer = TextualVisualizer(container, app)
+        visualizer = TextualVisualizer(container, app)  # type: ignore[arg-type]
 
         # Create a message with problematic Chinese content
         from openhands.sdk.llm import Message
@@ -151,7 +158,6 @@ class TestChineseCharacterMarkupHandling:
                     text="根据分析，增长率为+0.3%,月变化+0.8%,处于历史40%分位]的数据。"
                 )
             ],
-            response_id="resp_1",
         )
 
         message_event = MessageEvent(llm_message=message, source="agent")
@@ -179,7 +185,7 @@ class TestChineseCharacterMarkupHandling:
         """Test that various patterns of Chinese text with special chars are handled."""
         app = App()
         container = VerticalScroll()
-        visualizer = TextualVisualizer(container, app)
+        visualizer = TextualVisualizer(container, app)  # type: ignore[arg-type]
 
         # Use the safe_content_string method
         safe_content = visualizer._safe_content_string(test_content)
@@ -203,7 +209,6 @@ class TestVisualizerWithoutEscaping:
 
     def test_close_tag_without_open_causes_error(self):
         """Demonstrate that close tag without open causes MarkupError."""
-        from rich.text import Text
 
         # Close tag without matching open tag
         problematic_text = "[/bold]"
@@ -215,8 +220,7 @@ class TestVisualizerWithoutEscaping:
         assert "closing tag" in str(exc_info.value).lower()
 
     def test_escaping_prevents_markup_interpretation(self):
-        """Demonstrate that escaping prevents brackets from being interpreted as markup."""
-        from rich.text import Text
+        """Demonstrate escaping prevents bracket markup interpretation."""
 
         # Content that looks like a close tag
         content_with_brackets = "Result [/end]"
@@ -239,10 +243,10 @@ class TestVisualizerIntegration:
         """End-to-end test: create event with Chinese content and visualize it."""
         app = App()
         container = VerticalScroll()
-        visualizer = TextualVisualizer(container, app)
+        visualizer = TextualVisualizer(container, app)  # type: ignore[arg-type]
 
         # Create realistic event with problematic content
-        action = MockAction(
+        action = RichLogMockAction(
             command="分析结果: 增长率+0.3%,月变化+0.8%,处于历史40%分位]"
         )
         tool_call = create_tool_call("call_test", "analyze")
