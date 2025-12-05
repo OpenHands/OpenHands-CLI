@@ -13,7 +13,7 @@ from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 # Register tools on import
 from openhands.tools.file_editor import FileEditorTool  # noqa: F401
 from openhands.tools.task_tracker import TaskTrackerTool  # noqa: F401
-from openhands.tools.terminal import TerminalTool  # noqa: F401
+from openhands.tools.terminal import TerminalTool 
 from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
 from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.tui.settings.store import AgentStore
