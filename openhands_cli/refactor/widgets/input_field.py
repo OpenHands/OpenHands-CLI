@@ -91,6 +91,9 @@ class InputField(Container):
 
     def action_toggle_input_mode(self) -> None:
         """Toggle between single-line Input and multi-line TextArea."""
+        # Get the input_area container
+        input_area = self.screen.query_one("#input_area")
+
         if self.is_multiline_mode:
             # Switch from TextArea to Input
             # Replace actual newlines with literal "\n" for single-line display
@@ -100,6 +103,8 @@ class InputField(Container):
             self.input_widget.value = self.stored_content
             self.input_widget.focus()
             self.is_multiline_mode = False
+            # Shrink input area for single-line mode
+            input_area.styles.height = 7
         else:
             # Switch from Input to TextArea
             # Replace literal "\n" with actual newlines for multi-line display
@@ -109,6 +114,8 @@ class InputField(Container):
             self.textarea_widget.text = self.stored_content
             self.textarea_widget.focus()
             self.is_multiline_mode = True
+            # Expand input area for multi-line mode
+            input_area.styles.height = 10
 
         self.mutliline_mode_status.publish(self.is_multiline_mode)
 
