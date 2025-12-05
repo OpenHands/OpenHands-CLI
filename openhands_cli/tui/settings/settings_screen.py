@@ -191,6 +191,11 @@ class SettingsScreen:
             extra_kwargs["litellm_extra_body"] = {
                 "metadata": get_llm_metadata(model_name=model, llm_type="agent")
             }
+
+        # Hardcode base_url for OpenHands provider models
+        if model.startswith("openhands/") and base_url is None:
+            base_url = "https://llm-proxy.app.all-hands.dev/"
+
         llm = LLM(
             model=model,
             api_key=api_key,
