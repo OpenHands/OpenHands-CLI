@@ -4,6 +4,7 @@ import pytest
 from pydantic import SecretStr
 
 from openhands.sdk import LLM
+from openhands_cli.locations import AGENT_SETTINGS_PATH
 from openhands_cli.utils import get_default_cli_agent
 
 
@@ -70,11 +71,13 @@ def setup_test_agent_config(tmp_path_factory):
     This fixture:
     - Creates a temporary directory for agent settings
     - Creates a minimal agent_settings.json file
-    - Patches PERSISTENCE_DIR to use the temporary directory
+    - Patches AgentStore to use the temporary directory
     - Runs for every test automatically (autouse=True)
     """
     # Create a temporary directory for this test session
     temp_persistence_dir = tmp_path_factory.mktemp("openhands_test")
+    conversations_dir = temp_persistence_dir / "conversations"
+    conversations_dir.mkdir(exist_ok=True)
 
     # Create minimal agent configuration
     # Use a mock LLM configuration that doesn't require real API keys
@@ -89,14 +92,34 @@ def setup_test_agent_config(tmp_path_factory):
 
     # Save agent configuration to temporary directory
     agent_settings_path = temp_persistence_dir / "agent_settings.json"
-    agent_settings_path.write_text(agent.model_dump_json())
+    agent_settings_json = agent.model_dump_json()
+    agent_settings_path.write_text(agent_settings_json)
 
-    # Patch PERSISTENCE_DIR to use temporary directory
-    with patch.multiple(
-        "openhands_cli.locations",
-        PERSISTENCE_DIR=str(temp_persistence_dir),
-        CONVERSATIONS_DIR=str(temp_persistence_dir / "conversations"),
+    # Store the original read method
+    from openhands.sdk import LocalFileStore
+
+    original_read = LocalFileStore.read
+
+    # Create a mock LocalFileStore.read() that falls back to our agent config
+    def mock_file_store_read(self, path):
+        try:
+            # Try to read from the file store's root first
+            return original_read(self, path)
+        except FileNotFoundError:
+            # If file doesn't exist and it's the agent settings file,
+            # return our mock agent config
+            if path == AGENT_SETTINGS_PATH or path.endswith("agent_settings.json"):
+                return agent_settings_json
+            # Otherwise, re-raise the exception
+            raise
+
+    # Patch locations module and LocalFileStore
+    with (
+        patch.multiple(
+            "openhands_cli.locations",
+            PERSISTENCE_DIR=str(temp_persistence_dir),
+            CONVERSATIONS_DIR=str(conversations_dir),
+        ),
+        patch("openhands.sdk.LocalFileStore.read", mock_file_store_read),
     ):
-        # Also ensure the conversations directory exists
-        (temp_persistence_dir / "conversations").mkdir(exist_ok=True)
         yield temp_persistence_dir
