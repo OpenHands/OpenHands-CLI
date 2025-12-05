@@ -276,6 +276,19 @@ class TextualVisualizer(ConversationVisualizerBase):
 
             # Create content string with metrics if available
             content_string = str(content)
+
+            # Remove the first line if it duplicates the title content
+            # Title shows truncated line like "Agent: Hi! I'm..." duplicated in content
+            lines = content_string.split("\n")
+            if len(lines) > 1:
+                # Extract the message part from title (after "Agent: " or "User: ")
+                title_lower = title.lower()
+                if ": " in title_lower:
+                    title_message = title.split(": ", 1)[1].rstrip("...")
+                    # If first line starts with the same text as title, skip it
+                    if lines[0].strip().startswith(title_message.strip()):
+                        content_string = "\n".join(lines[1:])
+
             metrics = self._format_metrics_subtitle()
             if metrics and event.llm_message.role == "assistant":
                 content_string = f"{content_string}\n\n{metrics}"
