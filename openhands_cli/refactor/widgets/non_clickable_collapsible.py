@@ -327,6 +327,9 @@ class NonClickableCollapsible(Widget):
     def _on_mount(self, event: events.Mount) -> None:  # noqa: ARG002
         """Initialise collapsed state."""
         self._update_collapsed(self.collapsed)
+        # Initialize title text visibility based on collapsed state
+        if hasattr(self._title, "_title_static") and self._title._title_static:
+            self._title._title_static.display = self.collapsed
 
     def compose(self) -> ComposeResult:
         yield self._title
