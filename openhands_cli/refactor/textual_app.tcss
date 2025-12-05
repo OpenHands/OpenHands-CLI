@@ -68,23 +68,19 @@ Footer {
 .status-panel {
     width: auto;
     height: auto;
-    border: solid $primary;
-    background: $surface;
-    padding: 1;
-    text-align: center;
-    margin: 1 0;
-    border-title-align: center;
+    background: transparent;
+    padding: 0;
+    text-align: left;
+    margin: 0;
 }
 
 .conversation-panel {
     width: auto;
     height: auto;
-    border: solid $secondary;
-    background: $surface;
-    padding: 1;
-    text-align: center;
-    margin: 1 0;
-    border-title-align: center;
+    background: transparent;
+    padding: 0;
+    text-align: left;
+    margin: 0;
 }
 
 .splash-instruction {
