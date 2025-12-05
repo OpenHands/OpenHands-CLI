@@ -89,7 +89,10 @@ class WorkingStatusLine(Static):
             frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧"]
             working_indicator = f"{frames[self._working_frame % len(frames)]} Working"
 
-        return f"{working_indicator} ({elapsed}s • ESC: pause • Ctrl+O: expand)"
+        return (
+            f"{working_indicator} ({elapsed}s • "
+            f"ESC: pause • Ctrl+O: toggle expand/collapse)"
+        )
 
     def _update_text(self) -> None:
         """Rebuild the working status text."""
