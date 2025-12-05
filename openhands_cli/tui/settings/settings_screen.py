@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 from prompt_toolkit import HTML, print_formatted_text
 from prompt_toolkit.shortcuts import print_container
@@ -20,55 +21,11 @@ from openhands_cli.user_actions.settings_action import (
     save_settings_confirmation,
     settings_type_confirmation,
 )
-from openhands_cli.utils import get_default_cli_agent, get_llm_metadata
-
-
-def _strip_step_prefix(value: str) -> str:
-    """Remove leading step annotations such as '(Step 2/3)'."""
-    cleaned = value.strip()
-    if cleaned.lower().startswith("(step"):
-        parts = cleaned.split(")", 1)
-        if len(parts) == 2:
-            cleaned = parts[1].strip()
-    return cleaned
-
-
-def _select_identifier_token(value: str) -> str:
-    """
-    Choose the most likely identifier token when extra text is present.
-
-    Prioritises tokens containing characters commonly found in model IDs.
-    """
-    tokens = value.split()
-    if len(tokens) <= 1:
-        return value
-
-    for token in reversed(tokens):
-        if any(symbol in token for symbol in ("-", "_", ".", "/", ":")):
-            return token
-    return tokens[-1]
-
-
-def _sanitize_model_identifier(raw_value: str) -> str:
-    """
-    Normalise provider/model strings captured from the interactive prompts.
-
-    This strips step counter prefixes and trims descriptive text that might be
-    present when copy/pasting from the UI (e.g. '2.5 gemini-2.0-flash-lite').
-    """
-    if not raw_value:
-        return raw_value
-
-    cleaned = _strip_step_prefix(raw_value)
-    cleaned = " ".join(cleaned.split())
-
-    if "/" in cleaned:
-        provider, remainder = cleaned.split("/", 1)
-        provider = _select_identifier_token(_strip_step_prefix(provider))
-        remainder = _select_identifier_token(_strip_step_prefix(remainder))
-        return f"{provider}/{remainder}"
-
-    return _select_identifier_token(cleaned)
+from openhands_cli.utils import (
+    get_default_cli_agent,
+    get_llm_metadata,
+    should_set_litellm_extra_body,
+)
 
 
 class SettingsScreen:
@@ -148,8 +105,8 @@ class SettingsScreen:
 
         # Construct the summary text with aligned columns
         settings_lines = [
-            # Changed value alignment to left (<)
-            f"{label + ':':<{max_label_width + 1}} {value:<}"
+            f"{label + ':':<{max_label_width + 1}} {value:<}"  # Changed value
+            # alignment to left (<)
             for label, value in str_labels_and_values
         ]
         settings_text = "\n".join(settings_lines)
@@ -229,18 +186,17 @@ class SettingsScreen:
         )
 
     def _save_llm_settings(self, model, api_key, base_url: str | None = None) -> None:
-        normalized_model = _sanitize_model_identifier(model)
-
+        extra_kwargs: dict[str, Any] = {}
+        if should_set_litellm_extra_body(model):
+            extra_kwargs["litellm_extra_body"] = {
+                "metadata": get_llm_metadata(model_name=model, llm_type="agent")
+            }
         llm = LLM(
-            model=normalized_model,
+            model=model,
             api_key=api_key,
             base_url=base_url,
             usage_id="agent",
-            litellm_extra_body={
-                "metadata": get_llm_metadata(
-                    model_name=normalized_model, llm_type="agent"
-                )
-            },
+            **extra_kwargs,
         )
 
         agent = self.agent_store.load()
