@@ -232,17 +232,14 @@ class TextualVisualizer(ConversationVisualizerBase):
             else:
                 title = self._extract_meaningful_title(event, "Agent Action")
 
-            # Add metrics subtitle if available
+            # Create content string with metrics subtitle if available
+            content_string = str(content)
             metrics = self._format_metrics_subtitle()
             if metrics:
-                from rich.console import Group
-
-                final_content = Group(content, metrics)
-            else:
-                final_content = content
+                content_string = f"{content_string}\n\n{metrics}"
 
             return NonClickableCollapsible(
-                final_content,
+                content_string,
                 title=title,
                 collapsed=False,  # Start expanded by default
                 border_color=_get_event_border_color(event),
@@ -250,7 +247,7 @@ class TextualVisualizer(ConversationVisualizerBase):
         elif isinstance(event, ObservationEvent):
             title = self._extract_meaningful_title(event, "Observation")
             return NonClickableCollapsible(
-                content,
+                str(content),
                 title=title,
                 collapsed=False,  # Start expanded for observations
                 border_color=_get_event_border_color(event),
@@ -258,7 +255,7 @@ class TextualVisualizer(ConversationVisualizerBase):
         elif isinstance(event, UserRejectObservation):
             title = self._extract_meaningful_title(event, "User Rejected Action")
             return NonClickableCollapsible(
-                content,
+                str(content),
                 title=title,
                 collapsed=False,  # Start expanded by default
                 border_color=_get_event_border_color(event),
@@ -277,33 +274,27 @@ class TextualVisualizer(ConversationVisualizerBase):
             else:
                 title = self._extract_meaningful_title(event, "Agent Message")
 
-            # Add metrics if available
+            # Create content string with metrics if available
+            content_string = str(content)
             metrics = self._format_metrics_subtitle()
             if metrics and event.llm_message.role == "assistant":
-                from rich.console import Group
-
-                final_content = Group(content, metrics)
-            else:
-                final_content = content
+                content_string = f"{content_string}\n\n{metrics}"
 
             return NonClickableCollapsible(
-                final_content,
+                content_string,
                 title=title,
                 collapsed=False,  # Start expanded by default
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, AgentErrorEvent):
             title = self._extract_meaningful_title(event, "Agent Error")
+            content_string = str(content)
             metrics = self._format_metrics_subtitle()
             if metrics:
-                from rich.console import Group
-
-                final_content = Group(content, metrics)
-            else:
-                final_content = content
+                content_string = f"{content_string}\n\n{metrics}"
 
             return NonClickableCollapsible(
-                final_content,
+                content_string,
                 title=title,
                 collapsed=False,  # Start expanded by default
                 border_color=_get_event_border_color(event),
@@ -311,23 +302,20 @@ class TextualVisualizer(ConversationVisualizerBase):
         elif isinstance(event, PauseEvent):
             title = self._extract_meaningful_title(event, "User Paused")
             return NonClickableCollapsible(
-                content,
+                str(content),
                 title=title,
                 collapsed=False,  # Start expanded for pauses
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, Condensation):
             title = self._extract_meaningful_title(event, "Condensation")
+            content_string = str(content)
             metrics = self._format_metrics_subtitle()
             if metrics:
-                from rich.console import Group
-
-                final_content = Group(content, metrics)
-            else:
-                final_content = content
+                content_string = f"{content_string}\n\n{metrics}"
 
             return NonClickableCollapsible(
-                final_content,
+                content_string,
                 title=title,
                 collapsed=False,  # Start expanded for condensations
                 border_color=_get_event_border_color(event),
