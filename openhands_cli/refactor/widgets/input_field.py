@@ -12,7 +12,7 @@ from openhands_cli.refactor.widgets.autocomplete import EnhancedAutoComplete
 
 class InputField(Container):
     BINDINGS: ClassVar = [
-        Binding("ctrl+i", "toggle_input_mode", "Toggle single/multi-line input"),
+        Binding("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         Binding("ctrl+j", "submit_textarea", "Submit multi-line input"),
     ]
 
@@ -35,16 +35,12 @@ class InputField(Container):
         height: 6;
         background: $background;
         color: $foreground;
-        border: thick $accent;
-        border-title-color: $accent;
-        border-title-background: $surface;
-        border-title-style: bold;
+        border: solid $secondary;
         display: none;
     }
 
     #user_textarea:focus {
-        border: thick $primary;
-        border-title-color: $primary;
+        border: solid $primary;
         background: $background;
     }
 
@@ -85,7 +81,6 @@ class InputField(Container):
             show_line_numbers=False,
         )
         self.textarea_widget.display = False
-        self.textarea_widget.border_title = "Multi-line Mode (Ctrl+J to submit)"
         yield self.textarea_widget
 
         yield EnhancedAutoComplete(self.input_widget, command_candidates=COMMANDS)

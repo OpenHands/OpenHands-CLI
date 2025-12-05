@@ -8,7 +8,10 @@ from textual.notifications import SeverityLevel
 
 from openhands.sdk import BaseConversation, Message, TextContent
 from openhands.sdk.conversation.exceptions import ConversationRunError
-from openhands.sdk.conversation.state import ConversationExecutionStatus
+from openhands.sdk.conversation.state import (
+    ConversationExecutionStatus,
+    ConversationState,
+)
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmationPolicyBase,
@@ -188,9 +191,6 @@ class ConversationRunner:
         """
         if not self.conversation:
             return UserConfirmation.DEFER
-
-        # Get pending actions that need confirmation
-        from openhands.sdk.conversation.state import ConversationState
 
         pending_actions = ConversationState.get_unmatched_actions(
             self.conversation.state.events

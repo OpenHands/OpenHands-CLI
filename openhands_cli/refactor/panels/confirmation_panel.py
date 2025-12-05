@@ -7,6 +7,7 @@ from textual.app import ComposeResult
 from textual.containers import Container, Vertical
 from textual.widgets import ListItem, ListView, Static
 
+from openhands.sdk.event import ActionEvent
 from openhands_cli.user_actions.types import UserConfirmation
 
 
@@ -15,7 +16,7 @@ class ConfirmationPanel(Container):
 
     def __init__(
         self,
-        pending_actions: list,
+        pending_actions: list[ActionEvent],
         confirmation_callback: Callable[[UserConfirmation], None],
         **kwargs,
     ):
@@ -42,10 +43,9 @@ class ConfirmationPanel(Container):
             # Actions list
             with Container(classes="actions-container"):
                 for i, action in enumerate(self.pending_actions, 1):
-                    tool_name = getattr(action, "tool_name", "[unknown tool]")
+                    tool_name = action.tool_name
                     action_content = (
-                        str(getattr(action, "action", ""))[:100].replace("\n", " ")
-                        or "[unknown action]"
+                        str(action.action.visualize) if action.action else ""
                     )
                     yield Static(
                         f"{i}. {tool_name}: {html.escape(action_content)}...",
@@ -100,7 +100,7 @@ class ConfirmationSidePanel(Container):
 
     def __init__(
         self,
-        pending_actions: list,
+        pending_actions: list[ActionEvent],
         confirmation_callback: Callable[[UserConfirmation], None],
         **kwargs,
     ):

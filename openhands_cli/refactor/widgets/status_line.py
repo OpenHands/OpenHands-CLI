@@ -53,11 +53,9 @@ class WorkingStatusLine(Static):
         self._is_working = is_running
         if is_running:
             self._conversation_start_time = time.time()
-            self._working_frame = 0
             if self._timer:
                 self._timer.stop()
 
-            # Update more frequently (0.1s) for smooth spinner animation
             self._timer = self.set_interval(0.1, self._on_tick)
             return
 
@@ -66,7 +64,6 @@ class WorkingStatusLine(Static):
             self._timer.stop()
             self._timer = None
 
-        self.conversation_start_time = None
         self._update_text()
 
     # ----- Internal helpers -----
@@ -74,8 +71,8 @@ class WorkingStatusLine(Static):
     def _on_tick(self) -> None:
         """Periodic update from timer."""
         if self._conversation_start_time is not None:
+            # Update animation frame more frequently than timer for smooth animation
             if self._is_working:
-                # Advance spinner animation
                 self._working_frame = (self._working_frame + 1) % 10
             self._update_text()
 
@@ -115,7 +112,7 @@ class InfoStatusLine(Static):
     def __init__(self, app: OpenHandsApp, **kwargs) -> None:
         super().__init__("", id="info_status_line", markup=False, **kwargs)
         self.main_app = app
-        self.mode_indicator = "Single-line • Ctrl+I for multi-line"
+        self.mode_indicator = "[Ctrl+L for multi-line]"
         self.work_dir_display = self._get_work_dir_display()
 
     def on_mount(self) -> None:
@@ -127,9 +124,9 @@ class InfoStatusLine(Static):
 
     def _on_handle_mutliline_mode(self, is_multiline_mode: bool) -> None:
         if is_multiline_mode:
-            self.mode_indicator = "Multi-line mode • Ctrl+J to submit"
+            self.mode_indicator = "[Multi-line: Ctrl+J to submit]"
         else:
-            self.mode_indicator = "Single-line • Ctrl+I for multi-line"
+            self.mode_indicator = "[Ctrl+L for multi-line]"
         self._update_text()
 
     def _get_work_dir_display(self) -> str:
@@ -138,7 +135,7 @@ class InfoStatusLine(Static):
         home = os.path.expanduser("~")
         if work_dir.startswith(home):
             work_dir = work_dir.replace(home, "~", 1)
-        return f"{work_dir}"
+        return work_dir
 
     def _update_text(self) -> None:
         """Rebuild the info status text."""

@@ -1,8 +1,6 @@
 Screen {
     layout: vertical;
     background: $background;
-    min-width: 80;
-    min-height: 24;
 }
 
 #content_area {
@@ -15,32 +13,6 @@ Screen {
     margin: 1 1 0 1;
     background: $background;
     color: $foreground;
-    scrollbar-size: 1 1;
-    scrollbar-background: $surface;
-    scrollbar-color: $primary;
-    scrollbar-color-hover: $accent;
-    scrollbar-color-active: $secondary;
-}
-
-#main_display.conversation-paused {
-    border: thick $warning;
-    border-title-color: $warning;
-}
-
-#main_display.conversation-error {
-    border: thick $error;
-    border-title-color: $error;
-}
-
-/* Animated working indicator */
-.working-indicator {
-    width: auto;
-    height: 1;
-    margin: 0 1;
-    padding: 0 1;
-    background: $accent 30%;
-    color: $accent;
-    text-style: bold;
 }
 
 #splash_content {
@@ -50,55 +22,15 @@ Screen {
 }
 
 .user-message {
-    padding: 1 1;
-    margin: 1 0;
-    background: $surface;
+    padding: 0 1;
+    background: $background;
     color: $primary;
-    border-left: thick $primary;
 }
 
-.help-message {
-    padding: 1 1;
-    margin: 1 0;
-    background: $surface;
-    color: $foreground;
-    border-left: thick $accent;
-}
-
-.error-message {
-    padding: 1 1;
-    margin: 1 0;
-    background: $surface;
-    color: $error;
-    border-left: thick $error;
-}
-
-.error-container {
-    padding: 1 1;
-    margin: 1 0;
-    background: $surface;
-    border: thick $error;
-    border-title-color: $error;
-}
-
-.error-title {
+.help-message, .error-message, .status-message {
     padding: 0 1;
-    color: $error;
-    text-style: bold;
-}
-
-.error-details {
-    padding: 0 1;
-    margin-top: 1;
+    background: $background;
     color: $foreground;
-}
-
-.status-message {
-    padding: 1 1;
-    margin: 1 0;
-    background: $surface;
-    color: $foreground;
-    border-left: thick $secondary;
 }
 
 #input_area {
@@ -134,19 +66,23 @@ Footer {
 .status-panel {
     width: auto;
     height: auto;
-    background: $background;
+    border: solid $primary;
+    background: $surface;
     padding: 1;
     text-align: center;
     margin: 1 0;
+    border-title-align: center;
 }
 
 .conversation-panel {
     width: auto;
     height: auto;
-    background: $background;
+    border: solid $secondary;
+    background: $surface;
     padding: 1;
     text-align: center;
     margin: 1 0;
+    border-title-align: center;
 }
 
 .splash-instruction {
@@ -168,33 +104,4 @@ Footer {
     background: $background;
     color: $primary;
     margin: 1 0 0 0;
-}
-
-/* Autocomplete dropdown styling */
-AutoComplete {
-    width: auto;
-}
-
-AutoComplete > .autocomplete--dropdown-container {
-    background: $surface;
-    border: thick $accent;
-}
-
-AutoComplete > .autocomplete--dropdown-container > OptionList {
-    background: $surface;
-    color: $foreground;
-}
-
-AutoComplete > .autocomplete--dropdown-container > OptionList > .option-list--option {
-    background: $surface;
-    color: $foreground;
-}
-
-AutoComplete > .autocomplete--dropdown-container > OptionList > .option-list--option-highlighted {
-    background: $accent;
-    color: $background;
-}
-
-AutoComplete > .autocomplete--dropdown-container > OptionList > .option-list--option-hover {
-    background: $primary 20%;
 }
