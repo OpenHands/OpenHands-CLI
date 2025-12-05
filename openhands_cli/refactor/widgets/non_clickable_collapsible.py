@@ -21,7 +21,7 @@ from textual.widgets import Button, Static
 class NonClickableCollapsibleTitle(Container, can_focus=False):
     """Title and symbol for the NonClickableCollapsible that ignores click events."""
 
-    ALLOW_SELECT = False
+    ALLOW_SELECT = True
     DEFAULT_CSS = """
     NonClickableCollapsibleTitle {
         width: 100%;
@@ -46,22 +46,24 @@ class NonClickableCollapsibleTitle(Container, can_focus=False):
         height: 1;
         min-width: 4;
         margin-left: 1;
-        background: transparent;
-        border: none;
-        color: $text-muted;
-        text-style: none;
+        background: #3a3a3a;
+        border: tall #555555;
+        color: #ffffff;
+        text-style: bold;
     }
 
     NonClickableCollapsibleTitle .copy-button:hover {
-        background: $surface-lighten-1;
-        color: $text;
+        background: #4a4a4a;
+        color: #ffe165;
         text-style: bold;
+        border: tall #ffe165;
     }
 
     NonClickableCollapsibleTitle .copy-button:focus {
-        background: $surface-lighten-2;
-        color: $text;
+        background: #5a5a5a;
+        color: #ffe165;
         text-style: bold;
+        border: tall #ffe165;
     }
     """
 
