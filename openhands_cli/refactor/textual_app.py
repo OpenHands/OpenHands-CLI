@@ -41,7 +41,8 @@ from openhands_cli.refactor.widgets.non_clickable_collapsible import (
 )
 from openhands_cli.refactor.widgets.richlog_visualizer import TextualVisualizer
 from openhands_cli.refactor.widgets.status_line import (
-    StatusLine,
+    InfoStatusLine,
+    WorkingStatusLine,
 )
 from openhands_cli.user_actions.types import UserConfirmation
 
@@ -56,6 +57,8 @@ class OpenHandsApp(App):
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
+        ("ctrl+c", "request_quit", "Quit the application"),
+        ("ctrl+d", "request_quit", "Quit the application"),
     ]
 
     input_field: getters.query_one[InputField] = getters.query_one(InputField)
@@ -142,9 +145,9 @@ class OpenHandsApp(App):
 
         # Input area - docked to bottom
         with Container(id="input_area"):
+            yield WorkingStatusLine(self)
             yield InputField(placeholder="Message, @file, or /command")
-
-            yield StatusLine(self)
+            yield InfoStatusLine(self)
 
         # Footer - shows available key bindings
         yield Footer()
