@@ -13,6 +13,7 @@ ExitConfirmationModal {
     min-width: 40;
     border: $primary 80%;
     background: $surface 90%;
+    margin: 1 1;
 }
 
 #question {
