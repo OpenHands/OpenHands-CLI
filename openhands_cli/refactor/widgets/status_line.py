@@ -82,11 +82,11 @@ class WorkingStatusLine(Static):
             return ""
         elapsed = int(time.time() - self._conversation_start_time)
 
-        # Add working indicator with waving hand animation
+        # Add working indicator with ASCII hand waving animation
         working_indicator = ""
         if self._is_working:
-            # Waving hand animation - alternating positions to simulate waving
-            frames = ["👋", "🖐️", "👋", "✋", "👋", "🖐️", "👋", "✋"]
+            # ASCII art hand waving - stick figure with arms in different positions
+            frames = ["\\o/", "|o/", "-o-", "\\o|", "\\o/", "|o/", "-o-", "\\o|"]
             working_indicator = f"{frames[self._working_frame % len(frames)]} Working"
 
         return f"{working_indicator} ({elapsed}s • ESC: pause • Ctrl+O: expand)"

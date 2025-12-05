@@ -287,8 +287,10 @@ class OpenHandsApp(App):
 
         # Add the user message to the main display as a Static widget
         user_message_widget = Static(f"> {content}", classes="user-message")
-        self.main_display.mount(user_message_widget)
+        await self.main_display.mount(user_message_widget)
         self.main_display.scroll_end(animate=False)
+        # Force immediate refresh to show the message without delay
+        self.refresh()
 
         # Handle commands - only exact matches
         if is_valid_command(content):
