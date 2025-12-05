@@ -194,7 +194,7 @@ class TestMainEntryPoint:
         mock_run_agent_chat.assert_called_once()
         kwargs = mock_run_agent_chat.call_args.kwargs
         assert kwargs["resume_conversation_id"] is None
-        assert isinstance(kwargs["confirmation_policy"], AlwaysConfirm)
+        assert isinstance(kwargs["confirmation_policy"], NeverConfirm)
         assert kwargs["queued_inputs"] == ["list files"]
         assert kwargs["headless"] is True
 
@@ -220,7 +220,7 @@ class TestMainEntryPoint:
             None,
             False,
         ),
-        (["openhands", "--headless"], None, AlwaysConfirm, None, True),
+        (["openhands", "--headless"], None, NeverConfirm, None, True),
     ],
 )
 def test_main_cli_calls_run_cli_entry(

@@ -69,6 +69,8 @@ def main() -> None:
                 confirmation_policy = NeverConfirm()
             elif args.llm_approve:
                 confirmation_policy = ConfirmRisky(threshold=SecurityRisk.HIGH)
+            elif getattr(args, "headless", False):
+                confirmation_policy = NeverConfirm()
 
             queued_inputs = create_seeded_instructions_from_args(args)
 

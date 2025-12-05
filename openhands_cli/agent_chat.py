@@ -138,7 +138,9 @@ def run_cli_entry(
                 user_input = pending_inputs.pop(0)
             elif headless:
                 print_formatted_text(
-                    HTML("<yellow>No additional input provided. Ending headless session.</yellow>")
+                    HTML(
+                        "<yellow>No additional input provided. Ending headless session.</yellow>"
+                    )
                 )
                 break
             else:
@@ -277,7 +279,9 @@ def run_cli_entry(
                     break
                 if status == ConversationExecutionStatus.PAUSED:
                     print_formatted_text(
-                        HTML("<yellow>Conversation paused. Exiting headless mode.</yellow>")
+                        HTML(
+                            "<yellow>Conversation paused. Exiting headless mode.</yellow>"
+                        )
                     )
                     break
                 if status == ConversationExecutionStatus.ERROR:

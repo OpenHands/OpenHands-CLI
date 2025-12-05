@@ -19,6 +19,9 @@ def create_main_parser() -> argparse.ArgumentParser:
             with 'always-ask' confirmation mode, where all agent actions
             require user confirmation.
 
+            In headless mode the CLI auto-approves actions unless you
+            explicitly select a different confirmation policy.
+
             Use 'serve' subcommand to launch the GUI server instead.
 
             Examples:
@@ -62,7 +65,7 @@ def create_main_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Run in non-interactive mode and exit automatically when the agent "
-            "finishes"
+            "finishes (auto-approves actions unless another confirmation policy is set)"
         ),
     )
 
