@@ -241,7 +241,7 @@ class TextualVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 content_string,
                 title=title,
-                collapsed=True,  # Start collapsed by default
+                collapsed=False,  # Start expanded by default
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, ObservationEvent):
@@ -249,7 +249,7 @@ class TextualVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 str(content),
                 title=title,
-                collapsed=True,  # Start collapsed for observations
+                collapsed=False,  # Start expanded for observations
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, UserRejectObservation):
@@ -257,7 +257,7 @@ class TextualVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 str(content),
                 title=title,
-                collapsed=True,  # Start collapsed by default
+                collapsed=False,  # Start expanded by default
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, MessageEvent):
@@ -283,7 +283,7 @@ class TextualVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 content_string,
                 title=title,
-                collapsed=True,  # Start collapsed by default
+                collapsed=False,  # Start expanded by default
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, AgentErrorEvent):
@@ -296,7 +296,7 @@ class TextualVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 content_string,
                 title=title,
-                collapsed=True,  # Start collapsed by default
+                collapsed=False,  # Start expanded by default
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, PauseEvent):
@@ -304,7 +304,7 @@ class TextualVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 str(content),
                 title=title,
-                collapsed=True,  # Start collapsed for pauses
+                collapsed=False,  # Start expanded for pauses
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, Condensation):
@@ -317,7 +317,7 @@ class TextualVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 content_string,
                 title=title,
-                collapsed=True,  # Start collapsed for condensations
+                collapsed=False,  # Start expanded for condensations
                 border_color=_get_event_border_color(event),
             )
         else:
@@ -329,7 +329,7 @@ class TextualVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 content_string,
                 title=title,
-                collapsed=True,  # Start collapsed for unknown events
+                collapsed=False,  # Start expanded for unknown events
                 border_color=_get_event_border_color(event),
             )
 

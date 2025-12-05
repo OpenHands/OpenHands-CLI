@@ -245,7 +245,8 @@ class OpenHandsApp(App):
 
     def create_conversation_runner(self) -> ConversationRunner:
         # Initialize conversation runner with visualizer that can add widgets
-        visualizer = TextualVisualizer(self.main_display, self)
+        # Skip user messages since we display them immediately in the UI
+        visualizer = TextualVisualizer(self.main_display, self, skip_user_messages=True)
 
         return ConversationRunner(
             self.conversation_id,
