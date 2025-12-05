@@ -7,7 +7,9 @@ This is a simplified version that demonstrates the TUI functionality.
 import logging
 import os
 import warnings
+from pathlib import Path
 
+from dotenv import load_dotenv
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 
@@ -20,6 +22,11 @@ from openhands.sdk.security.confirmation_policy import (
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.argparsers.main_parser import create_main_parser
 from openhands_cli.utils import create_seeded_instructions_from_args
+
+
+env_path = Path.cwd() / ".env"
+if env_path.is_file():
+    load_dotenv(dotenv_path=str(env_path), override=False)
 
 
 debug_env = os.getenv("DEBUG", "false").lower()

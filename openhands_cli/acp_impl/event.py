@@ -160,9 +160,9 @@ class EventSubscriber:
             if event.reasoning_content and event.reasoning_content.strip():
                 await self.conn.sessionUpdate(
                     SessionNotification(
-                        sessionId=self.session_id,
+                        session_id=self.session_id,
                         update=AgentThoughtChunk(
-                            sessionUpdate="agent_thought_chunk",
+                            session_update="agent_thought_chunk",
                             content=TextContentBlock(
                                 type="text",
                                 text="**Reasoning**:\n"
@@ -176,9 +176,9 @@ class EventSubscriber:
             if thought_text.strip():
                 await self.conn.sessionUpdate(
                     SessionNotification(
-                        sessionId=self.session_id,
+                        session_id=self.session_id,
                         update=AgentThoughtChunk(
-                            sessionUpdate="agent_thought_chunk",
+                            session_update="agent_thought_chunk",
                             content=TextContentBlock(
                                 type="text",
                                 text="\n**Thought**:\n" + thought_text.strip() + "\n",
@@ -230,9 +230,9 @@ class EventSubscriber:
                 elif isinstance(event.action, ThinkAction):
                     await self.conn.sessionUpdate(
                         SessionNotification(
-                            sessionId=self.session_id,
+                            session_id=self.session_id,
                             update=AgentThoughtChunk(
-                                sessionUpdate="agent_thought_chunk",
+                                session_update="agent_thought_chunk",
                                 content=TextContentBlock(
                                     type="text",
                                     text=action_viz,
@@ -244,9 +244,9 @@ class EventSubscriber:
                 elif isinstance(event.action, FinishAction):
                     await self.conn.sessionUpdate(
                         SessionNotification(
-                            sessionId=self.session_id,
+                            session_id=self.session_id,
                             update=AgentMessageChunk(
-                                sessionUpdate="agent_message_chunk",
+                                session_update="agent_message_chunk",
                                 content=TextContentBlock(
                                     type="text",
                                     text=action_viz,
@@ -258,10 +258,10 @@ class EventSubscriber:
 
             await self.conn.sessionUpdate(
                 SessionNotification(
-                    sessionId=self.session_id,
+                    session_id=self.session_id,
                     update=ToolCallStart(
-                        sessionUpdate="tool_call",
-                        toolCallId=event.tool_call_id,
+                        session_update="tool_call",
+                        tool_call_id=event.tool_call_id,
                         title=title,
                         kind=tool_kind,
                         status="in_progress",
@@ -269,7 +269,7 @@ class EventSubscriber:
                         locations=extract_action_locations(event.action)
                         if event.action
                         else None,
-                        rawInput=event.action.model_dump() if event.action else None,
+                        raw_input=event.action.model_dump() if event.action else None,
                     ),
                 )
             )
@@ -321,9 +321,9 @@ class EventSubscriber:
                     # Send AgentPlanUpdate
                     await self.conn.sessionUpdate(
                         SessionNotification(
-                            sessionId=self.session_id,
+                            session_id=self.session_id,
                             update=AgentPlanUpdate(
-                                sessionUpdate="plan",
+                                session_update="plan",
                                 entries=entries,
                             ),
                         )
@@ -355,13 +355,13 @@ class EventSubscriber:
             # Send tool_call_update for all observation types
             await self.conn.sessionUpdate(
                 SessionNotification(
-                    sessionId=self.session_id,
+                    session_id=self.session_id,
                     update=ToolCallProgress(
-                        sessionUpdate="tool_call_update",
-                        toolCallId=event.tool_call_id,
+                        session_update="tool_call_update",
+                        tool_call_id=event.tool_call_id,
                         status=status,
                         content=[content] if content else None,
-                        rawOutput=event.model_dump(),
+                        raw_output=event.model_dump(),
                     ),
                 )
             )
@@ -388,9 +388,9 @@ class EventSubscriber:
             else:  # assistant or other roles
                 await self.conn.sessionUpdate(
                     SessionNotification(
-                        sessionId=self.session_id,
+                        session_id=self.session_id,
                         update=AgentMessageChunk(
-                            sessionUpdate="agent_message_chunk",
+                            session_update="agent_message_chunk",
                             content=TextContentBlock(
                                 type="text",
                                 text=viz_text,
@@ -417,9 +417,9 @@ class EventSubscriber:
 
             await self.conn.sessionUpdate(
                 SessionNotification(
-                    sessionId=self.session_id,
+                    session_id=self.session_id,
                     update=AgentThoughtChunk(
-                        sessionUpdate="agent_thought_chunk",
+                        session_update="agent_thought_chunk",
                         content=TextContentBlock(
                             type="text",
                             text=viz_text,
@@ -443,9 +443,9 @@ class EventSubscriber:
 
             await self.conn.sessionUpdate(
                 SessionNotification(
-                    sessionId=self.session_id,
+                    session_id=self.session_id,
                     update=AgentThoughtChunk(
-                        sessionUpdate="agent_thought_chunk",
+                        session_update="agent_thought_chunk",
                         content=TextContentBlock(
                             type="text",
                             text=viz_text,
@@ -472,9 +472,9 @@ class EventSubscriber:
 
             await self.conn.sessionUpdate(
                 SessionNotification(
-                    sessionId=self.session_id,
+                    session_id=self.session_id,
                     update=AgentThoughtChunk(
-                        sessionUpdate="agent_thought_chunk",
+                        session_update="agent_thought_chunk",
                         content=TextContentBlock(
                             type="text",
                             text=viz_text,
@@ -498,9 +498,9 @@ class EventSubscriber:
 
             await self.conn.sessionUpdate(
                 SessionNotification(
-                    sessionId=self.session_id,
+                    session_id=self.session_id,
                     update=AgentThoughtChunk(
-                        sessionUpdate="agent_thought_chunk",
+                        session_update="agent_thought_chunk",
                         content=TextContentBlock(
                             type="text",
                             text=viz_text,

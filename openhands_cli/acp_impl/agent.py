@@ -10,11 +10,8 @@ from uuid import UUID
 from acp import (
     Agent as ACPAgent,
     AgentSideConnection,
-    InitializeRequest,
     InitializeResponse,
-    NewSessionRequest,
     NewSessionResponse,
-    PromptRequest,
     PromptResponse,
     RequestError,
     SessionNotification,
@@ -23,17 +20,13 @@ from acp import (
 from acp.schema import (
     AgentCapabilities,
     AgentMessageChunk,
-    AuthenticateRequest,
     AuthenticateResponse,
-    CancelNotification,
     Implementation,
-    LoadSessionRequest,
+    ListSessionsResponse,
     LoadSessionResponse,
     McpCapabilities,
     PromptCapabilities,
-    SetSessionModelRequest,
     SetSessionModelResponse,
-    SetSessionModeRequest,
     SetSessionModeResponse,
     TextContentBlock,
 )
@@ -76,6 +69,10 @@ class OpenHandsACPAgent(ACPAgent):
         self._running_tasks: dict[str, asyncio.Task] = {}
 
         logger.info("OpenHands ACP Agent initialized")
+
+    def on_connect(self, conn: AgentSideConnection) -> None:  # noqa: ARG002
+        """Called when connection is established."""
+        logger.info("ACP connection established")
 
     def _get_or_create_conversation(
         self,
@@ -193,9 +190,15 @@ class OpenHandsACPAgent(ACPAgent):
 
         return conversation
 
-    async def initialize(self, params: InitializeRequest) -> InitializeResponse:
+    async def initialize(
+        self,
+        protocol_version: int,
+        client_capabilities: Any | None = None,  # noqa: ARG002
+        client_info: Any | None = None,  # noqa: ARG002
+        **_kwargs: Any,
+    ) -> InitializeResponse:
         """Initialize the ACP protocol."""
-        logger.info(f"Initializing ACP with protocol version: {params.protocolVersion}")
+        logger.info(f"Initializing ACP with protocol version: {protocol_version}")
 
         # Check if agent is configured
         try:
@@ -209,44 +212,47 @@ class OpenHandsACPAgent(ACPAgent):
             logger.warning("Agent not configured - users should run 'openhands' first")
 
         return InitializeResponse(
-            protocolVersion=params.protocolVersion,
-            authMethods=auth_methods,
-            agentCapabilities=AgentCapabilities(
-                loadSession=True,
-                mcpCapabilities=McpCapabilities(http=True, sse=True),
-                promptCapabilities=PromptCapabilities(
+            protocol_version=protocol_version,
+            auth_methods=auth_methods,
+            agent_capabilities=AgentCapabilities(
+                load_session=True,
+                mcp_capabilities=McpCapabilities(http=True, sse=True),
+                prompt_capabilities=PromptCapabilities(
                     audio=False,
-                    embeddedContext=True,
+                    embedded_context=True,
                     image=True,
                 ),
             ),
-            agentInfo=Implementation(
+            agent_info=Implementation(
                 name="OpenHands CLI ACP Agent",
                 version=__version__,
             ),
         )
 
     async def authenticate(
-        self, params: AuthenticateRequest
+        self, method_id: str, **_kwargs: Any
     ) -> AuthenticateResponse | None:
         """Authenticate the client (no-op for now)."""
-        logger.info(f"Authentication requested with method: {params.methodId}")
+        logger.info(f"Authentication requested with method: {method_id}")
         return AuthenticateResponse()
 
-    async def newSession(self, params: NewSessionRequest) -> NewSessionResponse:
+    async def new_session(
+        self,
+        cwd: str,
+        mcp_servers: list[Any],
+        **_kwargs: Any,
+    ) -> NewSessionResponse:
         """Create a new conversation session."""
         session_id = str(uuid.uuid4())
 
         try:
             # Convert ACP MCP servers to Agent format
             mcp_servers_dict = None
-            if params.mcpServers:
-                mcp_servers_dict = convert_acp_mcp_servers_to_agent_format(
-                    params.mcpServers
-                )
+            if mcp_servers:
+                mcp_servers_dict = convert_acp_mcp_servers_to_agent_format(mcp_servers)
 
             # Validate working directory
-            working_dir = params.cwd or str(Path.cwd())
+            working_dir = cwd or str(Path.cwd())
             logger.info(f"Using working directory: {working_dir}")
 
             # Create conversation and cache it for future operations
@@ -262,7 +268,7 @@ class OpenHandsACPAgent(ACPAgent):
                 f"{conversation.agent.llm.model}"  # type: ignore[attr-defined]
             )
 
-            return NewSessionResponse(sessionId=session_id)
+            return NewSessionResponse(session_id=session_id)
 
         except MissingAgentSpec as e:
             logger.error(f"Agent not configured: {e}")
@@ -281,19 +287,19 @@ class OpenHandsACPAgent(ACPAgent):
                 {"reason": "Failed to create new session", "details": str(e)}
             )
 
-    async def prompt(self, params: PromptRequest) -> PromptResponse:
+    async def prompt(
+        self, prompt: list[Any], session_id: str, **_kwargs: Any
+    ) -> PromptResponse:
         """Handle a prompt request."""
-        session_id = params.sessionId
-
         try:
             # Get or create conversation (preserves state like pause/confirmation)
             conversation = self._get_or_create_conversation(session_id=session_id)
 
             # Convert ACP prompt format to OpenHands message content
-            message_content = convert_acp_prompt_to_message_content(params.prompt)
+            message_content = convert_acp_prompt_to_message_content(prompt)
 
             if not message_content:
-                return PromptResponse(stopReason="end_turn")
+                return PromptResponse(stop_reason="end_turn")
 
             # Send the message with potentially multiple content types
             # (text + images)
@@ -312,7 +318,7 @@ class OpenHandsACPAgent(ACPAgent):
                 self._running_tasks.pop(session_id, None)
 
             # Return the final response
-            return PromptResponse(stopReason="end_turn")
+            return PromptResponse(stop_reason="end_turn")
 
         except RequestError:
             # Re-raise RequestError as-is
@@ -322,9 +328,9 @@ class OpenHandsACPAgent(ACPAgent):
             # Send error notification to client
             await self._conn.sessionUpdate(
                 SessionNotification(
-                    sessionId=session_id,
+                    session_id=session_id,
                     update=AgentMessageChunk(
-                        sessionUpdate="agent_message_chunk",
+                        session_update="agent_message_chunk",
                         content=TextContentBlock(type="text", text=f"Error: {str(e)}"),
                     ),
                 )
@@ -358,34 +364,37 @@ class OpenHandsACPAgent(ACPAgent):
                 }
             )
 
-    async def cancel(self, params: CancelNotification) -> None:
+    async def cancel(self, session_id: str, **_kwargs: Any) -> None:
         """Cancel the current operation."""
-        logger.info(f"Cancel requested for session: {params.sessionId}")
+        logger.info(f"Cancel requested for session: {session_id}")
 
         try:
-            conversation = self._get_or_create_conversation(session_id=params.sessionId)
+            conversation = self._get_or_create_conversation(session_id=session_id)
             conversation.pause()
 
-            running_task = self._running_tasks.get(params.sessionId)
+            running_task = self._running_tasks.get(session_id)
             if not running_task or running_task.done():
                 return
 
             logger.debug(
-                f"Waiting for conversation thread to terminate for session "
-                f"{params.sessionId}"
+                f"Waiting for conversation thread to terminate for session {session_id}"
             )
-            await self._wait_for_task_completion(running_task, params.sessionId)
+            await self._wait_for_task_completion(running_task, session_id)
 
         except RequestError:
             raise
         except Exception as e:
-            logger.error(f"Failed to cancel session {params.sessionId}: {e}")
+            logger.error(f"Failed to cancel session {session_id}: {e}")
             raise RequestError.internal_error(
                 {"reason": "Failed to cancel session", "details": str(e)}
             )
 
-    async def loadSession(
-        self, params: LoadSessionRequest
+    async def load_session(
+        self,
+        cwd: str,  # noqa: ARG002
+        mcp_servers: list[Any],  # noqa: ARG002
+        session_id: str,
+        **_kwargs: Any,
     ) -> LoadSessionResponse | None:
         """Load an existing session and replay conversation history.
 
@@ -398,7 +407,6 @@ class OpenHandsACPAgent(ACPAgent):
         - Server should load the session state from persistent storage
         - Replay the conversation history to the client via sessionUpdate notifications
         """
-        session_id = params.sessionId
         logger.info(f"Loading session: {session_id}")
 
         try:
@@ -444,26 +452,42 @@ class OpenHandsACPAgent(ACPAgent):
                 {"reason": "Failed to load session", "details": str(e)}
             )
 
-    async def setSessionMode(
-        self, params: SetSessionModeRequest
+    async def list_sessions(
+        self,
+        cursor: str | None = None,  # noqa: ARG002
+        cwd: str | None = None,  # noqa: ARG002
+        **_kwargs: Any,
+    ) -> ListSessionsResponse:
+        """List available sessions (no-op for now)."""
+        logger.info("List sessions requested")
+        return ListSessionsResponse(sessions=[])
+
+    async def set_session_mode(
+        self,
+        mode_id: str,  # noqa: ARG002
+        session_id: str,
+        **_kwargs: Any,
     ) -> SetSessionModeResponse | None:
         """Set session mode (no-op for now)."""
-        logger.info(f"Set session mode requested: {params.sessionId}")
+        logger.info(f"Set session mode requested: {session_id}")
         return SetSessionModeResponse()
 
-    async def setSessionModel(
-        self, params: SetSessionModelRequest
+    async def set_session_model(
+        self,
+        model_id: str,  # noqa: ARG002
+        session_id: str,
+        **_kwargs: Any,
     ) -> SetSessionModelResponse | None:
         """Set session model (no-op for now)."""
-        logger.info(f"Set session model requested: {params.sessionId}")
+        logger.info(f"Set session model requested: {session_id}")
         return SetSessionModelResponse()
 
-    async def extMethod(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         """Extension method (not supported)."""
         logger.info(f"Extension method '{method}' requested with params: {params}")
-        return {"error": "extMethod not supported"}
+        return {"error": "ext_method not supported"}
 
-    async def extNotification(self, method: str, params: dict[str, Any]) -> None:
+    async def ext_notification(self, method: str, params: dict[str, Any]) -> None:
         """Extension notification (no-op for now)."""
         logger.info(f"Extension notification '{method}' received with params: {params}")
 

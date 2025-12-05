@@ -74,6 +74,7 @@ class AgentStore:
                 skills=skills,
                 system_message_suffix=f"You current working directory is: {WORK_DIR}",
                 load_user_skills=True,
+                load_public_skills=True,
             )
 
             mcp_config: dict = self.load_mcp_configuration()

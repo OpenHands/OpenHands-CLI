@@ -40,7 +40,7 @@ def convert_acp_mcp_servers_to_agent_format(
 
     ACP and Agent use different formats for MCP server configurations:
     - ACP: List of Pydantic server models with 'name' field, env as array of EnvVariable
-    - Agent: Dict keyed by server name, env as dict
+    - Agent: Dict keyed by server name, env as dict, with transport field
 
     Args:
         mcp_servers: List of MCP server Pydantic models from ACP
@@ -61,6 +61,16 @@ def convert_acp_mcp_servers_to_agent_format(
         # ACP sends env as array of EnvVariable objects, but Agent expects dict
         if "env" in server_config:
             server_config["env"] = _convert_env_to_dict(server_config["env"])
+
+        # Add transport type based on server class
+        # StdioMcpServer -> stdio, HttpMcpServer -> http, SseMcpServer -> sse
+        if isinstance(server, StdioMcpServer):
+            server_config["transport"] = "stdio"
+        elif isinstance(server, HttpMcpServer):
+            server_config["transport"] = "http"
+        elif isinstance(server, SseMcpServer):
+            server_config["transport"] = "sse"
+
         converted_servers[server_name] = server_config
 
     return converted_servers

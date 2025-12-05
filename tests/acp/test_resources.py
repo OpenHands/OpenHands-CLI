@@ -21,7 +21,7 @@ def test_materialize_text_resource():
     """Test converting text resource to TextContent."""
     text_resource = TextResourceContents(
         uri="file:///example.txt",
-        mimeType="text/plain",
+        mime_type="text/plain",
         text="Hello, world!",
     )
     block = EmbeddedResourceContentBlock(
@@ -46,7 +46,7 @@ def test_materialize_supported_image_blob():
     for mime_type in supported_types:
         blob_resource = BlobResourceContents(
             uri="file:///example.png",
-            mimeType=mime_type,
+            mime_type=mime_type,
             blob=test_data,
         )
         block = EmbeddedResourceContentBlock(
@@ -73,7 +73,7 @@ def test_materialize_unsupported_image_blob_with_conversion():
 
     blob_resource = BlobResourceContents(
         uri="file:///example.bmp",
-        mimeType="image/bmp",
+        mime_type="image/bmp",
         blob=bmp_data,
     )
     block = EmbeddedResourceContentBlock(
@@ -96,7 +96,7 @@ def test_materialize_corrupted_image_blob():
 
     blob_resource = BlobResourceContents(
         uri="file:///example.bmp",
-        mimeType="image/bmp",
+        mime_type="image/bmp",
         blob=invalid_data,
     )
     block = EmbeddedResourceContentBlock(
@@ -119,7 +119,7 @@ def test_materialize_non_image_blob():
     test_data = base64.b64encode(b"binary data").decode("utf-8")
     blob_resource = BlobResourceContents(
         uri="file:///example.bin",
-        mimeType="application/octet-stream",
+        mime_type="application/octet-stream",
         blob=test_data,
     )
     block = EmbeddedResourceContentBlock(

@@ -58,9 +58,9 @@ async def test_handle_message_event(event_subscriber, mock_connection):
     assert mock_connection.sessionUpdate.called
     call_args = mock_connection.sessionUpdate.call_args[0][0]
     assert isinstance(call_args, SessionNotification)
-    assert call_args.sessionId == "test-session"
+    assert call_args.session_id == "test-session"
     assert isinstance(call_args.update, SessionUpdate2)
-    assert call_args.update.sessionUpdate == "agent_message_chunk"
+    assert call_args.update.session_update == "agent_message_chunk"
 
 
 @pytest.mark.asyncio
@@ -112,8 +112,8 @@ async def test_handle_action_event(event_subscriber, mock_connection):
         notification = call[0][0]
         if isinstance(notification.update, SessionUpdate4):
             tool_call_found = True
-            assert notification.update.sessionUpdate == "tool_call"
-            assert notification.update.toolCallId == "test-call-123"
+            assert notification.update.session_update == "tool_call"
+            assert notification.update.tool_call_id == "test-call-123"
             assert notification.update.kind == "execute"  # terminal maps to execute
             assert notification.update.status == "in_progress"
 
@@ -145,7 +145,7 @@ async def test_handle_observation_event(event_subscriber, mock_connection):
     call_args = mock_connection.sessionUpdate.call_args[0][0]
     assert isinstance(call_args, SessionNotification)
     assert isinstance(call_args.update, SessionUpdate5)
-    assert call_args.update.sessionUpdate == "tool_call_update"
+    assert call_args.update.session_update == "tool_call_update"
     assert call_args.update.toolCallId == "test-call-123"
     assert call_args.update.status == "completed"
 
@@ -170,7 +170,7 @@ async def test_handle_agent_error_event(event_subscriber, mock_connection):
     call_args = mock_connection.sessionUpdate.call_args[0][0]
     assert isinstance(call_args, SessionNotification)
     assert isinstance(call_args.update, SessionUpdate5)
-    assert call_args.update.sessionUpdate == "tool_call_update"
+    assert call_args.update.session_update == "tool_call_update"
     assert call_args.update.status == "failed"
     assert call_args.update.rawOutput == {"error": "Something went wrong"}
 
@@ -220,9 +220,9 @@ async def test_handle_system_prompt_event(event_subscriber, mock_connection):
     assert mock_connection.sessionUpdate.called
     call_args = mock_connection.sessionUpdate.call_args[0][0]
     assert isinstance(call_args, SessionNotification)
-    assert call_args.sessionId == "test-session"
+    assert call_args.session_id == "test-session"
     assert isinstance(call_args.update, SessionUpdate3)
-    assert call_args.update.sessionUpdate == "agent_thought_chunk"
+    assert call_args.update.session_update == "agent_thought_chunk"
 
 
 @pytest.mark.asyncio
@@ -238,9 +238,9 @@ async def test_handle_pause_event(event_subscriber, mock_connection):
     assert mock_connection.sessionUpdate.called
     call_args = mock_connection.sessionUpdate.call_args[0][0]
     assert isinstance(call_args, SessionNotification)
-    assert call_args.sessionId == "test-session"
+    assert call_args.session_id == "test-session"
     assert isinstance(call_args.update, SessionUpdate3)
-    assert call_args.update.sessionUpdate == "agent_thought_chunk"
+    assert call_args.update.session_update == "agent_thought_chunk"
 
 
 @pytest.mark.asyncio
@@ -261,9 +261,9 @@ async def test_handle_condensation_event(event_subscriber, mock_connection):
     assert mock_connection.sessionUpdate.called
     call_args = mock_connection.sessionUpdate.call_args[0][0]
     assert isinstance(call_args, SessionNotification)
-    assert call_args.sessionId == "test-session"
+    assert call_args.session_id == "test-session"
     assert isinstance(call_args.update, SessionUpdate3)
-    assert call_args.update.sessionUpdate == "agent_thought_chunk"
+    assert call_args.update.session_update == "agent_thought_chunk"
 
 
 @pytest.mark.asyncio
@@ -279,9 +279,9 @@ async def test_handle_condensation_request_event(event_subscriber, mock_connecti
     assert mock_connection.sessionUpdate.called
     call_args = mock_connection.sessionUpdate.call_args[0][0]
     assert isinstance(call_args, SessionNotification)
-    assert call_args.sessionId == "test-session"
+    assert call_args.session_id == "test-session"
     assert isinstance(call_args.update, SessionUpdate3)
-    assert call_args.update.sessionUpdate == "agent_thought_chunk"
+    assert call_args.update.session_update == "agent_thought_chunk"
 
 
 @pytest.mark.asyncio
@@ -337,7 +337,7 @@ async def test_handle_task_tracker_observation(event_subscriber, mock_connection
         if isinstance(notification.update, SessionUpdate6):
             plan_update_found = True
             # Verify plan structure
-            assert notification.update.sessionUpdate == "plan"
+            assert notification.update.session_update == "plan"
             assert len(notification.update.entries) == 3
 
             # Verify first entry (done -> completed)
@@ -361,8 +361,8 @@ async def test_handle_task_tracker_observation(event_subscriber, mock_connection
 
         elif isinstance(notification.update, SessionUpdate5):
             tool_call_update_found = True
-            assert notification.update.sessionUpdate == "tool_call_update"
-            assert notification.update.toolCallId == "task-call-123"
+            assert notification.update.session_update == "tool_call_update"
+            assert notification.update.tool_call_id == "task-call-123"
             assert notification.update.status == "completed"
 
     assert plan_update_found, "AgentPlanUpdate notification should be sent"
