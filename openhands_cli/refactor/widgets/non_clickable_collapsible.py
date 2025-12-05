@@ -261,12 +261,11 @@ class NonClickableCollapsible(Widget):
             collapsed=collapsed,
         )
         self.title = title
-        self._content_string = str(
-            content
-        )  # Store the original content as string for copying
-        self._content_widget = Static(
-            self._content_string
-        )  # Create Static widget internally
+        # Store both the original content for rendering and string for copying
+        self._content = content
+        self._content_string = str(content)  # String version for copying
+        # Pass the original content to Static (can be Rich renderable)
+        self._content_widget = Static(content)
         self.collapsed = collapsed
         self.styles.border_left = ("thick", border_color)
 
