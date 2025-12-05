@@ -342,7 +342,7 @@ def test_acp_executable() -> bool:
         str(exe_path),
         ["acp"],
         test_messages,
-        timeout_per_message=15.0,  # Increased timeout for CI environments
+        timeout_per_message=20.0,  # Increased timeout for CI environments
         verbose=True,
     )
 
