@@ -13,6 +13,8 @@ Screen {
     margin: 1 1 0 1;
     background: $background;
     color: $foreground;
+    overflow-y: auto;
+    scrollbar-size-vertical: 1;
 }
 
 #splash_content {
@@ -69,7 +71,7 @@ Footer {
     width: auto;
     height: auto;
     background: transparent;
-    padding: 0;
+    padding: 0 1;
     text-align: left;
     margin: 0;
 }
@@ -78,7 +80,7 @@ Footer {
     width: auto;
     height: auto;
     background: transparent;
-    padding: 0;
+    padding: 0 1;
     text-align: left;
     margin: 0;
 }
