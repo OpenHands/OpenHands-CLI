@@ -6,19 +6,20 @@ from typing import Any
 
 from fastmcp.mcp_config import MCPConfig
 from textual.app import App
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.widgets import Static
 
 from openhands.sdk import Agent
 from openhands_cli.locations import MCP_CONFIG_FILE, PERSISTENCE_DIR
 from openhands_cli.refactor.core.theme import OPENHANDS_THEME
+from openhands_cli.refactor.panels.mcp_panel_style import MCP_PANEL_STYLE
 
 
-class MCPSidePanel(Vertical):
+class MCPSidePanel(VerticalScroll):
     """Side panel widget that displays MCP server information."""
 
-    CSS_PATH = "mcp_side_panel.tcss"
+    DEFAULT_CSS = MCP_PANEL_STYLE
 
     def __init__(self, agent: Agent | None = None, **kwargs):
         """Initialize the MCP side panel.
