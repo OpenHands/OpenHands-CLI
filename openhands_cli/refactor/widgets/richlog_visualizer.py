@@ -150,10 +150,21 @@ class TextualVisualizer(ConversationVisualizerBase):
             obs_type = obs.__class__.__name__.replace("Observation", "")
 
             if hasattr(obs, "content") and obs.content:
-                content = str(obs.content).strip().replace("\n", " ")
-                if len(content) > 50:
-                    content = content[:47] + "..."
-                return f"{obs_type}: {self._escape_rich_markup(content)}"
+                # Extract text from content (handle both string and list of TextContent)
+                content_text = ""
+                if isinstance(obs.content, list):
+                    for content_item in obs.content:
+                        if hasattr(content_item, "text"):
+                            content_text += content_item.text + " "
+                        elif hasattr(content_item, "content"):
+                            content_text += str(content_item.content) + " "
+                else:
+                    content_text = str(obs.content)
+
+                content_text = content_text.strip().replace("\n", " ")
+                if len(content_text) > 50:
+                    content_text = content_text[:47] + "..."
+                return f"{obs_type}: {self._escape_rich_markup(content_text)}"
             else:
                 return f"{obs_type} Observation"
 

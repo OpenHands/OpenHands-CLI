@@ -306,8 +306,9 @@ class NonClickableCollapsible(Widget):
     def _watch_collapsed(self, collapsed: bool) -> None:
         """Update collapsed state when reactive is changed."""
         self._update_collapsed(collapsed)
-        # Hide title when expanded, show when collapsed
-        self._title.display = collapsed
+        # Hide title text when expanded, but keep copy button visible
+        if hasattr(self._title, "_title_static") and self._title._title_static:
+            self._title._title_static.display = collapsed
         if self.collapsed:
             self.post_message(self.Collapsed(self))
         else:
