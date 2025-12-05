@@ -89,10 +89,7 @@ class WorkingStatusLine(Static):
             frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧"]
             working_indicator = f"{frames[self._working_frame % len(frames)]} Working"
 
-        return (
-            f"{working_indicator} ({elapsed}s • "
-            f"ESC: pause • Ctrl+O: toggle expand/collapse)"
-        )
+        return f"{working_indicator} ({elapsed}s • ESC: pause)"
 
     def _update_text(self) -> None:
         """Rebuild the working status text."""
@@ -142,5 +139,8 @@ class InfoStatusLine(Static):
 
     def _update_text(self) -> None:
         """Rebuild the info status text."""
-        status_text = f"{self.mode_indicator} • {self.work_dir_display}"
+        status_text = (
+            f"{self.mode_indicator} • "
+            f"Ctrl+O: expand/collapse messages • {self.work_dir_display}"
+        )
         self.update(status_text)
