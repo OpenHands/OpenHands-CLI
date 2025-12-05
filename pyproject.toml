@@ -20,7 +20,7 @@ dependencies = [
   "openhands-tools==1.4.0",
   "prompt-toolkit>=3",
   "typer>=0.17.4",
-  "agent-client-protocol>=0.7.0",
+  "agent-client-protocol==0.7.0",
   "pydantic>=2.7",
 ]
 
