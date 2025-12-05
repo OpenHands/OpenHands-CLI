@@ -1,18 +1,19 @@
 ExitConfirmationModal {
     align: center middle;
+    background: rgba(0, 0, 0, 0.8);
 }
 
 #dialog {
     grid-size: 2;
     grid-gutter: 1 2;
     grid-rows: 1fr auto;
-    padding: 0 1;
+    padding: 1;
     width: 60;
     height: auto;
     min-width: 40;
     min-height: 7;
-    border: $primary 80%;
-    background: $surface 90%;
+    border: solid $primary;
+    background: $surface;
     margin: 1 1;
 }
 

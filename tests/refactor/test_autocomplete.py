@@ -150,10 +150,9 @@ class TestCommandsAndAutocomplete:
         # Create callbacks to track behavior
         mock_exit_confirmed = mock.MagicMock()
         mock_exit_cancelled = mock.MagicMock()
-        
+
         modal = ExitConfirmationModal(
-            on_exit_confirmed=mock_exit_confirmed,
-            on_exit_cancelled=mock_exit_cancelled
+            on_exit_confirmed=mock_exit_confirmed, on_exit_cancelled=mock_exit_cancelled
         )
 
         # Mock the dismiss method to avoid event loop issues
@@ -163,7 +162,7 @@ class TestCommandsAndAutocomplete:
         yes_button = Button("Yes", id="yes")
         yes_event = Button.Pressed(yes_button)
         modal.on_button_pressed(yes_event)
-        
+
         # Verify dismiss was called and exit confirmed callback was called
         modal.dismiss.assert_called_once()
         mock_exit_confirmed.assert_called_once()
@@ -178,7 +177,7 @@ class TestCommandsAndAutocomplete:
         no_button = Button("No", id="no")
         no_event = Button.Pressed(no_button)
         modal.on_button_pressed(no_event)
-        
+
         # Verify dismiss was called and exit cancelled callback was called
         modal.dismiss.assert_called_once()
         mock_exit_cancelled.assert_called_once()
