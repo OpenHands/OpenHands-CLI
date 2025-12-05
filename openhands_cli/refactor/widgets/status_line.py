@@ -31,11 +31,9 @@ class StatusLine(Static):
         super().__init__("", id="status_line", markup=False, **kwargs)
         self._conversation_start_time: float | None = None
         self._timer: Timer | None = None
-        self._working_frame: int = 0
-        self._is_working: bool = False
 
         self.main_app = app
-        self.mode_indicator = " [Single-line mode • Ctrl+L for multi-line]"
+        self.mode_indicator = " [Ctrl+L for multi-line]"
         self.work_dir_display = self._get_work_dir_display()
 
     def on_mount(self) -> None:
@@ -56,22 +54,19 @@ class StatusLine(Static):
 
     def _on_handle_mutliline_mode(self, is_multiline_mode: bool) -> None:
         if is_multiline_mode:
-            self.mode_indicator = " [Multi-line mode • Ctrl+J to submit]"
+            self.mode_indicator = " [Multi-line: Ctrl+J to submit]"
         else:
-            self.mode_indicator = " [Single-line • Ctrl+L for multi-line]"
+            self.mode_indicator = " [Ctrl+L for multi-line]"
         self._update_text()
 
     def _on_conversation_state_changed(self, is_running: bool) -> None:
         """Update when conversation running state changes."""
-        self._is_working = is_running
         if is_running:
             self._conversation_start_time = time.time()
-            self._working_frame = 0
             if self._timer:
                 self._timer.stop()
 
-            # Update more frequently (0.1s) for smooth spinner animation
-            self._timer = self.set_interval(0.1, self._on_tick)
+            self._timer = self.set_interval(1.0, self._on_tick)
             return
 
         self._conversation_start_time = None
@@ -87,9 +82,6 @@ class StatusLine(Static):
     def _on_tick(self) -> None:
         """Periodic update from timer."""
         if self._conversation_start_time is not None:
-            if self._is_working:
-                # Advance spinner animation
-                self._working_frame = (self._working_frame + 1) % 10
             self._update_text()
 
     def _get_work_dir_display(self) -> str:
@@ -98,23 +90,14 @@ class StatusLine(Static):
         home = os.path.expanduser("~")
         if work_dir.startswith(home):
             work_dir = work_dir.replace(home, "~", 1)
-        return f"{work_dir}"
+        return work_dir
 
     def _get_elapsed_text(self) -> str:
         """Return timer text if conversation is running."""
         if not self._conversation_start_time:
             return ""
         elapsed = int(time.time() - self._conversation_start_time)
-
-        # Add working indicator with spinner if currently working
-        working_indicator = ""
-        if self._is_working:
-            frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-            working_indicator = f" {frames[self._working_frame]} Working"
-
-        return (
-            f"{working_indicator} (esc to cancel • {elapsed}s , Ctrl+O to show details)"
-        )
+        return f" ✦ (esc to cancel • {elapsed}s , Ctrl+O to show details)"
 
     def _update_text(self) -> None:
         """Rebuild the full status line text."""

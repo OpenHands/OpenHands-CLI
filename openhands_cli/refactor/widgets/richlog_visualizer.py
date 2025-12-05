@@ -4,7 +4,6 @@ This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 """
 
 import threading
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
@@ -68,24 +67,19 @@ class TextualVisualizer(ConversationVisualizerBase):
         container: "VerticalScroll",
         app: "OpenHandsApp",
         skip_user_messages: bool = False,
-        show_timestamps: bool = True,
-        collapsed: bool = True,
     ):
         """Initialize the visualizer.
 
         Args:
             container: The Textual VerticalScroll container to add widgets to
             app: The Textual app instance for thread-safe UI updates
+            highlight_regex: Dictionary mapping regex patterns to Rich color styles
             skip_user_messages: If True, skip displaying user messages
-            show_timestamps: If True, add timestamps to event titles
-            collapsed: If True, start cells in collapsed state by default
         """
         super().__init__()
         self._container = container
         self._app = app
         self._skip_user_messages = skip_user_messages
-        self._show_timestamps = show_timestamps
-        self._collapsed = collapsed
         # Store the main thread ID for thread safety checks
         self._main_thread_id = threading.get_ident()
 
@@ -107,13 +101,6 @@ class TextualVisualizer(ConversationVisualizerBase):
         self._container.mount(widget)
         # Automatically scroll to the bottom to show the newly added widget
         self._container.scroll_end(animate=False)
-
-    def _add_timestamp_prefix(self, title: str) -> str:
-        """Add timestamp prefix to title if enabled."""
-        if not self._show_timestamps:
-            return title
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        return f"[dim]{timestamp}[/dim] {title}"
 
     def _escape_rich_markup(self, text: str) -> str:
         """Escape Rich markup characters in text to prevent markup errors."""
@@ -253,24 +240,24 @@ class TextualVisualizer(ConversationVisualizerBase):
 
             return NonClickableCollapsible(
                 content_string,
-                title=self._add_timestamp_prefix(title),
-                collapsed=self._collapsed,
+                title=title,
+                collapsed=True,  # Start collapsed by default
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, ObservationEvent):
             title = self._extract_meaningful_title(event, "Observation")
             return NonClickableCollapsible(
                 str(content),
-                title=self._add_timestamp_prefix(title),
-                collapsed=self._collapsed,
+                title=title,
+                collapsed=True,  # Start collapsed for observations
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, UserRejectObservation):
             title = self._extract_meaningful_title(event, "User Rejected Action")
             return NonClickableCollapsible(
                 str(content),
-                title=self._add_timestamp_prefix(title),
-                collapsed=self._collapsed,
+                title=title,
+                collapsed=True,  # Start collapsed by default
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, MessageEvent):
@@ -295,8 +282,8 @@ class TextualVisualizer(ConversationVisualizerBase):
 
             return NonClickableCollapsible(
                 content_string,
-                title=self._add_timestamp_prefix(title),
-                collapsed=self._collapsed,
+                title=title,
+                collapsed=True,  # Start collapsed by default
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, AgentErrorEvent):
@@ -308,16 +295,16 @@ class TextualVisualizer(ConversationVisualizerBase):
 
             return NonClickableCollapsible(
                 content_string,
-                title=self._add_timestamp_prefix(title),
-                collapsed=self._collapsed,
+                title=title,
+                collapsed=True,  # Start collapsed by default
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, PauseEvent):
             title = self._extract_meaningful_title(event, "User Paused")
             return NonClickableCollapsible(
                 str(content),
-                title=self._add_timestamp_prefix(title),
-                collapsed=self._collapsed,
+                title=title,
+                collapsed=True,  # Start collapsed for pauses
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, Condensation):
@@ -329,8 +316,8 @@ class TextualVisualizer(ConversationVisualizerBase):
 
             return NonClickableCollapsible(
                 content_string,
-                title=self._add_timestamp_prefix(title),
-                collapsed=self._collapsed,
+                title=title,
+                collapsed=True,  # Start collapsed for condensations
                 border_color=_get_event_border_color(event),
             )
         else:
@@ -341,13 +328,13 @@ class TextualVisualizer(ConversationVisualizerBase):
             content_string = f"{content}\n\nSource: {event.source}"
             return NonClickableCollapsible(
                 content_string,
-                title=self._add_timestamp_prefix(title),
-                collapsed=self._collapsed,
+                title=title,
+                collapsed=True,  # Start collapsed for unknown events
                 border_color=_get_event_border_color(event),
             )
 
     def _format_metrics_subtitle(self) -> str | None:
-        """Format LLM metrics as a visually appealing subtitle string with icons."""
+        """Format LLM metrics as a visually appealing subtitle string."""
         stats = self.conversation_stats
         if not stats:
             return None
@@ -378,26 +365,19 @@ class TextualVisualizer(ConversationVisualizerBase):
         # Cache hit rate (prompt + cache)
         prompt = usage.prompt_tokens or 0
         cache_read = usage.cache_read_tokens or 0
-        cache_rate = f"{(cache_read / prompt * 100):.2f}%" if prompt > 0 else "0.00%"
+        cache_rate = f"{(cache_read / prompt * 100):.2f}%" if prompt > 0 else "N/A"
         reasoning_tokens = usage.reasoning_tokens or 0
 
-        # Cost - highlight high costs
-        cost_str = f"{cost:.4f}" if cost > 0 else "0.0000"
-        cost_color = "yellow" if cost > 0.1 else "green"
+        # Cost
+        cost_str = f"{cost:.4f}" if cost > 0 else "0.00"
 
-        # Color code cache rate - green for good hit rates
-        cache_pct = (cache_read / prompt * 100) if prompt > 0 else 0
-        cache_color = (
-            "green" if cache_pct > 50 else "yellow" if cache_pct > 20 else "dim"
-        )
-
-        # Build with enhanced formatting and icons
+        # Build with fixed color scheme
         parts: list[str] = []
-        parts.append(f"[cyan]📥 {input_tokens}[/cyan]")
-        parts.append(f"[{cache_color}]🎯 {cache_rate}[/{cache_color}]")
+        parts.append(f"[cyan]↑ input {input_tokens}[/cyan]")
+        parts.append(f"[magenta]cache hit {cache_rate}[/magenta]")
         if reasoning_tokens > 0:
-            parts.append(f"[magenta]🧠 {abbr(reasoning_tokens)}[/magenta]")
-        parts.append(f"[blue]📤 {output_tokens}[/blue]")
-        parts.append(f"[{cost_color}]💰 ${cost_str}[/{cost_color}]")
+            parts.append(f"[yellow] reasoning {abbr(reasoning_tokens)}[/yellow]")
+        parts.append(f"[blue]↓ output {output_tokens}[/blue]")
+        parts.append(f"[green]$ {cost_str}[/green]")
 
-        return "📊 " + " • ".join(parts)
+        return "Tokens: " + " • ".join(parts)

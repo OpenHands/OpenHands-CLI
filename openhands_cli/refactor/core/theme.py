@@ -7,15 +7,15 @@ def create_openhands_theme() -> Theme:
     """Create and return the custom OpenHands theme."""
     return Theme(
         name="openhands",
-        primary="#ffe165",  # Logo, cursor color, user messages
+        primary="#ffe165",  # Logo, cursor color
         secondary="#ffffff",  # Borders, plain text
-        accent="#277dff",  # Special text like "initialize conversation", agent messages
+        accent="#277dff",  # Special text like "initialize conversation"
         foreground="#ffffff",  # Default text color
         background="#222222",  # Background color
-        surface="#2a2a2a",  # Surface color (slightly lighter than background)
+        surface="#222222",  # Surface color (same as background)
         panel="#222222",  # Panel color (same as background)
-        success="#4ade80",  # Success messages (green)
-        warning="#fbbf24",  # Warning messages (amber/orange)
+        success="#ffe165",  # Success messages (use logo color)
+        warning="#ffe165",  # Warning messages (use logo color)
         error="#ff6b6b",  # Error messages (light red)
         dark=True,  # This is a dark theme
         variables={

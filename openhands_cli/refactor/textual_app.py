@@ -111,11 +111,6 @@ class OpenHandsApp(App):
         # MCP panel tracking
         self.mcp_panel: MCPSidePanel | None = None
 
-        # Working indicator tracking
-        self._working_indicator: Static | None = None
-        self._working_indicator_timer = None
-        self._working_indicator_frame = 0
-
         # Register the custom theme
         self.register_theme(OPENHANDS_THEME)
 
@@ -143,7 +138,9 @@ class OpenHandsApp(App):
 
         # Input area - docked to bottom
         with Container(id="input_area"):
-            yield InputField(placeholder="Message, @file, or /command")
+            yield InputField(
+                placeholder="Type your message, @mention a file, or / for commands"
+            )
 
             yield StatusLine(self)
 
@@ -239,48 +236,13 @@ class OpenHandsApp(App):
         else:
             update_notice_widget.display = False
 
-        # Subscribe to conversation running state changes for visual feedback
-        self.conversation_running_signal.subscribe(
-            self, self._on_conversation_state_changed
-        )
-
         # Process any queued inputs
         self._process_queued_inputs()
         self.is_ui_initialized = True
 
-    def _on_conversation_state_changed(self, is_running: bool) -> None:
-        """Update visual feedback based on conversation state."""
-        # Working indicator is now handled by StatusLine widget
-        pass
-
-    def display_structured_error(self, error_title: str, error_details: str) -> None:
-        """Display a structured error message in the main display.
-
-        Args:
-            error_title: The title/summary of the error
-            error_details: Detailed error information
-        """
-        error_container = Container(classes="error-container")
-        error_container.border_title = "Error"
-
-        title_widget = Static(f"{error_title}", classes="error-title")
-        details_widget = Static(error_details, classes="error-details")
-
-        error_container.mount(title_widget)
-        error_container.mount(details_widget)
-
-        self.main_display.mount(error_container)
-        self.main_display.scroll_end(animate=False)
-
     def create_conversation_runner(self) -> ConversationRunner:
         # Initialize conversation runner with visualizer that can add widgets
-        visualizer = TextualVisualizer(
-            self.main_display,
-            self,
-            skip_user_messages=True,
-            show_timestamps=False,
-            collapsed=False,
-        )
+        visualizer = TextualVisualizer(self.main_display, self)
 
         return ConversationRunner(
             self.conversation_id,
@@ -320,13 +282,10 @@ class OpenHandsApp(App):
         if not content:
             return
 
-        # Defer visual update to prevent UI lag
-        def add_user_message() -> None:
-            user_message_widget = Static(f"> {content}", classes="user-message")
-            self.main_display.mount(user_message_widget)
-            self.main_display.scroll_end(animate=False)
-
-        self.call_after_refresh(add_user_message)
+        # Add the user message to the main display as a Static widget
+        user_message_widget = Static(f"> {content}", classes="user-message")
+        self.main_display.mount(user_message_widget)
+        self.main_display.scroll_end(animate=False)
 
         # Handle commands - only exact matches
         if is_valid_command(content):

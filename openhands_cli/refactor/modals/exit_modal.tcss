@@ -6,60 +6,33 @@ ExitConfirmationModal {
     grid-size: 2;
     grid-gutter: 1 2;
     grid-rows: 1fr auto;
-    padding: 2 3;
+    padding: 0 1;
     width: 60;
     height: auto;
     min-width: 40;
-    min-height: 11;
-    border: solid $warning;
-    background: $surface;
+    min-height: 7;
+    border: $primary 80%;
+    background: $surface 90%;
     margin: 1 1;
 }
 
 #question {
     column-span: 2;
-    height: 3;
+    height: 1fr;
     width: 1fr;
     content-align: center middle;
-    text-style: bold;
-    color: $foreground;
 }
 
 Button {
     width: 100%;
     height: 3;
     margin: 0 1;
-    border: solid $secondary;
 }
 
 #yes {
     content-align: center middle;
-    background: $error;
-    color: $background;
-    border: solid $error;
-}
-
-#yes:hover {
-    background: $error 80%;
-    border: solid $error;
-}
-
-#yes:focus {
-    border: thick $error;
 }
 
 #no {
     content-align: center middle;
-    background: $surface;
-    color: $foreground;
-    border: solid $secondary;
-}
-
-#no:hover {
-    background: $primary 20%;
-    border: solid $primary;
-}
-
-#no:focus {
-    border: thick $primary;
 }
