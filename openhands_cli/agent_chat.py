@@ -67,6 +67,7 @@ def run_cli_entry(
     resume_conversation_id: str | None = None,
     confirmation_policy: ConfirmationPolicyBase | None = None,
     queued_inputs: list[str] | None = None,
+    headless: bool = False,
 ) -> None:
     """Run the agent chat session using the agent SDK.
 
@@ -76,6 +77,8 @@ def run_cli_entry(
             Options: AlwaysConfirm(), NeverConfirm(), ConfirmRisky()
             Defaults to AlwaysConfirm() if not provided.
         queued_inputs: Optional list of input strings to queue at the start
+        headless: When True, skip the interactive prompt and exit once the
+            agent finishes.
 
     Raises:
         AgentSetupError: If agent setup fails
@@ -110,135 +113,195 @@ def run_cli_entry(
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
         return
 
+    if headless and not pending_inputs:
+        print_formatted_text(
+            HTML(
+                "<yellow>Headless mode requires an initial task via --task or --file. "
+                "Exiting.</yellow>"
+            )
+        )
+        return
+
     display_welcome(conversation_id, confirmation_policy, bool(resume_conversation_id))
 
-    # Track session start time for uptime calculation
     session_start_time = datetime.now()
 
-    # Create conversation runner to handle state machine logic
-    runner = None
+    runner: ConversationRunner | None = None
     conversation = None
-    session = get_session_prompter()
+    session = None if headless else get_session_prompter()
 
-    # Main chat loop
     while True:
         try:
-            # Get user input
+            message: Message | None = None
+
             if pending_inputs:
                 user_input = pending_inputs.pop(0)
+            elif headless:
+                print_formatted_text(
+                    HTML("<yellow>No additional input provided. Ending headless session.</yellow>")
+                )
+                break
             else:
+                assert session is not None
                 user_input = session.prompt(
                     HTML("<gold>> </gold>"),
                     multiline=False,
                 )
 
-            if not user_input.strip():
-                continue
+            if user_input is not None:
+                if not user_input.strip():
+                    continue
 
-            # Handle commands
-            command = user_input.strip().lower()
+                command = user_input.strip().lower()
 
-            message = Message(
-                role="user",
-                content=[TextContent(text=user_input)],
-            )
-
-            if command == "/exit":
-                exit_confirmation = exit_session_confirmation()
-                if exit_confirmation == UserConfirmation.ACCEPT:
-                    print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
-                    _print_exit_hint(str(conversation_id))
-                    break
-
-            elif command == "/settings":
-                settings_screen = SettingsScreen(
-                    runner.conversation if runner else None
+                message = Message(
+                    role="user",
+                    content=[TextContent(text=user_input)],
                 )
-                settings_screen.display_settings()
-                continue
 
-            elif command == "/mcp":
-                mcp_screen = MCPScreen()
-                mcp_screen.display_mcp_info(initialized_agent)
-                continue
+                if command == "/exit":
+                    exit_confirmation = exit_session_confirmation()
+                    if exit_confirmation == UserConfirmation.ACCEPT:
+                        print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
+                        _print_exit_hint(str(conversation_id))
+                        break
 
-            elif command == "/clear":
-                display_welcome(conversation_id)
-                continue
-
-            elif command == "/new":
-                try:
-                    # Start a fresh conversation (no resume ID = new conversation)
-                    conversation_id = uuid.uuid4()
-                    runner = None
-                    conversation = None
-                    display_welcome(conversation_id, resume=False)
-                    print_formatted_text(
-                        HTML("<green>✓ Started fresh conversation</green>")
+                elif command == "/settings":
+                    settings_screen = SettingsScreen(
+                        runner.conversation if runner else None
                     )
-                    continue
-                except Exception as e:
-                    print_formatted_text(
-                        HTML(f"<red>Error starting fresh conversation: {e}</red>")
-                    )
+                    settings_screen.display_settings()
                     continue
 
-            elif command == "/help":
-                display_help()
-                continue
-
-            elif command == "/status":
-                if conversation is not None:
-                    display_status(conversation, session_start_time=session_start_time)
-                else:
-                    print_formatted_text(
-                        HTML("<yellow>No active conversation</yellow>")
-                    )
-                continue
-
-            elif command == "/confirm":
-                if runner is not None:
-                    runner.toggle_confirmation_mode()
-                    new_status = (
-                        "enabled" if runner.is_confirmation_mode_active else "disabled"
-                    )
-                else:
-                    new_status = "disabled (no active conversation)"
-                print_formatted_text(
-                    HTML(f"<yellow>Confirmation mode {new_status}</yellow>")
-                )
-                continue
-
-            elif command == "/resume":
-                if not runner:
-                    print_formatted_text(
-                        HTML("<yellow>No active conversation running...</yellow>")
-                    )
+                elif command == "/mcp":
+                    mcp_screen = MCPScreen()
+                    mcp_screen.display_mcp_info(initialized_agent)
                     continue
 
-                conversation = runner.conversation
-                if not (
-                    conversation.state.execution_status
-                    == ConversationExecutionStatus.PAUSED
-                    or conversation.state.execution_status
-                    == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
-                ):
+                elif command == "/clear":
+                    display_welcome(conversation_id)
+                    continue
+
+                elif command == "/new":
+                    try:
+                        conversation_id = uuid.uuid4()
+                        runner = None
+                        conversation = None
+                        display_welcome(conversation_id, resume=False)
+                        print_formatted_text(
+                            HTML("<green>✓ Started fresh conversation</green>")
+                        )
+                        continue
+                    except Exception as e:
+                        print_formatted_text(
+                            HTML(f"<red>Error starting fresh conversation: {e}</red>")
+                        )
+                        continue
+
+                elif command == "/help":
+                    display_help()
+                    continue
+
+                elif command == "/status":
+                    if conversation is not None:
+                        display_status(
+                            conversation, session_start_time=session_start_time
+                        )
+                    else:
+                        print_formatted_text(
+                            HTML("<yellow>No active conversation</yellow>")
+                        )
+                    continue
+
+                elif command == "/confirm":
+                    if runner is not None:
+                        runner.toggle_confirmation_mode()
+                        new_status = (
+                            "enabled"
+                            if runner.is_confirmation_mode_active
+                            else "disabled"
+                        )
+                    else:
+                        new_status = "disabled (no active conversation)"
                     print_formatted_text(
-                        HTML("<red>No paused conversation to resume...</red>")
+                        HTML(f"<yellow>Confirmation mode {new_status}</yellow>")
                     )
                     continue
 
-                # Resume without new message
-                message = None
+                elif command == "/resume":
+                    if not runner:
+                        print_formatted_text(
+                            HTML("<yellow>No active conversation running...</yellow>")
+                        )
+                        continue
+
+                    conversation = runner.conversation
+                    if not (
+                        conversation.state.execution_status
+                        == ConversationExecutionStatus.PAUSED
+                        or conversation.state.execution_status
+                        == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
+                    ):
+                        print_formatted_text(
+                            HTML("<red>No paused conversation to resume...</red>")
+                        )
+                        continue
+
+                    message = None
 
             if not runner or not conversation:
                 conversation = setup_conversation(
                     conversation_id, confirmation_policy=confirmation_policy
                 )
                 runner = ConversationRunner(conversation)
+
             runner.process_message(message)
 
-            print()  # Add spacing
+            if headless:
+                status = runner.conversation.state.execution_status
+                if status == ConversationExecutionStatus.FINISHED:
+                    print_formatted_text(
+                        HTML(
+                            "<green>Agent finished execution. Exiting headless mode.</green>"
+                        )
+                    )
+                    break
+                if status == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION:
+                    print_formatted_text(
+                        HTML(
+                            "<red>Agent is waiting for confirmation but headless mode "
+                            "cannot respond. Re-run without --headless or adjust "
+                            "confirmation settings.</red>"
+                        )
+                    )
+                    break
+                if status == ConversationExecutionStatus.PAUSED:
+                    print_formatted_text(
+                        HTML("<yellow>Conversation paused. Exiting headless mode.</yellow>")
+                    )
+                    break
+                if status == ConversationExecutionStatus.ERROR:
+                    print_formatted_text(
+                        HTML(
+                            "<red>Conversation encountered an error. Exiting headless mode.</red>"
+                        )
+                    )
+                    break
+                if status == ConversationExecutionStatus.STUCK:
+                    print_formatted_text(
+                        HTML("<red>Conversation is stuck. Exiting headless mode.</red>")
+                    )
+                    break
+                if not pending_inputs:
+                    print_formatted_text(
+                        HTML(
+                            "<yellow>No additional input available. Ending headless session.</yellow>"
+                        )
+                    )
+                    break
+
+            if not headless:
+                print()
 
         except KeyboardInterrupt:
             exit_confirmation = exit_session_confirmation()

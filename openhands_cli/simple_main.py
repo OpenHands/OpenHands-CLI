@@ -77,6 +77,7 @@ def main() -> None:
                 resume_conversation_id=args.resume,
                 confirmation_policy=confirmation_policy,
                 queued_inputs=queued_inputs,
+                headless=getattr(args, "headless", False),
             )
     except KeyboardInterrupt:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))

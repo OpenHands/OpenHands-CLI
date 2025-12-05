@@ -59,6 +59,7 @@ class TestMainEntryPoint:
         assert kwargs["resume_conversation_id"] is None
         assert isinstance(kwargs["confirmation_policy"], AlwaysConfirm)
         assert kwargs["queued_inputs"] is None
+        assert kwargs["headless"] is False
 
     @patch("openhands_cli.agent_chat.run_cli_entry")
     @patch("sys.argv", ["openhands"])
@@ -71,6 +72,9 @@ class TestMainEntryPoint:
             simple_main.main()
 
         assert str(exc_info.value) == "Missing dependency"
+        mock_run_agent_chat.assert_called_once()
+        kwargs = mock_run_agent_chat.call_args.kwargs
+        assert kwargs["headless"] is False
 
     @patch("openhands_cli.agent_chat.run_cli_entry")
     @patch("sys.argv", ["openhands"])
@@ -84,6 +88,10 @@ class TestMainEntryPoint:
         # Should complete without raising an exception (graceful exit)
         simple_main.main()
 
+        mock_run_agent_chat.assert_called_once()
+        kwargs = mock_run_agent_chat.call_args.kwargs
+        assert kwargs["headless"] is False
+
     @patch("openhands_cli.agent_chat.run_cli_entry")
     @patch("sys.argv", ["openhands"])
     def test_main_handles_eof_error(self, mock_run_agent_chat: MagicMock) -> None:
@@ -93,6 +101,10 @@ class TestMainEntryPoint:
 
         # Should complete without raising an exception (graceful exit)
         simple_main.main()
+
+        mock_run_agent_chat.assert_called_once()
+        kwargs = mock_run_agent_chat.call_args.kwargs
+        assert kwargs["headless"] is False
 
     @patch("openhands_cli.agent_chat.run_cli_entry")
     @patch("sys.argv", ["openhands"])
@@ -107,6 +119,9 @@ class TestMainEntryPoint:
             simple_main.main()
 
         assert str(exc_info.value) == "Unexpected error"
+        mock_run_agent_chat.assert_called_once()
+        kwargs = mock_run_agent_chat.call_args.kwargs
+        assert kwargs["headless"] is False
 
     @patch("openhands_cli.agent_chat.run_cli_entry")
     @patch("sys.argv", ["openhands", "--resume", "test-conversation-id"])
@@ -124,6 +139,7 @@ class TestMainEntryPoint:
         assert kwargs["resume_conversation_id"] == "test-conversation-id"
         assert isinstance(kwargs["confirmation_policy"], AlwaysConfirm)
         assert kwargs["queued_inputs"] is None
+        assert kwargs["headless"] is False
 
     @patch("openhands_cli.agent_chat.run_cli_entry")
     @patch("sys.argv", ["openhands", "--always-approve"])
@@ -143,6 +159,7 @@ class TestMainEntryPoint:
         assert kwargs["resume_conversation_id"] is None
         assert isinstance(kwargs["confirmation_policy"], NeverConfirm)
         assert kwargs["queued_inputs"] is None
+        assert kwargs["headless"] is False
 
     @patch("openhands_cli.agent_chat.run_cli_entry")
     @patch("sys.argv", ["openhands", "--llm-approve"])
@@ -164,30 +181,55 @@ class TestMainEntryPoint:
         assert isinstance(policy, ConfirmRisky)
         assert policy.threshold == SecurityRisk.HIGH
         assert kwargs["queued_inputs"] is None
+        assert kwargs["headless"] is False
+
+
+    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("sys.argv", ["openhands", "--headless", "--task", "list files"])
+    def test_main_with_headless_argument(self, mock_run_agent_chat: MagicMock) -> None:
+        mock_run_agent_chat.side_effect = KeyboardInterrupt()
+
+        simple_main.main()
+
+        mock_run_agent_chat.assert_called_once()
+        kwargs = mock_run_agent_chat.call_args.kwargs
+        assert kwargs["resume_conversation_id"] is None
+        assert isinstance(kwargs["confirmation_policy"], AlwaysConfirm)
+        assert kwargs["queued_inputs"] == ["list files"]
+        assert kwargs["headless"] is True
+
 
 
 @pytest.mark.parametrize(
-    "argv,expected_resume_id,expected_policy_cls,expected_threshold",
+    "argv,expected_resume_id,expected_policy_cls,expected_threshold,expected_headless",
     [
-        (["openhands"], None, AlwaysConfirm, None),
-        (["openhands", "--resume", "test-id"], "test-id", AlwaysConfirm, None),
-        (["openhands", "--always-approve"], None, NeverConfirm, None),
+        (["openhands"], None, AlwaysConfirm, None, False),
+        (["openhands", "--resume", "test-id"], "test-id", AlwaysConfirm, None, False),
+        (["openhands", "--always-approve"], None, NeverConfirm, None, False),
         (
             ["openhands", "--llm-approve"],
             None,
             ConfirmRisky,
             SecurityRisk.HIGH,
+            False,
         ),
         (
             ["openhands", "--resume", "test-id", "--always-approve"],
             "test-id",
             NeverConfirm,
             None,
+            False,
         ),
+        (["openhands", "--headless"], None, AlwaysConfirm, None, True),
     ],
 )
 def test_main_cli_calls_run_cli_entry(
-    monkeypatch, argv, expected_resume_id, expected_policy_cls, expected_threshold
+    monkeypatch,
+    argv,
+    expected_resume_id,
+    expected_policy_cls,
+    expected_threshold,
+    expected_headless,
 ):
     # Patch sys.argv since main() takes no params
     monkeypatch.setattr(sys, "argv", argv, raising=False)
@@ -207,6 +249,7 @@ def test_main_cli_calls_run_cli_entry(
     if expected_threshold is not None:
         assert kwargs["confirmation_policy"].threshold == expected_threshold
     assert kwargs["queued_inputs"] is None
+    assert kwargs["headless"] is expected_headless
 
 
 def test_main_cli_task_sets_queued_inputs(monkeypatch):
@@ -229,6 +272,7 @@ def test_main_cli_task_sets_queued_inputs(monkeypatch):
 
     assert called["kwargs"]["resume_conversation_id"] is None
     assert called["kwargs"]["queued_inputs"] == ["Summarize the README"]
+    assert called["kwargs"]["headless"] is False
 
 
 def test_main_cli_file_sets_queued_inputs(monkeypatch, tmp_path):
@@ -254,6 +298,7 @@ def test_main_cli_file_sets_queued_inputs(monkeypatch, tmp_path):
     main()
 
     assert called["kwargs"]["resume_conversation_id"] is None
+    assert called["kwargs"]["headless"] is False
 
     queued = called["kwargs"]["queued_inputs"]
     assert isinstance(queued, list)
@@ -302,6 +347,7 @@ def test_main_cli_file_takes_precedence_over_task(monkeypatch, tmp_path):
     assert isinstance(msg, str)
     assert file_content in msg
     assert "this should be ignored" not in msg
+    assert called["kwargs"]["headless"] is False
 
 
 @pytest.mark.parametrize(

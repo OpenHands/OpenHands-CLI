@@ -26,6 +26,7 @@ def create_main_parser() -> argparse.ArgumentParser:
                 openhands --resume conversation-id  # Resume conversation
                 openhands --always-approve          # Auto-approve all actions
                 openhands --llm-approve             # LLM-based approval mode
+                openhands --headless -t "do X"      # Run once in non-interactive mode
                 openhands serve                     # Launch GUI server
                 openhands serve --gpu               # Launch with GPU support
                 openhands acp                       # Agent-Client Protocol
@@ -54,6 +55,15 @@ def create_main_parser() -> argparse.ArgumentParser:
         "--file",
         type=str,
         help="Path to a file whose contents will seed the initial conversation",
+    )
+
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help=(
+            "Run in non-interactive mode and exit automatically when the agent "
+            "finishes"
+        ),
     )
 
     # CLI arguments at top level (default mode)
