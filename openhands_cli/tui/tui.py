@@ -7,9 +7,11 @@ from prompt_toolkit.document import Document
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import clear
 
-from openhands.sdk.security.confirmation_policy import ConfirmationPolicyBase
 from openhands_cli.pt_style import get_cli_style
 from openhands_cli.version_check import check_for_updates
+
+# Default number of lines to show before truncating command output
+DEFAULT_COMMAND_OUTPUT_LINES = 20
 
 
 DEFAULT_STYLE = get_cli_style()
@@ -25,6 +27,7 @@ COMMANDS = {
     "/resume": "Resume a paused conversation",
     "/settings": "Display and modify current settings",
     "/mcp": "View MCP (Model Context Protocol) server configuration",
+    "/full": "Display the full content of the last truncated output",
 }
 
 
@@ -81,7 +84,8 @@ def display_help() -> None:
     print_formatted_text("")
 
     for command, description in COMMANDS.items():
-        print_formatted_text(HTML(f"  <white>{command}</white> - {description}"))
+        print_formatted_text(
+            HTML(f"  <white>{command}</white> - {description}"))
 
     print_formatted_text("")
     print_formatted_text(HTML("<grey>Tips:</grey>"))
@@ -91,35 +95,25 @@ def display_help() -> None:
     print_formatted_text("")
 
 
-def display_welcome(
-    conversation_id: UUID,
-    confirmation_policy: ConfirmationPolicyBase | None = None,
-    resume: bool = False,
-) -> None:
+def display_welcome(conversation_id: UUID, resume: bool = False) -> None:
     """Display welcome message."""
     clear()
     display_banner(str(conversation_id), resume)
 
     # Check for updates and display version info
     version_info = check_for_updates()
-    print_formatted_text(HTML(f"<grey>Version: {version_info.current_version}</grey>"))
+    print_formatted_text(
+        HTML(f"<grey>Version: {version_info.current_version}</grey>"))
 
     if version_info.needs_update and version_info.latest_version:
         print_formatted_text(
-            HTML(f"<yellow>⚠ Update available: {version_info.latest_version}</yellow>")
+            HTML(
+                f"<yellow>⚠ Update available: {version_info.latest_version}</yellow>")
         )
         print_formatted_text(
             HTML(
                 "<grey>Run</grey> <gold>uv tool upgrade openhands</gold> "
                 "<grey>to update</grey>"
-            )
-        )
-
-    if confirmation_policy:
-        print_formatted_text(
-            HTML(
-                "<grey>Confirmation mode: "
-                f"{confirmation_policy.__class__.__name__}</grey>"
             )
         )
 
@@ -131,3 +125,38 @@ def display_welcome(
         )
     )
     print()
+
+
+def display_command_output(
+    output: str, max_lines: int = DEFAULT_COMMAND_OUTPUT_LINES, show_full: bool = False
+) -> str:
+    """Truncate command output to a specified number of lines.
+
+    Args:
+        output: The full command output text
+        max_lines: Maximum number of lines to display before truncation (default: 20)
+        show_full: If True, return full output without truncation
+
+    Returns:
+        Truncated output string with line count information if truncated
+    """
+    if show_full:
+        return output
+
+    lines = output.split("\n")
+    total_lines = len(lines)
+
+    # If output is short enough, return as-is
+    if total_lines <= max_lines:
+        return output
+
+    # Truncate to first max_lines
+    truncated_lines = lines[:max_lines]
+    remaining_lines = total_lines - max_lines
+
+    # Build truncated output
+    truncated_output = "\n".join(truncated_lines)
+    truncated_output += f"\n... and {remaining_lines} more line{'s' if remaining_lines != 1 else ''}"
+    truncated_output += "\n(use /full to see complete output)"
+
+    return truncated_output
