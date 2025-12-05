@@ -1,5 +1,6 @@
 """Tests for InputField widget component."""
 
+from typing import Generator
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -15,7 +16,7 @@ def input_field() -> InputField:
 
 
 @pytest.fixture
-def field_with_mocks(input_field: InputField) -> InputField:
+def field_with_mocks(input_field: InputField) -> Generator[InputField, None, None]:
     """InputField with its internal widgets and signal mocked out."""
     input_field.input_widget = MagicMock(spec=Input)
     input_field.textarea_widget = MagicMock(spec=TextArea)
@@ -32,9 +33,15 @@ def field_with_mocks(input_field: InputField) -> InputField:
     signal_mock.publish = publish_mock
     input_field.mutliline_mode_status = signal_mock
 
-    # Note: screen access will be mocked in individual tests that need it
+    # Mock the screen and input_area for toggle functionality
+    input_area_mock = MagicMock()
+    input_area_mock.styles = MagicMock()
+    mock_screen = MagicMock()
+    mock_screen.query_one.return_value = input_area_mock
 
-    return input_field
+    # Use patch to mock the screen property
+    with patch.object(type(input_field), "screen", new_callable=lambda: mock_screen):
+        yield input_field
 
 
 class TestInputField:
@@ -68,36 +75,27 @@ class TestInputField:
         expected_singleline_content,
     ) -> None:
         """Toggling mode converts newline representation and flips displays + signal."""
-        # Mock the screen access for toggle functionality
-        input_area_mock = MagicMock()
-        input_area_mock.styles = MagicMock()
-        mock_screen = MagicMock()
-        mock_screen.query_one.return_value = input_area_mock
+        # Set mutliline mode
+        field_with_mocks.action_toggle_input_mode()
+        assert field_with_mocks.is_multiline_mode is True
+        assert field_with_mocks.input_widget.display is False
+        assert field_with_mocks.textarea_widget.display is True
 
-        with patch.object(
-            type(field_with_mocks), "screen", new_callable=lambda: mock_screen
-        ):
-            # Set mutliline mode
-            field_with_mocks.action_toggle_input_mode()
-            assert field_with_mocks.is_multiline_mode is True
-            assert field_with_mocks.input_widget.display is False
-            assert field_with_mocks.textarea_widget.display is True
+        # Seed instructions
+        field_with_mocks.textarea_widget.text = mutliline_content
 
-            # Seed instructions
-            field_with_mocks.textarea_widget.text = mutliline_content
+        field_with_mocks.action_toggle_input_mode()
+        field_with_mocks.mutliline_mode_status.publish.assert_called()  # type: ignore
 
-            field_with_mocks.action_toggle_input_mode()
-            field_with_mocks.mutliline_mode_status.publish.assert_called()  # type: ignore
+        # Mutli-line -> single-line
+        assert field_with_mocks.input_widget.value == expected_singleline_content
 
-            # Mutli-line -> single-line
-            assert field_with_mocks.input_widget.value == expected_singleline_content
+        # Single-line -> multi-line
+        field_with_mocks.action_toggle_input_mode()
+        field_with_mocks.mutliline_mode_status.publish.assert_called()  # type: ignore
 
-            # Single-line -> multi-line
-            field_with_mocks.action_toggle_input_mode()
-            field_with_mocks.mutliline_mode_status.publish.assert_called()  # type: ignore
-
-            # Check original content is preserved
-            assert field_with_mocks.textarea_widget.text == mutliline_content
+        # Check original content is preserved
+        assert field_with_mocks.textarea_widget.text == mutliline_content
 
     @pytest.mark.parametrize(
         "content, should_submit",
