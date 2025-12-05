@@ -12,7 +12,7 @@ from openhands_cli.refactor.widgets.autocomplete import EnhancedAutoComplete
 
 class InputField(Container):
     BINDINGS: ClassVar = [
-        Binding("f1", "toggle_input_mode", "Toggle single/multi-line input"),
+        Binding("ctrl+i", "toggle_input_mode", "Toggle single/multi-line input"),
         Binding("ctrl+j", "submit_textarea", "Submit multi-line input"),
     ]
 

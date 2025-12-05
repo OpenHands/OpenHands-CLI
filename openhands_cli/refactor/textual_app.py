@@ -51,8 +51,8 @@ class OpenHandsApp(App):
 
     # Key bindings
     BINDINGS: ClassVar = [
-        ("f1", "toggle_input_mode", "Toggle single/multi-line input"),
-        ("f2", "expand_all", "Expand the cells"),
+        ("ctrl+i", "toggle_input_mode", "Toggle single/multi-line input"),
+        ("ctrl+o", "expand_all", "Expand the cells"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
@@ -249,45 +249,8 @@ class OpenHandsApp(App):
 
     def _on_conversation_state_changed(self, is_running: bool) -> None:
         """Update visual feedback based on conversation state."""
-        if is_running:
-            self._add_working_indicator()
-        else:
-            self._remove_working_indicator()
-
-    def _add_working_indicator(self) -> None:
-        """Add a blinking working indicator at the bottom of the display."""
-        if not hasattr(self, "_working_indicator") or self._working_indicator is None:
-            self._working_indicator = Static(
-                "⠋ Working...", id="working_indicator", classes="working-indicator"
-            )
-            self._working_indicator_timer = self.set_interval(
-                0.1, self._update_working_indicator, pause=False
-            )
-            self._working_indicator_frame = 0
-            self.main_display.mount(self._working_indicator)
-            self.main_display.scroll_end(animate=False)
-
-    def _remove_working_indicator(self) -> None:
-        """Remove the working indicator."""
-        if hasattr(self, "_working_indicator") and self._working_indicator is not None:
-            if (
-                hasattr(self, "_working_indicator_timer")
-                and self._working_indicator_timer is not None
-            ):
-                self._working_indicator_timer.stop()
-            self._working_indicator.remove()
-            self._working_indicator = None
-
-    def _update_working_indicator(self) -> None:
-        """Update the working indicator animation."""
-        if hasattr(self, "_working_indicator") and self._working_indicator is not None:
-            frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-            self._working_indicator_frame = (self._working_indicator_frame + 1) % len(
-                frames
-            )
-            self._working_indicator.update(
-                f"{frames[self._working_indicator_frame]} Working..."
-            )
+        # Working indicator is now handled by StatusLine widget
+        pass
 
     def display_structured_error(self, error_title: str, error_details: str) -> None:
         """Display a structured error message in the main display.
@@ -311,7 +274,11 @@ class OpenHandsApp(App):
     def create_conversation_runner(self) -> ConversationRunner:
         # Initialize conversation runner with visualizer that can add widgets
         visualizer = TextualVisualizer(
-            self.main_display, self, show_timestamps=False, collapsed=False
+            self.main_display,
+            self,
+            skip_user_messages=True,
+            show_timestamps=False,
+            collapsed=False,
         )
 
         return ConversationRunner(
@@ -352,10 +319,13 @@ class OpenHandsApp(App):
         if not content:
             return
 
-        # Add the user message to the main display as a Static widget
-        user_message_widget = Static(f"> {content}", classes="user-message")
-        self.main_display.mount(user_message_widget)
-        self.main_display.scroll_end(animate=False)
+        # Defer visual update to prevent UI lag
+        def add_user_message() -> None:
+            user_message_widget = Static(f"> {content}", classes="user-message")
+            self.main_display.mount(user_message_widget)
+            self.main_display.scroll_end(animate=False)
+
+        self.call_after_refresh(add_user_message)
 
         # Handle commands - only exact matches
         if is_valid_command(content):

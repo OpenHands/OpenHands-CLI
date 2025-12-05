@@ -31,9 +31,11 @@ class StatusLine(Static):
         super().__init__("", id="status_line", markup=False, **kwargs)
         self._conversation_start_time: float | None = None
         self._timer: Timer | None = None
+        self._working_frame: int = 0
+        self._is_working: bool = False
 
         self.main_app = app
-        self.mode_indicator = " Single-line • F1 for multi-line"
+        self.mode_indicator = " Single-line • Ctrl+I for multi-line"
         self.work_dir_display = self._get_work_dir_display()
 
     def on_mount(self) -> None:
@@ -56,17 +58,20 @@ class StatusLine(Static):
         if is_multiline_mode:
             self.mode_indicator = " Multi-line mode • Ctrl+J to submit"
         else:
-            self.mode_indicator = " Single-line • F1 for multi-line"
+            self.mode_indicator = " Single-line • Ctrl+I for multi-line"
         self._update_text()
 
     def _on_conversation_state_changed(self, is_running: bool) -> None:
         """Update when conversation running state changes."""
+        self._is_working = is_running
         if is_running:
             self._conversation_start_time = time.time()
+            self._working_frame = 0
             if self._timer:
                 self._timer.stop()
 
-            self._timer = self.set_interval(1.0, self._on_tick)
+            # Update more frequently (0.1s) for smooth spinner animation
+            self._timer = self.set_interval(0.1, self._on_tick)
             return
 
         self._conversation_start_time = None
@@ -82,6 +87,9 @@ class StatusLine(Static):
     def _on_tick(self) -> None:
         """Periodic update from timer."""
         if self._conversation_start_time is not None:
+            if self._is_working:
+                # Advance spinner animation
+                self._working_frame = (self._working_frame + 1) % 10
             self._update_text()
 
     def _get_work_dir_display(self) -> str:
@@ -97,7 +105,14 @@ class StatusLine(Static):
         if not self._conversation_start_time:
             return ""
         elapsed = int(time.time() - self._conversation_start_time)
-        return f" • {elapsed}s • ESC: pause • F2: expand"
+
+        # Add working indicator with spinner if currently working
+        working_indicator = ""
+        if self._is_working:
+            frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+            working_indicator = f" {frames[self._working_frame]} Working"
+
+        return f"{working_indicator} • {elapsed}s • ESC: pause • Ctrl+O: expand"
 
     def _update_text(self) -> None:
         """Rebuild the full status line text."""
