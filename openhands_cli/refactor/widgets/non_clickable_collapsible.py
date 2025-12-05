@@ -46,21 +46,21 @@ class NonClickableCollapsibleTitle(Container, can_focus=False):
         height: 1;
         min-width: 4;
         margin-left: 1;
-        background: transparent;
-        border: none;
-        color: $text-muted;
+        background: $surface;
+        border: solid $primary;
+        color: $primary;
         text-style: none;
     }
 
     NonClickableCollapsibleTitle .copy-button:hover {
-        background: $surface-lighten-1;
-        color: $text;
+        background: $primary;
+        color: $background;
         text-style: bold;
     }
 
     NonClickableCollapsibleTitle .copy-button:focus {
-        background: $surface-lighten-2;
-        color: $text;
+        background: $accent;
+        color: $background;
         text-style: bold;
     }
     """

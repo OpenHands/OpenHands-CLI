@@ -73,7 +73,7 @@ class WorkingStatusLine(Static):
         if self._conversation_start_time is not None:
             # Update animation frame more frequently than timer for smooth animation
             if self._is_working:
-                self._working_frame = (self._working_frame + 1) % 10
+                self._working_frame = (self._working_frame + 1) % 8
             self._update_text()
 
     def _get_working_text(self) -> str:
@@ -82,11 +82,11 @@ class WorkingStatusLine(Static):
             return ""
         elapsed = int(time.time() - self._conversation_start_time)
 
-        # Add working indicator with ASCII hand waving animation
+        # Add working indicator with Braille spinner animation
         working_indicator = ""
         if self._is_working:
-            # ASCII art hand waving - stick figure with arms in different positions
-            frames = ["\\o/", "|o/", "-o-", "\\o|", "\\o/", "|o/", "-o-", "\\o|"]
+            # Braille pattern spinner - smooth and professional
+            frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧"]
             working_indicator = f"{frames[self._working_frame % len(frames)]} Working"
 
         return f"{working_indicator} ({elapsed}s • ESC: pause • Ctrl+O: expand)"
