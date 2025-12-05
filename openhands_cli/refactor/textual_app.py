@@ -33,6 +33,7 @@ from openhands_cli.refactor.core.commands import is_valid_command, show_help
 from openhands_cli.refactor.core.conversation_runner import ConversationRunner
 from openhands_cli.refactor.core.theme import OPENHANDS_THEME
 from openhands_cli.refactor.modals import SettingsScreen
+from openhands_cli.refactor.modals.confirmation_modal import ConfirmationSettingsModal
 from openhands_cli.refactor.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.refactor.panels.confirmation_panel import ConfirmationSidePanel
 from openhands_cli.refactor.panels.mcp_side_panel import MCPSidePanel
@@ -367,25 +368,44 @@ class OpenHandsApp(App):
             self.notify(message="No running conversation to pause", severity="error")
 
     def _handle_confirm_command(self) -> None:
-        """Handle the /confirm command to toggle confirmation mode."""
+        """Handle the /confirm command to show confirmation settings modal."""
+        if not self.conversation_runner:
+            # If no conversation runner, create one to get the current policy
+            self.conversation_runner = self.create_conversation_runner()
+
+        # Get current confirmation policy
+        current_policy = self.conversation_runner.get_confirmation_policy()
+
+        # Show the confirmation settings modal
+        confirmation_modal = ConfirmationSettingsModal(
+            current_policy=current_policy,
+            on_policy_selected=self._on_confirmation_policy_selected,
+        )
+        self.push_screen(confirmation_modal)
+
+    def _on_confirmation_policy_selected(self, policy: ConfirmationPolicyBase) -> None:
+        """Handle when a confirmation policy is selected from the modal.
+
+        Args:
+            policy: The selected confirmation policy
+        """
         if not self.conversation_runner:
             return
 
-        # Toggle confirmation mode
-        self.conversation_runner.toggle_confirmation_mode()
+        # Set the new confirmation policy
+        self.conversation_runner.set_confirmation_policy(policy)
 
-        # Show status message
-        mode_status = (
-            "enabled"
-            if self.conversation_runner.is_confirmation_mode_active
-            else "disabled"
-        )
-        status_widget = Static(
-            f"[yellow]Confirmation mode {mode_status}[/yellow]",
-            classes="status-message",
-        )
-        self.main_display.mount(status_widget)
-        self.main_display.scroll_end(animate=False)
+        # Show status message based on the policy type
+        if isinstance(policy, NeverConfirm):
+            policy_name = "Always approve actions (no confirmation)"
+        elif isinstance(policy, AlwaysConfirm):
+            policy_name = "Confirm every action"
+        elif isinstance(policy, ConfirmRisky):
+            policy_name = "Confirm high-risk actions only"
+        else:
+            policy_name = "Custom policy"
+
+        self.notify(f"Confirmation policy set to: {policy_name}")
 
     def _handle_confirmation_request(
         self, pending_actions: list[ActionEvent]

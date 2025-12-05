@@ -14,7 +14,7 @@ from .theme import OPENHANDS_THEME
 # Available commands with descriptions after the command
 COMMANDS = [
     DropdownItem(main="/help - Display available commands"),
-    DropdownItem(main="/confirm - Toggle confirmation mode"),
+    DropdownItem(main="/confirm - Configure confirmation settings"),
     DropdownItem(main="/exit - Exit the application"),
 ]
 
@@ -63,7 +63,7 @@ def show_help(main_display: VerticalScroll) -> None:
 [dim]Available commands:[/dim]
 
   [{secondary}]/help[/{secondary}] - Display available commands
-  [{secondary}]/confirm[/{secondary}] - Toggle confirmation mode
+  [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
   [{secondary}]/exit[/{secondary}] - Exit the application
 
 [dim]Tips:[/dim]

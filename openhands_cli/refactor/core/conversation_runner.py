@@ -70,6 +70,10 @@ class ConversationRunner:
         """Check if confirmation mode is currently active."""
         return self._confirmation_mode_active
 
+    def get_confirmation_policy(self) -> ConfirmationPolicyBase:
+        """Get the current confirmation policy."""
+        return self.conversation.state.confirmation_policy
+
     def toggle_confirmation_mode(self) -> None:
         """Toggle confirmation mode on/off."""
         new_confirmation_mode_state = not self._confirmation_mode_active
