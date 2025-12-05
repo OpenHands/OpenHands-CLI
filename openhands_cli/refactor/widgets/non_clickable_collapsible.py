@@ -44,23 +44,23 @@ class NonClickableCollapsibleTitle(Container, can_focus=False):
     NonClickableCollapsibleTitle .copy-button {
         width: auto;
         height: 1;
-        min-width: 4;
+        min-width: 8;
         margin-left: 1;
-        background: $surface;
-        border: solid $primary;
-        color: $primary;
-        text-style: none;
+        background: $panel;
+        border: solid $accent;
+        color: $accent;
+        text-style: bold;
     }
 
     NonClickableCollapsibleTitle .copy-button:hover {
-        background: $primary;
-        color: $background;
+        background: $accent;
+        color: $panel;
         text-style: bold;
     }
 
     NonClickableCollapsibleTitle .copy-button:focus {
-        background: $accent;
-        color: $background;
+        background: $primary;
+        color: $panel;
         text-style: bold;
     }
     """
@@ -101,7 +101,7 @@ class NonClickableCollapsibleTitle(Container, can_focus=False):
         self._title_static = Static(classes="title-text")
         with Horizontal():
             yield self._title_static
-            yield Button("📋", id="copy-btn", classes="copy-button")
+            yield Button("[Copy]", id="copy-btn", classes="copy-button")
 
     def on_mount(self) -> None:
         """Initialize the title display."""
