@@ -147,31 +147,41 @@ class TestCommandsAndAutocomplete:
 
         from openhands_cli.refactor.modals.exit_modal import ExitConfirmationModal
 
-        modal = ExitConfirmationModal()
+        # Create callbacks to track behavior
+        mock_exit_confirmed = mock.MagicMock()
+        mock_exit_cancelled = mock.MagicMock()
 
-        # Create a mock app and manually set it
-        mock_app = mock.MagicMock()
+        modal = ExitConfirmationModal(
+            on_exit_confirmed=mock_exit_confirmed, on_exit_cancelled=mock_exit_cancelled
+        )
 
-        # Patch the app property to return our mock
-        with mock.patch.object(
-            type(modal), "app", new_callable=mock.PropertyMock
-        ) as mock_app_prop:
-            mock_app_prop.return_value = mock_app
+        # Mock the dismiss method to avoid event loop issues
+        modal.dismiss = mock.MagicMock()
 
-            # Test "yes" button - should exit app
-            yes_button = Button("Yes", id="yes")
-            yes_event = Button.Pressed(yes_button)
-            modal.on_button_pressed(yes_event)
-            mock_app.exit.assert_called_once()
+        # Test "yes" button - should call exit confirmed callback
+        yes_button = Button("Yes", id="yes")
+        yes_event = Button.Pressed(yes_button)
+        modal.on_button_pressed(yes_event)
 
-            # Reset mock
-            mock_app.reset_mock()
+        # Verify dismiss was called and exit confirmed callback was called
+        modal.dismiss.assert_called_once()
+        mock_exit_confirmed.assert_called_once()
+        mock_exit_cancelled.assert_not_called()
 
-            # Test "no" button - should pop screen
-            no_button = Button("No", id="no")
-            no_event = Button.Pressed(no_button)
-            modal.on_button_pressed(no_event)
-            mock_app.pop_screen.assert_called_once()
+        # Reset mocks
+        modal.dismiss.reset_mock()
+        mock_exit_confirmed.reset_mock()
+        mock_exit_cancelled.reset_mock()
+
+        # Test "no" button - should call exit cancelled callback
+        no_button = Button("No", id="no")
+        no_event = Button.Pressed(no_button)
+        modal.on_button_pressed(no_event)
+
+        # Verify dismiss was called and exit cancelled callback was called
+        modal.dismiss.assert_called_once()
+        mock_exit_cancelled.assert_called_once()
+        mock_exit_confirmed.assert_not_called()
 
     def test_handle_command_unknown(self):
         """Test that unknown commands show error notification."""

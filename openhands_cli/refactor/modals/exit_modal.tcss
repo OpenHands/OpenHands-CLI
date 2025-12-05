@@ -1,5 +1,6 @@
 ExitConfirmationModal {
     align: center middle;
+    background: rgba(0, 0, 0, 0.8);
 }
 
 #dialog {

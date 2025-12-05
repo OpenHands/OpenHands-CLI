@@ -2,7 +2,6 @@
 
 from unittest import mock
 
-import pytest
 from textual.widgets import Button
 
 from openhands_cli.refactor.modals.exit_modal import ExitConfirmationModal
@@ -98,8 +97,8 @@ class TestExitConfirmationModal:
             # Verify the order: dismiss should be called before callback
             assert call_order == ["modal_dismissed", "callback_executed"]
 
-    def test_callback_exceptions_do_not_break_modal(self):
-        """Test that exceptions in callbacks don't prevent modal dismissal."""
+    def test_callback_exceptions_are_handled_gracefully(self):
+        """Test that exceptions in callbacks are caught and notified."""
 
         # Create a callback that raises an exception
         def failing_callback():
@@ -108,20 +107,115 @@ class TestExitConfirmationModal:
         # Create modal with failing callback
         modal = ExitConfirmationModal(on_exit_confirmed=failing_callback)
 
-        # Mock the dismiss method
+        # Mock the dismiss and notify methods
         modal.dismiss = mock.MagicMock()
+        modal.notify = mock.MagicMock()
 
         # Create a "yes" button press event
         yes_button = Button("Yes, proceed", id="yes")
         yes_event = Button.Pressed(yes_button)
 
         # Handle the button press - should not raise exception
-        # The modal should still be dismissed even if callback fails
-        with pytest.raises(ValueError, match="Test exception"):
+        modal.on_button_pressed(yes_event)
+
+        # Verify the modal was dismissed
+        modal.dismiss.assert_called_once()
+
+        # Verify notify was called with the error
+        modal.notify.assert_called_once_with(
+            "Error during exit confirmation: Test exception", severity="error"
+        )
+
+    def test_no_button_with_none_callback_does_not_crash(self):
+        """Test that clicking 'No' with None callback doesn't crash the app."""
+        # Create modal with None callback for on_exit_cancelled
+        modal = ExitConfirmationModal(on_exit_cancelled=None)
+
+        # Mock the dismiss method
+        modal.dismiss = mock.MagicMock()
+
+        # Create a "no" button press event
+        no_button = Button("No, dismiss", id="no")
+        no_event = Button.Pressed(no_button)
+
+        # Handle the button press - should not raise exception
+        modal.on_button_pressed(no_event)
+
+        # Verify the modal was dismissed
+        modal.dismiss.assert_called_once()
+
+    def test_exit_cancelled_callback_exception_handling(self):
+        """Test that exceptions in on_exit_cancelled callback are handled gracefully."""
+
+        # Create a callback that raises an exception
+        def failing_cancelled_callback():
+            raise RuntimeError("Cancelled callback failed")
+
+        # Create modal with failing cancelled callback
+        modal = ExitConfirmationModal(on_exit_cancelled=failing_cancelled_callback)
+
+        # Mock the dismiss and notify methods
+        modal.dismiss = mock.MagicMock()
+        modal.notify = mock.MagicMock()
+
+        # Create a "no" button press event
+        no_button = Button("No, dismiss", id="no")
+        no_event = Button.Pressed(no_button)
+
+        # Handle the button press - should not raise exception
+        modal.on_button_pressed(no_event)
+
+        # Verify the modal was dismissed
+        modal.dismiss.assert_called_once()
+
+        # Verify notify was called with the error
+        modal.notify.assert_called_once_with(
+            "Error during exit cancellation: Cancelled callback failed",
+            severity="error",
+        )
+
+    def test_dismiss_called_before_any_callback_execution(self):
+        """Test that dismiss is always called first, regardless of button pressed."""
+        call_order = []
+
+        def track_exit_confirmed():
+            call_order.append("exit_confirmed")
+
+        def track_exit_cancelled():
+            call_order.append("exit_cancelled")
+
+        # Test with "yes" button
+        modal = ExitConfirmationModal(
+            on_exit_confirmed=track_exit_confirmed,
+            on_exit_cancelled=track_exit_cancelled,
+        )
+
+        with mock.patch.object(modal, "dismiss") as mock_dismiss:
+            mock_dismiss.side_effect = lambda: call_order.append("dismiss")
+
+            # Test "yes" button
+            yes_button = Button("Yes, proceed", id="yes")
+            yes_event = Button.Pressed(yes_button)
             modal.on_button_pressed(yes_event)
 
-        # Verify the modal was still dismissed despite the exception
-        modal.dismiss.assert_called_once()
+            assert call_order == ["dismiss", "exit_confirmed"]
+
+        # Reset and test with "no" button
+        call_order.clear()
+        modal = ExitConfirmationModal(
+            on_exit_confirmed=track_exit_confirmed,
+            on_exit_cancelled=track_exit_cancelled,
+        )
+
+        with mock.patch.object(modal, "dismiss") as mock_dismiss:
+            mock_dismiss.side_effect = lambda: call_order.append("dismiss")
+
+            # Test "no" button
+            no_button = Button("No, dismiss", id="no")
+            no_event = Button.Pressed(no_button)
+            modal.on_button_pressed(no_event)
+
+            assert call_order == ["dismiss", "exit_cancelled"]
 
     async def test_modal_keyboard_navigation(self):
         """Test that the modal supports proper keyboard navigation."""
