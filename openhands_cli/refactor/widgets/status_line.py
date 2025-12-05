@@ -139,8 +139,5 @@ class InfoStatusLine(Static):
 
     def _update_text(self) -> None:
         """Rebuild the info status text."""
-        status_text = (
-            f"{self.mode_indicator} • "
-            f"Ctrl+O: expand/collapse messages • {self.work_dir_display}"
-        )
+        status_text = f"{self.mode_indicator} • {self.work_dir_display}"
         self.update(status_text)
