@@ -44,23 +44,23 @@ class NonClickableCollapsibleTitle(Container, can_focus=False):
     NonClickableCollapsibleTitle .copy-button {
         width: auto;
         height: 1;
-        min-width: 8;
+        min-width: 4;
         margin-left: 1;
-        background: $panel;
-        border: solid $accent;
-        color: $accent;
-        text-style: bold;
+        background: transparent;
+        border: none;
+        color: $text-muted;
+        text-style: none;
     }
 
     NonClickableCollapsibleTitle .copy-button:hover {
-        background: $accent;
-        color: $panel;
+        background: $surface-lighten-1;
+        color: $text;
         text-style: bold;
     }
 
     NonClickableCollapsibleTitle .copy-button:focus {
-        background: $primary;
-        color: $panel;
+        background: $surface-lighten-2;
+        color: $text;
         text-style: bold;
     }
     """
@@ -101,7 +101,7 @@ class NonClickableCollapsibleTitle(Container, can_focus=False):
         self._title_static = Static(classes="title-text")
         with Horizontal():
             yield self._title_static
-            yield Button("[Copy]", id="copy-btn", classes="copy-button")
+            yield Button("📋", id="copy-btn", classes="copy-button")
 
     def on_mount(self) -> None:
         """Initialize the title display."""
@@ -306,9 +306,6 @@ class NonClickableCollapsible(Widget):
     def _watch_collapsed(self, collapsed: bool) -> None:
         """Update collapsed state when reactive is changed."""
         self._update_collapsed(collapsed)
-        # Hide title text when expanded, but keep copy button visible
-        if hasattr(self._title, "_title_static") and self._title._title_static:
-            self._title._title_static.display = collapsed
         if self.collapsed:
             self.post_message(self.Collapsed(self))
         else:
@@ -327,9 +324,6 @@ class NonClickableCollapsible(Widget):
     def _on_mount(self, event: events.Mount) -> None:  # noqa: ARG002
         """Initialise collapsed state."""
         self._update_collapsed(self.collapsed)
-        # Initialize title text visibility based on collapsed state
-        if hasattr(self._title, "_title_static") and self._title._title_static:
-            self._title._title_static.display = self.collapsed
 
     def compose(self) -> ComposeResult:
         yield self._title
