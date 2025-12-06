@@ -1,0 +1,107 @@
+Screen {
+    layout: vertical;
+    background: $background;
+}
+
+#content_area {
+    height: 1fr;
+    layout: horizontal;
+}
+
+#main_display {
+    height: 1fr;
+    margin: 1 1 0 1;
+    background: $background;
+    color: $foreground;
+    overflow-y: auto;
+    scrollbar-size-vertical: 1;
+}
+
+#splash_content {
+    padding: 1;
+    background: $background;
+    color: $foreground;
+}
+
+.user-message {
+    padding: 0 1;
+    margin-top: 1;
+    margin-bottom: 1;
+    background: $background;
+    color: $primary;
+}
+
+.help-message, .error-message, .status-message {
+    padding: 0 1;
+    background: $background;
+    color: $foreground;
+}
+
+#input_area {
+    height: 7;
+    dock: bottom;
+    background: $background;
+    padding: 1;
+    margin-bottom: 1;
+}
+
+Footer {
+    dock: bottom;
+    background: $surface;
+    color: $foreground;
+}
+
+/* Panel-like styling for splash screen elements */
+.splash-banner {
+    padding: 0 1;
+    background: $background;
+    color: $primary;
+    text-align: center;
+}
+
+.splash-version {
+    padding: 0 1;
+    background: $background;
+    color: $foreground;
+    text-align: center;
+    margin-bottom: 1;
+}
+
+.status-panel {
+    width: auto;
+    height: auto;
+    background: transparent;
+    padding: 0 1;
+    text-align: left;
+    margin: 0;
+}
+
+.conversation-panel {
+    width: auto;
+    height: auto;
+    background: transparent;
+    padding: 0 1;
+    text-align: left;
+    margin: 0;
+}
+
+.splash-instruction {
+    padding: 0 1;
+    background: $background;
+    color: $foreground;
+    margin: 0;
+}
+
+.splash-instruction-header {
+    padding: 0 1;
+    background: $background;
+    color: $primary;
+    margin: 1 0 0 0;
+}
+
+.splash-update-notice {
+    padding: 0 1;
+    background: $background;
+    color: $primary;
+    margin: 1 0 0 0;
+}

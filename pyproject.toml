@@ -19,9 +19,12 @@ dependencies = [
   "openhands-sdk==1.4.0",
   "openhands-tools==1.4.0",
   "prompt-toolkit>=3",
+  "textual>=0.79.0",
   "typer>=0.17.4",
   "agent-client-protocol>=0.7.0,<0.8.0",
   "pydantic>=2.7",
+  "textual-autocomplete>=4.0.6",
+  "pyperclip>=1.9.0",
 ]
 
 scripts = { openhands = "openhands_cli.simple_main:main", "openhands-acp" = "openhands_cli.acp:main" }

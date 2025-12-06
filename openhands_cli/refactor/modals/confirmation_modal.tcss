@@ -1,0 +1,60 @@
+ConfirmationSettingsModal {
+    align: center middle;
+}
+
+#dialog {
+    width: 70;
+    height: auto;
+    min-width: 50;
+    min-height: 15;
+    max-height: 20;
+    border: $primary 80%;
+    background: $surface 90%;
+    margin: 1 1;
+    padding: 1 2;
+}
+
+#title {
+    text-align: center;
+    text-style: bold;
+    color: $primary;
+    margin-bottom: 1;
+}
+
+#description {
+    text-align: center;
+    color: $text-muted;
+    margin-bottom: 1;
+}
+
+#options_list {
+    height: 8;
+    border: $primary 40%;
+    margin-bottom: 1;
+}
+
+#options_list > ListItem {
+    height: 2;
+    padding: 0 1;
+}
+
+#options_list > ListItem:hover {
+    background: $primary 20%;
+}
+
+#options_list > ListItem.--highlight {
+    background: $primary 40%;
+}
+
+#instructions {
+    text-align: center;
+    color: $text-muted;
+    text-style: italic;
+}
+
+/* Style the static text inside list items */
+#options_list Static {
+    width: 100%;
+    height: 1;
+    content-align: left middle;
+}

@@ -23,6 +23,7 @@ def create_main_parser() -> argparse.ArgumentParser:
 
             Examples:
                 openhands                           # Start CLI mode
+                openhands --exp                     # Start experimental textual UI
                 openhands --resume conversation-id  # Resume conversation
                 openhands --always-approve          # Auto-approve all actions
                 openhands --llm-approve             # LLM-based approval mode
@@ -58,6 +59,11 @@ def create_main_parser() -> argparse.ArgumentParser:
 
     # CLI arguments at top level (default mode)
     parser.add_argument("--resume", type=str, help="Conversation ID to resume")
+    parser.add_argument(
+        "--exp",
+        action="store_true",
+        help="Use experimental textual-based UI instead of the default CLI interface",
+    )
 
     # Confirmation mode options (mutually exclusive)
     confirmation_group = parser.add_mutually_exclusive_group()
