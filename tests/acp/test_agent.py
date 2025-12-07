@@ -7,6 +7,7 @@ import pytest
 from acp.schema import (
     AgentCapabilities,
     Implementation,
+    NewSessionRequest,
     TextContentBlock,
 )
 
@@ -124,7 +125,7 @@ async def test_new_session_with_malformed_mcp_json(acp_agent, tmp_path, monkeypa
 
     from openhands_cli.tui.settings.store import MCPConfigurationError
 
-    request = NewSessionRequest(cwd=str(tmp_path), mcpServers=[])
+    request = NewSessionRequest(cwd=str(tmp_path), mcp_servers=[])
 
     # Mock load_agent_specs to raise MCPConfigurationError
     with patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load:
@@ -134,7 +135,9 @@ async def test_new_session_with_malformed_mcp_json(acp_agent, tmp_path, monkeypa
 
         # Should raise RequestError with helpful message
         with pytest.raises(RequestError) as exc_info:
-            await acp_agent.newSession(request)
+            await acp_agent.new_session(
+                cwd=request.cwd, mcp_servers=request.mcp_servers
+            )
 
         # Verify the error contains helpful information
         error = exc_info.value
@@ -153,7 +156,7 @@ async def test_new_session_with_malformed_mcp_json_integration(
 
     from openhands_cli.tui.settings.store import AgentStore, MCPConfigurationError
 
-    request = NewSessionRequest(cwd=str(tmp_path), mcpServers=[])
+    request = NewSessionRequest(cwd=str(tmp_path), mcp_servers=[])
 
     # Mock AgentStore to inject our own load_mcp_configuration behavior
     original_init = AgentStore.__init__
@@ -180,7 +183,9 @@ async def test_new_session_with_malformed_mcp_json_integration(
 
         # RequestError raised when creating session with malformed mcp.json
         with pytest.raises(RequestError) as exc_info:
-            await acp_agent.newSession(request)
+            await acp_agent.new_session(
+                cwd=request.cwd, mcp_servers=request.mcp_servers
+            )
 
         # Verify the error contains helpful information
         error = exc_info.value
