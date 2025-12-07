@@ -191,12 +191,11 @@ class NonClickableCollapsible(Widget):
             collapsed=collapsed,
         )
         self.title = title
-        # Store both the original content for rendering and string for copying
-        self._content = content
         self._content_string = str(content)  # String version for copying
         # Pass the original content to Static (can be Rich renderable)
         self._content_widget = Static(content)
         self.collapsed = collapsed
+        self._watch_collapsed(collapsed)
         self.styles.border_left = ("thick", border_color)
 
     def _on_non_clickable_collapsible_title_copy_requested(
@@ -204,10 +203,9 @@ class NonClickableCollapsible(Widget):
     ) -> None:
         """Handle copy request from the title."""
         event.stop()
-        content_text = self._content_string
-        if content_text:
+        if self._content_string:
             try:
-                pyperclip.copy(content_text)
+                pyperclip.copy(self._content_string)
                 self.app.notify(
                     "Content copied to clipboard!", title="Copy Success", timeout=2
                 )
