@@ -118,6 +118,79 @@ async def test_new_session_agent_not_configured(acp_agent, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_new_session_with_malformed_mcp_json(acp_agent, tmp_path, monkeypatch):
+    """Test that malformed mcp.json raises a clear error in ACP."""
+    from acp import RequestError
+
+    from openhands_cli.tui.settings.store import MCPConfigurationError
+
+    request = NewSessionRequest(cwd=str(tmp_path), mcpServers=[])
+
+    # Mock load_agent_specs to raise MCPConfigurationError
+    with patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load:
+        mock_load.side_effect = MCPConfigurationError(
+            "Invalid JSON: trailing characters at line 20 column 1"
+        )
+
+        # Should raise RequestError with helpful message
+        with pytest.raises(RequestError) as exc_info:
+            await acp_agent.newSession(request)
+
+        # Verify the error contains helpful information
+        error = exc_info.value
+        assert error.code == -32602  # Invalid params error code
+        assert error.data is not None
+        assert "Invalid MCP configuration" in error.data.get("reason", "")
+        assert "mcp.json" in error.data.get("help", "")
+
+
+@pytest.mark.asyncio
+async def test_new_session_with_malformed_mcp_json_integration(
+    acp_agent, tmp_path, monkeypatch
+):
+    """Integration test verifying error handling with malformed mcp.json."""
+    from acp import RequestError
+
+    from openhands_cli.tui.settings.store import AgentStore, MCPConfigurationError
+
+    request = NewSessionRequest(cwd=str(tmp_path), mcpServers=[])
+
+    # Mock AgentStore to inject our own load_mcp_configuration behavior
+    original_init = AgentStore.__init__
+
+    def mock_init(self):
+        # Call original init
+        original_init(self)
+
+    def mock_load_mcp(self):
+        # Simulate malformed mcp.json being detected
+        raise MCPConfigurationError(
+            "Invalid JSON: trailing characters at line 20 column 1"
+        )
+
+    with (
+        patch.object(AgentStore, "__init__", mock_init),
+        patch.object(AgentStore, "load_mcp_configuration", mock_load_mcp),
+        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load_specs,
+    ):
+        # Mock load_agent_specs to propagate the MCPConfigurationError
+        mock_load_specs.side_effect = MCPConfigurationError(
+            "Invalid JSON: trailing characters at line 20 column 1"
+        )
+
+        # RequestError raised when creating session with malformed mcp.json
+        with pytest.raises(RequestError) as exc_info:
+            await acp_agent.newSession(request)
+
+        # Verify the error contains helpful information
+        error = exc_info.value
+        assert error.code == -32602  # Invalid params error code
+        assert error.data is not None
+        assert "Invalid MCP configuration" in error.data.get("reason", "")
+        assert "mcp.json" in error.data.get("help", "")
+
+
+@pytest.mark.asyncio
 async def test_new_session_creates_working_directory(acp_agent, tmp_path):
     """Test that new session creates working directory if it doesn't exist."""
     # Create a path that doesn't exist yet

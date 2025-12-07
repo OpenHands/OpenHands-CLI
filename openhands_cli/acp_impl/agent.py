@@ -45,8 +45,9 @@ from openhands_cli.acp_impl.utils import (
     convert_acp_mcp_servers_to_agent_format,
     convert_acp_prompt_to_message_content,
 )
-from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
+from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
+from openhands_cli.tui.settings.store import MCPConfigurationError
 
 
 logger = logging.getLogger(__name__)
@@ -136,13 +137,27 @@ class OpenHandsACPAgent(ACPAgent):
 
         Raises:
             MissingAgentSpec: If agent configuration is missing
+            RequestError: If MCP configuration is invalid
         """
         # Load agent specs (same as setup_conversation)
-        agent = load_agent_specs(
-            conversation_id=session_id,
-            mcp_servers=mcp_servers,
-            skills=[RESOURCE_SKILL],
-        )
+        try:
+            agent = load_agent_specs(
+                conversation_id=session_id,
+                mcp_servers=mcp_servers,
+                skills=[RESOURCE_SKILL],
+            )
+        except MCPConfigurationError as e:
+            logger.error(f"Invalid MCP configuration: {e}")
+            raise RequestError.invalid_params(
+                {
+                    "reason": "Invalid MCP configuration file",
+                    "details": str(e),
+                    "help": (
+                        f"Please check ~/.openhands/{MCP_CONFIG_FILE} for "
+                        "JSON syntax errors"
+                    ),
+                }
+            )
 
         # Validate and setup workspace
         if working_dir is None:

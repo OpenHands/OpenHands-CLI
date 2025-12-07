@@ -246,3 +246,55 @@ def test_verify_agent_exists_or_setup_agent_retries_after_missing_spec():
         # Load should be called twice: before and after configuration
         assert mock_load.call_count == 2
         assert result is mock_agent
+
+
+def test_openhands_provider_hardcodes_base_url():
+    """Test that when using OpenHands provider, the base_url is hardcoded."""
+    screen = SettingsScreen(conversation=None)
+
+    with patch.object(screen.agent_store, "save") as mock_save:
+        # Test with openhands/ prefix
+        screen._save_llm_settings(model="openhands/gpt-4o-mini", api_key="sk-test-123")
+
+        mock_save.assert_called_once()
+        saved_spec = mock_save.call_args[0][0]
+
+        # Verify the base_url is hardcoded for openhands provider
+        assert saved_spec.llm.base_url == "https://llm-proxy.app.all-hands.dev/"
+        # The SDK converts openhands/ to litellm_proxy/ internally
+        assert saved_spec.llm.model == "litellm_proxy/gpt-4o-mini"
+
+
+def test_openhands_provider_respects_explicit_base_url():
+    """Test that explicit base_url is preserved even for OpenHands provider."""
+    screen = SettingsScreen(conversation=None)
+
+    with patch.object(screen.agent_store, "save") as mock_save:
+        # Test with explicit base_url
+        custom_base_url = "https://custom-proxy.example.com/"
+        screen._save_llm_settings(
+            model="openhands/gpt-4o-mini",
+            api_key="sk-test-123",
+            base_url=custom_base_url,
+        )
+
+        mock_save.assert_called_once()
+        saved_spec = mock_save.call_args[0][0]
+
+        # Verify the explicit base_url is preserved
+        assert saved_spec.llm.base_url == custom_base_url
+
+
+def test_non_openhands_provider_no_base_url():
+    """Test that non-OpenHands providers don't get automatic base_url."""
+    screen = SettingsScreen(conversation=None)
+
+    with patch.object(screen.agent_store, "save") as mock_save:
+        # Test with non-openhands provider
+        screen._save_llm_settings(model="openai/gpt-4o-mini", api_key="sk-test-123")
+
+        mock_save.assert_called_once()
+        saved_spec = mock_save.call_args[0][0]
+
+        # Verify no base_url is set for non-openhands providers
+        assert saved_spec.llm.base_url is None
