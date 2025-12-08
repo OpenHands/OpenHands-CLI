@@ -109,15 +109,56 @@ class EventSubscriber:
     them to ACP session update notifications that are streamed back to the client.
     """
 
-    def __init__(self, session_id: str, conn: "Client"):
+    def __init__(
+        self,
+        session_id: str,
+        conn: "Client",
+        conversation: BaseConversation | None = None,
+    ):
         """Initialize the event subscriber.
 
         Args:
             session_id: The ACP session ID
             conn: The ACP connection for sending notifications
+            conversation: Optional conversation instance for accessing metrics
         """
         self.session_id = session_id
         self.conn = conn
+        self.conversation = conversation
+
+    def _get_metadata(self) -> dict[str, dict[str, int | float]] | None:
+        """Get metrics data to include in the _meta field.
+
+        Returns metrics data similar to how SDK's _format_metrics_subtitle works,
+        extracting token usage and cost from conversation stats.
+
+        Returns:
+            Dictionary with metrics data or None if stats unavailable
+        """
+        if not self.conversation:
+            return None
+
+        stats = self.conversation.conversation_stats
+        if not stats:
+            return None
+
+        combined_metrics = stats.get_combined_metrics()
+        if not combined_metrics or not combined_metrics.accumulated_token_usage:
+            return None
+
+        usage = combined_metrics.accumulated_token_usage
+        cost = combined_metrics.accumulated_cost or 0.0
+
+        # Return structured metrics data
+        return {
+            "metrics": {
+                "input_tokens": usage.prompt_tokens or 0,
+                "output_tokens": usage.completion_tokens or 0,
+                "cache_read_tokens": usage.cache_read_tokens or 0,
+                "reasoning_tokens": usage.reasoning_tokens or 0,
+                "cost": cost,
+            }
+        }
 
     async def __call__(self, event: Event):
         """Handle incoming events and convert them to ACP notifications.
