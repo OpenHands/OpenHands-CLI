@@ -1,13 +1,36 @@
 from typing import ClassVar
 
+from textual import on
 from textual.binding import Binding
 from textual.containers import Container
+from textual.events import Paste
 from textual.message import Message
 from textual.signal import Signal
 from textual.widgets import Input, TextArea
 
 from openhands_cli.refactor.core.commands import COMMANDS
 from openhands_cli.refactor.widgets.autocomplete import EnhancedAutoComplete
+
+
+class PasteAwareInput(Input):
+    """Custom Input widget that can handle paste events and notify parent."""
+    
+    class PasteDetected(Message):
+        """Message sent when multi-line paste is detected."""
+        
+        def __init__(self, text: str) -> None:
+            super().__init__()
+            self.text = text
+    
+    @on(Paste)
+    def _on_paste(self, event: Paste) -> None:
+        """Handle paste events and detect multi-line content."""
+        if '\n' in event.text or '\r' in event.text:
+            # Multi-line content detected - notify parent and prevent default
+            self.post_message(self.PasteDetected(event.text))
+            event.prevent_default()
+            event.stop()
+        # For single-line content, let the default paste behavior handle it
 
 
 class InputField(Container):
@@ -68,7 +91,7 @@ class InputField(Container):
     def compose(self):
         """Create the input widgets."""
         # Single-line input (initially visible)
-        self.input_widget = Input(
+        self.input_widget = PasteAwareInput(
             placeholder=self.placeholder,
             id="user_input",
         )
@@ -153,3 +176,15 @@ class InputField(Container):
             self.textarea_widget.focus()
         else:
             self.input_widget.focus()
+
+    @on(PasteAwareInput.PasteDetected)
+    def on_paste_aware_input_paste_detected(
+        self, event: PasteAwareInput.PasteDetected
+    ) -> None:
+        """Handle multi-line paste detection from the input widget."""
+        # Only handle when in single-line mode
+        if not self.is_multiline_mode:
+            # Switch to multi-line mode
+            self.action_toggle_input_mode()
+            # Set the pasted content in the textarea
+            self.textarea_widget.text = event.text
