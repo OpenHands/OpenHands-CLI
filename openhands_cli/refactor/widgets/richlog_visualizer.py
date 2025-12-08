@@ -103,7 +103,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._container.scroll_end(animate=False)
 
     def _escape_rich_markup(self, text: str) -> str:
-        """Escape Rich markup characters in text to prevent markup errors."""
+        """Escape Rich markup characters in text to prevent markup errors.
+
+        This is needed to handle content with special characters (e.g., Chinese text
+        with brackets) that would otherwise cause MarkupError when rendered in Static
+        widgets with markup=True.
+        """
         # Escape square brackets which are used for Rich markup
         return text.replace("[", r"\[").replace("]", r"\]")
 
@@ -233,7 +238,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 title = self._extract_meaningful_title(event, "Agent Action")
 
             # Create content string with metrics subtitle if available
-            content_string = str(content)
+            content_string = self._escape_rich_markup(str(content))
             metrics = self._format_metrics_subtitle()
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
@@ -247,7 +252,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         elif isinstance(event, ObservationEvent):
             title = self._extract_meaningful_title(event, "Observation")
             return NonClickableCollapsible(
-                str(content),
+                self._escape_rich_markup(str(content)),
                 title=title,
                 collapsed=False,  # Start expanded for observations
                 border_color=_get_event_border_color(event),
@@ -255,7 +260,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         elif isinstance(event, UserRejectObservation):
             title = self._extract_meaningful_title(event, "User Rejected Action")
             return NonClickableCollapsible(
-                str(content),
+                self._escape_rich_markup(str(content)),
                 title=title,
                 collapsed=False,  # Start expanded by default
                 border_color=_get_event_border_color(event),
@@ -275,7 +280,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 title = self._extract_meaningful_title(event, "Agent Message")
 
             # Create content string with metrics if available
-            content_string = str(content)
+            content_string = self._escape_rich_markup(str(content))
             metrics = self._format_metrics_subtitle()
             if metrics and event.llm_message.role == "assistant":
                 content_string = f"{content_string}\n\n{metrics}"
@@ -288,7 +293,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             )
         elif isinstance(event, AgentErrorEvent):
             title = self._extract_meaningful_title(event, "Agent Error")
-            content_string = str(content)
+            content_string = self._escape_rich_markup(str(content))
             metrics = self._format_metrics_subtitle()
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
@@ -302,14 +307,14 @@ class ConversationVisualizer(ConversationVisualizerBase):
         elif isinstance(event, PauseEvent):
             title = self._extract_meaningful_title(event, "User Paused")
             return NonClickableCollapsible(
-                str(content),
+                self._escape_rich_markup(str(content)),
                 title=title,
                 collapsed=False,  # Start expanded for pauses
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, Condensation):
             title = self._extract_meaningful_title(event, "Condensation")
-            content_string = str(content)
+            content_string = self._escape_rich_markup(str(content))
             metrics = self._format_metrics_subtitle()
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
@@ -325,7 +330,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
             title = self._extract_meaningful_title(
                 event, f"UNKNOWN Event: {event.__class__.__name__}"
             )
-            content_string = f"{content}\n\nSource: {event.source}"
+            content_string = (
+                f"{self._escape_rich_markup(str(content))}\n\nSource: {event.source}"
+            )
             return NonClickableCollapsible(
                 content_string,
                 title=title,
