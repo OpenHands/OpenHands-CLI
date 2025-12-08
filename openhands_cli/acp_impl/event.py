@@ -1,6 +1,6 @@
 """Utility functions for ACP implementation."""
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from acp import SessionNotification
 from acp.schema import (
@@ -128,7 +128,7 @@ class EventSubscriber:
         """
         self.conversation = conversation
 
-    def _get_metrics_meta(self) -> dict[str, dict[str, int | float]] | None:
+    def _get_metadata(self) -> dict[str, dict[str, int | float]] | None:
         """Get metrics data to include in the _meta field.
 
         Returns metrics data similar to how SDK's _format_metrics_subtitle works,
@@ -137,10 +137,10 @@ class EventSubscriber:
         Returns:
             Dictionary with metrics data or None if stats unavailable
         """
-        if not self.conversation or not hasattr(self.conversation, "state"):
+        if not self.conversation:
             return None
 
-        stats = self.conversation.state.stats
+        stats = self.conversation.conversation_stats
         if not stats:
             return None
 
@@ -161,20 +161,6 @@ class EventSubscriber:
                 "cost": cost,
             }
         }
-
-    def _add_meta_to_update(self, update: Any) -> Any:
-        """Add _meta field to an ACP update object if metrics are available.
-
-        Args:
-            update: ACP update object to add metrics to
-
-        Returns:
-            The update object with _meta field set
-        """
-        metrics = self._get_metrics_meta()
-        if metrics:
-            update._meta = metrics  # type: ignore[attr-defined]
-        return update
 
     async def __call__(self, event: Event):
         """Handle incoming events and convert them to ACP notifications.
@@ -218,16 +204,15 @@ class EventSubscriber:
                 await self.conn.sessionUpdate(
                     SessionNotification(
                         session_id=self.session_id,
-                        update=self._add_meta_to_update(
-                            AgentThoughtChunk(
-                                session_update="agent_thought_chunk",
-                                content=TextContentBlock(
-                                    type="text",
-                                    text="**Reasoning**:\n"
-                                    + event.reasoning_content.strip()
-                                    + "\n",
-                                ),
-                            )
+                        update=AgentThoughtChunk(
+                            session_update="agent_thought_chunk",
+                            content=TextContentBlock(
+                                type="text",
+                                text="**Reasoning**:\n"
+                                + event.reasoning_content.strip()
+                                + "\n",
+                            ),
+                            field_meta=self._get_metadata(),
                         ),
                     )
                 )
@@ -236,16 +221,13 @@ class EventSubscriber:
                 await self.conn.sessionUpdate(
                     SessionNotification(
                         session_id=self.session_id,
-                        update=self._add_meta_to_update(
-                            AgentThoughtChunk(
-                                session_update="agent_thought_chunk",
-                                content=TextContentBlock(
-                                    type="text",
-                                    text="\n**Thought**:\n"
-                                    + thought_text.strip()
-                                    + "\n",
-                                ),
-                            )
+                        update=AgentThoughtChunk(
+                            session_update="agent_thought_chunk",
+                            content=TextContentBlock(
+                                type="text",
+                                text="\n**Thought**:\n" + thought_text.strip() + "\n",
+                            ),
+                            field_meta=self._get_metadata(),
                         ),
                     )
                 )
@@ -294,14 +276,13 @@ class EventSubscriber:
                     await self.conn.sessionUpdate(
                         SessionNotification(
                             session_id=self.session_id,
-                            update=self._add_meta_to_update(
-                                AgentThoughtChunk(
-                                    session_update="agent_thought_chunk",
-                                    content=TextContentBlock(
-                                        type="text",
-                                        text=action_viz,
-                                    ),
-                                )
+                            update=AgentThoughtChunk(
+                                session_update="agent_thought_chunk",
+                                content=TextContentBlock(
+                                    type="text",
+                                    text=action_viz,
+                                ),
+                                field_meta=self._get_metadata(),
                             ),
                         )
                     )
@@ -310,37 +291,33 @@ class EventSubscriber:
                     await self.conn.sessionUpdate(
                         SessionNotification(
                             session_id=self.session_id,
-                            update=self._add_meta_to_update(
-                                AgentMessageChunk(
-                                    session_update="agent_message_chunk",
-                                    content=TextContentBlock(
-                                        type="text",
-                                        text=action_viz,
-                                    ),
-                                )
+                            update=AgentMessageChunk(
+                                session_update="agent_message_chunk",
+                                content=TextContentBlock(
+                                    type="text",
+                                    text=action_viz,
+                                ),
+                                field_meta=self._get_metadata(),
                             ),
-                        )
+                        ),
                     )
                     return
 
             await self.conn.sessionUpdate(
                 SessionNotification(
                     session_id=self.session_id,
-                    update=self._add_meta_to_update(
-                        ToolCallStart(
-                            session_update="tool_call",
-                            tool_call_id=event.tool_call_id,
-                            title=title,
-                            kind=tool_kind,
-                            status="in_progress",
-                            content=content,
-                            locations=extract_action_locations(event.action)
-                            if event.action
-                            else None,
-                            raw_input=event.action.model_dump()
-                            if event.action
-                            else None,
-                        )
+                    update=ToolCallStart(
+                        session_update="tool_call",
+                        tool_call_id=event.tool_call_id,
+                        title=title,
+                        kind=tool_kind,
+                        status="in_progress",
+                        content=content,
+                        locations=extract_action_locations(event.action)
+                        if event.action
+                        else None,
+                        raw_input=event.action.model_dump() if event.action else None,
+                        field_meta=self._get_metadata(),
                     ),
                 )
             )
@@ -427,16 +404,15 @@ class EventSubscriber:
             await self.conn.sessionUpdate(
                 SessionNotification(
                     session_id=self.session_id,
-                    update=self._add_meta_to_update(
-                        ToolCallProgress(
-                            session_update="tool_call_update",
-                            tool_call_id=event.tool_call_id,
-                            status=status,
-                            content=[content] if content else None,
-                            raw_output=event.model_dump(),
-                        )
+                    update=ToolCallProgress(
+                        session_update="tool_call_update",
+                        tool_call_id=event.tool_call_id,
+                        status=status,
+                        content=[content] if content else None,
+                        raw_output=event.model_dump(),
+                        field_meta=self._get_metadata(),
                     ),
-                )
+                ),
             )
         except Exception as e:
             logger.debug(f"Error processing observation event: {e}", exc_info=True)
@@ -462,16 +438,15 @@ class EventSubscriber:
                 await self.conn.sessionUpdate(
                     SessionNotification(
                         session_id=self.session_id,
-                        update=self._add_meta_to_update(
-                            AgentMessageChunk(
-                                session_update="agent_message_chunk",
-                                content=TextContentBlock(
-                                    type="text",
-                                    text=viz_text,
-                                ),
-                            )
+                        update=AgentMessageChunk(
+                            session_update="agent_message_chunk",
+                            content=TextContentBlock(
+                                type="text",
+                                text=viz_text,
+                            ),
                         ),
-                    )
+                        field_meta=self._get_metadata(),
+                    ),
                 )
         except Exception as e:
             logger.debug(f"Error processing MessageEvent: {e}", exc_info=True)
@@ -493,16 +468,15 @@ class EventSubscriber:
             await self.conn.sessionUpdate(
                 SessionNotification(
                     session_id=self.session_id,
-                    update=self._add_meta_to_update(
-                        AgentThoughtChunk(
-                            session_update="agent_thought_chunk",
-                            content=TextContentBlock(
-                                type="text",
-                                text=viz_text,
-                            ),
-                        )
+                    update=AgentThoughtChunk(
+                        session_update="agent_thought_chunk",
+                        content=TextContentBlock(
+                            type="text",
+                            text=viz_text,
+                        ),
                     ),
-                )
+                    field_meta=self._get_metadata(),
+                ),
             )
         except Exception as e:
             logger.debug(f"Error processing SystemPromptEvent: {e}", exc_info=True)
@@ -521,14 +495,13 @@ class EventSubscriber:
             await self.conn.sessionUpdate(
                 SessionNotification(
                     session_id=self.session_id,
-                    update=self._add_meta_to_update(
-                        AgentThoughtChunk(
-                            session_update="agent_thought_chunk",
-                            content=TextContentBlock(
-                                type="text",
-                                text=viz_text,
-                            ),
-                        )
+                    update=AgentThoughtChunk(
+                        session_update="agent_thought_chunk",
+                        content=TextContentBlock(
+                            type="text",
+                            text=viz_text,
+                        ),
+                        field_meta=self._get_metadata(),
                     ),
                 )
             )
@@ -552,16 +525,15 @@ class EventSubscriber:
             await self.conn.sessionUpdate(
                 SessionNotification(
                     session_id=self.session_id,
-                    update=self._add_meta_to_update(
-                        AgentThoughtChunk(
-                            session_update="agent_thought_chunk",
-                            content=TextContentBlock(
-                                type="text",
-                                text=viz_text,
-                            ),
-                        )
+                    update=AgentThoughtChunk(
+                        session_update="agent_thought_chunk",
+                        content=TextContentBlock(
+                            type="text",
+                            text=viz_text,
+                        ),
+                        field_meta=self._get_metadata(),
                     ),
-                )
+                ),
             )
         except Exception as e:
             logger.debug(f"Error processing Condensation: {e}", exc_info=True)
@@ -580,14 +552,13 @@ class EventSubscriber:
             await self.conn.sessionUpdate(
                 SessionNotification(
                     session_id=self.session_id,
-                    update=self._add_meta_to_update(
-                        AgentThoughtChunk(
-                            session_update="agent_thought_chunk",
-                            content=TextContentBlock(
-                                type="text",
-                                text=viz_text,
-                            ),
-                        )
+                    update=AgentThoughtChunk(
+                        session_update="agent_thought_chunk",
+                        content=TextContentBlock(
+                            type="text",
+                            text=viz_text,
+                        ),
+                        field_meta=self._get_metadata(),
                     ),
                 )
             )
