@@ -272,6 +272,9 @@ class OpenHandsACPAgent(ACPAgent):
             visualizer=None,  # No visualizer needed for ACP
         )
 
+        # Set conversation reference in subscriber for metrics access
+        subscriber.conversation = conversation
+
         # # Set up security analyzer (same as setup_conversation with confirmation mode)
         # conversation.set_security_analyzer(LLMSecurityAnalyzer())
         # conversation.set_confirmation_policy(AlwaysConfirm())

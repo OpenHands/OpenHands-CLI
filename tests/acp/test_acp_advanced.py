@@ -87,7 +87,7 @@ async def test_load_session_with_no_history(acp_agent, mock_connection):
         )
 
         # Verify no sessionUpdate was called
-        mock_connection.sessionUpdate.assert_not_called()
+        mock_connection.session_update.assert_not_called()
 
 
 def test_extract_action_locations_file_editor():

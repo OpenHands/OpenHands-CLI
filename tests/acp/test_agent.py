@@ -314,7 +314,7 @@ async def test_prompt_success(acp_agent, mock_connection):
         import asyncio
 
         await asyncio.sleep(0.1)
-        mock_connection.sessionUpdate.assert_called()
+        mock_connection.session_update.assert_called()
 
 
 @pytest.mark.asyncio
@@ -390,7 +390,7 @@ async def test_load_session_success(acp_agent, mock_connection):
     # Verify sessionUpdate was called for:
     # 1. Agent message (user messages are skipped to avoid duplication in Zed UI)
     # 2. Available commands update
-    assert mock_connection.sessionUpdate.call_count == 2
+    assert mock_connection.session_update.call_count == 2
 
 
 @pytest.mark.asyncio
@@ -500,7 +500,7 @@ async def test_prompt_with_image(acp_agent, mock_connection):
         import asyncio
 
         await asyncio.sleep(0.1)
-        mock_connection.sessionUpdate.assert_called()
+        mock_connection.session_update.assert_called()
 
 
 @pytest.mark.asyncio

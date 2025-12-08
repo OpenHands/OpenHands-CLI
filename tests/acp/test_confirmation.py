@@ -4,7 +4,6 @@ import pytest
 from acp.schema import (
     AllowedOutcome,
     PermissionOption,
-    RequestPermissionRequest,
     RequestPermissionResponse,
 )
 
@@ -23,14 +22,30 @@ class MockACPConnection:
         self.user_choice = user_choice
         self.last_request = None
 
-    async def requestPermission(
-        self, request: RequestPermissionRequest
+    async def request_permission(
+        self,
+        options: list,
+        session_id: str,
+        tool_call,
+        **kwargs,
     ) -> RequestPermissionResponse:
         """Mock permission request."""
-        self.last_request = request
+        self.last_request = {
+            "options": options,
+            "session_id": session_id,
+            "tool_call": tool_call,
+        }
         return RequestPermissionResponse(
             outcome=AllowedOutcome(option_id=self.user_choice, outcome="selected")
         )
+
+
+class MockActionObject:
+    """Mock action object with visualize method."""
+
+    def __init__(self, text: str):
+        """Initialize mock action object."""
+        self.visualize = text
 
 
 class MockAction:
@@ -39,7 +54,7 @@ class MockAction:
     def __init__(self, tool_name: str = "unknown", action: str = ""):
         """Initialize mock action."""
         self.tool_name = tool_name
-        self.action = action
+        self.action = MockActionObject(action) if action else None
 
     def to_dict(self):
         """Convert to dict."""
@@ -56,15 +71,15 @@ class TestAskUserConfirmationACP:
         action = MockAction(tool_name="execute_bash", action="ls -la")
 
         result = await ask_user_confirmation_acp(
-            conn=mock_conn,
+            conn=mock_conn,  # type: ignore[arg-type]
             session_id="test-session",
-            pending_actions=[action],
+            pending_actions=[action],  # type: ignore[arg-type]
         )
 
         assert result.decision.value == "accept"
         assert mock_conn.last_request is not None
-        assert mock_conn.last_request.sessionId == "test-session"
-        assert len(mock_conn.last_request.options) >= 2
+        assert mock_conn.last_request["session_id"] == "test-session"
+        assert len(mock_conn.last_request["options"]) >= 2
 
     @pytest.mark.asyncio
     async def test_reject_action(self):
@@ -73,9 +88,9 @@ class TestAskUserConfirmationACP:
         action = MockAction(tool_name="execute_bash", action="rm -rf /")
 
         result = await ask_user_confirmation_acp(
-            conn=mock_conn,
+            conn=mock_conn,  # type: ignore[arg-type]
             session_id="test-session",
-            pending_actions=[action],
+            pending_actions=[action],  # type: ignore[arg-type]
         )
 
         assert result.decision.value == "reject"
@@ -90,9 +105,9 @@ class TestAskUserConfirmationACP:
         ]
 
         result = await ask_user_confirmation_acp(
-            conn=mock_conn,
+            conn=mock_conn,  # type: ignore[arg-type]
             session_id="test-session",
-            pending_actions=actions,
+            pending_actions=actions,  # type: ignore[arg-type]
         )
 
         assert result.decision.value == "accept"
@@ -104,9 +119,9 @@ class TestAskUserConfirmationACP:
         mock_conn = MockACPConnection(user_choice="accept")
 
         result = await ask_user_confirmation_acp(
-            conn=mock_conn,
+            conn=mock_conn,  # type: ignore[arg-type]
             session_id="test-session",
-            pending_actions=[],
+            pending_actions=[],  # type: ignore[arg-type]
         )
 
         # Should auto-accept if no actions
