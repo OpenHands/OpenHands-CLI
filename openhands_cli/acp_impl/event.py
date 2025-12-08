@@ -109,23 +109,21 @@ class EventSubscriber:
     them to ACP session update notifications that are streamed back to the client.
     """
 
-    def __init__(self, session_id: str, conn: "AgentSideConnection"):
+    def __init__(
+        self,
+        session_id: str,
+        conn: "AgentSideConnection",
+        conversation: BaseConversation | None = None,
+    ):
         """Initialize the event subscriber.
 
         Args:
             session_id: The ACP session ID
             conn: The ACP connection for sending notifications
+            conversation: Optional conversation instance for accessing metrics
         """
         self.session_id = session_id
         self.conn = conn
-        self.conversation: BaseConversation | None = None
-
-    def set_conversation(self, conversation: "BaseConversation") -> None:
-        """Set the conversation reference for accessing stats.
-
-        Args:
-            conversation: The conversation instance
-        """
         self.conversation = conversation
 
     def _get_metadata(self) -> dict[str, dict[str, int | float]] | None:

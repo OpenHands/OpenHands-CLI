@@ -199,7 +199,7 @@ class OpenHandsACPAgent(ACPAgent):
         )
 
         # Set conversation reference in subscriber for metrics access
-        subscriber.set_conversation(conversation)
+        subscriber.conversation = conversation
 
         # # Set up security analyzer (same as setup_conversation with confirmation mode)
         # conversation.set_security_analyzer(LLMSecurityAnalyzer())
