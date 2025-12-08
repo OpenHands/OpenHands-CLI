@@ -28,7 +28,7 @@ class TestCommands:
         "expected_command,expected_description",
         [
             ("/help", "Display available commands"),
-            ("/confirm", "Toggle confirmation mode"),
+            ("/confirm", "Configure confirmation settings"),
             ("/exit", "Exit the application"),
         ],
     )
@@ -65,7 +65,7 @@ class TestCommands:
             "/confirm",
             "/exit",
             "Display available commands",
-            "Toggle confirmation mode",
+            "Configure confirmation settings",
             "Exit the application",
             "Tips:",
             "Type / and press Tab",
