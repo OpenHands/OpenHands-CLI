@@ -266,7 +266,9 @@ class SettingsScreen(ModalScreen):
                     key_value = llm.api_key.get_secret_value()  # type: ignore
                 except AttributeError:
                     key_value = str(llm.api_key)
-                self.api_key_input.placeholder = f"Current: {key_value[:3]}***"
+                self.api_key_input.placeholder = (
+                    f"Current: {key_value[:3]}*** (leave empty to keep current)"
+                )
             else:
                 # No API key set
                 self.api_key_input.placeholder = "Enter your API key"
@@ -282,10 +284,20 @@ class SettingsScreen(ModalScreen):
 
     def _update_model_options(self, provider: str) -> None:
         """Update model select options based on provider."""
+        # Store current selection to preserve it if possible
+        current_selection = self.model_select.value
+
         model_options = get_model_options(provider)
 
         if model_options:
             self.model_select.set_options(model_options)
+
+            # Try to preserve the current selection if it's still valid
+            if current_selection and current_selection != Select.BLANK:
+                # Check if the current selection is still in the new options
+                option_values = [option[1] for option in model_options]
+                if current_selection in option_values:
+                    self.model_select.value = current_selection
         else:
             self.model_select.set_options([("No models available", "")])
 
@@ -433,11 +445,24 @@ class SettingsScreen(ModalScreen):
             api_key = self.api_key_input.value.strip()
 
             # If no API key entered, keep existing one
-            if not api_key and self.current_agent and self.current_agent.llm.api_key:
-                try:
-                    api_key = self.current_agent.llm.api_key.get_secret_value()  # type: ignore
-                except AttributeError:
-                    api_key = str(self.current_agent.llm.api_key)
+            if not api_key:
+                # Ensure we have the latest agent data
+                if not self.current_agent:
+                    self.current_agent = self.agent_store.load()
+
+                if self.current_agent and self.current_agent.llm.api_key:
+                    try:
+                        api_key = self.current_agent.llm.api_key.get_secret_value()  # type: ignore
+                    except AttributeError:
+                        api_key = str(self.current_agent.llm.api_key)
+
+                    # Debug: Log that we're preserving the existing API key
+                    # This can help users understand what's happening
+                    if api_key:
+                        self._show_message(
+                            "Using existing API key (not shown for security)",
+                            is_error=False,
+                        )
 
             if not api_key:
                 self._show_message("API Key is required", is_error=True)
