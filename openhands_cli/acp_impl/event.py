@@ -20,7 +20,7 @@ from acp.schema import (
     ToolKind,
 )
 
-from openhands.sdk import Action
+from openhands.sdk import Action, BaseConversation
 from openhands.sdk.event import (
     ActionEvent,
     AgentErrorEvent,
@@ -109,15 +109,56 @@ class EventSubscriber:
     them to ACP session update notifications that are streamed back to the client.
     """
 
-    def __init__(self, session_id: str, conn: "AgentSideConnection"):
+    def __init__(
+        self,
+        session_id: str,
+        conn: "AgentSideConnection",
+        conversation: BaseConversation | None = None,
+    ):
         """Initialize the event subscriber.
 
         Args:
             session_id: The ACP session ID
             conn: The ACP connection for sending notifications
+            conversation: Optional conversation instance for accessing metrics
         """
         self.session_id = session_id
         self.conn = conn
+        self.conversation = conversation
+
+    def _get_metadata(self) -> dict[str, dict[str, int | float]] | None:
+        """Get metrics data to include in the _meta field.
+
+        Returns metrics data similar to how SDK's _format_metrics_subtitle works,
+        extracting token usage and cost from conversation stats.
+
+        Returns:
+            Dictionary with metrics data or None if stats unavailable
+        """
+        if not self.conversation:
+            return None
+
+        stats = self.conversation.conversation_stats
+        if not stats:
+            return None
+
+        combined_metrics = stats.get_combined_metrics()
+        if not combined_metrics or not combined_metrics.accumulated_token_usage:
+            return None
+
+        usage = combined_metrics.accumulated_token_usage
+        cost = combined_metrics.accumulated_cost or 0.0
+
+        # Return structured metrics data
+        return {
+            "metrics": {
+                "input_tokens": usage.prompt_tokens or 0,
+                "output_tokens": usage.completion_tokens or 0,
+                "cache_read_tokens": usage.cache_read_tokens or 0,
+                "reasoning_tokens": usage.reasoning_tokens or 0,
+                "cost": cost,
+            }
+        }
 
     async def __call__(self, event: Event):
         """Handle incoming events and convert them to ACP notifications.
@@ -169,6 +210,7 @@ class EventSubscriber:
                                 + event.reasoning_content.strip()
                                 + "\n",
                             ),
+                            field_meta=self._get_metadata(),
                         ),
                     )
                 )
@@ -183,6 +225,7 @@ class EventSubscriber:
                                 type="text",
                                 text="\n**Thought**:\n" + thought_text.strip() + "\n",
                             ),
+                            field_meta=self._get_metadata(),
                         ),
                     )
                 )
@@ -237,6 +280,7 @@ class EventSubscriber:
                                     type="text",
                                     text=action_viz,
                                 ),
+                                field_meta=self._get_metadata(),
                             ),
                         )
                     )
@@ -251,8 +295,9 @@ class EventSubscriber:
                                     type="text",
                                     text=action_viz,
                                 ),
+                                field_meta=self._get_metadata(),
                             ),
-                        )
+                        ),
                     )
                     return
 
@@ -270,6 +315,7 @@ class EventSubscriber:
                         if event.action
                         else None,
                         raw_input=event.action.model_dump() if event.action else None,
+                        field_meta=self._get_metadata(),
                     ),
                 )
             )
@@ -362,8 +408,9 @@ class EventSubscriber:
                         status=status,
                         content=[content] if content else None,
                         raw_output=event.model_dump(),
+                        field_meta=self._get_metadata(),
                     ),
-                )
+                ),
             )
         except Exception as e:
             logger.debug(f"Error processing observation event: {e}", exc_info=True)
@@ -396,7 +443,8 @@ class EventSubscriber:
                                 text=viz_text,
                             ),
                         ),
-                    )
+                        field_meta=self._get_metadata(),
+                    ),
                 )
         except Exception as e:
             logger.debug(f"Error processing MessageEvent: {e}", exc_info=True)
@@ -425,7 +473,8 @@ class EventSubscriber:
                             text=viz_text,
                         ),
                     ),
-                )
+                    field_meta=self._get_metadata(),
+                ),
             )
         except Exception as e:
             logger.debug(f"Error processing SystemPromptEvent: {e}", exc_info=True)
@@ -450,6 +499,7 @@ class EventSubscriber:
                             type="text",
                             text=viz_text,
                         ),
+                        field_meta=self._get_metadata(),
                     ),
                 )
             )
@@ -479,8 +529,9 @@ class EventSubscriber:
                             type="text",
                             text=viz_text,
                         ),
+                        field_meta=self._get_metadata(),
                     ),
-                )
+                ),
             )
         except Exception as e:
             logger.debug(f"Error processing Condensation: {e}", exc_info=True)
@@ -505,6 +556,7 @@ class EventSubscriber:
                             type="text",
                             text=viz_text,
                         ),
+                        field_meta=self._get_metadata(),
                     ),
                 )
             )
