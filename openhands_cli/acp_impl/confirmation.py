@@ -108,11 +108,12 @@ async def ask_user_confirmation_acp(
             if selected == "accept":
                 return ConfirmationResult(decision=UserConfirmation.ACCEPT)
             elif selected == "reject":
-                # For reject, we could ask for a reason via another permission request
-                # For now, just return reject without reason
                 return ConfirmationResult(
                     decision=UserConfirmation.REJECT,
-                    reason="User rejected via ACP",
+                    reason=(
+                        "User rejected the action. Please ask the user how "
+                        "they want to proceed."
+                    ),
                 )
             elif selected == "always_proceed":
                 return ConfirmationResult(
@@ -132,7 +133,11 @@ async def ask_user_confirmation_acp(
         else:
             # DeniedOutcome - user cancelled
             return ConfirmationResult(
-                decision=UserConfirmation.REJECT, reason="User cancelled via ACP"
+                decision=UserConfirmation.REJECT,
+                reason=(
+                    "User cancelled the action. Please ask the user how "
+                    "they want to proceed."
+                ),
             )
 
     except Exception as e:
