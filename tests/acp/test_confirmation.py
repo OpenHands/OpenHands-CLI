@@ -4,7 +4,6 @@ import pytest
 from acp.schema import (
     AllowedOutcome,
     PermissionOption,
-    RequestPermissionRequest,
     RequestPermissionResponse,
 )
 
@@ -31,7 +30,11 @@ class MockACPConnection:
         **kwargs,
     ) -> RequestPermissionResponse:
         """Mock permission request."""
-        self.last_request = {"options": options, "session_id": session_id, "tool_call": tool_call}
+        self.last_request = {
+            "options": options,
+            "session_id": session_id,
+            "tool_call": tool_call,
+        }
         return RequestPermissionResponse(
             outcome=AllowedOutcome(option_id=self.user_choice, outcome="selected")
         )
@@ -68,9 +71,9 @@ class TestAskUserConfirmationACP:
         action = MockAction(tool_name="execute_bash", action="ls -la")
 
         result = await ask_user_confirmation_acp(
-            conn=mock_conn,
+            conn=mock_conn,  # type: ignore[arg-type]
             session_id="test-session",
-            pending_actions=[action],
+            pending_actions=[action],  # type: ignore[arg-type]
         )
 
         assert result.decision.value == "accept"
@@ -85,9 +88,9 @@ class TestAskUserConfirmationACP:
         action = MockAction(tool_name="execute_bash", action="rm -rf /")
 
         result = await ask_user_confirmation_acp(
-            conn=mock_conn,
+            conn=mock_conn,  # type: ignore[arg-type]
             session_id="test-session",
-            pending_actions=[action],
+            pending_actions=[action],  # type: ignore[arg-type]
         )
 
         assert result.decision.value == "reject"
@@ -102,9 +105,9 @@ class TestAskUserConfirmationACP:
         ]
 
         result = await ask_user_confirmation_acp(
-            conn=mock_conn,
+            conn=mock_conn,  # type: ignore[arg-type]
             session_id="test-session",
-            pending_actions=actions,
+            pending_actions=actions,  # type: ignore[arg-type]
         )
 
         assert result.decision.value == "accept"
@@ -116,9 +119,9 @@ class TestAskUserConfirmationACP:
         mock_conn = MockACPConnection(user_choice="accept")
 
         result = await ask_user_confirmation_acp(
-            conn=mock_conn,
+            conn=mock_conn,  # type: ignore[arg-type]
             session_id="test-session",
-            pending_actions=[],
+            pending_actions=[],  # type: ignore[arg-type]
         )
 
         # Should auto-accept if no actions
