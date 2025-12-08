@@ -21,11 +21,13 @@ from acp.schema import (
     AgentCapabilities,
     AgentMessageChunk,
     AuthenticateResponse,
+    AvailableCommandsUpdate,
     Implementation,
     ListSessionsResponse,
     LoadSessionResponse,
     McpCapabilities,
     PromptCapabilities,
+    SessionModelState,
     SetSessionModelResponse,
     SetSessionModeResponse,
     TextContentBlock,
@@ -38,12 +40,20 @@ from openhands.sdk import (
     Workspace,
 )
 from openhands.sdk.event import Event
+from openhands.sdk.security.confirmation_policy import AlwaysConfirm, NeverConfirm
+from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 from openhands_cli import __version__
 from openhands_cli.acp_impl.event import EventSubscriber
+from openhands_cli.acp_impl.runner import ACPConversationRunner
+from openhands_cli.acp_impl.slash_commands import (
+    SlashCommandRegistry,
+    parse_slash_command,
+)
 from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
     convert_acp_mcp_servers_to_agent_format,
     convert_acp_prompt_to_message_content,
+    get_available_models,
 )
 from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
@@ -68,8 +78,112 @@ class OpenHandsACPAgent(ACPAgent):
         self._active_sessions: dict[str, BaseConversation] = {}
         # Track running tasks for each session to ensure proper cleanup on cancel
         self._running_tasks: dict[str, asyncio.Task] = {}
+        # Track confirmation mode state per session
+        self._confirmation_mode: dict[str, bool] = {}
+        # Slash commands registry
+        self._slash_commands = self._setup_slash_commands()
 
         logger.info("OpenHands ACP Agent initialized")
+
+    def _setup_slash_commands(self) -> SlashCommandRegistry:
+        """Set up slash commands registry.
+
+        Returns:
+            SlashCommandRegistry with all available commands
+        """
+        registry = SlashCommandRegistry()
+
+        registry.register(
+            "help",
+            "Show available slash commands",
+            self._cmd_help,
+        )
+
+        registry.register(
+            "confirm",
+            "Control confirmation mode (on/off/toggle)",
+            self._cmd_confirm,
+        )
+
+        return registry
+
+    def _cmd_help(self) -> str:
+        """Handle /help command."""
+        commands = self._slash_commands.get_available_commands()
+        lines = ["Available slash commands:", ""]
+        for cmd in commands:
+            lines.append(f"  {cmd.name} - {cmd.description}")
+        return "\n".join(lines)
+
+    async def _cmd_confirm(self, session_id: str, argument: str = "") -> str:
+        """Handle /confirm command.
+
+        Args:
+            session_id: The session ID
+            argument: Command argument (on/off/toggle)
+
+        Returns:
+            Status message
+        """
+        arg = argument.lower().strip()
+
+        # Get current state
+        current_state = self._confirmation_mode.get(session_id, False)
+
+        if arg in ("on", "enable", "yes"):
+            new_state = True
+        elif arg in ("off", "disable", "no"):
+            new_state = False
+        elif arg in ("toggle", ""):
+            new_state = not current_state
+        else:
+            return (
+                f"Unknown argument: {argument}\n"
+                f"Usage: /confirm [on|off|toggle]\n"
+                f"Current state: {'enabled' if current_state else 'disabled'}"
+            )
+
+        # Update confirmation mode for this session
+        await self._set_confirmation_mode(session_id, new_state)
+
+        message_part1 = f"Confirmation mode {'enabled' if new_state else 'disabled'}.\n"
+        message_part2 = (
+            "Agent will ask for permission before executing actions."
+            if new_state
+            else "Agent will execute actions without asking."
+        )
+        return message_part1 + message_part2
+
+    async def _set_confirmation_mode(self, session_id: str, enabled: bool) -> None:
+        """Enable or disable confirmation mode for a session.
+
+        Args:
+            session_id: The session ID
+            enabled: Whether to enable confirmation mode
+        """
+        # Update state
+        self._confirmation_mode[session_id] = enabled
+
+        # Update conversation if it exists
+        if session_id in self._active_sessions:
+            conversation = self._active_sessions[session_id]
+
+            if enabled:
+                # Enable confirmation mode
+                conversation.set_security_analyzer(LLMSecurityAnalyzer())  # type: ignore[attr-defined]
+                conversation.set_confirmation_policy(AlwaysConfirm())  # type: ignore[attr-defined]
+                logger.info(f"Enabled confirmation mode for session {session_id}")
+            else:
+                # Disable confirmation mode
+                conversation.set_confirmation_policy(NeverConfirm())  # type: ignore[attr-defined]
+                # Note: We don't remove the security analyzer here - just setting
+                # NeverConfirm policy is sufficient
+                logger.info(f"Disabled confirmation mode for session {session_id}")
+
+        logger.debug(
+            f"Confirmation mode for session {session_id}: "
+            f"{'enabled' if enabled else 'disabled'}"
+        )
 
     def on_connect(self, conn: AgentSideConnection) -> None:  # noqa: ARG002
         """Called when connection is established."""
@@ -278,12 +392,35 @@ class OpenHandsACPAgent(ACPAgent):
                 mcp_servers=mcp_servers_dict,
             )
 
-            logger.info(
-                f"Created new session {session_id} with model: "
-                f"{conversation.agent.llm.model}"  # type: ignore[attr-defined]
+            # Get current model and available models
+            current_model = conversation.agent.llm.model  # type: ignore[attr-defined]
+            available_models = get_available_models(conversation)
+
+            # Build SessionModelState
+            model_state = None
+            if available_models:
+                model_state = SessionModelState(
+                    available_models=available_models,
+                    current_model_id=current_model,
+                )
+                logger.debug(
+                    f"Loaded {len(available_models)} available models for new session"
+                )
+
+            logger.info(f"Created new session {session_id} with model: {current_model}")
+
+            # Send available slash commands to client
+            await self._conn.sessionUpdate(
+                SessionNotification(
+                    session_id=session_id,
+                    update=AvailableCommandsUpdate(
+                        session_update="available_commands_update",
+                        available_commands=self._slash_commands.get_available_commands(),
+                    ),
+                )
             )
 
-            return NewSessionResponse(session_id=session_id)
+            return NewSessionResponse(session_id=session_id, models=model_state)
 
         except MissingAgentSpec as e:
             logger.error(f"Agent not configured: {e}")
@@ -316,15 +453,65 @@ class OpenHandsACPAgent(ACPAgent):
             if not message_content:
                 return PromptResponse(stop_reason="end_turn")
 
+            # Check if this is a slash command
+            # For simplicity, check if the entire message content is a single text block
+            # that starts with "/"
+            slash_cmd = None
+            if isinstance(message_content, list) and len(message_content) == 1:
+                first_content = message_content[0]
+                # Check if it's a text block (has 'text' attribute and it's a string)
+                if hasattr(first_content, "text") and isinstance(
+                    getattr(first_content, "text"), str
+                ):
+                    text = getattr(first_content, "text").strip()
+                    slash_cmd = parse_slash_command(text)
+
+            if slash_cmd:
+                command, argument = slash_cmd
+                logger.info(f"Executing slash command: /{command} {argument}")
+
+                # Execute the slash command
+                response_text = await self._slash_commands.execute(
+                    command, session_id, argument
+                )
+
+                # Send response to client
+                if response_text:
+                    await self._conn.sessionUpdate(
+                        SessionNotification(
+                            session_id=session_id,
+                            update=AgentMessageChunk(
+                                session_update="agent_message_chunk",
+                                content=TextContentBlock(
+                                    type="text", text=response_text
+                                ),
+                            ),
+                        )
+                    )
+
+                return PromptResponse(stop_reason="end_turn")
+
             # Send the message with potentially multiple content types
             # (text + images)
             message = Message(role="user", content=message_content)
             conversation.send_message(message)
 
-            # Run the conversation asynchronously
-            # Callbacks are already set up when conversation was created
+            # Run the conversation with or without confirmation mode
             # Track the running task so cancel() can wait for proper cleanup
-            run_task = asyncio.create_task(asyncio.to_thread(conversation.run))
+            confirmation_enabled = self._confirmation_mode.get(session_id, False)
+
+            if confirmation_enabled:
+                # Run with confirmation mode
+                runner = ACPConversationRunner(
+                    conversation=conversation,
+                    conn=self._conn,
+                    session_id=session_id,
+                )
+                run_task = asyncio.create_task(runner.run_with_confirmation())
+            else:
+                # Run without confirmation mode (standard execution)
+                run_task = asyncio.create_task(asyncio.to_thread(conversation.run))
+
             self._running_tasks[session_id] = run_task
             try:
                 await run_task
@@ -455,8 +642,35 @@ class OpenHandsACPAgent(ACPAgent):
             for event in conversation.state.events:
                 await subscriber(event)
 
+            # Get current model and available models
+            current_model = conversation.agent.llm.model  # type: ignore[attr-defined]
+            available_models = get_available_models(conversation)
+
+            # Build SessionModelState
+            model_state = None
+            if available_models:
+                model_state = SessionModelState(
+                    available_models=available_models,
+                    current_model_id=current_model,
+                )
+                logger.debug(
+                    f"Loaded {len(available_models)} available models for session"
+                )
+
             logger.info(f"Successfully loaded session {session_id}")
-            return LoadSessionResponse()
+
+            # Send available slash commands to client
+            await self._conn.sessionUpdate(
+                SessionNotification(
+                    session_id=session_id,
+                    update=AvailableCommandsUpdate(
+                        session_update="available_commands_update",
+                        available_commands=self._slash_commands.get_available_commands(),
+                    ),
+                )
+            )
+
+            return LoadSessionResponse(models=model_state)
 
         except RequestError:
             # Re-raise RequestError as-is

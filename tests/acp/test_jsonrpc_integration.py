@@ -18,7 +18,11 @@ def acp_executable():
 
 
 def send_jsonrpc_message(proc: subprocess.Popen, message: dict) -> dict | None:
-    """Send a JSON-RPC message and wait for response."""
+    """Send a JSON-RPC message and wait for response.
+
+    This function skips notifications (messages without 'id') and returns
+    the first response message that matches the request ID.
+    """
     if not proc.stdin or not proc.stdout:
         return None
 
@@ -26,11 +30,26 @@ def send_jsonrpc_message(proc: subprocess.Popen, message: dict) -> dict | None:
     proc.stdin.write(msg_json.encode())
     proc.stdin.flush()
 
-    # Read response
-    line = proc.stdout.readline()
-    if line:
-        return json.loads(line.decode())
-    return None
+    # Read response, skipping notifications
+    request_id = message.get("id")
+    while True:
+        line = proc.stdout.readline()
+        if not line:
+            return None
+
+        response = json.loads(line.decode())
+
+        # If this is a notification (no id), skip it
+        if "id" not in response and "method" in response:
+            continue
+
+        # If this is the response we're waiting for, return it
+        if request_id is None or response.get("id") == request_id:
+            return response
+
+        # Otherwise keep looking
+        # This handles out-of-order responses (shouldn't happen but be safe)
+        continue
 
 
 def test_jsonrpc_initialize(acp_executable):

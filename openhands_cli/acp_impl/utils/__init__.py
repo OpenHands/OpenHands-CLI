@@ -1,4 +1,5 @@
 from openhands_cli.acp_impl.utils.convert import convert_acp_prompt_to_message_content
+from openhands_cli.acp_impl.utils.llm import get_available_models
 from openhands_cli.acp_impl.utils.mcp import (
     ACPMCPServerType,
     convert_acp_mcp_servers_to_agent_format,
@@ -11,4 +12,5 @@ __all__ = [
     "ACPMCPServerType",
     "convert_acp_prompt_to_message_content",
     "RESOURCE_SKILL",
+    "get_available_models",
 ]

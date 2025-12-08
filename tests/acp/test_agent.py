@@ -387,9 +387,10 @@ async def test_load_session_success(acp_agent, mock_connection):
         session_id=session_id, cwd="/test/path", mcp_servers=[]
     )
 
-    # Verify sessionUpdate was called for agent message only
-    # (user messages are skipped to avoid duplication in Zed UI)
-    assert mock_connection.sessionUpdate.call_count == 1
+    # Verify sessionUpdate was called for:
+    # 1. Agent message (user messages are skipped to avoid duplication in Zed UI)
+    # 2. Available commands update
+    assert mock_connection.sessionUpdate.call_count == 2
 
 
 @pytest.mark.asyncio
