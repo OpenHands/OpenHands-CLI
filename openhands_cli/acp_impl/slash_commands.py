@@ -3,7 +3,7 @@
 import logging
 from typing import Literal
 
-from acp.schema import AvailableCommand
+from acp.schema import AvailableCommand, AvailableCommandInput, UnstructuredCommandInput
 
 from openhands.sdk import ImageContent, LocalConversation, TextContent
 from openhands.sdk.security.confirmation_policy import (
@@ -55,11 +55,19 @@ def get_available_slash_commands() -> list[AvailableCommand]:
         AvailableCommand(
             name="help",
             description="Show available slash commands",
+            input=AvailableCommandInput(
+                root=UnstructuredCommandInput(hint="No arguments"),
+            ),
         ),
         AvailableCommand(
             name="confirm",
             description=(
                 "Control confirmation mode (always-ask|always-approve|llm-approve)"
+            ),
+            input=AvailableCommandInput(
+                root=UnstructuredCommandInput(
+                    hint="always-ask | always-approve | llm-approve"
+                ),
             ),
         ),
     ]
