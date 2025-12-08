@@ -1,6 +1,6 @@
 """Utility functions for ACP implementation."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from acp import SessionNotification
 from acp.schema import (
@@ -20,7 +20,7 @@ from acp.schema import (
     ToolKind,
 )
 
-from openhands.sdk import Action
+from openhands.sdk import Action, BaseConversation
 from openhands.sdk.event import (
     ActionEvent,
     AgentErrorEvent,
@@ -118,6 +118,63 @@ class EventSubscriber:
         """
         self.session_id = session_id
         self.conn = conn
+        self.conversation: BaseConversation | None = None
+
+    def set_conversation(self, conversation: "BaseConversation") -> None:
+        """Set the conversation reference for accessing stats.
+
+        Args:
+            conversation: The conversation instance
+        """
+        self.conversation = conversation
+
+    def _get_metrics_meta(self) -> dict[str, dict[str, int | float]] | None:
+        """Get metrics data to include in the _meta field.
+
+        Returns metrics data similar to how SDK's _format_metrics_subtitle works,
+        extracting token usage and cost from conversation stats.
+
+        Returns:
+            Dictionary with metrics data or None if stats unavailable
+        """
+        if not self.conversation or not hasattr(self.conversation, "state"):
+            return None
+
+        stats = self.conversation.state.stats
+        if not stats:
+            return None
+
+        combined_metrics = stats.get_combined_metrics()
+        if not combined_metrics or not combined_metrics.accumulated_token_usage:
+            return None
+
+        usage = combined_metrics.accumulated_token_usage
+        cost = combined_metrics.accumulated_cost or 0.0
+
+        # Return structured metrics data
+        return {
+            "metrics": {
+                "input_tokens": usage.prompt_tokens or 0,
+                "output_tokens": usage.completion_tokens or 0,
+                "cache_read_tokens": usage.cache_read_tokens or 0,
+                "reasoning_tokens": usage.reasoning_tokens or 0,
+                "cost": cost,
+            }
+        }
+
+    def _add_meta_to_update(self, update: Any) -> Any:
+        """Add _meta field to an ACP update object if metrics are available.
+
+        Args:
+            update: ACP update object to add metrics to
+
+        Returns:
+            The update object with _meta field set
+        """
+        metrics = self._get_metrics_meta()
+        if metrics:
+            update._meta = metrics  # type: ignore[attr-defined]
+        return update
 
     async def __call__(self, event: Event):
         """Handle incoming events and convert them to ACP notifications.
@@ -161,14 +218,16 @@ class EventSubscriber:
                 await self.conn.sessionUpdate(
                     SessionNotification(
                         session_id=self.session_id,
-                        update=AgentThoughtChunk(
-                            session_update="agent_thought_chunk",
-                            content=TextContentBlock(
-                                type="text",
-                                text="**Reasoning**:\n"
-                                + event.reasoning_content.strip()
-                                + "\n",
-                            ),
+                        update=self._add_meta_to_update(
+                            AgentThoughtChunk(
+                                session_update="agent_thought_chunk",
+                                content=TextContentBlock(
+                                    type="text",
+                                    text="**Reasoning**:\n"
+                                    + event.reasoning_content.strip()
+                                    + "\n",
+                                ),
+                            )
                         ),
                     )
                 )
@@ -177,12 +236,16 @@ class EventSubscriber:
                 await self.conn.sessionUpdate(
                     SessionNotification(
                         session_id=self.session_id,
-                        update=AgentThoughtChunk(
-                            session_update="agent_thought_chunk",
-                            content=TextContentBlock(
-                                type="text",
-                                text="\n**Thought**:\n" + thought_text.strip() + "\n",
-                            ),
+                        update=self._add_meta_to_update(
+                            AgentThoughtChunk(
+                                session_update="agent_thought_chunk",
+                                content=TextContentBlock(
+                                    type="text",
+                                    text="\n**Thought**:\n"
+                                    + thought_text.strip()
+                                    + "\n",
+                                ),
+                            )
                         ),
                     )
                 )
@@ -231,12 +294,14 @@ class EventSubscriber:
                     await self.conn.sessionUpdate(
                         SessionNotification(
                             session_id=self.session_id,
-                            update=AgentThoughtChunk(
-                                session_update="agent_thought_chunk",
-                                content=TextContentBlock(
-                                    type="text",
-                                    text=action_viz,
-                                ),
+                            update=self._add_meta_to_update(
+                                AgentThoughtChunk(
+                                    session_update="agent_thought_chunk",
+                                    content=TextContentBlock(
+                                        type="text",
+                                        text=action_viz,
+                                    ),
+                                )
                             ),
                         )
                     )
@@ -245,12 +310,14 @@ class EventSubscriber:
                     await self.conn.sessionUpdate(
                         SessionNotification(
                             session_id=self.session_id,
-                            update=AgentMessageChunk(
-                                session_update="agent_message_chunk",
-                                content=TextContentBlock(
-                                    type="text",
-                                    text=action_viz,
-                                ),
+                            update=self._add_meta_to_update(
+                                AgentMessageChunk(
+                                    session_update="agent_message_chunk",
+                                    content=TextContentBlock(
+                                        type="text",
+                                        text=action_viz,
+                                    ),
+                                )
                             ),
                         )
                     )
@@ -259,17 +326,21 @@ class EventSubscriber:
             await self.conn.sessionUpdate(
                 SessionNotification(
                     session_id=self.session_id,
-                    update=ToolCallStart(
-                        session_update="tool_call",
-                        tool_call_id=event.tool_call_id,
-                        title=title,
-                        kind=tool_kind,
-                        status="in_progress",
-                        content=content,
-                        locations=extract_action_locations(event.action)
-                        if event.action
-                        else None,
-                        raw_input=event.action.model_dump() if event.action else None,
+                    update=self._add_meta_to_update(
+                        ToolCallStart(
+                            session_update="tool_call",
+                            tool_call_id=event.tool_call_id,
+                            title=title,
+                            kind=tool_kind,
+                            status="in_progress",
+                            content=content,
+                            locations=extract_action_locations(event.action)
+                            if event.action
+                            else None,
+                            raw_input=event.action.model_dump()
+                            if event.action
+                            else None,
+                        )
                     ),
                 )
             )
@@ -356,12 +427,14 @@ class EventSubscriber:
             await self.conn.sessionUpdate(
                 SessionNotification(
                     session_id=self.session_id,
-                    update=ToolCallProgress(
-                        session_update="tool_call_update",
-                        tool_call_id=event.tool_call_id,
-                        status=status,
-                        content=[content] if content else None,
-                        raw_output=event.model_dump(),
+                    update=self._add_meta_to_update(
+                        ToolCallProgress(
+                            session_update="tool_call_update",
+                            tool_call_id=event.tool_call_id,
+                            status=status,
+                            content=[content] if content else None,
+                            raw_output=event.model_dump(),
+                        )
                     ),
                 )
             )
@@ -389,12 +462,14 @@ class EventSubscriber:
                 await self.conn.sessionUpdate(
                     SessionNotification(
                         session_id=self.session_id,
-                        update=AgentMessageChunk(
-                            session_update="agent_message_chunk",
-                            content=TextContentBlock(
-                                type="text",
-                                text=viz_text,
-                            ),
+                        update=self._add_meta_to_update(
+                            AgentMessageChunk(
+                                session_update="agent_message_chunk",
+                                content=TextContentBlock(
+                                    type="text",
+                                    text=viz_text,
+                                ),
+                            )
                         ),
                     )
                 )
@@ -418,12 +493,14 @@ class EventSubscriber:
             await self.conn.sessionUpdate(
                 SessionNotification(
                     session_id=self.session_id,
-                    update=AgentThoughtChunk(
-                        session_update="agent_thought_chunk",
-                        content=TextContentBlock(
-                            type="text",
-                            text=viz_text,
-                        ),
+                    update=self._add_meta_to_update(
+                        AgentThoughtChunk(
+                            session_update="agent_thought_chunk",
+                            content=TextContentBlock(
+                                type="text",
+                                text=viz_text,
+                            ),
+                        )
                     ),
                 )
             )
@@ -444,12 +521,14 @@ class EventSubscriber:
             await self.conn.sessionUpdate(
                 SessionNotification(
                     session_id=self.session_id,
-                    update=AgentThoughtChunk(
-                        session_update="agent_thought_chunk",
-                        content=TextContentBlock(
-                            type="text",
-                            text=viz_text,
-                        ),
+                    update=self._add_meta_to_update(
+                        AgentThoughtChunk(
+                            session_update="agent_thought_chunk",
+                            content=TextContentBlock(
+                                type="text",
+                                text=viz_text,
+                            ),
+                        )
                     ),
                 )
             )
@@ -473,12 +552,14 @@ class EventSubscriber:
             await self.conn.sessionUpdate(
                 SessionNotification(
                     session_id=self.session_id,
-                    update=AgentThoughtChunk(
-                        session_update="agent_thought_chunk",
-                        content=TextContentBlock(
-                            type="text",
-                            text=viz_text,
-                        ),
+                    update=self._add_meta_to_update(
+                        AgentThoughtChunk(
+                            session_update="agent_thought_chunk",
+                            content=TextContentBlock(
+                                type="text",
+                                text=viz_text,
+                            ),
+                        )
                     ),
                 )
             )
@@ -499,12 +580,14 @@ class EventSubscriber:
             await self.conn.sessionUpdate(
                 SessionNotification(
                     session_id=self.session_id,
-                    update=AgentThoughtChunk(
-                        session_update="agent_thought_chunk",
-                        content=TextContentBlock(
-                            type="text",
-                            text=viz_text,
-                        ),
+                    update=self._add_meta_to_update(
+                        AgentThoughtChunk(
+                            session_update="agent_thought_chunk",
+                            content=TextContentBlock(
+                                type="text",
+                                text=viz_text,
+                            ),
+                        )
                     ),
                 )
             )
