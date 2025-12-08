@@ -10,6 +10,7 @@ from acp.schema import (
     ToolCallUpdate,
 )
 
+from openhands.sdk.event import ActionEvent
 from openhands.sdk.security.confirmation_policy import ConfirmRisky, NeverConfirm
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.user_actions.types import ConfirmationResult, UserConfirmation
@@ -35,14 +36,14 @@ PERMISSION_OPTIONS = [
         kind="reject_once",
     ),
     PermissionOption(
+        option_id="risk_based",
+        name="Auto-confirm LOW/MEDIUM risk, ask for HIGH risk action",
+        kind="allow_once",
+    ),
+    PermissionOption(
         option_id="always_proceed",
         name="Always proceed (don't ask again)",
         kind="allow_always",
-    ),
-    PermissionOption(
-        option_id="risk_based",
-        name="Auto-confirm LOW/MEDIUM risk, ask for HIGH risk",
-        kind="allow_once",
     ),
 ]
 
@@ -77,7 +78,7 @@ def _get_option_handlers() -> dict[str, Callable[[], ConfirmationResult]]:
 async def ask_user_confirmation_acp(
     conn: "AgentSideConnection",
     session_id: str,
-    pending_actions: list,
+    pending_actions: list[ActionEvent],
 ) -> ConfirmationResult:
     """Ask user to confirm pending actions via ACP protocol.
 
@@ -95,10 +96,9 @@ async def ask_user_confirmation_acp(
     # Build description of actions
     actions_description = []
     for i, action in enumerate(pending_actions, 1):
-        tool_name = getattr(action, "tool_name", "[unknown tool]")
+        tool_name = action.tool_name
         action_content = (
-            str(getattr(action, "action", ""))[:100].replace("\n", " ")
-            or "[unknown action]"
+            str(action.action.visualize) if action.action else "[unknown action]"
         )
         actions_description.append(f"{i}. {tool_name}: {action_content}...")
 
