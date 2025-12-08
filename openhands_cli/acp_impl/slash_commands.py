@@ -29,11 +29,11 @@ def get_available_slash_commands() -> list[AvailableCommand]:
     """
     return [
         AvailableCommand(
-            name="/help",
+            name="help",
             description="Show available slash commands",
         ),
         AvailableCommand(
-            name="/confirm",
+            name="confirm",
             description=(
                 "Control confirmation mode (always-ask|always-approve|llm-approve)"
             ),
@@ -81,7 +81,7 @@ def create_help_text() -> str:
     commands = get_available_slash_commands()
     lines = ["Available slash commands:", ""]
     for cmd in commands:
-        lines.append(f"  {cmd.name} - {cmd.description}")
+        lines.append(f"  /{cmd.name} - {cmd.description}")
     return "\n".join(lines)
 
 

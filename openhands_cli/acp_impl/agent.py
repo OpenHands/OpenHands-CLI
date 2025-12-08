@@ -69,11 +69,14 @@ logger = logging.getLogger(__name__)
 class OpenHandsACPAgent(ACPAgent):
     """OpenHands Agent Client Protocol implementation."""
 
-    def __init__(self, conn: AgentSideConnection):
+    def __init__(
+        self, conn: AgentSideConnection, initial_confirmation_mode: ConfirmationMode
+    ):
         """Initialize the OpenHands ACP agent.
 
         Args:
             conn: ACP connection for sending notifications
+            initial_confirmation_mode: Default confirmation mode for new sessions
         """
         self._conn = conn
         # Cache of active conversations to preserve state (pause, confirmation, etc.)
@@ -83,8 +86,12 @@ class OpenHandsACPAgent(ACPAgent):
         self._running_tasks: dict[str, asyncio.Task] = {}
         # Track confirmation mode state per session
         self._confirmation_mode: dict[str, ConfirmationMode] = {}
-        # Slash commands registry
-        logger.info("OpenHands ACP Agent initialized")
+        # Default confirmation mode for new sessions
+        self._initial_confirmation_mode: ConfirmationMode = initial_confirmation_mode
+        logger.info(
+            f"OpenHands ACP Agent initialized with "
+            f"confirmation mode: {initial_confirmation_mode}"
+        )
 
     def _cmd_help(self) -> str:
         """Handle /help command."""
@@ -175,12 +182,12 @@ class OpenHandsACPAgent(ACPAgent):
             mcp_servers=mcp_servers,
         )
 
-        # Initialize confirmation mode to "always-ask" by default
+        # Initialize confirmation mode to the configured default
         if session_id not in self._confirmation_mode:
-            self._confirmation_mode[session_id] = "always-ask"
+            self._confirmation_mode[session_id] = self._initial_confirmation_mode
             # Set the confirmation policy on the conversation
             apply_confirmation_mode_to_conversation(
-                conversation, "always-ask", session_id
+                conversation, self._initial_confirmation_mode, session_id
             )
 
         # Cache it for future operations
@@ -656,14 +663,23 @@ class OpenHandsACPAgent(ACPAgent):
         logger.info(f"Extension notification '{method}' received with params: {params}")
 
 
-async def run_acp_server() -> None:
-    """Run the OpenHands ACP server."""
-    logger.info("Starting OpenHands ACP server...")
+async def run_acp_server(
+    initial_confirmation_mode: ConfirmationMode = "always-ask",
+) -> None:
+    """Run the OpenHands ACP server.
+
+    Args:
+        initial_confirmation_mode: Default confirmation mode for new sessions
+    """
+    logger.info(
+        f"Starting OpenHands ACP server with confirmation mode: "
+        f"{initial_confirmation_mode}..."
+    )
 
     reader, writer = await stdio_streams()
 
     def create_agent(conn: AgentSideConnection) -> OpenHandsACPAgent:
-        return OpenHandsACPAgent(conn)
+        return OpenHandsACPAgent(conn, initial_confirmation_mode)
 
     AgentSideConnection(create_agent, writer, reader)
 

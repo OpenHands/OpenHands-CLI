@@ -98,8 +98,24 @@ def create_main_parser() -> argparse.ArgumentParser:
     )
 
     # Add ACP subcommand
-    subparsers.add_parser(
+    acp_parser = subparsers.add_parser(
         "acp", help="Start OpenHands as an Agent Client Protocol (ACP) agent"
+    )
+
+    # ACP confirmation mode options (mutually exclusive)
+    acp_confirmation_group = acp_parser.add_mutually_exclusive_group()
+    acp_confirmation_group.add_argument(
+        "--always-approve",
+        action="store_true",
+        help="Auto-approve all actions without asking for confirmation",
+    )
+    acp_confirmation_group.add_argument(
+        "--llm-approve",
+        action="store_true",
+        help=(
+            "Enable LLM-based security analyzer "
+            "(only confirm LLM-predicted high-risk actions)"
+        ),
     )
 
     return parser

@@ -24,7 +24,7 @@ def mock_connection():
 @pytest.fixture
 def acp_agent(mock_connection):
     """Create an OpenHands ACP agent instance."""
-    return OpenHandsACPAgent(mock_connection)
+    return OpenHandsACPAgent(mock_connection, "always-ask")
 
 
 @pytest.mark.asyncio

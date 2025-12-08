@@ -59,14 +59,14 @@ class TestSlashCommandFunctions:
         commands = get_available_slash_commands()
         assert len(commands) == 2
 
-        # Check that both commands are present
+        # Check that both commands are present (without "/" prefix per ACP spec)
         command_names = {cmd.name for cmd in commands}
-        assert command_names == {"/help", "/confirm"}
+        assert command_names == {"help", "confirm"}
 
         # Check that descriptions exist
-        help_cmd = next(cmd for cmd in commands if cmd.name == "/help")
+        help_cmd = next(cmd for cmd in commands if cmd.name == "help")
         assert help_cmd.description
-        confirm_cmd = next(cmd for cmd in commands if cmd.name == "/confirm")
+        confirm_cmd = next(cmd for cmd in commands if cmd.name == "confirm")
         assert confirm_cmd.description
 
     def test_create_help_text(self):
