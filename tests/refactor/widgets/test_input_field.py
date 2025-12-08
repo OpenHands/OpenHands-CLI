@@ -268,7 +268,7 @@ class TestInputField:
             # Set up mock input widget with initial state
             field_with_mocks.input_widget.value = ""  # Start with empty text
             field_with_mocks.input_widget.cursor_position = 0  # Cursor at beginning
-            
+
             # Create a PasteDetected message (only sent for multi-line content)
             paste_detected_event = Mock(spec=PasteAwareInput.PasteDetected)
             paste_detected_event.text = paste_text
@@ -321,19 +321,19 @@ class TestInputFieldPasteIntegration:
         async with app.run_test() as pilot:
             # Get the input field
             input_field = app.query_one(InputField)
-            
+
             # Verify we start in single-line mode
             assert not input_field.is_multiline_mode
-            
+
             # Ensure the input widget has focus
             input_field.input_widget.focus()
             await pilot.pause()
-            
+
             # Create and post a single-line paste event to the input widget
             paste_event = Paste(text="Single line text")
             input_field.input_widget.post_message(paste_event)
             await pilot.pause()
-            
+
             # Should still be in single-line mode
             assert not input_field.is_multiline_mode
             # Input widget should still be visible
@@ -356,25 +356,25 @@ class TestInputFieldPasteIntegration:
         async with app.run_test() as pilot:
             # Get the input field
             input_field = app.query_one(InputField)
-            
+
             # Mock the screen.query_one method to avoid the #input_area dependency
             mock_input_area = Mock()
             mock_input_area.styles = Mock()
             input_field.screen.query_one = Mock(return_value=mock_input_area)
-            
+
             # Verify we start in single-line mode
             assert not input_field.is_multiline_mode
-            
+
             # Focus the input widget
             input_field.input_widget.focus()
             await pilot.pause()
-            
+
             # Create and post a multi-line paste event to the input widget
             multiline_text = "Line 1\nLine 2\nLine 3"
             paste_event = Paste(text=multiline_text)
             input_field.input_widget.post_message(paste_event)
             await pilot.pause()
-            
+
             # Should have switched to multi-line mode
             assert input_field.is_multiline_mode
             # Textarea should be visible, input should be hidden
@@ -399,25 +399,25 @@ class TestInputFieldPasteIntegration:
         async with app.run_test() as pilot:
             # Get the input field
             input_field = app.query_one(InputField)
-            
+
             # Mock the screen.query_one method to avoid the #input_area dependency
             mock_input_area = Mock()
             mock_input_area.styles = Mock()
             input_field.screen.query_one = Mock(return_value=mock_input_area)
-            
+
             # Verify we start in single-line mode
             assert not input_field.is_multiline_mode
-            
+
             # Focus the input widget
             input_field.input_widget.focus()
             await pilot.pause()
-            
+
             # Create and post a carriage return paste event to the input widget
             cr_text = "Line 1\rLine 2"
             paste_event = Paste(text=cr_text)
             input_field.input_widget.post_message(paste_event)
             await pilot.pause()
-            
+
             # Should have switched to multi-line mode
             assert input_field.is_multiline_mode
             # Content should be set in textarea
@@ -439,25 +439,25 @@ class TestInputFieldPasteIntegration:
         async with app.run_test() as pilot:
             # Get the input field
             input_field = app.query_one(InputField)
-            
+
             # Mock the screen.query_one method to avoid the #input_area dependency
             mock_input_area = Mock()
             mock_input_area.styles = Mock()
             input_field.screen.query_one = Mock(return_value=mock_input_area)
-            
+
             # Verify we start in single-line mode
             assert not input_field.is_multiline_mode
-            
+
             # Focus the input widget
             input_field.input_widget.focus()
             await pilot.pause()
-            
+
             # Create and post a Windows line endings paste event to the input widget
             windows_text = "Line 1\r\nLine 2\r\nLine 3"
             paste_event = Paste(text=windows_text)
             input_field.input_widget.post_message(paste_event)
             await pilot.pause()
-            
+
             # Should have switched to multi-line mode
             assert input_field.is_multiline_mode
             # Content should be set in textarea
@@ -479,34 +479,34 @@ class TestInputFieldPasteIntegration:
         async with app.run_test() as pilot:
             # Get the input field
             input_field = app.query_one(InputField)
-            
+
             # Mock the screen.query_one method to avoid the #input_area dependency
             mock_input_area = Mock()
             mock_input_area.styles = Mock()
             input_field.screen.query_one = Mock(return_value=mock_input_area)
-            
+
             # Switch to multi-line mode first
             input_field.action_toggle_input_mode()
             await pilot.pause()
-            
+
             # Verify we're in multi-line mode
             assert input_field.is_multiline_mode
-            
+
             # Set some initial content
             initial_content = "Initial content"
             input_field.textarea_widget.text = initial_content
-            
+
             # Focus the textarea widget
             input_field.textarea_widget.focus()
             await pilot.pause()
-            
+
             # Create and post a multi-line paste event to the input widget
             # (but it's not focused)
             paste_text = "Pasted\nContent"
             paste_event = Paste(text=paste_text)
             input_field.input_widget.post_message(paste_event)
             await pilot.pause()
-            
+
             # Should still be in multi-line mode
             assert input_field.is_multiline_mode
             # Content should remain unchanged (paste handler doesn't apply in
@@ -527,19 +527,19 @@ class TestInputFieldPasteIntegration:
         async with app.run_test() as pilot:
             # Get the input field
             input_field = app.query_one(InputField)
-            
+
             # Verify we start in single-line mode
             assert not input_field.is_multiline_mode
-            
+
             # Focus the input widget
             input_field.input_widget.focus()
             await pilot.pause()
-            
+
             # Create and post an empty paste event to the input widget
             paste_event = Paste(text="")
             input_field.input_widget.post_message(paste_event)
             await pilot.pause()
-            
+
             # Should still be in single-line mode
             assert not input_field.is_multiline_mode
 
@@ -559,39 +559,39 @@ class TestInputFieldPasteIntegration:
         async with app.run_test() as pilot:
             # Get the input field
             input_field = app.query_one(InputField)
-            
+
             # Mock the screen.query_one method to avoid the #input_area dependency
             mock_input_area = Mock()
             mock_input_area.styles = Mock()
             input_field.screen.query_one = Mock(return_value=mock_input_area)
-            
+
             # Verify we start in single-line mode
             assert not input_field.is_multiline_mode
-            
+
             # Set some initial text and position cursor in the middle
             initial_text = "Hello World"
             input_field.input_widget.value = initial_text
             # Position cursor after "Hello " (position 6)
             cursor_position = 6
             input_field.input_widget.cursor_position = cursor_position
-            
+
             # Focus the input widget
             input_field.input_widget.focus()
             await pilot.pause()
-            
+
             # Create and post a multi-line paste event
             paste_text = "Beautiful\nMulti-line"
             paste_event = Paste(text=paste_text)
             input_field.input_widget.post_message(paste_event)
             await pilot.pause()
-            
+
             # Should have switched to multi-line mode
             assert input_field.is_multiline_mode
-            
+
             # Text should be inserted at cursor position, not replaced
             expected_text = "Hello Beautiful\nMulti-lineWorld"
             assert input_field.textarea_widget.text == expected_text
-            
+
             # Verify the structure: "Hello " + paste_text + "World"
             assert input_field.textarea_widget.text.startswith("Hello Beautiful")
             assert "Multi-line" in input_field.textarea_widget.text
@@ -613,26 +613,26 @@ class TestInputFieldPasteIntegration:
         async with app.run_test() as pilot:
             # Get the input field
             input_field = app.query_one(InputField)
-            
+
             # Mock the screen.query_one method
             mock_input_area = Mock()
             mock_input_area.styles = Mock()
             input_field.screen.query_one = Mock(return_value=mock_input_area)
-            
+
             # Set initial text with cursor at beginning (position 0)
             initial_text = "World"
             input_field.input_widget.value = initial_text
             input_field.input_widget.cursor_position = 0
-            
+
             # Focus and paste multi-line content
             input_field.input_widget.focus()
             await pilot.pause()
-            
+
             paste_text = "Hello\nBeautiful\n"
             paste_event = Paste(text=paste_text)
             input_field.input_widget.post_message(paste_event)
             await pilot.pause()
-            
+
             # Should switch to multi-line mode with paste prepended
             assert input_field.is_multiline_mode
             expected_text = "Hello\nBeautiful\nWorld"
@@ -654,26 +654,26 @@ class TestInputFieldPasteIntegration:
         async with app.run_test() as pilot:
             # Get the input field
             input_field = app.query_one(InputField)
-            
+
             # Mock the screen.query_one method
             mock_input_area = Mock()
             mock_input_area.styles = Mock()
             input_field.screen.query_one = Mock(return_value=mock_input_area)
-            
+
             # Set initial text with cursor at end
             initial_text = "Hello"
             input_field.input_widget.value = initial_text
             input_field.input_widget.cursor_position = len(initial_text)
-            
+
             # Focus and paste multi-line content
             input_field.input_widget.focus()
             await pilot.pause()
-            
+
             paste_text = "\nBeautiful\nWorld"
             paste_event = Paste(text=paste_text)
             input_field.input_widget.post_message(paste_event)
             await pilot.pause()
-            
+
             # Should switch to multi-line mode with paste appended
             assert input_field.is_multiline_mode
             expected_text = "Hello\nBeautiful\nWorld"
@@ -695,25 +695,25 @@ class TestInputFieldPasteIntegration:
         async with app.run_test() as pilot:
             # Get the input field
             input_field = app.query_one(InputField)
-            
+
             # Mock the screen.query_one method
             mock_input_area = Mock()
             mock_input_area.styles = Mock()
             input_field.screen.query_one = Mock(return_value=mock_input_area)
-            
+
             # Start with empty text (cursor at position 0)
             assert input_field.input_widget.value == ""
             assert input_field.input_widget.cursor_position == 0
-            
+
             # Focus and paste multi-line content
             input_field.input_widget.focus()
             await pilot.pause()
-            
+
             paste_text = "Line 1\nLine 2\nLine 3"
             paste_event = Paste(text=paste_text)
             input_field.input_widget.post_message(paste_event)
             await pilot.pause()
-            
+
             # Should switch to multi-line mode with just the pasted content
             assert input_field.is_multiline_mode
             assert input_field.textarea_widget.text == paste_text

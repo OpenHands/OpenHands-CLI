@@ -14,18 +14,18 @@ from openhands_cli.refactor.widgets.autocomplete import EnhancedAutoComplete
 
 class PasteAwareInput(Input):
     """Custom Input widget that can handle paste events and notify parent."""
-    
+
     class PasteDetected(Message):
         """Message sent when multi-line paste is detected."""
-        
+
         def __init__(self, text: str) -> None:
             super().__init__()
             self.text = text
-    
+
     @on(Paste)
     def _on_paste(self, event: Paste) -> None:
         """Handle paste events and detect multi-line content."""
-        if '\n' in event.text or '\r' in event.text:
+        if "\n" in event.text or "\r" in event.text:
             # Multi-line content detected - notify parent and prevent default
             self.post_message(self.PasteDetected(event.text))
             event.prevent_default()
@@ -187,14 +187,14 @@ class InputField(Container):
             # Get current text and cursor position before switching modes
             current_text = self.input_widget.value
             cursor_pos = self.input_widget.cursor_position
-            
+
             # Insert the pasted text at the cursor position
             new_text = (
                 current_text[:cursor_pos] + event.text + current_text[cursor_pos:]
             )
-            
+
             # Set the combined text in the input widget first
             self.input_widget.value = new_text
-            
+
             # Then switch to multi-line mode (this will convert the text properly)
             self.action_toggle_input_mode()
