@@ -32,14 +32,14 @@ PERMISSION_OPTIONS = [
         kind="reject_once",
     ),
     PermissionOption(
-        option_id="risk_based",
-        name="Auto-confirm LOW/MEDIUM risk, ask for HIGH risk action",
-        kind="allow_once",
-    ),
-    PermissionOption(
         option_id="always_proceed",
         name="Always proceed (don't ask again)",
         kind="allow_always",
+    ),
+    PermissionOption(
+        option_id="risk_based",
+        name="Auto-confirm LOW/MEDIUM risk, ask for HIGH risk action",
+        kind="allow_once",
     ),
 ]
 
