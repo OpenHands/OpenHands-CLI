@@ -23,6 +23,7 @@ def create_main_parser() -> argparse.ArgumentParser:
 
             Examples:
                 openhands                           # Start CLI mode
+                openhands login                     # Login to OpenHands Cloud
                 openhands --resume conversation-id  # Resume conversation
                 openhands --always-approve          # Auto-approve all actions
                 openhands --llm-approve             # LLM-based approval mode
@@ -94,6 +95,12 @@ def create_main_parser() -> argparse.ArgumentParser:
     # Add ACP subcommand
     subparsers.add_parser(
         "acp", help="Start OpenHands as an Agent Client Protocol (ACP) agent"
+    )
+
+    # Add login subcommand
+    subparsers.add_parser(
+        "login",
+        help="Login to OpenHands Cloud (authenticates and saves API key)",
     )
 
     return parser
