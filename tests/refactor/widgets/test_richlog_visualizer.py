@@ -66,14 +66,14 @@ class TestChineseCharacterMarkupHandling:
             )
 
     def test_safe_content_string_escapes_problematic_content(self):
-        """Test that _safe_content_string escapes MarkupError content."""
+        """Test that _escape_rich_markup escapes MarkupError content."""
         app = App()
         container = VerticalScroll()
         visualizer = TextualVisualizer(container, app)  # type: ignore[arg-type]
 
         # Example content that caused the original error
         problematic_content = "+0.3%,月变化+0.8%,处于历史40%分位]"
-        safe_content = visualizer._safe_content_string(problematic_content)
+        safe_content = visualizer._escape_rich_markup(str(problematic_content))
 
         # Verify brackets are escaped
         assert r"\]" in safe_content
@@ -108,8 +108,8 @@ class TestChineseCharacterMarkupHandling:
         # Content with Chinese characters and special markup characters
         problematic_content = "+0.3%,月变化+0.8%,处于历史40%分位]"
 
-        # Use the safe_content_string method (the fix)
-        safe_content = visualizer._safe_content_string(problematic_content)
+        # Use the _escape_rich_markup method (the fix)
+        safe_content = visualizer._escape_rich_markup(str(problematic_content))
 
         # This should NOT raise an error
         widget = Static(safe_content, markup=True)
@@ -187,8 +187,8 @@ class TestChineseCharacterMarkupHandling:
         container = VerticalScroll()
         visualizer = TextualVisualizer(container, app)  # type: ignore[arg-type]
 
-        # Use the safe_content_string method
-        safe_content = visualizer._safe_content_string(test_content)
+        # Use the _escape_rich_markup method
+        safe_content = visualizer._escape_rich_markup(str(test_content))
 
         # Verify brackets are escaped
         assert "[" not in safe_content or r"\[" in safe_content
