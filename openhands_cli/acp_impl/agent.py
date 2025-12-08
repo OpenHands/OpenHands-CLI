@@ -17,6 +17,7 @@ from acp import (
     stdio_streams,
 )
 from acp.core import AgentSideConnection
+from acp.helpers import update_current_mode
 from acp.schema import (
     AgentCapabilities,
     AgentMessageChunk,
@@ -27,6 +28,8 @@ from acp.schema import (
     LoadSessionResponse,
     McpCapabilities,
     PromptCapabilities,
+    SessionMode,
+    SessionModeState,
     SetSessionModelResponse,
     SetSessionModeResponse,
     TextContentBlock,
@@ -63,6 +66,64 @@ from openhands_cli.tui.settings.store import MCPConfigurationError
 
 
 logger = logging.getLogger(__name__)
+
+
+# Mapping from ACP mode IDs to confirmation modes
+MODE_TO_CONFIRMATION: dict[str, ConfirmationMode] = {
+    "ask": "always-ask",
+    "auto": "always-approve",
+    "analyze": "llm-approve",
+}
+
+# Mapping from confirmation modes to ACP mode IDs
+CONFIRMATION_TO_MODE: dict[ConfirmationMode, str] = {
+    "always-ask": "ask",
+    "always-approve": "auto",
+    "llm-approve": "analyze",
+}
+
+
+def get_available_modes() -> list[SessionMode]:
+    """Get list of available session modes.
+
+    Returns:
+        List of SessionMode objects representing available modes
+    """
+    return [
+        SessionMode(
+            id="ask",
+            name="Ask",
+            description="Request permission before making any changes",
+        ),
+        SessionMode(
+            id="auto",
+            name="Auto",
+            description="Automatically approve all actions without asking",
+        ),
+        SessionMode(
+            id="analyze",
+            name="Analyze",
+            description=(
+                "Use LLM security analyzer to auto-approve safe actions. "
+                "Only ask for permission on potentially risky actions."
+            ),
+        ),
+    ]
+
+
+def get_session_mode_state(current_mode: ConfirmationMode) -> SessionModeState:
+    """Get the session mode state for a given confirmation mode.
+
+    Args:
+        current_mode: The current confirmation mode
+
+    Returns:
+        SessionModeState with available modes and current mode
+    """
+    return SessionModeState(
+        current_mode_id=CONFIRMATION_TO_MODE[current_mode],
+        available_modes=get_available_modes(),
+    )
 
 
 class OpenHandsACPAgent(ACPAgent):
@@ -360,7 +421,16 @@ class OpenHandsACPAgent(ACPAgent):
             # Send available slash commands to client
             await self._send_available_commands(session_id)
 
-            return NewSessionResponse(session_id=session_id)
+            # Get current confirmation mode for this session
+            current_mode = self._confirmation_mode.get(
+                session_id, self._initial_confirmation_mode
+            )
+
+            # Return response with modes
+            return NewSessionResponse(
+                session_id=session_id,
+                modes=get_session_mode_state(current_mode),
+            )
 
         except MissingAgentSpec as e:
             logger.error(f"Agent not configured: {e}")
@@ -551,7 +621,11 @@ class OpenHandsACPAgent(ACPAgent):
                 logger.warning(
                     f"Session {session_id} has no history (new or empty session)"
                 )
-                return LoadSessionResponse()
+                # Get current confirmation mode for this session
+                current_mode = self._confirmation_mode.get(
+                    session_id, self._initial_confirmation_mode
+                )
+                return LoadSessionResponse(modes=get_session_mode_state(current_mode))
 
             # Stream conversation history to client by reusing EventSubscriber
             # This ensures consistent event handling with live conversations
@@ -568,7 +642,13 @@ class OpenHandsACPAgent(ACPAgent):
             # Send available slash commands to client
             await self._send_available_commands(session_id)
 
-            return LoadSessionResponse()
+            # Get current confirmation mode for this session
+            current_mode = self._confirmation_mode.get(
+                session_id, self._initial_confirmation_mode
+            )
+
+            # Return response with modes
+            return LoadSessionResponse(modes=get_session_mode_state(current_mode))
 
         except RequestError:
             # Re-raise RequestError as-is
@@ -591,12 +671,57 @@ class OpenHandsACPAgent(ACPAgent):
 
     async def set_session_mode(
         self,
-        mode_id: str,  # noqa: ARG002
+        mode_id: str,
         session_id: str,
         **_kwargs: Any,
     ) -> SetSessionModeResponse | None:
-        """Set session mode (no-op for now)."""
-        logger.info(f"Set session mode requested: {session_id}")
+        """Set session mode by updating confirmation mode.
+
+        Args:
+            mode_id: The mode ID to switch to (ask, auto, analyze)
+            session_id: The session ID to update
+
+        Returns:
+            SetSessionModeResponse if successful
+
+        Raises:
+            RequestError: If mode_id is invalid
+        """
+        logger.info(f"Set session mode requested: {session_id} -> {mode_id}")
+
+        # Validate mode_id
+        if mode_id not in MODE_TO_CONFIRMATION:
+            raise RequestError.invalid_params(
+                {
+                    "reason": f"Invalid mode ID: {mode_id}",
+                    "validModes": list(MODE_TO_CONFIRMATION.keys()),
+                }
+            )
+
+        # Map mode to confirmation mode
+        confirmation_mode = MODE_TO_CONFIRMATION[mode_id]
+
+        # Update confirmation mode for this session
+        self._confirmation_mode[session_id] = confirmation_mode
+
+        # Apply the new confirmation mode to the conversation if it exists
+        if session_id in self._active_sessions:
+            conversation = self._active_sessions[session_id]
+            apply_confirmation_mode_to_conversation(
+                conversation, confirmation_mode, session_id
+            )
+
+        logger.info(
+            f"Session {session_id} mode changed to {mode_id} "
+            f"(confirmation: {confirmation_mode})"
+        )
+
+        # Send mode update notification to client
+        await self._conn.session_update(
+            session_id=session_id,
+            update=update_current_mode(current_mode_id=mode_id),
+        )
+
         return SetSessionModeResponse()
 
     async def set_session_model(
