@@ -23,14 +23,26 @@ class MockACPConnection:
         self.user_choice = user_choice
         self.last_request = None
 
-    async def requestPermission(
-        self, request: RequestPermissionRequest
+    async def request_permission(
+        self,
+        options: list,
+        session_id: str,
+        tool_call,
+        **kwargs,
     ) -> RequestPermissionResponse:
         """Mock permission request."""
-        self.last_request = request
+        self.last_request = {"options": options, "session_id": session_id, "tool_call": tool_call}
         return RequestPermissionResponse(
             outcome=AllowedOutcome(option_id=self.user_choice, outcome="selected")
         )
+
+
+class MockActionObject:
+    """Mock action object with visualize method."""
+
+    def __init__(self, text: str):
+        """Initialize mock action object."""
+        self.visualize = text
 
 
 class MockAction:
@@ -39,7 +51,7 @@ class MockAction:
     def __init__(self, tool_name: str = "unknown", action: str = ""):
         """Initialize mock action."""
         self.tool_name = tool_name
-        self.action = action
+        self.action = MockActionObject(action) if action else None
 
     def to_dict(self):
         """Convert to dict."""
@@ -63,8 +75,8 @@ class TestAskUserConfirmationACP:
 
         assert result.decision.value == "accept"
         assert mock_conn.last_request is not None
-        assert mock_conn.last_request.sessionId == "test-session"
-        assert len(mock_conn.last_request.options) >= 2
+        assert mock_conn.last_request["session_id"] == "test-session"
+        assert len(mock_conn.last_request["options"]) >= 2
 
     @pytest.mark.asyncio
     async def test_reject_action(self):

@@ -20,7 +20,7 @@ from acp.schema import (
     ToolKind,
 )
 
-from openhands.sdk import Action
+from openhands.sdk import Action, BaseConversation
 from openhands.sdk.event import (
     ActionEvent,
     AgentErrorEvent,
