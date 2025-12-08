@@ -5,7 +5,7 @@ from typing import Literal
 
 from acp.schema import AvailableCommand
 
-from openhands.sdk import BaseConversation
+from openhands.sdk import LocalConversation
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmRisky,
@@ -182,7 +182,7 @@ def validate_confirmation_mode(mode_str: str) -> ConfirmationMode | None:
 
 
 def apply_confirmation_mode_to_conversation(
-    conversation: BaseConversation,
+    conversation: LocalConversation,
     mode: ConfirmationMode,
     session_id: str,
 ) -> None:
@@ -195,16 +195,17 @@ def apply_confirmation_mode_to_conversation(
     """
     if mode == "always-ask":
         # Always ask for confirmation
-        conversation.set_security_analyzer(LLMSecurityAnalyzer())  # type: ignore[attr-defined]
-        conversation.set_confirmation_policy(AlwaysConfirm())  # type: ignore[attr-defined]
+        conversation.set_security_analyzer(LLMSecurityAnalyzer())
+        conversation.set_confirmation_policy(AlwaysConfirm())
 
     elif mode == "always-approve":
         # Never ask for confirmation - auto-approve everything
-        conversation.set_confirmation_policy(NeverConfirm())  # type: ignore[attr-defined]
+        conversation.set_security_analyzer(LLMSecurityAnalyzer())
+        conversation.set_confirmation_policy(NeverConfirm())
 
     elif mode == "llm-approve":
         # Use LLM to analyze and only confirm risky actions
-        conversation.set_security_analyzer(LLMSecurityAnalyzer())  # type: ignore[attr-defined]
-        conversation.set_confirmation_policy(ConfirmRisky())  # type: ignore[attr-defined]
+        conversation.set_security_analyzer(LLMSecurityAnalyzer())
+        conversation.set_confirmation_policy(ConfirmRisky())
 
     logger.info(f"Set confirmation mode to {mode} for session {session_id}")
