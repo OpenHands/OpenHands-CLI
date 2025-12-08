@@ -1,6 +1,7 @@
 """Confirmation mode implementation for ACP."""
 
 import logging
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from acp.schema import (
@@ -20,6 +21,58 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+# Permission options for confirmation requests
+PERMISSION_OPTIONS = [
+    PermissionOption(
+        option_id="accept",
+        name="Yes, proceed",
+        kind="allow_once",
+    ),
+    PermissionOption(
+        option_id="reject",
+        name="Reject",
+        kind="reject_once",
+    ),
+    PermissionOption(
+        option_id="always_proceed",
+        name="Always proceed (don't ask again)",
+        kind="allow_always",
+    ),
+    PermissionOption(
+        option_id="risk_based",
+        name="Auto-confirm LOW/MEDIUM risk, ask for HIGH risk",
+        kind="allow_once",
+    ),
+]
+
+
+# Dispatch dictionary for handling user choices
+def _get_option_handlers() -> dict[str, Callable[[], ConfirmationResult]]:
+    """Get handlers for each permission option.
+
+    Returns:
+        Dictionary mapping option IDs to handler functions
+    """
+    return {
+        "accept": lambda: ConfirmationResult(decision=UserConfirmation.ACCEPT),
+        "reject": lambda: ConfirmationResult(
+            decision=UserConfirmation.REJECT,
+            reason=(
+                "User rejected the action. Please ask the user how "
+                "they want to proceed."
+            ),
+        ),
+        "always_proceed": lambda: ConfirmationResult(
+            decision=UserConfirmation.ACCEPT,
+            policy_change=NeverConfirm(),
+        ),
+        "risk_based": lambda: ConfirmationResult(
+            decision=UserConfirmation.ACCEPT,
+            policy_change=ConfirmRisky(threshold=SecurityRisk.HIGH),
+        ),
+    }
 
 
 async def ask_user_confirmation_acp(
@@ -50,30 +103,6 @@ async def ask_user_confirmation_acp(
         )
         actions_description.append(f"{i}. {tool_name}: {action_content}...")
 
-    # Build permission options
-    options = [
-        PermissionOption(
-            option_id="accept",
-            name="Yes, proceed",
-            kind="allow_once",
-        ),
-        PermissionOption(
-            option_id="reject",
-            name="Reject",
-            kind="reject_once",
-        ),
-        PermissionOption(
-            option_id="always_proceed",
-            name="Always proceed (don't ask again)",
-            kind="allow_always",
-        ),
-        PermissionOption(
-            option_id="risk_based",
-            name="Auto-confirm LOW/MEDIUM risk, ask for HIGH risk",
-            kind="allow_once",
-        ),
-    ]
-
     # Create a tool call representation
     tool_call = ToolCallUpdate(
         tool_call_id=f"confirmation-{session_id}",
@@ -88,37 +117,20 @@ async def ask_user_confirmation_acp(
             RequestPermissionRequest(
                 session_id=session_id,
                 tool_call=tool_call,
-                options=options,
+                options=PERMISSION_OPTIONS,
             )
         )
 
-        # Handle user's choice
+        # Handle user's choice using dispatch dictionary
         outcome = response.outcome
         if isinstance(outcome, AllowedOutcome):
-            selected = outcome.optionId
-            if selected == "accept":
-                return ConfirmationResult(decision=UserConfirmation.ACCEPT)
-            elif selected == "reject":
-                return ConfirmationResult(
-                    decision=UserConfirmation.REJECT,
-                    reason=(
-                        "User rejected the action. Please ask the user how "
-                        "they want to proceed."
-                    ),
-                )
-            elif selected == "always_proceed":
-                return ConfirmationResult(
-                    decision=UserConfirmation.ACCEPT,
-                    policy_change=NeverConfirm(),
-                )
-            elif selected == "risk_based":
-                return ConfirmationResult(
-                    decision=UserConfirmation.ACCEPT,
-                    policy_change=ConfirmRisky(threshold=SecurityRisk.HIGH),
-                )
+            option_handlers = _get_option_handlers()
+            handler = option_handlers.get(outcome.optionId)
+            if handler:
+                return handler()
             else:
                 logger.warning(
-                    f"Unknown option selected: {selected}, treating as reject"
+                    f"Unknown option selected: {outcome.optionId}, treating as reject"
                 )
                 return ConfirmationResult(decision=UserConfirmation.REJECT)
         else:

@@ -21,6 +21,30 @@ logger = logging.getLogger(__name__)
 ConfirmationMode = Literal["always-ask", "always-approve", "llm-approve"]
 
 
+# Confirmation mode descriptions
+CONFIRMATION_MODES: dict[ConfirmationMode, dict[str, str]] = {
+    "always-ask": {
+        "short": "Ask for permission before every action",
+        "long": "Agent will ask for permission before executing every action.",
+    },
+    "always-approve": {
+        "short": "Automatically approve all actions",
+        "long": (
+            "Agent will automatically approve all actions without asking. "
+            "⚠️  Use with caution!"
+        ),
+    },
+    "llm-approve": {
+        "short": "Use LLM security analyzer to auto-approve safe actions",
+        "long": (
+            "Agent will use LLM security analyzer to automatically "
+            "approve safe actions. You will only be asked for permission "
+            "on potentially risky actions."
+        ),
+    },
+}
+
+
 def get_available_slash_commands() -> list[AvailableCommand]:
     """Get list of available slash commands in ACP format.
 
@@ -94,13 +118,13 @@ def get_confirm_help_text(current_mode: ConfirmationMode) -> str:
     Returns:
         Formatted help text
     """
+    modes_list = "\n".join(
+        f"  {mode:14} - {info['short']}" for mode, info in CONFIRMATION_MODES.items()
+    )
     return (
         f"Current confirmation mode: {current_mode}\n\n"
         f"Available modes:\n"
-        f"  always-ask     - Ask for permission before every action\n"
-        f"  always-approve - Automatically approve all actions\n"
-        f"  llm-approve    - Use LLM security analyzer to "
-        f"auto-approve safe actions\n\n"
+        f"{modes_list}\n\n"
         f"Usage: /confirm <mode>\n"
         f"Example: /confirm always-ask"
     )
@@ -116,13 +140,13 @@ def get_confirm_error_text(invalid_mode: str, current_mode: ConfirmationMode) ->
     Returns:
         Formatted error text
     """
+    modes_list = "\n".join(
+        f"  {mode:14} - {info['short']}" for mode, info in CONFIRMATION_MODES.items()
+    )
     return (
         f"Unknown mode: {invalid_mode}\n\n"
         f"Available modes:\n"
-        f"  always-ask     - Ask for permission before every action\n"
-        f"  always-approve - Automatically approve all actions\n"
-        f"  llm-approve    - Use LLM security analyzer to "
-        f"auto-approve safe actions\n\n"
+        f"{modes_list}\n\n"
         f"Current mode: {current_mode}"
     )
 
@@ -136,19 +160,7 @@ def get_confirm_success_text(mode: ConfirmationMode) -> str:
     Returns:
         Formatted success text
     """
-    messages: dict[ConfirmationMode, str] = {
-        "always-ask": ("Agent will ask for permission before executing every action."),
-        "always-approve": (
-            "Agent will automatically approve all actions without asking. "
-            "⚠️  Use with caution!"
-        ),
-        "llm-approve": (
-            "Agent will use LLM security analyzer to automatically "
-            "approve safe actions. You will only be asked for permission "
-            "on potentially risky actions."
-        ),
-    }
-    return f"Confirmation mode set to: {mode}\n\n{messages[mode]}"
+    return f"Confirmation mode set to: {mode}\n\n{CONFIRMATION_MODES[mode]['long']}"
 
 
 def validate_confirmation_mode(mode_str: str) -> ConfirmationMode | None:
@@ -185,15 +197,14 @@ def apply_confirmation_mode_to_conversation(
         # Always ask for confirmation
         conversation.set_security_analyzer(LLMSecurityAnalyzer())  # type: ignore[attr-defined]
         conversation.set_confirmation_policy(AlwaysConfirm())  # type: ignore[attr-defined]
-        logger.info(f"Set confirmation mode to always-ask for session {session_id}")
 
     elif mode == "always-approve":
         # Never ask for confirmation - auto-approve everything
         conversation.set_confirmation_policy(NeverConfirm())  # type: ignore[attr-defined]
-        logger.info(f"Set confirmation mode to always-approve for session {session_id}")
 
     elif mode == "llm-approve":
         # Use LLM to analyze and only confirm risky actions
         conversation.set_security_analyzer(LLMSecurityAnalyzer())  # type: ignore[attr-defined]
         conversation.set_confirmation_policy(ConfirmRisky())  # type: ignore[attr-defined]
-        logger.info(f"Set confirmation mode to llm-approve for session {session_id}")
+
+    logger.info(f"Set confirmation mode to {mode} for session {session_id}")

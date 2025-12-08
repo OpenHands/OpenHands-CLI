@@ -146,6 +146,22 @@ class OpenHandsACPAgent(ACPAgent):
 
         logger.debug(f"Confirmation mode for session {session_id}: {mode}")
 
+    async def _send_available_commands(self, session_id: str) -> None:
+        """Send available slash commands to the client.
+
+        Args:
+            session_id: The session ID
+        """
+        await self._conn.sessionUpdate(
+            SessionNotification(
+                session_id=session_id,
+                update=AvailableCommandsUpdate(
+                    session_update="available_commands_update",
+                    available_commands=get_available_slash_commands(),
+                ),
+            )
+        )
+
     def on_connect(self, conn: AgentSideConnection) -> None:  # noqa: ARG002
         """Called when connection is established."""
         logger.info("ACP connection established")
@@ -364,15 +380,7 @@ class OpenHandsACPAgent(ACPAgent):
             logger.info(f"Created new session {session_id}")
 
             # Send available slash commands to client
-            await self._conn.sessionUpdate(
-                SessionNotification(
-                    session_id=session_id,
-                    update=AvailableCommandsUpdate(
-                        session_update="available_commands_update",
-                        available_commands=get_available_slash_commands(),
-                    ),
-                )
-            )
+            await self._send_available_commands(session_id)
 
             return NewSessionResponse(session_id=session_id)
 
@@ -602,15 +610,7 @@ class OpenHandsACPAgent(ACPAgent):
             logger.info(f"Successfully loaded session {session_id}")
 
             # Send available slash commands to client
-            await self._conn.sessionUpdate(
-                SessionNotification(
-                    session_id=session_id,
-                    update=AvailableCommandsUpdate(
-                        session_update="available_commands_update",
-                        available_commands=get_available_slash_commands(),
-                    ),
-                )
-            )
+            await self._send_available_commands(session_id)
 
             return LoadSessionResponse()
 
