@@ -18,8 +18,6 @@ class EnhancedAutoComplete(AutoComplete):
     def __init__(self, target, command_candidates=None, **kwargs):
         """Initialize with command candidates and no static candidates."""
         self.command_candidates = command_candidates or []
-        # Remove 'candidates' from kwargs if present to avoid duplicate argument
-        kwargs.pop("candidates", None)
         # Don't pass candidates to parent - we'll handle them dynamically
         super().__init__(target, candidates=None, **kwargs)
 
