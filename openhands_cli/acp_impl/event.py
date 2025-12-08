@@ -2,6 +2,7 @@
 
 from typing import TYPE_CHECKING
 
+from acp import Client
 from acp.schema import (
     AgentMessageChunk,
     AgentPlanUpdate,
@@ -37,7 +38,7 @@ from openhands.sdk.event import (
 
 
 if TYPE_CHECKING:
-    from acp.core import AgentSideConnection
+    pass
 
 
 from openhands.sdk import get_logger
@@ -108,7 +109,7 @@ class EventSubscriber:
     them to ACP session update notifications that are streamed back to the client.
     """
 
-    def __init__(self, session_id: str, conn: "AgentSideConnection"):
+    def __init__(self, session_id: str, conn: "Client"):
         """Initialize the event subscriber.
 
         Args:

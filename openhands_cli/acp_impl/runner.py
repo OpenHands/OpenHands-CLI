@@ -18,7 +18,7 @@ from openhands_cli.user_actions.types import UserConfirmation
 
 
 if TYPE_CHECKING:
-    from acp.core import AgentSideConnection
+    from acp import Client
 
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 async def run_conversation_with_confirmation(
     conversation: BaseConversation,
-    conn: "AgentSideConnection",
+    conn: "Client",
     session_id: str,
 ) -> None:
     """Run the conversation with confirmation mode enabled.
@@ -81,7 +81,7 @@ async def run_conversation_with_confirmation(
 
 async def _handle_confirmation_request(
     conversation: BaseConversation,
-    conn: "AgentSideConnection",
+    conn: "Client",
     session_id: str,
 ) -> UserConfirmation:
     """Handle confirmation request via ACP protocol.

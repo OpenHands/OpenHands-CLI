@@ -9,14 +9,14 @@ from uuid import UUID
 
 from acp import (
     Agent as ACPAgent,
-    AgentSideConnection,
+    Client,
     InitializeResponse,
     NewSessionResponse,
     PromptResponse,
     RequestError,
-    SessionNotification,
     stdio_streams,
 )
+from acp.core import AgentSideConnection
 from acp.schema import (
     AgentCapabilities,
     AgentMessageChunk,
@@ -68,9 +68,7 @@ logger = logging.getLogger(__name__)
 class OpenHandsACPAgent(ACPAgent):
     """OpenHands Agent Client Protocol implementation."""
 
-    def __init__(
-        self, conn: AgentSideConnection, initial_confirmation_mode: ConfirmationMode
-    ):
+    def __init__(self, conn: Client, initial_confirmation_mode: ConfirmationMode):
         """Initialize the OpenHands ACP agent.
 
         Args:
@@ -92,7 +90,7 @@ class OpenHandsACPAgent(ACPAgent):
             f"confirmation mode: {initial_confirmation_mode}"
         )
 
-    async def _cmd_confirm(self, session_id: str, argument: str = "") -> str:
+    async def _cmd_confirm(self, session_id: str, argument: str) -> str:
         """Handle /confirm command.
 
         Args:
@@ -105,9 +103,7 @@ class OpenHandsACPAgent(ACPAgent):
         current_mode: ConfirmationMode = self._confirmation_mode.get(
             session_id, "always-ask"
         )
-
         response_text, new_mode = handle_confirm_command(current_mode, argument)
-
         if new_mode is not None:
             await self._set_confirmation_mode(session_id, new_mode)
 
@@ -122,14 +118,10 @@ class OpenHandsACPAgent(ACPAgent):
             session_id: The session ID
             mode: Confirmation mode (always-ask|always-approve|llm-approve)
         """
-        # Update state
         self._confirmation_mode[session_id] = mode
-
-        # Update conversation if it exists
         if session_id in self._active_sessions:
             conversation = self._active_sessions[session_id]
             apply_confirmation_mode_to_conversation(conversation, mode, session_id)
-
         logger.debug(f"Confirmation mode for session {session_id}: {mode}")
 
     async def _send_available_commands(self, session_id: str) -> None:
@@ -138,19 +130,16 @@ class OpenHandsACPAgent(ACPAgent):
         Args:
             session_id: The session ID
         """
-        await self._conn.sessionUpdate(
-            SessionNotification(
-                session_id=session_id,
-                update=AvailableCommandsUpdate(
-                    session_update="available_commands_update",
-                    available_commands=get_available_slash_commands(),
-                ),
-            )
+        await self._conn.session_update(
+            session_id=session_id,
+            update=AvailableCommandsUpdate(
+                session_update="available_commands_update",
+                available_commands=get_available_slash_commands(),
+            ),
         )
 
-    def on_connect(self, conn: AgentSideConnection) -> None:  # noqa: ARG002
-        """Called when connection is established."""
-        logger.info("ACP connection established")
+    def on_connect(self, conn: Client) -> None:
+        pass
 
     def _get_or_create_conversation(
         self,
@@ -417,14 +406,12 @@ class OpenHandsACPAgent(ACPAgent):
                     response_text = get_unknown_command_text(command)
 
                 # Send response to client
-                await self._conn.sessionUpdate(
-                    SessionNotification(
-                        session_id=session_id,
-                        update=AgentMessageChunk(
-                            session_update="agent_message_chunk",
-                            content=TextContentBlock(type="text", text=response_text),
-                        ),
-                    )
+                await self._conn.session_update(
+                    session_id=session_id,
+                    update=AgentMessageChunk(
+                        session_update="agent_message_chunk",
+                        content=TextContentBlock(type="text", text=response_text),
+                    ),
                 )
 
                 return PromptResponse(stop_reason="end_turn")
@@ -461,14 +448,12 @@ class OpenHandsACPAgent(ACPAgent):
         except Exception as e:
             logger.error(f"Error processing prompt: {e}", exc_info=True)
             # Send error notification to client
-            await self._conn.sessionUpdate(
-                SessionNotification(
-                    session_id=session_id,
-                    update=AgentMessageChunk(
-                        session_update="agent_message_chunk",
-                        content=TextContentBlock(type="text", text=f"Error: {str(e)}"),
-                    ),
-                )
+            await self._conn.session_update(
+                session_id=session_id,
+                update=AgentMessageChunk(
+                    session_update="agent_message_chunk",
+                    content=TextContentBlock(type="text", text=f"Error: {str(e)}"),
+                ),
             )
             raise RequestError.internal_error(
                 {"reason": "Failed to process prompt", "details": str(e)}
@@ -646,7 +631,7 @@ async def run_acp_server(
 
     reader, writer = await stdio_streams()
 
-    def create_agent(conn: AgentSideConnection) -> OpenHandsACPAgent:
+    def create_agent(conn: Client) -> OpenHandsACPAgent:
         return OpenHandsACPAgent(conn, initial_confirmation_mode)
 
     AgentSideConnection(create_agent, writer, reader)

@@ -2,8 +2,8 @@
 
 import logging
 from collections.abc import Callable
-from typing import TYPE_CHECKING
 
+from acp import Client
 from acp.schema import (
     AllowedOutcome,
     PermissionOption,
@@ -14,10 +14,6 @@ from openhands.sdk.event import ActionEvent
 from openhands.sdk.security.confirmation_policy import ConfirmRisky, NeverConfirm
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.user_actions.types import ConfirmationResult, UserConfirmation
-
-
-if TYPE_CHECKING:
-    from acp.core import AgentSideConnection
 
 
 logger = logging.getLogger(__name__)
@@ -76,7 +72,7 @@ def _get_option_handlers() -> dict[str, Callable[[], ConfirmationResult]]:
 
 
 async def ask_user_confirmation_acp(
-    conn: "AgentSideConnection",
+    conn: Client,
     session_id: str,
     pending_actions: list[ActionEvent],
 ) -> ConfirmationResult:
