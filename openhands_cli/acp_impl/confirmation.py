@@ -10,10 +10,7 @@ from acp.schema import (
     ToolCallUpdate,
 )
 
-from openhands.sdk.security.confirmation_policy import (
-    ConfirmRisky,
-    NeverConfirm,
-)
+from openhands.sdk.security.confirmation_policy import ConfirmRisky, NeverConfirm
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.user_actions.types import ConfirmationResult, UserConfirmation
 
@@ -29,7 +26,6 @@ async def ask_user_confirmation_acp(
     conn: "AgentSideConnection",
     session_id: str,
     pending_actions: list,
-    using_risk_based_policy: bool = False,
 ) -> ConfirmationResult:
     """Ask user to confirm pending actions via ACP protocol.
 
@@ -37,7 +33,6 @@ async def ask_user_confirmation_acp(
         conn: ACP connection for sending permission requests
         session_id: The session ID
         pending_actions: List of pending actions from the agent
-        using_risk_based_policy: Whether risk-based policy is already enabled
 
     Returns:
         ConfirmationResult with decision, optional policy_change, and reason
@@ -72,16 +67,12 @@ async def ask_user_confirmation_acp(
             name="Always proceed (don't ask again)",
             kind="allow_always",
         ),
+        PermissionOption(
+            option_id="risk_based",
+            name="Auto-confirm LOW/MEDIUM risk, ask for HIGH risk",
+            kind="allow_once",
+        ),
     ]
-
-    if not using_risk_based_policy:
-        options.append(
-            PermissionOption(
-                option_id="risk_based",
-                name="Auto-confirm LOW/MEDIUM risk, ask for HIGH risk",
-                kind="allow_once",
-            )
-        )
 
     # Create a tool call representation
     tool_call = ToolCallUpdate(

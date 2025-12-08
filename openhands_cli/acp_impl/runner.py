@@ -105,9 +105,6 @@ async def _handle_confirmation_request(
         conn=conn,
         session_id=session_id,
         pending_actions=pending_actions,
-        using_risk_based_policy=isinstance(
-            conversation.state.confirmation_policy, ConfirmRisky
-        ),
     )
 
     decision = result.decision

@@ -59,7 +59,6 @@ class TestAskUserConfirmationACP:
             conn=mock_conn,
             session_id="test-session",
             pending_actions=[action],
-            using_risk_based_policy=False,
         )
 
         assert result.decision.value == "accept"
@@ -77,7 +76,6 @@ class TestAskUserConfirmationACP:
             conn=mock_conn,
             session_id="test-session",
             pending_actions=[action],
-            using_risk_based_policy=False,
         )
 
         assert result.decision.value == "reject"
@@ -95,7 +93,6 @@ class TestAskUserConfirmationACP:
             conn=mock_conn,
             session_id="test-session",
             pending_actions=actions,
-            using_risk_based_policy=False,
         )
 
         assert result.decision.value == "accept"
@@ -110,7 +107,6 @@ class TestAskUserConfirmationACP:
             conn=mock_conn,
             session_id="test-session",
             pending_actions=[],
-            using_risk_based_policy=False,
         )
 
         # Should auto-accept if no actions
