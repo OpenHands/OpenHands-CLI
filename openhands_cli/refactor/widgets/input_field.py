@@ -184,7 +184,16 @@ class InputField(Container):
         """Handle multi-line paste detection from the input widget."""
         # Only handle when in single-line mode
         if not self.is_multiline_mode:
+            # Get current text and cursor position before switching modes
+            current_text = self.input_widget.value
+            cursor_pos = self.input_widget.cursor_position
+            
+            # Insert the pasted text at the cursor position
+            new_text = (
+                current_text[:cursor_pos] + event.text + current_text[cursor_pos:]
+            )
+            
             # Switch to multi-line mode
             self.action_toggle_input_mode()
-            # Set the pasted content in the textarea
-            self.textarea_widget.text = event.text
+            # Set the combined text in the textarea
+            self.textarea_widget.text = new_text
