@@ -27,7 +27,6 @@ from acp.schema import (
     LoadSessionResponse,
     McpCapabilities,
     PromptCapabilities,
-    SessionModelState,
     SetSessionModelResponse,
     SetSessionModeResponse,
     TextContentBlock,
@@ -53,7 +52,6 @@ from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
     convert_acp_mcp_servers_to_agent_format,
     convert_acp_prompt_to_message_content,
-    get_available_models,
 )
 from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
@@ -386,28 +384,13 @@ class OpenHandsACPAgent(ACPAgent):
 
             # Create conversation and cache it for future operations
             # This reuses the same pattern as openhands --resume
-            conversation = self._get_or_create_conversation(
+            _ = self._get_or_create_conversation(
                 session_id=session_id,
                 working_dir=working_dir,
                 mcp_servers=mcp_servers_dict,
             )
 
-            # Get current model and available models
-            current_model = conversation.agent.llm.model  # type: ignore[attr-defined]
-            available_models = get_available_models(conversation)
-
-            # Build SessionModelState
-            model_state = None
-            if available_models:
-                model_state = SessionModelState(
-                    available_models=available_models,
-                    current_model_id=current_model,
-                )
-                logger.debug(
-                    f"Loaded {len(available_models)} available models for new session"
-                )
-
-            logger.info(f"Created new session {session_id} with model: {current_model}")
+            logger.info(f"Created new session {session_id}")
 
             # Send available slash commands to client
             await self._conn.sessionUpdate(
@@ -420,7 +403,7 @@ class OpenHandsACPAgent(ACPAgent):
                 )
             )
 
-            return NewSessionResponse(session_id=session_id, models=model_state)
+            return NewSessionResponse(session_id=session_id)
 
         except MissingAgentSpec as e:
             logger.error(f"Agent not configured: {e}")
@@ -642,21 +625,6 @@ class OpenHandsACPAgent(ACPAgent):
             for event in conversation.state.events:
                 await subscriber(event)
 
-            # Get current model and available models
-            current_model = conversation.agent.llm.model  # type: ignore[attr-defined]
-            available_models = get_available_models(conversation)
-
-            # Build SessionModelState
-            model_state = None
-            if available_models:
-                model_state = SessionModelState(
-                    available_models=available_models,
-                    current_model_id=current_model,
-                )
-                logger.debug(
-                    f"Loaded {len(available_models)} available models for session"
-                )
-
             logger.info(f"Successfully loaded session {session_id}")
 
             # Send available slash commands to client
@@ -670,7 +638,7 @@ class OpenHandsACPAgent(ACPAgent):
                 )
             )
 
-            return LoadSessionResponse(models=model_state)
+            return LoadSessionResponse()
 
         except RequestError:
             # Re-raise RequestError as-is

@@ -55,25 +55,20 @@ async def ask_user_confirmation_acp(
         )
         actions_description.append(f"{i}. {tool_name}: {action_content}...")
 
-    description = (
-        f"Agent created {len(pending_actions)} action(s) and is waiting for "
-        f"confirmation:\n\n" + "\n".join(actions_description)
-    )
-
     # Build permission options
     options = [
         PermissionOption(
-            optionId="accept",
+            option_id="accept",
             name="Yes, proceed",
             kind="allow_once",
         ),
         PermissionOption(
-            optionId="reject",
+            option_id="reject",
             name="Reject",
             kind="reject_once",
         ),
         PermissionOption(
-            optionId="always_proceed",
+            option_id="always_proceed",
             name="Always proceed (don't ask again)",
             kind="allow_always",
         ),
@@ -82,7 +77,7 @@ async def ask_user_confirmation_acp(
     if not using_risk_based_policy:
         options.append(
             PermissionOption(
-                optionId="risk_based",
+                option_id="risk_based",
                 name="Auto-confirm LOW/MEDIUM risk, ask for HIGH risk",
                 kind="allow_once",
             )
@@ -90,7 +85,7 @@ async def ask_user_confirmation_acp(
 
     # Create a tool call representation
     tool_call = ToolCallUpdate(
-        toolCallId=f"confirmation-{session_id}",
+        tool_call_id=f"confirmation-{session_id}",
         title="Confirm Agent Actions",
         status="pending",
         kind="other",
@@ -100,8 +95,8 @@ async def ask_user_confirmation_acp(
     try:
         response = await conn.requestPermission(
             RequestPermissionRequest(
-                sessionId=session_id,
-                toolCall=tool_call,
+                session_id=session_id,
+                tool_call=tool_call,
                 options=options,
             )
         )

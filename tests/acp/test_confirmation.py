@@ -9,7 +9,6 @@ from acp.schema import (
 )
 
 from openhands_cli.acp_impl.confirmation import ask_user_confirmation_acp
-from openhands_cli.user_actions.types import ConfirmationResult
 
 
 class MockACPConnection:
@@ -30,7 +29,7 @@ class MockACPConnection:
         """Mock permission request."""
         self.last_request = request
         return RequestPermissionResponse(
-            outcome=AllowedOutcome(optionId=self.user_choice, outcome="selected")
+            outcome=AllowedOutcome(option_id=self.user_choice, outcome="selected")
         )
 
 
@@ -124,10 +123,10 @@ class TestConfirmationOptions:
     def test_permission_options_structure(self):
         """Test that permission options have the correct structure."""
         approve_opt = PermissionOption(
-            optionId="approve", name="Approve action", kind="allow_once"
+            option_id="approve", name="Approve action", kind="allow_once"
         )
         reject_opt = PermissionOption(
-            optionId="reject", name="Reject action", kind="reject_once"
+            option_id="reject", name="Reject action", kind="reject_once"
         )
 
         assert approve_opt.name == "Approve action"

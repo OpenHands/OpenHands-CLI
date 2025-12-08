@@ -1,7 +1,5 @@
 """Tests for ACP slash commands functionality."""
 
-import pytest
-
 from openhands_cli.acp_impl.slash_commands import (
     SlashCommandRegistry,
     parse_slash_command,
@@ -75,6 +73,7 @@ class TestSlashCommandRegistry:
         registry = SlashCommandRegistry()
 
         result = await registry.execute("nonexistent", "session123", "")
+        assert result is not None
         assert "Unknown command" in result
         assert "nonexistent" in result
 
@@ -184,5 +183,6 @@ class TestSlashCommandIntegration:
         registry.register("help", "Show available commands", help_handler)
 
         result = await registry.execute("help", "session1", "")
+        assert result is not None
         assert "Available commands" in result
         assert "/help" in result

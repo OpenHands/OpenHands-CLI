@@ -1,7 +1,7 @@
 """Slash commands implementation for ACP."""
 
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 from acp.schema import AvailableCommand
 
