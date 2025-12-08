@@ -4,7 +4,7 @@ import asyncio
 import logging
 import uuid
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 from uuid import UUID
 
 from acp import (
@@ -39,15 +39,19 @@ from openhands.sdk import (
     Workspace,
 )
 from openhands.sdk.event import Event
-from openhands.sdk.security.confirmation_policy import (
-    AlwaysConfirm,
-    ConfirmRisky,
-    NeverConfirm,
-)
-from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 from openhands_cli import __version__
 from openhands_cli.acp_impl.event import EventSubscriber
-from openhands_cli.acp_impl.runner import ACPConversationRunner
+from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
+from openhands_cli.acp_impl.slash_command_handlers import (
+    ConfirmationMode,
+    apply_confirmation_mode_to_conversation,
+    create_help_text,
+    get_confirm_error_text,
+    get_confirm_help_text,
+    get_confirm_success_text,
+    setup_slash_commands,
+    validate_confirmation_mode,
+)
 from openhands_cli.acp_impl.slash_commands import (
     SlashCommandRegistry,
     parse_slash_command,
@@ -63,10 +67,6 @@ from openhands_cli.tui.settings.store import MCPConfigurationError
 
 
 logger = logging.getLogger(__name__)
-
-
-# Type alias for confirmation modes
-ConfirmationMode = Literal["always-ask", "always-approve", "llm-approve"]
 
 
 class OpenHandsACPAgent(ACPAgent):
@@ -98,28 +98,13 @@ class OpenHandsACPAgent(ACPAgent):
             SlashCommandRegistry with all available commands
         """
         registry = SlashCommandRegistry()
-
-        registry.register(
-            "help",
-            "Show available slash commands",
-            self._cmd_help,
-        )
-
-        registry.register(
-            "confirm",
-            "Control confirmation mode (always-ask|always-approve|llm-approve)",
-            self._cmd_confirm,
-        )
-
+        setup_slash_commands(registry, self._cmd_help, self._cmd_confirm)
         return registry
 
     def _cmd_help(self) -> str:
         """Handle /help command."""
         commands = self._slash_commands.get_available_commands()
-        lines = ["Available slash commands:", ""]
-        for cmd in commands:
-            lines.append(f"  {cmd.name} - {cmd.description}")
-        return "\n".join(lines)
+        return create_help_text(commands)
 
     async def _cmd_confirm(self, session_id: str, argument: str = "") -> str:
         """Handle /confirm command.
@@ -131,66 +116,25 @@ class OpenHandsACPAgent(ACPAgent):
         Returns:
             Status message
         """
-        arg = argument.lower().strip()
-
         # Get current mode (default to always-ask)
         current_mode: ConfirmationMode = self._confirmation_mode.get(
             session_id, "always-ask"
         )
 
-        # Valid modes
-        valid_modes: list[ConfirmationMode] = [
-            "always-ask",
-            "always-approve",
-            "llm-approve",
-        ]
-
         # If no argument provided, show current state and prompt for mode
-        if not arg:
-            return (
-                f"Current confirmation mode: {current_mode}\n\n"
-                f"Available modes:\n"
-                f"  always-ask     - Ask for permission before every action\n"
-                f"  always-approve - Automatically approve all actions\n"
-                f"  llm-approve    - Use LLM security analyzer to "
-                f"auto-approve safe actions\n\n"
-                f"Usage: /confirm <mode>\n"
-                f"Example: /confirm always-ask"
-            )
+        if not argument.strip():
+            return get_confirm_help_text(current_mode)
 
         # Validate mode
-        if arg not in valid_modes:
-            return (
-                f"Unknown mode: {argument}\n\n"
-                f"Available modes:\n"
-                f"  always-ask     - Ask for permission before every action\n"
-                f"  always-approve - Automatically approve all actions\n"
-                f"  llm-approve    - Use LLM security analyzer to "
-                f"auto-approve safe actions\n\n"
-                f"Current mode: {current_mode}"
-            )
+        mode = validate_confirmation_mode(argument)
+        if mode is None:
+            return get_confirm_error_text(argument, current_mode)
 
         # Update confirmation mode for this session
-        # arg is now guaranteed to be a valid ConfirmationMode
-        await self._set_confirmation_mode(session_id, arg)  # type: ignore[arg-type]
+        await self._set_confirmation_mode(session_id, mode)
 
         # Return success message with explanation
-        messages: dict[ConfirmationMode, str] = {
-            "always-ask": (
-                "Agent will ask for permission before executing every action."
-            ),
-            "always-approve": (
-                "Agent will automatically approve all actions without asking. "
-                "⚠️  Use with caution!"
-            ),
-            "llm-approve": (
-                "Agent will use LLM security analyzer to automatically "
-                "approve safe actions. You will only be asked for permission "
-                "on potentially risky actions."
-            ),
-        }
-
-        return f"Confirmation mode set to: {arg}\n\n{messages[arg]}"  # type: ignore[index]
+        return get_confirm_success_text(mode)
 
     async def _set_confirmation_mode(
         self, session_id: str, mode: ConfirmationMode
@@ -207,29 +151,7 @@ class OpenHandsACPAgent(ACPAgent):
         # Update conversation if it exists
         if session_id in self._active_sessions:
             conversation = self._active_sessions[session_id]
-
-            if mode == "always-ask":
-                # Always ask for confirmation
-                conversation.set_security_analyzer(LLMSecurityAnalyzer())  # type: ignore[attr-defined]
-                conversation.set_confirmation_policy(AlwaysConfirm())  # type: ignore[attr-defined]
-                logger.info(
-                    f"Set confirmation mode to always-ask for session {session_id}"
-                )
-
-            elif mode == "always-approve":
-                # Never ask for confirmation - auto-approve everything
-                conversation.set_confirmation_policy(NeverConfirm())  # type: ignore[attr-defined]
-                logger.info(
-                    f"Set confirmation mode to always-approve for session {session_id}"
-                )
-
-            elif mode == "llm-approve":
-                # Use LLM to analyze and only confirm risky actions
-                conversation.set_security_analyzer(LLMSecurityAnalyzer())  # type: ignore[attr-defined]
-                conversation.set_confirmation_policy(ConfirmRisky())  # type: ignore[attr-defined]
-                logger.info(
-                    f"Set confirmation mode to llm-approve for session {session_id}"
-                )
+            apply_confirmation_mode_to_conversation(conversation, mode, session_id)
 
         logger.debug(f"Confirmation mode for session {session_id}: {mode}")
 
@@ -273,11 +195,8 @@ class OpenHandsACPAgent(ACPAgent):
         if session_id not in self._confirmation_mode:
             self._confirmation_mode[session_id] = "always-ask"
             # Set the confirmation policy on the conversation
-            conversation.set_security_analyzer(LLMSecurityAnalyzer())  # type: ignore[attr-defined]
-            conversation.set_confirmation_policy(AlwaysConfirm())  # type: ignore[attr-defined]
-            logger.info(
-                f"Initialized session {session_id} with default confirmation "
-                f"mode: always-ask"
+            apply_confirmation_mode_to_conversation(
+                conversation, "always-ask", session_id
             )
 
         # Cache it for future operations
@@ -540,15 +459,16 @@ class OpenHandsACPAgent(ACPAgent):
             message = Message(role="user", content=message_content)
             conversation.send_message(message)
 
-            # Run the conversation with confirmation mode via runner
+            # Run the conversation with confirmation mode via runner function
             # The runner handles the confirmation flow for all modes
             # Track the running task so cancel() can wait for proper cleanup
-            runner = ACPConversationRunner(
-                conversation=conversation,
-                conn=self._conn,
-                session_id=session_id,
+            run_task = asyncio.create_task(
+                run_conversation_with_confirmation(
+                    conversation=conversation,
+                    conn=self._conn,
+                    session_id=session_id,
+                )
             )
-            run_task = asyncio.create_task(runner.run_with_confirmation())
 
             self._running_tasks[session_id] = run_task
             try:
