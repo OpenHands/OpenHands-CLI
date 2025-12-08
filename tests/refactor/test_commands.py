@@ -1,12 +1,20 @@
 """Tests for the commands module."""
 
+from typing import cast
 from unittest import mock
 
 import pytest
 from textual.containers import VerticalScroll
 from textual_autocomplete import DropdownItem
 
-from openhands_cli.refactor.core.commands import COMMANDS, show_help
+from openhands.sdk.security.confirmation_policy import AlwaysConfirm
+from openhands_cli.refactor.core.commands import COMMANDS, is_valid_command, show_help
+from openhands_cli.refactor.modals import SettingsScreen
+from openhands_cli.refactor.modals.confirmation_modal import (
+    ConfirmationSettingsModal,
+)
+from openhands_cli.refactor.modals.exit_modal import ExitConfirmationModal
+from openhands_cli.refactor.textual_app import OpenHandsApp
 
 
 class TestCommands:
@@ -126,3 +134,98 @@ class TestCommands:
         # Should start and end with newlines for proper spacing
         assert help_text.startswith("\n")
         assert help_text.endswith("\n")
+
+    @pytest.mark.parametrize(
+        "cmd,expected",
+        [
+            ("/help", True),
+            ("/confirm", True),
+            ("/exit", True),
+            ("/help extra", False),
+            ("/exit now", False),
+            ("/unknown", False),
+            ("/", False),
+            ("help", False),
+            ("", False),
+        ],
+    )
+    def test_is_valid_command(self, cmd, expected):
+        """Command validation is strict and argument-sensitive."""
+        assert is_valid_command(cmd) is expected
+
+
+class TestOpenHandsAppCommands:
+    """Integration-style tests for command handling in OpenHandsApp."""
+
+    @pytest.mark.asyncio
+    async def test_confirm_command_opens_confirmation_settings_modal(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=True)
+
+        dummy_runner = mock.MagicMock()
+        dummy_runner.get_confirmation_policy.return_value = AlwaysConfirm()
+        app.conversation_runner = dummy_runner
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            oh_app._handle_command("/confirm")
+
+            top_screen = oh_app.screen_stack[-1]
+            assert isinstance(top_screen, ConfirmationSettingsModal)
+            dummy_runner.get_confirmation_policy.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_exit_command_opens_exit_confirmation_modal_when_enabled(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/exit` should open ExitConfirmationModal when exit_confirmation is True."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=True)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            oh_app._handle_command("/exit")
+
+            top_screen = oh_app.screen_stack[-1]
+            assert isinstance(top_screen, ExitConfirmationModal)
+
+    @pytest.mark.asyncio
+    async def test_exit_command_exits_immediately_when_confirmation_disabled(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/exit` should call app.exit() directly when exit_confirmation is False."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            # Replace exit with a MagicMock so we can assert it was called
+            exit_mock = mock.MagicMock()
+            oh_app.exit = exit_mock
+
+            oh_app._handle_command("/exit")
+
+            exit_mock.assert_called_once_with()
