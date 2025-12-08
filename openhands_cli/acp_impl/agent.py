@@ -33,8 +33,8 @@ from acp.schema import (
 )
 
 from openhands.sdk import (
-    BaseConversation,
     Conversation,
+    LocalConversation,
     Message,
     Workspace,
 )
@@ -81,7 +81,7 @@ class OpenHandsACPAgent(ACPAgent):
         self._conn = conn
         # Cache of active conversations to preserve state (pause, confirmation, etc.)
         # across multiple operations on the same session
-        self._active_sessions: dict[str, BaseConversation] = {}
+        self._active_sessions: dict[str, LocalConversation] = {}
         # Track running tasks for each session to ensure proper cleanup on cancel
         self._running_tasks: dict[str, asyncio.Task] = {}
         # Track confirmation mode state per session
@@ -92,10 +92,6 @@ class OpenHandsACPAgent(ACPAgent):
             f"OpenHands ACP Agent initialized with "
             f"confirmation mode: {initial_confirmation_mode}"
         )
-
-    def _cmd_help(self) -> str:
-        """Handle /help command."""
-        return create_help_text()
 
     async def _cmd_confirm(self, session_id: str, argument: str = "") -> str:
         """Handle /confirm command.
@@ -171,7 +167,7 @@ class OpenHandsACPAgent(ACPAgent):
         session_id: str,
         working_dir: str | None = None,
         mcp_servers: dict[str, dict[str, Any]] | None = None,
-    ) -> BaseConversation:
+    ) -> LocalConversation:
         """Get an active conversation from cache or create/load it.
 
         This maintains conversation state (pause, confirmation, etc.) across
@@ -215,7 +211,7 @@ class OpenHandsACPAgent(ACPAgent):
         session_id: str,
         working_dir: str | None = None,
         mcp_servers: dict[str, dict[str, Any]] | None = None,
-    ) -> BaseConversation:
+    ) -> LocalConversation:
         """Set up a conversation for ACP with event streaming support.
 
         This function reuses the resume logic from
@@ -435,7 +431,7 @@ class OpenHandsACPAgent(ACPAgent):
                 # Execute the slash command
                 response_text: str | None = None
                 if command == "help":
-                    response_text = self._cmd_help()
+                    response_text = create_help_text()
                 elif command == "confirm":
                     response_text = await self._cmd_confirm(session_id, argument)
                 else:
