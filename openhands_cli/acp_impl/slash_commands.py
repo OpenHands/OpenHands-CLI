@@ -208,4 +208,4 @@ def apply_confirmation_mode_to_conversation(
         conversation.set_security_analyzer(LLMSecurityAnalyzer())
         conversation.set_confirmation_policy(ConfirmRisky())
 
-    logger.info(f"Set confirmation mode to {mode} for session {session_id}")
+    logger.debug(f"Set confirmation mode to {mode} for session {session_id}")
