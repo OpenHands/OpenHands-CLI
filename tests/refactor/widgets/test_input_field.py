@@ -1,5 +1,6 @@
 """Tests for InputField widget component."""
 
+from collections.abc import Generator
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 import pytest
@@ -15,7 +16,7 @@ def input_field() -> InputField:
 
 
 @pytest.fixture
-def field_with_mocks(input_field: InputField) -> InputField:
+def field_with_mocks(input_field: InputField) -> Generator[InputField, None, None]:
     """InputField with its internal widgets and signal mocked out."""
     input_field.input_widget = MagicMock(spec=Input)
     input_field.textarea_widget = MagicMock(spec=TextArea)
@@ -32,7 +33,15 @@ def field_with_mocks(input_field: InputField) -> InputField:
     signal_mock.publish = publish_mock
     input_field.mutliline_mode_status = signal_mock
 
-    return input_field
+    # Mock the screen and input_area for toggle functionality
+    input_area_mock = MagicMock()
+    input_area_mock.styles = MagicMock()
+    mock_screen = MagicMock()
+    mock_screen.query_one.return_value = input_area_mock
+
+    # Use patch to mock the screen property
+    with patch.object(type(input_field), "screen", new_callable=lambda: mock_screen):
+        yield input_field
 
 
 class TestInputField:

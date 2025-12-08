@@ -268,7 +268,9 @@ class TestCommandsAndAutocomplete:
         mock_input = mock.MagicMock(spec=Input)
 
         # Create CommandAutoComplete instance
-        autocomplete = EnhancedAutoComplete(target=mock_input, candidates=COMMANDS)
+        autocomplete = EnhancedAutoComplete(
+            target=mock_input, command_candidates=COMMANDS
+        )
 
         # Create a mock state
         mock_state = TargetState(text="", cursor_position=0)
@@ -320,7 +322,9 @@ class TestCommandsAndAutocomplete:
         """Test that get_search_string returns correct search strings."""
         # Create CommandAutoComplete instance with a mock input
         mock_input = mock.MagicMock(spec=Input)
-        autocomplete = EnhancedAutoComplete(target=mock_input, candidates=COMMANDS)
+        autocomplete = EnhancedAutoComplete(
+            target=mock_input, command_candidates=COMMANDS
+        )
 
         # Create target state
         target_state = TargetState(text=text, cursor_position=cursor_position)
