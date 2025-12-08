@@ -46,12 +46,11 @@ from openhands_cli.acp_impl.slash_commands import (
     ConfirmationMode,
     apply_confirmation_mode_to_conversation,
     create_help_text,
+    extract_text_from_message_content,
     get_available_slash_commands,
-    get_confirm_error_text,
-    get_confirm_help_text,
-    get_confirm_success_text,
+    get_unknown_command_text,
+    handle_confirm_command,
     parse_slash_command,
-    validate_confirmation_mode,
 )
 from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
@@ -103,25 +102,16 @@ class OpenHandsACPAgent(ACPAgent):
         Returns:
             Status message
         """
-        # Get current mode (default to always-ask)
         current_mode: ConfirmationMode = self._confirmation_mode.get(
             session_id, "always-ask"
         )
 
-        # If no argument provided, show current state and prompt for mode
-        if not argument.strip():
-            return get_confirm_help_text(current_mode)
+        response_text, new_mode = handle_confirm_command(current_mode, argument)
 
-        # Validate mode
-        mode = validate_confirmation_mode(argument)
-        if mode is None:
-            return get_confirm_error_text(argument, current_mode)
+        if new_mode is not None:
+            await self._set_confirmation_mode(session_id, new_mode)
 
-        # Update confirmation mode for this session
-        await self._set_confirmation_mode(session_id, mode)
-
-        # Return success message with explanation
-        return get_confirm_success_text(mode)
+        return response_text
 
     async def _set_confirmation_mode(
         self, session_id: str, mode: ConfirmationMode
@@ -411,49 +401,31 @@ class OpenHandsACPAgent(ACPAgent):
             if not message_content:
                 return PromptResponse(stop_reason="end_turn")
 
-            # Check if this is a slash command
-            # For simplicity, check if the entire message content is a single text block
-            # that starts with "/"
-            slash_cmd = None
-            if isinstance(message_content, list) and len(message_content) == 1:
-                first_content = message_content[0]
-                # Check if it's a text block (has 'text' attribute and it's a string)
-                if hasattr(first_content, "text") and isinstance(
-                    getattr(first_content, "text"), str
-                ):
-                    text = getattr(first_content, "text").strip()
-                    slash_cmd = parse_slash_command(text)
-
+            # Check if this is a slash command (single text block starting with "/")
+            text = extract_text_from_message_content(message_content)
+            slash_cmd = parse_slash_command(text) if text else None
             if slash_cmd:
                 command, argument = slash_cmd
                 logger.info(f"Executing slash command: /{command} {argument}")
 
                 # Execute the slash command
-                response_text: str | None = None
                 if command == "help":
                     response_text = create_help_text()
                 elif command == "confirm":
                     response_text = await self._cmd_confirm(session_id, argument)
                 else:
-                    response_text = (
-                        f"Unknown command: /{command}\n\n"
-                        f"Available commands: /help, /confirm\n"
-                        f"Use /help for more information."
-                    )
+                    response_text = get_unknown_command_text(command)
 
                 # Send response to client
-                if response_text:
-                    await self._conn.sessionUpdate(
-                        SessionNotification(
-                            session_id=session_id,
-                            update=AgentMessageChunk(
-                                session_update="agent_message_chunk",
-                                content=TextContentBlock(
-                                    type="text", text=response_text
-                                ),
-                            ),
-                        )
+                await self._conn.sessionUpdate(
+                    SessionNotification(
+                        session_id=session_id,
+                        update=AgentMessageChunk(
+                            session_update="agent_message_chunk",
+                            content=TextContentBlock(type="text", text=response_text),
+                        ),
                     )
+                )
 
                 return PromptResponse(stop_reason="end_turn")
 

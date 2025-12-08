@@ -5,7 +5,7 @@ from typing import Literal
 
 from acp.schema import AvailableCommand
 
-from openhands.sdk import LocalConversation
+from openhands.sdk import ImageContent, LocalConversation, TextContent
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmRisky,
@@ -93,9 +93,6 @@ def parse_slash_command(text: str) -> tuple[str, str] | None:
     return command, argument
 
 
-# Slash command helper functions
-
-
 def create_help_text() -> str:
     """Create help text for available slash commands.
 
@@ -178,7 +175,7 @@ def validate_confirmation_mode(mode_str: str) -> ConfirmationMode | None:
         "llm-approve",
     ]
     normalized = mode_str.lower().strip()
-    return normalized if normalized in valid_modes else None  # type: ignore[return-value]
+    return normalized if normalized in valid_modes else None
 
 
 def apply_confirmation_mode_to_conversation(
@@ -209,3 +206,70 @@ def apply_confirmation_mode_to_conversation(
         conversation.set_confirmation_policy(ConfirmRisky())
 
     logger.debug(f"Set confirmation mode to {mode} for session {session_id}")
+
+
+def handle_confirm_command(
+    current_mode: ConfirmationMode, argument: str
+) -> tuple[str, ConfirmationMode | None]:
+    """Handle /confirm command and return response.
+
+    This is a pure function that computes the response text and new mode
+    without any side effects.
+
+    Args:
+        current_mode: Current confirmation mode for the session
+        argument: Command argument (mode to set, or empty for help)
+
+    Returns:
+        Tuple of (response_text, new_mode_or_none). new_mode is None if
+        no mode change should occur (help text or invalid mode).
+    """
+    # If no argument provided, show current state and prompt for mode
+    if not argument.strip():
+        return get_confirm_help_text(current_mode), None
+
+    # Validate mode
+    mode = validate_confirmation_mode(argument)
+    if mode is None:
+        return get_confirm_error_text(argument, current_mode), None
+
+    # Return success message with the new mode
+    return get_confirm_success_text(mode), mode
+
+
+def extract_text_from_message_content(
+    message_content: list[TextContent | ImageContent],
+) -> str | None:
+    """Extract text from message content.
+
+    Args:
+        message_content: Message content (typically a list of content blocks)
+
+    Returns:
+        The text content, None otherwise
+    """
+    if not isinstance(message_content, list) or len(message_content) != 1:
+        return None
+
+    text = []
+    for block in message_content:
+        if isinstance(block, TextContent):
+            text.append(block.text)
+
+    return "\n".join(text) if text else None
+
+
+def get_unknown_command_text(command: str) -> str:
+    """Get error text for unknown slash command.
+
+    Args:
+        command: The unknown command
+
+    Returns:
+        Formatted error text
+    """
+    return (
+        f"Unknown command: /{command}\n\n"
+        f"Available commands: /help, /confirm\n"
+        f"Use /help for more information."
+    )
