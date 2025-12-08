@@ -68,21 +68,6 @@ from openhands_cli.tui.settings.store import MCPConfigurationError
 logger = logging.getLogger(__name__)
 
 
-# Mapping from ACP mode IDs to confirmation modes
-MODE_TO_CONFIRMATION: dict[str, ConfirmationMode] = {
-    "ask": "always-ask",
-    "auto": "always-approve",
-    "analyze": "llm-approve",
-}
-
-# Mapping from confirmation modes to ACP mode IDs
-CONFIRMATION_TO_MODE: dict[ConfirmationMode, str] = {
-    "always-ask": "ask",
-    "always-approve": "auto",
-    "llm-approve": "analyze",
-}
-
-
 def get_available_modes() -> list[SessionMode]:
     """Get list of available session modes.
 
@@ -91,18 +76,18 @@ def get_available_modes() -> list[SessionMode]:
     """
     return [
         SessionMode(
-            id="ask",
-            name="Ask",
+            id="always-ask",
+            name="Always Ask",
             description="Request permission before making any changes",
         ),
         SessionMode(
-            id="auto",
-            name="Auto",
+            id="always-approve",
+            name="Always Approve",
             description="Automatically approve all actions without asking",
         ),
         SessionMode(
-            id="analyze",
-            name="Analyze",
+            id="llm-approve",
+            name="LLM Approve",
             description=(
                 "Use LLM security analyzer to auto-approve safe actions. "
                 "Only ask for permission on potentially risky actions."
@@ -121,7 +106,7 @@ def get_session_mode_state(current_mode: ConfirmationMode) -> SessionModeState:
         SessionModeState with available modes and current mode
     """
     return SessionModeState(
-        current_mode_id=CONFIRMATION_TO_MODE[current_mode],
+        current_mode_id=current_mode,
         available_modes=get_available_modes(),
     )
 
@@ -689,17 +674,18 @@ class OpenHandsACPAgent(ACPAgent):
         """
         logger.info(f"Set session mode requested: {session_id} -> {mode_id}")
 
-        # Validate mode_id
-        if mode_id not in MODE_TO_CONFIRMATION:
+        # Validate mode_id is a valid confirmation mode
+        valid_modes = {"always-ask", "always-approve", "llm-approve"}
+        if mode_id not in valid_modes:
             raise RequestError.invalid_params(
                 {
                     "reason": f"Invalid mode ID: {mode_id}",
-                    "validModes": list(MODE_TO_CONFIRMATION.keys()),
+                    "validModes": sorted(valid_modes),
                 }
             )
 
-        # Map mode to confirmation mode
-        confirmation_mode = MODE_TO_CONFIRMATION[mode_id]
+        # mode_id is the confirmation mode directly
+        confirmation_mode: ConfirmationMode = mode_id  # type: ignore
 
         # Update confirmation mode for this session
         self._confirmation_mode[session_id] = confirmation_mode
@@ -711,10 +697,7 @@ class OpenHandsACPAgent(ACPAgent):
                 conversation, confirmation_mode, session_id
             )
 
-        logger.info(
-            f"Session {session_id} mode changed to {mode_id} "
-            f"(confirmation: {confirmation_mode})"
-        )
+        logger.info(f"Session {session_id} mode changed to {mode_id}")
 
         # Send mode update notification to client
         await self._conn.session_update(

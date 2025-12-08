@@ -397,7 +397,7 @@ async def test_load_session_success(acp_agent, mock_connection):
 async def test_set_session_mode(acp_agent):
     """Test setting session mode."""
     response = await acp_agent.set_session_mode(
-        session_id="test-session", mode_id="ask"
+        session_id="test-session", mode_id="always-ask"
     )
 
     assert response is not None
@@ -587,12 +587,12 @@ async def test_new_session_includes_modes(acp_agent, tmp_path):
 
         # Verify modes are included
         assert response.modes is not None
-        assert response.modes.current_mode_id == "ask"  # Default is always-ask
+        assert response.modes.current_mode_id == "always-ask"  # Default is always-ask
         assert len(response.modes.available_modes) == 3
 
         # Verify all modes are present
         mode_ids = {mode.id for mode in response.modes.available_modes}
-        assert mode_ids == {"ask", "auto", "analyze"}
+        assert mode_ids == {"always-ask", "always-approve", "llm-approve"}
 
 
 @pytest.mark.asyncio
@@ -619,7 +619,7 @@ async def test_load_session_includes_modes(acp_agent, tmp_path):
 
         # Verify modes are included
         assert response.modes is not None
-        assert response.modes.current_mode_id == "ask"  # Default
+        assert response.modes.current_mode_id == "always-ask"  # Default
         assert len(response.modes.available_modes) == 3
 
 
@@ -645,7 +645,7 @@ async def test_set_session_mode_success(acp_agent, tmp_path):
 
         # Now set the mode
         response = await acp_agent.set_session_mode(
-            mode_id="auto", session_id=session_id
+            mode_id="always-approve", session_id=session_id
         )
 
         assert response is not None
@@ -658,7 +658,7 @@ async def test_set_session_mode_success(acp_agent, tmp_path):
         call_args = acp_agent._conn.session_update.call_args
         assert call_args[1]["session_id"] == session_id
         update = call_args[1]["update"]
-        assert update.current_mode_id == "auto"
+        assert update.current_mode_id == "always-approve"
 
 
 @pytest.mark.asyncio
@@ -693,8 +693,10 @@ async def test_set_session_mode_updates_existing_conversation(acp_agent, tmp_pat
         # Conversation should be cached
         assert session_id in acp_agent._active_sessions
 
-        # Change mode to auto
-        await acp_agent.set_session_mode(mode_id="auto", session_id=session_id)
+        # Change mode to always-approve
+        await acp_agent.set_session_mode(
+            mode_id="always-approve", session_id=session_id
+        )
 
         # Verify confirmation mode was updated
         assert acp_agent._confirmation_mode[session_id] == "always-approve"
