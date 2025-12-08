@@ -4,7 +4,7 @@ import asyncio
 import logging
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from acp import (
@@ -65,6 +65,10 @@ from openhands_cli.tui.settings.store import MCPConfigurationError
 logger = logging.getLogger(__name__)
 
 
+# Type alias for confirmation modes
+ConfirmationMode = Literal["always-ask", "always-approve", "llm-approve"]
+
+
 class OpenHandsACPAgent(ACPAgent):
     """OpenHands Agent Client Protocol implementation."""
 
@@ -81,8 +85,7 @@ class OpenHandsACPAgent(ACPAgent):
         # Track running tasks for each session to ensure proper cleanup on cancel
         self._running_tasks: dict[str, asyncio.Task] = {}
         # Track confirmation mode state per session
-        # Modes: "always-ask", "always-approve", "llm-approve"
-        self._confirmation_mode: dict[str, str] = {}
+        self._confirmation_mode: dict[str, ConfirmationMode] = {}
         # Slash commands registry
         self._slash_commands = self._setup_slash_commands()
 
@@ -131,10 +134,16 @@ class OpenHandsACPAgent(ACPAgent):
         arg = argument.lower().strip()
 
         # Get current mode (default to always-ask)
-        current_mode = self._confirmation_mode.get(session_id, "always-ask")
+        current_mode: ConfirmationMode = self._confirmation_mode.get(
+            session_id, "always-ask"
+        )
 
         # Valid modes
-        valid_modes = ["always-ask", "always-approve", "llm-approve"]
+        valid_modes: list[ConfirmationMode] = [
+            "always-ask",
+            "always-approve",
+            "llm-approve",
+        ]
 
         # If no argument provided, show current state and prompt for mode
         if not arg:
@@ -162,10 +171,11 @@ class OpenHandsACPAgent(ACPAgent):
             )
 
         # Update confirmation mode for this session
-        await self._set_confirmation_mode(session_id, arg)
+        # arg is now guaranteed to be a valid ConfirmationMode
+        await self._set_confirmation_mode(session_id, arg)  # type: ignore[arg-type]
 
         # Return success message with explanation
-        messages = {
+        messages: dict[ConfirmationMode, str] = {
             "always-ask": (
                 "Agent will ask for permission before executing every action."
             ),
@@ -180,9 +190,11 @@ class OpenHandsACPAgent(ACPAgent):
             ),
         }
 
-        return f"Confirmation mode set to: {arg}\n\n{messages[arg]}"
+        return f"Confirmation mode set to: {arg}\n\n{messages[arg]}"  # type: ignore[index]
 
-    async def _set_confirmation_mode(self, session_id: str, mode: str) -> None:
+    async def _set_confirmation_mode(
+        self, session_id: str, mode: ConfirmationMode
+    ) -> None:
         """Set confirmation mode for a session.
 
         Args:
