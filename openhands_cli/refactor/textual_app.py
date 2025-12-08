@@ -41,7 +41,7 @@ from openhands_cli.refactor.widgets.input_field import InputField
 from openhands_cli.refactor.widgets.non_clickable_collapsible import (
     NonClickableCollapsible,
 )
-from openhands_cli.refactor.widgets.richlog_visualizer import TextualVisualizer
+from openhands_cli.refactor.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.refactor.widgets.status_line import (
     InfoStatusLine,
     WorkingStatusLine,
@@ -248,7 +248,9 @@ class OpenHandsApp(App):
     def create_conversation_runner(self) -> ConversationRunner:
         # Initialize conversation runner with visualizer that can add widgets
         # Skip user messages since we display them immediately in the UI
-        visualizer = TextualVisualizer(self.main_display, self, skip_user_messages=True)
+        visualizer = ConversationVisualizer(
+            self.main_display, self, skip_user_messages=True
+        )
 
         return ConversationRunner(
             self.conversation_id,

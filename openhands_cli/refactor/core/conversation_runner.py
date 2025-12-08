@@ -18,7 +18,7 @@ from openhands.sdk.security.confirmation_policy import (
     ConfirmRisky,
     NeverConfirm,
 )
-from openhands_cli.refactor.widgets.richlog_visualizer import TextualVisualizer
+from openhands_cli.refactor.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.setup import setup_conversation
 from openhands_cli.user_actions.types import UserConfirmation
 
@@ -32,7 +32,7 @@ class ConversationRunner:
         running_state_callback: Callable[[bool], None],
         confirmation_callback: Callable,
         notification_callback: Callable[[str, str, SeverityLevel], None],
-        visualizer: TextualVisualizer,
+        visualizer: ConversationVisualizer,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
     ):
         """Initialize the conversation runner.
