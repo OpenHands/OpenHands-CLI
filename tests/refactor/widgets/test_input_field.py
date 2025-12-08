@@ -4,6 +4,8 @@ from collections.abc import Generator
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 import pytest
+from textual.app import App
+from textual.events import Paste
 from textual.widgets import TextArea
 
 from openhands_cli.refactor.widgets.input_field import InputField, PasteAwareInput
@@ -239,69 +241,11 @@ class TestInputField:
         assert msg.content == content
         assert isinstance(msg, InputField.Submitted)
 
-    @pytest.mark.parametrize(
-        "paste_text, should_switch_mode",
-        [
-            ("Single line text", False),
-            ("Multi\nline\ntext", True),
-            ("Text with\nnewline", True),
-            ("Text with\rcarriage return", True),
-            ("Windows\r\nline endings", True),
-            ("Mixed\nline\rendings", True),
-            ("", False),
-            ("Line 1\nLine 2\nLine 3", True),
-            ("No newlines here", False),
-        ],
-    )
-    def test_paste_event_handling(
-        self,
-        field_with_mocks: InputField,
-        paste_text: str,
-        should_switch_mode: bool,
-    ) -> None:
-        """Paste events should switch to multi-line mode for multi-line content."""
-        # Start in single-line mode
-        field_with_mocks.is_multiline_mode = False
-        field_with_mocks.action_toggle_input_mode = Mock()
 
-        if should_switch_mode:
-            # Set up mock input widget with initial state
-            field_with_mocks.input_widget.value = ""  # Start with empty text
-            field_with_mocks.input_widget.cursor_position = 0  # Cursor at beginning
-
-            # Create a PasteDetected message (only sent for multi-line content)
-            paste_detected_event = Mock(spec=PasteAwareInput.PasteDetected)
-            paste_detected_event.text = paste_text
-
-            # Handle the paste detected event
-            field_with_mocks.on_paste_aware_input_paste_detected(paste_detected_event)
-
-            # Should set the text in input widget first, then toggle mode
-            field_with_mocks.action_toggle_input_mode.assert_called_once()
-            # With empty initial text and cursor at 0, input should have paste text
-            assert field_with_mocks.input_widget.value == paste_text
-        else:
-            # For single-line content, no PasteDetected message is sent
-            # So we don't call the handler and nothing should happen
-            field_with_mocks.action_toggle_input_mode.assert_not_called()
-
-    def test_paste_event_ignored_when_in_multiline_mode(
-        self,
-        field_with_mocks: InputField,
-    ) -> None:
-        """Paste events should be ignored when already in multi-line mode."""
-        field_with_mocks.is_multiline_mode = True  # Already in multi-line mode
-        field_with_mocks.action_toggle_input_mode = Mock()
-
-        # Create a PasteDetected message
-        paste_detected_event = Mock(spec=PasteAwareInput.PasteDetected)
-        paste_detected_event.text = "Multi\nline\ntext"
-
-        # Handle the paste detected event
-        field_with_mocks.on_paste_aware_input_paste_detected(paste_detected_event)
-
-        # Should not switch modes since already in multi-line mode
-        field_with_mocks.action_toggle_input_mode.assert_not_called()
+# Single shared app for all integration tests
+class InputFieldTestApp(App):
+    def compose(self):
+        yield InputField(placeholder="Test input")
 
 
 class TestInputFieldPasteIntegration:
@@ -310,16 +254,8 @@ class TestInputFieldPasteIntegration:
     @pytest.mark.asyncio
     async def test_single_line_paste_stays_in_single_line_mode(self) -> None:
         """Single-line paste should not trigger mode switch."""
-        from textual.app import App
-        from textual.events import Paste
-
-        class TestApp(App):
-            def compose(self):
-                yield InputField(placeholder="Test input")
-
-        app = TestApp()
+        app = InputFieldTestApp()
         async with app.run_test() as pilot:
-            # Get the input field
             input_field = app.query_one(InputField)
 
             # Verify we start in single-line mode
@@ -329,32 +265,24 @@ class TestInputFieldPasteIntegration:
             input_field.input_widget.focus()
             await pilot.pause()
 
-            # Create and post a single-line paste event to the input widget
+            # Single-line paste
             paste_event = Paste(text="Single line text")
             input_field.input_widget.post_message(paste_event)
             await pilot.pause()
 
-            # Should still be in single-line mode
+            # Still single-line
             assert not input_field.is_multiline_mode
-            # Input widget should still be visible
             assert input_field.input_widget.display
             assert not input_field.textarea_widget.display
 
-    @pytest.mark.asyncio
-    async def test_multiline_paste_switches_to_multiline_mode(self) -> None:
-        """Multi-line paste should trigger automatic mode switch."""
-        from unittest.mock import Mock
+    # ------------------------------
+    # Shared helper for basic multi-line variants
+    # ------------------------------
 
-        from textual.app import App
-        from textual.events import Paste
-
-        class TestApp(App):
-            def compose(self):
-                yield InputField(placeholder="Test input")
-
-        app = TestApp()
+    async def _assert_multiline_paste_switches_mode(self, paste_text: str) -> None:
+        """Shared scenario: multi-line-ish paste should flip to multi-line mode."""
+        app = InputFieldTestApp()
         async with app.run_test() as pilot:
-            # Get the input field
             input_field = app.query_one(InputField)
 
             # Mock the screen.query_one method to avoid the #input_area dependency
@@ -362,42 +290,50 @@ class TestInputFieldPasteIntegration:
             mock_input_area.styles = Mock()
             input_field.screen.query_one = Mock(return_value=mock_input_area)
 
-            # Verify we start in single-line mode
             assert not input_field.is_multiline_mode
 
-            # Focus the input widget
             input_field.input_widget.focus()
             await pilot.pause()
 
-            # Create and post a multi-line paste event to the input widget
-            multiline_text = "Line 1\nLine 2\nLine 3"
-            paste_event = Paste(text=multiline_text)
+            paste_event = Paste(text=paste_text)
             input_field.input_widget.post_message(paste_event)
             await pilot.pause()
 
-            # Should have switched to multi-line mode
+            # Switched to multi-line and content transferred
             assert input_field.is_multiline_mode
-            # Textarea should be visible, input should be hidden
             assert not input_field.input_widget.display
             assert input_field.textarea_widget.display
-            # Content should be set in textarea
-            assert input_field.textarea_widget.text == multiline_text
+            assert input_field.textarea_widget.text == paste_text
 
     @pytest.mark.asyncio
-    async def test_carriage_return_paste_switches_to_multiline_mode(self) -> None:
-        """Carriage return paste should trigger automatic mode switch."""
-        from unittest.mock import Mock
+    @pytest.mark.parametrize(
+        "paste_text",
+        [
+            "Line 1\nLine 2\nLine 3",  # Unix newlines
+            "Line 1\rLine 2",  # Classic Mac CR
+            "Line 1\r\nLine 2\r\nLine 3",  # Windows CRLF
+        ],
+    )
+    async def test_multiline_paste_variants_switch_to_multiline_mode(
+        self, paste_text: str
+    ) -> None:
+        """Any multi-line-ish paste should trigger automatic mode switch."""
+        await self._assert_multiline_paste_switches_mode(paste_text)
 
-        from textual.app import App
-        from textual.events import Paste
+    # ------------------------------
+    # Parametrized insertion behavior
+    # ------------------------------
 
-        class TestApp(App):
-            def compose(self):
-                yield InputField(placeholder="Test input")
-
-        app = TestApp()
+    async def _assert_paste_insertion_scenario(
+        self,
+        initial_text: str,
+        cursor_pos: int,
+        paste_text: str,
+        expected_text: str,
+    ) -> None:
+        """Shared scenario for insert/append/prepend/empty initial text."""
+        app = InputFieldTestApp()
         async with app.run_test() as pilot:
-            # Get the input field
             input_field = app.query_one(InputField)
 
             # Mock the screen.query_one method to avoid the #input_area dependency
@@ -405,82 +341,82 @@ class TestInputFieldPasteIntegration:
             mock_input_area.styles = Mock()
             input_field.screen.query_one = Mock(return_value=mock_input_area)
 
-            # Verify we start in single-line mode
+            # Start in single-line mode with initial text + cursor position
             assert not input_field.is_multiline_mode
+            input_field.input_widget.value = initial_text
+            input_field.input_widget.cursor_position = cursor_pos
 
-            # Focus the input widget
             input_field.input_widget.focus()
             await pilot.pause()
 
-            # Create and post a carriage return paste event to the input widget
-            cr_text = "Line 1\rLine 2"
-            paste_event = Paste(text=cr_text)
+            paste_event = Paste(text=paste_text)
             input_field.input_widget.post_message(paste_event)
             await pilot.pause()
 
-            # Should have switched to multi-line mode
+            # Should have switched to multi-line mode with correct final text
             assert input_field.is_multiline_mode
-            # Content should be set in textarea
-            assert input_field.textarea_widget.text == cr_text
+            assert input_field.textarea_widget.text == expected_text
 
     @pytest.mark.asyncio
-    async def test_windows_line_endings_paste_switches_to_multiline_mode(self) -> None:
-        """Windows line endings paste should trigger automatic mode switch."""
-        from unittest.mock import Mock
+    @pytest.mark.parametrize(
+        "initial_text,cursor_pos,paste_text,expected_text",
+        [
+            # Insert in the middle: "Hello " + paste + "World"
+            (
+                "Hello World",
+                6,
+                "Beautiful\nMulti-line",
+                "Hello Beautiful\nMulti-lineWorld",
+            ),
+            # Prepend to existing text (cursor at beginning)
+            (
+                "World",
+                0,
+                "Hello\nBeautiful\n",
+                "Hello\nBeautiful\nWorld",
+            ),
+            # Append to end (cursor at len(initial_text))
+            (
+                "Hello",
+                5,
+                "\nBeautiful\nWorld",
+                "Hello\nBeautiful\nWorld",
+            ),
+            # Empty initial text (cursor at 0) – just pasted content
+            (
+                "",
+                0,
+                "Line 1\nLine 2\nLine 3",
+                "Line 1\nLine 2\nLine 3",
+            ),
+        ],
+    )
+    async def test_multiline_paste_insertion_scenarios(
+        self,
+        initial_text: str,
+        cursor_pos: int,
+        paste_text: str,
+        expected_text: str,
+    ) -> None:
+        """Multi-line paste should insert at cursor with correct final content."""
+        await self._assert_paste_insertion_scenario(
+            initial_text=initial_text,
+            cursor_pos=cursor_pos,
+            paste_text=paste_text,
+            expected_text=expected_text,
+        )
 
-        from textual.app import App
-        from textual.events import Paste
-
-        class TestApp(App):
-            def compose(self):
-                yield InputField(placeholder="Test input")
-
-        app = TestApp()
-        async with app.run_test() as pilot:
-            # Get the input field
-            input_field = app.query_one(InputField)
-
-            # Mock the screen.query_one method to avoid the #input_area dependency
-            mock_input_area = Mock()
-            mock_input_area.styles = Mock()
-            input_field.screen.query_one = Mock(return_value=mock_input_area)
-
-            # Verify we start in single-line mode
-            assert not input_field.is_multiline_mode
-
-            # Focus the input widget
-            input_field.input_widget.focus()
-            await pilot.pause()
-
-            # Create and post a Windows line endings paste event to the input widget
-            windows_text = "Line 1\r\nLine 2\r\nLine 3"
-            paste_event = Paste(text=windows_text)
-            input_field.input_widget.post_message(paste_event)
-            await pilot.pause()
-
-            # Should have switched to multi-line mode
-            assert input_field.is_multiline_mode
-            # Content should be set in textarea
-            assert input_field.textarea_widget.text == windows_text
+    # ------------------------------
+    # Edge behaviors that don't fit the same shape
+    # ------------------------------
 
     @pytest.mark.asyncio
     async def test_paste_ignored_when_already_in_multiline_mode(self) -> None:
         """Paste events should be ignored when already in multi-line mode."""
-        from unittest.mock import Mock
-
-        from textual.app import App
-        from textual.events import Paste
-
-        class TestApp(App):
-            def compose(self):
-                yield InputField(placeholder="Test input")
-
-        app = TestApp()
+        app = InputFieldTestApp()
         async with app.run_test() as pilot:
-            # Get the input field
             input_field = app.query_one(InputField)
 
-            # Mock the screen.query_one method to avoid the #input_area dependency
             mock_input_area = Mock()
             mock_input_area.styles = Mock()
             input_field.screen.query_one = Mock(return_value=mock_input_area)
@@ -488,232 +424,38 @@ class TestInputFieldPasteIntegration:
             # Switch to multi-line mode first
             input_field.action_toggle_input_mode()
             await pilot.pause()
-
-            # Verify we're in multi-line mode
             assert input_field.is_multiline_mode
 
-            # Set some initial content
+            # Initial content in textarea
             initial_content = "Initial content"
             input_field.textarea_widget.text = initial_content
 
-            # Focus the textarea widget
             input_field.textarea_widget.focus()
             await pilot.pause()
 
-            # Create and post a multi-line paste event to the input widget
-            # (but it's not focused)
-            paste_text = "Pasted\nContent"
-            paste_event = Paste(text=paste_text)
+            # Paste into input_widget (not focused) – should be ignored
+            paste_event = Paste(text="Pasted\nContent")
             input_field.input_widget.post_message(paste_event)
             await pilot.pause()
 
-            # Should still be in multi-line mode
             assert input_field.is_multiline_mode
-            # Content should remain unchanged (paste handler doesn't apply in
-            # multi-line mode)
             assert input_field.textarea_widget.text == initial_content
 
     @pytest.mark.asyncio
     async def test_empty_paste_does_not_switch_mode(self) -> None:
         """Empty paste should not trigger mode switch."""
-        from textual.app import App
-        from textual.events import Paste
-
-        class TestApp(App):
-            def compose(self):
-                yield InputField(placeholder="Test input")
-
-        app = TestApp()
+        app = InputFieldTestApp()
         async with app.run_test() as pilot:
-            # Get the input field
             input_field = app.query_one(InputField)
 
-            # Verify we start in single-line mode
             assert not input_field.is_multiline_mode
 
-            # Focus the input widget
             input_field.input_widget.focus()
             await pilot.pause()
 
-            # Create and post an empty paste event to the input widget
             paste_event = Paste(text="")
             input_field.input_widget.post_message(paste_event)
             await pilot.pause()
 
-            # Should still be in single-line mode
+            # Still single-line, nothing changed
             assert not input_field.is_multiline_mode
-
-    @pytest.mark.asyncio
-    async def test_multiline_paste_inserts_at_cursor_position(self) -> None:
-        """Multi-line paste should insert at cursor position, not replace text."""
-        from unittest.mock import Mock
-
-        from textual.app import App
-        from textual.events import Paste
-
-        class TestApp(App):
-            def compose(self):
-                yield InputField(placeholder="Test input")
-
-        app = TestApp()
-        async with app.run_test() as pilot:
-            # Get the input field
-            input_field = app.query_one(InputField)
-
-            # Mock the screen.query_one method to avoid the #input_area dependency
-            mock_input_area = Mock()
-            mock_input_area.styles = Mock()
-            input_field.screen.query_one = Mock(return_value=mock_input_area)
-
-            # Verify we start in single-line mode
-            assert not input_field.is_multiline_mode
-
-            # Set some initial text and position cursor in the middle
-            initial_text = "Hello World"
-            input_field.input_widget.value = initial_text
-            # Position cursor after "Hello " (position 6)
-            cursor_position = 6
-            input_field.input_widget.cursor_position = cursor_position
-
-            # Focus the input widget
-            input_field.input_widget.focus()
-            await pilot.pause()
-
-            # Create and post a multi-line paste event
-            paste_text = "Beautiful\nMulti-line"
-            paste_event = Paste(text=paste_text)
-            input_field.input_widget.post_message(paste_event)
-            await pilot.pause()
-
-            # Should have switched to multi-line mode
-            assert input_field.is_multiline_mode
-
-            # Text should be inserted at cursor position, not replaced
-            expected_text = "Hello Beautiful\nMulti-lineWorld"
-            assert input_field.textarea_widget.text == expected_text
-
-            # Verify the structure: "Hello " + paste_text + "World"
-            assert input_field.textarea_widget.text.startswith("Hello Beautiful")
-            assert "Multi-line" in input_field.textarea_widget.text
-            assert input_field.textarea_widget.text.endswith("World")
-
-    @pytest.mark.asyncio
-    async def test_multiline_paste_at_beginning_of_text(self) -> None:
-        """Multi-line paste at beginning should prepend to existing text."""
-        from unittest.mock import Mock
-
-        from textual.app import App
-        from textual.events import Paste
-
-        class TestApp(App):
-            def compose(self):
-                yield InputField(placeholder="Test input")
-
-        app = TestApp()
-        async with app.run_test() as pilot:
-            # Get the input field
-            input_field = app.query_one(InputField)
-
-            # Mock the screen.query_one method
-            mock_input_area = Mock()
-            mock_input_area.styles = Mock()
-            input_field.screen.query_one = Mock(return_value=mock_input_area)
-
-            # Set initial text with cursor at beginning (position 0)
-            initial_text = "World"
-            input_field.input_widget.value = initial_text
-            input_field.input_widget.cursor_position = 0
-
-            # Focus and paste multi-line content
-            input_field.input_widget.focus()
-            await pilot.pause()
-
-            paste_text = "Hello\nBeautiful\n"
-            paste_event = Paste(text=paste_text)
-            input_field.input_widget.post_message(paste_event)
-            await pilot.pause()
-
-            # Should switch to multi-line mode with paste prepended
-            assert input_field.is_multiline_mode
-            expected_text = "Hello\nBeautiful\nWorld"
-            assert input_field.textarea_widget.text == expected_text
-
-    @pytest.mark.asyncio
-    async def test_multiline_paste_at_end_of_text(self) -> None:
-        """Multi-line paste at end should append to existing text."""
-        from unittest.mock import Mock
-
-        from textual.app import App
-        from textual.events import Paste
-
-        class TestApp(App):
-            def compose(self):
-                yield InputField(placeholder="Test input")
-
-        app = TestApp()
-        async with app.run_test() as pilot:
-            # Get the input field
-            input_field = app.query_one(InputField)
-
-            # Mock the screen.query_one method
-            mock_input_area = Mock()
-            mock_input_area.styles = Mock()
-            input_field.screen.query_one = Mock(return_value=mock_input_area)
-
-            # Set initial text with cursor at end
-            initial_text = "Hello"
-            input_field.input_widget.value = initial_text
-            input_field.input_widget.cursor_position = len(initial_text)
-
-            # Focus and paste multi-line content
-            input_field.input_widget.focus()
-            await pilot.pause()
-
-            paste_text = "\nBeautiful\nWorld"
-            paste_event = Paste(text=paste_text)
-            input_field.input_widget.post_message(paste_event)
-            await pilot.pause()
-
-            # Should switch to multi-line mode with paste appended
-            assert input_field.is_multiline_mode
-            expected_text = "Hello\nBeautiful\nWorld"
-            assert input_field.textarea_widget.text == expected_text
-
-    @pytest.mark.asyncio
-    async def test_multiline_paste_with_empty_initial_text(self) -> None:
-        """Multi-line paste with empty initial text should work correctly."""
-        from unittest.mock import Mock
-
-        from textual.app import App
-        from textual.events import Paste
-
-        class TestApp(App):
-            def compose(self):
-                yield InputField(placeholder="Test input")
-
-        app = TestApp()
-        async with app.run_test() as pilot:
-            # Get the input field
-            input_field = app.query_one(InputField)
-
-            # Mock the screen.query_one method
-            mock_input_area = Mock()
-            mock_input_area.styles = Mock()
-            input_field.screen.query_one = Mock(return_value=mock_input_area)
-
-            # Start with empty text (cursor at position 0)
-            assert input_field.input_widget.value == ""
-            assert input_field.input_widget.cursor_position == 0
-
-            # Focus and paste multi-line content
-            input_field.input_widget.focus()
-            await pilot.pause()
-
-            paste_text = "Line 1\nLine 2\nLine 3"
-            paste_event = Paste(text=paste_text)
-            input_field.input_widget.post_message(paste_event)
-            await pilot.pause()
-
-            # Should switch to multi-line mode with just the pasted content
-            assert input_field.is_multiline_mode
-            assert input_field.textarea_widget.text == paste_text
