@@ -276,10 +276,10 @@ class TestInputField:
             # Handle the paste detected event
             field_with_mocks.on_paste_aware_input_paste_detected(paste_detected_event)
 
-            # Should switch to multi-line mode and set the text
+            # Should set the text in input widget first, then toggle mode
             field_with_mocks.action_toggle_input_mode.assert_called_once()
-            # With empty initial text and cursor at 0, result should be paste text
-            assert field_with_mocks.textarea_widget.text == paste_text
+            # With empty initial text and cursor at 0, input should have paste text
+            assert field_with_mocks.input_widget.value == paste_text
         else:
             # For single-line content, no PasteDetected message is sent
             # So we don't call the handler and nothing should happen

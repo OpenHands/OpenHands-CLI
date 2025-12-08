@@ -193,7 +193,8 @@ class InputField(Container):
                 current_text[:cursor_pos] + event.text + current_text[cursor_pos:]
             )
             
-            # Switch to multi-line mode
+            # Set the combined text in the input widget first
+            self.input_widget.value = new_text
+            
+            # Then switch to multi-line mode (this will convert the text properly)
             self.action_toggle_input_mode()
-            # Set the combined text in the textarea
-            self.textarea_widget.text = new_text
