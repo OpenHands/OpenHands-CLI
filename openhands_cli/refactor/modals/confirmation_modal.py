@@ -93,6 +93,11 @@ class ConfirmationSettingsModal(ModalScreen):
 
     def on_mount(self) -> None:
         """Focus the ListView when the modal is mounted."""
+        # Defer until after the DOM is fully composed
+        self.call_after_refresh(self._focus_list)
+
+    def _focus_list(self) -> None:
+        """Focus the options ListView once it's available."""
         listview = self.query_one("#options_list", ListView)
         listview.focus()
 

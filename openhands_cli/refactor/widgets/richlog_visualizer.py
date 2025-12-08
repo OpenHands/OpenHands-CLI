@@ -55,7 +55,7 @@ def _get_event_border_color(event: Event) -> str:
         return DEFAULT_COLOR
 
 
-class TextualVisualizer(ConversationVisualizerBase):
+class ConversationVisualizer(ConversationVisualizerBase):
     """Handles visualization of conversation events for Textual apps.
 
     This visualizer creates Collapsible widgets and adds them to a VerticalScroll
