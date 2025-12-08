@@ -1,4 +1,4 @@
-"""Tests for TextualVisualizer and Chinese character markup handling."""
+"""Tests for ConversationVisualizer and Chinese character markup handling."""
 
 from typing import TYPE_CHECKING
 
@@ -12,7 +12,7 @@ from textual.widgets import Static
 from openhands.sdk.event import ActionEvent, MessageEvent
 from openhands.sdk.llm import MessageToolCall, TextContent
 from openhands.sdk.tool import Action
-from openhands_cli.refactor.widgets.richlog_visualizer import TextualVisualizer
+from openhands_cli.refactor.widgets.richlog_visualizer import ConversationVisualizer
 
 
 if TYPE_CHECKING:
@@ -45,7 +45,7 @@ class TestChineseCharacterMarkupHandling:
         # Create a mock app and container for the visualizer
         app = App()
         container = VerticalScroll()
-        visualizer = TextualVisualizer(container, app)  # type: ignore[arg-type]
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
         # Test escaping with various bracket patterns
         test_cases = [
@@ -69,7 +69,7 @@ class TestChineseCharacterMarkupHandling:
         """Test that _escape_rich_markup escapes MarkupError content."""
         app = App()
         container = VerticalScroll()
-        visualizer = TextualVisualizer(container, app)  # type: ignore[arg-type]
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
         # Example content that caused the original error
         problematic_content = "+0.3%,月变化+0.8%,处于历史40%分位]"
@@ -103,7 +103,7 @@ class TestChineseCharacterMarkupHandling:
         """
         app = App()
         container = VerticalScroll()
-        visualizer = TextualVisualizer(container, app)  # type: ignore[arg-type]
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
         # Content with Chinese characters and special markup characters
         problematic_content = "+0.3%,月变化+0.8%,处于历史40%分位]"
@@ -123,7 +123,7 @@ class TestChineseCharacterMarkupHandling:
         """Test that visualizer can handle ActionEvent with Chinese content."""
         app = App()
         container = VerticalScroll()
-        visualizer = TextualVisualizer(container, app)  # type: ignore[arg-type]
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
         # Create an action with Chinese content
         action = RichLogMockAction(command="分析数据: [结果+0.3%]")
@@ -146,7 +146,7 @@ class TestChineseCharacterMarkupHandling:
         """Test that visualizer can handle MessageEvent with Chinese content."""
         app = App()
         container = VerticalScroll()
-        visualizer = TextualVisualizer(container, app)  # type: ignore[arg-type]
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
         # Create a message with problematic Chinese content
         from openhands.sdk.llm import Message
@@ -185,7 +185,7 @@ class TestChineseCharacterMarkupHandling:
         """Test that various patterns of Chinese text with special chars are handled."""
         app = App()
         container = VerticalScroll()
-        visualizer = TextualVisualizer(container, app)  # type: ignore[arg-type]
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
         # Use the _escape_rich_markup method
         safe_content = visualizer._escape_rich_markup(str(test_content))
@@ -243,7 +243,7 @@ class TestVisualizerIntegration:
         """End-to-end test: create event with Chinese content and visualize it."""
         app = App()
         container = VerticalScroll()
-        visualizer = TextualVisualizer(container, app)  # type: ignore[arg-type]
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
         # Create realistic event with problematic content
         action = RichLogMockAction(
