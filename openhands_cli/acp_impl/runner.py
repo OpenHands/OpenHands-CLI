@@ -18,7 +18,7 @@ from openhands_cli.user_actions.types import UserConfirmation
 
 
 if TYPE_CHECKING:
-    from acp import AgentSideConnection
+    from acp.core import AgentSideConnection
 
 
 logger = logging.getLogger(__name__)

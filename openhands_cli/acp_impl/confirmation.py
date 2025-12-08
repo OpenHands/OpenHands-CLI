@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from acp.schema import (
     AllowedOutcome,
     PermissionOption,
-    RequestPermissionRequest,
     ToolCallUpdate,
 )
 
@@ -17,7 +16,7 @@ from openhands_cli.user_actions.types import ConfirmationResult, UserConfirmatio
 
 
 if TYPE_CHECKING:
-    from acp import AgentSideConnection
+    from acp.core import AgentSideConnection
 
 
 logger = logging.getLogger(__name__)
@@ -113,12 +112,8 @@ async def ask_user_confirmation_acp(
 
     # Send permission request
     try:
-        response = await conn.requestPermission(
-            RequestPermissionRequest(
-                session_id=session_id,
-                tool_call=tool_call,
-                options=PERMISSION_OPTIONS,
-            )
+        response = await conn.request_permission(
+            session_id=session_id, tool_call=tool_call, options=PERMISSION_OPTIONS
         )
 
         # Handle user's choice using dispatch dictionary

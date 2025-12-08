@@ -2,7 +2,6 @@
 
 from typing import TYPE_CHECKING
 
-from acp import SessionNotification
 from acp.schema import (
     AgentMessageChunk,
     AgentPlanUpdate,
@@ -38,7 +37,7 @@ from openhands.sdk.event import (
 
 
 if TYPE_CHECKING:
-    from acp import AgentSideConnection
+    from acp.core import AgentSideConnection
 
 
 from openhands.sdk import get_logger
@@ -158,33 +157,29 @@ class EventSubscriber:
             thought_text = " ".join([t.text for t in event.thought])
 
             if event.reasoning_content and event.reasoning_content.strip():
-                await self.conn.sessionUpdate(
-                    SessionNotification(
-                        session_id=self.session_id,
-                        update=AgentThoughtChunk(
-                            session_update="agent_thought_chunk",
-                            content=TextContentBlock(
-                                type="text",
-                                text="**Reasoning**:\n"
-                                + event.reasoning_content.strip()
-                                + "\n",
-                            ),
+                await self.conn.session_update(
+                    session_id=self.session_id,
+                    update=AgentThoughtChunk(
+                        session_update="agent_thought_chunk",
+                        content=TextContentBlock(
+                            type="text",
+                            text="**Reasoning**:\n"
+                            + event.reasoning_content.strip()
+                            + "\n",
                         ),
-                    )
+                    ),
                 )
 
             if thought_text.strip():
-                await self.conn.sessionUpdate(
-                    SessionNotification(
-                        session_id=self.session_id,
-                        update=AgentThoughtChunk(
-                            session_update="agent_thought_chunk",
-                            content=TextContentBlock(
-                                type="text",
-                                text="\n**Thought**:\n" + thought_text.strip() + "\n",
-                            ),
+                await self.conn.session_update(
+                    session_id=self.session_id,
+                    update=AgentThoughtChunk(
+                        session_update="agent_thought_chunk",
+                        content=TextContentBlock(
+                            type="text",
+                            text="\n**Thought**:\n" + thought_text.strip() + "\n",
                         ),
-                    )
+                    ),
                 )
 
             # Generate content for the tool call
@@ -228,50 +223,44 @@ class EventSubscriber:
                 elif isinstance(event.action, TaskTrackerAction):
                     title = "Plan updated"
                 elif isinstance(event.action, ThinkAction):
-                    await self.conn.sessionUpdate(
-                        SessionNotification(
-                            session_id=self.session_id,
-                            update=AgentThoughtChunk(
-                                session_update="agent_thought_chunk",
-                                content=TextContentBlock(
-                                    type="text",
-                                    text=action_viz,
-                                ),
+                    await self.conn.session_update(
+                        session_id=self.session_id,
+                        update=AgentThoughtChunk(
+                            session_update="agent_thought_chunk",
+                            content=TextContentBlock(
+                                type="text",
+                                text=action_viz,
                             ),
-                        )
+                        ),
                     )
                     return
                 elif isinstance(event.action, FinishAction):
-                    await self.conn.sessionUpdate(
-                        SessionNotification(
-                            session_id=self.session_id,
-                            update=AgentMessageChunk(
-                                session_update="agent_message_chunk",
-                                content=TextContentBlock(
-                                    type="text",
-                                    text=action_viz,
-                                ),
+                    await self.conn.session_update(
+                        session_id=self.session_id,
+                        update=AgentMessageChunk(
+                            session_update="agent_message_chunk",
+                            content=TextContentBlock(
+                                type="text",
+                                text=action_viz,
                             ),
-                        )
+                        ),
                     )
                     return
 
-            await self.conn.sessionUpdate(
-                SessionNotification(
-                    session_id=self.session_id,
-                    update=ToolCallStart(
-                        session_update="tool_call",
-                        tool_call_id=event.tool_call_id,
-                        title=title,
-                        kind=tool_kind,
-                        status="in_progress",
-                        content=content,
-                        locations=extract_action_locations(event.action)
-                        if event.action
-                        else None,
-                        raw_input=event.action.model_dump() if event.action else None,
-                    ),
-                )
+            await self.conn.session_update(
+                session_id=self.session_id,
+                update=ToolCallStart(
+                    session_update="tool_call",
+                    tool_call_id=event.tool_call_id,
+                    title=title,
+                    kind=tool_kind,
+                    status="in_progress",
+                    content=content,
+                    locations=extract_action_locations(event.action)
+                    if event.action
+                    else None,
+                    raw_input=event.action.model_dump() if event.action else None,
+                ),
             )
         except Exception as e:
             logger.debug(f"Error processing ActionEvent: {e}", exc_info=True)
@@ -319,14 +308,12 @@ class EventSubscriber:
                         )
 
                     # Send AgentPlanUpdate
-                    await self.conn.sessionUpdate(
-                        SessionNotification(
-                            session_id=self.session_id,
-                            update=AgentPlanUpdate(
-                                session_update="plan",
-                                entries=entries,
-                            ),
-                        )
+                    await self.conn.session_update(
+                        session_id=self.session_id,
+                        update=AgentPlanUpdate(
+                            session_update="plan",
+                            entries=entries,
+                        ),
                     )
                 else:
                     observation = event.observation
@@ -353,17 +340,15 @@ class EventSubscriber:
                         ),
                     )
             # Send tool_call_update for all observation types
-            await self.conn.sessionUpdate(
-                SessionNotification(
-                    session_id=self.session_id,
-                    update=ToolCallProgress(
-                        session_update="tool_call_update",
-                        tool_call_id=event.tool_call_id,
-                        status=status,
-                        content=[content] if content else None,
-                        raw_output=event.model_dump(),
-                    ),
-                )
+            await self.conn.session_update(
+                session_id=self.session_id,
+                update=ToolCallProgress(
+                    session_update="tool_call_update",
+                    tool_call_id=event.tool_call_id,
+                    status=status,
+                    content=[content] if content else None,
+                    raw_output=event.model_dump(),
+                ),
             )
         except Exception as e:
             logger.debug(f"Error processing observation event: {e}", exc_info=True)
@@ -386,17 +371,15 @@ class EventSubscriber:
                 # if we update it again, they will be duplicated
                 pass
             else:  # assistant or other roles
-                await self.conn.sessionUpdate(
-                    SessionNotification(
-                        session_id=self.session_id,
-                        update=AgentMessageChunk(
-                            session_update="agent_message_chunk",
-                            content=TextContentBlock(
-                                type="text",
-                                text=viz_text,
-                            ),
+                await self.conn.session_update(
+                    session_id=self.session_id,
+                    update=AgentMessageChunk(
+                        session_update="agent_message_chunk",
+                        content=TextContentBlock(
+                            type="text",
+                            text=viz_text,
                         ),
-                    )
+                    ),
                 )
         except Exception as e:
             logger.debug(f"Error processing MessageEvent: {e}", exc_info=True)
@@ -415,17 +398,15 @@ class EventSubscriber:
             if not viz_text.strip():
                 return
 
-            await self.conn.sessionUpdate(
-                SessionNotification(
-                    session_id=self.session_id,
-                    update=AgentThoughtChunk(
-                        session_update="agent_thought_chunk",
-                        content=TextContentBlock(
-                            type="text",
-                            text=viz_text,
-                        ),
+            await self.conn.session_update(
+                session_id=self.session_id,
+                update=AgentThoughtChunk(
+                    session_update="agent_thought_chunk",
+                    content=TextContentBlock(
+                        type="text",
+                        text=viz_text,
                     ),
-                )
+                ),
             )
         except Exception as e:
             logger.debug(f"Error processing SystemPromptEvent: {e}", exc_info=True)
@@ -441,17 +422,15 @@ class EventSubscriber:
             if not viz_text.strip():
                 return
 
-            await self.conn.sessionUpdate(
-                SessionNotification(
-                    session_id=self.session_id,
-                    update=AgentThoughtChunk(
-                        session_update="agent_thought_chunk",
-                        content=TextContentBlock(
-                            type="text",
-                            text=viz_text,
-                        ),
+            await self.conn.session_update(
+                session_id=self.session_id,
+                update=AgentThoughtChunk(
+                    session_update="agent_thought_chunk",
+                    content=TextContentBlock(
+                        type="text",
+                        text=viz_text,
                     ),
-                )
+                ),
             )
         except Exception as e:
             logger.debug(f"Error processing PauseEvent: {e}", exc_info=True)
@@ -470,17 +449,15 @@ class EventSubscriber:
             if not viz_text.strip():
                 return
 
-            await self.conn.sessionUpdate(
-                SessionNotification(
-                    session_id=self.session_id,
-                    update=AgentThoughtChunk(
-                        session_update="agent_thought_chunk",
-                        content=TextContentBlock(
-                            type="text",
-                            text=viz_text,
-                        ),
+            await self.conn.session_update(
+                session_id=self.session_id,
+                update=AgentThoughtChunk(
+                    session_update="agent_thought_chunk",
+                    content=TextContentBlock(
+                        type="text",
+                        text=viz_text,
                     ),
-                )
+                ),
             )
         except Exception as e:
             logger.debug(f"Error processing Condensation: {e}", exc_info=True)
@@ -496,17 +473,15 @@ class EventSubscriber:
             if not viz_text.strip():
                 return
 
-            await self.conn.sessionUpdate(
-                SessionNotification(
-                    session_id=self.session_id,
-                    update=AgentThoughtChunk(
-                        session_update="agent_thought_chunk",
-                        content=TextContentBlock(
-                            type="text",
-                            text=viz_text,
-                        ),
+            await self.conn.session_update(
+                session_id=self.session_id,
+                update=AgentThoughtChunk(
+                    session_update="agent_thought_chunk",
+                    content=TextContentBlock(
+                        type="text",
+                        text=viz_text,
                     ),
-                )
+                ),
             )
         except Exception as e:
             logger.debug(f"Error processing CondensationRequest: {e}", exc_info=True)
