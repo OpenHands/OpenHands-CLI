@@ -1,7 +1,6 @@
 """Slash commands implementation for ACP."""
 
 import logging
-from collections.abc import Callable
 from typing import Literal
 
 from acp.schema import AvailableCommand
@@ -22,69 +21,24 @@ logger = logging.getLogger(__name__)
 ConfirmationMode = Literal["always-ask", "always-approve", "llm-approve"]
 
 
-class SlashCommandRegistry:
-    """Registry for slash commands."""
+def get_available_slash_commands() -> list[AvailableCommand]:
+    """Get list of available slash commands in ACP format.
 
-    def __init__(self):
-        """Initialize the slash command registry."""
-        self._commands: dict[str, Callable] = {}
-        self._descriptions: dict[str, str] = {}
-
-    def register(self, name: str, description: str, handler: Callable) -> None:
-        """Register a slash command.
-
-        Args:
-            name: Command name (without leading slash)
-            description: Human-readable description
-            handler: Function to handle the command
-        """
-        self._commands[name] = handler
-        self._descriptions[name] = description
-        logger.debug(f"Registered slash command: /{name}")
-
-    def get_available_commands(self) -> list[AvailableCommand]:
-        """Get list of available commands in ACP format.
-
-        Returns:
-            List of AvailableCommand objects
-        """
-        return [
-            AvailableCommand(
-                name=f"/{name}",
-                description=self._descriptions[name],
-            )
-            for name in sorted(self._commands.keys())
-        ]
-
-    async def execute(self, command: str, *args, **kwargs) -> str | None:
-        """Execute a slash command.
-
-        Args:
-            command: Command name (without leading slash)
-            *args: Positional arguments for the handler
-            **kwargs: Keyword arguments for the handler
-
-        Returns:
-            Response message or None
-        """
-        if command not in self._commands:
-            available = ", ".join(f"/{cmd}" for cmd in sorted(self._commands.keys()))
-            return (
-                f"Unknown command: /{command}\n\n"
-                f"Available commands: {available}\n"
-                f"Use /help for more information."
-            )
-
-        try:
-            handler = self._commands[command]
-            result = handler(*args, **kwargs)
-            # Support both sync and async handlers
-            if hasattr(result, "__await__"):
-                result = await result
-            return result
-        except Exception as e:
-            logger.error(f"Error executing command /{command}: {e}", exc_info=True)
-            return f"Error executing command /{command}: {str(e)}"
+    Returns:
+        List of AvailableCommand objects
+    """
+    return [
+        AvailableCommand(
+            name="/help",
+            description="Show available slash commands",
+        ),
+        AvailableCommand(
+            name="/confirm",
+            description=(
+                "Control confirmation mode (always-ask|always-approve|llm-approve)"
+            ),
+        ),
+    ]
 
 
 def parse_slash_command(text: str) -> tuple[str, str] | None:
@@ -118,15 +72,13 @@ def parse_slash_command(text: str) -> tuple[str, str] | None:
 # Slash command helper functions
 
 
-def create_help_text(commands: list[AvailableCommand]) -> str:
+def create_help_text() -> str:
     """Create help text for available slash commands.
-
-    Args:
-        commands: List of available slash commands
 
     Returns:
         Formatted help text
     """
+    commands = get_available_slash_commands()
     lines = ["Available slash commands:", ""]
     for cmd in commands:
         lines.append(f"  {cmd.name} - {cmd.description}")
@@ -245,28 +197,3 @@ def apply_confirmation_mode_to_conversation(
         conversation.set_security_analyzer(LLMSecurityAnalyzer())  # type: ignore[attr-defined]
         conversation.set_confirmation_policy(ConfirmRisky())  # type: ignore[attr-defined]
         logger.info(f"Set confirmation mode to llm-approve for session {session_id}")
-
-
-def setup_slash_commands(
-    registry: SlashCommandRegistry,
-    help_handler: callable,  # type: ignore[valid-type]
-    confirm_handler: callable,  # type: ignore[valid-type]
-) -> None:
-    """Register slash commands in the registry.
-
-    Args:
-        registry: The slash command registry
-        help_handler: Handler function for /help command
-        confirm_handler: Handler function for /confirm command
-    """
-    registry.register(
-        "help",
-        "Show available slash commands",
-        help_handler,
-    )
-
-    registry.register(
-        "confirm",
-        "Control confirmation mode (always-ask|always-approve|llm-approve)",
-        confirm_handler,
-    )

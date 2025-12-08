@@ -1,7 +1,8 @@
 """Tests for ACP slash commands functionality."""
 
 from openhands_cli.acp_impl.slash_commands import (
-    SlashCommandRegistry,
+    create_help_text,
+    get_available_slash_commands,
     parse_slash_command,
 )
 
@@ -50,162 +51,28 @@ class TestParseSlashCommand:
         assert result is None
 
 
-class TestSlashCommandRegistry:
-    """Test the slash command registry."""
-
-    async def test_register_and_execute_command(self):
-        """Test registering and executing a command."""
-        registry = SlashCommandRegistry()
-        called_with = []
-
-        async def test_handler(session_id: str, argument: str) -> str:
-            called_with.append((session_id, argument))
-            return f"Handled: {argument}"
-
-        registry.register("test", "Test command", test_handler)
-
-        result = await registry.execute("test", "session123", "arg1")
-        assert result == "Handled: arg1"
-        assert called_with == [("session123", "arg1")]
-
-    async def test_execute_nonexistent_command(self):
-        """Test executing a command that doesn't exist."""
-        registry = SlashCommandRegistry()
-
-        result = await registry.execute("nonexistent", "session123", "")
-        assert result is not None
-        assert "Unknown command" in result
-        assert "nonexistent" in result
+class TestSlashCommandFunctions:
+    """Test the slash command helper functions."""
 
     def test_get_available_commands(self):
-        """Test retrieving available commands."""
-        registry = SlashCommandRegistry()
-
-        async def dummy_handler(session_id: str, argument: str) -> str:
-            return "dummy"
-
-        registry.register("cmd1", "Command 1", dummy_handler)
-        registry.register("cmd2", "Command 2", dummy_handler)
-
-        commands = registry.get_available_commands()
+        """Test getting available slash commands."""
+        commands = get_available_slash_commands()
         assert len(commands) == 2
 
         # Check that both commands are present
         command_names = {cmd.name for cmd in commands}
-        assert command_names == {"/cmd1", "/cmd2"}
+        assert command_names == {"/help", "/confirm"}
 
-        # Check that descriptions are correct
-        cmd1 = next(cmd for cmd in commands if cmd.name == "/cmd1")
-        assert cmd1.description == "Command 1"
+        # Check that descriptions exist
+        help_cmd = next(cmd for cmd in commands if cmd.name == "/help")
+        assert help_cmd.description
+        confirm_cmd = next(cmd for cmd in commands if cmd.name == "/confirm")
+        assert confirm_cmd.description
 
-    def test_register_duplicate_command(self):
-        """Test that registering a duplicate command replaces the old one."""
-        registry = SlashCommandRegistry()
-
-        async def handler1(session_id: str, argument: str) -> str:
-            return "handler1"
-
-        async def handler2(session_id: str, argument: str) -> str:
-            return "handler2"
-
-        registry.register("test", "First", handler1)
-        registry.register("test", "Second", handler2)
-
-        # Should have only one command
-        commands = registry.get_available_commands()
-        assert len(commands) == 1
-        assert commands[0].description == "Second"
-
-
-class TestSlashCommandIntegration:
-    """Integration tests for slash commands with confirmation mode."""
-
-    async def test_confirm_command_modes(self):
-        """Test /confirm command with different modes."""
-        registry = SlashCommandRegistry()
-        confirmation_states = {}
-
-        async def confirm_handler(session_id: str, argument: str) -> str:
-            arg = argument.strip().lower()
-            valid_modes = ["always-ask", "always-approve", "llm-approve"]
-
-            if not arg:
-                current = confirmation_states.get(session_id, "always-ask")
-                return (
-                    f"Current confirmation mode: {current}\n\n"
-                    f"Available modes:\n"
-                    f"  always-ask     - Ask for permission before every action\n"
-                    f"  always-approve - Automatically approve all actions\n"
-                    f"  llm-approve    - Use LLM security analyzer\n\n"
-                    f"Usage: /confirm <mode>"
-                )
-
-            if arg in valid_modes:
-                confirmation_states[session_id] = arg
-                return f"Confirmation mode set to: {arg}"
-            else:
-                current = confirmation_states.get(session_id, "always-ask")
-                return (
-                    f"Unknown mode: {arg}\n\n"
-                    f"Available modes: {', '.join(valid_modes)}\n"
-                    f"Current mode: {current}"
-                )
-
-        registry.register(
-            "confirm",
-            "Control confirmation mode",
-            confirm_handler,
-        )
-
-        # Test with no argument (should show help)
-        result = await registry.execute("confirm", "session1", "")
-        assert result is not None
-        assert "Current confirmation mode" in result
-        assert "always-ask" in result
-        assert "always-approve" in result
-        assert "llm-approve" in result
-
-        # Test setting to always-ask
-        result = await registry.execute("confirm", "session1", "always-ask")
-        assert result is not None
-        assert "always-ask" in result.lower()
-        assert confirmation_states.get("session1") == "always-ask"
-
-        # Test setting to always-approve
-        result = await registry.execute("confirm", "session1", "always-approve")
-        assert result is not None
-        assert "always-approve" in result.lower()
-        assert confirmation_states.get("session1") == "always-approve"
-
-        # Test setting to llm-approve
-        result = await registry.execute("confirm", "session1", "llm-approve")
-        assert result is not None
-        assert "llm-approve" in result.lower()
-        assert confirmation_states.get("session1") == "llm-approve"
-
-        # Test invalid mode
-        result = await registry.execute("confirm", "session1", "invalid-mode")
-        assert result is not None
-        assert "Unknown mode" in result
-        assert "invalid-mode" in result
-
-    async def test_help_command(self):
-        """Test /help command."""
-        registry = SlashCommandRegistry()
-
-        async def help_handler(session_id: str, argument: str) -> str:
-            commands = registry.get_available_commands()
-            if not commands:
-                return "No commands available."
-
-            help_text = "Available commands:\n"
-            for cmd in commands:
-                help_text += f"\n{cmd.name}: {cmd.description}"
-            return help_text
-
-        registry.register("help", "Show available commands", help_handler)
-
-        result = await registry.execute("help", "session1", "")
-        assert result is not None
-        assert "Available commands" in result
-        assert "/help" in result
+    def test_create_help_text(self):
+        """Test creating help text."""
+        help_text = create_help_text()
+        assert help_text
+        assert "Available slash commands" in help_text
+        assert "/help" in help_text
+        assert "/confirm" in help_text

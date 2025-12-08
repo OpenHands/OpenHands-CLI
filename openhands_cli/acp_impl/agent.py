@@ -44,14 +44,13 @@ from openhands_cli.acp_impl.event import EventSubscriber
 from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
 from openhands_cli.acp_impl.slash_commands import (
     ConfirmationMode,
-    SlashCommandRegistry,
     apply_confirmation_mode_to_conversation,
     create_help_text,
+    get_available_slash_commands,
     get_confirm_error_text,
     get_confirm_help_text,
     get_confirm_success_text,
     parse_slash_command,
-    setup_slash_commands,
     validate_confirmation_mode,
 )
 from openhands_cli.acp_impl.utils import (
@@ -85,24 +84,11 @@ class OpenHandsACPAgent(ACPAgent):
         # Track confirmation mode state per session
         self._confirmation_mode: dict[str, ConfirmationMode] = {}
         # Slash commands registry
-        self._slash_commands = self._setup_slash_commands()
-
         logger.info("OpenHands ACP Agent initialized")
-
-    def _setup_slash_commands(self) -> SlashCommandRegistry:
-        """Set up slash commands registry.
-
-        Returns:
-            SlashCommandRegistry with all available commands
-        """
-        registry = SlashCommandRegistry()
-        setup_slash_commands(registry, self._cmd_help, self._cmd_confirm)
-        return registry
 
     def _cmd_help(self) -> str:
         """Handle /help command."""
-        commands = self._slash_commands.get_available_commands()
-        return create_help_text(commands)
+        return create_help_text()
 
     async def _cmd_confirm(self, session_id: str, argument: str = "") -> str:
         """Handle /confirm command.
@@ -376,7 +362,7 @@ class OpenHandsACPAgent(ACPAgent):
                     session_id=session_id,
                     update=AvailableCommandsUpdate(
                         session_update="available_commands_update",
-                        available_commands=self._slash_commands.get_available_commands(),
+                        available_commands=get_available_slash_commands(),
                     ),
                 )
             )
@@ -432,9 +418,17 @@ class OpenHandsACPAgent(ACPAgent):
                 logger.info(f"Executing slash command: /{command} {argument}")
 
                 # Execute the slash command
-                response_text = await self._slash_commands.execute(
-                    command, session_id, argument
-                )
+                response_text: str | None = None
+                if command == "help":
+                    response_text = self._cmd_help()
+                elif command == "confirm":
+                    response_text = await self._cmd_confirm(session_id, argument)
+                else:
+                    response_text = (
+                        f"Unknown command: /{command}\n\n"
+                        f"Available commands: /help, /confirm\n"
+                        f"Use /help for more information."
+                    )
 
                 # Send response to client
                 if response_text:
@@ -606,7 +600,7 @@ class OpenHandsACPAgent(ACPAgent):
                     session_id=session_id,
                     update=AvailableCommandsUpdate(
                         session_update="available_commands_update",
-                        available_commands=self._slash_commands.get_available_commands(),
+                        available_commands=get_available_slash_commands(),
                     ),
                 )
             )
