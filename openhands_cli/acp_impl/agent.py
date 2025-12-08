@@ -528,21 +528,15 @@ class OpenHandsACPAgent(ACPAgent):
             message = Message(role="user", content=message_content)
             conversation.send_message(message)
 
-            # Run the conversation with or without confirmation mode
+            # Run the conversation with confirmation mode via runner
+            # The runner handles the confirmation flow for all modes
             # Track the running task so cancel() can wait for proper cleanup
-            confirmation_enabled = self._confirmation_mode.get(session_id, False)
-
-            if confirmation_enabled:
-                # Run with confirmation mode
-                runner = ACPConversationRunner(
-                    conversation=conversation,
-                    conn=self._conn,
-                    session_id=session_id,
-                )
-                run_task = asyncio.create_task(runner.run_with_confirmation())
-            else:
-                # Run without confirmation mode (standard execution)
-                run_task = asyncio.create_task(asyncio.to_thread(conversation.run))
+            runner = ACPConversationRunner(
+                conversation=conversation,
+                conn=self._conn,
+                session_id=session_id,
+            )
+            run_task = asyncio.create_task(runner.run_with_confirmation())
 
             self._running_tasks[session_id] = run_task
             try:
