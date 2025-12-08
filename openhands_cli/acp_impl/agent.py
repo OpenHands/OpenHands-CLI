@@ -42,19 +42,17 @@ from openhands.sdk.event import Event
 from openhands_cli import __version__
 from openhands_cli.acp_impl.event import EventSubscriber
 from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
-from openhands_cli.acp_impl.slash_command_handlers import (
+from openhands_cli.acp_impl.slash_commands import (
     ConfirmationMode,
+    SlashCommandRegistry,
     apply_confirmation_mode_to_conversation,
     create_help_text,
     get_confirm_error_text,
     get_confirm_help_text,
     get_confirm_success_text,
+    parse_slash_command,
     setup_slash_commands,
     validate_confirmation_mode,
-)
-from openhands_cli.acp_impl.slash_commands import (
-    SlashCommandRegistry,
-    parse_slash_command,
 )
 from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
