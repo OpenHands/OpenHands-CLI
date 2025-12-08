@@ -120,27 +120,36 @@ class TestSlashCommandRegistry:
 class TestSlashCommandIntegration:
     """Integration tests for slash commands with confirmation mode."""
 
-    async def test_confirm_command_on(self):
-        """Test /confirm on command."""
+    async def test_confirm_command_modes(self):
+        """Test /confirm command with different modes."""
         registry = SlashCommandRegistry()
         confirmation_states = {}
 
         async def confirm_handler(session_id: str, argument: str) -> str:
             arg = argument.strip().lower()
-            if arg == "on":
-                confirmation_states[session_id] = True
-                return "Confirmation mode enabled."
-            elif arg == "off":
-                confirmation_states[session_id] = False
-                return "Confirmation mode disabled."
-            elif arg == "toggle":
-                confirmation_states[session_id] = not confirmation_states.get(
-                    session_id, False
+            valid_modes = ["always-ask", "always-approve", "llm-approve"]
+
+            if not arg:
+                current = confirmation_states.get(session_id, "always-ask")
+                return (
+                    f"Current confirmation mode: {current}\n\n"
+                    f"Available modes:\n"
+                    f"  always-ask     - Ask for permission before every action\n"
+                    f"  always-approve - Automatically approve all actions\n"
+                    f"  llm-approve    - Use LLM security analyzer\n\n"
+                    f"Usage: /confirm <mode>"
                 )
-                state = "enabled" if confirmation_states[session_id] else "disabled"
-                return f"Confirmation mode {state}."
+
+            if arg in valid_modes:
+                confirmation_states[session_id] = arg
+                return f"Confirmation mode set to: {arg}"
             else:
-                return "Usage: /confirm [on|off|toggle]"
+                current = confirmation_states.get(session_id, "always-ask")
+                return (
+                    f"Unknown mode: {arg}\n\n"
+                    f"Available modes: {', '.join(valid_modes)}\n"
+                    f"Current mode: {current}"
+                )
 
         registry.register(
             "confirm",
@@ -148,23 +157,37 @@ class TestSlashCommandIntegration:
             confirm_handler,
         )
 
-        # Test turning on
-        result = await registry.execute("confirm", "session1", "on")
+        # Test with no argument (should show help)
+        result = await registry.execute("confirm", "session1", "")
         assert result is not None
-        assert "enabled" in result.lower()
-        assert confirmation_states.get("session1") is True
+        assert "Current confirmation mode" in result
+        assert "always-ask" in result
+        assert "always-approve" in result
+        assert "llm-approve" in result
 
-        # Test turning off
-        result = await registry.execute("confirm", "session1", "off")
+        # Test setting to always-ask
+        result = await registry.execute("confirm", "session1", "always-ask")
         assert result is not None
-        assert "disabled" in result.lower()
-        assert confirmation_states.get("session1") is False
+        assert "always-ask" in result.lower()
+        assert confirmation_states.get("session1") == "always-ask"
 
-        # Test toggle
-        result = await registry.execute("confirm", "session1", "toggle")
+        # Test setting to always-approve
+        result = await registry.execute("confirm", "session1", "always-approve")
         assert result is not None
-        assert "enabled" in result.lower()
-        assert confirmation_states.get("session1") is True
+        assert "always-approve" in result.lower()
+        assert confirmation_states.get("session1") == "always-approve"
+
+        # Test setting to llm-approve
+        result = await registry.execute("confirm", "session1", "llm-approve")
+        assert result is not None
+        assert "llm-approve" in result.lower()
+        assert confirmation_states.get("session1") == "llm-approve"
+
+        # Test invalid mode
+        result = await registry.execute("confirm", "session1", "invalid-mode")
+        assert result is not None
+        assert "Unknown mode" in result
+        assert "invalid-mode" in result
 
     async def test_help_command(self):
         """Test /help command."""

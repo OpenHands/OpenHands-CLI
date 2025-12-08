@@ -39,7 +39,11 @@ from openhands.sdk import (
     Workspace,
 )
 from openhands.sdk.event import Event
-from openhands.sdk.security.confirmation_policy import AlwaysConfirm, NeverConfirm
+from openhands.sdk.security.confirmation_policy import (
+    AlwaysConfirm,
+    ConfirmRisky,
+    NeverConfirm,
+)
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 from openhands_cli import __version__
 from openhands_cli.acp_impl.event import EventSubscriber
@@ -77,7 +81,8 @@ class OpenHandsACPAgent(ACPAgent):
         # Track running tasks for each session to ensure proper cleanup on cancel
         self._running_tasks: dict[str, asyncio.Task] = {}
         # Track confirmation mode state per session
-        self._confirmation_mode: dict[str, bool] = {}
+        # Modes: "always-ask", "always-approve", "llm-approve"
+        self._confirmation_mode: dict[str, str] = {}
         # Slash commands registry
         self._slash_commands = self._setup_slash_commands()
 
@@ -99,7 +104,7 @@ class OpenHandsACPAgent(ACPAgent):
 
         registry.register(
             "confirm",
-            "Control confirmation mode (on/off/toggle)",
+            "Control confirmation mode (always-ask|always-approve|llm-approve)",
             self._cmd_confirm,
         )
 
@@ -118,70 +123,103 @@ class OpenHandsACPAgent(ACPAgent):
 
         Args:
             session_id: The session ID
-            argument: Command argument (on/off/toggle)
+            argument: Command argument (always-ask|always-approve|llm-approve)
 
         Returns:
             Status message
         """
         arg = argument.lower().strip()
 
-        # Get current state
-        current_state = self._confirmation_mode.get(session_id, False)
+        # Get current mode (default to always-ask)
+        current_mode = self._confirmation_mode.get(session_id, "always-ask")
 
-        if arg in ("on", "enable", "yes"):
-            new_state = True
-        elif arg in ("off", "disable", "no"):
-            new_state = False
-        elif arg in ("toggle", ""):
-            new_state = not current_state
-        else:
+        # Valid modes
+        valid_modes = ["always-ask", "always-approve", "llm-approve"]
+
+        # If no argument provided, show current state and prompt for mode
+        if not arg:
             return (
-                f"Unknown argument: {argument}\n"
-                f"Usage: /confirm [on|off|toggle]\n"
-                f"Current state: {'enabled' if current_state else 'disabled'}"
+                f"Current confirmation mode: {current_mode}\n\n"
+                f"Available modes:\n"
+                f"  always-ask     - Ask for permission before every action\n"
+                f"  always-approve - Automatically approve all actions\n"
+                f"  llm-approve    - Use LLM security analyzer to "
+                f"auto-approve safe actions\n\n"
+                f"Usage: /confirm <mode>\n"
+                f"Example: /confirm always-ask"
+            )
+
+        # Validate mode
+        if arg not in valid_modes:
+            return (
+                f"Unknown mode: {argument}\n\n"
+                f"Available modes:\n"
+                f"  always-ask     - Ask for permission before every action\n"
+                f"  always-approve - Automatically approve all actions\n"
+                f"  llm-approve    - Use LLM security analyzer to "
+                f"auto-approve safe actions\n\n"
+                f"Current mode: {current_mode}"
             )
 
         # Update confirmation mode for this session
-        await self._set_confirmation_mode(session_id, new_state)
+        await self._set_confirmation_mode(session_id, arg)
 
-        message_part1 = f"Confirmation mode {'enabled' if new_state else 'disabled'}.\n"
-        message_part2 = (
-            "Agent will ask for permission before executing actions."
-            if new_state
-            else "Agent will execute actions without asking."
-        )
-        return message_part1 + message_part2
+        # Return success message with explanation
+        messages = {
+            "always-ask": (
+                "Agent will ask for permission before executing every action."
+            ),
+            "always-approve": (
+                "Agent will automatically approve all actions without asking. "
+                "⚠️  Use with caution!"
+            ),
+            "llm-approve": (
+                "Agent will use LLM security analyzer to automatically "
+                "approve safe actions. You will only be asked for permission "
+                "on potentially risky actions."
+            ),
+        }
 
-    async def _set_confirmation_mode(self, session_id: str, enabled: bool) -> None:
-        """Enable or disable confirmation mode for a session.
+        return f"Confirmation mode set to: {arg}\n\n{messages[arg]}"
+
+    async def _set_confirmation_mode(self, session_id: str, mode: str) -> None:
+        """Set confirmation mode for a session.
 
         Args:
             session_id: The session ID
-            enabled: Whether to enable confirmation mode
+            mode: Confirmation mode (always-ask|always-approve|llm-approve)
         """
         # Update state
-        self._confirmation_mode[session_id] = enabled
+        self._confirmation_mode[session_id] = mode
 
         # Update conversation if it exists
         if session_id in self._active_sessions:
             conversation = self._active_sessions[session_id]
 
-            if enabled:
-                # Enable confirmation mode
+            if mode == "always-ask":
+                # Always ask for confirmation
                 conversation.set_security_analyzer(LLMSecurityAnalyzer())  # type: ignore[attr-defined]
                 conversation.set_confirmation_policy(AlwaysConfirm())  # type: ignore[attr-defined]
-                logger.info(f"Enabled confirmation mode for session {session_id}")
-            else:
-                # Disable confirmation mode
-                conversation.set_confirmation_policy(NeverConfirm())  # type: ignore[attr-defined]
-                # Note: We don't remove the security analyzer here - just setting
-                # NeverConfirm policy is sufficient
-                logger.info(f"Disabled confirmation mode for session {session_id}")
+                logger.info(
+                    f"Set confirmation mode to always-ask for session {session_id}"
+                )
 
-        logger.debug(
-            f"Confirmation mode for session {session_id}: "
-            f"{'enabled' if enabled else 'disabled'}"
-        )
+            elif mode == "always-approve":
+                # Never ask for confirmation - auto-approve everything
+                conversation.set_confirmation_policy(NeverConfirm())  # type: ignore[attr-defined]
+                logger.info(
+                    f"Set confirmation mode to always-approve for session {session_id}"
+                )
+
+            elif mode == "llm-approve":
+                # Use LLM to analyze and only confirm risky actions
+                conversation.set_security_analyzer(LLMSecurityAnalyzer())  # type: ignore[attr-defined]
+                conversation.set_confirmation_policy(ConfirmRisky())  # type: ignore[attr-defined]
+                logger.info(
+                    f"Set confirmation mode to llm-approve for session {session_id}"
+                )
+
+        logger.debug(f"Confirmation mode for session {session_id}: {mode}")
 
     def on_connect(self, conn: AgentSideConnection) -> None:  # noqa: ARG002
         """Called when connection is established."""
@@ -218,6 +256,17 @@ class OpenHandsACPAgent(ACPAgent):
             working_dir=working_dir,
             mcp_servers=mcp_servers,
         )
+
+        # Initialize confirmation mode to "always-ask" by default
+        if session_id not in self._confirmation_mode:
+            self._confirmation_mode[session_id] = "always-ask"
+            # Set the confirmation policy on the conversation
+            conversation.set_security_analyzer(LLMSecurityAnalyzer())  # type: ignore[attr-defined]
+            conversation.set_confirmation_policy(AlwaysConfirm())  # type: ignore[attr-defined]
+            logger.info(
+                f"Initialized session {session_id} with default confirmation "
+                f"mode: always-ask"
+            )
 
         # Cache it for future operations
         self._active_sessions[session_id] = conversation
