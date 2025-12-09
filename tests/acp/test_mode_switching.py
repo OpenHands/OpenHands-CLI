@@ -64,6 +64,24 @@ class TestAgentModeSwitching:
         assert agent._initial_confirmation_mode == "always-approve"
 
     @pytest.mark.asyncio
+    async def test_default_confirmation_mode_is_always_ask(self, mock_connection):
+        """Test that the default confirmation mode for ACP is 'always-ask'."""
+        # When no mode is specified, agent should default to "always-ask"
+        agent = OpenHandsACPAgent(mock_connection, "always-ask")
+        assert agent._initial_confirmation_mode == "always-ask"
+
+        # Verify this matches the default parameter in run_acp_server
+        import inspect
+
+        from openhands_cli.acp_impl.agent import run_acp_server
+
+        sig = inspect.signature(run_acp_server)
+        default_mode = sig.parameters["initial_confirmation_mode"].default
+        assert default_mode == "always-ask", (
+            f"Expected default mode to be 'always-ask', got '{default_mode}'"
+        )
+
+    @pytest.mark.asyncio
     async def test_new_session_returns_mode_state(self, acp_agent, tmp_path):
         """Test that new_session returns session mode state."""
         with (
