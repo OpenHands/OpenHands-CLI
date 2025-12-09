@@ -3,6 +3,8 @@
 import argparse
 
 from openhands_cli import __version__
+from openhands_cli.argparsers.mcp_parser import add_mcp_parser
+from openhands_cli.argparsers.serve_parser import add_serve_parser
 
 
 def create_main_parser() -> argparse.ArgumentParser:
@@ -91,21 +93,14 @@ def create_main_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", help="Additional commands")
 
     # Add serve subcommand
-    serve_parser = subparsers.add_parser(
-        "serve", help="Launch the OpenHands GUI server using Docker (web interface)"
-    )
-    serve_parser.add_argument(
-        "--mount-cwd",
-        action="store_true",
-        help="Mount the current working directory in the Docker container",
-    )
-    serve_parser.add_argument(
-        "--gpu", action="store_true", help="Enable GPU support in the Docker container"
-    )
+    add_serve_parser(subparsers)
 
     # Add ACP subcommand
     subparsers.add_parser(
         "acp", help="Start OpenHands as an Agent Client Protocol (ACP) agent"
     )
+
+    # Add MCP subcommand
+    add_mcp_parser(subparsers)
 
     return parser

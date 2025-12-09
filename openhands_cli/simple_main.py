@@ -57,6 +57,11 @@ def main() -> None:
             from openhands_cli.acp_impl.agent import run_acp_server
 
             asyncio.run(run_acp_server())
+        elif args.command == "mcp":
+            # Import MCP command handler only when needed
+            from openhands_cli.mcp_commands import handle_mcp_command
+
+            handle_mcp_command(args)
         else:
             # Check if experimental flag is used
             if args.exp:
