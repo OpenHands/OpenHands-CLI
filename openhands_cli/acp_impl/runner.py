@@ -80,7 +80,7 @@ async def run_conversation_with_confirmation(
 
 
 async def _handle_confirmation_request(
-    conversation: LocalConversation,
+    conversation: BaseConversation,
     conn: "Client",
     session_id: str,
 ) -> UserConfirmation:

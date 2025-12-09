@@ -5,7 +5,6 @@ import logging
 from acp.schema import AvailableCommand, AvailableCommandInput, UnstructuredCommandInput
 
 from openhands.sdk import ImageContent, LocalConversation, TextContent
-from openhands.sdk.llm import content_to_str
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmRisky,
