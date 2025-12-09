@@ -276,8 +276,10 @@ def get_unknown_command_text(command: str) -> str:
     Returns:
         Formatted error text
     """
+    commands = get_available_slash_commands()
+    command_list = ", ".join(f"/{cmd.name}" for cmd in commands)
     return (
         f"Unknown command: /{command}\n\n"
-        f"Available commands: /help, /confirm\n"
+        f"Available commands: {command_list}\n"
         f"Use /help for more information."
     )
