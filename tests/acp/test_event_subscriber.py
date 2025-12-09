@@ -399,3 +399,99 @@ async def test_handle_task_tracker_with_empty_list(event_subscriber, mock_connec
             assert notification.update.entries == []
 
     assert plan_found, "AgentPlanUpdate with empty entries should be sent"
+
+
+@pytest.mark.asyncio
+async def test_get_metadata_with_status_line(mock_connection):
+    """Test that _get_metadata returns status_line along with raw metrics."""
+    from unittest.mock import Mock
+
+    # Create a mock conversation with stats
+    mock_conversation = Mock()
+
+    # Create mock token usage
+    usage = Mock()
+    usage.prompt_tokens = 1234
+    usage.completion_tokens = 567
+    usage.cache_read_tokens = 123
+    usage.reasoning_tokens = 100
+
+    # Create mock metrics
+    metrics = Mock()
+    metrics.accumulated_cost = 0.0567
+    metrics.accumulated_token_usage = usage
+
+    # Set up the mock to return our metrics
+    mock_conversation.conversation_stats.get_combined_metrics.return_value = metrics
+
+    # Create EventSubscriber with conversation
+    event_subscriber = EventSubscriber(
+        "test-session", mock_connection, mock_conversation
+    )
+
+    # Get metadata
+    metadata = event_subscriber._get_metadata()
+
+    # Verify metadata structure
+    assert metadata is not None
+    assert "openhands.dev/metrics" in metadata
+    metrics_dict = metadata["openhands.dev/metrics"]
+
+    # Verify raw metrics
+    assert metrics_dict["input_tokens"] == 1234
+    assert metrics_dict["output_tokens"] == 567
+    assert metrics_dict["cache_read_tokens"] == 123
+    assert metrics_dict["reasoning_tokens"] == 100
+    assert metrics_dict["cost"] == 0.0567
+
+    # Verify status_line is present and formatted correctly
+    assert "status_line" in metrics_dict
+    status_line = metrics_dict["status_line"]
+    assert isinstance(status_line, str)
+    # Should contain key components
+    assert "↑ input" in status_line
+    assert "↓ output" in status_line
+    assert "cache hit" in status_line
+    assert "reasoning" in status_line  # Since reasoning_tokens > 0
+    assert "$" in status_line
+    # Check abbreviated values
+    assert "1.23K" in status_line  # input_tokens abbreviated
+    assert "567" in status_line  # output_tokens not abbreviated (< 1000)
+
+
+@pytest.mark.asyncio
+async def test_format_status_line_abbreviations(mock_connection):
+    """Test that _format_status_line correctly abbreviates large numbers."""
+    from unittest.mock import Mock
+
+    # Create a mock conversation with large token counts
+    mock_conversation = Mock()
+
+    # Create token usage with large numbers
+    usage = Mock()
+    usage.prompt_tokens = 5_234_567  # Should be 5.23M
+    usage.completion_tokens = 1_234_567  # Should be 1.23M
+    usage.cache_read_tokens = 2_617_284  # cache hit rate: 50%
+    usage.reasoning_tokens = 0
+
+    metrics = Mock()
+    metrics.accumulated_cost = 12.3456
+    metrics.accumulated_token_usage = usage
+
+    mock_conversation.conversation_stats.get_combined_metrics.return_value = metrics
+
+    event_subscriber = EventSubscriber(
+        "test-session", mock_connection, mock_conversation
+    )
+
+    # Get status line
+    metadata = event_subscriber._get_metadata()
+    assert metadata is not None
+    status_line = metadata["openhands.dev/metrics"]["status_line"]
+    assert isinstance(status_line, str)
+
+    # Verify abbreviations
+    assert "5.23M" in status_line  # 5,234,567 abbreviated
+    assert "1.23M" in status_line  # 1,234,567 abbreviated
+    assert "50.00%" in status_line  # Cache hit rate
+    assert "12.3456" in status_line  # Cost
