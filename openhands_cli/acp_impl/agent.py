@@ -684,22 +684,9 @@ class OpenHandsACPAgent(ACPAgent):
                 }
             )
 
-        # mode_id is the confirmation mode directly
         confirmation_mode: ConfirmationMode = mode_id  # type: ignore
+        await self._set_confirmation_mode(session_id, confirmation_mode)
 
-        # Update confirmation mode for this session
-        self._confirmation_mode[session_id] = confirmation_mode
-
-        # Apply the new confirmation mode to the conversation if it exists
-        if session_id in self._active_sessions:
-            conversation = self._active_sessions[session_id]
-            apply_confirmation_mode_to_conversation(
-                conversation, confirmation_mode, session_id
-            )
-
-        logger.info(f"Session {session_id} mode changed to {mode_id}")
-
-        # Send mode update notification to client
         await self._conn.session_update(
             session_id=session_id,
             update=update_current_mode(current_mode_id=mode_id),
