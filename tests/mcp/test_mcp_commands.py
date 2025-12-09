@@ -8,13 +8,13 @@ from unittest.mock import patch
 import pytest
 
 from openhands_cli.mcp.mcp_commands import (
-    _mask_sensitive_value,
     handle_mcp_add,
     handle_mcp_command,
     handle_mcp_get,
     handle_mcp_list,
     handle_mcp_remove,
 )
+from openhands_cli.mcp.mcp_display_utils import mask_sensitive_value
 
 
 class TestMCPCommands:
@@ -254,7 +254,7 @@ class TestMCPCommands:
         ]
 
         for key, value, expected in sensitive_cases:
-            result = _mask_sensitive_value(key, value)
+            result = mask_sensitive_value(key, value)
             assert result == expected
 
     def test_mask_sensitive_value_non_sensitive(self):
@@ -267,7 +267,7 @@ class TestMCPCommands:
         ]
 
         for key, value in non_sensitive_cases:
-            result = _mask_sensitive_value(key, value)
+            result = mask_sensitive_value(key, value)
             assert result == value
 
     def test_handle_mcp_command_routing(self):

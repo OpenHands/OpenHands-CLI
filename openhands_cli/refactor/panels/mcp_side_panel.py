@@ -12,6 +12,11 @@ from textual.widgets import Static
 
 from openhands.sdk import Agent
 from openhands_cli.locations import MCP_CONFIG_FILE, PERSISTENCE_DIR
+from openhands_cli.mcp.mcp_display_utils import (
+    extract_server_info,
+    format_command_details,
+    format_server_type_label,
+)
 from openhands_cli.refactor.core.theme import OPENHANDS_THEME
 from openhands_cli.refactor.panels.mcp_panel_style import MCP_PANEL_STYLE
 
@@ -172,23 +177,18 @@ class MCPSidePanel(VerticalScroll):
 
     def _format_server_details(self, server_spec: dict[str, Any]) -> list[str]:
         """Format server specification details for display."""
+        info = extract_server_info(server_spec)
         details = []
 
-        if isinstance(server_spec, dict):
-            if "command" in server_spec:
-                cmd = server_spec.get("command", "")
-                args = server_spec.get("args", [])
-                args_str = " ".join(args) if args else ""
-                details.append("Type: Command-based")
-                if cmd or args_str:
-                    details.append(f"Command: {cmd} {args_str}")
-            elif "url" in server_spec:
-                url = server_spec.get("url", "")
-                auth = server_spec.get("auth", "none")
-                details.append("Type: URL-based")
-                if url:
-                    details.append(f"URL: {url}")
-                details.append(f"Auth: {auth}")
+        details.append(f"Type: {format_server_type_label(info['transport_type'])}")
+
+        if info["transport_type"] == "stdio" and (info["command"] or info["args"]):
+            command_str = format_command_details(info["command"], info["args"])
+            if command_str:
+                details.append(f"Command: {command_str}")
+        elif info["url"]:
+            details.append(f"URL: {info['url']}")
+            details.append(f"Auth: {info['auth'] or 'none'}")
 
         return details
 

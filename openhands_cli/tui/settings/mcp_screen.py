@@ -7,6 +7,10 @@ from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk import Agent
 from openhands_cli.locations import MCP_CONFIG_FILE, PERSISTENCE_DIR
+from openhands_cli.mcp.mcp_display_utils import (
+    extract_server_info,
+    format_command_details,
+)
 
 
 class MCPScreen:
@@ -151,23 +155,22 @@ class MCPScreen:
         if server_name:
             print_formatted_text(HTML(f"{pad}<white>• {server_name}</white>"))
 
-        if isinstance(server_spec, dict):
-            if "command" in server_spec:
-                cmd = server_spec.get("command", "")
-                args = server_spec.get("args", [])
-                args_str = " ".join(args) if args else ""
-                print_formatted_text(HTML(f"{pad}  <grey>Type: Command-based</grey>"))
-                if cmd or args_str:
+        info = extract_server_info(server_spec)
+
+        if info["transport_type"] == "stdio":
+            print_formatted_text(HTML(f"{pad}  <grey>Type: Command-based</grey>"))
+            if info["command"] or info["args"]:
+                command_str = format_command_details(info["command"], info["args"])
+                if command_str:
                     print_formatted_text(
-                        HTML(f"{pad}  <grey>Command: {cmd} {args_str}</grey>")
+                        HTML(f"{pad}  <grey>Command: {command_str}</grey>")
                     )
-            elif "url" in server_spec:
-                url = server_spec.get("url", "")
-                auth = server_spec.get("auth", "none")
-                print_formatted_text(HTML(f"{pad}  <grey>Type: URL-based</grey>"))
-                if url:
-                    print_formatted_text(HTML(f"{pad}  <grey>URL: {url}</grey>"))
-                print_formatted_text(HTML(f"{pad}  <grey>Auth: {auth}</grey>"))
+        elif info["url"]:
+            print_formatted_text(HTML(f"{pad}  <grey>Type: URL-based</grey>"))
+            print_formatted_text(HTML(f"{pad}  <grey>URL: {info['url']}</grey>"))
+            print_formatted_text(
+                HTML(f"{pad}  <grey>Auth: {info['auth'] or 'none'}</grey>")
+            )
 
     def _display_information_header(self) -> None:
         print_formatted_text(

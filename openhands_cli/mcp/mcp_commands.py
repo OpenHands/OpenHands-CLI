@@ -9,6 +9,10 @@ from typing import Any
 
 from prompt_toolkit import HTML, print_formatted_text
 
+from openhands_cli.mcp.mcp_display_utils import (
+    extract_server_info,
+    mask_sensitive_value,
+)
 from openhands_cli.mcp.mcp_utils import (
     MCPConfigurationError,
     add_server,
@@ -125,72 +129,38 @@ def _render_server_details(
     if show_name:
         print_formatted_text(HTML(f"  <cyan>• {name}</cyan>"))
 
-    transport = config.get("transport", "unknown")
-    print_formatted_text(HTML(f"    <grey>Transport:</grey> {transport}"))
+    info = extract_server_info(config)
+    print_formatted_text(HTML(f"    <grey>Transport:</grey> {info['transport_type']}"))
 
     # Show authentication method if specified
-    auth = config.get("auth")
-    if auth:
-        print_formatted_text(HTML(f"    <grey>Authentication:</grey> {auth}"))
+    if info["auth"]:
+        print_formatted_text(HTML(f"    <grey>Authentication:</grey> {info['auth']}"))
 
-    if transport in ["http", "sse"]:
-        url = config.get("url", "")
-        print_formatted_text(HTML(f"    <grey>URL:</grey> {url}"))
+    if info["transport_type"] in ["http", "sse"]:
+        if info["url"]:
+            print_formatted_text(HTML(f"    <grey>URL:</grey> {info['url']}"))
 
-        headers = config.get("headers", {})
-        if headers:
+        if info["headers"]:
             print_formatted_text(HTML("    <grey>Headers:</grey>"))
-            for key, value in headers.items():
+            for key, value in info["headers"].items():
                 # Mask potential sensitive values
-                display_value = _mask_sensitive_value(key, value)
+                display_value = mask_sensitive_value(key, value)
                 print_formatted_text(HTML(f"      {key}: {display_value}"))
 
-    elif transport == "stdio":
-        command = config.get("command", "")
-        args = config.get("args", [])
-        print_formatted_text(HTML(f"    <grey>Command:</grey> {command}"))
+    elif info["transport_type"] == "stdio":
+        if info["command"]:
+            print_formatted_text(HTML(f"    <grey>Command:</grey> {info['command']}"))
 
-        if args:
-            args_str = " ".join(args)
+        if info["args"]:
+            args_str = " ".join(info["args"])
             print_formatted_text(HTML(f"    <grey>Arguments:</grey> {args_str}"))
 
-        env = config.get("env", {})
-        if env:
+        if info["env"]:
             print_formatted_text(HTML("    <grey>Environment:</grey>"))
-            for key, value in env.items():
+            for key, value in info["env"].items():
                 # Mask potential sensitive values
-                display_value = _mask_sensitive_value(key, value)
+                display_value = mask_sensitive_value(key, value)
                 print_formatted_text(HTML(f"      {key}={display_value}"))
-
-
-def _mask_sensitive_value(key: str, value: str) -> str:
-    """Mask potentially sensitive values in configuration display.
-
-    Args:
-        key: Configuration key name
-        value: Configuration value
-
-    Returns:
-        Masked value if sensitive, original value otherwise
-    """
-    sensitive_keys = {
-        "authorization",
-        "bearer",
-        "token",
-        "key",
-        "secret",
-        "password",
-        "api_key",
-        "apikey",
-    }
-
-    key_lower = key.lower()
-    if any(sensitive in key_lower for sensitive in sensitive_keys):
-        if len(value) <= 8:
-            return "*" * len(value)
-        else:
-            return value[:4] + "*" * (len(value) - 8) + value[-4:]
-    return value
 
 
 def handle_mcp_command(args: argparse.Namespace) -> None:
