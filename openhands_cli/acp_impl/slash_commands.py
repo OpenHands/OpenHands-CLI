@@ -24,6 +24,10 @@ def get_available_slash_commands() -> list[AvailableCommand]:
     Returns:
         List of AvailableCommand objects
     """
+    # Dynamically construct mode options from CONFIRMATION_MODES
+    mode_options = " | ".join(CONFIRMATION_MODES.keys())
+    mode_list = "|".join(CONFIRMATION_MODES.keys())
+
     return [
         AvailableCommand(
             name="help",
@@ -34,13 +38,9 @@ def get_available_slash_commands() -> list[AvailableCommand]:
         ),
         AvailableCommand(
             name="confirm",
-            description=(
-                "Control confirmation mode (always-ask|always-approve|llm-approve)"
-            ),
+            description=f"Control confirmation mode ({mode_list})",
             input=AvailableCommandInput(
-                root=UnstructuredCommandInput(
-                    hint="always-ask | always-approve | llm-approve"
-                ),
+                root=UnstructuredCommandInput(hint=mode_options),
             ),
         ),
     ]
