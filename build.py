@@ -326,7 +326,12 @@ def test_experimental_ui() -> bool:
         captured = []
 
         # Markers that indicate the textual UI has started
-        ui_markers = ["openhands", "conversation", "initialized", "what do you want to build"]
+        ui_markers = [
+            "openhands",
+            "conversation",
+            "initialized",
+            "what do you want to build",
+        ]
 
         while time.time() < deadline:
             if proc.poll() is not None:
@@ -370,7 +375,8 @@ def test_experimental_ui() -> bool:
         total_end = time.time()
         full_output = "".join(captured) + (out or "")
 
-        print(f"⏱️  Experimental UI end-to-end test time: {total_end - boot_start:.2f} seconds")
+        test_time = total_end - boot_start
+        print(f"⏱️  Experimental UI end-to-end test time: {test_time:.2f} seconds")
 
         # Check if the experimental UI started properly
         if any(marker in full_output.lower() for marker in ui_markers):
