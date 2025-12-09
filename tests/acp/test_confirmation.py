@@ -83,9 +83,62 @@ class TestAskUserConfirmationACP:
     """Test the ACP confirmation function."""
 
     @pytest.mark.asyncio
-    async def test_approve_action(self):
-        """Test that approving actions returns ACCEPT."""
-        mock_conn = MockACPConnection(user_choice="accept")
+    @pytest.mark.parametrize(
+        "user_choice,expected_decision,expected_policy,additional_checks",
+        [
+            (
+                "accept",
+                UserConfirmation.ACCEPT,
+                None,
+                lambda result, mock_conn: (
+                    mock_conn.last_request is not None
+                    and mock_conn.last_request["session_id"] == "test-session"
+                    and len(mock_conn.last_request["options"]) >= 2
+                ),
+            ),
+            (
+                "reject",
+                UserConfirmation.REJECT,
+                None,
+                lambda result, mock_conn: (
+                    result.reason is not None and "User rejected" in result.reason
+                ),
+            ),
+            (
+                "always_proceed",
+                UserConfirmation.ACCEPT,
+                "NeverConfirm",
+                lambda result, mock_conn: result.policy_change is not None,
+            ),
+            (
+                "risk_based",
+                UserConfirmation.ACCEPT,
+                "ConfirmRisky",
+                lambda result, mock_conn: (
+                    result.policy_change is not None
+                    and result.policy_change.threshold.name == "HIGH"
+                ),
+            ),
+        ],
+        ids=["accept", "reject", "always_proceed", "risk_based"],
+    )
+    async def test_user_choices(
+        self, user_choice, expected_decision, expected_policy, additional_checks
+    ):
+        """Test different user choice options for confirmation.
+
+        Args:
+            user_choice: The user's choice (accept, reject, always_proceed, risk_based)
+            expected_decision: The expected UserConfirmation decision
+            expected_policy: The expected policy change class name (or None)
+            additional_checks: Lambda function for additional assertions
+        """
+        from openhands.sdk.security.confirmation_policy import (
+            ConfirmRisky,
+            NeverConfirm,
+        )
+
+        mock_conn = MockACPConnection(user_choice=user_choice)
         action = MockAction(tool_name="execute_bash", action="ls -la")
 
         result = await ask_user_confirmation_acp(
@@ -94,64 +147,16 @@ class TestAskUserConfirmationACP:
             pending_actions=[action],  # type: ignore[arg-type]
         )
 
-        assert result.decision == UserConfirmation.ACCEPT
-        assert mock_conn.last_request is not None
-        assert mock_conn.last_request["session_id"] == "test-session"
-        assert len(mock_conn.last_request["options"]) >= 2
+        assert result.decision == expected_decision
 
-    @pytest.mark.asyncio
-    async def test_reject_action(self):
-        """Test that rejecting actions returns REJECT."""
-        mock_conn = MockACPConnection(user_choice="reject")
-        action = MockAction(tool_name="execute_bash", action="rm -rf /")
+        if expected_policy:
+            assert result.policy_change is not None
+            if expected_policy == "NeverConfirm":
+                assert isinstance(result.policy_change, NeverConfirm)
+            elif expected_policy == "ConfirmRisky":
+                assert isinstance(result.policy_change, ConfirmRisky)
 
-        result = await ask_user_confirmation_acp(
-            conn=mock_conn,  # type: ignore[arg-type]
-            session_id="test-session",
-            pending_actions=[action],  # type: ignore[arg-type]
-        )
-
-        assert result.decision == UserConfirmation.REJECT
-        assert result.reason is not None
-        assert "User rejected" in result.reason
-
-    @pytest.mark.asyncio
-    async def test_always_proceed_option(self):
-        """Test that 'always_proceed' option disables confirmation."""
-        from openhands.sdk.security.confirmation_policy import NeverConfirm
-
-        mock_conn = MockACPConnection(user_choice="always_proceed")
-        action = MockAction(tool_name="execute_bash", action="ls")
-
-        result = await ask_user_confirmation_acp(
-            conn=mock_conn,  # type: ignore[arg-type]
-            session_id="test-session",
-            pending_actions=[action],  # type: ignore[arg-type]
-        )
-
-        assert result.decision == UserConfirmation.ACCEPT
-        assert result.policy_change is not None
-        assert isinstance(result.policy_change, NeverConfirm)
-
-    @pytest.mark.asyncio
-    async def test_risk_based_option(self):
-        """Test that 'risk_based' option enables ConfirmRisky policy."""
-        from openhands.sdk.security.confirmation_policy import ConfirmRisky
-        from openhands.sdk.security.risk import SecurityRisk
-
-        mock_conn = MockACPConnection(user_choice="risk_based")
-        action = MockAction(tool_name="execute_bash", action="ls")
-
-        result = await ask_user_confirmation_acp(
-            conn=mock_conn,  # type: ignore[arg-type]
-            session_id="test-session",
-            pending_actions=[action],  # type: ignore[arg-type]
-        )
-
-        assert result.decision == UserConfirmation.ACCEPT
-        assert result.policy_change is not None
-        assert isinstance(result.policy_change, ConfirmRisky)
-        assert result.policy_change.threshold == SecurityRisk.HIGH
+        assert additional_checks(result, mock_conn)
 
     @pytest.mark.asyncio
     async def test_denied_outcome(self):
