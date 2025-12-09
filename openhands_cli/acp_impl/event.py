@@ -186,31 +186,35 @@ class EventSubscriber:
         Returns:
             Dictionary with metrics data or None if stats unavailable
         """
-        if not self.conversation:
-            return None
+        try:
+            if not self.conversation:
+                return None
 
-        stats = self.conversation.conversation_stats
-        if not stats:
-            return None
+            stats = self.conversation.conversation_stats
+            if not stats:
+                return None
 
-        combined_metrics = stats.get_combined_metrics()
-        if not combined_metrics or not combined_metrics.accumulated_token_usage:
-            return None
+            combined_metrics = stats.get_combined_metrics()
+            if not combined_metrics or not combined_metrics.accumulated_token_usage:
+                return None
 
-        usage = combined_metrics.accumulated_token_usage
-        cost = combined_metrics.accumulated_cost or 0.0
+            usage = combined_metrics.accumulated_token_usage
+            cost = combined_metrics.accumulated_cost or 0.0
 
-        # Return structured metrics data including status_line
-        return {
-            "metrics": {
-                "input_tokens": usage.prompt_tokens or 0,
-                "output_tokens": usage.completion_tokens or 0,
-                "cache_read_tokens": usage.cache_read_tokens or 0,
-                "reasoning_tokens": usage.reasoning_tokens or 0,
-                "cost": cost,
-                "status_line": self._format_status_line(usage, cost),
+            # Return structured metrics data including status_line
+            return {
+                "metrics": {
+                    "input_tokens": usage.prompt_tokens or 0,
+                    "output_tokens": usage.completion_tokens or 0,
+                    "cache_read_tokens": usage.cache_read_tokens or 0,
+                    "reasoning_tokens": usage.reasoning_tokens or 0,
+                    "cost": cost,
+                    "status_line": self._format_status_line(usage, cost),
+                }
             }
-        }
+        except Exception:
+            # If there's any error getting metadata, return None rather than crashing
+            return None
 
     async def __call__(self, event: Event):
         """Handle incoming events and convert them to ACP notifications.
