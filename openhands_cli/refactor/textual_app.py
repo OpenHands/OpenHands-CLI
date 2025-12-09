@@ -202,7 +202,21 @@ class OpenHandsApp(App):
         """Handle conversation state changes for auto-exit in headless mode."""
         # If conversation just finished and we're in headless mode, exit
         if not is_running and self.headless_mode:
+            self._print_conversation_summary()
             self.exit()
+
+    def _print_conversation_summary(self) -> None:
+        """Print conversation summary for headless mode."""
+        if self.conversation_runner:
+            summary = self.conversation_runner.get_conversation_summary()
+            print("\n" + "=" * 50)
+            print("CONVERSATION SUMMARY")
+            print("=" * 50)
+            print(f"Number of agent messages: {summary['agent_messages']}")
+            print(f"Number of user messages: {summary['user_messages']}")
+            print("Last message sent by the agent:")
+            print(f"  {summary['last_agent_message']}")
+            print("=" * 50)
 
     def action_open_settings(self) -> None:
         """Action to open the settings screen."""

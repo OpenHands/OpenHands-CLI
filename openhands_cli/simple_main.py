@@ -95,7 +95,10 @@ def main() -> None:
                 # Determine confirmation mode from args
                 # Default is "always-ask" (handled in setup_conversation)
                 confirmation_policy: ConfirmationPolicyBase = AlwaysConfirm()
-                if args.always_approve:
+                if args.headless:
+                    # Headless mode always uses NeverConfirm (auto-approve)
+                    confirmation_policy = NeverConfirm()
+                elif args.always_approve:
                     confirmation_policy = NeverConfirm()
                 elif args.llm_approve:
                     confirmation_policy = ConfirmRisky(threshold=SecurityRisk.HIGH)
