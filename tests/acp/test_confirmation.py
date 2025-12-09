@@ -1,11 +1,21 @@
 """Tests for ACP confirmation mode functionality."""
 
+from typing import Any
+
 import pytest
 from acp.schema import (
     AllowedOutcome,
+    CreateTerminalResponse,
     DeniedOutcome,
+    EnvVariable,
+    KillTerminalCommandResponse,
     PermissionOption,
+    ReadTextFileResponse,
+    ReleaseTerminalResponse,
     RequestPermissionResponse,
+    TerminalOutputResponse,
+    WaitForTerminalExitResponse,
+    WriteTextFileResponse,
 )
 
 from openhands_cli.acp_impl.confirmation import (
@@ -16,7 +26,7 @@ from openhands_cli.user_actions.types import UserConfirmation
 
 
 class MockACPConnection:
-    """Mock ACP connection for testing."""
+    """Mock ACP connection for testing that implements the Client protocol."""
 
     def __init__(
         self, user_choice: str = "accept", should_deny: bool = False, fail: bool = False
@@ -35,10 +45,10 @@ class MockACPConnection:
 
     async def request_permission(
         self,
-        options: list,
+        options: list[PermissionOption],
         session_id: str,
-        tool_call,
-        **kwargs,
+        tool_call: Any,
+        **kwargs: Any,
     ) -> RequestPermissionResponse:
         """Mock permission request."""
         if self.fail:
@@ -57,9 +67,80 @@ class MockACPConnection:
                 outcome=AllowedOutcome(option_id=self.user_choice, outcome="selected")
             )
 
+    # Stub implementations for other Client protocol methods (not used in tests)
+    async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
+        """Stub method."""
+        pass
+
+    async def write_text_file(
+        self, content: str, path: str, session_id: str, **kwargs: Any
+    ) -> WriteTextFileResponse | None:
+        """Stub method."""
+        return None
+
+    async def read_text_file(
+        self,
+        path: str,
+        session_id: str,
+        limit: int | None = None,
+        line: int | None = None,
+        **kwargs: Any,
+    ) -> ReadTextFileResponse:
+        """Stub method."""
+        raise NotImplementedError("Not used in these tests")
+
+    async def create_terminal(
+        self,
+        command: str,
+        session_id: str,
+        args: list[str] | None = None,
+        cwd: str | None = None,
+        env: list[EnvVariable] | None = None,
+        output_byte_limit: int | None = None,
+        **kwargs: Any,
+    ) -> CreateTerminalResponse:
+        """Stub method."""
+        raise NotImplementedError("Not used in these tests")
+
+    async def terminal_output(
+        self, session_id: str, terminal_id: str, **kwargs: Any
+    ) -> TerminalOutputResponse:
+        """Stub method."""
+        raise NotImplementedError("Not used in these tests")
+
+    async def release_terminal(
+        self, session_id: str, terminal_id: str, **kwargs: Any
+    ) -> ReleaseTerminalResponse | None:
+        """Stub method."""
+        return None
+
+    async def wait_for_terminal_exit(
+        self, session_id: str, terminal_id: str, **kwargs: Any
+    ) -> WaitForTerminalExitResponse:
+        """Stub method."""
+        raise NotImplementedError("Not used in these tests")
+
+    async def kill_terminal(
+        self, session_id: str, terminal_id: str, **kwargs: Any
+    ) -> KillTerminalCommandResponse | None:
+        """Stub method."""
+        return None
+
+    def on_connect(self, conn: Any) -> None:
+        """Stub method (sync, not async)."""
+        pass
+
+    async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+        """Stub method."""
+        return {}
+
+    async def ext_notification(self, method: str, params: dict[str, Any]) -> None:
+        """Stub method."""
+        pass
+
 
 class MockActionObject:
-    """Mock action object with visualize method."""
+    """Mock action object with visualize attribute."""
 
     def __init__(self, text: str):
         """Initialize mock action object."""
@@ -67,7 +148,16 @@ class MockActionObject:
 
 
 class MockAction:
-    """Mock action for testing."""
+    """Mock action for testing.
+
+    This provides the minimal interface used by ask_user_confirmation_acp:
+    - tool_name: str
+    - action: object with visualize attribute (or None)
+
+    We use # type: ignore because ActionEvent is a complex Pydantic model with many
+    required fields that are not used by the confirmation function. Creating full
+    ActionEvent instances would require initializing many unused fields.
+    """
 
     def __init__(self, tool_name: str = "unknown", action: str = ""):
         """Initialize mock action."""
@@ -142,7 +232,7 @@ class TestAskUserConfirmationACP:
         action = MockAction(tool_name="execute_bash", action="ls -la")
 
         result = await ask_user_confirmation_acp(
-            conn=mock_conn,  # type: ignore[arg-type]
+            conn=mock_conn,
             session_id="test-session",
             pending_actions=[action],  # type: ignore[arg-type]
         )
@@ -165,7 +255,7 @@ class TestAskUserConfirmationACP:
         action = MockAction(tool_name="execute_bash", action="ls")
 
         result = await ask_user_confirmation_acp(
-            conn=mock_conn,  # type: ignore[arg-type]
+            conn=mock_conn,
             session_id="test-session",
             pending_actions=[action],  # type: ignore[arg-type]
         )
@@ -181,7 +271,7 @@ class TestAskUserConfirmationACP:
         action = MockAction(tool_name="execute_bash", action="ls")
 
         result = await ask_user_confirmation_acp(
-            conn=mock_conn,  # type: ignore[arg-type]
+            conn=mock_conn,
             session_id="test-session",
             pending_actions=[action],  # type: ignore[arg-type]
         )
@@ -196,7 +286,7 @@ class TestAskUserConfirmationACP:
         action = MockAction(tool_name="execute_bash", action="ls")
 
         result = await ask_user_confirmation_acp(
-            conn=mock_conn,  # type: ignore[arg-type]
+            conn=mock_conn,
             session_id="test-session",
             pending_actions=[action],  # type: ignore[arg-type]
         )
@@ -215,7 +305,7 @@ class TestAskUserConfirmationACP:
         ]
 
         result = await ask_user_confirmation_acp(
-            conn=mock_conn,  # type: ignore[arg-type]
+            conn=mock_conn,
             session_id="test-session",
             pending_actions=actions,  # type: ignore[arg-type]
         )
@@ -229,7 +319,7 @@ class TestAskUserConfirmationACP:
         mock_conn = MockACPConnection(user_choice="accept")
 
         result = await ask_user_confirmation_acp(
-            conn=mock_conn,  # type: ignore[arg-type]
+            conn=mock_conn,
             session_id="test-session",
             pending_actions=[],  # type: ignore[arg-type]
         )
@@ -244,7 +334,7 @@ class TestAskUserConfirmationACP:
         action = MockAction(tool_name="some_tool", action="")  # Empty action
 
         result = await ask_user_confirmation_acp(
-            conn=mock_conn,  # type: ignore[arg-type]
+            conn=mock_conn,
             session_id="test-session",
             pending_actions=[action],  # type: ignore[arg-type]
         )
