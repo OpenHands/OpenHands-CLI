@@ -136,5 +136,5 @@ async def _handle_confirmation_request(
         conversation.set_confirmation_policy(policy_change)
         return decision
 
-    # Default: accept
+    # Default: DEFER
     return decision
