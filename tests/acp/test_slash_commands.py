@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from openhands_cli.acp_impl.confirmation import CONFIRMATION_MODES
 from openhands_cli.acp_impl.slash_commands import (
-    CONFIRMATION_MODES,
     apply_confirmation_mode_to_conversation,
     create_help_text,
     extract_text_from_message_content,

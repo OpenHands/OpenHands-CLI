@@ -55,7 +55,7 @@ def main() -> None:
             import asyncio
 
             from openhands_cli.acp_impl.agent import run_acp_server
-            from openhands_cli.acp_impl.slash_commands import ConfirmationMode
+            from openhands_cli.acp_impl.confirmation import ConfirmationMode
 
             # Determine confirmation mode from arguments
             confirmation_mode: ConfirmationMode = "always-ask"  # default

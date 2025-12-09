@@ -1,7 +1,6 @@
 """Slash commands implementation for ACP."""
 
 import logging
-from typing import Literal
 
 from acp.schema import AvailableCommand, AvailableCommandInput, UnstructuredCommandInput
 
@@ -12,37 +11,10 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
+from openhands_cli.acp_impl.confirmation import CONFIRMATION_MODES, ConfirmationMode
 
 
 logger = logging.getLogger(__name__)
-
-
-# Type alias for confirmation modes
-ConfirmationMode = Literal["always-ask", "always-approve", "llm-approve"]
-
-
-# Confirmation mode descriptions
-CONFIRMATION_MODES: dict[ConfirmationMode, dict[str, str]] = {
-    "always-ask": {
-        "short": "Ask for permission before every action",
-        "long": "Agent will ask for permission before executing every action.",
-    },
-    "always-approve": {
-        "short": "Automatically approve all actions",
-        "long": (
-            "Agent will automatically approve all actions without asking. "
-            "⚠️  Use with caution!"
-        ),
-    },
-    "llm-approve": {
-        "short": "Use LLM security analyzer to auto-approve safe actions",
-        "long": (
-            "Agent will use LLM security analyzer to automatically "
-            "approve safe actions. You will only be asked for permission "
-            "on potentially risky actions."
-        ),
-    },
-}
 
 
 def get_available_slash_commands() -> list[AvailableCommand]:

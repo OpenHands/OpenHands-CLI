@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Callable
+from typing import Literal
 
 from acp import Client
 from acp.schema import (
@@ -17,6 +18,34 @@ from openhands_cli.user_actions.types import ConfirmationResult, UserConfirmatio
 
 
 logger = logging.getLogger(__name__)
+
+
+# Type alias for confirmation modes
+ConfirmationMode = Literal["always-ask", "always-approve", "llm-approve"]
+
+
+# Confirmation mode descriptions
+CONFIRMATION_MODES: dict[ConfirmationMode, dict[str, str]] = {
+    "always-ask": {
+        "short": "Ask for permission before every action",
+        "long": "Agent will ask for permission before executing every action.",
+    },
+    "always-approve": {
+        "short": "Automatically approve all actions",
+        "long": (
+            "Agent will automatically approve all actions without asking. "
+            "⚠️  Use with caution!"
+        ),
+    },
+    "llm-approve": {
+        "short": "Use LLM security analyzer to auto-approve safe actions",
+        "long": (
+            "Agent will use LLM security analyzer to automatically "
+            "approve safe actions. You will only be asked for permission "
+            "on potentially risky actions."
+        ),
+    },
+}
 
 
 # Permission options for confirmation requests

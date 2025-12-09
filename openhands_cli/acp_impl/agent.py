@@ -43,10 +43,10 @@ from openhands.sdk import (
 )
 from openhands.sdk.event import Event
 from openhands_cli import __version__
+from openhands_cli.acp_impl.confirmation import ConfirmationMode
 from openhands_cli.acp_impl.event import EventSubscriber
 from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
 from openhands_cli.acp_impl.slash_commands import (
-    ConfirmationMode,
     apply_confirmation_mode_to_conversation,
     create_help_text,
     extract_text_from_message_content,
