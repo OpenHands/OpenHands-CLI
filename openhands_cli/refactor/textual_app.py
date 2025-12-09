@@ -73,6 +73,7 @@ class OpenHandsApp(App):
         resume_conversation_id: uuid.UUID | None = None,
         queued_inputs: list[str] | None = None,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
+        headless_mode: bool = False,
         **kwargs,
     ):
         """Initialize the app with custom OpenHands theme.
@@ -94,7 +95,7 @@ class OpenHandsApp(App):
         self.exit_confirmation = exit_confirmation
 
         # Store headless mode setting for auto-exit behavior
-        self.headless_mode = False
+        self.headless_mode = headless_mode
 
         # Store resume conversation ID
         self.conversation_id = (
@@ -362,7 +363,9 @@ class OpenHandsApp(App):
         # Only run worker if we have an active app (not in tests)
         try:
             self.run_worker(
-                self.conversation_runner.process_message_async(user_message),
+                self.conversation_runner.process_message_async(
+                    user_message, self.headless_mode
+                ),
                 name="process_message",
             )
         except RuntimeError:
@@ -535,9 +538,8 @@ def main(
         else None,
         queued_inputs=queued_inputs,
         initial_confirmation_policy=initial_confirmation_policy,
+        headless_mode=headless,
     )
-    # Set headless mode flag for auto-exit behavior
-    app.headless_mode = headless
     app.run(headless=headless)
 
     return app.conversation_id

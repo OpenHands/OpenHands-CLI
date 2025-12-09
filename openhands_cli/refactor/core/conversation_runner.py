@@ -4,6 +4,7 @@ import asyncio
 import uuid
 from collections.abc import Callable
 
+from rich.console import Console
 from textual.notifications import SeverityLevel
 
 from openhands.sdk import BaseConversation, Message, TextContent
@@ -109,7 +110,9 @@ class ConversationRunner:
         # Run send_message in the same thread pool, not on the UI loop
         await loop.run_in_executor(None, self.conversation.send_message, message)
 
-    async def process_message_async(self, user_input: str) -> None:
+    async def process_message_async(
+        self, user_input: str, headless: bool = False
+    ) -> None:
         """Process a user message asynchronously to keep UI unblocked.
 
         Args:
@@ -123,10 +126,10 @@ class ConversationRunner:
 
         # Run conversation processing in a separate thread to avoid blocking UI
         await asyncio.get_event_loop().run_in_executor(
-            None, self._run_conversation_sync, message
+            None, self._run_conversation_sync, message, headless
         )
 
-    def _run_conversation_sync(self, message: Message) -> None:
+    def _run_conversation_sync(self, message: Message, headless: bool = False) -> None:
         """Run the conversation synchronously in a thread.
 
         Args:
@@ -136,11 +139,16 @@ class ConversationRunner:
         try:
             # Send message and run conversation
             self.conversation.send_message(message)
-
             if self._confirmation_mode_active:
                 self._run_with_confirmation()
+            elif headless:
+                console = Console()
+                with console.status("Agent is working") as status:
+                    self.conversation.run()
+                    status.update("Agent finished")
             else:
                 self.conversation.run()
+
         except ConversationRunError as e:
             # Handle conversation run errors (includes LLM errors)
             self._notification_callback("Conversation Error", str(e), "error")
