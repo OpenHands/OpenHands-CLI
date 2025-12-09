@@ -106,6 +106,9 @@ def save_settings(
                 "metadata": get_llm_metadata(model_name=full_model, llm_type="agent")
             }
 
+        if full_model.startswith("openhands/") and data.base_url is None:
+            data.base_url = "https://llm-proxy.app.all-hands.dev/"
+
         llm = LLM(
             model=full_model,
             api_key=data.api_key_input,
