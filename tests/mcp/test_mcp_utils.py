@@ -305,3 +305,50 @@ class TestMCPFunctions:
             config_path.write_text('{"invalid": json}')
 
             assert server_exists("test", config_path=str(config_path)) is False
+
+    def test_add_server_validates_configuration(self):
+        """Test that add_server validates the configuration after saving."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "mcp.json"
+
+            # Add a valid server - should not raise validation error
+            add_server(
+                name="test_server",
+                transport="http",
+                target="https://api.example.com",
+                config_path=str(config_path),
+            )
+
+            # Verify the server was added and config is valid
+            assert server_exists("test_server", config_path=str(config_path))
+
+            # The configuration should be loadable by MCPConfig
+            from fastmcp.mcp_config import MCPConfig
+
+            mcp_config = MCPConfig.from_file(config_path)
+            assert "test_server" in mcp_config.to_dict()["mcpServers"]
+
+    def test_add_oauth_server_validates_configuration(self):
+        """Test that OAuth server configuration is valid."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "mcp.json"
+
+            # Add an OAuth server - should not raise validation error
+            add_server(
+                name="notion_server",
+                transport="http",
+                target="https://mcp.notion.com/mcp",
+                auth="oauth",
+                config_path=str(config_path),
+            )
+
+            # Verify the server was added and config is valid
+            assert server_exists("notion_server", config_path=str(config_path))
+
+            # The configuration should be loadable by MCPConfig
+            from fastmcp.mcp_config import MCPConfig
+
+            mcp_config = MCPConfig.from_file(config_path)
+            servers = mcp_config.to_dict()["mcpServers"]
+            assert "notion_server" in servers
+            assert servers["notion_server"]["auth"] == "oauth"

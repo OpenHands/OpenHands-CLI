@@ -8,6 +8,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from fastmcp.mcp_config import MCPConfig
+
 from openhands_cli.locations import MCP_CONFIG_FILE, PERSISTENCE_DIR
 
 
@@ -90,6 +92,35 @@ def _save_config(config: dict[str, Any], config_path: str | None = None) -> None
             json.dump(config, f, indent=2)
     except Exception as e:
         raise MCPConfigurationError(f"Error saving config file: {e}") from e
+
+
+def _validate_config(config_path: str | None = None) -> None:
+    """Validate the MCP configuration using MCPConfig.from_file().
+
+    This ensures the configuration format is compatible with the existing
+    MCP infrastructure that loads configurations.
+
+    Args:
+        config_path: Optional custom path to the MCP config file
+
+    Raises:
+        MCPConfigurationError: If the configuration is invalid
+    """
+    path = _get_config_path(config_path)
+
+    if not path.exists():
+        return  # No config file to validate
+
+    try:
+        # Use MCPConfig.from_file() to validate the configuration
+        # This is the same method used by the AgentStore.load_mcp_configuration()
+        MCPConfig.from_file(path)
+    except Exception as e:
+        raise MCPConfigurationError(
+            f"Configuration validation failed: {e}. "
+            "The saved configuration may not be compatible with OpenHands MCP "
+            "infrastructure."
+        ) from e
 
 
 def _parse_headers(headers: list[str] | None) -> dict[str, str]:
@@ -196,6 +227,9 @@ def add_server(
     config["mcpServers"][name] = server_config
     _save_config(config, config_path)
 
+    # Validate the saved configuration to ensure it's compatible with MCP infrastructure
+    _validate_config(config_path)
+
 
 def remove_server(name: str, config_path: str | None = None) -> None:
     """Remove an MCP server configuration.
@@ -214,6 +248,9 @@ def remove_server(name: str, config_path: str | None = None) -> None:
 
     del config["mcpServers"][name]
     _save_config(config, config_path)
+
+    # Validate the saved configuration to ensure it remains compatible
+    _validate_config(config_path)
 
 
 def list_servers(config_path: str | None = None) -> dict[str, dict[str, Any]]:
