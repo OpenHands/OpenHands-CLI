@@ -227,7 +227,6 @@ class SettingsScreen(ModalScreen):
 
     def _load_current_settings(self) -> None:
         """Load current agent settings into the form."""
-        # Always reload from store to get latest settings
         if not self.current_agent:
             return
 
