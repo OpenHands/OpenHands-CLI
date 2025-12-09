@@ -8,8 +8,8 @@ import pytest
 from textual.widgets import Select
 
 from openhands.sdk import LLM
-from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands_cli.refactor.modals.settings.settings_screen import SettingsScreen
+from openhands_cli.refactor.modals.settings.utils import SettingsFormData, save_settings
 from openhands_cli.tui.settings.store import AgentStore
 from openhands_cli.utils import get_default_cli_agent
 
@@ -116,8 +116,9 @@ class TestSettingsScreen:
         agent = get_default_cli_agent(llm=llm)
         agent_store.save(agent)
 
-        # Mock the UI components
+        # Set the current agent and mock the UI components
         settings_screen.agent_store = agent_store
+        settings_screen.current_agent = agent  # Set the current agent
         settings_screen.mode_select = Mock()
         settings_screen.provider_select = Mock()
         settings_screen.model_select = Mock()
@@ -220,42 +221,27 @@ class TestSettingsScreen:
         settings_screen.agent_store = agent_store
         settings_screen.current_agent = test_agent
 
-        # Mock UI components
-        settings_screen.api_key_input = Mock()
-        settings_screen.api_key_input.value = ""  # Empty input
-        settings_screen.mode_select = Mock()
-        settings_screen.mode_select.value = "basic"
-        settings_screen.provider_select = Mock()
-        settings_screen.provider_select.value = "openai"
-        settings_screen.model_select = Mock()
-        settings_screen.model_select.value = "openai/gpt-4o"
-        settings_screen.memory_select = Mock()
-        settings_screen.memory_select.value = False
-        settings_screen._show_message = Mock()
-        settings_screen._save_llm_settings = Mock()
-        settings_screen._update_memory_condensation = Mock()
-        settings_screen.dismiss = Mock()
-
-        # Call _save_settings
-        settings_screen._save_settings()
-
-        # Verify that _save_llm_settings was called with preserved API key
-        settings_screen._save_llm_settings.assert_called_once()
-        args = settings_screen._save_llm_settings.call_args[0]
-        assert args[1] == "test-api-key-12345"  # API key should be preserved
-
-        # Verify success message was shown (preservation + success)
-        success_calls = [
-            call
-            for call in settings_screen._show_message.call_args_list
-            if not call.kwargs.get("is_error", True)
-        ]
-        assert len(success_calls) >= 1
-        # Check that one of the success calls is about preserving the API key
-        preservation_call_found = any(
-            "Using existing API key" in str(call.args[0]) for call in success_calls
+        # Test the save_settings utility function directly
+        form_data = SettingsFormData(
+            mode="basic",
+            provider="openai",
+            model="openai/gpt-4o",
+            custom_model=None,
+            base_url=None,
+            api_key_input="",  # Empty input should preserve existing
+            memory_condensation_enabled=False,
         )
-        assert preservation_call_found
+
+        result = save_settings(form_data, test_agent)
+        assert result.success is True
+
+        # Verify the agent was saved with preserved API key
+        saved_agent = agent_store.load()
+        assert saved_agent is not None
+        api_key_value = saved_agent.llm.api_key
+        if hasattr(api_key_value, "get_secret_value"):
+            api_key_value = api_key_value.get_secret_value()
+        assert api_key_value == "test-api-key-12345"  # API key should be preserved
 
     def test_api_key_preservation_no_current_agent(
         self, settings_screen, agent_store, test_agent
@@ -264,35 +250,27 @@ class TestSettingsScreen:
         # Save test agent
         agent_store.save(test_agent)
 
-        # Setup settings screen with no current_agent
-        settings_screen.agent_store = agent_store
-        settings_screen.current_agent = None  # No current agent
+        # Test the save_settings utility function directly with existing agent
+        form_data = SettingsFormData(
+            mode="basic",
+            provider="openai",
+            model="openai/gpt-4o",
+            custom_model=None,
+            base_url=None,
+            api_key_input="",  # Empty input should preserve existing
+            memory_condensation_enabled=False,
+        )
 
-        # Mock UI components
-        settings_screen.api_key_input = Mock()
-        settings_screen.api_key_input.value = ""  # Empty input
-        settings_screen.mode_select = Mock()
-        settings_screen.mode_select.value = "basic"
-        settings_screen.provider_select = Mock()
-        settings_screen.provider_select.value = "openai"
-        settings_screen.model_select = Mock()
-        settings_screen.model_select.value = "openai/gpt-4o"
-        settings_screen.memory_select = Mock()
-        settings_screen.memory_select.value = False
-        settings_screen._show_message = Mock()
-        settings_screen._save_llm_settings = Mock()
-        settings_screen._update_memory_condensation = Mock()
+        result = save_settings(form_data, test_agent)
+        assert result.success is True
 
-        # Call _save_settings
-        settings_screen._save_settings()
-
-        # Verify that current_agent was loaded from store
-        assert settings_screen.current_agent is not None
-
-        # Verify that _save_llm_settings was called with preserved API key
-        settings_screen._save_llm_settings.assert_called_once()
-        args = settings_screen._save_llm_settings.call_args[0]
-        assert args[1] == "test-api-key-12345"  # API key should be preserved
+        # Verify the agent was saved with preserved API key
+        saved_agent = agent_store.load()
+        assert saved_agent is not None
+        api_key_value = saved_agent.llm.api_key
+        if hasattr(api_key_value, "get_secret_value"):
+            api_key_value = api_key_value.get_secret_value()
+        assert api_key_value == "test-api-key-12345"  # API key should be preserved
 
     def test_api_key_preservation_with_new_key(
         self, settings_screen, agent_store, test_agent
@@ -301,52 +279,45 @@ class TestSettingsScreen:
         # Save test agent
         agent_store.save(test_agent)
 
-        # Setup settings screen
-        settings_screen.agent_store = agent_store
-        settings_screen.current_agent = test_agent
+        # Test the save_settings utility function directly with new API key
+        form_data = SettingsFormData(
+            mode="basic",
+            provider="openai",
+            model="openai/gpt-4o",
+            custom_model=None,
+            base_url=None,
+            api_key_input="new-api-key-67890",  # New key provided
+            memory_condensation_enabled=False,
+        )
 
-        # Mock UI components
-        settings_screen.api_key_input = Mock()
-        settings_screen.api_key_input.value = "new-api-key-67890"  # New key provided
-        settings_screen.mode_select = Mock()
-        settings_screen.mode_select.value = "basic"
-        settings_screen.provider_select = Mock()
-        settings_screen.provider_select.value = "openai"
-        settings_screen.model_select = Mock()
-        settings_screen.model_select.value = "openai/gpt-4o"
-        settings_screen.memory_select = Mock()
-        settings_screen.memory_select.value = False
-        settings_screen._show_message = Mock()
-        settings_screen._save_llm_settings = Mock()
-        settings_screen._update_memory_condensation = Mock()
+        result = save_settings(form_data, test_agent)
+        assert result.success is True
 
-        # Call _save_settings
-        settings_screen._save_settings()
-
-        # Verify that _save_llm_settings was called with new API key
-        settings_screen._save_llm_settings.assert_called_once()
-        args = settings_screen._save_llm_settings.call_args[0]
-        assert args[1] == "new-api-key-67890"  # New API key should be used
+        # Verify the agent was saved with new API key
+        saved_agent = agent_store.load()
+        assert saved_agent is not None
+        api_key_value = saved_agent.llm.api_key
+        if hasattr(api_key_value, "get_secret_value"):
+            api_key_value = api_key_value.get_secret_value()
+        assert api_key_value == "new-api-key-67890"  # New API key should be used
 
     def test_save_settings_no_api_key_error(self, settings_screen):
         """Test that error is shown when no API key is available."""
-        # Setup settings screen with no current agent and no API key input
-        settings_screen.agent_store = Mock()
-        settings_screen.agent_store.load.return_value = None
-        settings_screen.current_agent = None
-
-        # Mock UI components
-        settings_screen.api_key_input = Mock()
-        settings_screen.api_key_input.value = ""  # Empty input
-        settings_screen._show_message = Mock()
-
-        # Call _save_settings
-        settings_screen._save_settings()
-
-        # Verify error message was shown
-        settings_screen._show_message.assert_called_with(
-            "API Key is required", is_error=True
+        # Test the save_settings utility function directly with no API key and no
+        # existing agent
+        form_data = SettingsFormData(
+            mode="basic",
+            provider="openai",
+            model="openai/gpt-4o",
+            custom_model=None,
+            base_url=None,
+            api_key_input="",  # Empty input with no existing agent
+            memory_condensation_enabled=False,
         )
+
+        result = save_settings(form_data, None)  # No existing agent
+        assert result.success is False
+        assert result.error_message == "API Key is required"
 
     def test_save_settings_advanced_mode(
         self, settings_screen, agent_store, test_agent
@@ -355,78 +326,63 @@ class TestSettingsScreen:
         # Save test agent
         agent_store.save(test_agent)
 
-        # Setup settings screen
-        settings_screen.agent_store = agent_store
-        settings_screen.current_agent = test_agent
-
-        # Mock UI components for advanced mode
-        settings_screen.api_key_input = Mock()
-        settings_screen.api_key_input.value = (
-            ""  # Empty input (should preserve existing)
+        # Test the save_settings utility function directly in advanced mode
+        form_data = SettingsFormData(
+            mode="advanced",
+            provider=None,
+            model=None,
+            custom_model="custom-model",
+            base_url="https://api.example.com/v1",
+            api_key_input="",  # Empty input (should preserve existing)
+            memory_condensation_enabled=False,
         )
-        settings_screen.mode_select = Mock()
-        settings_screen.mode_select.value = "advanced"
-        settings_screen.custom_model_input = Mock()
-        settings_screen.custom_model_input.value = "custom-model"
-        settings_screen.base_url_input = Mock()
-        settings_screen.base_url_input.value = "https://api.example.com/v1"
-        settings_screen.memory_select = Mock()
-        settings_screen.memory_select.value = False
-        settings_screen._show_message = Mock()
-        settings_screen._save_llm_settings = Mock()
-        settings_screen._update_memory_condensation = Mock()
 
-        # Call _save_settings
-        settings_screen._save_settings()
+        result = save_settings(form_data, test_agent)
+        assert result.success is True
 
-        # Verify that _save_llm_settings was called with correct parameters
-        settings_screen._save_llm_settings.assert_called_once()
-        args = settings_screen._save_llm_settings.call_args[0]
-        assert args[0] == "custom-model"  # model
-        assert args[1] == "test-api-key-12345"  # preserved API key
-        assert args[2] == "https://api.example.com/v1"  # base_url
+        # Verify the agent was saved with correct parameters
+        saved_agent = agent_store.load()
+        assert saved_agent is not None
+        assert saved_agent.llm.model == "custom-model"
+        api_key_value = saved_agent.llm.api_key
+        if hasattr(api_key_value, "get_secret_value"):
+            api_key_value = api_key_value.get_secret_value()
+        assert api_key_value == "test-api-key-12345"  # preserved API key
+        assert saved_agent.llm.base_url == "https://api.example.com/v1"
 
     def test_save_settings_advanced_mode_missing_model(self, settings_screen):
         """Test that error is shown when custom model is missing in advanced mode."""
-        # Mock UI components for advanced mode with missing model
-        settings_screen.api_key_input = Mock()
-        settings_screen.api_key_input.value = "test-key"
-        settings_screen.mode_select = Mock()
-        settings_screen.mode_select.value = "advanced"
-        settings_screen.custom_model_input = Mock()
-        settings_screen.custom_model_input.value = ""  # Missing model
-        settings_screen.base_url_input = Mock()  # Add this mock
-        settings_screen.base_url_input.value = "https://api.example.com"
-        settings_screen._show_message = Mock()
-
-        # Call _save_settings
-        settings_screen._save_settings()
-
-        # Verify error message was shown
-        settings_screen._show_message.assert_called_with(
-            "Custom model is required in advanced mode", is_error=True
+        # Test the save_settings utility function directly with missing model
+        form_data = SettingsFormData(
+            mode="advanced",
+            provider=None,
+            model=None,
+            custom_model="",  # Missing model
+            base_url="https://api.example.com",
+            api_key_input="test-key",
+            memory_condensation_enabled=False,
         )
+
+        result = save_settings(form_data, None)
+        assert result.success is False
+        assert result.error_message == "Custom model is required in advanced mode"
 
     def test_save_settings_advanced_mode_missing_base_url(self, settings_screen):
         """Test that error is shown when base URL is missing in advanced mode."""
-        # Mock UI components for advanced mode with missing base URL
-        settings_screen.api_key_input = Mock()
-        settings_screen.api_key_input.value = "test-key"
-        settings_screen.mode_select = Mock()
-        settings_screen.mode_select.value = "advanced"
-        settings_screen.custom_model_input = Mock()
-        settings_screen.custom_model_input.value = "custom-model"
-        settings_screen.base_url_input = Mock()
-        settings_screen.base_url_input.value = ""  # Missing base URL
-        settings_screen._show_message = Mock()
-
-        # Call _save_settings
-        settings_screen._save_settings()
-
-        # Verify error message was shown
-        settings_screen._show_message.assert_called_with(
-            "Base URL is required in advanced mode", is_error=True
+        # Test the save_settings utility function directly with missing base URL
+        form_data = SettingsFormData(
+            mode="advanced",
+            provider=None,
+            model=None,
+            custom_model="custom-model",
+            base_url="",  # Missing base URL
+            api_key_input="test-key",
+            memory_condensation_enabled=False,
         )
+
+        result = save_settings(form_data, None)
+        assert result.success is False
+        assert result.error_message == "Base URL is required in advanced mode"
 
     def test_update_field_dependencies_basic_mode(self, settings_screen):
         """Test field dependency updates in basic mode."""
@@ -497,87 +453,41 @@ class TestSettingsScreen:
         assert settings_screen.model_select.value == Select.BLANK
         assert settings_screen.memory_select.value is False
 
-    def test_save_llm_settings_basic_model(self, settings_screen):
-        """Test _save_llm_settings with basic model configuration."""
-        # Mock agent store
-        mock_agent_store = Mock()
-        settings_screen.agent_store = mock_agent_store
-        settings_screen.current_agent = None
+    def test_save_settings_integration(self, settings_screen, agent_store, test_agent):
+        """Test that save_settings integration works correctly."""
+        # Save test agent
+        agent_store.save(test_agent)
 
-        # Mock get_default_cli_agent
-        with patch(
-            "openhands_cli.refactor.modals.settings.settings_screen.get_default_cli_agent"
-        ) as mock_get_default:
-            mock_agent = Mock()
-            mock_get_default.return_value = mock_agent
-            mock_agent.model_copy.return_value = mock_agent
-
-            # Call _save_llm_settings
-            settings_screen._save_llm_settings("openai/gpt-4o", "test-key")
-
-            # Verify agent was saved
-            assert settings_screen.current_agent == mock_agent
-            mock_agent_store.save.assert_called_once_with(mock_agent)
-
-    def test_save_llm_settings_with_condenser(self, settings_screen, test_agent):
-        """Test _save_llm_settings preserves condenser configuration."""
-        # Add condenser to test agent
-        condenser_llm = test_agent.llm.model_copy(update={"usage_id": "condenser"})
-        condenser = LLMSummarizingCondenser(llm=condenser_llm)
-        test_agent_with_condenser = test_agent.model_copy(
-            update={"condenser": condenser}
-        )
-
-        # Mock agent store
-        mock_agent_store = Mock()
-        settings_screen.agent_store = mock_agent_store
-        settings_screen.current_agent = test_agent_with_condenser
-
-        # Call _save_llm_settings
-        settings_screen._save_llm_settings("openai/gpt-4o", "test-key")
-
-        # Verify agent was updated and saved
-        assert settings_screen.current_agent is not None
-        assert settings_screen.current_agent.llm.model == "openai/gpt-4o"
-        mock_agent_store.save.assert_called_once()
-
-    def test_update_memory_condensation_enable(self, settings_screen, test_agent):
-        """Test enabling memory condensation."""
-        # Mock agent store
-        mock_agent_store = Mock()
-        settings_screen.agent_store = mock_agent_store
+        # Setup settings screen
+        settings_screen.agent_store = agent_store
         settings_screen.current_agent = test_agent
 
-        # Call _update_memory_condensation to enable
-        settings_screen._update_memory_condensation(True)
+        # Mock UI components
+        settings_screen.api_key_input = Mock()
+        settings_screen.api_key_input.value = "new-api-key"
+        settings_screen.mode_select = Mock()
+        settings_screen.mode_select.value = "basic"
+        settings_screen.provider_select = Mock()
+        settings_screen.provider_select.value = "openai"
+        settings_screen.model_select = Mock()
+        settings_screen.model_select.value = "openai/gpt-4o"
+        settings_screen.custom_model_input = Mock()
+        settings_screen.custom_model_input.value = ""
+        settings_screen.base_url_input = Mock()
+        settings_screen.base_url_input.value = ""
+        settings_screen.memory_select = Mock()
+        settings_screen.memory_select.value = True
+        settings_screen._show_message = Mock()
+        settings_screen.dismiss = Mock()
 
-        # Verify condenser was added
-        assert settings_screen.current_agent.condenser is not None
-        assert isinstance(
-            settings_screen.current_agent.condenser, LLMSummarizingCondenser
-        )
-        mock_agent_store.save.assert_called_once()
+        # Call _save_settings
+        settings_screen._save_settings()
 
-    def test_update_memory_condensation_disable(self, settings_screen, test_agent):
-        """Test disabling memory condensation."""
-        # Add condenser to test agent
-        condenser_llm = test_agent.llm.model_copy(update={"usage_id": "condenser"})
-        condenser = LLMSummarizingCondenser(llm=condenser_llm)
-        test_agent_with_condenser = test_agent.model_copy(
-            update={"condenser": condenser}
-        )
-
-        # Mock agent store
-        mock_agent_store = Mock()
-        settings_screen.agent_store = mock_agent_store
-        settings_screen.current_agent = test_agent_with_condenser
-
-        # Call _update_memory_condensation to disable
-        settings_screen._update_memory_condensation(False)
-
-        # Verify condenser was removed
-        assert settings_screen.current_agent.condenser is None
-        mock_agent_store.save.assert_called_once()
+        # Verify agent was updated and saved
+        saved_agent = agent_store.load()
+        assert saved_agent is not None
+        assert saved_agent.llm.model == "openai/gpt-4o"
+        assert saved_agent.condenser is not None  # Memory condensation enabled
 
     def test_show_message(self, settings_screen):
         """Test _show_message functionality."""
