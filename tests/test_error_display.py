@@ -8,7 +8,7 @@ import pytest
 
 def test_error_with_xml_special_characters(monkeypatch):
     """Test that error messages with XML special characters are displayed correctly.
-    
+
     This reproduces the bug where error messages containing < > & characters
     would cause xml.parsers.expat.ExpatError when the error handler tried to
     display them using prompt_toolkit's HTML formatting.
@@ -43,7 +43,7 @@ Diff: agent_context:
 
     # Verify that the error handler didn't crash with ExpatError
     # (if it did, we'd get ExpatError instead of ValueError)
-    assert exc_info.type == ValueError
+    assert exc_info.type is ValueError
 
 
 def test_error_with_angle_brackets(monkeypatch):
@@ -63,7 +63,7 @@ def test_error_with_angle_brackets(monkeypatch):
         main()
 
     assert "<missing>" in str(exc_info.value)
-    assert exc_info.type == RuntimeError
+    assert exc_info.type is RuntimeError
 
 
 def test_error_with_ampersand(monkeypatch):
@@ -83,7 +83,7 @@ def test_error_with_ampersand(monkeypatch):
         main()
 
     assert "foo & bar" in str(exc_info.value)
-    assert exc_info.type == RuntimeError
+    assert exc_info.type is RuntimeError
 
 
 def test_error_with_quotes(monkeypatch):
@@ -103,4 +103,4 @@ def test_error_with_quotes(monkeypatch):
         main()
 
     assert '"test"' in str(exc_info.value)
-    assert exc_info.type == RuntimeError
+    assert exc_info.type is RuntimeError
