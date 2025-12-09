@@ -157,14 +157,15 @@ class EventSubscriber:
         input_tokens = abbr(usage.prompt_tokens or 0)
         output_tokens = abbr(usage.completion_tokens or 0)
 
-        # Calculate cache hit rate
-        prompt = usage.prompt_tokens or 0
-        cache_read = usage.cache_read_tokens or 0
+        # Calculate cache hit rate (convert to int to handle mock objects safely)
+        prompt = int(usage.prompt_tokens or 0)
+        cache_read = int(usage.cache_read_tokens or 0)
         cache_rate = f"{(cache_read / prompt * 100):.2f}%" if prompt > 0 else "N/A"
-        reasoning_tokens = usage.reasoning_tokens or 0
+        reasoning_tokens = int(usage.reasoning_tokens or 0)
 
-        # Format cost
-        cost_str = f"{cost:.4f}" if cost > 0 else "0.00"
+        # Format cost (convert to float to handle mock objects safely)
+        cost_val = float(cost or 0)
+        cost_str = f"{cost_val:.4f}" if cost_val > 0 else "0.00"
 
         # Build status line
         parts: list[str] = []
