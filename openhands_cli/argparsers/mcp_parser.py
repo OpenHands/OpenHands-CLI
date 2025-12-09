@@ -12,8 +12,60 @@ def add_mcp_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentP
     Returns:
         The MCP argument parser
     """
+    description = """
+Manage Model Context Protocol (MCP) server configurations.
+
+MCP servers provide additional tools and context to OpenHands agents.
+You can add HTTP/SSE servers with authentication or stdio-based local servers.
+
+Examples:
+
+  # Add an HTTP server with Bearer token authentication
+  openhands mcp add my-api https://api.example.com/mcp \\
+    --transport http \\
+    --header "Authorization: Bearer your-token-here"
+
+  # Add an HTTP server with API key authentication
+  openhands mcp add weather-api https://weather.api.com \\
+    --transport http \\
+    --header "X-API-Key: your-api-key"
+
+  # Add an HTTP server with multiple headers
+  openhands mcp add secure-api https://api.example.com \\
+    --transport http \\
+    --header "Authorization: Bearer token123" \\
+    --header "X-Client-ID: client456"
+
+  # Add a local stdio server with environment variables
+  openhands mcp add local-server python \\
+    --transport stdio \\
+    --env "API_KEY=secret123" \\
+    --env "DATABASE_URL=postgresql://..." \\
+    -- -m my_mcp_server --config config.json
+
+  # List all configured servers
+  openhands mcp list
+
+  # Get details for a specific server
+  openhands mcp get my-api
+
+  # Remove a server
+  openhands mcp remove my-api
+
+Authentication is supported through:
+- Bearer tokens (JWT, OAuth)
+- API keys (custom headers)
+- Basic authentication
+- Multiple custom headers
+- Environment variables (stdio transport)
+
+All sensitive values are automatically masked when displayed.
+"""
     mcp_parser = subparsers.add_parser(
-        "mcp", help="Manage Model Context Protocol (MCP) server configurations"
+        "mcp",
+        help="Manage Model Context Protocol (MCP) server configurations",
+        description=description,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     mcp_subparsers = mcp_parser.add_subparsers(dest="mcp_command", help="MCP commands")
 

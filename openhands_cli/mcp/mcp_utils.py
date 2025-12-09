@@ -55,7 +55,7 @@ def _load_config(config_path: str | None = None) -> dict[str, Any]:
         MCPConfigurationError: If the configuration file is invalid.
     """
     path = _get_config_path(config_path)
-    
+
     if not path.exists():
         return {"mcpServers": {}}
 
@@ -83,7 +83,7 @@ def _save_config(config: dict[str, Any], config_path: str | None = None) -> None
         MCPConfigurationError: If the configuration cannot be saved.
     """
     path = _get_config_path(config_path)
-    
+
     try:
         _ensure_config_dir(path)
         with open(path, "w") as f:
@@ -137,8 +137,7 @@ def _parse_env_vars(env_vars: list[str] | None) -> dict[str, str]:
     for env_var in env_vars:
         if "=" not in env_var:
             raise MCPConfigurationError(
-                f"Invalid environment variable format '{env_var}'. "
-                "Expected 'KEY=value'"
+                f"Invalid environment variable format '{env_var}'. Expected 'KEY=value'"
             )
         key, value = env_var.split("=", 1)
         parsed_env[key.strip()] = value.strip()

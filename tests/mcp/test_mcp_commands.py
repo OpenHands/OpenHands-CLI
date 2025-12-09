@@ -15,12 +15,6 @@ from openhands_cli.mcp.mcp_commands import (
     handle_mcp_list,
     handle_mcp_remove,
 )
-from openhands_cli.mcp.mcp_utils import (
-    add_server,
-    get_server,
-    list_servers,
-    remove_server,
-)
 
 
 class TestMCPCommands:
@@ -29,7 +23,6 @@ class TestMCPCommands:
     def test_handle_mcp_add_http_success(self):
         """Test successful HTTP server addition."""
         with tempfile.TemporaryDirectory():
-
             args = argparse.Namespace(
                 name="test_http",
                 transport="http",
@@ -92,7 +85,9 @@ class TestMCPCommands:
 
             mock_add_server.side_effect = MCPConfigurationError("Test error")
 
-            with patch("openhands_cli.mcp.mcp_commands.print_formatted_text") as mock_print:
+            with patch(
+                "openhands_cli.mcp.mcp_commands.print_formatted_text"
+            ) as mock_print:
                 with pytest.raises(SystemExit):
                     handle_mcp_add(args)
 
@@ -105,7 +100,9 @@ class TestMCPCommands:
         """Test successful server removal."""
         args = argparse.Namespace(name="test_server")
 
-        with patch("openhands_cli.mcp.mcp_commands.remove_server") as mock_remove_server:
+        with patch(
+            "openhands_cli.mcp.mcp_commands.remove_server"
+        ) as mock_remove_server:
             with patch("openhands_cli.mcp.mcp_commands.print_formatted_text"):
                 handle_mcp_remove(args)
 
@@ -115,12 +112,12 @@ class TestMCPCommands:
         """Test MCP remove command with error."""
         args = argparse.Namespace(name="nonexistent")
 
-        with patch("openhands_cli.mcp.mcp_commands.remove_server") as mock_remove_server:
+        with patch(
+            "openhands_cli.mcp.mcp_commands.remove_server"
+        ) as mock_remove_server:
             from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 
-            mock_remove_server.side_effect = MCPConfigurationError(
-                "Server not found"
-            )
+            mock_remove_server.side_effect = MCPConfigurationError("Server not found")
 
             with patch("openhands_cli.mcp.mcp_commands.print_formatted_text"):
                 with pytest.raises(SystemExit):
@@ -133,7 +130,9 @@ class TestMCPCommands:
         with patch("openhands_cli.mcp.mcp_commands.list_servers") as mock_list_servers:
             mock_list_servers.return_value = {}
 
-            with patch("openhands_cli.mcp.mcp_commands.print_formatted_text") as mock_print:
+            with patch(
+                "openhands_cli.mcp.mcp_commands.print_formatted_text"
+            ) as mock_print:
                 handle_mcp_list(args)
 
                 # Should print "no servers" message
@@ -162,7 +161,9 @@ class TestMCPCommands:
         with patch("openhands_cli.mcp.mcp_commands.list_servers") as mock_list_servers:
             mock_list_servers.return_value = test_servers
 
-            with patch("openhands_cli.mcp.mcp_commands.print_formatted_text") as mock_print:
+            with patch(
+                "openhands_cli.mcp.mcp_commands.print_formatted_text"
+            ) as mock_print:
                 handle_mcp_list(args)
 
                 # Should print server details
@@ -185,7 +186,9 @@ class TestMCPCommands:
         with patch("openhands_cli.mcp.mcp_commands.get_server") as mock_get_server:
             mock_get_server.return_value = test_config
 
-            with patch("openhands_cli.mcp.mcp_commands.print_formatted_text") as mock_print:
+            with patch(
+                "openhands_cli.mcp.mcp_commands.print_formatted_text"
+            ) as mock_print:
                 handle_mcp_get(args)
 
                 mock_get_server.assert_called_once_with("test_server")
@@ -201,9 +204,7 @@ class TestMCPCommands:
         with patch("openhands_cli.mcp.mcp_commands.get_server") as mock_get_server:
             from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 
-            mock_get_server.side_effect = MCPConfigurationError(
-                "Server not found"
-            )
+            mock_get_server.side_effect = MCPConfigurationError("Server not found")
 
             with patch("openhands_cli.mcp.mcp_commands.print_formatted_text"):
                 with pytest.raises(SystemExit):
@@ -249,7 +250,9 @@ class TestMCPCommands:
         for command, handler_name in test_cases:
             args = argparse.Namespace(mcp_command=command)
 
-            with patch(f"openhands_cli.mcp.mcp_commands.{handler_name}") as mock_handler:
+            with patch(
+                f"openhands_cli.mcp.mcp_commands.{handler_name}"
+            ) as mock_handler:
                 handle_mcp_command(args)
                 mock_handler.assert_called_once_with(args)
 
@@ -275,19 +278,34 @@ class TestMCPCommandsIntegration:
             config_path = Path(temp_dir) / "mcp.json"
 
             # Patch all MCP functions to use our temp directory
-            with patch("openhands_cli.mcp.mcp_commands.add_server") as mock_add, \
-                 patch("openhands_cli.mcp.mcp_commands.list_servers") as mock_list, \
-                 patch("openhands_cli.mcp.mcp_commands.get_server") as mock_get, \
-                 patch("openhands_cli.mcp.mcp_commands.remove_server") as mock_remove:
-                
+            with (
+                patch("openhands_cli.mcp.mcp_commands.add_server") as mock_add,
+                patch("openhands_cli.mcp.mcp_commands.list_servers") as mock_list,
+                patch("openhands_cli.mcp.mcp_commands.get_server") as mock_get,
+                patch("openhands_cli.mcp.mcp_commands.remove_server") as mock_remove,
+            ):
                 # Import the real functions for the actual calls
-                from openhands_cli.mcp.mcp_utils import add_server, get_server, list_servers, remove_server, server_exists
-                
+                from openhands_cli.mcp.mcp_utils import (
+                    add_server,
+                    get_server,
+                    list_servers,
+                    remove_server,
+                    server_exists,
+                )
+
                 # Configure mocks to call real functions with our config path
-                mock_add.side_effect = lambda *args, **kwargs: add_server(*args, **kwargs, config_path=str(config_path))
-                mock_list.side_effect = lambda *args, **kwargs: list_servers(*args, **kwargs, config_path=str(config_path))
-                mock_get.side_effect = lambda *args, **kwargs: get_server(*args, **kwargs, config_path=str(config_path))
-                mock_remove.side_effect = lambda *args, **kwargs: remove_server(*args, **kwargs, config_path=str(config_path))
+                mock_add.side_effect = lambda *args, **kwargs: add_server(
+                    *args, **kwargs, config_path=str(config_path)
+                )
+                mock_list.side_effect = lambda *args, **kwargs: list_servers(
+                    *args, **kwargs, config_path=str(config_path)
+                )
+                mock_get.side_effect = lambda *args, **kwargs: get_server(
+                    *args, **kwargs, config_path=str(config_path)
+                )
+                mock_remove.side_effect = lambda *args, **kwargs: remove_server(
+                    *args, **kwargs, config_path=str(config_path)
+                )
 
                 with patch("openhands_cli.mcp.mcp_commands.print_formatted_text"):
                     # Add server
@@ -317,4 +335,6 @@ class TestMCPCommandsIntegration:
                     handle_mcp_remove(remove_args)
 
                     # Verify server was removed
-                    assert not server_exists("test_server", config_path=str(config_path))
+                    assert not server_exists(
+                        "test_server", config_path=str(config_path)
+                    )

@@ -164,11 +164,15 @@ class TestMCPFunctions:
             config_path = Path(temp_dir) / "mcp.json"
 
             # Add server first time
-            add_server("test", "http", "https://example.com", config_path=str(config_path))
+            add_server(
+                "test", "http", "https://example.com", config_path=str(config_path)
+            )
 
             # Try to add same server again
             with pytest.raises(MCPConfigurationError, match="already exists"):
-                add_server("test", "http", "https://example.com", config_path=str(config_path))
+                add_server(
+                    "test", "http", "https://example.com", config_path=str(config_path)
+                )
 
     def test_add_server_invalid_transport(self):
         """Test adding server with invalid transport."""
@@ -184,7 +188,9 @@ class TestMCPFunctions:
             config_path = Path(temp_dir) / "mcp.json"
 
             # Add server first
-            add_server("test", "http", "https://example.com", config_path=str(config_path))
+            add_server(
+                "test", "http", "https://example.com", config_path=str(config_path)
+            )
 
             # Remove server
             remove_server("test", config_path=str(config_path))
@@ -214,8 +220,19 @@ class TestMCPFunctions:
             config_path = Path(temp_dir) / "mcp.json"
 
             # Add multiple servers
-            add_server("http_server", "http", "https://example.com", config_path=str(config_path))
-            add_server("stdio_server", "stdio", "python", args=["-m", "server"], config_path=str(config_path))
+            add_server(
+                "http_server",
+                "http",
+                "https://example.com",
+                config_path=str(config_path),
+            )
+            add_server(
+                "stdio_server",
+                "stdio",
+                "python",
+                args=["-m", "server"],
+                config_path=str(config_path),
+            )
 
             servers = list_servers(config_path=str(config_path))
             assert len(servers) == 2
@@ -228,7 +245,9 @@ class TestMCPFunctions:
             config_path = Path(temp_dir) / "mcp.json"
 
             # Add server
-            add_server("test", "http", "https://example.com", config_path=str(config_path))
+            add_server(
+                "test", "http", "https://example.com", config_path=str(config_path)
+            )
 
             # Get server
             config = get_server("test", config_path=str(config_path))
@@ -248,7 +267,9 @@ class TestMCPFunctions:
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "mcp.json"
 
-            add_server("test", "http", "https://example.com", config_path=str(config_path))
+            add_server(
+                "test", "http", "https://example.com", config_path=str(config_path)
+            )
             assert server_exists("test", config_path=str(config_path)) is True
 
     def test_server_exists_false(self):
