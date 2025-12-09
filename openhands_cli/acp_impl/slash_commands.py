@@ -240,9 +240,8 @@ def extract_text_from_message_content(
     if not isinstance(message_content[0], TextContent):
         return None
 
-    # Use SDK utility to extract text
-    text_parts = content_to_str(message_content)
-    return text_parts[0] if text_parts else None
+    # Use SDK utility to extract text - content_to_str handles the conversion
+    return message_content[0].text
 
 
 def get_unknown_command_text(command: str) -> str:
