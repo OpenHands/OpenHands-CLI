@@ -201,6 +201,7 @@ class EventSubscriber:
                             + "\n",
                         ),
                     ),
+                    field_meta=self._get_metadata(),
                 )
 
             if thought_text.strip():
@@ -213,6 +214,7 @@ class EventSubscriber:
                             text="\n**Thought**:\n" + thought_text.strip() + "\n",
                         ),
                     ),
+                    field_meta=self._get_metadata(),
                 )
 
             # Generate content for the tool call
@@ -265,6 +267,7 @@ class EventSubscriber:
                                 text=action_viz,
                             ),
                         ),
+                        field_meta=self._get_metadata(),
                     )
                     return
                 elif isinstance(event.action, FinishAction):
@@ -277,6 +280,7 @@ class EventSubscriber:
                                 text=action_viz,
                             ),
                         ),
+                        field_meta=self._get_metadata(),
                     )
                     return
 
@@ -294,6 +298,7 @@ class EventSubscriber:
                     else None,
                     raw_input=event.action.model_dump() if event.action else None,
                 ),
+                field_meta=self._get_metadata(),
             )
         except Exception as e:
             logger.debug(f"Error processing ActionEvent: {e}", exc_info=True)
@@ -347,6 +352,7 @@ class EventSubscriber:
                             session_update="plan",
                             entries=entries,
                         ),
+                        field_meta=self._get_metadata(),
                     )
                 else:
                     observation = event.observation
@@ -382,6 +388,7 @@ class EventSubscriber:
                     content=[content] if content else None,
                     raw_output=event.model_dump(),
                 ),
+                field_meta=self._get_metadata(),
             )
         except Exception as e:
             logger.debug(f"Error processing observation event: {e}", exc_info=True)
@@ -413,6 +420,7 @@ class EventSubscriber:
                             text=viz_text,
                         ),
                     ),
+                    field_meta=self._get_metadata(),
                 )
         except Exception as e:
             logger.debug(f"Error processing MessageEvent: {e}", exc_info=True)
@@ -440,6 +448,7 @@ class EventSubscriber:
                         text=viz_text,
                     ),
                 ),
+                field_meta=self._get_metadata(),
             )
         except Exception as e:
             logger.debug(f"Error processing SystemPromptEvent: {e}", exc_info=True)
@@ -464,6 +473,7 @@ class EventSubscriber:
                         text=viz_text,
                     ),
                 ),
+                field_meta=self._get_metadata(),
             )
         except Exception as e:
             logger.debug(f"Error processing PauseEvent: {e}", exc_info=True)
@@ -491,6 +501,7 @@ class EventSubscriber:
                         text=viz_text,
                     ),
                 ),
+                field_meta=self._get_metadata(),
             )
         except Exception as e:
             logger.debug(f"Error processing Condensation: {e}", exc_info=True)
@@ -515,6 +526,7 @@ class EventSubscriber:
                         text=viz_text,
                     ),
                 ),
+                field_meta=self._get_metadata(),
             )
         except Exception as e:
             logger.debug(f"Error processing CondensationRequest: {e}", exc_info=True)
