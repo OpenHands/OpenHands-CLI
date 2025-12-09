@@ -24,6 +24,7 @@ def create_main_parser() -> argparse.ArgumentParser:
             Examples:
                 openhands                           # Start CLI mode
                 openhands --exp                     # Start experimental textual UI
+                openhands --exp --headless          # Start textual UI in headless mode
                 openhands --resume conversation-id  # Resume conversation
                 openhands --always-approve          # Auto-approve all actions
                 openhands --llm-approve             # LLM-based approval mode
@@ -63,6 +64,14 @@ def create_main_parser() -> argparse.ArgumentParser:
         "--exp",
         action="store_true",
         help="Use experimental textual-based UI instead of the default CLI interface",
+    )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help=(
+            "Run in headless mode (no UI output, auto-approve actions). "
+            "Requires --task or --file."
+        ),
     )
 
     # Confirmation mode options (mutually exclusive)
