@@ -77,20 +77,20 @@ def get_available_modes() -> list[SessionMode]:
     return [
         SessionMode(
             id="always-ask",
-            name="Always Ask",
+            name="Always Ask Mode",
             description="Request permission before making any changes",
         ),
         SessionMode(
             id="always-approve",
-            name="Always Approve",
+            name="Always Approve Mode",
             description="Automatically approve all actions without asking",
         ),
         SessionMode(
             id="llm-approve",
-            name="LLM Approve",
+            name="LLM Approve Mode",
             description=(
                 "Use LLM security analyzer to auto-approve safe actions. "
-                "Only ask for permission on potentially risky actions."
+                "Only ask for permission on high risk actions."
             ),
         ),
     ]
