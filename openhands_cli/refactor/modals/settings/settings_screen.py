@@ -8,6 +8,7 @@ LLM provider, model, API keys, and advanced options.
 from collections.abc import Callable
 from typing import Any, ClassVar
 
+from pydantic import SecretStr
 from textual import getters
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
@@ -450,19 +451,15 @@ class SettingsScreen(ModalScreen):
                 if not self.current_agent:
                     self.current_agent = self.agent_store.load()
 
-                if self.current_agent and self.current_agent.llm.api_key:
-                    try:
-                        api_key = self.current_agent.llm.api_key.get_secret_value()  # type: ignore
-                    except AttributeError:
-                        api_key = str(self.current_agent.llm.api_key)
-
-                    # Debug: Log that we're preserving the existing API key
-                    # This can help users understand what's happening
-                    if api_key:
-                        self._show_message(
-                            "Using existing API key (not shown for security)",
-                            is_error=False,
-                        )
+                existing_api_key = (
+                    self.current_agent.llm.api_key if self.current_agent else None
+                )
+                if existing_api_key:
+                    api_key = (
+                        existing_api_key.get_secret_value()
+                        if isinstance(existing_api_key, SecretStr)
+                        else existing_api_key
+                    )
 
             if not api_key:
                 self._show_message("API Key is required", is_error=True)
