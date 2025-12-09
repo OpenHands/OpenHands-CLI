@@ -51,15 +51,6 @@ Examples:
 
   # Remove a server
   openhands mcp remove my-api
-
-Authentication is supported through:
-- Bearer tokens (JWT, OAuth)
-- API keys (custom headers)
-- Basic authentication
-- Multiple custom headers
-- Environment variables (stdio transport)
-
-All sensitive values are automatically masked when displayed.
 """
     mcp_parser = subparsers.add_parser(
         "mcp",
