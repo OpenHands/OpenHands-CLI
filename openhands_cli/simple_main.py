@@ -77,6 +77,7 @@ def main() -> None:
                     queued_inputs=queued_inputs,
                     always_approve=args.always_approve,
                     llm_approve=args.llm_approve,
+                    exit_without_confirmation=args.exit_without_confirmation,
                 )
                 print("Goodbye! 👋")
                 print(f"Conversation ID: {conversation_id.hex}")
