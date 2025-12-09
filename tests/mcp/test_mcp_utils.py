@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from openhands_cli.mcp_manager import (
+from openhands_cli.mcp.mcp_utils import (
     MCPConfigurationError,
     _load_config,
     _parse_env_vars,

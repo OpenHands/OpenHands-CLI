@@ -9,7 +9,7 @@ from typing import Any
 
 from prompt_toolkit import HTML, print_formatted_text
 
-from openhands_cli.mcp_manager import (
+from openhands_cli.mcp.mcp_utils import (
     MCPConfigurationError,
     add_server,
     get_server,
