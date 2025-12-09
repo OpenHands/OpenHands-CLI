@@ -31,12 +31,15 @@ class TestSessionModes:
         modes_by_id = {mode.id: mode for mode in modes}
 
         # Always-ask should mention permission
+        assert modes_by_id["always-ask"].description
         assert "permission" in modes_by_id["always-ask"].description.lower()
 
         # Always-approve should mention automatic
+        assert modes_by_id["always-approve"].description
         assert "automatically" in modes_by_id["always-approve"].description.lower()
 
         # LLM-approve should mention risk or high risk
+        assert modes_by_id["llm-approve"].description
         llm_desc = modes_by_id["llm-approve"].description.lower()
         assert "llm" in llm_desc or "risk" in llm_desc
 
@@ -211,9 +214,7 @@ class TestAgentModeSwitching:
             assert acp_agent._confirmation_mode[session_id] == "always-ask"
 
     @pytest.mark.asyncio
-    async def test_different_sessions_have_independent_modes(
-        self, acp_agent, tmp_path
-    ):
+    async def test_different_sessions_have_independent_modes(self, acp_agent, tmp_path):
         """Test that different sessions can have different confirmation modes."""
         with (
             patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
