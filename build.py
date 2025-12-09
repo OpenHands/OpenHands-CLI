@@ -293,6 +293,112 @@ def test_version() -> bool:
         return False
 
 
+def test_experimental_ui() -> bool:
+    """Test the experimental textual UI with --exp flag."""
+    print("🧪 Testing the experimental textual UI...")
+
+    exe_path = Path("dist/openhands")
+    if not exe_path.exists():
+        exe_path = Path("dist/openhands.exe")
+        if not exe_path.exists():
+            print("❌ Executable not found!")
+            return False
+
+    proc = None
+    try:
+        if os.name != "nt":
+            os.chmod(exe_path, 0o755)
+
+        boot_start = time.time()
+        proc = subprocess.Popen(
+            [str(exe_path), "--exp", "--exit-without-confirmation"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            env={**os.environ},
+        )
+
+        # Wait for experimental UI to start - look for textual UI markers
+        deadline = boot_start + 60
+        saw_ui_start = False
+        captured = []
+
+        # Markers that indicate the textual UI has started
+        ui_markers = ["openhands", "conversation", "initialized", "what do you want to build"]
+
+        while time.time() < deadline:
+            if proc.poll() is not None:
+                break
+            if proc.stdout is None:
+                break
+            rlist, _, _ = select.select([proc.stdout], [], [], 0.2)
+            if not rlist:
+                continue
+            line = proc.stdout.readline()
+            if not line:
+                continue
+            captured.append(line)
+            line_lower = line.strip().lower()
+            if any(marker in line_lower for marker in ui_markers):
+                saw_ui_start = True
+                break
+
+        if not saw_ui_start:
+            print("❌ Did not detect experimental UI startup")
+            try:
+                proc.kill()
+            except Exception:
+                pass
+            return False
+
+        boot_end = time.time()
+        print(f"⏱️  Experimental UI boot time: {boot_end - boot_start:.2f} seconds")
+
+        # Send Ctrl+Q to gracefully exit the experimental UI
+        if proc.stdin is None:
+            print("❌ stdin unavailable")
+            proc.kill()
+            return False
+
+        # Send Ctrl+Q (ASCII 17) to exit the textual UI
+        proc.stdin.write("\x11")  # Ctrl+Q
+        proc.stdin.flush()
+        out, _ = proc.communicate(timeout=30)
+
+        total_end = time.time()
+        full_output = "".join(captured) + (out or "")
+
+        print(f"⏱️  Experimental UI end-to-end test time: {total_end - boot_start:.2f} seconds")
+
+        # Check if the experimental UI started properly
+        if any(marker in full_output.lower() for marker in ui_markers):
+            print("✅ Experimental UI starts and responds correctly")
+            return True
+        else:
+            print("❌ Experimental UI startup markers not found")
+            print("Output preview:", full_output[-500:])
+            return False
+
+    except subprocess.TimeoutExpired:
+        print("❌ Experimental UI test timed out")
+        if proc:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        return False
+    except Exception as e:
+        print(f"❌ Error testing experimental UI: {e}")
+        if proc:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        return False
+
+
 def test_acp_executable() -> bool:
     """Test the ACP server in the built executable with JSON-RPC messages."""
     print("🧪 Testing ACP server in the built executable...")
@@ -418,6 +524,11 @@ def main() -> int:
         dummy_agent = get_default_cli_agent(llm=llm)
         if not test_executable(dummy_agent):
             print("❌ Executable test failed, build process failed")
+            return 1
+
+        print("\n" + "=" * 60)
+        if not test_experimental_ui():
+            print("❌ Experimental UI test failed, build process failed")
             return 1
 
         print("\n" + "=" * 60)
