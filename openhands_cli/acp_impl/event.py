@@ -1,7 +1,5 @@
 """Utility functions for ACP implementation."""
 
-from typing import TYPE_CHECKING
-
 from acp import Client
 from acp.schema import (
     AgentMessageChunk,
@@ -20,7 +18,7 @@ from acp.schema import (
     ToolKind,
 )
 
-from openhands.sdk import Action, BaseConversation
+from openhands.sdk import Action, BaseConversation, get_logger
 from openhands.sdk.event import (
     ActionEvent,
     AgentErrorEvent,
@@ -35,13 +33,6 @@ from openhands.sdk.event import (
     SystemPromptEvent,
     UserRejectObservation,
 )
-
-
-if TYPE_CHECKING:
-    pass
-
-
-from openhands.sdk import get_logger
 from openhands.sdk.tool.builtins.finish import FinishAction, FinishObservation
 from openhands.sdk.tool.builtins.think import ThinkAction, ThinkObservation
 from openhands.tools.file_editor.definition import (
