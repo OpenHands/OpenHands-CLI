@@ -208,16 +208,36 @@ class OpenHandsApp(App):
 
     def _print_conversation_summary(self) -> None:
         """Print conversation summary for headless mode."""
-        if self.conversation_runner:
-            summary = self.conversation_runner.get_conversation_summary()
-            print("\n" + "=" * 50)
-            print("CONVERSATION SUMMARY")
-            print("=" * 50)
-            print(f"Number of agent messages: {summary['agent_messages']}")
-            print(f"Number of user messages: {summary['user_messages']}")
-            print("Last message sent by the agent:")
-            print(f"  {summary['last_agent_message']}")
-            print("=" * 50)
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.rule import Rule
+
+        console = Console()
+
+        if not self.conversation_runner:
+            return
+
+        num_agent_messages, last_agent_message = (
+            self.conversation_runner.get_conversation_summary()
+        )
+
+        console.print()  # blank line
+        console.print(Rule("CONVERSATION SUMMARY"))
+
+        console.print(f"[bold]Number of agent messages:[/bold] {num_agent_messages}")
+
+        console.print("[bold]Last message sent by the agent:[/bold]")
+        console.print(
+            Panel(
+                last_agent_message,
+                expand=False,
+                border_style="cyan",
+                title="Agent",
+                title_align="left",
+            )
+        )
+
+        console.print(Rule())
 
     def action_open_settings(self) -> None:
         """Action to open the settings screen."""

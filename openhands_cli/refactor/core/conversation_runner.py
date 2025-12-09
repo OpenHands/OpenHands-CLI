@@ -5,6 +5,7 @@ import uuid
 from collections.abc import Callable
 
 from rich.console import Console
+from rich.text import Text
 from textual.notifications import SeverityLevel
 
 from openhands.sdk import BaseConversation, Message, TextContent
@@ -277,39 +278,24 @@ class ConversationRunner:
         if self.is_running:
             asyncio.create_task(self.pause())
 
-    def get_conversation_summary(self) -> dict[str, str | int]:
+    def get_conversation_summary(self) -> tuple[int, Text]:
         """Get a summary of the conversation for headless mode output.
 
         Returns:
             Dictionary with conversation statistics and last agent message
         """
         if not self.conversation or not self.conversation.state:
-            return {
-                "agent_messages": 0,
-                "user_messages": 0,
-                "last_agent_message": "No conversation data available",
-            }
+            return 0, Text(
+                text="No conversation data available",
+            )
 
-        agent_message_count = 0
-        user_message_count = 0
-        last_agent_message = ""
+        agent_event_count = 0
+        last_agent_message = Text(text="No agent messages found")
 
         # Parse events to count messages
         for event in self.conversation.state.events:
-            # Import here to avoid circular imports
-            from openhands.sdk.event import MessageEvent
+            if event.source == "agent":
+                agent_event_count += 1
+                last_agent_message = event.visualize
 
-            if isinstance(event, MessageEvent):
-                # Check if it's an agent or user message
-                if event.llm_message.role == "assistant":
-                    agent_message_count += 1
-                    # Use the visualize property to get formatted content
-                    last_agent_message = str(event.visualize)
-                elif event.llm_message.role == "user":
-                    user_message_count += 1
-
-        return {
-            "agent_messages": agent_message_count,
-            "user_messages": user_message_count,
-            "last_agent_message": last_agent_message or "No agent messages found",
-        }
+        return agent_event_count, last_agent_message
