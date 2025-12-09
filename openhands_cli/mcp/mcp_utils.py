@@ -151,6 +151,7 @@ def add_server(
     args: list[str] | None = None,
     headers: list[str] | None = None,
     env_vars: list[str] | None = None,
+    auth: str | None = None,
     config_path: str | None = None,
 ) -> None:
     """Add a new MCP server configuration.
@@ -162,6 +163,7 @@ def add_server(
         args: Additional arguments for stdio transport
         headers: HTTP headers for http/sse transports
         env_vars: Environment variables for stdio transport
+        auth: Authentication method (e.g., "oauth")
         config_path: Optional custom path to the MCP config file
 
     Raises:
@@ -186,6 +188,10 @@ def add_server(
             server_config["env"] = _parse_env_vars(env_vars)
     else:
         raise MCPConfigurationError(f"Invalid transport type: {transport}")
+
+    # Add authentication method if specified
+    if auth:
+        server_config["auth"] = auth
 
     config["mcpServers"][name] = server_config
     _save_config(config, config_path)

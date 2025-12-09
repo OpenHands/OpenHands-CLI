@@ -32,6 +32,7 @@ def handle_mcp_add(args: argparse.Namespace) -> None:
             args=args.args if args.args else None,
             headers=args.header if args.header else None,
             env_vars=args.env if args.env else None,
+            auth=args.auth if args.auth else None,
         )
         print_formatted_text(
             HTML(f"<green>Successfully added MCP server '{args.name}'</green>")
@@ -131,6 +132,11 @@ def _render_server_details(
 
     transport = config.get("transport", "unknown")
     print_formatted_text(HTML(f"    <grey>Transport:</grey> {transport}"))
+
+    # Show authentication method if specified
+    auth = config.get("auth")
+    if auth:
+        print_formatted_text(HTML(f"    <grey>Authentication:</grey> {auth}"))
 
     if transport in ["http", "sse"]:
         url = config.get("url", "")

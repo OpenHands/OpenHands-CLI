@@ -30,6 +30,7 @@ class TestMCPCommands:
                 args=None,
                 header=["Authorization: Bearer token"],
                 env=None,
+                auth=None,
             )
 
             with patch("openhands_cli.mcp.mcp_commands.add_server") as mock_add_server:
@@ -43,6 +44,7 @@ class TestMCPCommands:
                         args=None,
                         headers=["Authorization: Bearer token"],
                         env_vars=None,
+                        auth=None,
                     )
 
     def test_handle_mcp_add_stdio_success(self):
@@ -54,6 +56,7 @@ class TestMCPCommands:
             args=["-m", "server"],
             header=None,
             env=["API_KEY=secret"],
+            auth=None,
         )
 
         with patch("openhands_cli.mcp.mcp_commands.add_server") as mock_add_server:
@@ -67,7 +70,35 @@ class TestMCPCommands:
                     args=["-m", "server"],
                     headers=None,
                     env_vars=["API_KEY=secret"],
+                    auth=None,
                 )
+
+    def test_handle_mcp_add_oauth_success(self):
+        """Test successful OAuth server addition."""
+        with tempfile.TemporaryDirectory():
+            args = argparse.Namespace(
+                name="notion_server",
+                transport="http",
+                target="https://mcp.notion.com/mcp",
+                args=None,
+                header=None,
+                env=None,
+                auth="oauth",
+            )
+
+            with patch("openhands_cli.mcp.mcp_commands.add_server") as mock_add_server:
+                with patch("openhands_cli.mcp.mcp_commands.print_formatted_text"):
+                    handle_mcp_add(args)
+
+                    mock_add_server.assert_called_once_with(
+                        name="notion_server",
+                        transport="http",
+                        target="https://mcp.notion.com/mcp",
+                        args=None,
+                        headers=None,
+                        env_vars=None,
+                        auth="oauth",
+                    )
 
     def test_handle_mcp_add_error(self):
         """Test MCP add command with error."""
@@ -78,6 +109,7 @@ class TestMCPCommands:
             args=None,
             header=None,
             env=None,
+            auth=None,
         )
 
         with patch("openhands_cli.mcp.mcp_commands.add_server") as mock_add_server:
@@ -316,6 +348,7 @@ class TestMCPCommandsIntegration:
                         args=None,
                         header=["Authorization: Bearer token"],
                         env=None,
+                        auth=None,
                     )
                     handle_mcp_add(add_args)
 

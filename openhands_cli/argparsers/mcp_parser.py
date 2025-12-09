@@ -43,6 +43,11 @@ Examples:
     --env "DATABASE_URL=postgresql://..." \\
     -- -m my_mcp_server --config config.json
 
+  # Add an OAuth-based server (like Notion MCP)
+  openhands mcp add notion-server https://mcp.notion.com/mcp \\
+    --transport http \\
+    --auth oauth
+
   # List all configured servers
   openhands mcp list
 
@@ -86,6 +91,11 @@ Examples:
         "--env",
         action="append",
         help="Environment variable for stdio transport (format: KEY=value)",
+    )
+    add_parser.add_argument(
+        "--auth",
+        choices=["oauth"],
+        help="Authentication method for the MCP server",
     )
 
     # MCP list command

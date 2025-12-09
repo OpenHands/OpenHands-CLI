@@ -117,6 +117,25 @@ class TestMCPFunctions:
             assert server["url"] == "https://api.example.com/mcp"
             assert server["headers"]["Authorization"] == "Bearer token"
 
+    def test_add_server_http_with_oauth(self):
+        """Test adding HTTP MCP server with OAuth authentication."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "mcp.json"
+
+            add_server(
+                name="test_oauth",
+                transport="http",
+                target="https://mcp.notion.com/mcp",
+                auth="oauth",
+                config_path=str(config_path),
+            )
+
+            config = _load_config(str(config_path))
+            server = config["mcpServers"]["test_oauth"]
+            assert server["transport"] == "http"
+            assert server["url"] == "https://mcp.notion.com/mcp"
+            assert server["auth"] == "oauth"
+
     def test_add_server_sse(self):
         """Test adding SSE MCP server."""
         with tempfile.TemporaryDirectory() as temp_dir:
