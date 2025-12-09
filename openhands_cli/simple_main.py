@@ -4,6 +4,7 @@ Simple main entry point for OpenHands CLI.
 This is a simplified version that demonstrates the TUI functionality.
 """
 
+import html
 import logging
 import os
 import warnings
@@ -104,7 +105,7 @@ def main() -> None:
     except EOFError:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
     except Exception as e:
-        print_formatted_text(HTML(f"<red>Error: {e}</red>"))
+        print_formatted_text(HTML(f"<red>Error: {html.escape(str(e))}</red>"))
         import traceback
 
         traceback.print_exc()
