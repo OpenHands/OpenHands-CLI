@@ -81,6 +81,12 @@ def create_main_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    parser.add_argument(
+        "--exit-without-confirmation",
+        action="store_true",
+        help="Exit the application without showing confirmation dialog",
+    )
+
     # Subcommands
     subparsers = parser.add_subparsers(dest="command", help="Additional commands")
 

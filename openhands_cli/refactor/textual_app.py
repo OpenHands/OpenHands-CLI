@@ -480,6 +480,7 @@ def main(
     queued_inputs: list[str] | None = None,
     always_approve: bool = False,
     llm_approve: bool = False,
+    exit_without_confirmation: bool = False,
 ):
     """Run the textual app.
 
@@ -488,6 +489,7 @@ def main(
         queued_inputs: Optional list of input strings to queue at the start.
         always_approve: If True, auto-approve all actions without confirmation.
         llm_approve: If True, use LLM-based security analyzer (ConfirmRisky policy).
+        exit_without_confirmation: If True, exit without showing confirmation dialog.
     """
     # Determine initial confirmation policy from CLI arguments
     initial_confirmation_policy = AlwaysConfirm()  # Default
@@ -497,6 +499,7 @@ def main(
         initial_confirmation_policy = ConfirmRisky(threshold=SecurityRisk.HIGH)
 
     app = OpenHandsApp(
+        exit_confirmation=not exit_without_confirmation,
         resume_conversation_id=uuid.UUID(resume_conversation_id)
         if resume_conversation_id
         else None,

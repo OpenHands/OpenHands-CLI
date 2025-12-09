@@ -6,7 +6,7 @@ LLM provider, model, API keys, and advanced options.
 """
 
 from collections.abc import Callable
-from typing import Any, ClassVar
+from typing import ClassVar, Literal, cast
 
 from textual import getters
 from textual.app import ComposeResult
@@ -15,18 +15,12 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, Select, Static
 from textual.widgets._select import NoSelection
 
-from openhands.sdk import LLM
-from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands_cli.refactor.modals.settings.choices import (
     get_model_options,
     provider_options,
 )
+from openhands_cli.refactor.modals.settings.utils import SettingsFormData, save_settings
 from openhands_cli.tui.settings.store import AgentStore
-from openhands_cli.utils import (
-    get_default_cli_agent,
-    get_llm_metadata,
-    should_set_litellm_extra_body,
-)
 
 
 class SettingsScreen(ModalScreen):
@@ -69,7 +63,7 @@ class SettingsScreen(ModalScreen):
         """
         super().__init__(**kwargs)
         self.agent_store = AgentStore()
-        self.current_agent = None
+        self.current_agent = self.agent_store.load()
         self.is_advanced_mode = False
         self.message_widget = None
         self.is_initial_setup = SettingsScreen.is_initial_setup_required()
@@ -233,59 +227,65 @@ class SettingsScreen(ModalScreen):
 
     def _load_current_settings(self) -> None:
         """Load current agent settings into the form."""
-        try:
-            # Always reload from store to get latest settings
-            self.current_agent = self.agent_store.load()
-            if not self.current_agent:
-                return
+        if not self.current_agent:
+            return
 
-            llm = self.current_agent.llm
+        llm = self.current_agent.llm
 
-            # Determine if we're in advanced mode
-            self.is_advanced_mode = bool(llm.base_url)
-            self.mode_select.value = "advanced" if self.is_advanced_mode else "basic"
+        # Determine if we're in advanced mode
+        self.is_advanced_mode = bool(llm.base_url)
+        self.mode_select.value = "advanced" if self.is_advanced_mode else "basic"
 
-            if self.is_advanced_mode:
-                # Advanced mode - populate custom model and base URL
-                self.custom_model_input.value = llm.model or ""
-                self.base_url_input.value = llm.base_url or ""
-            else:
-                # Basic mode - populate provider and model selects
-                if "/" in llm.model:
-                    provider, model = llm.model.split("/", 1)
-                    self.provider_select.value = provider
+        if self.is_advanced_mode:
+            # Advanced mode - populate custom model and base URL
+            self.custom_model_input.value = llm.model or ""
+            self.base_url_input.value = llm.base_url or ""
+        else:
+            # Basic mode - populate provider and model selects
+            if "/" in llm.model:
+                provider, model = llm.model.split("/", 1)
+                self.provider_select.value = provider
 
-                    # Update model options and select current model
-                    self._update_model_options(provider)
-                    self.model_select.value = llm.model
+                # Update model options and select current model
+                self._update_model_options(provider)
+                self.model_select.value = llm.model
 
-            # API Key (show masked version)
-            if llm.api_key:
-                # Show masked key as placeholder
-                try:
-                    key_value = llm.api_key.get_secret_value()  # type: ignore
-                except AttributeError:
-                    key_value = str(llm.api_key)
-                self.api_key_input.placeholder = f"Current: {key_value[:3]}***"
-            else:
-                # No API key set
-                self.api_key_input.placeholder = "Enter your API key"
+        # API Key (show masked version)
+        if llm.api_key:
+            key_value = (
+                llm.api_key
+                if isinstance(llm.api_key, str)
+                else llm.api_key.get_secret_value()
+            )
+            self.api_key_input.placeholder = (
+                f"Current: {key_value[:3]}*** (leave empty to keep current)"
+            )
+        else:
+            # No API key set
+            self.api_key_input.placeholder = "Enter your API key"
 
-            # Memory Condensation
-            self.memory_select.value = bool(self.current_agent.condenser)
+        # Memory Condensation
+        self.memory_select.value = bool(self.current_agent.condenser)
 
-            # Update field dependencies after loading all values
-            self._update_field_dependencies()
-
-        except Exception as e:
-            self._show_message(f"Error loading settings: {str(e)}", is_error=True)
+        # Update field dependencies after loading all values
+        self._update_field_dependencies()
 
     def _update_model_options(self, provider: str) -> None:
         """Update model select options based on provider."""
+        # Store current selection to preserve it if possible
+        current_selection = self.model_select.value
+
         model_options = get_model_options(provider)
 
         if model_options:
             self.model_select.set_options(model_options)
+
+            # Try to preserve the current selection if it's still valid
+            if current_selection and current_selection != Select.BLANK:
+                # Check if the current selection is still in the new options
+                option_values = [option[1] for option in model_options]
+                if current_selection in option_values:
+                    self.model_select.value = current_selection
         else:
             self.model_select.set_options([("No models available", "")])
 
@@ -428,141 +428,49 @@ class SettingsScreen(ModalScreen):
 
     def _save_settings(self) -> None:
         """Save the current settings."""
-        try:
-            # Collect form data
-            api_key = self.api_key_input.value.strip()
 
-            # If no API key entered, keep existing one
-            if not api_key and self.current_agent and self.current_agent.llm.api_key:
-                try:
-                    api_key = self.current_agent.llm.api_key.get_secret_value()  # type: ignore
-                except AttributeError:
-                    api_key = str(self.current_agent.llm.api_key)
+        raw_mode = self.mode_select.value
 
-            if not api_key:
-                self._show_message("API Key is required", is_error=True)
-                return
-
-            if self.mode_select.value == "advanced":
-                # Advanced mode
-
-                model = self.custom_model_input.value.strip()
-                base_url = self.base_url_input.value.strip()
-
-                if not model:
-                    self._show_message(
-                        "Custom model is required in advanced mode", is_error=True
-                    )
-                    return
-                if not base_url:
-                    self._show_message(
-                        "Base URL is required in advanced mode", is_error=True
-                    )
-                    return
-
-                self._save_llm_settings(model, api_key, base_url)
-            else:
-                # Basic mode
-                provider = self.provider_select.value
-                model = self.model_select.value
-
-                if provider is NoSelection or not provider:
-                    self._show_message("Please select a provider", is_error=True)
-                    return
-                if model is NoSelection or not model:
-                    self._show_message("Please select a model", is_error=True)
-                    return
-
-                model_str = str(model)
-                full_model = (
-                    f"{provider}/{model_str}" if "/" not in model_str else model_str
-                )
-                self._save_llm_settings(full_model, api_key)
-
-            # Handle memory condensation
-            if self.memory_select.value is not NoSelection:
-                self._update_memory_condensation(self.memory_select.value == "enabled")
-
-            # Show success message
-            message = "Settings saved successfully!"
-            if self.is_initial_setup:
-                message = "Settings saved successfully! Welcome to OpenHands CLI!"
-            self._show_message(message, is_error=False)
-
-            # Invoke callback if provided, then close screen
-            if self.on_settings_saved:
-                self.on_settings_saved()
-            self.dismiss(True)
-
-        except Exception as e:
-            self._show_message(f"Error saving settings: {str(e)}", is_error=True)
-
-    def _save_llm_settings(
-        self, model: str, api_key: str, base_url: str | None = None
-    ) -> None:
-        """Save LLM settings to the agent store."""
-        extra_kwargs: dict[str, Any] = {}
-        if should_set_litellm_extra_body(model):
-            extra_kwargs["litellm_extra_body"] = {
-                "metadata": get_llm_metadata(model_name=model, llm_type="agent")
-            }
-
-        llm = LLM(
-            model=model,
-            api_key=api_key,
-            base_url=base_url,
-            usage_id="agent",
-            **extra_kwargs,
-        )
-
-        agent = self.current_agent or get_default_cli_agent(llm=llm)
-        agent = agent.model_copy(update={"llm": llm})
-
-        # Update condenser LLM as well
-        if agent.condenser and isinstance(agent.condenser, LLMSummarizingCondenser):
-            condenser_llm = llm.model_copy(update={"usage_id": "condenser"})
-            if should_set_litellm_extra_body(model):
-                condenser_llm = condenser_llm.model_copy(
-                    update={
-                        "litellm_extra_body": {
-                            "metadata": get_llm_metadata(
-                                model_name=model, llm_type="condenser"
-                            )
-                        }
-                    }
-                )
-            agent = agent.model_copy(
-                update={
-                    "condenser": agent.condenser.model_copy(
-                        update={"llm": condenser_llm}
-                    )
-                }
-            )
-
-        self.agent_store.save(agent)
-        self.current_agent = agent
-
-    def _update_memory_condensation(self, enabled: bool) -> None:
-        """Update memory condensation setting."""
-        if not self.current_agent:
+        if raw_mode not in ("basic", "advanced"):
+            self._show_message("Please select a settings mode", is_error=True)
             return
 
-        if enabled and not self.current_agent.condenser:
-            # Enable condensation
-            condenser_llm = self.current_agent.llm.model_copy(
-                update={"usage_id": "condenser"}
-            )
-            condenser = LLMSummarizingCondenser(llm=condenser_llm)
-            self.current_agent = self.current_agent.model_copy(
-                update={"condenser": condenser}
-            )
-        elif not enabled and self.current_agent.condenser:
-            # Disable condensation
-            self.current_agent = self.current_agent.model_copy(
-                update={"condenser": None}
-            )
+        mode = cast(Literal["basic", "advanced"], raw_mode)
 
-        self.agent_store.save(self.current_agent)
+        provider_value = self.provider_select.value
+        model = self.model_select.value
+        custom_model = self.custom_model_input.value
+        base_url = self.base_url_input.value
+        form_data = SettingsFormData(
+            mode=mode,
+            provider=None if provider_value is Select.BLANK else str(provider_value),
+            model=None if model is Select.BLANK else str(model),
+            custom_model=None if custom_model is Select.BLANK else str(custom_model),
+            base_url=None if base_url is Select.BLANK else str(base_url),
+            api_key_input=self.api_key_input.value,
+            memory_condensation_enabled=bool(self.memory_select.value),
+        )
+
+        result = save_settings(form_data, self.current_agent)
+        if not result.success:
+            self._show_message(result.error_message or "Unknown error", is_error=True)
+            return
+
+        message = (
+            "Settings saved successfully! Welcome to OpenHands CLI!"
+            if self.is_initial_setup
+            else "Settings saved successfully!"
+        )
+        self._show_message(message, is_error=False)
+        # Invoke callback if provided, then close screen
+        if self.on_settings_saved:
+            try:
+                self.on_settings_saved()
+            except Exception as e:
+                self.notify(
+                    f"Error occurred when saving settings: {e}", severity="error"
+                )
+        self.dismiss(True)
 
     @staticmethod
     def is_initial_setup_required() -> bool:
@@ -571,6 +479,7 @@ class SettingsScreen(ModalScreen):
         Returns:
             True if initial setup is needed (no existing settings), False otherwise
         """
+
         agent_store = AgentStore()
         existing_agent = agent_store.load()
         return existing_agent is None
