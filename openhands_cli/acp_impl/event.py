@@ -203,7 +203,7 @@ class EventSubscriber:
 
             # Return structured metrics data including status_line
             return {
-                "metrics": {
+                "openhands.dev/metrics": {
                     "input_tokens": usage.prompt_tokens or 0,
                     "output_tokens": usage.completion_tokens or 0,
                     "cache_read_tokens": usage.cache_read_tokens or 0,

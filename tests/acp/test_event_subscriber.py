@@ -434,8 +434,8 @@ async def test_get_metadata_with_status_line(mock_connection):
 
     # Verify metadata structure
     assert metadata is not None
-    assert "metrics" in metadata
-    metrics_dict = metadata["metrics"]
+    assert "openhands.dev/metrics" in metadata
+    metrics_dict = metadata["openhands.dev/metrics"]
 
     # Verify raw metrics
     assert metrics_dict["input_tokens"] == 1234
@@ -487,7 +487,7 @@ async def test_format_status_line_abbreviations(mock_connection):
     # Get status line
     metadata = event_subscriber._get_metadata()
     assert metadata is not None
-    status_line = metadata["metrics"]["status_line"]
+    status_line = metadata["openhands.dev/metrics"]["status_line"]
     assert isinstance(status_line, str)
 
     # Verify abbreviations
