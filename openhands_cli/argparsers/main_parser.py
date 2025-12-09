@@ -5,6 +5,29 @@ import argparse
 from openhands_cli import __version__
 
 
+def add_confirmation_mode_args(
+    parser_or_group: argparse.ArgumentParser | argparse._MutuallyExclusiveGroup,
+) -> None:
+    """Add confirmation mode arguments to a parser or mutually exclusive group.
+
+    Args:
+        parser_or_group: Either an ArgumentParser or a mutually exclusive group
+    """
+    parser_or_group.add_argument(
+        "--always-approve",
+        action="store_true",
+        help="Auto-approve all actions without asking for confirmation",
+    )
+    parser_or_group.add_argument(
+        "--llm-approve",
+        action="store_true",
+        help=(
+            "Enable LLM-based security analyzer "
+            "(only confirm LLM-predicted high-risk actions)"
+        ),
+    )
+
+
 def create_main_parser() -> argparse.ArgumentParser:
     """Create the main argument parser with CLI as default and serve as subcommand.
 
@@ -67,19 +90,7 @@ def create_main_parser() -> argparse.ArgumentParser:
 
     # Confirmation mode options (mutually exclusive)
     confirmation_group = parser.add_mutually_exclusive_group()
-    confirmation_group.add_argument(
-        "--always-approve",
-        action="store_true",
-        help="Auto-approve all actions without asking for confirmation",
-    )
-    confirmation_group.add_argument(
-        "--llm-approve",
-        action="store_true",
-        help=(
-            "Enable LLM-based security analyzer "
-            "(only confirm LLM-predicted high-risk actions)"
-        ),
-    )
+    add_confirmation_mode_args(confirmation_group)
 
     parser.add_argument(
         "--exit-without-confirmation",
@@ -110,18 +121,6 @@ def create_main_parser() -> argparse.ArgumentParser:
 
     # ACP confirmation mode options (mutually exclusive)
     acp_confirmation_group = acp_parser.add_mutually_exclusive_group()
-    acp_confirmation_group.add_argument(
-        "--always-approve",
-        action="store_true",
-        help="Auto-approve all actions without asking for confirmation",
-    )
-    acp_confirmation_group.add_argument(
-        "--llm-approve",
-        action="store_true",
-        help=(
-            "Enable LLM-based security analyzer "
-            "(only confirm LLM-predicted high-risk actions)"
-        ),
-    )
+    add_confirmation_mode_args(acp_confirmation_group)
 
     return parser
