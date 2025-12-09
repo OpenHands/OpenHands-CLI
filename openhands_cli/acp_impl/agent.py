@@ -48,6 +48,7 @@ from openhands_cli.acp_impl.utils import (
 from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
 from openhands_cli.tui.settings.store import MCPConfigurationError
+from openhands_cli.utils import apply_mcp_visualization_fix
 
 
 logger = logging.getLogger(__name__)
@@ -512,6 +513,9 @@ class OpenHandsACPAgent(ACPAgent):
 
 async def run_acp_server() -> None:
     """Run the OpenHands ACP server."""
+    # Apply fix for MCP visualization issue with Linear MCP server
+    apply_mcp_visualization_fix()
+
     logger.info("Starting OpenHands ACP server...")
 
     reader, writer = await stdio_streams()

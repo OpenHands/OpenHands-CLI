@@ -21,7 +21,10 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.argparsers.main_parser import create_main_parser
-from openhands_cli.utils import create_seeded_instructions_from_args
+from openhands_cli.utils import (
+    apply_mcp_visualization_fix,
+    create_seeded_instructions_from_args,
+)
 
 
 env_path = Path.cwd() / ".env"
@@ -42,6 +45,9 @@ def main() -> None:
         ImportError: If agent chat dependencies are missing
         Exception: On other error conditions
     """
+    # Apply fix for MCP visualization issue with Linear MCP server
+    apply_mcp_visualization_fix()
+
     parser = create_main_parser()
     args = parser.parse_args()
 

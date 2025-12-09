@@ -7,6 +7,7 @@ from typing import Any
 
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
+from rich.text import Text
 
 from openhands.sdk import LLM
 from openhands.tools.preset import get_default_agent
@@ -120,3 +121,67 @@ def create_seeded_instructions_from_args(args: Namespace) -> list[str] | None:
         return [args.task]
 
     return None
+
+
+def display_json_data(data: Any) -> Text:
+    """Create a Rich Text representation of JSON data (dict, list, or other types).
+
+    This is an improved version of the SDK's display_dict function that handles
+    not just dictionaries but also lists and other JSON data types.
+
+    Fixes the issue where Linear MCP server returns JSON lists causing:
+    'list' object has no attribute 'items' error.
+    """
+    content = Text()
+
+    if isinstance(data, dict):
+        # Handle dictionary - original display_dict behavior
+        for field_name, field_value in data.items():
+            if field_value is None:
+                continue  # skip None fields
+            content.append(f"\n  {field_name}: ", style="bold")
+            if isinstance(field_value, str):
+                # Handle multiline strings with proper indentation
+                if "\n" in field_value:
+                    content.append("\n")
+                    for line in field_value.split("\n"):
+                        content.append(f"    {line}\n")
+                else:
+                    content.append(f'"{field_value}"')
+            elif isinstance(field_value, list | dict):
+                content.append(str(field_value))
+            else:
+                content.append(str(field_value))
+    elif isinstance(data, list):
+        # Handle list - format as numbered items
+        content.append("\n")
+        for i, item in enumerate(data):
+            content.append(f"  [{i}]: ", style="bold")
+            if isinstance(item, str):
+                if "\n" in item:
+                    content.append("\n")
+                    for line in item.split("\n"):
+                        content.append(f"    {line}\n")
+                else:
+                    content.append(f'"{item}"\n')
+            elif isinstance(item, list | dict):
+                content.append(f"{item}\n")
+            else:
+                content.append(f"{item}\n")
+    else:
+        # Handle other types (string, number, boolean, null)
+        content.append(str(data))
+
+    return content
+
+
+def apply_mcp_visualization_fix():
+    """Apply monkey patch to fix MCP visualization issue.
+
+    This fixes the issue where the SDK's display_dict function assumes input
+    is always a dictionary, but Linear MCP server returns JSON lists.
+    """
+    import openhands.sdk.utils.visualize
+
+    # Replace the problematic display_dict function with our improved version
+    openhands.sdk.utils.visualize.display_dict = display_json_data
