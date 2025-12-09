@@ -174,6 +174,19 @@ class OpenHandsApp(App):
 
         # Check if user has existing settings
         if SettingsScreen.is_initial_setup_required():
+            # In headless mode we cannot open interactive settings.
+            if self.headless_mode:
+                from rich.console import Console
+
+                console = Console()
+                console.print(
+                    "[red]Headless mode requires existing settings.[/red]\n"
+                    "[bold]Please run:[/bold] [green]openhands --exp[/green] "
+                    "to configure your settings before using [cyan]--headless[/cyan]."
+                )
+                self.exit()
+                return
+
             # No existing settings - show settings screen first
             self._show_initial_settings()
             return
