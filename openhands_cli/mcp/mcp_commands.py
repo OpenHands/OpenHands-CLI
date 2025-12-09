@@ -37,11 +37,6 @@ def handle_mcp_add(args: argparse.Namespace) -> None:
         print_formatted_text(
             HTML(f"<green>Successfully added MCP server '{args.name}'</green>")
         )
-        print_formatted_text(
-            HTML(
-                "<yellow>Restart your OpenHands session to load the new server</yellow>"
-            )
-        )
     except MCPConfigurationError as e:
         print_formatted_text(HTML(f"<red>Error: {e}</red>"))
         raise SystemExit(1)
