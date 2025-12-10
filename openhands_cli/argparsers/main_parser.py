@@ -7,6 +7,29 @@ from openhands_cli.argparsers.mcp_parser import add_mcp_parser
 from openhands_cli.argparsers.serve_parser import add_serve_parser
 
 
+def add_confirmation_mode_args(
+    parser_or_group: argparse.ArgumentParser | argparse._MutuallyExclusiveGroup,
+) -> None:
+    """Add confirmation mode arguments to a parser or mutually exclusive group.
+
+    Args:
+        parser_or_group: Either an ArgumentParser or a mutually exclusive group
+    """
+    parser_or_group.add_argument(
+        "--always-approve",
+        action="store_true",
+        help="Auto-approve all actions without asking for confirmation",
+    )
+    parser_or_group.add_argument(
+        "--llm-approve",
+        action="store_true",
+        help=(
+            "Enable LLM-based security analyzer "
+            "(only confirm LLM-predicted high-risk actions)"
+        ),
+    )
+
+
 def create_main_parser() -> argparse.ArgumentParser:
     """Create the main argument parser with CLI as default and serve as subcommand.
 
@@ -26,6 +49,7 @@ def create_main_parser() -> argparse.ArgumentParser:
             Examples:
                 openhands                           # Start CLI mode
                 openhands --exp                     # Start experimental textual UI
+                openhands --exp --headless          # Start textual UI in headless mode
                 openhands --resume conversation-id  # Resume conversation
                 openhands --always-approve          # Auto-approve all actions
                 openhands --llm-approve             # LLM-based approval mode
@@ -66,22 +90,18 @@ def create_main_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Use experimental textual-based UI instead of the default CLI interface",
     )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help=(
+            "Run in headless mode (no UI output, auto-approve actions). "
+            "Requires --task or --file."
+        ),
+    )
 
     # Confirmation mode options (mutually exclusive)
     confirmation_group = parser.add_mutually_exclusive_group()
-    confirmation_group.add_argument(
-        "--always-approve",
-        action="store_true",
-        help="Auto-approve all actions without asking for confirmation",
-    )
-    confirmation_group.add_argument(
-        "--llm-approve",
-        action="store_true",
-        help=(
-            "Enable LLM-based security analyzer "
-            "(only confirm LLM-predicted high-risk actions)"
-        ),
-    )
+    add_confirmation_mode_args(confirmation_group)
 
     parser.add_argument(
         "--exit-without-confirmation",
@@ -96,9 +116,13 @@ def create_main_parser() -> argparse.ArgumentParser:
     add_serve_parser(subparsers)
 
     # Add ACP subcommand
-    subparsers.add_parser(
+    acp_parser = subparsers.add_parser(
         "acp", help="Start OpenHands as an Agent Client Protocol (ACP) agent"
     )
+
+    # ACP confirmation mode options (mutually exclusive)
+    acp_confirmation_group = acp_parser.add_mutually_exclusive_group()
+    add_confirmation_mode_args(acp_confirmation_group)
 
     # Add MCP subcommand
     add_mcp_parser(subparsers)

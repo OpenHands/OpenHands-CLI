@@ -4,6 +4,7 @@ Simple main entry point for OpenHands CLI.
 This is a simplified version that demonstrates the TUI functionality.
 """
 
+import html
 import logging
 import os
 import warnings
@@ -45,6 +46,14 @@ def main() -> None:
     parser = create_main_parser()
     args = parser.parse_args()
 
+    # Validate headless mode requirements
+    if args.headless and not args.task and not args.file:
+        parser.error("--headless requires either --task or --file to be specified")
+
+    # Automatically set exit_without_confirmation when headless mode is used
+    if args.headless:
+        args.exit_without_confirmation = True
+
     try:
         if args.command == "serve":
             # Import gui_launcher only when needed
@@ -55,13 +64,23 @@ def main() -> None:
             import asyncio
 
             from openhands_cli.acp_impl.agent import run_acp_server
+            from openhands_cli.acp_impl.confirmation import ConfirmationMode
 
-            asyncio.run(run_acp_server())
+            # Determine confirmation mode from arguments
+            confirmation_mode: ConfirmationMode = "always-ask"  # default
+            if args.always_approve:
+                confirmation_mode = "always-approve"
+            elif args.llm_approve:
+                confirmation_mode = "llm-approve"
+
+            asyncio.run(run_acp_server(initial_confirmation_mode=confirmation_mode))
+
         elif args.command == "mcp":
             # Import MCP command handler only when needed
             from openhands_cli.mcp.mcp_commands import handle_mcp_command
 
             handle_mcp_command(args)
+
         else:
             # Check if experimental flag is used
             if args.exp:
@@ -75,6 +94,7 @@ def main() -> None:
                     always_approve=args.always_approve,
                     llm_approve=args.llm_approve,
                     exit_without_confirmation=args.exit_without_confirmation,
+                    headless=args.headless,
                 )
                 print("Goodbye! 👋")
                 print(f"Conversation ID: {conversation_id.hex}")
@@ -91,7 +111,10 @@ def main() -> None:
                 # Determine confirmation mode from args
                 # Default is "always-ask" (handled in setup_conversation)
                 confirmation_policy: ConfirmationPolicyBase = AlwaysConfirm()
-                if args.always_approve:
+                if args.headless:
+                    # Headless mode always uses NeverConfirm (auto-approve)
+                    confirmation_policy = NeverConfirm()
+                elif args.always_approve:
                     confirmation_policy = NeverConfirm()
                 elif args.llm_approve:
                     confirmation_policy = ConfirmRisky(threshold=SecurityRisk.HIGH)
@@ -109,7 +132,7 @@ def main() -> None:
     except EOFError:
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
     except Exception as e:
-        print_formatted_text(HTML(f"<red>Error: {e}</red>"))
+        print_formatted_text(HTML(f"<red>Error: {html.escape(str(e))}</red>"))
         import traceback
 
         traceback.print_exc()

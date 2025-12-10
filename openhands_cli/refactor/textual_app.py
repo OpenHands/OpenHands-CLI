@@ -73,6 +73,7 @@ class OpenHandsApp(App):
         resume_conversation_id: uuid.UUID | None = None,
         queued_inputs: list[str] | None = None,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
+        headless_mode: bool = False,
         **kwargs,
     ):
         """Initialize the app with custom OpenHands theme.
@@ -92,6 +93,9 @@ class OpenHandsApp(App):
 
         # Store exit confirmation setting
         self.exit_confirmation = exit_confirmation
+
+        # Store headless mode setting for auto-exit behavior
+        self.headless_mode = headless_mode
 
         # Store resume conversation ID
         self.conversation_id = (
@@ -163,9 +167,26 @@ class OpenHandsApp(App):
 
     def on_mount(self) -> None:
         """Called when app starts."""
-        # Check if user has existing settings
+        # Subscribe to conversation running signal for auto-exit in headless mode
+        self.conversation_running_signal.subscribe(
+            self, self._on_conversation_state_changed
+        )
 
+        # Check if user has existing settings
         if SettingsScreen.is_initial_setup_required():
+            # In headless mode we cannot open interactive settings.
+            if self.headless_mode:
+                from rich.console import Console
+
+                console = Console()
+                console.print(
+                    "[red]Headless mode requires existing settings.[/red]\n"
+                    "[bold]Please run:[/bold] [green]openhands --exp[/green] "
+                    "to configure your settings before using [cyan]--headless[/cyan]."
+                )
+                self.exit()
+                return
+
             # No existing settings - show settings screen first
             self._show_initial_settings()
             return
@@ -190,6 +211,46 @@ class OpenHandsApp(App):
             on_exit_cancelled=self._show_initial_settings,
         )
         self.app.push_screen(exit_modal)
+
+    def _on_conversation_state_changed(self, is_running: bool) -> None:
+        """Handle conversation state changes for auto-exit in headless mode."""
+        # If conversation just finished and we're in headless mode, exit
+        if not is_running and self.headless_mode:
+            self._print_conversation_summary()
+            self.exit()
+
+    def _print_conversation_summary(self) -> None:
+        """Print conversation summary for headless mode."""
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.rule import Rule
+
+        console = Console()
+
+        if not self.conversation_runner:
+            return
+
+        num_agent_messages, last_agent_message = (
+            self.conversation_runner.get_conversation_summary()
+        )
+
+        console.print()  # blank line
+        console.print(Rule("CONVERSATION SUMMARY"))
+
+        console.print(f"[bold]Number of agent messages:[/bold] {num_agent_messages}")
+
+        console.print("[bold]Last message sent by the agent:[/bold]")
+        console.print(
+            Panel(
+                last_agent_message,
+                expand=False,
+                border_style="cyan",
+                title="Agent",
+                title_align="left",
+            )
+        )
+
+        console.print(Rule())
 
     def action_open_settings(self) -> None:
         """Action to open the settings screen."""
@@ -335,7 +396,9 @@ class OpenHandsApp(App):
         # Only run worker if we have an active app (not in tests)
         try:
             self.run_worker(
-                self.conversation_runner.process_message_async(user_message),
+                self.conversation_runner.process_message_async(
+                    user_message, self.headless_mode
+                ),
                 name="process_message",
             )
         except RuntimeError:
@@ -481,6 +544,7 @@ def main(
     always_approve: bool = False,
     llm_approve: bool = False,
     exit_without_confirmation: bool = False,
+    headless: bool = False,
 ):
     """Run the textual app.
 
@@ -490,10 +554,12 @@ def main(
         always_approve: If True, auto-approve all actions without confirmation.
         llm_approve: If True, use LLM-based security analyzer (ConfirmRisky policy).
         exit_without_confirmation: If True, exit without showing confirmation dialog.
+        headless: If True, run in headless mode (no UI output, auto-approve actions).
     """
     # Determine initial confirmation policy from CLI arguments
+    # If headless mode is enabled, always use NeverConfirm (auto-approve all actions)
     initial_confirmation_policy = AlwaysConfirm()  # Default
-    if always_approve:
+    if headless or always_approve:
         initial_confirmation_policy = NeverConfirm()
     elif llm_approve:
         initial_confirmation_policy = ConfirmRisky(threshold=SecurityRisk.HIGH)
@@ -505,8 +571,9 @@ def main(
         else None,
         queued_inputs=queued_inputs,
         initial_confirmation_policy=initial_confirmation_policy,
+        headless_mode=headless,
     )
-    app.run()
+    app.run(headless=headless)
 
     return app.conversation_id
 
