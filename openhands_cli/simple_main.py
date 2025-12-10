@@ -69,6 +69,13 @@ def main() -> None:
         else:
             # Check if experimental flag is used
             if args.exp:
+                # Check if resume was called without ID
+                if args.resume is not None and args.resume == "":
+                    # Resume called without ID - show conversation list
+                    from openhands_cli.conversations.display import display_recent_conversations
+                    display_recent_conversations()
+                    return
+                
                 # Use experimental textual-based UI
                 from openhands_cli.refactor.textual_app import main as textual_main
 
@@ -89,6 +96,13 @@ def main() -> None:
                 )
 
             else:
+                # Check if resume was called without ID
+                if args.resume is not None and args.resume == "":
+                    # Resume called without ID - show conversation list
+                    from openhands_cli.conversations.display import display_recent_conversations
+                    display_recent_conversations()
+                    return
+                
                 # Default CLI behavior - no subcommand needed
                 # Import agent_chat only when needed
                 from openhands_cli.agent_chat import run_cli_entry

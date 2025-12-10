@@ -59,7 +59,13 @@ def create_main_parser() -> argparse.ArgumentParser:
     )
 
     # CLI arguments at top level (default mode)
-    parser.add_argument("--resume", type=str, help="Conversation ID to resume")
+    parser.add_argument(
+        "--resume", 
+        type=str, 
+        nargs="?", 
+        const="", 
+        help="Conversation ID to resume. If no ID provided, shows list of recent conversations"
+    )
     parser.add_argument(
         "--exp",
         action="store_true",
