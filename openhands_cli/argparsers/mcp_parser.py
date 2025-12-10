@@ -63,7 +63,9 @@ Examples:
         description=description,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    mcp_subparsers = mcp_parser.add_subparsers(dest="mcp_command", help="MCP commands")
+    mcp_subparsers = mcp_parser.add_subparsers(
+        dest="mcp_command", help="MCP commands", required=True
+    )
 
     # MCP add command
     add_parser = mcp_subparsers.add_parser("add", help="Add a new MCP server")

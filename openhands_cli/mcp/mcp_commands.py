@@ -163,14 +163,11 @@ def _render_server_details(
                 print_formatted_text(HTML(f"      {key}={display_value}"))
 
 
-def handle_mcp_command(
-    args: argparse.Namespace, mcp_parser: argparse.ArgumentParser | None = None
-) -> None:
+def handle_mcp_command(args: argparse.Namespace) -> None:
     """Main handler for MCP commands.
 
     Args:
         args: Parsed command line arguments
-        mcp_parser: The MCP argument parser (optional, used for showing help)
     """
     if args.mcp_command == "add":
         handle_mcp_add(args)
@@ -180,21 +177,6 @@ def handle_mcp_command(
         handle_mcp_list(args)
     elif args.mcp_command == "get":
         handle_mcp_get(args)
-    elif args.mcp_command is None:
-        # No subcommand provided, show help
-        if mcp_parser:
-            mcp_parser.print_help()
-        else:
-            # Fallback: recreate the parser to show help
-            import argparse
-
-            from openhands_cli.argparsers.mcp_parser import add_mcp_parser
-
-            temp_parser = argparse.ArgumentParser()
-            temp_subparsers = temp_parser.add_subparsers()
-            mcp_parser = add_mcp_parser(temp_subparsers)
-            mcp_parser.print_help()
-        raise SystemExit(0)
     else:
         print_formatted_text(HTML("<red>Unknown MCP command</red>"))
         raise SystemExit(1)
