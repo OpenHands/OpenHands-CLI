@@ -4,7 +4,7 @@ import asyncio
 import logging
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from acp import (
@@ -684,7 +684,7 @@ class OpenHandsACPAgent(ACPAgent):
                 }
             )
 
-        confirmation_mode: ConfirmationMode = mode_id  # type: ignore
+        confirmation_mode: ConfirmationMode = cast(ConfirmationMode, mode_id)
         await self._set_confirmation_mode(session_id, confirmation_mode)
 
         await self._conn.session_update(
