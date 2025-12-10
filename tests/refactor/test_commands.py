@@ -266,6 +266,7 @@ class TestOpenHandsAppCommands:
             oh_app = cast(OpenHandsApp, pilot.app)
             oh_app.notify = notify_mock
 
+            dummy_runner = None
             if has_runner:
                 # Create a mock conversation runner
                 dummy_runner = mock.MagicMock()
@@ -282,14 +283,10 @@ class TestOpenHandsAppCommands:
                 notify_mock.assert_called_once()
                 call_args = notify_mock.call_args
                 assert call_args[1]["title"] == expected_notification
-            elif has_runner and not runner_running:
+            elif has_runner and dummy_runner is not None:
                 # Should have called condense_async
                 dummy_runner.condense_async.assert_called_once()
                 # Should not have called notify (error handling is in runner)
-                notify_mock.assert_not_called()
-            elif has_runner and runner_running:
-                # Should have called condense_async (which handles the running check)
-                dummy_runner.condense_async.assert_called_once()
                 notify_mock.assert_not_called()
 
     @pytest.mark.asyncio
