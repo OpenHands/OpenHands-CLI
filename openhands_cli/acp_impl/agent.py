@@ -47,12 +47,14 @@ from openhands_cli.acp_impl.confirmation import ConfirmationMode
 from openhands_cli.acp_impl.event import EventSubscriber
 from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
 from openhands_cli.acp_impl.slash_commands import (
+    VALID_CONFIRMATION_MODE,
     apply_confirmation_mode_to_conversation,
     create_help_text,
     get_available_slash_commands,
     get_unknown_command_text,
     handle_confirm_argument,
     parse_slash_command,
+    validate_confirmation_mode,
 )
 from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
@@ -674,13 +676,12 @@ class OpenHandsACPAgent(ACPAgent):
         """
         logger.info(f"Set session mode requested: {session_id} -> {mode_id}")
 
-        # Validate mode_id is a valid confirmation mode
-        valid_modes = {"always-ask", "always-approve", "llm-approve"}
-        if mode_id not in valid_modes:
+        mode = validate_confirmation_mode(mode_id)
+        if mode is None:
             raise RequestError.invalid_params(
                 {
                     "reason": f"Invalid mode ID: {mode_id}",
-                    "validModes": sorted(valid_modes),
+                    "validModes": sorted(VALID_CONFIRMATION_MODE),
                 }
             )
 

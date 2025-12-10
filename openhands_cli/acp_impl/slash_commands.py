@@ -16,6 +16,12 @@ from openhands_cli.acp_impl.confirmation import CONFIRMATION_MODES, Confirmation
 
 logger = logging.getLogger(__name__)
 
+VALID_CONFIRMATION_MODE: list[ConfirmationMode] = [
+    "always-ask",
+    "always-approve",
+    "llm-approve",
+]
+
 
 def get_available_slash_commands() -> list[AvailableCommand]:
     """Get list of available slash commands in ACP format.
@@ -149,13 +155,8 @@ def validate_confirmation_mode(mode_str: str) -> ConfirmationMode | None:
     Returns:
         ConfirmationMode if valid, None otherwise
     """
-    valid_modes: list[ConfirmationMode] = [
-        "always-ask",
-        "always-approve",
-        "llm-approve",
-    ]
     normalized = mode_str.lower().strip()
-    return normalized if normalized in valid_modes else None
+    return normalized if normalized in VALID_CONFIRMATION_MODE else None
 
 
 def apply_confirmation_mode_to_conversation(
