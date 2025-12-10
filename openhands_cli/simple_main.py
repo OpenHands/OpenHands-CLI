@@ -96,8 +96,29 @@ def main() -> None:
                 )
 
             else:
-                # Check if resume was called without ID
-                if args.resume is not None and args.resume == "":
+                # Handle resume logic
+                resume_id = args.resume
+                
+                # Check if --last flag is used
+                if args.last:
+                    if args.resume is None:
+                        print_formatted_text(HTML("<yellow>Error: --last flag requires --resume</yellow>"))
+                        return
+                    
+                    # Get the latest conversation ID
+                    from openhands_cli.conversations.lister import ConversationLister
+                    lister = ConversationLister()
+                    latest_id = lister.get_latest_conversation_id()
+                    
+                    if latest_id is None:
+                        print_formatted_text(HTML("<yellow>No conversations found to resume.</yellow>"))
+                        return
+                    
+                    resume_id = latest_id
+                    print_formatted_text(HTML(f"<green>Resuming latest conversation: {latest_id}</green>"))
+                
+                # Check if resume was called without ID and without --last
+                elif args.resume is not None and args.resume == "":
                     # Resume called without ID - show conversation list
                     from openhands_cli.conversations.display import display_recent_conversations
                     display_recent_conversations()
@@ -122,7 +143,7 @@ def main() -> None:
 
                 # Start agent chat
                 run_cli_entry(
-                    resume_conversation_id=args.resume,
+                    resume_conversation_id=resume_id,
                     confirmation_policy=confirmation_policy,
                     queued_inputs=queued_inputs,
                 )

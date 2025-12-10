@@ -139,3 +139,16 @@ class ConversationLister:
                 continue
         
         return None
+    
+    def get_latest_conversation_id(self) -> str | None:
+        """Get the ID of the most recent conversation.
+        
+        Returns:
+            The conversation ID of the most recent conversation, or None if no conversations exist.
+        """
+        conversations = self.list()
+        if not conversations:
+            return None
+        
+        # Conversations are already sorted by created_date (latest first)
+        return conversations[0].id

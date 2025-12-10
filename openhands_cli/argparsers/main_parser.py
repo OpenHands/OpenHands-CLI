@@ -67,6 +67,11 @@ def create_main_parser() -> argparse.ArgumentParser:
         help="Conversation ID to resume. If no ID provided, shows list of recent conversations"
     )
     parser.add_argument(
+        "--last",
+        action="store_true",
+        help="Resume the most recent conversation (use with --resume)"
+    )
+    parser.add_argument(
         "--exp",
         action="store_true",
         help="Use experimental textual-based UI instead of the default CLI interface",
