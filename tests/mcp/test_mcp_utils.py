@@ -23,10 +23,11 @@ from openhands_cli.mcp.mcp_utils import (
 
 @pytest.fixture
 def temp_config_path():
-    """Fixture that provides a temporary config path and patches MCP_CONFIG_PATH."""
+    """Fixture that provides a temporary config path and patches PERSISTENCE_DIR."""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "mcp.json"
-        with patch("openhands_cli.mcp.mcp_utils.MCP_CONFIG_PATH", config_path):
+        # Patch PERSISTENCE_DIR so that _get_mcp_config_path() returns our temp path
+        with patch("openhands_cli.locations.PERSISTENCE_DIR", str(temp_dir)):
             yield config_path
 
 

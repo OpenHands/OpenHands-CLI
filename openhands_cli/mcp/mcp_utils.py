@@ -14,8 +14,15 @@ from pydantic import ValidationError as PydanticValidationError
 from openhands_cli.locations import MCP_CONFIG_FILE, PERSISTENCE_DIR
 
 
-# MCP configuration file path
-MCP_CONFIG_PATH = Path(PERSISTENCE_DIR) / MCP_CONFIG_FILE
+def _get_mcp_config_path() -> Path:
+    """Get the MCP configuration file path.
+
+    This function dynamically resolves the path to ensure it works
+    correctly when PERSISTENCE_DIR is patched in tests.
+    """
+    # Import dynamically to get the current (potentially patched) value
+
+    return Path(PERSISTENCE_DIR) / MCP_CONFIG_FILE
 
 
 class MCPConfigurationError(Exception):
@@ -43,12 +50,13 @@ def _load_config() -> MCPConfig:
         MCPConfigurationError: If the configuration file is invalid.
         ValidationError: If the configuration format is invalid.
     """
-    if not MCP_CONFIG_PATH.exists():
+    config_path = _get_mcp_config_path()
+    if not config_path.exists():
         # Return empty config with mcpServers structure
         return MCPConfig.from_dict({"mcpServers": {}})
 
     try:
-        return MCPConfig.from_file(MCP_CONFIG_PATH)
+        return MCPConfig.from_file(config_path)
     except (ValueError, PydanticValidationError) as e:
         # Re-raise as MCPConfigurationError for consistency
         raise MCPConfigurationError(f"Invalid MCP configuration file: {e}") from e
@@ -66,8 +74,9 @@ def _save_config(config: MCPConfig) -> None:
         MCPConfigurationError: If the configuration cannot be saved.
     """
     try:
-        _ensure_config_dir(MCP_CONFIG_PATH)
-        config.write_to_file(MCP_CONFIG_PATH)
+        config_path = _get_mcp_config_path()
+        _ensure_config_dir(config_path)
+        config.write_to_file(config_path)
     except Exception as e:
         raise MCPConfigurationError(f"Error saving config file: {e}") from e
 
@@ -265,12 +274,13 @@ def get_config_status() -> dict[str, Any]:
             'message': str
         }
     """
-    if not MCP_CONFIG_PATH.exists():
+    config_path = _get_mcp_config_path()
+    if not config_path.exists():
         return {
             "exists": False,
             "valid": False,
             "servers": {},
-            "message": f"MCP configuration file not found at {MCP_CONFIG_PATH}",
+            "message": f"MCP configuration file not found at {config_path}",
         }
 
     try:
