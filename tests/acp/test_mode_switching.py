@@ -101,7 +101,7 @@ class TestAgentModeSwitching:
             assert len(response.modes.available_modes) == 3
 
     @pytest.mark.asyncio
-    async def test_mode_persists_across_session(self, acp_agent, tmp_path):
+    async def test_mode_not_persists_across_session(self, acp_agent, tmp_path):
         """Test that confirmation mode persists within a session."""
         with (
             patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
