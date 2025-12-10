@@ -72,10 +72,13 @@ def main() -> None:
                 # Check if resume was called without ID
                 if args.resume is not None and args.resume == "":
                     # Resume called without ID - show conversation list
-                    from openhands_cli.conversations.display import display_recent_conversations
+                    from openhands_cli.conversations.display import (
+                        display_recent_conversations,
+                    )
+
                     display_recent_conversations()
                     return
-                
+
                 # Use experimental textual-based UI
                 from openhands_cli.refactor.textual_app import main as textual_main
 
@@ -98,32 +101,46 @@ def main() -> None:
             else:
                 # Handle resume logic
                 resume_id = args.resume
-                
+
                 # Check if --last flag is used
                 if args.last:
                     if args.resume is None:
-                        print_formatted_text(HTML("<yellow>Error: --last flag requires --resume</yellow>"))
+                        print_formatted_text(
+                            HTML(
+                                "<yellow>Error: --last flag requires --resume</yellow>"
+                            )
+                        )
                         return
-                    
+
                     # Get the latest conversation ID
                     from openhands_cli.conversations.lister import ConversationLister
+
                     lister = ConversationLister()
                     latest_id = lister.get_latest_conversation_id()
-                    
+
                     if latest_id is None:
-                        print_formatted_text(HTML("<yellow>No conversations found to resume.</yellow>"))
+                        print_formatted_text(
+                            HTML("<yellow>No conversations found to resume.</yellow>")
+                        )
                         return
-                    
+
                     resume_id = latest_id
-                    print_formatted_text(HTML(f"<green>Resuming latest conversation: {latest_id}</green>"))
-                
+                    print_formatted_text(
+                        HTML(
+                            f"<green>Resuming latest conversation: {latest_id}</green>"
+                        )
+                    )
+
                 # Check if resume was called without ID and without --last
                 elif args.resume is not None and args.resume == "":
                     # Resume called without ID - show conversation list
-                    from openhands_cli.conversations.display import display_recent_conversations
+                    from openhands_cli.conversations.display import (
+                        display_recent_conversations,
+                    )
+
                     display_recent_conversations()
                     return
-                
+
                 # Default CLI behavior - no subcommand needed
                 # Import agent_chat only when needed
                 from openhands_cli.agent_chat import run_cli_entry
