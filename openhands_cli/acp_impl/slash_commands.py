@@ -189,6 +189,34 @@ def apply_confirmation_mode_to_conversation(
     logger.debug(f"Set confirmation mode to {mode} for session {session_id}")
 
 
+def get_confirmation_mode_from_conversation(
+    conversation: LocalConversation,
+) -> ConfirmationMode:
+    """Get current confirmation mode from a conversation's policy.
+
+    Args:
+        conversation: The conversation to query
+
+    Returns:
+        Current confirmation mode as a string
+        ("always-ask", "always-approve", or "llm-approve")
+    """
+    policy = conversation.state.confirmation_policy
+
+    if isinstance(policy, NeverConfirm):
+        return "always-approve"
+    elif isinstance(policy, ConfirmRisky):
+        return "llm-approve"
+    elif isinstance(policy, AlwaysConfirm):
+        return "always-ask"
+    else:
+        # Default to always-ask for unknown policies
+        logger.warning(
+            f"Unknown confirmation policy: {type(policy)}, defaulting to always-ask"
+        )
+        return "always-ask"
+
+
 def handle_confirm_argument(
     current_mode: ConfirmationMode, argument: str
 ) -> tuple[str, ConfirmationMode | None]:

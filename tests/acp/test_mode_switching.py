@@ -6,6 +6,9 @@ import pytest
 from acp.schema import TextContentBlock
 
 from openhands_cli.acp_impl.agent import OpenHandsACPAgent, get_available_modes
+from openhands_cli.acp_impl.slash_commands import (
+    get_confirmation_mode_from_conversation,
+)
 
 
 class TestSessionModes:
@@ -120,7 +123,8 @@ class TestAgentModeSwitching:
             session_id = response.session_id
 
             # Initial mode should be default
-            assert acp_agent._confirmation_mode[session_id] == "always-ask"
+            conversation = acp_agent._active_sessions[session_id]
+            assert get_confirmation_mode_from_conversation(conversation) == "always-ask"
 
             # Send slash command to change mode
             await acp_agent.prompt(
@@ -129,7 +133,11 @@ class TestAgentModeSwitching:
             )
 
             # Mode should be updated
-            assert acp_agent._confirmation_mode[session_id] == "always-approve"
+            conversation = acp_agent._active_sessions[session_id]
+            assert (
+                get_confirmation_mode_from_conversation(conversation)
+                == "always-approve"
+            )
 
     @pytest.mark.asyncio
     async def test_slash_command_changes_conversation_policy(self, acp_agent, tmp_path):
@@ -187,21 +195,29 @@ class TestAgentModeSwitching:
                 session_id=session_id,
                 prompt=[TextContentBlock(type="text", text="/confirm always-approve")],
             )
-            assert acp_agent._confirmation_mode[session_id] == "always-approve"
+            conversation = acp_agent._active_sessions[session_id]
+            assert (
+                get_confirmation_mode_from_conversation(conversation)
+                == "always-approve"
+            )
 
             # Switch to llm-approve
             await acp_agent.prompt(
                 session_id=session_id,
                 prompt=[TextContentBlock(type="text", text="/confirm llm-approve")],
             )
-            assert acp_agent._confirmation_mode[session_id] == "llm-approve"
+            conversation = acp_agent._active_sessions[session_id]
+            assert (
+                get_confirmation_mode_from_conversation(conversation) == "llm-approve"
+            )
 
             # Switch back to always-ask
             await acp_agent.prompt(
                 session_id=session_id,
                 prompt=[TextContentBlock(type="text", text="/confirm always-ask")],
             )
-            assert acp_agent._confirmation_mode[session_id] == "always-ask"
+            conversation = acp_agent._active_sessions[session_id]
+            assert get_confirmation_mode_from_conversation(conversation) == "always-ask"
 
     @pytest.mark.asyncio
     async def test_invalid_mode_keeps_current_mode(self, acp_agent, tmp_path):
@@ -229,7 +245,8 @@ class TestAgentModeSwitching:
             )
 
             # Mode should remain unchanged
-            assert acp_agent._confirmation_mode[session_id] == "always-ask"
+            conversation = acp_agent._active_sessions[session_id]
+            assert get_confirmation_mode_from_conversation(conversation) == "always-ask"
 
     @pytest.mark.asyncio
     async def test_different_sessions_have_independent_modes(self, acp_agent, tmp_path):
@@ -272,8 +289,15 @@ class TestAgentModeSwitching:
             )
 
             # Verify modes are independent
-            assert acp_agent._confirmation_mode[session_id1] == "always-approve"
-            assert acp_agent._confirmation_mode[session_id2] == "llm-approve"
+            conversation1 = acp_agent._active_sessions[session_id1]
+            conversation2 = acp_agent._active_sessions[session_id2]
+            assert (
+                get_confirmation_mode_from_conversation(conversation1)
+                == "always-approve"
+            )
+            assert (
+                get_confirmation_mode_from_conversation(conversation2) == "llm-approve"
+            )
 
 
 class TestSlashCommandIntegration:
@@ -368,7 +392,8 @@ class TestSlashCommandIntegration:
             session_id = response.session_id
 
             # Get initial mode
-            initial_mode = acp_agent._confirmation_mode[session_id]
+            conversation = acp_agent._active_sessions[session_id]
+            initial_mode = get_confirmation_mode_from_conversation(conversation)
 
             # Send /confirm without argument
             await acp_agent.prompt(
@@ -377,7 +402,8 @@ class TestSlashCommandIntegration:
             )
 
             # Mode should not change
-            assert acp_agent._confirmation_mode[session_id] == initial_mode
+            conversation = acp_agent._active_sessions[session_id]
+            assert get_confirmation_mode_from_conversation(conversation) == initial_mode
 
             # Verify help text was sent
             acp_agent._conn.session_update.assert_called()
@@ -417,4 +443,8 @@ class TestSlashCommandIntegration:
             )
 
             # Mode should be updated
-            assert acp_agent._confirmation_mode[session_id] == "always-approve"
+            conversation = acp_agent._active_sessions[session_id]
+            assert (
+                get_confirmation_mode_from_conversation(conversation)
+                == "always-approve"
+            )

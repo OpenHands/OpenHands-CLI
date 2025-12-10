@@ -51,6 +51,7 @@ from openhands_cli.acp_impl.slash_commands import (
     apply_confirmation_mode_to_conversation,
     create_help_text,
     get_available_slash_commands,
+    get_confirmation_mode_from_conversation,
     get_unknown_command_text,
     handle_confirm_argument,
     parse_slash_command,
@@ -129,8 +130,6 @@ class OpenHandsACPAgent(ACPAgent):
         self._active_sessions: dict[str, LocalConversation] = {}
         # Track running tasks for each session to ensure proper cleanup on cancel
         self._running_tasks: dict[str, asyncio.Task] = {}
-        # Track confirmation mode state per session
-        self._confirmation_mode: dict[str, ConfirmationMode] = {}
         # Default confirmation mode for new sessions
         self._initial_confirmation_mode: ConfirmationMode = initial_confirmation_mode
         logger.info(
@@ -148,9 +147,14 @@ class OpenHandsACPAgent(ACPAgent):
         Returns:
             Status message
         """
-        current_mode: ConfirmationMode = self._confirmation_mode.get(
-            session_id, "always-ask"
-        )
+        # Get current mode from conversation if it exists
+        if session_id in self._active_sessions:
+            current_mode = get_confirmation_mode_from_conversation(
+                self._active_sessions[session_id]
+            )
+        else:
+            current_mode = self._initial_confirmation_mode
+
         response_text, new_mode = handle_confirm_argument(current_mode, argument)
         if new_mode is not None:
             await self._set_confirmation_mode(session_id, new_mode)
@@ -166,11 +170,15 @@ class OpenHandsACPAgent(ACPAgent):
             session_id: The session ID
             mode: Confirmation mode (always-ask|always-approve|llm-approve)
         """
-        self._confirmation_mode[session_id] = mode
         if session_id in self._active_sessions:
             conversation = self._active_sessions[session_id]
             apply_confirmation_mode_to_conversation(conversation, mode, session_id)
-        logger.debug(f"Confirmation mode for session {session_id}: {mode}")
+            logger.debug(f"Confirmation mode for session {session_id}: {mode}")
+        else:
+            logger.warning(
+                f"Cannot set confirmation mode for session {session_id}: "
+                "session not found"
+            )
 
     async def _send_available_commands(self, session_id: str) -> None:
         """Send available slash commands to the client.
@@ -222,12 +230,10 @@ class OpenHandsACPAgent(ACPAgent):
         )
 
         # Initialize confirmation mode to the configured default
-        if session_id not in self._confirmation_mode:
-            self._confirmation_mode[session_id] = self._initial_confirmation_mode
-            # Set the confirmation policy on the conversation
-            apply_confirmation_mode_to_conversation(
-                conversation, self._initial_confirmation_mode, session_id
-            )
+        # Set the confirmation policy on the conversation
+        apply_confirmation_mode_to_conversation(
+            conversation, self._initial_confirmation_mode, session_id
+        )
 
         # Cache it for future operations
         self._active_sessions[session_id] = conversation
@@ -409,9 +415,8 @@ class OpenHandsACPAgent(ACPAgent):
             await self._send_available_commands(session_id)
 
             # Get current confirmation mode for this session
-            current_mode = self._confirmation_mode.get(
-                session_id, self._initial_confirmation_mode
-            )
+            conversation = self._active_sessions[session_id]
+            current_mode = get_confirmation_mode_from_conversation(conversation)
 
             # Return response with modes
             return NewSessionResponse(
@@ -609,9 +614,7 @@ class OpenHandsACPAgent(ACPAgent):
                     f"Session {session_id} has no history (new or empty session)"
                 )
                 # Get current confirmation mode for this session
-                current_mode = self._confirmation_mode.get(
-                    session_id, self._initial_confirmation_mode
-                )
+                current_mode = get_confirmation_mode_from_conversation(conversation)
                 return LoadSessionResponse(modes=get_session_mode_state(current_mode))
 
             # Stream conversation history to client by reusing EventSubscriber
@@ -630,9 +633,7 @@ class OpenHandsACPAgent(ACPAgent):
             await self._send_available_commands(session_id)
 
             # Get current confirmation mode for this session
-            current_mode = self._confirmation_mode.get(
-                session_id, self._initial_confirmation_mode
-            )
+            current_mode = get_confirmation_mode_from_conversation(conversation)
 
             # Return response with modes
             return LoadSessionResponse(modes=get_session_mode_state(current_mode))
