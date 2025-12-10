@@ -110,8 +110,16 @@ def main() -> None:
             import asyncio
 
             from openhands_cli.acp_impl.agent import run_acp_server
+            from openhands_cli.acp_impl.confirmation import ConfirmationMode
 
-            asyncio.run(run_acp_server())
+            # Determine confirmation mode from arguments
+            confirmation_mode: ConfirmationMode = "always-ask"  # default
+            if args.always_approve:
+                confirmation_mode = "always-approve"
+            elif args.llm_approve:
+                confirmation_mode = "llm-approve"
+
+            asyncio.run(run_acp_server(initial_confirmation_mode=confirmation_mode))
         else:
             # Check if experimental flag is used
             if args.exp:
