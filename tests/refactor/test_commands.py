@@ -23,7 +23,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 3
+        assert len(COMMANDS) == 4
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -37,6 +37,7 @@ class TestCommands:
         [
             ("/help", "Display available commands"),
             ("/confirm", "Configure confirmation settings"),
+            ("/condense", "Condense conversation history"),
             ("/exit", "Exit the application"),
         ],
     )
@@ -71,9 +72,11 @@ class TestCommands:
             "OpenHands CLI Help",
             "/help",
             "/confirm",
+            "/condense",
             "/exit",
             "Display available commands",
             "Configure confirmation settings",
+            "Condense conversation history",
             "Exit the application",
             "Tips:",
             "Type / and press Tab",
@@ -140,6 +143,7 @@ class TestCommands:
         [
             ("/help", True),
             ("/confirm", True),
+            ("/condense", True),
             ("/exit", True),
             ("/help extra", False),
             ("/exit now", False),
