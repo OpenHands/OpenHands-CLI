@@ -4,6 +4,8 @@ import asyncio
 import uuid
 from collections.abc import Callable
 
+from rich.console import Console
+from rich.text import Text
 from textual.notifications import SeverityLevel
 
 from openhands.sdk import BaseConversation, Message, TextContent
@@ -109,7 +111,9 @@ class ConversationRunner:
         # Run send_message in the same thread pool, not on the UI loop
         await loop.run_in_executor(None, self.conversation.send_message, message)
 
-    async def process_message_async(self, user_input: str) -> None:
+    async def process_message_async(
+        self, user_input: str, headless: bool = False
+    ) -> None:
         """Process a user message asynchronously to keep UI unblocked.
 
         Args:
@@ -123,10 +127,10 @@ class ConversationRunner:
 
         # Run conversation processing in a separate thread to avoid blocking UI
         await asyncio.get_event_loop().run_in_executor(
-            None, self._run_conversation_sync, message
+            None, self._run_conversation_sync, message, headless
         )
 
-    def _run_conversation_sync(self, message: Message) -> None:
+    def _run_conversation_sync(self, message: Message, headless: bool = False) -> None:
         """Run the conversation synchronously in a thread.
 
         Args:
@@ -136,11 +140,16 @@ class ConversationRunner:
         try:
             # Send message and run conversation
             self.conversation.send_message(message)
-
             if self._confirmation_mode_active:
                 self._run_with_confirmation()
+            elif headless:
+                console = Console()
+                with console.status("Agent is working") as status:
+                    self.conversation.run()
+                    status.update("Agent finished")
             else:
                 self.conversation.run()
+
         except ConversationRunError as e:
             # Handle conversation run errors (includes LLM errors)
             self._notification_callback("Conversation Error", str(e), "error")
@@ -268,3 +277,25 @@ class ConversationRunner:
     def pause_runner_without_blocking(self):
         if self.is_running:
             asyncio.create_task(self.pause())
+
+    def get_conversation_summary(self) -> tuple[int, Text]:
+        """Get a summary of the conversation for headless mode output.
+
+        Returns:
+            Dictionary with conversation statistics and last agent message
+        """
+        if not self.conversation or not self.conversation.state:
+            return 0, Text(
+                text="No conversation data available",
+            )
+
+        agent_event_count = 0
+        last_agent_message = Text(text="No agent messages found")
+
+        # Parse events to count messages
+        for event in self.conversation.state.events:
+            if event.source == "agent":
+                agent_event_count += 1
+                last_agent_message = event.visualize
+
+        return agent_event_count, last_agent_message
