@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -111,36 +112,56 @@ class ConversationLister:
             First user prompt text or None if not found.
         """
         for event_file in event_files:
-            try:
-                with open(event_file, encoding="utf-8") as f:
-                    event_data = json.load(f)
-
-                # Try to convert JSON to MessageEvent
-                try:
-                    message_event = MessageEvent(**event_data)
-                except Exception:
-                    # Try to transform old format to new format
-                    try:
-                        transformed_data = self._transform_old_message_format(
-                            event_data
-                        )
-                        message_event = MessageEvent(**transformed_data)
-                    except Exception:
-                        # If it doesn't convert, skip this event
-                        continue
-
-                # Check if this is a user message event
-                if message_event.source == "user":
-                    # Access the typed object attributes
-                    for content_item in message_event.llm_message.content:
-                        if isinstance(content_item, TextContent):
-                            text = content_item.text.strip()
-                            if text:
-                                return text
-
-            except (json.JSONDecodeError, KeyError, TypeError):
+            event_data = self._load_event_data(event_file)
+            if event_data is None:
                 continue
 
+            message_event = self._to_message_event(event_data)
+            if message_event is None or message_event.source != "user":
+                continue
+
+            text = self._extract_text_from_message_event(message_event)
+            if text:
+                return text
+
+        return None
+
+    def _load_event_data(self, event_file: Path) -> dict[str, Any] | None:
+        """Safely load JSON event data from a file."""
+        try:
+            with open(event_file, encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError, TypeError):
+            return None
+
+    def _to_message_event(self, event_data: dict[str, Any]) -> MessageEvent | None:
+        """Convert raw event data to a MessageEvent, handling old formats."""
+        # Try new format first
+        try:
+            return MessageEvent(**event_data)
+        except Exception:
+            pass
+
+        # Try transformed old format
+        try:
+            transformed_data = self._transform_old_message_format(event_data)
+            return MessageEvent(**transformed_data)
+        except Exception:
+            return None
+
+    def _extract_text_from_message_event(
+        self, message_event: MessageEvent
+    ) -> str | None:
+        """Extract the first non-empty text content from a MessageEvent."""
+        llm_message = getattr(message_event, "llm_message", None)
+        if llm_message is None:
+            return None
+
+        for content_item in getattr(llm_message, "content", []):
+            if isinstance(content_item, TextContent):
+                text = content_item.text.strip()
+                if text:
+                    return text
         return None
 
     def _transform_old_message_format(self, event_data: dict) -> dict:
