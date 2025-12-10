@@ -1,6 +1,7 @@
 """Main argument parser for OpenHands CLI."""
 
 import argparse
+import os
 
 from openhands_cli import __version__
 
@@ -123,11 +124,12 @@ def create_main_parser() -> argparse.ArgumentParser:
     login_parser = subparsers.add_parser(
         "login", help="Authenticate with OpenHands Cloud using OAuth 2.0 Device Flow"
     )
+    default_cloud_url = os.getenv("OPENHANDS_CLOUD_URL", "https://app.all-hands.dev")
     login_parser.add_argument(
         "--server-url",
         type=str,
-        default="https://app.all-hands.dev",
-        help="OpenHands server URL (default: https://app.all-hands.dev)"
+        default=default_cloud_url,
+        help=f"OpenHands server URL (default: {default_cloud_url}, configurable via OPENHANDS_CLOUD_URL env var)"
     )
 
     # Add logout subcommand
