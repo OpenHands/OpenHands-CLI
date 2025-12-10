@@ -4,7 +4,6 @@ from typing import ClassVar
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from acp import SessionNotification
 from acp.schema import (
     SessionUpdate2,
     SessionUpdate3,
@@ -54,13 +53,13 @@ async def test_handle_message_event(event_subscriber, mock_connection):
     # Process the event
     await event_subscriber(event)
 
-    # Verify sessionUpdate was called
-    assert mock_connection.sessionUpdate.called
-    call_args = mock_connection.sessionUpdate.call_args[0][0]
-    assert isinstance(call_args, SessionNotification)
-    assert call_args.session_id == "test-session"
-    assert isinstance(call_args.update, SessionUpdate2)
-    assert call_args.update.session_update == "agent_message_chunk"
+    # Verify session_update was called
+    assert mock_connection.session_update.called
+    # Get the update parameter (second argument, first is session_id)
+    call_kwargs = mock_connection.session_update.call_args[1]
+    assert call_kwargs["session_id"] == "test-session"
+    assert isinstance(call_kwargs["update"], SessionUpdate2)
+    assert call_kwargs["update"].session_update == "agent_message_chunk"
 
 
 @pytest.mark.asyncio
@@ -101,21 +100,22 @@ async def test_handle_action_event(event_subscriber, mock_connection):
     # Process the event
     await event_subscriber._handle_action_event(event)
 
-    # Verify sessionUpdate was called multiple times (reasoning, thought, tool_call)
+    # Verify session_update was called multiple times (reasoning, thought, tool_call)
     # Should be at least 2: thought + tool_call
-    assert mock_connection.sessionUpdate.call_count >= 2
+    assert mock_connection.session_update.call_count >= 2
 
     # Check that tool_call notification was sent
-    calls = mock_connection.sessionUpdate.call_args_list
+    calls = mock_connection.session_update.call_args_list
     tool_call_found = False
     for call in calls:
-        notification = call[0][0]
-        if isinstance(notification.update, SessionUpdate4):
+        call_kwargs = call[1]
+        update = call_kwargs["update"]
+        if isinstance(update, SessionUpdate4):
             tool_call_found = True
-            assert notification.update.session_update == "tool_call"
-            assert notification.update.tool_call_id == "test-call-123"
-            assert notification.update.kind == "execute"  # terminal maps to execute
-            assert notification.update.status == "in_progress"
+            assert update.session_update == "tool_call"
+            assert update.tool_call_id == "test-call-123"
+            assert update.kind == "execute"  # terminal maps to execute
+            assert update.status == "in_progress"
 
     assert tool_call_found, "tool_call notification should be sent"
 
@@ -140,14 +140,15 @@ async def test_handle_observation_event(event_subscriber, mock_connection):
     # Process the event
     await event_subscriber._handle_observation_event(event)
 
-    # Verify sessionUpdate was called
-    assert mock_connection.sessionUpdate.called
-    call_args = mock_connection.sessionUpdate.call_args[0][0]
-    assert isinstance(call_args, SessionNotification)
-    assert isinstance(call_args.update, SessionUpdate5)
-    assert call_args.update.session_update == "tool_call_update"
-    assert call_args.update.toolCallId == "test-call-123"
-    assert call_args.update.status == "completed"
+    # Verify session_update was called
+    assert mock_connection.session_update.called
+    call_kwargs = mock_connection.session_update.call_args[1]
+    assert call_kwargs["session_id"] == "test-session"
+    update = call_kwargs["update"]
+    assert isinstance(update, SessionUpdate5)
+    assert update.session_update == "tool_call_update"
+    assert update.tool_call_id == "test-call-123"
+    assert update.status == "completed"
 
 
 @pytest.mark.asyncio
@@ -165,14 +166,15 @@ async def test_handle_agent_error_event(event_subscriber, mock_connection):
     # Process the event
     await event_subscriber._handle_observation_event(event)
 
-    # Verify sessionUpdate was called
-    assert mock_connection.sessionUpdate.called
-    call_args = mock_connection.sessionUpdate.call_args[0][0]
-    assert isinstance(call_args, SessionNotification)
-    assert isinstance(call_args.update, SessionUpdate5)
-    assert call_args.update.session_update == "tool_call_update"
-    assert call_args.update.status == "failed"
-    assert call_args.update.rawOutput == {"error": "Something went wrong"}
+    # Verify session_update was called
+    assert mock_connection.session_update.called
+    call_kwargs = mock_connection.session_update.call_args[1]
+    assert call_kwargs["session_id"] == "test-session"
+    update = call_kwargs["update"]
+    assert isinstance(update, SessionUpdate5)
+    assert update.session_update == "tool_call_update"
+    assert update.status == "failed"
+    assert update.raw_output == {"error": "Something went wrong"}
 
 
 @pytest.mark.asyncio
@@ -185,8 +187,8 @@ async def test_event_subscriber_with_empty_text(event_subscriber, mock_connectio
     # Process the event
     await event_subscriber(event)
 
-    # Verify sessionUpdate was not called for empty text
-    assert not mock_connection.sessionUpdate.called
+    # Verify session_update was not called for empty text
+    assert not mock_connection.session_update.called
 
 
 @pytest.mark.asyncio
@@ -199,10 +201,10 @@ async def test_event_subscriber_with_user_message(event_subscriber, mock_connect
     # Process the event
     await event_subscriber(event)
 
-    # Verify sessionUpdate was NOT called (user messages are skipped)
+    # Verify session_update was NOT called (user messages are skipped)
     # NOTE: Zed UI renders user messages when they're sent, so we don't
     # want to duplicate them by sending them again as UserMessageChunk
-    assert not mock_connection.sessionUpdate.called
+    assert not mock_connection.session_update.called
 
 
 @pytest.mark.asyncio
@@ -216,13 +218,13 @@ async def test_handle_system_prompt_event(event_subscriber, mock_connection):
     # Process the event
     await event_subscriber(event)
 
-    # Verify sessionUpdate was called
-    assert mock_connection.sessionUpdate.called
-    call_args = mock_connection.sessionUpdate.call_args[0][0]
-    assert isinstance(call_args, SessionNotification)
-    assert call_args.session_id == "test-session"
-    assert isinstance(call_args.update, SessionUpdate3)
-    assert call_args.update.session_update == "agent_thought_chunk"
+    # Verify session_update was called
+    assert mock_connection.session_update.called
+    call_kwargs = mock_connection.session_update.call_args[1]
+    assert call_kwargs["session_id"] == "test-session"
+    update = call_kwargs["update"]
+    assert isinstance(update, SessionUpdate3)
+    assert update.session_update == "agent_thought_chunk"
 
 
 @pytest.mark.asyncio
@@ -234,13 +236,13 @@ async def test_handle_pause_event(event_subscriber, mock_connection):
     # Process the event
     await event_subscriber(event)
 
-    # Verify sessionUpdate was called
-    assert mock_connection.sessionUpdate.called
-    call_args = mock_connection.sessionUpdate.call_args[0][0]
-    assert isinstance(call_args, SessionNotification)
-    assert call_args.session_id == "test-session"
-    assert isinstance(call_args.update, SessionUpdate3)
-    assert call_args.update.session_update == "agent_thought_chunk"
+    # Verify session_update was called
+    assert mock_connection.session_update.called
+    call_kwargs = mock_connection.session_update.call_args[1]
+    assert call_kwargs["session_id"] == "test-session"
+    update = call_kwargs["update"]
+    assert isinstance(update, SessionUpdate3)
+    assert update.session_update == "agent_thought_chunk"
 
 
 @pytest.mark.asyncio
@@ -257,13 +259,13 @@ async def test_handle_condensation_event(event_subscriber, mock_connection):
     # Process the event
     await event_subscriber(event)
 
-    # Verify sessionUpdate was called
-    assert mock_connection.sessionUpdate.called
-    call_args = mock_connection.sessionUpdate.call_args[0][0]
-    assert isinstance(call_args, SessionNotification)
-    assert call_args.session_id == "test-session"
-    assert isinstance(call_args.update, SessionUpdate3)
-    assert call_args.update.session_update == "agent_thought_chunk"
+    # Verify session_update was called
+    assert mock_connection.session_update.called
+    call_kwargs = mock_connection.session_update.call_args[1]
+    assert call_kwargs["session_id"] == "test-session"
+    update = call_kwargs["update"]
+    assert isinstance(update, SessionUpdate3)
+    assert update.session_update == "agent_thought_chunk"
 
 
 @pytest.mark.asyncio
@@ -275,13 +277,13 @@ async def test_handle_condensation_request_event(event_subscriber, mock_connecti
     # Process the event
     await event_subscriber(event)
 
-    # Verify sessionUpdate was called
-    assert mock_connection.sessionUpdate.called
-    call_args = mock_connection.sessionUpdate.call_args[0][0]
-    assert isinstance(call_args, SessionNotification)
-    assert call_args.session_id == "test-session"
-    assert isinstance(call_args.update, SessionUpdate3)
-    assert call_args.update.session_update == "agent_thought_chunk"
+    # Verify session_update was called
+    assert mock_connection.session_update.called
+    call_kwargs = mock_connection.session_update.call_args[1]
+    assert call_kwargs["session_id"] == "test-session"
+    update = call_kwargs["update"]
+    assert isinstance(update, SessionUpdate3)
+    assert update.session_update == "agent_thought_chunk"
 
 
 @pytest.mark.asyncio
@@ -295,8 +297,8 @@ async def test_conversation_state_update_event_is_skipped(
     # Process the event
     await event_subscriber(event)
 
-    # Verify sessionUpdate was NOT called
-    assert not mock_connection.sessionUpdate.called
+    # Verify session_update was NOT called
+    assert not mock_connection.session_update.called
 
 
 @pytest.mark.asyncio
@@ -324,46 +326,47 @@ async def test_handle_task_tracker_observation(event_subscriber, mock_connection
     # Process the event
     await event_subscriber._handle_observation_event(event)
 
-    # Verify sessionUpdate was called twice (plan + tool_call_update)
-    assert mock_connection.sessionUpdate.call_count == 2
+    # Verify session_update was called twice (plan + tool_call_update)
+    assert mock_connection.session_update.call_count == 2
 
     # Verify the plan update was sent
-    calls = mock_connection.sessionUpdate.call_args_list
+    calls = mock_connection.session_update.call_args_list
     plan_update_found = False
     tool_call_update_found = False
 
     for call in calls:
-        notification = call[0][0]
-        if isinstance(notification.update, SessionUpdate6):
+        call_kwargs = call[1]
+        update = call_kwargs["update"]
+        if isinstance(update, SessionUpdate6):
             plan_update_found = True
             # Verify plan structure
-            assert notification.update.session_update == "plan"
-            assert len(notification.update.entries) == 3
+            assert update.session_update == "plan"
+            assert len(update.entries) == 3
 
             # Verify first entry (done -> completed)
             # Note: notes are intentionally omitted for conciseness
-            entry1 = notification.update.entries[0]
+            entry1 = update.entries[0]
             assert entry1.content == "Task 1"
             assert entry1.status == "completed"
             assert entry1.priority == "medium"
 
             # Verify second entry (in_progress -> in_progress)
-            entry2 = notification.update.entries[1]
+            entry2 = update.entries[1]
             assert entry2.content == "Task 2"
             assert entry2.status == "in_progress"
             assert entry2.priority == "medium"
 
             # Verify third entry (todo -> pending)
-            entry3 = notification.update.entries[2]
+            entry3 = update.entries[2]
             assert entry3.content == "Task 3"
             assert entry3.status == "pending"
             assert entry3.priority == "medium"
 
-        elif isinstance(notification.update, SessionUpdate5):
+        elif isinstance(update, SessionUpdate5):
             tool_call_update_found = True
-            assert notification.update.session_update == "tool_call_update"
-            assert notification.update.tool_call_id == "task-call-123"
-            assert notification.update.status == "completed"
+            assert update.session_update == "tool_call_update"
+            assert update.tool_call_id == "task-call-123"
+            assert update.status == "completed"
 
     assert plan_update_found, "AgentPlanUpdate notification should be sent"
     assert tool_call_update_found, "ToolCallProgress notification should be sent"
@@ -386,17 +389,18 @@ async def test_handle_task_tracker_with_empty_list(event_subscriber, mock_connec
     # Process the event
     await event_subscriber._handle_observation_event(event)
 
-    # Verify sessionUpdate was called twice (plan with empty list + tool_call_update)
-    assert mock_connection.sessionUpdate.call_count == 2
+    # Verify session_update was called twice (plan with empty list + tool_call_update)
+    assert mock_connection.session_update.call_count == 2
 
     # Verify empty plan was sent
-    calls = mock_connection.sessionUpdate.call_args_list
+    calls = mock_connection.session_update.call_args_list
     plan_found = False
     for call in calls:
-        notification = call[0][0]
-        if isinstance(notification.update, SessionUpdate6):
+        call_kwargs = call[1]
+        update = call_kwargs["update"]
+        if isinstance(update, SessionUpdate6):
             plan_found = True
-            assert notification.update.entries == []
+            assert update.entries == []
 
     assert plan_found, "AgentPlanUpdate with empty entries should be sent"
 
