@@ -52,7 +52,7 @@ from openhands_cli.acp_impl.slash_commands import (
     extract_text_from_message_content,
     get_available_slash_commands,
     get_unknown_command_text,
-    handle_confirm_command,
+    handle_confirm_argument,
     parse_slash_command,
 )
 from openhands_cli.acp_impl.utils import (
@@ -149,7 +149,7 @@ class OpenHandsACPAgent(ACPAgent):
         current_mode: ConfirmationMode = self._confirmation_mode.get(
             session_id, "always-ask"
         )
-        response_text, new_mode = handle_confirm_command(current_mode, argument)
+        response_text, new_mode = handle_confirm_argument(current_mode, argument)
         if new_mode is not None:
             await self._set_confirmation_mode(session_id, new_mode)
 

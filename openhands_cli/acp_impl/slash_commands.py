@@ -188,7 +188,7 @@ def apply_confirmation_mode_to_conversation(
     logger.debug(f"Set confirmation mode to {mode} for session {session_id}")
 
 
-def handle_confirm_command(
+def handle_confirm_argument(
     current_mode: ConfirmationMode, argument: str
 ) -> tuple[str, ConfirmationMode | None]:
     """Handle /confirm command and return response.

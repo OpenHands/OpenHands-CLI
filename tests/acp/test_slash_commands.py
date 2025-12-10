@@ -14,7 +14,7 @@ from openhands_cli.acp_impl.slash_commands import (
     get_confirm_help_text,
     get_confirm_success_text,
     get_unknown_command_text,
-    handle_confirm_command,
+    handle_confirm_argument,
     parse_slash_command,
     validate_confirmation_mode,
 )
@@ -132,7 +132,7 @@ class TestConfirmCommandHandling:
 
     def test_confirm_no_argument_shows_help(self):
         """Test /confirm with no argument shows help."""
-        response, new_mode = handle_confirm_command("always-ask", "")
+        response, new_mode = handle_confirm_argument("always-ask", "")
         assert new_mode is None
         assert "Current confirmation mode: always-ask" in response
         assert "always-ask" in response
@@ -141,13 +141,13 @@ class TestConfirmCommandHandling:
 
     def test_confirm_whitespace_only_shows_help(self):
         """Test /confirm with whitespace shows help."""
-        response, new_mode = handle_confirm_command("always-ask", "   ")
+        response, new_mode = handle_confirm_argument("always-ask", "   ")
         assert new_mode is None
         assert "Current confirmation mode" in response
 
     def test_confirm_valid_mode_returns_success(self):
         """Test /confirm with valid mode returns success message."""
-        response, new_mode = handle_confirm_command("always-ask", "always-approve")
+        response, new_mode = handle_confirm_argument("always-ask", "always-approve")
         assert new_mode == "always-approve"
         assert "Confirmation mode set to: always-approve" in response
         assert CONFIRMATION_MODES["always-approve"]["long"] in response
@@ -155,13 +155,13 @@ class TestConfirmCommandHandling:
     def test_confirm_all_valid_modes(self):
         """Test /confirm with all valid modes."""
         for mode in ["always-ask", "always-approve", "llm-approve"]:
-            response, new_mode = handle_confirm_command("always-ask", mode)
+            response, new_mode = handle_confirm_argument("always-ask", mode)
             assert new_mode == mode
             assert f"Confirmation mode set to: {mode}" in response
 
     def test_confirm_invalid_mode_shows_error(self):
         """Test /confirm with invalid mode shows error."""
-        response, new_mode = handle_confirm_command("always-ask", "invalid-mode")
+        response, new_mode = handle_confirm_argument("always-ask", "invalid-mode")
         assert new_mode is None
         assert "Unknown mode: invalid-mode" in response
         assert "always-ask" in response
