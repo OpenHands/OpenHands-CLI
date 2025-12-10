@@ -32,6 +32,8 @@ def create_main_parser() -> argparse.ArgumentParser:
                 openhands serve --gpu               # Launch with GPU support
                 openhands acp                       # Agent-Client Protocol
                                                       server (e.g., Zed IDE)
+                openhands login                     # Authenticate with OpenHands Cloud
+                openhands logout                    # Log out from OpenHands Cloud
         """,
     )
 
@@ -115,6 +117,27 @@ def create_main_parser() -> argparse.ArgumentParser:
     # Add ACP subcommand
     subparsers.add_parser(
         "acp", help="Start OpenHands as an Agent Client Protocol (ACP) agent"
+    )
+
+    # Add login subcommand
+    login_parser = subparsers.add_parser(
+        "login", help="Authenticate with OpenHands Cloud using OAuth 2.0 Device Flow"
+    )
+    login_parser.add_argument(
+        "--server-url",
+        type=str,
+        default="https://app.all-hands.dev",
+        help="OpenHands server URL (default: https://app.all-hands.dev)"
+    )
+
+    # Add logout subcommand
+    logout_parser = subparsers.add_parser(
+        "logout", help="Log out from OpenHands Cloud"
+    )
+    logout_parser.add_argument(
+        "--server-url",
+        type=str,
+        help="OpenHands server URL to log out from (if not specified, logs out from all servers)"
     )
 
     return parser

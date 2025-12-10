@@ -66,6 +66,18 @@ def main() -> None:
             from openhands_cli.acp_impl.agent import run_acp_server
 
             asyncio.run(run_acp_server())
+        elif args.command == "login":
+            from openhands_cli.auth.login_command import run_login_command
+
+            success = run_login_command(args.server_url)
+            if not success:
+                exit(1)
+        elif args.command == "logout":
+            from openhands_cli.auth.logout_command import run_logout_command
+
+            success = run_logout_command(args.server_url)
+            if not success:
+                exit(1)
         else:
             # Check if experimental flag is used
             if args.exp:
