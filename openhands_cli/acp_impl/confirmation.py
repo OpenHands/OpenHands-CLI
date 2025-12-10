@@ -141,20 +141,10 @@ async def ask_user_confirmation_acp(
             session_id=session_id, tool_call=tool_call, options=PERMISSION_OPTIONS
         )
 
-        # Handle user's choice using dispatch dictionary
         outcome = response.outcome
-        if isinstance(outcome, AllowedOutcome):
-            option_handlers = _get_option_handlers()
-            handler = option_handlers.get(outcome.optionId)
-            if handler:
-                return handler()
-            else:
-                logger.warning(
-                    f"Unknown option selected: {outcome.optionId}, treating as reject"
-                )
-                return ConfirmationResult(decision=UserConfirmation.REJECT)
-        else:
-            # DeniedOutcome - user cancelled
+
+        # Handle DeniedOutcome - user cancelled
+        if not isinstance(outcome, AllowedOutcome):
             return ConfirmationResult(
                 decision=UserConfirmation.REJECT,
                 reason=(
@@ -162,6 +152,19 @@ async def ask_user_confirmation_acp(
                     "they want to proceed."
                 ),
             )
+
+        # Handle AllowedOutcome using dispatch dictionary
+        option_handlers = _get_option_handlers()
+        handler = option_handlers.get(outcome.optionId)
+
+        if handler:
+            return handler()
+
+        # Unknown option - treat as reject
+        logger.warning(
+            f"Unknown option selected: {outcome.optionId}, treating as reject"
+        )
+        return ConfirmationResult(decision=UserConfirmation.REJECT)
 
     except Exception as e:
         logger.error(f"Error during ACP confirmation: {e}", exc_info=True)
