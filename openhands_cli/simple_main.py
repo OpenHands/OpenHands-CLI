@@ -4,6 +4,7 @@ Simple main entry point for OpenHands CLI.
 This is a simplified version that demonstrates the TUI functionality.
 """
 
+import argparse
 import logging
 import os
 import warnings
@@ -61,7 +62,18 @@ def main() -> None:
             # Import MCP command handler only when needed
             from openhands_cli.mcp.mcp_commands import handle_mcp_command
 
-            handle_mcp_command(args)
+            # Get the MCP parser to pass for help display
+            mcp_parser = None
+            if parser._subparsers:
+                for action in parser._subparsers._actions:
+                    if isinstance(action, argparse._SubParsersAction):
+                        for choice, subparser in action.choices.items():
+                            if choice == "mcp":
+                                mcp_parser = subparser
+                                break
+                        break
+
+            handle_mcp_command(args, mcp_parser)
         else:
             # Check if experimental flag is used
             if args.exp:
