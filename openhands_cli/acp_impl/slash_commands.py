@@ -4,7 +4,7 @@ import logging
 
 from acp.schema import AvailableCommand, AvailableCommandInput, UnstructuredCommandInput
 
-from openhands.sdk import ImageContent, LocalConversation, TextContent
+from openhands.sdk import LocalConversation
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmRisky,
@@ -215,32 +215,6 @@ def handle_confirm_argument(
 
     # Return success message with the new mode
     return get_confirm_success_text(mode), mode
-
-
-def extract_text_from_message_content(
-    message_content: list[TextContent | ImageContent],
-) -> str | None:
-    """Extract text from message content for slash command detection.
-
-    This function is specifically designed for slash command detection and only
-    accepts single text content blocks. Multiple blocks or image content are
-    not valid slash commands.
-
-    Args:
-        message_content: Message content (typically a list of content blocks)
-
-    Returns:
-        The text content if exactly one TextContent block, None otherwise
-    """
-    if not isinstance(message_content, list) or len(message_content) != 1:
-        return None
-
-    # Only accept single TextContent blocks for slash commands
-    if not isinstance(message_content[0], TextContent):
-        return None
-
-    # Use SDK utility to extract text - content_to_str handles the conversion
-    return message_content[0].text
 
 
 def get_unknown_command_text(command: str) -> str:

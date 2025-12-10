@@ -49,7 +49,6 @@ from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
 from openhands_cli.acp_impl.slash_commands import (
     apply_confirmation_mode_to_conversation,
     create_help_text,
-    extract_text_from_message_content,
     get_available_slash_commands,
     get_unknown_command_text,
     handle_confirm_argument,
@@ -59,6 +58,7 @@ from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
     convert_acp_mcp_servers_to_agent_format,
     convert_acp_prompt_to_message_content,
+    extract_text_from_message_content,
 )
 from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
