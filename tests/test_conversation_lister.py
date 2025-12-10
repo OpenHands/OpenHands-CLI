@@ -66,9 +66,7 @@ class TestConversationLister:
                 "id": "user-message-id",
                 "timestamp": timestamp,
                 "source": "user",
-                "message": {
-                    "content": [{"type": "text", "text": user_message}]
-                },
+                "message": {"content": [{"type": "text", "text": user_message}]},
             }
 
             with open(events_dir / "event-00001-user.json", "w") as f:
@@ -85,7 +83,7 @@ class TestConversationLister:
                 conv_id = "test-conversation-id"
                 timestamp = "2025-10-21T15:17:29.421124"
                 user_message = "Hello, please help me with my code"
-                
+
                 self._create_conversation_with_events(
                     temp_dir, conv_id, timestamp, user_message
                 )
@@ -111,7 +109,7 @@ class TestConversationLister:
                     ("conv1", "2025-10-20T10:00:00.000000", "First conversation"),
                     ("conv2", "2025-10-21T10:00:00.000000", "Second conversation"),
                 ]
-                
+
                 for conv_id, timestamp, user_message in conversations_data:
                     self._create_conversation_with_events(
                         temp_dir, conv_id, timestamp, user_message
@@ -136,7 +134,7 @@ class TestConversationLister:
             ):
                 conv_id = "no_user_msg"
                 timestamp = "2025-10-21T15:17:29.421124"
-                
+
                 # Create conversation without user message
                 self._create_conversation_with_events(temp_dir, conv_id, timestamp)
 
@@ -159,7 +157,7 @@ class TestConversationLister:
                 "openhands_cli.conversations.lister.CONVERSATIONS_DIR", temp_dir
             ):
                 conv_dir = Path(temp_dir) / "invalid_conv"
-                
+
                 if invalid_type == "no_events_dir":
                     # Directory without events subdirectory
                     conv_dir.mkdir()
@@ -207,14 +205,14 @@ class TestResumeLogicHandling:
     ):
         """Test handle_resume_logic with various argument combinations."""
         args = Namespace(**args_dict)
-        
+
         # Mock conversation lister for --last tests
         with patch(
             "openhands_cli.conversations.lister.ConversationLister"
         ) as mock_lister_cls:
             mock_lister = MagicMock()
             mock_lister_cls.return_value = mock_lister
-            
+
             if args_dict.get("last") and args_dict.get("resume") is not None:
                 # For --resume --last, mock getting latest conversation
                 mock_lister.get_latest_conversation_id.return_value = "latest-conv-id"
@@ -226,9 +224,9 @@ class TestResumeLogicHandling:
                 "openhands_cli.conversations.display.display_recent_conversations"
             ) as mock_display:
                 result = handle_resume_logic(args)
-                
+
                 assert result == expected_result
-                
+
                 # Verify appropriate functions were called
                 if args_dict.get("resume") == "" and not args_dict.get("last"):
                     # --resume without ID should show conversation list
@@ -236,7 +234,7 @@ class TestResumeLogicHandling:
                 elif args_dict.get("last") and args_dict.get("resume") is not None:
                     # --resume --last should get latest conversation
                     mock_lister.get_latest_conversation_id.assert_called_once()
-                
+
                 # Verify output was shown when expected
                 if should_show_output:
                     assert mock_print.called or mock_display.called
@@ -244,17 +242,17 @@ class TestResumeLogicHandling:
     def test_handle_resume_logic_no_conversations_for_last(self):
         """Test --resume --last when no conversations exist."""
         args = Namespace(resume="", last=True)
-        
+
         with patch(
             "openhands_cli.conversations.lister.ConversationLister"
         ) as mock_lister_cls:
             mock_lister = MagicMock()
             mock_lister_cls.return_value = mock_lister
             mock_lister.get_latest_conversation_id.return_value = None
-            
+
             with patch("openhands_cli.simple_main.print_formatted_text") as mock_print:
                 result = handle_resume_logic(args)
-                
+
                 assert result is None
                 mock_print.assert_called()
                 # Verify the error message contains expected text
