@@ -85,7 +85,6 @@ class DeviceFlowClient:
         url = urljoin(self.server_url, "/oauth/device/token")
         
         data = {
-            "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
             "device_code": device_code
         }
         
