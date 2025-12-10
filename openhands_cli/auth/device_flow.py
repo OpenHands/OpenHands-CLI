@@ -19,15 +19,13 @@ class DeviceFlowError(Exception):
 class DeviceFlowClient:
     """OAuth 2.0 Device Flow client for CLI authentication."""
     
-    def __init__(self, server_url: str, client_id: str = "openhands-cli"):
+    def __init__(self, server_url: str):
         """Initialize the device flow client.
         
         Args:
             server_url: Base URL of the OpenHands server
-            client_id: OAuth client ID for the CLI
         """
         self.server_url = server_url.rstrip('/')
-        self.client_id = client_id
         self.timeout = httpx.Timeout(30.0)  # 30 second timeout
     
     async def start_device_flow(self) -> Tuple[str, str, str, int]:
@@ -41,10 +39,8 @@ class DeviceFlowClient:
         """
         url = urljoin(self.server_url, "/oauth/device/authorize")
         
-        data = {
-            "client_id": self.client_id,
-            "scope": "openid profile email"
-        }
+        # No data needed since endpoints are already authenticated
+        data = {}
         
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -90,8 +86,7 @@ class DeviceFlowClient:
         
         data = {
             "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
-            "device_code": device_code,
-            "client_id": self.client_id
+            "device_code": device_code
         }
         
         max_attempts = 120  # 10 minutes with 5-second intervals
