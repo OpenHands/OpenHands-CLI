@@ -28,7 +28,6 @@ from acp.schema import (
     LoadSessionResponse,
     McpCapabilities,
     PromptCapabilities,
-    SessionMode,
     SessionModeState,
     SetSessionModelResponse,
     SetSessionModeResponse,
@@ -43,7 +42,10 @@ from openhands.sdk import (
 )
 from openhands.sdk.event import Event
 from openhands_cli import __version__
-from openhands_cli.acp_impl.confirmation import ConfirmationMode
+from openhands_cli.acp_impl.confirmation import (
+    ConfirmationMode,
+    get_available_modes,
+)
 from openhands_cli.acp_impl.event import EventSubscriber
 from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
 from openhands_cli.acp_impl.slash_commands import (
@@ -69,34 +71,6 @@ from openhands_cli.tui.settings.store import MCPConfigurationError
 
 
 logger = logging.getLogger(__name__)
-
-
-def get_available_modes() -> list[SessionMode]:
-    """Get list of available session modes.
-
-    Returns:
-        List of SessionMode objects representing available modes
-    """
-    return [
-        SessionMode(
-            id="always-ask",
-            name="Always Ask Mode",
-            description="Request permission before making any changes",
-        ),
-        SessionMode(
-            id="always-approve",
-            name="Always Approve Mode",
-            description="Automatically approve all actions without asking",
-        ),
-        SessionMode(
-            id="llm-approve",
-            name="LLM Approve Mode",
-            description=(
-                "Use LLM security analyzer to auto-approve safe actions. "
-                "Only ask for permission on high risk actions."
-            ),
-        ),
-    ]
 
 
 def get_session_mode_state(current_mode: ConfirmationMode) -> SessionModeState:

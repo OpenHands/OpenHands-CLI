@@ -9,7 +9,8 @@ from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     NeverConfirm,
 )
-from openhands_cli.acp_impl.agent import OpenHandsACPAgent, get_available_modes
+from openhands_cli.acp_impl.agent import OpenHandsACPAgent
+from openhands_cli.acp_impl.confirmation import get_available_modes
 from openhands_cli.acp_impl.slash_commands import (
     get_confirmation_mode_from_conversation,
 )
