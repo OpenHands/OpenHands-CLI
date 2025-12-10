@@ -11,8 +11,6 @@ from fastmcp.exceptions import ValidationError
 from fastmcp.mcp_config import MCPConfig, RemoteMCPServer, StdioMCPServer
 from pydantic import ValidationError as PydanticValidationError
 
-from openhands_cli.locations import MCP_CONFIG_FILE, PERSISTENCE_DIR
-
 
 def _get_mcp_config_path() -> Path:
     """Get the MCP configuration file path.
@@ -20,9 +18,10 @@ def _get_mcp_config_path() -> Path:
     This function dynamically resolves the path to ensure it works
     correctly when PERSISTENCE_DIR is patched in tests.
     """
-    # Import dynamically to get the current (potentially patched) value
+    # Import the module and get the current value to support patching
+    import openhands_cli.locations as locations
 
-    return Path(PERSISTENCE_DIR) / MCP_CONFIG_FILE
+    return Path(locations.PERSISTENCE_DIR) / locations.MCP_CONFIG_FILE
 
 
 class MCPConfigurationError(Exception):
