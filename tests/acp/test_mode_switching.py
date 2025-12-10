@@ -5,10 +5,42 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from acp.schema import TextContentBlock
 
+from openhands.sdk.security.confirmation_policy import (
+    AlwaysConfirm,
+    NeverConfirm,
+)
 from openhands_cli.acp_impl.agent import OpenHandsACPAgent, get_available_modes
 from openhands_cli.acp_impl.slash_commands import (
     get_confirmation_mode_from_conversation,
 )
+
+
+def create_mock_conversation_with_policy(initial_policy=None):
+    """Create a mock conversation with a real confirmation policy that can be updated.
+
+    Args:
+        initial_policy: Initial confirmation policy (defaults to AlwaysConfirm)
+
+    Returns:
+        Mock conversation with working set_confirmation_policy
+    """
+    if initial_policy is None:
+        initial_policy = AlwaysConfirm()
+
+    mock_conversation = MagicMock()
+    mock_conversation.state.events = []
+    mock_conversation.state.confirmation_policy = initial_policy
+
+    # Make set_confirmation_policy actually update the policy
+    def set_policy_side_effect(new_policy):
+        mock_conversation.state.confirmation_policy = new_policy
+
+    mock_conversation.set_confirmation_policy = MagicMock(
+        side_effect=set_policy_side_effect
+    )
+    mock_conversation.set_security_analyzer = MagicMock()
+
+    return mock_conversation
 
 
 class TestSessionModes:
@@ -114,8 +146,7 @@ class TestAgentModeSwitching:
             mock_agent.llm.model = "test-model"
             mock_load.return_value = mock_agent
 
-            mock_conversation = MagicMock()
-            mock_conversation.state.events = []
+            mock_conversation = create_mock_conversation_with_policy()
             mock_conv.return_value = mock_conversation
 
             # Create session
@@ -142,7 +173,6 @@ class TestAgentModeSwitching:
     @pytest.mark.asyncio
     async def test_slash_command_changes_conversation_policy(self, acp_agent, tmp_path):
         """Test that /confirm command updates the conversation's confirmation policy."""
-        from openhands.sdk.security.confirmation_policy import NeverConfirm
 
         with (
             patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
@@ -152,8 +182,7 @@ class TestAgentModeSwitching:
             mock_agent.llm.model = "test-model"
             mock_load.return_value = mock_agent
 
-            mock_conversation = MagicMock()
-            mock_conversation.state.events = []
+            mock_conversation = create_mock_conversation_with_policy()
             mock_conv.return_value = mock_conversation
 
             # Create session
@@ -182,8 +211,7 @@ class TestAgentModeSwitching:
             mock_agent.llm.model = "test-model"
             mock_load.return_value = mock_agent
 
-            mock_conversation = MagicMock()
-            mock_conversation.state.events = []
+            mock_conversation = create_mock_conversation_with_policy()
             mock_conv.return_value = mock_conversation
 
             # Create session
@@ -230,8 +258,7 @@ class TestAgentModeSwitching:
             mock_agent.llm.model = "test-model"
             mock_load.return_value = mock_agent
 
-            mock_conversation = MagicMock()
-            mock_conversation.state.events = []
+            mock_conversation = create_mock_conversation_with_policy()
             mock_conv.return_value = mock_conversation
 
             # Create session
@@ -260,8 +287,7 @@ class TestAgentModeSwitching:
             mock_load.return_value = mock_agent
 
             def create_mock_conversation(*args, **kwargs):
-                mock_conversation = MagicMock()
-                mock_conversation.state.events = []
+                mock_conversation = create_mock_conversation_with_policy()
                 return mock_conversation
 
             mock_conv.side_effect = create_mock_conversation
@@ -324,8 +350,7 @@ class TestSlashCommandIntegration:
             mock_agent.llm.model = "test-model"
             mock_load.return_value = mock_agent
 
-            mock_conversation = MagicMock()
-            mock_conversation.state.events = []
+            mock_conversation = create_mock_conversation_with_policy()
             mock_conv.return_value = mock_conversation
 
             # Create session
@@ -355,8 +380,7 @@ class TestSlashCommandIntegration:
             mock_agent.llm.model = "test-model"
             mock_load.return_value = mock_agent
 
-            mock_conversation = MagicMock()
-            mock_conversation.state.events = []
+            mock_conversation = create_mock_conversation_with_policy()
             mock_conv.return_value = mock_conversation
 
             # Create session
@@ -383,8 +407,7 @@ class TestSlashCommandIntegration:
             mock_agent.llm.model = "test-model"
             mock_load.return_value = mock_agent
 
-            mock_conversation = MagicMock()
-            mock_conversation.state.events = []
+            mock_conversation = create_mock_conversation_with_policy()
             mock_conv.return_value = mock_conversation
 
             # Create session
@@ -419,8 +442,7 @@ class TestSlashCommandIntegration:
             mock_agent.llm.model = "test-model"
             mock_load.return_value = mock_agent
 
-            mock_conversation = MagicMock()
-            mock_conversation.state.events = []
+            mock_conversation = create_mock_conversation_with_policy()
             mock_conv.return_value = mock_conversation
 
             # Create session
