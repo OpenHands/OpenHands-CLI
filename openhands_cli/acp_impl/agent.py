@@ -46,8 +46,8 @@ from openhands_cli.acp_impl.utils import (
     convert_acp_prompt_to_message_content,
 )
 from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
+from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
-from openhands_cli.tui.settings.store import MCPConfigurationError
 
 
 logger = logging.getLogger(__name__)

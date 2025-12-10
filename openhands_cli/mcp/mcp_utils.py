@@ -4,35 +4,24 @@ This module provides functionality to manage MCP server configurations
 similar to Claude's MCP command line interface.
 """
 
-import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
-from fastmcp.mcp_config import MCPConfig
+from fastmcp.exceptions import ValidationError
+from fastmcp.mcp_config import MCPConfig, RemoteMCPServer, StdioMCPServer
+from pydantic import ValidationError as PydanticValidationError
 
 from openhands_cli.locations import MCP_CONFIG_FILE, PERSISTENCE_DIR
+
+
+# MCP configuration file path
+MCP_CONFIG_PATH = Path(PERSISTENCE_DIR) / MCP_CONFIG_FILE
 
 
 class MCPConfigurationError(Exception):
     """Exception raised for MCP configuration errors."""
 
     pass
-
-
-def _get_config_path(config_path: str | None = None) -> Path:
-    """Get the path to the MCP configuration file.
-
-    Args:
-        config_path: Optional custom path to the MCP config file.
-                    If None, uses the default location.
-
-    Returns:
-        Path to the configuration file
-    """
-    if config_path:
-        return Path(config_path)
-    else:
-        return Path(PERSISTENCE_DIR) / MCP_CONFIG_FILE
 
 
 def _ensure_config_dir(config_path: Path) -> None:
@@ -44,83 +33,43 @@ def _ensure_config_dir(config_path: Path) -> None:
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
 
-def _load_config(config_path: str | None = None) -> dict[str, Any]:
+def _load_config() -> MCPConfig:
     """Load the MCP configuration from file.
 
-    Args:
-        config_path: Optional custom path to the MCP config file
-
     Returns:
-        The configuration dictionary, or empty dict if file doesn't exist.
+        The MCPConfig object, or empty config if file doesn't exist.
 
     Raises:
         MCPConfigurationError: If the configuration file is invalid.
+        ValidationError: If the configuration format is invalid.
     """
-    path = _get_config_path(config_path)
-
-    if not path.exists():
-        return {"mcpServers": {}}
+    if not MCP_CONFIG_PATH.exists():
+        # Return empty config with mcpServers structure
+        return MCPConfig.from_dict({"mcpServers": {}})
 
     try:
-        with open(path) as f:
-            config = json.load(f)
-            # Ensure mcpServers key exists
-            if "mcpServers" not in config:
-                config["mcpServers"] = {}
-            return config
-    except json.JSONDecodeError as e:
-        raise MCPConfigurationError(f"Invalid JSON in config file: {e}") from e
+        return MCPConfig.from_file(MCP_CONFIG_PATH)
+    except (ValueError, PydanticValidationError) as e:
+        # Re-raise as MCPConfigurationError for consistency
+        raise MCPConfigurationError(f"Invalid MCP configuration file: {e}") from e
     except Exception as e:
         raise MCPConfigurationError(f"Error reading config file: {e}") from e
 
 
-def _save_config(config: dict[str, Any], config_path: str | None = None) -> None:
+def _save_config(config: MCPConfig) -> None:
     """Save the MCP configuration to file.
 
     Args:
-        config: The configuration dictionary to save
-        config_path: Optional custom path to the MCP config file
+        config: The MCPConfig object to save
 
     Raises:
         MCPConfigurationError: If the configuration cannot be saved.
     """
-    path = _get_config_path(config_path)
-
     try:
-        _ensure_config_dir(path)
-        with open(path, "w") as f:
-            json.dump(config, f, indent=2)
+        _ensure_config_dir(MCP_CONFIG_PATH)
+        config.write_to_file(MCP_CONFIG_PATH)
     except Exception as e:
         raise MCPConfigurationError(f"Error saving config file: {e}") from e
-
-
-def _validate_config(config_path: str | None = None) -> None:
-    """Validate the MCP configuration using MCPConfig.from_file().
-
-    This ensures the configuration format is compatible with the existing
-    MCP infrastructure that loads configurations.
-
-    Args:
-        config_path: Optional custom path to the MCP config file
-
-    Raises:
-        MCPConfigurationError: If the configuration is invalid
-    """
-    path = _get_config_path(config_path)
-
-    if not path.exists():
-        return  # No config file to validate
-
-    try:
-        # Use MCPConfig.from_file() to validate the configuration
-        # This is the same method used by the AgentStore.load_mcp_configuration()
-        MCPConfig.from_file(path)
-    except Exception as e:
-        raise MCPConfigurationError(
-            f"Configuration validation failed: {e}. "
-            "The saved configuration may not be compatible with OpenHands MCP "
-            "infrastructure."
-        ) from e
 
 
 def _parse_headers(headers: list[str] | None) -> dict[str, str]:
@@ -183,7 +132,6 @@ def add_server(
     headers: list[str] | None = None,
     env_vars: list[str] | None = None,
     auth: str | None = None,
-    config_path: str | None = None,
 ) -> None:
     """Add a new MCP server configuration.
 
@@ -195,83 +143,83 @@ def add_server(
         headers: HTTP headers for http/sse transports
         env_vars: Environment variables for stdio transport
         auth: Authentication method (e.g., "oauth")
-        config_path: Optional custom path to the MCP config file
 
     Raises:
         MCPConfigurationError: If configuration is invalid or server already exists
     """
-    config = _load_config(config_path)
+    config = _load_config()
 
-    if name in config["mcpServers"]:
+    # Check if server already exists
+    servers_dict = config.to_dict().get("mcpServers", {})
+    if name in servers_dict:
         raise MCPConfigurationError(f"MCP server '{name}' already exists")
 
-    server_config: dict[str, Any] = {"transport": transport}
-
-    if transport in ["http", "sse"]:
-        server_config["url"] = target
-        if headers:
-            server_config["headers"] = _parse_headers(headers)
-    elif transport == "stdio":
-        server_config["command"] = target
-        if args:
-            server_config["args"] = args
-        if env_vars:
-            server_config["env"] = _parse_env_vars(env_vars)
+    # Create the appropriate server object based on transport type
+    if transport == "stdio":
+        server = StdioMCPServer(
+            command=target,
+            args=args or [],
+            env=_parse_env_vars(env_vars) if env_vars else {},
+            transport="stdio",
+        )
+    elif transport in ["http", "sse"]:
+        server = RemoteMCPServer(
+            url=target,
+            transport=cast(Literal["http", "sse"], transport),
+            headers=_parse_headers(headers) if headers else {},
+            auth=auth,
+        )
     else:
         raise MCPConfigurationError(f"Invalid transport type: {transport}")
 
-    # Add authentication method if specified
-    if auth:
-        server_config["auth"] = auth
+    # Add the server to the configuration
+    config.add_server(name, server)
+    _save_config(config)
 
-    config["mcpServers"][name] = server_config
-    _save_config(config, config_path)
-
-    # Validate the saved configuration to ensure it's compatible with MCP infrastructure
-    _validate_config(config_path)
+    # Validate the saved configuration by loading it (ensures compatibility)
+    _load_config()
 
 
-def remove_server(name: str, config_path: str | None = None) -> None:
+def remove_server(name: str) -> None:
     """Remove an MCP server configuration.
 
     Args:
         name: Name of the MCP server to remove
-        config_path: Optional custom path to the MCP config file
 
     Raises:
         MCPConfigurationError: If server doesn't exist
     """
-    config = _load_config(config_path)
+    config = _load_config()
 
-    if name not in config["mcpServers"]:
+    # Check if server exists
+    servers_dict = config.to_dict().get("mcpServers", {})
+    if name not in servers_dict:
         raise MCPConfigurationError(f"MCP server '{name}' not found")
 
-    del config["mcpServers"][name]
-    _save_config(config, config_path)
+    # Remove the server by creating a new config without it
+    new_servers = {k: v for k, v in servers_dict.items() if k != name}
+    new_config = MCPConfig.from_dict({"mcpServers": new_servers})
+    _save_config(new_config)
 
-    # Validate the saved configuration to ensure it remains compatible
-    _validate_config(config_path)
+    # Validate the saved configuration by loading it (ensures it remains compatible)
+    _load_config()
 
 
-def list_servers(config_path: str | None = None) -> dict[str, dict[str, Any]]:
+def list_servers() -> dict[str, dict[str, Any]]:
     """List all configured MCP servers.
-
-    Args:
-        config_path: Optional custom path to the MCP config file
 
     Returns:
         Dictionary of server configurations keyed by name
     """
-    config = _load_config(config_path)
-    return config["mcpServers"]
+    config = _load_config()
+    return config.to_dict().get("mcpServers", {})
 
 
-def get_server(name: str, config_path: str | None = None) -> dict[str, Any]:
+def get_server(name: str) -> dict[str, Any]:
     """Get configuration for a specific MCP server.
 
     Args:
         name: Name of the MCP server
-        config_path: Optional custom path to the MCP config file
 
     Returns:
         Server configuration dictionary
@@ -279,26 +227,65 @@ def get_server(name: str, config_path: str | None = None) -> dict[str, Any]:
     Raises:
         MCPConfigurationError: If server doesn't exist
     """
-    config = _load_config(config_path)
+    config = _load_config()
+    servers_dict = config.to_dict().get("mcpServers", {})
 
-    if name not in config["mcpServers"]:
+    if name not in servers_dict:
         raise MCPConfigurationError(f"MCP server '{name}' not found")
 
-    return config["mcpServers"][name]
+    return servers_dict[name]
 
 
-def server_exists(name: str, config_path: str | None = None) -> bool:
+def server_exists(name: str) -> bool:
     """Check if an MCP server configuration exists.
 
     Args:
         name: Name of the MCP server
-        config_path: Optional custom path to the MCP config file
 
     Returns:
         True if server exists, False otherwise
     """
     try:
-        config = _load_config(config_path)
-        return name in config["mcpServers"]
-    except MCPConfigurationError:
+        config = _load_config()
+        servers_dict = config.to_dict().get("mcpServers", {})
+        return name in servers_dict
+    except (MCPConfigurationError, ValidationError):
         return False
+
+
+def get_config_status() -> dict[str, Any]:
+    """Get the status of the MCP configuration file.
+
+    Returns:
+        Dictionary with status information:
+        {
+            'exists': bool,
+            'valid': bool,
+            'servers': dict,
+            'message': str
+        }
+    """
+    if not MCP_CONFIG_PATH.exists():
+        return {
+            "exists": False,
+            "valid": False,
+            "servers": {},
+            "message": f"MCP configuration file not found at {MCP_CONFIG_PATH}",
+        }
+
+    try:
+        config = _load_config()
+        servers = config.to_dict().get("mcpServers", {})
+        return {
+            "exists": True,
+            "valid": True,
+            "servers": servers,
+            "message": f"Valid MCP configuration found with {len(servers)} server(s)",
+        }
+    except (MCPConfigurationError, ValidationError) as e:
+        return {
+            "exists": True,
+            "valid": False,
+            "servers": {},
+            "message": f"Invalid MCP configuration file: {str(e)}",
+        }

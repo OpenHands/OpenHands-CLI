@@ -17,6 +17,15 @@ from openhands_cli.mcp.mcp_commands import (
 from openhands_cli.mcp.mcp_display_utils import mask_sensitive_value
 
 
+@pytest.fixture
+def temp_config_path():
+    """Fixture that provides a temporary config path and patches MCP_CONFIG_PATH."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "mcp.json"
+        with patch("openhands_cli.mcp.mcp_utils.MCP_CONFIG_PATH", config_path):
+            yield config_path
+
+
 class TestMCPCommands:
     """Test cases for MCP command handlers."""
 
@@ -304,70 +313,56 @@ class TestMCPCommands:
 class TestMCPCommandsIntegration:
     """Integration tests for MCP commands with real functions."""
 
-    def test_full_workflow_integration(self):
+    def test_full_workflow_integration(self, temp_config_path):
         """Test complete add -> list -> get -> remove workflow."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config_path = Path(temp_dir) / "mcp.json"
+        # Import the real functions for the actual calls
+        from openhands_cli.mcp.mcp_utils import (
+            add_server,
+            get_server,
+            list_servers,
+            remove_server,
+            server_exists,
+        )
 
-            # Patch all MCP functions to use our temp directory
-            with (
-                patch("openhands_cli.mcp.mcp_commands.add_server") as mock_add,
-                patch("openhands_cli.mcp.mcp_commands.list_servers") as mock_list,
-                patch("openhands_cli.mcp.mcp_commands.get_server") as mock_get,
-                patch("openhands_cli.mcp.mcp_commands.remove_server") as mock_remove,
-            ):
-                # Import the real functions for the actual calls
-                from openhands_cli.mcp.mcp_utils import (
-                    add_server,
-                    get_server,
-                    list_servers,
-                    remove_server,
-                    server_exists,
+        # Patch all MCP functions to use the real functions (no config_path needed)
+        with (
+            patch("openhands_cli.mcp.mcp_commands.add_server", side_effect=add_server),
+            patch(
+                "openhands_cli.mcp.mcp_commands.list_servers", side_effect=list_servers
+            ),
+            patch("openhands_cli.mcp.mcp_commands.get_server", side_effect=get_server),
+            patch(
+                "openhands_cli.mcp.mcp_commands.remove_server",
+                side_effect=remove_server,
+            ),
+        ):
+            with patch("openhands_cli.mcp.mcp_commands.print_formatted_text"):
+                # Add server
+                add_args = argparse.Namespace(
+                    name="test_server",
+                    transport="http",
+                    target="https://api.example.com",
+                    args=None,
+                    header=["Authorization: Bearer token"],
+                    env=None,
+                    auth=None,
                 )
+                handle_mcp_add(add_args)
 
-                # Configure mocks to call real functions with our config path
-                mock_add.side_effect = lambda *args, **kwargs: add_server(
-                    *args, **kwargs, config_path=str(config_path)
-                )
-                mock_list.side_effect = lambda *args, **kwargs: list_servers(
-                    *args, **kwargs, config_path=str(config_path)
-                )
-                mock_get.side_effect = lambda *args, **kwargs: get_server(
-                    *args, **kwargs, config_path=str(config_path)
-                )
-                mock_remove.side_effect = lambda *args, **kwargs: remove_server(
-                    *args, **kwargs, config_path=str(config_path)
-                )
+                # Verify server was added
+                assert server_exists("test_server")
 
-                with patch("openhands_cli.mcp.mcp_commands.print_formatted_text"):
-                    # Add server
-                    add_args = argparse.Namespace(
-                        name="test_server",
-                        transport="http",
-                        target="https://api.example.com",
-                        args=None,
-                        header=["Authorization: Bearer token"],
-                        env=None,
-                        auth=None,
-                    )
-                    handle_mcp_add(add_args)
+                # List servers
+                list_args = argparse.Namespace()
+                handle_mcp_list(list_args)
 
-                    # Verify server was added
-                    assert server_exists("test_server", config_path=str(config_path))
+                # Get server details
+                get_args = argparse.Namespace(name="test_server")
+                handle_mcp_get(get_args)
 
-                    # List servers
-                    list_args = argparse.Namespace()
-                    handle_mcp_list(list_args)
+                # Remove server
+                remove_args = argparse.Namespace(name="test_server")
+                handle_mcp_remove(remove_args)
 
-                    # Get server details
-                    get_args = argparse.Namespace(name="test_server")
-                    handle_mcp_get(get_args)
-
-                    # Remove server
-                    remove_args = argparse.Namespace(name="test_server")
-                    handle_mcp_remove(remove_args)
-
-                    # Verify server was removed
-                    assert not server_exists(
-                        "test_server", config_path=str(config_path)
-                    )
+                # Verify server was removed
+                assert not server_exists("test_server")
