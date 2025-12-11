@@ -2,9 +2,8 @@
 
 import argparse
 
-from argparsers.acp_parser import add_acp_parser
-
 from openhands_cli import __version__
+from openhands_cli.argparsers.acp_parser import add_acp_parser
 from openhands_cli.argparsers.auth_parser import add_login_parser, add_logout_parser
 from openhands_cli.argparsers.serve_parser import add_serve_parser
 from openhands_cli.argparsers.util import add_confirmation_mode_args
