@@ -185,9 +185,14 @@ async def fetch_user_data_after_oauth(server_url: str, api_key: str) -> dict[str
                     model=model, api_key=llm_api_key, custom_llm_provider="openhands"
                 )
 
-                # Create LLM summarizing condenser with the same LLM
+                # Create separate LLM for condenser to ensure different usage tracking
+                condenser_llm = LLM(
+                    model=model, api_key=llm_api_key, custom_llm_provider="openhands"
+                )
+
+                # Create LLM summarizing condenser with separate LLM
                 condenser = LLMSummarizingCondenser(
-                    llm=llm,
+                    llm=condenser_llm,
                     max_size=10000,  # Default max size
                     keep_first=1000,  # Keep first 1000 chars
                 )
