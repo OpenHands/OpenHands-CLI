@@ -2,6 +2,8 @@
 
 import argparse
 
+from argparsers.acp_parser import add_acp_parser
+
 from openhands_cli import __version__
 from openhands_cli.argparsers.auth_parser import add_login_parser, add_logout_parser
 from openhands_cli.argparsers.serve_parser import add_serve_parser
@@ -91,6 +93,9 @@ def create_main_parser() -> argparse.ArgumentParser:
 
     # Subcommands
     subparsers = parser.add_subparsers(dest="command", help="Additional commands")
+
+    # Add acp subcommands
+    add_acp_parser(subparsers)
 
     # Add serve subcommand
     add_serve_parser(subparsers)
