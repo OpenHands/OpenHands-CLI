@@ -15,7 +15,7 @@ from openhands_cli.locations import (
     PERSISTENCE_DIR,
     WORK_DIR,
 )
-from openhands_cli.mcp.mcp_utils import _load_config
+from openhands_cli.mcp.mcp_utils import load_mcp_config
 from openhands_cli.utils import get_llm_metadata, should_set_litellm_extra_body
 
 
@@ -34,8 +34,8 @@ class AgentStore:
         Raises:
             MCPConfigurationError: If the configuration file exists but is invalid
         """
-        # Use the same implementation as _load_config
-        config = _load_config()
+        # Use the same implementation as load_mcp_config
+        config = load_mcp_config()
         return config.to_dict().get("mcpServers", {})
 
     def load_project_skills(self) -> list:

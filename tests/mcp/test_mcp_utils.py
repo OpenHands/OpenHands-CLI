@@ -9,7 +9,7 @@ import pytest
 
 from openhands_cli.mcp.mcp_utils import (
     MCPConfigurationError,
-    _load_config,
+    load_mcp_config,
     _parse_env_vars,
     _parse_headers,
     add_server,
@@ -36,7 +36,7 @@ class TestMCPFunctions:
 
     def test_load_config_nonexistent_file(self, temp_config_path):
         """Test loading config when file doesn't exist."""
-        config = _load_config()
+        config = load_mcp_config()
         assert config.to_dict() == {"mcpServers": {}}
 
     def test_load_config_valid_file(self, temp_config_path):
@@ -46,7 +46,7 @@ class TestMCPFunctions:
         }
         temp_config_path.write_text(json.dumps(test_config))
 
-        config = _load_config()
+        config = load_mcp_config()
         # Check that the server was loaded correctly
         servers_dict = config.to_dict()["mcpServers"]
         assert "test_server" in servers_dict
@@ -58,7 +58,7 @@ class TestMCPFunctions:
         test_config = {"other_key": "value"}
         temp_config_path.write_text(json.dumps(test_config))
 
-        config = _load_config()
+        config = load_mcp_config()
         config_dict = config.to_dict()
         assert "mcpServers" in config_dict
         assert config_dict["mcpServers"] == {}
@@ -68,7 +68,7 @@ class TestMCPFunctions:
         temp_config_path.write_text("invalid json content")
 
         with pytest.raises(MCPConfigurationError):
-            _load_config()
+            load_mcp_config()
 
     def test_add_server_stdio(self, temp_config_path):
         """Test adding a stdio MCP server."""
@@ -81,7 +81,7 @@ class TestMCPFunctions:
         )
 
         # Verify server was added
-        config = _load_config()
+        config = load_mcp_config()
         servers_dict = config.to_dict()["mcpServers"]
         assert "test" in servers_dict
         server = servers_dict["test"]
@@ -100,7 +100,7 @@ class TestMCPFunctions:
         )
 
         # Verify server was added
-        config = _load_config()
+        config = load_mcp_config()
         servers_dict = config.to_dict()["mcpServers"]
         assert "test" in servers_dict
         server = servers_dict["test"]
@@ -118,7 +118,7 @@ class TestMCPFunctions:
         )
 
         # Verify server was added
-        config = _load_config()
+        config = load_mcp_config()
         servers_dict = config.to_dict()["mcpServers"]
         assert "test" in servers_dict
         server = servers_dict["test"]
@@ -143,7 +143,7 @@ class TestMCPFunctions:
         remove_server("test")
 
         # Verify server was removed
-        config = _load_config()
+        config = load_mcp_config()
         servers_dict = config.to_dict()["mcpServers"]
         assert "test" not in servers_dict
 

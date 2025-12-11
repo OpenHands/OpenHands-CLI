@@ -39,7 +39,7 @@ def _ensure_config_dir(config_path: Path) -> None:
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
 
-def _load_config() -> MCPConfig:
+def load_mcp_config() -> MCPConfig:
     """Load the MCP configuration from file.
 
     Returns:
@@ -155,7 +155,7 @@ def add_server(
     Raises:
         MCPConfigurationError: If configuration is invalid or server already exists
     """
-    config = _load_config()
+    config = load_mcp_config()
 
     # Check if server already exists
     servers_dict = config.to_dict().get("mcpServers", {})
@@ -185,7 +185,7 @@ def add_server(
     _save_config(config)
 
     # Validate the saved configuration by loading it (ensures compatibility)
-    _load_config()
+    load_mcp_config()
 
 
 def remove_server(name: str) -> None:
@@ -197,7 +197,7 @@ def remove_server(name: str) -> None:
     Raises:
         MCPConfigurationError: If server doesn't exist
     """
-    config = _load_config()
+    config = load_mcp_config()
 
     # Check if server exists
     servers_dict = config.to_dict().get("mcpServers", {})
@@ -210,7 +210,7 @@ def remove_server(name: str) -> None:
     _save_config(new_config)
 
     # Validate the saved configuration by loading it (ensures it remains compatible)
-    _load_config()
+    load_mcp_config()
 
 
 def list_servers() -> dict[str, dict[str, Any]]:
@@ -219,7 +219,7 @@ def list_servers() -> dict[str, dict[str, Any]]:
     Returns:
         Dictionary of server configurations keyed by name
     """
-    config = _load_config()
+    config = load_mcp_config()
     return config.to_dict().get("mcpServers", {})
 
 
@@ -235,7 +235,7 @@ def get_server(name: str) -> dict[str, Any]:
     Raises:
         MCPConfigurationError: If server doesn't exist
     """
-    config = _load_config()
+    config = load_mcp_config()
     servers_dict = config.to_dict().get("mcpServers", {})
 
     if name not in servers_dict:
@@ -254,7 +254,7 @@ def server_exists(name: str) -> bool:
         True if server exists, False otherwise
     """
     try:
-        config = _load_config()
+        config = load_mcp_config()
         servers_dict = config.to_dict().get("mcpServers", {})
         return name in servers_dict
     except (MCPConfigurationError, ValidationError):
@@ -283,7 +283,7 @@ def get_config_status() -> dict[str, Any]:
         }
 
     try:
-        config = _load_config()
+        config = load_mcp_config()
         servers = config.to_dict().get("mcpServers", {})
         return {
             "exists": True,
