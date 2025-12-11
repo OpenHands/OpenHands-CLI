@@ -63,7 +63,7 @@ def load_mcp_config() -> MCPConfig:
         raise MCPConfigurationError(f"Error reading config file: {e}") from e
 
 
-def _save_config(config: MCPConfig) -> None:
+def save_mcp_config(config: MCPConfig) -> None:
     """Save the MCP configuration to file.
 
     Args:
@@ -182,7 +182,7 @@ def add_server(
 
     # Add the server to the configuration
     config.add_server(name, server)
-    _save_config(config)
+    save_mcp_config(config)
 
     # Validate the saved configuration by loading it (ensures compatibility)
     load_mcp_config()
@@ -207,7 +207,7 @@ def remove_server(name: str) -> None:
     # Remove the server by creating a new config without it
     new_servers = {k: v for k, v in servers_dict.items() if k != name}
     new_config = MCPConfig.from_dict({"mcpServers": new_servers})
-    _save_config(new_config)
+    save_mcp_config(new_config)
 
     # Validate the saved configuration by loading it (ensures it remains compatible)
     load_mcp_config()
