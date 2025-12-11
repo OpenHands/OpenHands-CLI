@@ -27,6 +27,14 @@ class MissingAgentSpec(Exception):
     pass
 
 
+class MCPSetupError(Exception):
+    """Raised when MCP server setup fails."""
+
+    def __init__(self, message: str, conversation: BaseConversation | None = None):
+        super().__init__(message)
+        self.conversation = conversation
+
+
 def load_agent_specs(
     conversation_id: str | None = None,
     mcp_servers: dict[str, dict[str, Any]] | None = None,
@@ -112,26 +120,48 @@ def setup_conversation(
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
+        MCPSetupError: If MCP server setup fails but conversation can still be created.
     """
 
     print_formatted_text(HTML("<white>Initializing agent...</white>"))
 
     agent = load_agent_specs(str(conversation_id))
 
-    # Create conversation - agent context is now set in AgentStore.load()
-    conversation: BaseConversation = Conversation(
-        agent=agent,
-        workspace=Workspace(working_dir=WORK_DIR),
-        # Conversation will add /<conversation_id> to this path
-        persistence_dir=CONVERSATIONS_DIR,
-        conversation_id=conversation_id,
-        visualizer=visualizer if visualizer is not None else CLIVisualizer,
-    )
+    # Try to create conversation with MCP servers first
+    try:
+        conversation: BaseConversation = Conversation(
+            agent=agent,
+            workspace=Workspace(working_dir=WORK_DIR),
+            # Conversation will add /<conversation_id> to this path
+            persistence_dir=CONVERSATIONS_DIR,
+            conversation_id=conversation_id,
+            visualizer=visualizer if visualizer is not None else CLIVisualizer,
+        )
 
-    conversation.set_security_analyzer(LLMSecurityAnalyzer())
-    conversation.set_confirmation_policy(confirmation_policy)
+        conversation.set_security_analyzer(LLMSecurityAnalyzer())
+        conversation.set_confirmation_policy(confirmation_policy)
 
-    print_formatted_text(
-        HTML(f"<green>✓ Agent initialized with model: {agent.llm.model}</green>")
-    )
-    return conversation
+        print_formatted_text(
+            HTML(f"<green>✓ Agent initialized with model: {agent.llm.model}</green>")
+        )
+        return conversation
+
+    except (RuntimeError, ValueError) as e:
+        # Check if this is an MCP connection error or agent mismatch due to MCP config
+        if ("Client failed to connect" in str(e) or 
+            "Unexpected authorization response" in str(e) or
+            ("Agent provided is different" in str(e) and "mcp_config" in str(e))):
+            
+            print_formatted_text(
+                HTML("<red>✗ MCP server connection failed. Please check your MCP configuration.</red>")
+            )
+            
+            # Raise a custom exception to notify the UI about MCP issues
+            # Don't create a fallback conversation - let the UI handle this
+            raise MCPSetupError(
+                f"MCP server setup failed: {str(e)}. Please validate your MCP configuration in settings.",
+                conversation=None
+            )
+        else:
+            # Re-raise other errors
+            raise

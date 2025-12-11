@@ -387,7 +387,16 @@ class OpenHandsApp(App):
         """Handle regular user messages with the conversation runner."""
         # Check if conversation runner is initialized
         if self.conversation_runner is None:
-            self.conversation_runner = self.create_conversation_runner()
+            try:
+                self.conversation_runner = self.create_conversation_runner()
+            except Exception as e:
+                # Handle MCP setup errors or other initialization failures
+                self.notify(
+                    title="Agent Initialization Error",
+                    message=f"Failed to initialize agent: {str(e)}. Please check your configuration in settings.",
+                    severity="error",
+                )
+                return
 
         # Show that we're processing the message
         if self.conversation_runner.is_running:
@@ -439,7 +448,16 @@ class OpenHandsApp(App):
         """Handle the /confirm command to show confirmation settings modal."""
         if not self.conversation_runner:
             # If no conversation runner, create one to get the current policy
-            self.conversation_runner = self.create_conversation_runner()
+            try:
+                self.conversation_runner = self.create_conversation_runner()
+            except Exception as e:
+                # Handle MCP setup errors or other initialization failures
+                self.notify(
+                    title="Agent Initialization Error",
+                    message=f"Failed to initialize agent: {str(e)}. Please check your configuration in settings.",
+                    severity="error",
+                )
+                return
 
         # Get current confirmation policy
         current_policy = self.conversation_runner.get_confirmation_policy()

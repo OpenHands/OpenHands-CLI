@@ -21,7 +21,7 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands_cli.refactor.widgets.richlog_visualizer import ConversationVisualizer
-from openhands_cli.setup import setup_conversation
+from openhands_cli.setup import setup_conversation, MCPSetupError
 from openhands_cli.user_actions.types import UserConfirmation
 
 
@@ -49,11 +49,21 @@ class ConversationRunner:
         """
         starting_confirmation_policy = initial_confirmation_policy or AlwaysConfirm()
 
-        self.conversation: BaseConversation = setup_conversation(
-            conversation_id,
-            confirmation_policy=starting_confirmation_policy,
-            visualizer=visualizer,
-        )
+        try:
+            self.conversation: BaseConversation = setup_conversation(
+                conversation_id,
+                confirmation_policy=starting_confirmation_policy,
+                visualizer=visualizer,
+            )
+        except MCPSetupError as e:
+            # MCP setup failed - notify the user and re-raise
+            notification_callback(
+                "MCP Setup Error",
+                f"Failed to initialize agent: {str(e)}",
+                "error",
+            )
+            # Re-raise the exception to prevent the conversation runner from being created
+            raise
 
         self._running = False
 
