@@ -179,10 +179,21 @@ class MCPSidePanel(VerticalScroll):
         # Handle both FastMCP objects and legacy dict format for compatibility
         if isinstance(server, dict):
             # Legacy dict format - convert to appropriate server object for processing
-            if server.get("transport") == "stdio":
-                server_obj = StdioMCPServer(**server)
+            # Detect server type based on transport field or presence of command vs url
+            if server.get("transport") == "stdio" or (
+                "command" in server and "url" not in server
+            ):
+                # Add default transport if missing for StdioMCPServer
+                server_dict = server.copy()
+                if "transport" not in server_dict:
+                    server_dict["transport"] = "stdio"
+                server_obj = StdioMCPServer(**server_dict)
             else:
-                server_obj = RemoteMCPServer(**server)
+                # Add default transport if missing for RemoteMCPServer
+                server_dict = server.copy()
+                if "transport" not in server_dict:
+                    server_dict["transport"] = "http"
+                server_obj = RemoteMCPServer(**server_dict)
         else:
             server_obj = server
 
