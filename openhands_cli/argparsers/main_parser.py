@@ -1,10 +1,72 @@
 """Main argument parser for OpenHands CLI."""
 
 import argparse
+import sys
 
 from openhands_cli import __version__
 from openhands_cli.argparsers.mcp_parser import add_mcp_parser
 from openhands_cli.argparsers.serve_parser import add_serve_parser
+
+
+def preprocess_mcp_args(args: list[str]) -> list[str]:
+    """Preprocess MCP arguments to handle -- separator correctly.
+
+    This function handles the case where MCP add commands use -- to separate
+    the command arguments, but argparse doesn't handle this well when optional
+    arguments come after positional arguments.
+
+    Args:
+        args: List of command line arguments
+
+    Returns:
+        Preprocessed list of arguments
+    """
+    # Only process if this is an MCP add command with --
+    if len(args) < 3 or args[0] != "mcp" or args[1] != "add" or "--" not in args:
+        return args
+
+    try:
+        # Find the -- separator
+        separator_index = args.index("--")
+
+        # Split arguments at the -- separator
+        before_separator = args[:separator_index]
+        after_separator = args[separator_index + 1 :]  # Skip the -- itself
+
+        # Find positional arguments (name and target)
+        # They should be the first non-option arguments after "mcp add"
+        positional_args = []
+        option_args = []
+
+        i = 2  # Start after "mcp add"
+        while i < len(before_separator):
+            arg = before_separator[i]
+            if arg.startswith("--"):
+                # This is an option, add it and its value
+                option_args.append(arg)
+                if i + 1 < len(before_separator) and not before_separator[
+                    i + 1
+                ].startswith("--"):
+                    option_args.append(before_separator[i + 1])
+                    i += 2
+                else:
+                    i += 1
+            else:
+                # This is a positional argument
+                positional_args.append(arg)
+                i += 1
+
+        # Reconstruct the arguments in the correct order:
+        # mcp add [options] name target [-- args...]
+        result = ["mcp", "add"] + option_args + positional_args
+        if after_separator:
+            result.extend(["--"] + after_separator)
+
+        return result
+
+    except (ValueError, IndexError):
+        # If anything goes wrong, return original args
+        return args
 
 
 def add_confirmation_mode_args(
@@ -30,13 +92,43 @@ def add_confirmation_mode_args(
     )
 
 
-def create_main_parser() -> argparse.ArgumentParser:
+class MainArgumentParser(argparse.ArgumentParser):
+    """Custom ArgumentParser that preprocesses MCP arguments."""
+
+    def parse_args(self, args=None, namespace=None):  # type: ignore[override]
+        """Parse arguments with MCP preprocessing."""
+        if args is None:
+            args = sys.argv[1:]
+
+        # Convert to list for preprocessing
+        args_list = list(args)
+
+        # Preprocess MCP arguments
+        processed_args = preprocess_mcp_args(args_list)
+
+        return super().parse_args(processed_args, namespace)
+
+    def parse_known_args(self, args=None, namespace=None):  # type: ignore[override]
+        """Parse known arguments with MCP preprocessing."""
+        if args is None:
+            args = sys.argv[1:]
+
+        # Convert to list for preprocessing
+        args_list = list(args)
+
+        # Preprocess MCP arguments
+        processed_args = preprocess_mcp_args(args_list)
+
+        return super().parse_known_args(processed_args, namespace)
+
+
+def create_main_parser() -> MainArgumentParser:
     """Create the main argument parser with CLI as default and serve as subcommand.
 
     Returns:
         The configured argument parser
     """
-    parser = argparse.ArgumentParser(
+    parser = MainArgumentParser(
         description="OpenHands CLI - Terminal User Interface for OpenHands AI Agent",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""

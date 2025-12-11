@@ -136,7 +136,7 @@ Examples:
     )
     add_parser.add_argument(
         "args",
-        nargs="*",
+        nargs=argparse.REMAINDER,
         help="Additional arguments for stdio transport (after --)",
     )
     add_parser.add_argument(
