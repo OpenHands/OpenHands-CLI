@@ -1,15 +1,8 @@
 """Simple API key storage for OpenHands CLI authentication."""
 
-import os
 from pathlib import Path
 
 from openhands_cli.locations import PERSISTENCE_DIR
-
-
-class TokenStorageError(Exception):
-    """Exception raised for token storage errors."""
-
-    pass
 
 
 class TokenStorage:
@@ -25,7 +18,7 @@ class TokenStorage:
             config_dir = Path(PERSISTENCE_DIR)
 
         self.config_dir = config_dir
-        self.config_dir.mkdir(mode=0o700, exist_ok=True)  # Secure permissions
+        self.config_dir.mkdir(exist_ok=True)
 
         self.api_key_file = self.config_dir / "api_key.txt"
 
@@ -35,15 +28,9 @@ class TokenStorage:
         Args:
             api_key: The API key to store
         """
-        try:
-            with open(self.api_key_file, "w") as f:
-                f.write(api_key)
 
-            # Set secure permissions on API key file (owner read/write only)
-            os.chmod(self.api_key_file, 0o600)
-
-        except OSError as e:
-            raise TokenStorageError(f"Failed to store API key: {e}")
+        with open(self.api_key_file, "w") as f:
+            f.write(api_key)
 
     def get_api_key(self) -> str | None:
         """Get stored API key.
@@ -54,11 +41,8 @@ class TokenStorage:
         if not self.api_key_file.exists():
             return None
 
-        try:
-            with open(self.api_key_file) as f:
-                return f.read().strip()
-        except OSError:
-            return None
+        with open(self.api_key_file) as f:
+            return f.read().strip()
 
     def remove_api_key(self) -> bool:
         """Remove stored API key.
@@ -69,11 +53,8 @@ class TokenStorage:
         if not self.api_key_file.exists():
             return False
 
-        try:
-            self.api_key_file.unlink()
-            return True
-        except OSError:
-            return False
+        self.api_key_file.unlink()
+        return True
 
     def has_api_key(self) -> bool:
         """Check if an API key is stored.

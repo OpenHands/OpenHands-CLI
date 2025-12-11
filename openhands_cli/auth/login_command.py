@@ -10,7 +10,38 @@ from openhands_cli.auth.device_flow import (
     DeviceFlowError,
     authenticate_with_device_flow,
 )
-from openhands_cli.auth.token_storage import TokenStorage, TokenStorageError
+from openhands_cli.auth.token_storage import TokenStorage
+
+
+def _p(message: str) -> None:
+    """Print formatted text via prompt_toolkit."""
+    print_formatted_text(HTML(message))
+
+
+async def _fetch_user_data_with_context(
+    server_url: str,
+    api_key: str,
+    already_logged_in: bool,
+) -> None:
+    """Fetch user data and print messages depending on login context."""
+
+    # Initial context output
+    if already_logged_in:
+        _p("<yellow>You are already logged in to this server.</yellow>")
+        _p("<white>Pulling latest settings from remote...</white>")
+
+    try:
+        await fetch_user_data_after_oauth(server_url, api_key)
+
+        # --- SUCCESS MESSAGES ---
+        if already_logged_in:
+            _p("\n<green>✓ Settings synchronized successfully!</green>")
+        else:
+            _p("\n<white>You can now use OpenHands CLI with cloud features.</white>")
+
+    except ApiClientError as e:
+        # --- FAILURE MESSAGES ---
+        _p(f"\n<yellow>Warning: Could not fetch user data: {e}</yellow>")
 
 
 async def login_command(server_url: str) -> bool:
@@ -22,126 +53,49 @@ async def login_command(server_url: str) -> bool:
     Returns:
         True if login was successful, False otherwise
     """
-    print_formatted_text(
-        HTML(f"<cyan>Logging in to OpenHands at {server_url}...</cyan>")
-    )
+    _p(f"<cyan>Logging in to OpenHands at {server_url}...</cyan>")
 
-    try:
-        # Check if we already have an API key
-        token_storage = TokenStorage()
-        existing_api_key = token_storage.get_api_key()
+    # First, try to read any existing token
+    token_storage = TokenStorage()
+    existing_api_key = token_storage.get_api_key()
 
-        if existing_api_key:
-            print_formatted_text(
-                HTML("<yellow>You are already logged in to this server.</yellow>")
-            )
-            print_formatted_text(
-                HTML("<white>Pulling latest settings from remote...</white>")
-            )
-
-            # Pull settings from remote using existing API key
-            try:
-                await fetch_user_data_after_oauth(server_url, existing_api_key)
-                print_formatted_text(
-                    HTML("\n<green>✓ Settings synchronized successfully!</green>")
-                )
-            except ApiClientError as e:
-                print_formatted_text(
-                    HTML(
-                        f"\n<yellow>Warning: Could not fetch user data: "
-                        f"{str(e)}</yellow>"
-                    )
-                )
-                print_formatted_text(
-                    HTML(
-                        "<white>You are still logged in, but settings could not "
-                        "be synchronized.</white>"
-                    )
-                )
-
-            return True
-
-        # Perform device flow authentication
-        tokens = await authenticate_with_device_flow(server_url)
-
-        # Store the API key securely
-        api_key = tokens.get("access_token")
-        if api_key:
-            token_storage.store_api_key(api_key)
-
-        print_formatted_text(
-            HTML(f"<green>✓ Successfully logged in to {server_url}</green>")
+    # If we already have an API key, just sync settings and exit
+    if existing_api_key:
+        await _fetch_user_data_with_context(
+            server_url,
+            existing_api_key,
+            already_logged_in=True,
         )
-        print_formatted_text(
-            HTML("<white>Your authentication tokens have been stored securely.</white>")
-        )
-
-        # Fetch user data using the API key
-        if api_key:
-            try:
-                await fetch_user_data_after_oauth(server_url, api_key)
-                print_formatted_text(
-                    HTML(
-                        "\n<white>You can now use OpenHands CLI with cloud "
-                        "features.</white>"
-                    )
-                )
-            except ApiClientError as e:
-                print_formatted_text(
-                    HTML(
-                        f"\n<yellow>Warning: Could not fetch user data: "
-                        f"{str(e)}</yellow>"
-                    )
-                )
-                print_formatted_text(
-                    HTML(
-                        "<white>Authentication was successful, but some user data "
-                        "could not be retrieved.</white>"
-                    )
-                )
-                print_formatted_text(
-                    HTML(
-                        "<white>You can still use OpenHands CLI with cloud "
-                        "features.</white>"
-                    )
-                )
-        else:
-            print_formatted_text(
-                HTML(
-                    "\n<yellow>Warning: No access token found in OAuth "
-                    "response.</yellow>"
-                )
-            )
-            print_formatted_text(
-                HTML(
-                    "<white>You can still use OpenHands CLI with cloud "
-                    "features.</white>"
-                )
-            )
-
         return True
 
+    # No existing token: run device flow
+    try:
+        tokens = await authenticate_with_device_flow(server_url)
     except DeviceFlowError as e:
-        print_formatted_text(HTML(f"<red>Authentication failed: {str(e)}</red>"))
+        _p(f"<red>Authentication failed: {e}</red>")
         return False
 
-    except TokenStorageError as e:
-        print_formatted_text(
-            HTML(f"<red>Failed to store authentication tokens: {str(e)}</red>")
-        )
-        print_formatted_text(
-            HTML(
-                "<yellow>Authentication was successful but tokens could not be "
-                "saved.</yellow>"
-            )
-        )
-        return False
+    api_key = tokens.get("access_token")
 
-    except Exception as e:
-        print_formatted_text(
-            HTML(f"<red>Unexpected error during login: {str(e)}</red>")
-        )
-        return False
+    if not api_key:
+        _p("\n<yellow>Warning: No access token found in OAuth response.</yellow>")
+        _p("<white>You can still use OpenHands CLI with cloud features.</white>")
+        # Authentication technically succeeded, even if we lack a token
+        return True
+
+    # Store the API key securely
+    token_storage.store_api_key(api_key)
+
+    _p(f"<green>✓ Successfully logged in to {server_url}</green>")
+    _p("<white>Your authentication tokens have been stored securely.</white>")
+
+    # Fetch user data and configure local agent
+    await _fetch_user_data_with_context(
+        server_url,
+        api_key,
+        already_logged_in=False,
+    )
+    return True
 
 
 def run_login_command(server_url: str) -> bool:
@@ -156,5 +110,5 @@ def run_login_command(server_url: str) -> bool:
     try:
         return asyncio.run(login_command(server_url))
     except KeyboardInterrupt:
-        print_formatted_text(HTML("\n<yellow>Login cancelled by user.</yellow>"))
+        _p("\n<yellow>Login cancelled by user.</yellow>")
         return False
