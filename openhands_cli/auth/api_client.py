@@ -180,14 +180,18 @@ async def fetch_user_data_after_oauth(server_url: str, api_key: str) -> dict[str
                 # Get the model from settings, default to reasonable model if not found
                 model = settings.get("llm_model", "gpt-4o-mini")
 
-                # Create LLM configuration for OpenHands provider
+                # Create LLM configuration for agent
                 llm = LLM(
-                    model=model, api_key=llm_api_key, custom_llm_provider="openhands"
+                    model=model, 
+                    api_key=llm_api_key,
+                    usage_id="agent"
                 )
 
                 # Create separate LLM for condenser to ensure different usage tracking
                 condenser_llm = LLM(
-                    model=model, api_key=llm_api_key, custom_llm_provider="openhands"
+                    model=model, 
+                    api_key=llm_api_key,
+                    usage_id="condenser"
                 )
 
                 # Create LLM summarizing condenser with separate LLM
@@ -217,7 +221,7 @@ async def fetch_user_data_after_oauth(server_url: str, api_key: str) -> dict[str
                 print_formatted_text(HTML("<white>Configuration details:</white>"))
                 print_formatted_text(HTML(f"  • Model: <cyan>{model}</cyan>"))
                 print_formatted_text(
-                    HTML(f"  • Provider: <cyan>{llm.custom_llm_provider}</cyan>")
+                    HTML(f"  • Usage ID: <cyan>{llm.usage_id}</cyan>")
                 )
                 api_key_status = "✓ Set" if llm_api_key else "✗ Not set"
                 print_formatted_text(
