@@ -114,7 +114,9 @@ class BaseHttpClient:
         Returns:
             HTTP response object
         """
-        return await self._make_request("GET", endpoint, headers, raise_for_status=raise_for_status)
+        return await self._make_request(
+            "GET", endpoint, headers, raise_for_status=raise_for_status
+        )
 
     async def post(
         self,
@@ -134,4 +136,6 @@ class BaseHttpClient:
         Returns:
             HTTP response object
         """
-        return await self._make_request("POST", endpoint, headers, json_data, raise_for_status)
+        return await self._make_request(
+            "POST", endpoint, headers, json_data, raise_for_status
+        )
