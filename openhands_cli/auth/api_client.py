@@ -10,6 +10,7 @@ from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands.sdk.llm import LLM
 from openhands.tools.preset.default import get_default_tools
 from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
+from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
 from openhands_cli.tui.settings.store import AgentStore
 
 
@@ -19,213 +20,176 @@ class ApiClientError(Exception):
     pass
 
 
+DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_LLM_BASE_URL = "https://llm-proxy.app.all-hands.dev/"
+SETTINGS_PATH = f"{PERSISTENCE_DIR}/{AGENT_SETTINGS_PATH}"
+
+
+def _p(message: str) -> None:
+    """Unified formatted print helper."""
+    print_formatted_text(HTML(message))
+
+
 class OpenHandsApiClient(BaseHttpClient):
     """Client for making authenticated API calls to OpenHands server."""
 
     def __init__(self, server_url: str, api_key: str):
-        """Initialize the API client.
-
-        Args:
-            server_url: Base URL of the OpenHands server
-            api_key: API key for authentication
-        """
         super().__init__(server_url)
         self.api_key = api_key
+        self._headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+    async def _get_json(self, path: str) -> dict[str, Any]:
+        """Perform GET and return JSON with unified error handling."""
+        try:
+            response = await self.get(path, headers=self._headers)
+        except AuthHttpError as e:
+            raise ApiClientError(f"Request to {path!r} failed: {e}") from e
+        return response.json()
 
     async def get_llm_api_key(self) -> str | None:
-        """Get the LLM API key for BYOR (Bring Your Own Runtime).
-
-        Returns:
-            The LLM API key if available, None otherwise
-
-        Raises:
-            ApiClientError: If the API call fails
-        """
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-
-        try:
-            response = await self.get("/api/keys/llm/byor", headers=headers)
-            result = response.json()
-            return result.get("key")
-
-        except AuthHttpError as e:
-            raise ApiClientError(f"Failed to get LLM API key: {str(e)}")
+        result = await self._get_json("/api/keys/llm/byor")
+        return result.get("key")
 
     async def get_user_settings(self) -> dict[str, Any]:
-        """Get the user's settings.
-
-        Returns:
-            Dictionary containing user settings
-
-        Raises:
-            ApiClientError: If the API call fails
-        """
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-
-        try:
-            response = await self.get("/api/settings", headers=headers)
-            return response.json()
-
-        except AuthHttpError as e:
-            raise ApiClientError(f"Failed to get user settings: {str(e)}")
+        return await self._get_json("/api/settings")
 
 
-async def fetch_user_data_after_oauth(server_url: str, api_key: str) -> dict[str, Any]:
-    """Fetch user data after successful OAuth authentication.
+def _print_settings_summary(settings: dict[str, Any]) -> None:
+    _p("<green>  ✓ User settings retrieved</green>")
 
-    Args:
-        server_url: OpenHands server URL
-        api_key: API key obtained from OAuth
+    llm_model = settings.get("llm_model", "Not set")
+    agent_name = settings.get("agent", "Not set")
+    language = settings.get("language", "Not set")
+    llm_api_key_set = settings.get("llm_api_key_set", False)
 
-    Returns:
-        Dictionary containing user data (llm_api_key, settings)
+    _p(f"    <white>LLM Model: {llm_model}</white>")
+    _p(f"    <white>Agent: {agent_name}</white>")
+    _p(f"    <white>Language: {language}</white>")
 
-    Raises:
-        ApiClientError: If any API call fails
-    """
+    if llm_api_key_set:
+        _p("    <green>✓ LLM API key is configured in settings</green>")
+    else:
+        _p("    <yellow>! No LLM API key configured in settings</yellow>")
+
+
+def create_agent_from_settings(
+    llm_api_key: str,
+    settings: dict[str, Any],
+    base_url: str = DEFAULT_LLM_BASE_URL,
+) -> Agent:
+    """Create an Agent instance from user settings and API key."""
+    model = settings.get("llm_model", DEFAULT_MODEL)
+
+    llm = LLM(
+        model=model,
+        api_key=llm_api_key,
+        base_url=base_url,
+        usage_id="agent",
+    )
+
+    condenser_llm = LLM(
+        model=model,
+        api_key=llm_api_key,
+        base_url=base_url,
+        usage_id="condenser",
+    )
+
+    condenser = LLMSummarizingCondenser(
+        llm=condenser_llm,
+        max_size=10000,
+        keep_first=1000,
+    )
+
+    return Agent(
+        llm=llm,
+        tools=get_default_tools(enable_browser=False),
+        mcp_config={},
+        condenser=condenser,
+    )
+
+
+def save_agent_configuration(agent: Agent) -> None:
+    """Persist the Agent configuration and print details."""
+    store = AgentStore()
+    store.save(agent)
+
+    _p("<green>✓ Agent configuration created and saved!</green>")
+    _p("<white>Configuration details:</white>")
+
+    llm = agent.llm
+
+    _p(f"  • Model: <cyan>{llm.model}</cyan>")
+    _p(f"  • Base URL: <cyan>{llm.base_url}</cyan>")
+    _p(f"  • Usage ID: <cyan>{llm.usage_id}</cyan>")
+    _p("  • API Key: <cyan>✓ Set</cyan>")
+
+    tools_count = len(agent.tools)
+    _p(f"  • Tools: <cyan>{tools_count} default tools loaded</cyan>")
+
+    condenser = agent.condenser
+    if isinstance(condenser, LLMSummarizingCondenser):
+        _p(
+            f"  • Condenser: <cyan>LLM Summarizing (max_size: {condenser.max_size}, "
+            f"keep_first: {condenser.keep_first})</cyan>"
+        )
+
+    _p(f"  • Saved to: <cyan>{SETTINGS_PATH}</cyan>")
+
+
+async def fetch_user_data_after_oauth(
+    server_url: str,
+    api_key: str,
+) -> dict[str, Any]:
+    """Fetch user data after OAuth and optionally create & save an Agent."""
     client = OpenHandsApiClient(server_url, api_key)
 
-    print_formatted_text(HTML("<cyan>Fetching user data...</cyan>"))
-
-    user_data = {}
+    _p("<cyan>Fetching user data...</cyan>")
 
     try:
         # Fetch LLM API key
-        print_formatted_text(HTML("<white>• Getting LLM API key...</white>"))
+        _p("<white>• Getting LLM API key...</white>")
         llm_api_key = await client.get_llm_api_key()
-        user_data["llm_api_key"] = llm_api_key
-
         if llm_api_key:
-            print_formatted_text(
-                HTML(f"<green>  ✓ LLM API key retrieved: {llm_api_key[:10]}...</green>")
-            )
+            _p(f"<green>  ✓ LLM API key retrieved: {llm_api_key[:10]}...</green>")
         else:
-            print_formatted_text(HTML("<yellow>  ! No LLM API key available</yellow>"))
+            _p("<yellow>  ! No LLM API key available</yellow>")
 
         # Fetch user settings
-        print_formatted_text(HTML("<white>• Getting user settings...</white>"))
+        _p("<white>• Getting user settings...</white>")
         settings = await client.get_user_settings()
-        user_data["settings"] = settings
 
-        # Display key settings information
         if settings:
-            print_formatted_text(HTML("<green>  ✓ User settings retrieved</green>"))
-
-            # Show some key settings
-            llm_model = settings.get("llm_model", "Not set")
-            agent = settings.get("agent", "Not set")
-            language = settings.get("language", "Not set")
-
-            print_formatted_text(HTML(f"    <white>LLM Model: {llm_model}</white>"))
-            print_formatted_text(HTML(f"    <white>Agent: {agent}</white>"))
-            print_formatted_text(HTML(f"    <white>Language: {language}</white>"))
-
-            # Show if user has LLM API key set in settings
-            llm_api_key_set = settings.get("llm_api_key_set", False)
-            if llm_api_key_set:
-                print_formatted_text(
-                    HTML("    <green>✓ LLM API key is configured in settings</green>")
-                )
-            else:
-                print_formatted_text(
-                    HTML("    <yellow>! No LLM API key configured in settings</yellow>")
-                )
+            _print_settings_summary(settings)
         else:
-            print_formatted_text(
-                HTML("<yellow>  ! No user settings available</yellow>")
-            )
+            _p("<yellow>  ! No user settings available</yellow>")
 
-        # Create and save Agent configuration if we have the necessary data
+        user_data = {
+            "llm_api_key": llm_api_key,
+            "settings": settings,
+        }
+
+        # Create agent if possible
         if llm_api_key and settings:
             try:
-                # Get the model from settings, default to reasonable model if not found
-                model = settings.get("llm_model", "gpt-4o-mini")
-
-                # Create LLM configuration for agent
-                llm = LLM(
-                    model=model,
-                    api_key=llm_api_key,
-                    base_url="https://llm-proxy.app.all-hands.dev/",
-                    usage_id="agent",
-                )
-
-                # Create separate LLM for condenser to ensure different usage tracking
-                condenser_llm = LLM(
-                    model=model,
-                    api_key=llm_api_key,
-                    base_url="https://llm-proxy.app.all-hands.dev/",
-                    usage_id="condenser",
-                )
-
-                # Create LLM summarizing condenser with separate LLM
-                condenser = LLMSummarizingCondenser(
-                    llm=condenser_llm,
-                    max_size=10000,  # Default max size
-                    keep_first=1000,  # Keep first 1000 chars
-                )
-
-                # Create Agent with default tools
-                agent = Agent(
-                    llm=llm,
-                    tools=get_default_tools(enable_browser=False),
-                    mcp_config={},
-                    condenser=condenser,
-                )
-
-                # Save the agent configuration
-                agent_store = AgentStore()
-                agent_store.save(agent)
-
-                print_formatted_text(
-                    HTML("<green>✓ Agent configuration created and saved!</green>")
-                )
-
-                # Log what was saved (without exposing the API key)
-                print_formatted_text(HTML("<white>Configuration details:</white>"))
-                print_formatted_text(HTML(f"  • Model: <cyan>{model}</cyan>"))
-                print_formatted_text(HTML(f"  • Base URL: <cyan>{llm.base_url}</cyan>"))
-                print_formatted_text(HTML(f"  • Usage ID: <cyan>{llm.usage_id}</cyan>"))
-                api_key_status = "✓ Set" if llm_api_key else "✗ Not set"
-                print_formatted_text(
-                    HTML(f"  • API Key: <cyan>{api_key_status}</cyan>")
-                )
-                tools_count = len(agent.tools)
-                print_formatted_text(
-                    HTML(f"  • Tools: <cyan>{tools_count} default tools loaded</cyan>")
-                )
-                condenser_info = (
-                    f"LLM Summarizing (max_size: {condenser.max_size}, "
-                    f"keep_first: {condenser.keep_first})"
-                )
-                print_formatted_text(
-                    HTML(f"  • Condenser: <cyan>{condenser_info}</cyan>")
-                )
-
-                # Show where settings were saved
-                from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
-
-                settings_path = f"{PERSISTENCE_DIR}/{AGENT_SETTINGS_PATH}"
-                print_formatted_text(
-                    HTML(f"  • Saved to: <cyan>{settings_path}</cyan>")
-                )
-
+                agent = create_agent_from_settings(llm_api_key, settings)
+                save_agent_configuration(agent)
             except Exception as e:
-                print_formatted_text(
-                    HTML(
-                        f"<yellow>Warning: Could not create agent configuration: "
-                        f"{str(e)}</yellow>"
-                    )
+                _p(
+                    f"<yellow>Warning: Could not create "
+                    f"agent configuration: {e}</yellow>"
                 )
+        else:
+            _p(
+                "<yellow>Skipping agent configuration; "
+                "missing key or settings.</yellow>"
+            )
 
-        print_formatted_text(HTML("<green>✓ User data fetched successfully!</green>"))
+        _p("<green>✓ User data fetched successfully!</green>")
         return user_data
 
     except ApiClientError as e:
-        print_formatted_text(HTML(f"<red>Error fetching user data: {str(e)}</red>"))
+        _p(f"<red>Error fetching user data: {e}</red>")
         raise
