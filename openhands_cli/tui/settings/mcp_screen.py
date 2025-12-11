@@ -7,6 +7,7 @@ from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk import Agent
 from openhands_cli.locations import MCP_CONFIG_FILE, PERSISTENCE_DIR
+from openhands_cli.mcp.mcp_display_utils import normalize_server_object
 
 
 class MCPScreen:
@@ -154,26 +155,8 @@ class MCPScreen:
         if server_name:
             print_formatted_text(HTML(f"{pad}<white>• {server_name}</white>"))
 
-        # Handle both FastMCP objects and legacy dict format for compatibility
-        if isinstance(server, dict):
-            # Legacy dict format - convert to appropriate server object for processing
-            # Detect server type based on transport field or presence of command vs url
-            if server.get("transport") == "stdio" or (
-                "command" in server and "url" not in server
-            ):
-                # Add default transport if missing for StdioMCPServer
-                server_dict = server.copy()
-                if "transport" not in server_dict:
-                    server_dict["transport"] = "stdio"
-                server_obj = StdioMCPServer(**server_dict)
-            else:
-                # Add default transport if missing for RemoteMCPServer
-                server_dict = server.copy()
-                if "transport" not in server_dict:
-                    server_dict["transport"] = "http"
-                server_obj = RemoteMCPServer(**server_dict)
-        else:
-            server_obj = server
+        # Convert to FastMCP object if needed
+        server_obj = normalize_server_object(server)
 
         if isinstance(server_obj, StdioMCPServer):
             print_formatted_text(HTML(f"{pad}  <grey>Type: Command-based</grey>"))

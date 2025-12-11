@@ -11,6 +11,7 @@ from textual.widgets import Static
 
 from openhands.sdk import Agent
 from openhands_cli.locations import MCP_CONFIG_FILE
+from openhands_cli.mcp.mcp_display_utils import normalize_server_object
 from openhands_cli.mcp.mcp_utils import get_config_status
 from openhands_cli.refactor.core.theme import OPENHANDS_THEME
 from openhands_cli.refactor.panels.mcp_panel_style import MCP_PANEL_STYLE
@@ -176,26 +177,8 @@ class MCPSidePanel(VerticalScroll):
         """Format server specification details for display."""
         details = []
 
-        # Handle both FastMCP objects and legacy dict format for compatibility
-        if isinstance(server, dict):
-            # Legacy dict format - convert to appropriate server object for processing
-            # Detect server type based on transport field or presence of command vs url
-            if server.get("transport") == "stdio" or (
-                "command" in server and "url" not in server
-            ):
-                # Add default transport if missing for StdioMCPServer
-                server_dict = server.copy()
-                if "transport" not in server_dict:
-                    server_dict["transport"] = "stdio"
-                server_obj = StdioMCPServer(**server_dict)
-            else:
-                # Add default transport if missing for RemoteMCPServer
-                server_dict = server.copy()
-                if "transport" not in server_dict:
-                    server_dict["transport"] = "http"
-                server_obj = RemoteMCPServer(**server_dict)
-        else:
-            server_obj = server
+        # Convert to FastMCP object if needed
+        server_obj = normalize_server_object(server)
 
         if isinstance(server_obj, StdioMCPServer):
             details.append("Type: Command-based")
