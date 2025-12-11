@@ -129,7 +129,10 @@ def create_main_parser() -> argparse.ArgumentParser:
         "--server-url",
         type=str,
         default=default_cloud_url,
-        help=f"OpenHands server URL (default: {default_cloud_url}, configurable via OPENHANDS_CLOUD_URL env var)",
+        help=(
+            f"OpenHands server URL (default: {default_cloud_url}, "
+            "configurable via OPENHANDS_CLOUD_URL env var)"
+        ),
     )
 
     # Add logout subcommand
@@ -137,7 +140,10 @@ def create_main_parser() -> argparse.ArgumentParser:
     logout_parser.add_argument(
         "--server-url",
         type=str,
-        help="OpenHands server URL to log out from (if not specified, logs out from all servers)",
+        help=(
+            "OpenHands server URL to log out from "
+            "(if not specified, logs out from all servers)"
+        ),
     )
 
     return parser

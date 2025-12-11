@@ -48,8 +48,28 @@ class UserSettings:
             raise UserSettingsError(f"Failed to secure config directory: {e}")
 
     def _get_encryption_key(self) -> bytes:
-        """Get encryption key (reuse from token storage)."""
-        return self.token_storage._get_or_create_key()
+        """Get or create encryption key for user settings."""
+        key_file = self.config_dir / ".settings_key"
+
+        if key_file.exists():
+            try:
+                with open(key_file, "rb") as f:
+                    return f.read()
+            except OSError:
+                pass  # Fall through to create new key
+
+        # Generate new key
+        key = Fernet.generate_key()
+
+        try:
+            with open(key_file, "wb") as f:
+                f.write(key)
+            # Secure permissions on key file
+            os.chmod(key_file, stat.S_IRUSR | stat.S_IWUSR)  # 600
+        except OSError as e:
+            raise UserSettingsError(f"Failed to store encryption key: {e}")
+
+        return key
 
     def _encrypt_data(self, data: dict) -> bytes:
         """Encrypt settings data."""

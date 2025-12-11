@@ -36,11 +36,44 @@ async def login_command(server_url: str) -> bool:
                 HTML("<yellow>You are already logged in to this server.</yellow>")
             )
             print_formatted_text(
-                HTML(
-                    "<white>Use 'openhands logout' to log out first if you want to "
-                    "re-authenticate.</white>"
-                )
+                HTML("<white>Pulling latest settings from remote...</white>")
             )
+
+            # Pull settings from remote using existing tokens
+            api_key = existing_tokens.get("access_token")
+            if api_key:
+                try:
+                    await fetch_user_data_after_oauth(server_url, api_key)
+                    print_formatted_text(
+                        HTML("\n<green>✓ Settings synchronized successfully!</green>")
+                    )
+                except ApiClientError as e:
+                    print_formatted_text(
+                        HTML(
+                            f"\n<yellow>Warning: Could not fetch user data: "
+                            f"{str(e)}</yellow>"
+                        )
+                    )
+                    print_formatted_text(
+                        HTML(
+                            "<white>You are still logged in, but settings could not "
+                            "be synchronized.</white>"
+                        )
+                    )
+            else:
+                print_formatted_text(
+                    HTML(
+                        "\n<yellow>Warning: No access token found in stored "
+                        "credentials.</yellow>"
+                    )
+                )
+                print_formatted_text(
+                    HTML(
+                        "<white>You may need to log out and log in again to "
+                        "refresh your credentials.</white>"
+                    )
+                )
+
             return True
 
         # Perform device flow authentication
