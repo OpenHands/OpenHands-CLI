@@ -5,10 +5,6 @@ import os
 import stat
 from pathlib import Path
 
-from cryptography.fernet import Fernet
-
-from openhands_cli.auth.token_storage import TokenStorage
-
 
 class UserSettingsError(Exception):
     """Exception raised for user settings storage errors."""
@@ -31,10 +27,7 @@ class UserSettings:
         self.config_dir = config_dir
         self.config_dir.mkdir(mode=0o700, exist_ok=True)  # Secure permissions
 
-        self.settings_file = self.config_dir / "user_settings.enc"
-
-        # Reuse the same encryption key as token storage
-        self.token_storage = TokenStorage(config_dir)
+        self.settings_file = self.config_dir / "user_settings.json"
 
         # Ensure secure permissions on config directory
         self._secure_directory()
@@ -47,49 +40,7 @@ class UserSettings:
         except OSError as e:
             raise UserSettingsError(f"Failed to secure config directory: {e}")
 
-    def _get_encryption_key(self) -> bytes:
-        """Get or create encryption key for user settings."""
-        key_file = self.config_dir / ".settings_key"
 
-        if key_file.exists():
-            try:
-                with open(key_file, "rb") as f:
-                    return f.read()
-            except OSError:
-                pass  # Fall through to create new key
-
-        # Generate new key
-        key = Fernet.generate_key()
-
-        try:
-            with open(key_file, "wb") as f:
-                f.write(key)
-            # Secure permissions on key file
-            os.chmod(key_file, stat.S_IRUSR | stat.S_IWUSR)  # 600
-        except OSError as e:
-            raise UserSettingsError(f"Failed to store encryption key: {e}")
-
-        return key
-
-    def _encrypt_data(self, data: dict) -> bytes:
-        """Encrypt settings data."""
-        try:
-            key = self._get_encryption_key()
-            fernet = Fernet(key)
-            json_data = json.dumps(data, indent=2).encode("utf-8")
-            return fernet.encrypt(json_data)
-        except Exception as e:
-            raise UserSettingsError(f"Failed to encrypt settings data: {e}")
-
-    def _decrypt_data(self, encrypted_data: bytes) -> dict:
-        """Decrypt settings data."""
-        try:
-            key = self._get_encryption_key()
-            fernet = Fernet(key)
-            json_data = fernet.decrypt(encrypted_data)
-            return json.loads(json_data.decode("utf-8"))
-        except Exception as e:
-            raise UserSettingsError(f"Failed to decrypt settings data: {e}")
 
     def store_user_profile(self, server_url: str, profile_data: dict) -> None:
         """Store user profile data for a server.
@@ -103,20 +54,18 @@ class UserSettings:
             all_settings = {}
             if self.settings_file.exists():
                 try:
-                    with open(self.settings_file, "rb") as f:
-                        encrypted_data = f.read()
-                    all_settings = self._decrypt_data(encrypted_data)
-                except (OSError, UserSettingsError):
+                    with open(self.settings_file) as f:
+                        all_settings = json.load(f)
+                except (OSError, json.JSONDecodeError):
                     # If we can't read existing settings, start fresh
                     all_settings = {}
 
             # Add/update profile for this server
             all_settings[server_url] = profile_data
 
-            # Encrypt and save
-            encrypted_data = self._encrypt_data(all_settings)
-            with open(self.settings_file, "wb") as f:
-                f.write(encrypted_data)
+            # Save as plain JSON
+            with open(self.settings_file, "w") as f:
+                json.dump(all_settings, f, indent=2)
 
             # Secure permissions on settings file
             os.chmod(self.settings_file, stat.S_IRUSR | stat.S_IWUSR)  # 600
@@ -137,13 +86,11 @@ class UserSettings:
             return None
 
         try:
-            with open(self.settings_file, "rb") as f:
-                encrypted_data = f.read()
-
-            all_settings = self._decrypt_data(encrypted_data)
+            with open(self.settings_file) as f:
+                all_settings = json.load(f)
             return all_settings.get(server_url)
 
-        except (OSError, UserSettingsError):
+        except (OSError, json.JSONDecodeError):
             return None
 
     def remove_user_profile(self, server_url: str) -> bool:
@@ -159,10 +106,8 @@ class UserSettings:
             return False
 
         try:
-            with open(self.settings_file, "rb") as f:
-                encrypted_data = f.read()
-
-            all_settings = self._decrypt_data(encrypted_data)
+            with open(self.settings_file) as f:
+                all_settings = json.load(f)
 
             if server_url not in all_settings:
                 return False
@@ -171,16 +116,15 @@ class UserSettings:
 
             # Save updated settings
             if all_settings:
-                encrypted_data = self._encrypt_data(all_settings)
-                with open(self.settings_file, "wb") as f:
-                    f.write(encrypted_data)
+                with open(self.settings_file, "w") as f:
+                    json.dump(all_settings, f, indent=2)
             else:
                 # No settings left, remove the file
                 self.settings_file.unlink()
 
             return True
 
-        except (OSError, UserSettingsError):
+        except (OSError, json.JSONDecodeError):
             return False
 
     def clear_all_profiles(self) -> None:
@@ -201,13 +145,11 @@ class UserSettings:
             return []
 
         try:
-            with open(self.settings_file, "rb") as f:
-                encrypted_data = f.read()
-
-            all_settings = self._decrypt_data(encrypted_data)
+            with open(self.settings_file) as f:
+                all_settings = json.load(f)
             return list(all_settings.keys())
 
-        except (OSError, UserSettingsError):
+        except (OSError, json.JSONDecodeError):
             return []
 
     def get_setting(self, server_url: str, setting_name: str, default=None):
