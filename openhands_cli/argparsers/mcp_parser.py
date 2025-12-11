@@ -1,6 +1,20 @@
 """Argument parser for MCP subcommand."""
 
 import argparse
+import sys
+from typing import NoReturn
+
+
+class MCPArgumentParser(argparse.ArgumentParser):
+    """Custom ArgumentParser for MCP commands that shows full help on errors."""
+
+    def error(self, message: str) -> NoReturn:
+        """Override error method to show full help instead of just usage."""
+        # Print the full help including examples
+        self.print_help(sys.stderr)
+        # Print a separator and the specific error message
+        print(f"\nError: {message}", file=sys.stderr)
+        sys.exit(2)
 
 
 def add_mcp_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
@@ -64,11 +78,52 @@ Examples:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     mcp_subparsers = mcp_parser.add_subparsers(
-        dest="mcp_command", help="MCP commands", required=True
+        dest="mcp_command",
+        help="MCP commands",
+        required=True,
+        parser_class=MCPArgumentParser,
     )
 
     # MCP add command
-    add_parser = mcp_subparsers.add_parser("add", help="Add a new MCP server")
+    add_description = """
+Add a new MCP server configuration.
+
+Examples:
+
+  # Add an HTTP server with Bearer token authentication
+  openhands mcp add my-api https://api.example.com/mcp \\
+    --transport http \\
+    --header "Authorization: Bearer your-token-here"
+
+  # Add an HTTP server with API key authentication
+  openhands mcp add weather-api https://weather.api.com \\
+    --transport http \\
+    --header "X-API-Key: your-api-key"
+
+  # Add an HTTP server with multiple headers
+  openhands mcp add secure-api https://api.example.com \\
+    --transport http \\
+    --header "Authorization: Bearer token123" \\
+    --header "X-Client-ID: client456"
+
+  # Add a local stdio server with environment variables
+  openhands mcp add local-server python \\
+    --transport stdio \\
+    --env "API_KEY=secret123" \\
+    --env "DATABASE_URL=postgresql://..." \\
+    -- -m my_mcp_server --config config.json
+
+  # Add an OAuth-based server (like Notion MCP)
+  openhands mcp add notion-server https://mcp.notion.com/mcp \\
+    --transport http \\
+    --auth oauth
+"""
+    add_parser = mcp_subparsers.add_parser(
+        "add",
+        help="Add a new MCP server",
+        description=add_description,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     add_parser.add_argument(
         "--transport",
         choices=["http", "sse", "stdio"],
@@ -101,16 +156,53 @@ Examples:
     )
 
     # MCP list command
-    mcp_subparsers.add_parser("list", help="List all configured MCP servers")
+    list_description = """
+List all configured MCP servers.
+
+Examples:
+
+  # List all configured servers
+  openhands mcp list
+"""
+    mcp_subparsers.add_parser(
+        "list",
+        help="List all configured MCP servers",
+        description=list_description,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
 
     # MCP get command
+    get_description = """
+Get details for a specific MCP server.
+
+Examples:
+
+  # Get details for a specific server
+  openhands mcp get my-api
+"""
     get_parser = mcp_subparsers.add_parser(
-        "get", help="Get details for a specific MCP server"
+        "get",
+        help="Get details for a specific MCP server",
+        description=get_description,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     get_parser.add_argument("name", help="Name of the MCP server to get details for")
 
     # MCP remove command
-    remove_parser = mcp_subparsers.add_parser("remove", help="Remove an MCP server")
+    remove_description = """
+Remove an MCP server configuration.
+
+Examples:
+
+  # Remove a server
+  openhands mcp remove my-api
+"""
+    remove_parser = mcp_subparsers.add_parser(
+        "remove",
+        help="Remove an MCP server",
+        description=remove_description,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     remove_parser.add_argument("name", help="Name of the MCP server to remove")
 
     return mcp_parser
