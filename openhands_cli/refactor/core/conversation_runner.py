@@ -270,6 +270,41 @@ class ConversationRunner:
                 "No running converastion", "No running conversation to pause", "warning"
             )
 
+    async def condense_async(self) -> None:
+        """Condense the conversation history asynchronously."""
+        if self._running:
+            self._notification_callback(
+                "Condense Error",
+                "Cannot condense while conversation is running.",
+                "warning",
+            )
+            return
+
+        try:
+            # Notify user that condensation is starting
+            self._notification_callback(
+                "Condensation Started",
+                "Conversation condensation will be completed shortly...",
+                "information",
+            )
+
+            # Run condensation in a separate thread to avoid blocking UI
+            await asyncio.to_thread(self.conversation.condense)
+
+            # Notify user of successful completion
+            self._notification_callback(
+                "Condensation Complete",
+                "Conversation history has been condensed successfully",
+                "information",
+            )
+        except Exception as e:
+            # Notify user of error
+            self._notification_callback(
+                "Condensation Error",
+                f"Failed to condense conversation: {str(e)}",
+                "error",
+            )
+
     def _update_run_status(self, is_running: bool):
         self._running = is_running
         self._running_state_callback(is_running)

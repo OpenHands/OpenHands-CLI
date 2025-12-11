@@ -372,6 +372,8 @@ class OpenHandsApp(App):
             show_help(self.main_display)
         elif command == "/confirm":
             self._handle_confirm_command()
+        elif command == "/condense":
+            self._handle_condense_command()
         elif command == "/exit":
             self._handle_exit()
         else:
@@ -472,6 +474,20 @@ class OpenHandsApp(App):
             policy_name = "Custom policy"
 
         self.notify(f"Confirmation policy set to: {policy_name}")
+
+    def _handle_condense_command(self) -> None:
+        """Handle the /condense command to condense conversation history."""
+        if not self.conversation_runner:
+            self.notify(
+                title="Condense Error",
+                message="No conversation available to condense",
+                severity="error",
+            )
+            return
+
+        # Use the async condensation method from conversation runner
+        # This will handle all error cases and notifications
+        asyncio.create_task(self.conversation_runner.condense_async())
 
     def _handle_confirmation_request(
         self, pending_actions: list[ActionEvent]

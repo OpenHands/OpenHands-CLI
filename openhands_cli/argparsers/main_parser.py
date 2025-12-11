@@ -5,6 +5,7 @@ import argparse
 from openhands_cli import __version__
 from openhands_cli.argparsers.auth_parser import add_login_parser, add_logout_parser
 from openhands_cli.argparsers.serve_parser import add_serve_parser
+from openhands_cli.argparsers.util import add_confirmation_mode_args
 
 
 def create_main_parser() -> argparse.ArgumentParser:
@@ -80,19 +81,7 @@ def create_main_parser() -> argparse.ArgumentParser:
 
     # Confirmation mode options (mutually exclusive)
     confirmation_group = parser.add_mutually_exclusive_group()
-    confirmation_group.add_argument(
-        "--always-approve",
-        action="store_true",
-        help="Auto-approve all actions without asking for confirmation",
-    )
-    confirmation_group.add_argument(
-        "--llm-approve",
-        action="store_true",
-        help=(
-            "Enable LLM-based security analyzer "
-            "(only confirm LLM-predicted high-risk actions)"
-        ),
-    )
+    add_confirmation_mode_args(confirmation_group)
 
     parser.add_argument(
         "--exit-without-confirmation",
@@ -106,13 +95,7 @@ def create_main_parser() -> argparse.ArgumentParser:
     # Add serve subcommand
     add_serve_parser(subparsers)
 
-    # Add ACP subcommand
-    subparsers.add_parser(
-        "acp", help="Start OpenHands as an Agent Client Protocol (ACP) agent"
-    )
-
     # Add authentication subcommands
     add_login_parser(subparsers)
     add_logout_parser(subparsers)
-
     return parser

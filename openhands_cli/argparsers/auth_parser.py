@@ -29,7 +29,9 @@ def add_login_parser(subparsers: argparse._SubParsersAction) -> argparse.Argumen
     return login_parser
 
 
-def add_logout_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
+def add_logout_parser(
+    subparsers: argparse._SubParsersAction,
+) -> argparse.ArgumentParser:
     """Add logout subcommand parser.
 
     Args:

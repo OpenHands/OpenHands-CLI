@@ -23,7 +23,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 3
+        assert len(COMMANDS) == 4
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -37,6 +37,7 @@ class TestCommands:
         [
             ("/help", "Display available commands"),
             ("/confirm", "Configure confirmation settings"),
+            ("/condense", "Condense conversation history"),
             ("/exit", "Exit the application"),
         ],
     )
@@ -71,9 +72,11 @@ class TestCommands:
             "OpenHands CLI Help",
             "/help",
             "/confirm",
+            "/condense",
             "/exit",
             "Display available commands",
             "Configure confirmation settings",
+            "Condense conversation history",
             "Exit the application",
             "Tips:",
             "Type / and press Tab",
@@ -140,6 +143,7 @@ class TestCommands:
         [
             ("/help", True),
             ("/confirm", True),
+            ("/condense", True),
             ("/exit", True),
             ("/help extra", False),
             ("/exit now", False),
@@ -229,3 +233,125 @@ class TestOpenHandsAppCommands:
             oh_app._handle_command("/exit")
 
             exit_mock.assert_called_once_with()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "has_runner,runner_running,expected_notification",
+        [
+            (False, False, "Condense Error"),  # No conversation runner
+            (True, True, None),  # Runner exists but is running (handled by runner)
+            (True, False, None),  # Runner exists and not running (success case)
+        ],
+    )
+    async def test_condense_command_scenarios(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        has_runner: bool,
+        runner_running: bool,
+        expected_notification: str | None,
+    ) -> None:
+        """`/condense` should handle different conversation runner states correctly."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        # Mock the notify method to capture notifications
+        notify_mock = mock.MagicMock()
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+            oh_app.notify = notify_mock
+
+            dummy_runner = None
+            if has_runner:
+                # Create a mock conversation runner
+                dummy_runner = mock.MagicMock()
+                dummy_runner.is_running = runner_running
+                dummy_runner.condense_async = mock.AsyncMock()
+                oh_app.conversation_runner = dummy_runner
+            else:
+                oh_app.conversation_runner = None
+
+            oh_app._handle_command("/condense")
+
+            if expected_notification:
+                # Should have called notify with error
+                notify_mock.assert_called_once()
+                call_args = notify_mock.call_args
+                assert call_args[1]["title"] == expected_notification
+            elif has_runner and dummy_runner is not None:
+                # Should have called condense_async
+                dummy_runner.condense_async.assert_called_once()
+                # Should not have called notify (error handling is in runner)
+                notify_mock.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_condense_command_calls_async_method(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/condense` should call the async condense method on conversation runner."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            # Create a mock conversation runner with async condense method
+            dummy_runner = mock.MagicMock()
+            dummy_runner.is_running = False
+            dummy_runner.condense_async = mock.AsyncMock()
+            oh_app.conversation_runner = dummy_runner
+
+            # Mock notify to ensure no error notifications
+            notify_mock = mock.MagicMock()
+            oh_app.notify = notify_mock
+
+            oh_app._handle_command("/condense")
+
+            # Verify the async method was called
+            dummy_runner.condense_async.assert_called_once_with()
+            # Verify no error notifications were sent
+            notify_mock.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_condense_command_no_runner_error_message(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/condense` should show error when no conversation runner exists."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            # Ensure no conversation runner
+            oh_app.conversation_runner = None
+
+            # Mock notify to capture the error message
+            notify_mock = mock.MagicMock()
+            oh_app.notify = notify_mock
+
+            oh_app._handle_command("/condense")
+
+            # Verify error notification was called with correct parameters
+            notify_mock.assert_called_once_with(
+                title="Condense Error",
+                message="No conversation available to condense",
+                severity="error",
+            )
