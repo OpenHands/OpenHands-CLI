@@ -49,7 +49,6 @@ def test_experimental_ui() -> TestResult:
 
             # Markers that indicate the textual UI has started
             ui_markers = [
-                "openhands",
                 "conversation",
                 "initialized",
                 "what do you want to build",
@@ -68,7 +67,7 @@ def test_experimental_ui() -> TestResult:
                     continue
                 captured.append(line)
                 line_lower = line.strip().lower()
-                if any(marker in line_lower for marker in ui_markers):
+                if all(marker in line_lower for marker in ui_markers):
                     saw_ui_start = True
                     break
 
