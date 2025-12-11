@@ -1,10 +1,7 @@
 """API client for fetching user data after OAuth authentication."""
 
-import json
 from typing import Any
-from urllib.parse import urljoin
 
-import httpx
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 
@@ -12,6 +9,7 @@ from openhands.sdk import Agent
 from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands.sdk.llm import LLM
 from openhands.tools.preset.default import get_default_tools
+from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
 from openhands_cli.tui.settings.store import AgentStore
 
 
@@ -21,7 +19,7 @@ class ApiClientError(Exception):
     pass
 
 
-class OpenHandsApiClient:
+class OpenHandsApiClient(BaseHttpClient):
     """Client for making authenticated API calls to OpenHands server."""
 
     def __init__(self, server_url: str, api_key: str):
@@ -31,9 +29,8 @@ class OpenHandsApiClient:
             server_url: Base URL of the OpenHands server
             api_key: API key for authentication
         """
-        self.server_url = server_url.rstrip("/")
+        super().__init__(server_url)
         self.api_key = api_key
-        self.timeout = httpx.Timeout(30.0)
 
     async def get_llm_api_key(self) -> str | None:
         """Get the LLM API key for BYOR (Bring Your Own Runtime).
@@ -44,33 +41,18 @@ class OpenHandsApiClient:
         Raises:
             ApiClientError: If the API call fails
         """
-        url = urljoin(self.server_url, "/api/keys/llm/byor")
-
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(url, headers=headers)
-                response.raise_for_status()
+            response = await self.get("/api/keys/llm/byor", headers=headers)
+            result = response.json()
+            return result.get("key")
 
-                result = response.json()
-                return result.get("key")
-
-        except httpx.HTTPStatusError as e:
-            error_detail = "Unknown error"
-            try:
-                error_data = e.response.json()
-                error_detail = error_data.get("detail", str(e))
-            except (json.JSONDecodeError, AttributeError):
-                error_detail = str(e)
-
-            raise ApiClientError(f"Failed to get LLM API key: {error_detail}")
-
-        except httpx.RequestError as e:
-            raise ApiClientError(f"Network error getting LLM API key: {str(e)}")
+        except AuthHttpError as e:
+            raise ApiClientError(f"Failed to get LLM API key: {str(e)}")
 
     async def get_user_settings(self) -> dict[str, Any]:
         """Get the user's settings.
@@ -81,32 +63,17 @@ class OpenHandsApiClient:
         Raises:
             ApiClientError: If the API call fails
         """
-        url = urljoin(self.server_url, "/api/settings")
-
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(url, headers=headers)
-                response.raise_for_status()
+            response = await self.get("/api/settings", headers=headers)
+            return response.json()
 
-                return response.json()
-
-        except httpx.HTTPStatusError as e:
-            error_detail = "Unknown error"
-            try:
-                error_data = e.response.json()
-                error_detail = error_data.get("detail", str(e))
-            except (json.JSONDecodeError, AttributeError):
-                error_detail = str(e)
-
-            raise ApiClientError(f"Failed to get user settings: {error_detail}")
-
-        except httpx.RequestError as e:
-            raise ApiClientError(f"Network error getting user settings: {str(e)}")
+        except AuthHttpError as e:
+            raise ApiClientError(f"Failed to get user settings: {str(e)}")
 
 
 async def fetch_user_data_after_oauth(server_url: str, api_key: str) -> dict[str, Any]:

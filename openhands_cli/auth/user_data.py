@@ -7,7 +7,7 @@ from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 
 from openhands_cli.auth.api_client import ApiClientError, fetch_user_data_after_oauth
-from openhands_cli.auth.token_storage import get_token_storage
+from openhands_cli.auth.token_storage import TokenStorage
 
 
 async def get_user_data_for_server(server_url: str) -> dict[str, Any] | None:
@@ -19,20 +19,14 @@ async def get_user_data_for_server(server_url: str) -> dict[str, Any] | None:
     Returns:
         Dictionary containing user data if successful, None otherwise
     """
-    token_storage = get_token_storage()
-    tokens = token_storage.get_tokens(server_url)
+    token_storage = TokenStorage()
+    api_key = token_storage.get_api_key()
 
-    if not tokens:
+    if not api_key:
         print_formatted_text(
-            HTML(f"<red>No authentication tokens found for {server_url}</red>")
+            HTML(f"<red>No authentication found for {server_url}</red>")
         )
         print_formatted_text(HTML("<white>Please run 'openhands login' first.</white>"))
-        return None
-
-    api_key = tokens.get("access_token")
-    if not api_key:
-        print_formatted_text(HTML(f"<red>No access token found for {server_url}</red>"))
-        print_formatted_text(HTML("<white>Please run 'openhands login' again.</white>"))
         return None
 
     try:

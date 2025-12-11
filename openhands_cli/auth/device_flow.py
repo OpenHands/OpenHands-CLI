@@ -2,11 +2,11 @@
 
 import asyncio
 import json
-from urllib.parse import urljoin
 
-import httpx
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
+
+from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
 
 
 class DeviceFlowError(Exception):
@@ -15,7 +15,7 @@ class DeviceFlowError(Exception):
     pass
 
 
-class DeviceFlowClient:
+class DeviceFlowClient(BaseHttpClient):
     """OAuth 2.0 Device Flow client for CLI authentication."""
 
     def __init__(self, server_url: str):
@@ -24,8 +24,7 @@ class DeviceFlowClient:
         Args:
             server_url: Base URL of the OpenHands server
         """
-        self.server_url = server_url.rstrip("/")
-        self.timeout = httpx.Timeout(30.0)  # 30 second timeout
+        super().__init__(server_url)
 
     async def start_device_flow(self) -> tuple[str, str, str, int]:
         """Start the OAuth 2.0 Device Flow.
@@ -36,39 +35,22 @@ class DeviceFlowClient:
         Raises:
             DeviceFlowError: If the device flow initiation fails
         """
-        url = urljoin(self.server_url, "/oauth/device/authorize")
-
         # No data needed since endpoints are already authenticated
         data = {}
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(url, json=data)
-                response.raise_for_status()
+            response = await self.post("/oauth/device/authorize", json_data=data)
+            result = response.json()
 
-                result = response.json()
-
-                return (
-                    result["device_code"],
-                    result["user_code"],
-                    result["verification_uri"],
-                    result["interval"],
-                )
-
-        except httpx.HTTPStatusError as e:
-            error_detail = "Unknown error"
-            try:
-                error_data = e.response.json()
-                error_detail = error_data.get("detail", str(e))
-            except (json.JSONDecodeError, AttributeError):
-                error_detail = str(e)
-
-            raise DeviceFlowError(f"Failed to start device flow: {error_detail}")
-
-        except httpx.RequestError as e:
-            raise DeviceFlowError(
-                f"Network error during device flow initiation: {str(e)}"
+            return (
+                result["device_code"],
+                result["user_code"],
+                result["verification_uri"],
+                result["interval"],
             )
+
+        except AuthHttpError as e:
+            raise DeviceFlowError(f"Failed to start device flow: {str(e)}")
 
     async def poll_for_token(self, device_code: str, interval: int) -> dict[str, str]:
         """Poll for the API key after user authorization.
@@ -83,60 +65,54 @@ class DeviceFlowClient:
         Raises:
             DeviceFlowError: If polling fails or user denies access
         """
-        url = urljoin(self.server_url, "/oauth/device/token")
-
         data = {"device_code": device_code}
-
         max_attempts = 120  # 10 minutes with 5-second intervals
         attempt = 0
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            while attempt < max_attempts:
+        while attempt < max_attempts:
+            try:
+                response = await self.post(
+                    "/oauth/device/token", json_data=data, raise_for_status=False
+                )
+
+                if response.status_code == 200:
+                    # Success! We got the tokens
+                    return response.json()
+
+                # Handle error responses
                 try:
-                    response = await client.post(url, json=data)
+                    error_data = response.json()
+                    error = error_data.get("error", "unknown_error")
+                    error_description = error_data.get("error_description", "")
 
-                    if response.status_code == 200:
-                        # Success! We got the tokens
-                        return response.json()
-
-                    # Handle error responses
-                    try:
-                        error_data = response.json()
-                        error = error_data.get("error", "unknown_error")
-                        error_description = error_data.get("error_description", "")
-
-                        if error == "authorization_pending":
-                            # User hasn't completed authorization yet, keep polling
-                            pass
-                        elif error == "slow_down":
-                            # Server wants us to slow down, increase interval
-                            interval = min(interval * 2, 30)  # Cap at 30 seconds
-                        elif error == "expired_token":
-                            raise DeviceFlowError(
-                                "Device code has expired. Please try again."
-                            )
-                        elif error == "access_denied":
-                            raise DeviceFlowError(
-                                "User denied the authorization request."
-                            )
-                        else:
-                            raise DeviceFlowError(
-                                f"Authorization error: {error} - {error_description}"
-                            )
-
-                    except json.JSONDecodeError:
+                    if error == "authorization_pending":
+                        # User hasn't completed authorization yet, keep polling
+                        pass
+                    elif error == "slow_down":
+                        # Server wants us to slow down, increase interval
+                        interval = min(interval * 2, 30)  # Cap at 30 seconds
+                    elif error == "expired_token":
                         raise DeviceFlowError(
-                            f"Unexpected response from server: {response.status_code}"
+                            "Device code has expired. Please try again."
+                        )
+                    elif error == "access_denied":
+                        raise DeviceFlowError("User denied the authorization request.")
+                    else:
+                        raise DeviceFlowError(
+                            f"Authorization error: {error} - {error_description}"
                         )
 
-                except httpx.RequestError as e:
+                except json.JSONDecodeError:
                     raise DeviceFlowError(
-                        f"Network error during token polling: {str(e)}"
+                        f"Unexpected response from server: {response.status_code}"
                     )
 
-                # Wait before next poll
-                await asyncio.sleep(interval)
-                attempt += 1
+            except AuthHttpError as e:
+                raise DeviceFlowError(f"Network error during token polling: {str(e)}")
+
+            # Wait before next poll
+            await asyncio.sleep(interval)
+            attempt += 1
 
         raise DeviceFlowError(
             "Timeout waiting for user authorization. Please try again."

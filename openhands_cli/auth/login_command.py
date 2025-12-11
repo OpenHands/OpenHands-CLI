@@ -10,7 +10,7 @@ from openhands_cli.auth.device_flow import (
     DeviceFlowError,
     authenticate_with_device_flow,
 )
-from openhands_cli.auth.token_storage import TokenStorageError, get_token_storage
+from openhands_cli.auth.token_storage import TokenStorage, TokenStorageError
 
 
 async def login_command(server_url: str) -> bool:
@@ -27,11 +27,11 @@ async def login_command(server_url: str) -> bool:
     )
 
     try:
-        # Check if we already have tokens
-        token_storage = get_token_storage()
-        existing_tokens = token_storage.get_tokens(server_url)
+        # Check if we already have an API key
+        token_storage = TokenStorage()
+        existing_api_key = token_storage.get_api_key()
 
-        if existing_tokens:
+        if existing_api_key:
             print_formatted_text(
                 HTML("<yellow>You are already logged in to this server.</yellow>")
             )
@@ -39,38 +39,23 @@ async def login_command(server_url: str) -> bool:
                 HTML("<white>Pulling latest settings from remote...</white>")
             )
 
-            # Pull settings from remote using existing tokens
-            api_key = existing_tokens.get("access_token")
-            if api_key:
-                try:
-                    await fetch_user_data_after_oauth(server_url, api_key)
-                    print_formatted_text(
-                        HTML("\n<green>✓ Settings synchronized successfully!</green>")
-                    )
-                except ApiClientError as e:
-                    print_formatted_text(
-                        HTML(
-                            f"\n<yellow>Warning: Could not fetch user data: "
-                            f"{str(e)}</yellow>"
-                        )
-                    )
-                    print_formatted_text(
-                        HTML(
-                            "<white>You are still logged in, but settings could not "
-                            "be synchronized.</white>"
-                        )
-                    )
-            else:
+            # Pull settings from remote using existing API key
+            try:
+                await fetch_user_data_after_oauth(server_url, existing_api_key)
+                print_formatted_text(
+                    HTML("\n<green>✓ Settings synchronized successfully!</green>")
+                )
+            except ApiClientError as e:
                 print_formatted_text(
                     HTML(
-                        "\n<yellow>Warning: No access token found in stored "
-                        "credentials.</yellow>"
+                        f"\n<yellow>Warning: Could not fetch user data: "
+                        f"{str(e)}</yellow>"
                     )
                 )
                 print_formatted_text(
                     HTML(
-                        "<white>You may need to log out and log in again to "
-                        "refresh your credentials.</white>"
+                        "<white>You are still logged in, but settings could not "
+                        "be synchronized.</white>"
                     )
                 )
 
@@ -79,8 +64,10 @@ async def login_command(server_url: str) -> bool:
         # Perform device flow authentication
         tokens = await authenticate_with_device_flow(server_url)
 
-        # Store the tokens securely
-        token_storage.store_tokens(server_url, tokens)
+        # Store the API key securely
+        api_key = tokens.get("access_token")
+        if api_key:
+            token_storage.store_api_key(api_key)
 
         print_formatted_text(
             HTML(f"<green>✓ Successfully logged in to {server_url}</green>")
@@ -90,7 +77,6 @@ async def login_command(server_url: str) -> bool:
         )
 
         # Fetch user data using the API key
-        api_key = tokens.get("access_token")
         if api_key:
             try:
                 await fetch_user_data_after_oauth(server_url, api_key)
