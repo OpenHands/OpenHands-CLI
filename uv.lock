@@ -1499,8 +1499,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "agent-client-protocol", specifier = ">=0.7.0,<0.8.0" },
-    { name = "openhands-sdk", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=5ee81068fd16bb84d9a611e9af44825478155e15" },
-    { name = "openhands-tools", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=5ee81068fd16bb84d9a611e9af44825478155e15" },
+    { name = "openhands-sdk", specifier = "==1.5.1" },
+    { name = "openhands-tools", specifier = "==1.5.1" },
     { name = "prompt-toolkit", specifier = ">=3" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyperclip", specifier = ">=1.9.0" },
@@ -1527,8 +1527,8 @@ dev = [
 
 [[package]]
 name = "openhands-sdk"
-version = "1.5.0"
-source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=5ee81068fd16bb84d9a611e9af44825478155e15#5ee81068fd16bb84d9a611e9af44825478155e15" }
+version = "1.5.1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "deprecation" },
     { name = "fastmcp" },
@@ -1541,11 +1541,15 @@ dependencies = [
     { name = "tenacity" },
     { name = "websockets" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/99/23/391b7fa24b7f68514a9b891d03468dc8b4ecb8fb46220b7830cc198b1c51/openhands_sdk-1.5.1.tar.gz", hash = "sha256:4a4b397d6b88ee97c99b53a9f1b713af168f262bc3c8fb0c1afd17087546c683", size = 187238, upload-time = "2025-12-10T22:18:14.802Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a8/52/f82826c318510a0fcfc3144b11f913953d0c872a72ea85b90f132a839ed9/openhands_sdk-1.5.1-py3-none-any.whl", hash = "sha256:36aa0cc4781598c965b18a7f35e4e87d68be6a5e27299e371fc682d44d2df2a1", size = 247123, upload-time = "2025-12-10T22:18:17.887Z" },
+]
 
 [[package]]
 name = "openhands-tools"
-version = "1.5.0"
-source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=5ee81068fd16bb84d9a611e9af44825478155e15#5ee81068fd16bb84d9a611e9af44825478155e15" }
+version = "1.5.1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bashlex" },
     { name = "binaryornot" },
@@ -1556,6 +1560,10 @@ dependencies = [
     { name = "openhands-sdk" },
     { name = "pydantic" },
     { name = "tom-swe" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/73/af/6dc80698de2454a29f3c7ee28a7f782c000e7b49379d02748fdfadb56bff/openhands_tools-1.5.1.tar.gz", hash = "sha256:c3f16aef1cba2724b90286518cd670602b6e22440821275e5d7c7b90c82ddbdf", size = 80523, upload-time = "2025-12-10T22:18:17.03Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/04/aa/2b1aa91c881440a515209cfd729876703bb9698377848f0d37a40f324dfa/openhands_tools-1.5.1-py3-none-any.whl", hash = "sha256:8ccc2c91a947ea03339cd941c7f3c14b6c258849e966a9266c846b457837243c", size = 106496, upload-time = "2025-12-10T22:18:15.833Z" },
 ]
 
 [[package]]
