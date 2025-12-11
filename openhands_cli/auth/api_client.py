@@ -207,6 +207,35 @@ async def fetch_user_data_after_oauth(server_url: str, api_key: str) -> dict[str
                 print_formatted_text(
                     HTML("<green>✓ Agent configuration created and saved!</green>")
                 )
+                
+                # Log what was saved (without exposing the API key)
+                print_formatted_text(HTML("<white>Configuration details:</white>"))
+                print_formatted_text(HTML(f"  • Model: <cyan>{model}</cyan>"))
+                print_formatted_text(
+                    HTML(f"  • Provider: <cyan>{llm.custom_llm_provider}</cyan>")
+                )
+                api_key_status = "✓ Set" if llm_api_key else "✗ Not set"
+                print_formatted_text(
+                    HTML(f"  • API Key: <cyan>{api_key_status}</cyan>")
+                )
+                tools_count = len(agent.tools)
+                print_formatted_text(
+                    HTML(f"  • Tools: <cyan>{tools_count} default tools loaded</cyan>")
+                )
+                condenser_info = (
+                    f"LLM Summarizing (max_size: {condenser.max_size}, "
+                    f"keep_first: {condenser.keep_first})"
+                )
+                print_formatted_text(
+                    HTML(f"  • Condenser: <cyan>{condenser_info}</cyan>")
+                )
+                
+                # Show where settings were saved
+                from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
+                settings_path = f"{PERSISTENCE_DIR}/{AGENT_SETTINGS_PATH}"
+                print_formatted_text(
+                    HTML(f"  • Saved to: <cyan>{settings_path}</cyan>")
+                )
 
             except Exception as e:
                 print_formatted_text(
