@@ -184,6 +184,7 @@ async def fetch_user_data_after_oauth(server_url: str, api_key: str) -> dict[str
                 llm = LLM(
                     model=model, 
                     api_key=llm_api_key,
+                    base_url="https://llm-proxy.app.all-hands.dev/",
                     usage_id="agent"
                 )
 
@@ -191,6 +192,7 @@ async def fetch_user_data_after_oauth(server_url: str, api_key: str) -> dict[str
                 condenser_llm = LLM(
                     model=model, 
                     api_key=llm_api_key,
+                    base_url="https://llm-proxy.app.all-hands.dev/",
                     usage_id="condenser"
                 )
 
@@ -220,6 +222,7 @@ async def fetch_user_data_after_oauth(server_url: str, api_key: str) -> dict[str
                 # Log what was saved (without exposing the API key)
                 print_formatted_text(HTML("<white>Configuration details:</white>"))
                 print_formatted_text(HTML(f"  • Model: <cyan>{model}</cyan>"))
+                print_formatted_text(HTML(f"  • Base URL: <cyan>{llm.base_url}</cyan>"))
                 print_formatted_text(
                     HTML(f"  • Usage ID: <cyan>{llm.usage_id}</cyan>")
                 )
