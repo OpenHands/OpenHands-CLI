@@ -182,18 +182,18 @@ async def fetch_user_data_after_oauth(server_url: str, api_key: str) -> dict[str
 
                 # Create LLM configuration for agent
                 llm = LLM(
-                    model=model, 
+                    model=model,
                     api_key=llm_api_key,
                     base_url="https://llm-proxy.app.all-hands.dev/",
-                    usage_id="agent"
+                    usage_id="agent",
                 )
 
                 # Create separate LLM for condenser to ensure different usage tracking
                 condenser_llm = LLM(
-                    model=model, 
+                    model=model,
                     api_key=llm_api_key,
                     base_url="https://llm-proxy.app.all-hands.dev/",
-                    usage_id="condenser"
+                    usage_id="condenser",
                 )
 
                 # Create LLM summarizing condenser with separate LLM
@@ -218,14 +218,12 @@ async def fetch_user_data_after_oauth(server_url: str, api_key: str) -> dict[str
                 print_formatted_text(
                     HTML("<green>✓ Agent configuration created and saved!</green>")
                 )
-                
+
                 # Log what was saved (without exposing the API key)
                 print_formatted_text(HTML("<white>Configuration details:</white>"))
                 print_formatted_text(HTML(f"  • Model: <cyan>{model}</cyan>"))
                 print_formatted_text(HTML(f"  • Base URL: <cyan>{llm.base_url}</cyan>"))
-                print_formatted_text(
-                    HTML(f"  • Usage ID: <cyan>{llm.usage_id}</cyan>")
-                )
+                print_formatted_text(HTML(f"  • Usage ID: <cyan>{llm.usage_id}</cyan>"))
                 api_key_status = "✓ Set" if llm_api_key else "✗ Not set"
                 print_formatted_text(
                     HTML(f"  • API Key: <cyan>{api_key_status}</cyan>")
@@ -241,9 +239,10 @@ async def fetch_user_data_after_oauth(server_url: str, api_key: str) -> dict[str
                 print_formatted_text(
                     HTML(f"  • Condenser: <cyan>{condenser_info}</cyan>")
                 )
-                
+
                 # Show where settings were saved
                 from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
+
                 settings_path = f"{PERSISTENCE_DIR}/{AGENT_SETTINGS_PATH}"
                 print_formatted_text(
                     HTML(f"  • Saved to: <cyan>{settings_path}</cyan>")

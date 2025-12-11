@@ -1,9 +1,10 @@
 """Main argument parser for OpenHands CLI."""
 
 import argparse
-import os
 
 from openhands_cli import __version__
+from openhands_cli.argparsers.auth_parser import add_login_parser, add_logout_parser
+from openhands_cli.argparsers.serve_parser import add_serve_parser
 
 
 def create_main_parser() -> argparse.ArgumentParser:
@@ -103,47 +104,15 @@ def create_main_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", help="Additional commands")
 
     # Add serve subcommand
-    serve_parser = subparsers.add_parser(
-        "serve", help="Launch the OpenHands GUI server using Docker (web interface)"
-    )
-    serve_parser.add_argument(
-        "--mount-cwd",
-        action="store_true",
-        help="Mount the current working directory in the Docker container",
-    )
-    serve_parser.add_argument(
-        "--gpu", action="store_true", help="Enable GPU support in the Docker container"
-    )
+    add_serve_parser(subparsers)
 
     # Add ACP subcommand
     subparsers.add_parser(
         "acp", help="Start OpenHands as an Agent Client Protocol (ACP) agent"
     )
 
-    # Add login subcommand
-    login_parser = subparsers.add_parser(
-        "login", help="Authenticate with OpenHands Cloud using OAuth 2.0 Device Flow"
-    )
-    default_cloud_url = os.getenv("OPENHANDS_CLOUD_URL", "https://app.all-hands.dev")
-    login_parser.add_argument(
-        "--server-url",
-        type=str,
-        default=default_cloud_url,
-        help=(
-            f"OpenHands server URL (default: {default_cloud_url}, "
-            "configurable via OPENHANDS_CLOUD_URL env var)"
-        ),
-    )
-
-    # Add logout subcommand
-    logout_parser = subparsers.add_parser("logout", help="Log out from OpenHands Cloud")
-    logout_parser.add_argument(
-        "--server-url",
-        type=str,
-        help=(
-            "OpenHands server URL to log out from "
-            "(if not specified, logs out from all servers)"
-        ),
-    )
+    # Add authentication subcommands
+    add_login_parser(subparsers)
+    add_logout_parser(subparsers)
 
     return parser
