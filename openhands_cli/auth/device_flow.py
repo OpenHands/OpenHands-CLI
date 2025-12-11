@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from typing import Any
 
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
@@ -13,6 +14,11 @@ class DeviceFlowError(Exception):
     """Base exception for device flow errors."""
 
     pass
+
+
+def _p(message: str) -> None:
+    """Print formatted text through prompt_toolkit."""
+    print_formatted_text(HTML(message))
 
 
 class DeviceFlowClient(BaseHttpClient):
@@ -35,11 +41,8 @@ class DeviceFlowClient(BaseHttpClient):
         Raises:
             DeviceFlowError: If the device flow initiation fails
         """
-        # No data needed since endpoints are already authenticated
-        data = {}
-
         try:
-            response = await self.post("/oauth/device/authorize", json_data=data)
+            response = await self.post("/oauth/device/authorize", json_data={})
             result = response.json()
 
             return (
@@ -48,11 +51,10 @@ class DeviceFlowClient(BaseHttpClient):
                 result["verification_uri"],
                 result["interval"],
             )
+        except (AuthHttpError, KeyError) as e:
+            raise DeviceFlowError(f"Failed to start device flow: {e}") from e
 
-        except AuthHttpError as e:
-            raise DeviceFlowError(f"Failed to start device flow: {str(e)}")
-
-    async def poll_for_token(self, device_code: str, interval: int) -> dict[str, str]:
+    async def poll_for_token(self, device_code: str, interval: int) -> dict[str, Any]:
         """Poll for the API key after user authorization.
 
         Args:
@@ -66,59 +68,55 @@ class DeviceFlowClient(BaseHttpClient):
             DeviceFlowError: If polling fails or user denies access
         """
         data = {"device_code": device_code}
-        max_attempts = 120  # 10 minutes with 5-second intervals
-        attempt = 0
+        max_attempts = 120  # ~10 minutes at 5s, but interval may vary
 
-        while attempt < max_attempts:
+        for _ in range(max_attempts):
             try:
                 response = await self.post(
-                    "/oauth/device/token", json_data=data, raise_for_status=False
+                    "/oauth/device/token",
+                    json_data=data,
+                    raise_for_status=False,
+                )
+            except AuthHttpError as e:
+                raise DeviceFlowError(f"Network error during token polling: {e}") from e
+
+            if response.status_code == 200:
+                # Success
+                return response.json()
+
+            # Non-200: try to interpret the error
+            try:
+                error_data = response.json()
+            except json.JSONDecodeError:
+                raise DeviceFlowError(
+                    f"Unexpected response from server: {response.status_code}"
                 )
 
-                if response.status_code == 200:
-                    # Success! We got the tokens
-                    return response.json()
+            error = error_data.get("error", "unknown_error")
+            description = error_data.get("error_description", "")
 
-                # Handle error responses
-                try:
-                    error_data = response.json()
-                    error = error_data.get("error", "unknown_error")
-                    error_description = error_data.get("error_description", "")
+            if error == "authorization_pending":
+                # User hasn't finished yet; just sleep and retry
+                pass
+            elif error == "slow_down":
+                # Server asks us to poll less frequently
+                interval = min(interval * 2, 30)
+            elif error == "expired_token":
+                raise DeviceFlowError(
+                    "Device code has expired. Please start a new login."
+                )
+            elif error == "access_denied":
+                raise DeviceFlowError("User denied the authorization request.")
+            else:
+                raise DeviceFlowError(f"Authorization error: {error} - {description}")
 
-                    if error == "authorization_pending":
-                        # User hasn't completed authorization yet, keep polling
-                        pass
-                    elif error == "slow_down":
-                        # Server wants us to slow down, increase interval
-                        interval = min(interval * 2, 30)  # Cap at 30 seconds
-                    elif error == "expired_token":
-                        raise DeviceFlowError(
-                            "Device code has expired. Please try again."
-                        )
-                    elif error == "access_denied":
-                        raise DeviceFlowError("User denied the authorization request.")
-                    else:
-                        raise DeviceFlowError(
-                            f"Authorization error: {error} - {error_description}"
-                        )
-
-                except json.JSONDecodeError:
-                    raise DeviceFlowError(
-                        f"Unexpected response from server: {response.status_code}"
-                    )
-
-            except AuthHttpError as e:
-                raise DeviceFlowError(f"Network error during token polling: {str(e)}")
-
-            # Wait before next poll
             await asyncio.sleep(interval)
-            attempt += 1
 
         raise DeviceFlowError(
             "Timeout waiting for user authorization. Please try again."
         )
 
-    async def authenticate(self) -> dict[str, str]:
+    async def authenticate(self) -> dict[str, Any]:
         """Complete OAuth 2.0 Device Flow authentication.
 
         Returns:
@@ -127,7 +125,7 @@ class DeviceFlowClient(BaseHttpClient):
         Raises:
             DeviceFlowError: If authentication fails
         """
-        print_formatted_text(HTML("<cyan>Starting OpenHands authentication...</cyan>"))
+        _p("<cyan>Starting OpenHands authentication...</cyan>")
 
         # Step 1: Start device flow
         try:
@@ -138,40 +136,30 @@ class DeviceFlowClient(BaseHttpClient):
                 interval,
             ) = await self.start_device_flow()
         except DeviceFlowError as e:
-            print_formatted_text(HTML(f"<red>Error: {str(e)}</red>"))
+            _p(f"<red>Error: {e}</red>")
             raise
 
-        # Step 2: Display instructions to user
-        print_formatted_text(
-            HTML("\n<yellow>To authenticate, please follow these steps:</yellow>")
+        # Step 2: Show instructions
+        _p("\n<yellow>To authenticate, please follow these steps:</yellow>")
+        _p(
+            f"<white>1. Open your web browser and go to: "
+            f"<b>{verification_uri}</b></white>"
         )
-        print_formatted_text(
-            HTML(
-                f"<white>1. Open your web browser and go to: "
-                f"<b>{verification_uri}</b></white>"
-            )
-        )
-        print_formatted_text(
-            HTML(f"<white>2. Enter this code: <b>{user_code}</b></white>")
-        )
-        print_formatted_text(
-            HTML("<white>3. Follow the instructions to complete authentication</white>")
-        )
-        print_formatted_text(
-            HTML("\n<cyan>Waiting for authentication to complete...</cyan>")
-        )
+        _p(f"<white>2. Enter this code: <b>{user_code}</b></white>")
+        _p("<white>3. Follow the instructions to complete authentication</white>")
+        _p("\n<cyan>Waiting for authentication to complete...</cyan>")
 
         # Step 3: Poll for token
         try:
             tokens = await self.poll_for_token(device_code, interval)
-            print_formatted_text(HTML("<green>✓ Authentication successful!</green>"))
+            _p("<green>✓ Authentication successful!</green>")
             return tokens
         except DeviceFlowError as e:
-            print_formatted_text(HTML(f"<red>Error: {str(e)}</red>"))
+            _p(f"<red>Error: {e}</red>")
             raise
 
 
-async def authenticate_with_device_flow(server_url: str) -> dict[str, str]:
+async def authenticate_with_device_flow(server_url: str) -> dict[str, Any]:
     """Convenience function to authenticate using device flow.
 
     Args:
