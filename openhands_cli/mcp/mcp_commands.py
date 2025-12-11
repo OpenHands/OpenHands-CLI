@@ -5,14 +5,11 @@ through the command line interface.
 """
 
 import argparse
-from typing import Any
 
+from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
 from prompt_toolkit import HTML, print_formatted_text
 
-from openhands_cli.mcp.mcp_display_utils import (
-    extract_server_info,
-    mask_sensitive_value,
-)
+from openhands_cli.mcp.mcp_display_utils import mask_sensitive_value
 from openhands_cli.mcp.mcp_utils import (
     MCPConfigurationError,
     add_server,
@@ -89,8 +86,8 @@ def handle_mcp_list(_args: argparse.Namespace) -> None:
         )
         print_formatted_text("")
 
-        for name, config in servers.items():
-            _render_server_details(name, config)
+        for name, server in servers.items():
+            _render_server_details(name, server)
             print_formatted_text("")
 
     except MCPConfigurationError as e:
@@ -105,11 +102,11 @@ def handle_mcp_get(args: argparse.Namespace) -> None:
         args: Parsed command line arguments
     """
     try:
-        config = get_server(args.name)
+        server = get_server(args.name)
 
         print_formatted_text(HTML(f"<white>MCP server '{args.name}':</white>"))
         print_formatted_text("")
-        _render_server_details(args.name, config, show_name=False)
+        _render_server_details(args.name, server, show_name=False)
 
     except MCPConfigurationError as e:
         print_formatted_text(HTML(f"<red>Error: {e}</red>"))
@@ -117,47 +114,46 @@ def handle_mcp_get(args: argparse.Namespace) -> None:
 
 
 def _render_server_details(
-    name: str, config: dict[str, Any], show_name: bool = True
+    name: str, server: StdioMCPServer | RemoteMCPServer, show_name: bool = True
 ) -> None:
     """Render server configuration details.
 
     Args:
         name: Server name
-        config: Server configuration
+        server: Server object
         show_name: Whether to show the server name
     """
     if show_name:
         print_formatted_text(HTML(f"  <cyan>• {name}</cyan>"))
 
-    info = extract_server_info(config)
-    print_formatted_text(HTML(f"    <grey>Transport:</grey> {info['transport_type']}"))
+    print_formatted_text(HTML(f"    <grey>Transport:</grey> {server.transport}"))
 
-    # Show authentication method if specified
-    if info["auth"]:
-        print_formatted_text(HTML(f"    <grey>Authentication:</grey> {info['auth']}"))
+    # Show authentication method if specified (only for RemoteMCPServer)
+    if isinstance(server, RemoteMCPServer) and server.auth:
+        print_formatted_text(HTML(f"    <grey>Authentication:</grey> {server.auth}"))
 
-    if info["transport_type"] in ["http", "sse"]:
-        if info["url"]:
-            print_formatted_text(HTML(f"    <grey>URL:</grey> {info['url']}"))
+    if isinstance(server, RemoteMCPServer):
+        if server.url:
+            print_formatted_text(HTML(f"    <grey>URL:</grey> {server.url}"))
 
-        if info["headers"]:
+        if server.headers:
             print_formatted_text(HTML("    <grey>Headers:</grey>"))
-            for key, value in info["headers"].items():
+            for key, value in server.headers.items():
                 # Mask potential sensitive values
                 display_value = mask_sensitive_value(key, value)
                 print_formatted_text(HTML(f"      {key}: {display_value}"))
 
-    elif info["transport_type"] == "stdio":
-        if info["command"]:
-            print_formatted_text(HTML(f"    <grey>Command:</grey> {info['command']}"))
+    elif isinstance(server, StdioMCPServer):
+        if server.command:
+            print_formatted_text(HTML(f"    <grey>Command:</grey> {server.command}"))
 
-        if info["args"]:
-            args_str = " ".join(info["args"])
+        if server.args:
+            args_str = " ".join(server.args)
             print_formatted_text(HTML(f"    <grey>Arguments:</grey> {args_str}"))
 
-        if info["env"]:
+        if server.env:
             print_formatted_text(HTML("    <grey>Environment:</grey>"))
-            for key, value in info["env"].items():
+            for key, value in server.env.items():
                 # Mask potential sensitive values
                 display_value = mask_sensitive_value(key, value)
                 print_formatted_text(HTML(f"      {key}={display_value}"))

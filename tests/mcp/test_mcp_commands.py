@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
 
 from openhands_cli.mcp.mcp_commands import (
     handle_mcp_add,
@@ -186,18 +187,19 @@ class TestMCPCommands:
         """Test listing when servers exist."""
         args = argparse.Namespace()
 
+        # Create FastMCP server objects instead of dicts
         test_servers = {
-            "http_server": {
-                "transport": "http",
-                "url": "https://api.example.com",
-                "headers": {"Authorization": "Bearer token"},
-            },
-            "stdio_server": {
-                "transport": "stdio",
-                "command": "python",
-                "args": ["-m", "server"],
-                "env": {"API_KEY": "secret"},
-            },
+            "http_server": RemoteMCPServer(
+                transport="http",
+                url="https://api.example.com",
+                headers={"Authorization": "Bearer token"},
+            ),
+            "stdio_server": StdioMCPServer(
+                transport="stdio",
+                command="python",
+                args=["-m", "server"],
+                env={"API_KEY": "secret"},
+            ),
         }
 
         with patch("openhands_cli.mcp.mcp_commands.list_servers") as mock_list_servers:
@@ -219,14 +221,15 @@ class TestMCPCommands:
         """Test getting server details successfully."""
         args = argparse.Namespace(name="test_server")
 
-        test_config = {
-            "transport": "http",
-            "url": "https://api.example.com",
-            "headers": {"Authorization": "Bearer token"},
-        }
+        # Create FastMCP server object instead of dict
+        test_server = RemoteMCPServer(
+            transport="http",
+            url="https://api.example.com",
+            headers={"Authorization": "Bearer token"},
+        )
 
         with patch("openhands_cli.mcp.mcp_commands.get_server") as mock_get_server:
-            mock_get_server.return_value = test_config
+            mock_get_server.return_value = test_server
 
             with patch(
                 "openhands_cli.mcp.mcp_commands.print_formatted_text"

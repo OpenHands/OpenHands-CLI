@@ -6,16 +6,17 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
 
 from openhands_cli.mcp.mcp_utils import (
     MCPConfigurationError,
-    load_mcp_config,
     _parse_env_vars,
     _parse_headers,
     add_server,
     get_config_status,
     get_server,
     list_servers,
+    load_mcp_config,
     remove_server,
     server_exists,
 )
@@ -174,14 +175,19 @@ class TestMCPFunctions:
         assert len(servers) == 2
         assert "test1" in servers
         assert "test2" in servers
+        # Check that we get FastMCP server objects
+        assert isinstance(servers["test1"], StdioMCPServer)
+        assert isinstance(servers["test2"], RemoteMCPServer)
 
     def test_get_server_success(self, temp_config_path):
         """Test getting an existing server."""
         add_server("test", "http", "https://example.com")
-        config = get_server("test")
+        server = get_server("test")
 
-        assert config["url"] == "https://example.com"
-        assert config["transport"] == "http"
+        # Check that we get a FastMCP server object
+        assert isinstance(server, RemoteMCPServer)
+        assert server.url == "https://example.com"
+        assert server.transport == "http"
 
     def test_get_server_nonexistent(self, temp_config_path):
         """Test getting a non-existent server."""

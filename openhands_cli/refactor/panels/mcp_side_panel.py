@@ -3,6 +3,7 @@
 import json
 from typing import Any
 
+from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
 from textual.app import App
 from textual.containers import Horizontal, VerticalScroll
 from textual.css.query import NoMatches
@@ -10,11 +11,6 @@ from textual.widgets import Static
 
 from openhands.sdk import Agent
 from openhands_cli.locations import MCP_CONFIG_FILE
-from openhands_cli.mcp.mcp_display_utils import (
-    extract_server_info,
-    format_command_details,
-    format_server_type_label,
-)
 from openhands_cli.mcp.mcp_utils import get_config_status
 from openhands_cli.refactor.core.theme import OPENHANDS_THEME
 from openhands_cli.refactor.panels.mcp_panel_style import MCP_PANEL_STYLE
@@ -174,20 +170,36 @@ class MCPSidePanel(VerticalScroll):
         content_text = "\n".join(content_parts)
         content_widget.update(content_text)
 
-    def _format_server_details(self, server_spec: dict[str, Any]) -> list[str]:
+    def _format_server_details(
+        self, server: StdioMCPServer | RemoteMCPServer | dict[str, Any]
+    ) -> list[str]:
         """Format server specification details for display."""
-        info = extract_server_info(server_spec)
         details = []
 
-        details.append(f"Type: {format_server_type_label(info['transport_type'])}")
+        # Handle both FastMCP objects and legacy dict format for compatibility
+        if isinstance(server, dict):
+            # Legacy dict format - convert to appropriate server object for processing
+            if server.get("transport") == "stdio":
+                server_obj = StdioMCPServer(**server)
+            else:
+                server_obj = RemoteMCPServer(**server)
+        else:
+            server_obj = server
 
-        if info["transport_type"] == "stdio" and (info["command"] or info["args"]):
-            command_str = format_command_details(info["command"], info["args"])
-            if command_str:
-                details.append(f"Command: {command_str}")
-        elif info["url"]:
-            details.append(f"URL: {info['url']}")
-            details.append(f"Auth: {info['auth'] or 'none'}")
+        if isinstance(server_obj, StdioMCPServer):
+            details.append("Type: Command-based")
+            if server_obj.command or server_obj.args:
+                command_parts = [server_obj.command] if server_obj.command else []
+                if server_obj.args:
+                    command_parts.extend(server_obj.args)
+                command_str = " ".join(command_parts)
+                if command_str:
+                    details.append(f"Command: {command_str}")
+        elif isinstance(server_obj, RemoteMCPServer):
+            details.append("Type: URL-based")
+            if server_obj.url:
+                details.append(f"URL: {server_obj.url}")
+            details.append(f"Auth: {server_obj.auth or 'none'}")
 
         return details
 

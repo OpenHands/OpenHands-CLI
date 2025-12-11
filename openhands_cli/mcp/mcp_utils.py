@@ -158,8 +158,7 @@ def add_server(
     config = load_mcp_config()
 
     # Check if server already exists
-    servers_dict = config.to_dict().get("mcpServers", {})
-    if name in servers_dict:
+    if name in config.mcpServers:
         raise MCPConfigurationError(f"MCP server '{name}' already exists")
 
     # Create the appropriate server object based on transport type
@@ -200,12 +199,11 @@ def remove_server(name: str) -> None:
     config = load_mcp_config()
 
     # Check if server exists
-    servers_dict = config.to_dict().get("mcpServers", {})
-    if name not in servers_dict:
+    if name not in config.mcpServers:
         raise MCPConfigurationError(f"MCP server '{name}' not found")
 
     # Remove the server by creating a new config without it
-    new_servers = {k: v for k, v in servers_dict.items() if k != name}
+    new_servers = {k: v for k, v in config.mcpServers.items() if k != name}
     new_config = MCPConfig.from_dict({"mcpServers": new_servers})
     save_mcp_config(new_config)
 
@@ -213,35 +211,35 @@ def remove_server(name: str) -> None:
     load_mcp_config()
 
 
-def list_servers() -> dict[str, dict[str, Any]]:
+def list_servers() -> dict[str, StdioMCPServer | RemoteMCPServer]:
     """List all configured MCP servers.
 
     Returns:
-        Dictionary of server configurations keyed by name
+        Dictionary of server objects keyed by name
     """
     config = load_mcp_config()
-    return config.to_dict().get("mcpServers", {})
+    return config.mcpServers
 
 
-def get_server(name: str) -> dict[str, Any]:
+def get_server(name: str) -> StdioMCPServer | RemoteMCPServer:
     """Get configuration for a specific MCP server.
 
     Args:
         name: Name of the MCP server
 
     Returns:
-        Server configuration dictionary
+        Server object
 
     Raises:
         MCPConfigurationError: If server doesn't exist
     """
     config = load_mcp_config()
-    servers_dict = config.to_dict().get("mcpServers", {})
+    servers = config.mcpServers
 
-    if name not in servers_dict:
+    if name not in servers:
         raise MCPConfigurationError(f"MCP server '{name}' not found")
 
-    return servers_dict[name]
+    return servers[name]
 
 
 def server_exists(name: str) -> bool:
@@ -255,8 +253,7 @@ def server_exists(name: str) -> bool:
     """
     try:
         config = load_mcp_config()
-        servers_dict = config.to_dict().get("mcpServers", {})
-        return name in servers_dict
+        return name in config.mcpServers
     except (MCPConfigurationError, ValidationError):
         return False
 
