@@ -15,6 +15,10 @@ from openhands.sdk import (
     Message,
     TextContent,
 )
+from openhands_cli.terminal_compat import (
+    check_terminal_compatibility,
+    strict_mode_enabled,
+)
 from openhands.sdk.conversation.state import ConversationExecutionStatus
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
@@ -109,6 +113,20 @@ def run_cli_entry(
         )
         print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
         return
+
+    compat_result = check_terminal_compatibility()
+    if not compat_result.compatible:
+        message = (
+            "OpenHands CLI terminal UI may not work correctly in this environment: "
+            f"{compat_result.reason}"
+        )
+        if compat_result.is_tty:
+            print_formatted_text(HTML(f"<yellow>{message}</yellow>"))
+        else:
+            print(message)
+
+        if strict_mode_enabled():
+            sys.exit(2)
 
     display_welcome(conversation_id, confirmation_policy, bool(resume_conversation_id))
 
