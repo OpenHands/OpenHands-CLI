@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from .models import TestResult
+from .utils import seed_dummy_settings
 
 
 def test_experimental_ui() -> TestResult:
@@ -15,6 +16,8 @@ def test_experimental_ui() -> TestResult:
     start_time = time.time()
 
     try:
+        seed_dummy_settings()
+
         exe_path = Path("dist/openhands")
         if not exe_path.exists():
             exe_path = Path("dist/openhands.exe")
@@ -49,9 +52,7 @@ def test_experimental_ui() -> TestResult:
 
             # Markers that indicate the textual UI has started
             ui_markers = [
-                "openhands",
-                "conversation",
-                "initialized",
+                "initialized conversation",
                 "what do you want to build",
             ]
 
@@ -64,11 +65,12 @@ def test_experimental_ui() -> TestResult:
                 if not rlist:
                     continue
                 line = proc.stdout.readline()
+
                 if not line:
                     continue
                 captured.append(line)
-                line_lower = line.strip().lower()
-                if any(marker in line_lower for marker in ui_markers):
+                if any(marker.lower() in line.lower() for marker in ui_markers):
+                    print("fouind marker in line", line)
                     saw_ui_start = True
                     break
 

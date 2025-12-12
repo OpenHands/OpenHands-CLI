@@ -4,7 +4,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastmcp.mcp_config import MCPConfig
 from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk import Agent, AgentContext, LocalFileStore
@@ -13,17 +12,11 @@ from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands.tools.preset.default import get_default_tools
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
-    MCP_CONFIG_FILE,
     PERSISTENCE_DIR,
     WORK_DIR,
 )
+from openhands_cli.mcp.mcp_utils import load_mcp_config
 from openhands_cli.utils import get_llm_metadata, should_set_litellm_extra_body
-
-
-class MCPConfigurationError(Exception):
-    """Raised when MCP configuration file is invalid or malformed."""
-
-    pass
 
 
 class AgentStore:
@@ -41,21 +34,9 @@ class AgentStore:
         Raises:
             MCPConfigurationError: If the configuration file exists but is invalid
         """
-        try:
-            mcp_config_path = Path(self.file_store.root) / MCP_CONFIG_FILE
-            if not mcp_config_path.exists():
-                return {}
-
-            mcp_config = MCPConfig.from_file(mcp_config_path)
-            return mcp_config.to_dict()["mcpServers"]
-        except FileNotFoundError:
-            # File doesn't exist - this is OK, return empty config
-            return {}
-        except Exception as e:
-            # Configuration file exists but is invalid - raise error
-            raise MCPConfigurationError(
-                f"Invalid MCP configuration file: {str(e)}"
-            ) from e
+        # Use the same implementation as load_mcp_config
+        config = load_mcp_config()
+        return config.to_dict().get("mcpServers", {})
 
     def load_project_skills(self) -> list:
         """Load skills project-specific directories."""

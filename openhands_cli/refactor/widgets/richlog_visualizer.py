@@ -17,7 +17,7 @@ from openhands.sdk.event import (
     UserRejectObservation,
 )
 from openhands.sdk.event.base import Event
-from openhands.sdk.event.condenser import Condensation
+from openhands.sdk.event.condenser import Condensation, CondensationRequest
 from openhands_cli.refactor.core.theme import OPENHANDS_THEME
 from openhands_cli.refactor.widgets.non_clickable_collapsible import (
     NonClickableCollapsible,
@@ -227,6 +227,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         # Don't emit system prompt in CLI
         if isinstance(event, SystemPromptEvent):
+            return None
+        # Don't emit condensation request events (internal events)
+        elif isinstance(event, CondensationRequest):
             return None
         elif isinstance(event, ActionEvent):
             # Check if action is None (non-executable)
