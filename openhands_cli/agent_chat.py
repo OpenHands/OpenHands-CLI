@@ -17,6 +17,7 @@ from openhands.sdk import (
     TextContent,
 )
 from openhands.sdk.conversation.state import ConversationExecutionStatus
+from openhands.sdk.security.confirmation_policy import ConfirmationPolicyBase
 from openhands_cli.runner import ConversationRunner
 from openhands_cli.setup import (
     MissingAgentSpec,
@@ -35,7 +36,10 @@ from openhands_cli.user_actions.utils import get_session_prompter
 
 
 def _should_skip_terminal_check() -> tuple[bool, str | None]:
-    """Determine if the terminal compatibility check should be bypassed."""
+    """Determine if the terminal compatibility check should be bypassed.
+
+    This is primarily for non-interactive contexts (CI, scripted runs).
+    """
 
     skip_env = os.environ.get("OPENHANDS_CLI_SKIP_TTY_CHECK")
     if skip_env and skip_env.lower() not in ("0", "false", "no"):
@@ -53,16 +57,9 @@ def check_terminal_compatibility() -> bool:
     Returns:
         bool: True if terminal is compatible, False otherwise.
     """
-    skip_check, reason = _should_skip_terminal_check()
+    skip_check, _reason = _should_skip_terminal_check()
     if skip_check:
-        message = (
-            "<grey>Skipping terminal compatibility check "
-            f"(detected {reason} environment variable).</grey>"
-        )
-        try:
-            print_formatted_text(HTML(message))
-        except Exception:
-            print(message)
+        # In CI / explicit skip scenarios, quietly assume compatibility.
         return True
 
     # Check if stdin/stdout are TTY
@@ -70,7 +67,7 @@ def check_terminal_compatibility() -> bool:
         return False
 
     # Check TERM environment variable
-    term = os.environ.get("TERM", "")
+    term = os.environ.get("TERM", "").lower()
     if term in ("dumb", "", "unknown"):
         return False
 
@@ -79,9 +76,19 @@ def check_terminal_compatibility() -> bool:
         from prompt_toolkit.input import create_input
         from prompt_toolkit.output import create_output
 
-        create_input()
-        create_output()
-        return True
+        input_obj = create_input()
+        output_obj = create_output()
+        try:
+            return True
+        finally:
+            try:
+                input_obj.close()
+            except Exception:
+                pass
+            try:
+                output_obj.close()
+            except Exception:
+                pass
     except Exception:
         return False
 
@@ -114,6 +121,7 @@ def _print_exit_hint(conversation_id: str) -> None:
 
 def run_cli_entry(
     resume_conversation_id: str | None = None,
+    confirmation_policy: ConfirmationPolicyBase | None = None,
     queued_inputs: list[str] | None = None,
 ) -> None:
     """Run the agent chat session using the agent SDK.
@@ -126,27 +134,49 @@ def run_cli_entry(
 
     # Check terminal compatibility early
     if not check_terminal_compatibility():
-        print_formatted_text(HTML("<red>❌ Interactive terminal not detected</red>"))
-        print_formatted_text(
-            HTML("<yellow>OpenHands CLI requires an interactive terminal.</yellow>")
-        )
-        print_formatted_text("")
-        print_formatted_text(HTML("<b>Requirements:</b>"))
-        print_formatted_text("• Run in an interactive shell (not piped)")
-        print_formatted_text("• Ensure TERM is set (e.g., TERM=xterm-256color)")
-        print_formatted_text("• Use TTY allocation with Docker: docker run -it ...")
-        print_formatted_text("• Use PTY allocation with SSH: ssh -t user@host ...")
-        print_formatted_text("")
-        print_formatted_text(HTML("<b>Current environment:</b>"))
-        print_formatted_text(f"• TERM: {os.environ.get('TERM', 'not set')}")
-        print_formatted_text(f"• stdin is TTY: {sys.stdin.isatty()}")
-        print_formatted_text(f"• stdout is TTY: {sys.stdout.isatty()}")
-        print_formatted_text("")
-        print_formatted_text(
-            HTML(
-                "<grey>For troubleshooting, see: https://docs.openhands.dev/cli-troubleshooting</grey>"
+        # Degrade gracefully in non-TTY contexts (e.g., logs, CI) by avoiding
+        # prompt_toolkit HTML and emojis.
+        if sys.stdout.isatty():
+            print_formatted_text(
+                HTML("<red>❌ Interactive terminal not detected</red>")
             )
-        )
+            print_formatted_text(
+                HTML(
+                    "<yellow>OpenHands CLI requires an interactive terminal.</yellow>"
+                )
+            )
+            print_formatted_text("")
+            print_formatted_text(HTML("<b>Requirements:</b>"))
+            print_formatted_text("• Run in an interactive shell (not piped)")
+            print_formatted_text(
+                "• Ensure TERM is set (e.g., TERM=xterm-256color)"
+            )
+            print_formatted_text(
+                "• Use TTY allocation with Docker: docker run -it ..."
+            )
+            print_formatted_text(
+                "• Use PTY allocation with SSH: ssh -t user@host ..."
+            )
+            print_formatted_text("")
+            print_formatted_text(HTML("<b>Current environment:</b>"))
+            print_formatted_text(
+                f"• TERM: {os.environ.get('TERM', 'not set')}"
+            )
+            print_formatted_text(f"• stdin is TTY: {sys.stdin.isatty()}")
+            print_formatted_text(f"• stdout is TTY: {sys.stdout.isatty()}")
+            print_formatted_text("")
+            print_formatted_text(
+                HTML(
+                    "<grey>For troubleshooting, see: https://docs.openhands.dev/cli-troubleshooting</grey>"
+                )
+            )
+        else:
+            # Plain-text summary for non-interactive environments.
+            print("Interactive terminal not detected.")
+            print("OpenHands CLI requires an interactive TTY for the chat UI.")
+            print("TERM=", os.environ.get("TERM", "not set"))
+            print("stdin is TTY:", sys.stdin.isatty())
+            print("stdout is TTY:", sys.stdout.isatty())
         return
 
     # Normalize queued_inputs to a local copy to prevent mutating the caller's list
@@ -296,7 +326,9 @@ def run_cli_entry(
                 message = None
 
             if not runner or not conversation:
-                conversation = setup_conversation(conversation_id)
+                conversation = setup_conversation(
+                    conversation_id, confirmation_policy=confirmation_policy
+                )
                 runner = ConversationRunner(conversation)
             runner.process_message(message)
 
