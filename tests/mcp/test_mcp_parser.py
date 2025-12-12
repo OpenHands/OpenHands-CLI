@@ -7,6 +7,10 @@ from contextlib import redirect_stderr
 import pytest
 
 from openhands_cli.argparsers.mcp_parser import MCPArgumentParser, add_mcp_parser
+from openhands_cli.argparsers.utils import (
+    preprocess_mcp_args,
+    split_flags_and_positionals,
+)
 
 
 class TestMCPParserErrorHandling:
@@ -190,113 +194,192 @@ class TestMCPParserErrorHandling:
         assert args.mcp_command == "add"
         assert args.transport == "http"
 
-    def test_stdio_command_with_double_dash_comprehensive(self):
-        """Test comprehensive scenarios for -- separator with stdio commands."""
-        from openhands_cli.argparsers.main_parser import create_main_parser
 
-        main_parser = create_main_parser()
+@pytest.mark.parametrize(
+    "tokens, expected_flags, expected_positionals",
+    [
+        # No flags at all
+        (["name", "target"], [], ["name", "target"]),
+        # Single flag with value
+        (["--foo", "bar"], ["--foo", "bar"], []),
+        # Flag with value followed by positional
+        (["--foo", "bar", "pos"], ["--foo", "bar"], ["pos"]),
+        # Positional before and after a flag
+        (
+            ["pos1", "--foo", "bar", "pos2"],
+            ["--foo", "bar"],
+            ["pos1", "pos2"],
+        ),
+        # Multiple flags with values and a positional
+        (
+            ["--foo", "bar", "--baz", "qux", "pos"],
+            ["--foo", "bar", "--baz", "qux"],
+            ["pos"],
+        ),
+        # Flag without value followed by another flag with value
+        (
+            ["--verbose", "--model", "gpt4", "name"],
+            ["--verbose", "--model", "gpt4"],
+            ["name"],
+        ),
+    ],
+)
+def test_split_flags_and_positionals(tokens, expected_flags, expected_positionals):
+    flag_args, positional_args = split_flags_and_positionals(tokens)
+    assert flag_args == expected_flags
+    assert positional_args == expected_positionals
 
-        # Test various valid scenarios
-        test_cases = [
-            # Basic case with command and args
+
+@pytest.mark.parametrize(
+    "argv, expected",
+    [
+        # Non-MCP command: should be returned unchanged
+        (["--foo", "bar"], ["--foo", "bar"]),
+        # MCP command without `--`: no normalization
+        (
+            ["mcp", "add", "my-mcp", "--target", "python"],
+            ["mcp", "add", "my-mcp", "--target", "python"],
+        ),
+        # Simple MCP with mixed ordering before `--`
+        (
+            ["mcp", "add", "my-mcp", "--target", "python", "--", "echo", "hi"],
+            ["mcp", "add", "--target", "python", "my-mcp", "--", "echo", "hi"],
+        ),
+        # MCP where flags come after both positionals
+        (
+            ["mcp", "add", "my-mcp", "python", "--foo", "bar", "--", "echo", "hi"],
+            ["mcp", "add", "--foo", "bar", "my-mcp", "python", "--", "echo", "hi"],
+        ),
+        # MCP where flags are already first: normalization should be a no-op
+        (
+            ["mcp", "add", "--foo", "bar", "my-mcp", "python", "--", "echo"],
+            ["mcp", "add", "--foo", "bar", "my-mcp", "python", "--", "echo"],
+        ),
+        # MCP with `--` but no trailing command args
+        (
+            ["mcp", "add", "my-mcp", "--foo", "bar", "--"],
+            ["mcp", "add", "--foo", "bar", "my-mcp", "--"],
+        ),
+    ],
+)
+def test_preprocess_mcp_args(argv, expected):
+    assert preprocess_mcp_args(argv) == expected
+
+
+@pytest.mark.parametrize(
+    "cli_args, expected",
+    [
+        # Basic case with command and args
+        (
+            [
+                "mcp",
+                "add",
+                "server1",
+                "python",
+                "--transport",
+                "stdio",
+                "--",
+                "-m",
+                "module",
+            ],
             {
-                "args": [
-                    "mcp",
-                    "add",
-                    "server1",
-                    "python",
-                    "--transport",
-                    "stdio",
-                    "--",
-                    "-m",
-                    "module",
-                ],
-                "expected": {
-                    "name": "server1",
-                    "target": "python",
-                    "args": ["-m", "module"],
-                },
+                "name": "server1",
+                "target": "python",
+                "args": ["-m", "module"],
+                "env": None,
             },
-            # Case with environment variables
+        ),
+        # Case with environment variables
+        (
+            [
+                "mcp",
+                "add",
+                "server2",
+                "node",
+                "--transport",
+                "stdio",
+                "--env",
+                "KEY=value",
+                "--",
+                "script.js",
+                "--port",
+                "3000",
+            ],
             {
-                "args": [
-                    "mcp",
-                    "add",
-                    "server2",
-                    "node",
-                    "--transport",
-                    "stdio",
-                    "--env",
-                    "KEY=value",
-                    "--",
-                    "script.js",
-                    "--port",
-                    "3000",
-                ],
-                "expected": {
-                    "name": "server2",
-                    "target": "node",
-                    "args": ["script.js", "--port", "3000"],
-                    "env": ["KEY=value"],
-                },
+                "name": "server2",
+                "target": "node",
+                "args": ["script.js", "--port", "3000"],
+                "env": ["KEY=value"],
             },
-            # Airtable-style example
+        ),
+        # Airtable-style example
+        (
+            [
+                "mcp",
+                "add",
+                "--transport",
+                "stdio",
+                "airtable",
+                "--env",
+                "API_KEY=test",
+                "--",
+                "npx",
+                "-y",
+                "airtable-mcp-server",
+            ],
             {
-                "args": [
-                    "mcp",
-                    "add",
-                    "--transport",
-                    "stdio",
-                    "airtable",
-                    "--env",
-                    "API_KEY=test",
-                    "--",
-                    "npx",
-                    "-y",
-                    "airtable-mcp-server",
-                ],
-                "expected": {
-                    "name": "airtable",
-                    "target": "npx",
-                    "args": ["-y", "airtable-mcp-server"],
-                    "env": ["API_KEY=test"],
-                },
+                "name": "airtable",
+                "target": "npx",
+                "args": ["-y", "airtable-mcp-server"],
+                "env": ["API_KEY=test"],
             },
-        ]
+        ),
+    ],
+)
+def test_stdio_command_with_double_dash_comprehensive(cli_args, expected):
+    """Test various stdio MCP add scenarios with -- separator."""
+    from openhands_cli.argparsers.main_parser import create_main_parser
 
-        for i, test_case in enumerate(test_cases):
-            args = main_parser.parse_args(test_case["args"])
-            expected = test_case["expected"]
+    parser = create_main_parser()
+    args = parser.parse_args(cli_args)
 
-            assert args.command == "mcp", f"Case {i}: command mismatch"
-            assert args.mcp_command == "add", f"Case {i}: mcp_command mismatch"
-            assert args.name == expected["name"], f"Case {i}: name mismatch"
-            assert args.target == expected["target"], f"Case {i}: target mismatch"
-            assert args.transport == "stdio", f"Case {i}: transport mismatch"
-            assert args.args == expected["args"], f"Case {i}: args mismatch"
+    assert args.command == "mcp"
+    assert args.mcp_command == "add"
+    assert args.name == expected["name"]
+    assert args.target == expected["target"]
+    assert args.transport == "stdio"
+    assert args.args == expected["args"]
 
-            if "env" in expected:
-                assert args.env == expected["env"], f"Case {i}: env mismatch"
+    if expected["env"] is None:
+        # .env may default to None or [] depending on how parser is defined
+        # so only assert when we expect a concrete list
+        return
 
-    def test_stdio_edge_cases_and_error_handling(self):
-        """Test edge cases and error handling for stdio commands."""
-        from openhands_cli.argparsers.main_parser import create_main_parser
+    assert args.env == expected["env"]
 
-        main_parser = create_main_parser()
 
-        # Test case with no arguments after --
-        args = main_parser.parse_args(
-            ["mcp", "add", "empty-args", "python", "--transport", "stdio", "--"]
-        )
-        assert args.command == "mcp"
-        assert args.mcp_command == "add"
-        assert args.name == "empty-args"
-        assert args.target == "python"
-        assert args.transport == "stdio"
-        assert args.args == []  # No args after --
-
-        # Test case with only one argument after --
-        args2 = main_parser.parse_args(
+@pytest.mark.parametrize(
+    "cli_args, expected",
+    [
+        # No arguments after --
+        (
+            [
+                "mcp",
+                "add",
+                "empty-args",
+                "python",
+                "--transport",
+                "stdio",
+                "--",
+            ],
+            {
+                "name": "empty-args",
+                "target": "python",
+                "args": [],
+            },
+        ),
+        # Only one argument after --
+        (
             [
                 "mcp",
                 "add",
@@ -306,11 +389,25 @@ class TestMCPParserErrorHandling:
                 "stdio",
                 "--",
                 "script.js",
-            ]
-        )
-        assert args2.command == "mcp"
-        assert args2.mcp_command == "add"
-        assert args2.name == "single-arg"
-        assert args2.target == "node"
-        assert args2.transport == "stdio"
-        assert args2.args == ["script.js"]  # REMAINDER correctly excludes the --
+            ],
+            {
+                "name": "single-arg",
+                "target": "node",
+                "args": ["script.js"],
+            },
+        ),
+    ],
+)
+def test_stdio_edge_cases_and_error_handling(cli_args, expected):
+    """Test edge cases around the -- separator for stdio commands."""
+    from openhands_cli.argparsers.main_parser import create_main_parser
+
+    parser = create_main_parser()
+    args = parser.parse_args(cli_args)
+
+    assert args.command == "mcp"
+    assert args.mcp_command == "add"
+    assert args.name == expected["name"]
+    assert args.target == expected["target"]
+    assert args.transport == "stdio"
+    assert args.args == expected["args"]

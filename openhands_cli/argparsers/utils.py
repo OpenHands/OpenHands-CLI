@@ -107,9 +107,8 @@ def preprocess_mcp_args(raw_args: Sequence[str]) -> list[str]:
     #   mcp add [flags...] [positionals...] [-- remaining...]
     normalized_args: list[str] = ["mcp", "add", *flag_args, *positional_args]
 
-    if after_double_dash:
-        normalized_args.extend(["--", *after_double_dash])
-
+    normalized_args.append("--")
+    normalized_args.extend(after_double_dash)
     return normalized_args
 
 
