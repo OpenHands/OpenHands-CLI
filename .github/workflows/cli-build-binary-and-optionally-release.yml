@@ -29,10 +29,14 @@ jobs:
                     - os: ubuntu-22.04
                       platform: linux
                       artifact_name: openhands-cli-linux
-          # Build on macOS for macOS users
+          # Build on macOS ARM64 (Apple Silicon)
                     - os: macos-15
                       platform: macos
-                      artifact_name: openhands-cli-macos
+                      artifact_name: openhands-cli-macos-arm64
+          # Build on macOS Intel
+                    - os: macos-15-intel
+                      platform: macos
+                      artifact_name: openhands-cli-macos-intel
         runs-on: ${{ matrix.os }}
 
         steps:
@@ -104,8 +108,11 @@ jobs:
                   if [ -f artifacts/openhands-cli-linux/openhands ]; then
                     cp artifacts/openhands-cli-linux/openhands release-assets/openhands-linux
                   fi
-                  if [ -f artifacts/openhands-cli-macos/openhands ]; then
-                    cp artifacts/openhands-cli-macos/openhands release-assets/openhands-macos
+                  if [ -f artifacts/openhands-cli-macos-arm64/openhands ]; then
+                    cp artifacts/openhands-cli-macos-arm64/openhands release-assets/openhands-macos-arm64
+                  fi
+                  if [ -f artifacts/openhands-cli-macos-intel/openhands ]; then
+                    cp artifacts/openhands-cli-macos-intel/openhands release-assets/openhands-macos-intel
                   fi
                   ls -la release-assets/
 
