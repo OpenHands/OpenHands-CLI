@@ -66,7 +66,10 @@ class TestConversationLister:
                 "id": "user-message-id",
                 "timestamp": timestamp,
                 "source": "user",
-                "message": {"content": [{"type": "text", "text": user_message}]},
+                "llm_message": {
+                    "role": "user",
+                    "content": [{"type": "text", "text": user_message}],
+                },
             }
 
             with open(events_dir / "event-00001-user.json", "w") as f:
