@@ -25,6 +25,7 @@ COMMANDS = {
     "/resume": "Resume a paused conversation",
     "/settings": "Display and modify current settings",
     "/mcp": "View MCP (Model Context Protocol) server configuration",
+    "/conv": "Browse conversation history",
 }
 
 
