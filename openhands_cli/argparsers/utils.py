@@ -3,27 +3,41 @@ from collections.abc import Sequence
 
 
 def split_flags_and_positionals(tokens: Sequence[str]) -> tuple[list[str], list[str]]:
-    """Split tokens into flag arguments and positional arguments.
+    """Split tokens into two lists: flag arguments and positional arguments.
 
-    Flags are tokens starting with `--`. If a flag is followed by a non-flag
-    token, that token is treated as its value and grouped with the flag.
+    Flags:
+      • Tokens starting with ``--``.
+      • A flag consumes the next token as its value *only if* it exists and does
+        not start with ``--``.
+        Examples:
+            --model gpt4      → value = "gpt4"
+            --verbose --foo   → "--verbose" has no value; "--foo" is another flag.
+
+    Positionals:
+      • Tokens that do NOT start with ``--``.
+      • Their meaning comes from their order (e.g., ``mcp add NAME TARGET``).
+
+    This function does not perform full argparse logic—it only groups tokens so
+    the caller can reorder or inspect them safely.
+
+    Returns:
+        (flag_args, positional_args)
+
     """
+
     flag_args: list[str] = []
     positional_args: list[str] = []
 
-    skip_next = False
     for index, token in enumerate(tokens):
-        if skip_next:
-            skip_next = False
-            continue
-
+        # Flag indicator
         if token.startswith("--"):
             flag_args.append(token)
 
-            # Attach value if the next token is not another flag
-            if index + 1 < len(tokens) and not tokens[index + 1].startswith("--"):
-                flag_args.append(tokens[index + 1])
-                skip_next = True
+        # Value after a flag, should be grouped with the flag
+        elif index > 0 and tokens[index - 1].startswith("--"):
+            flag_args.append(token)
+
+        # Value that isn't next to a flag, must be positional
         else:
             positional_args.append(token)
 
@@ -33,7 +47,7 @@ def split_flags_and_positionals(tokens: Sequence[str]) -> tuple[list[str], list[
 def preprocess_mcp_args(raw_args: Sequence[str]) -> list[str]:
     """Normalize argv for ``mcp add`` so argparse can parse it reliably.
 
-    Argparse does **not** reorder arguments by itself – it processes them in the
+    Argparse does **not** reorder arguments by itself - it processes them in the
     order they appear. For the ``mcp add`` subcommand we want a stable shape:
 
         mcp add [flags...] [positionals...] -- [command args...]
