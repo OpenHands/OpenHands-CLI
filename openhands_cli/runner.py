@@ -110,6 +110,8 @@ class ConversationRunner:
             if (
                 self.conversation.state.execution_status
                 == ConversationExecutionStatus.FINISHED
+                or self.conversation.state.execution_status
+                == ConversationExecutionStatus.IDLE
             ):
                 break
 
