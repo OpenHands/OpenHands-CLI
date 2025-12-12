@@ -4,18 +4,21 @@ Core Settings Logic tests
 """
 
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from prompt_toolkit.completion import FuzzyWordCompleter
 from prompt_toolkit.validation import ValidationError
 from pydantic import SecretStr
 
+from openhands.sdk.llm.utils.model_features import ModelFeatures
+from openhands_cli.tui.utils import StepCounter
 from openhands_cli.user_actions.settings_action import (
     NonEmptyValueValidator,
     SettingsType,
     choose_llm_model,
     choose_llm_provider,
+    choose_reasoning_summary,
     prompt_api_key,
     settings_type_confirmation,
 )
@@ -105,6 +108,72 @@ def test_model_selection_flows(
     step_counter2 = StepCounter(1)
     result2 = choose_llm_model(step_counter2, "openai")
     assert result2 == "custom-model"
+
+
+# -------------------------------
+# Reasoning summaries
+# -------------------------------
+
+
+def _features(supports_responses_api: bool) -> ModelFeatures:
+    return ModelFeatures(
+        supports_reasoning_effort=False,
+        supports_extended_thinking=False,
+        supports_prompt_cache=False,
+        supports_stop_words=True,
+        supports_responses_api=supports_responses_api,
+        force_string_serializer=False,
+        send_reasoning_content=False,
+        supports_prompt_cache_retention=False,
+    )
+
+
+def test_reasoning_summary_skipped_for_non_responses_models(
+    mock_cli_interactions: Any,
+) -> None:
+    with patch(
+        "openhands_cli.user_actions.settings_action.get_features",
+        return_value=_features(False),
+    ):
+        step_counter = StepCounter(1)
+        result = choose_reasoning_summary(step_counter, "openai/gpt-4o-mini")
+
+    assert result is None
+    assert step_counter.total_steps == 1
+    mock_cli_interactions.cli_confirm.assert_not_called()
+
+
+def test_reasoning_summary_selection_and_default(
+    mock_cli_interactions: Any,
+) -> None:
+    with patch(
+        "openhands_cli.user_actions.settings_action.get_features",
+        return_value=_features(True),
+    ):
+        step_counter = StepCounter(1)
+        mock_cli_interactions.cli_confirm.return_value = 2
+        result = choose_reasoning_summary(step_counter, "openai/gpt-5")
+
+    assert result == "detailed"
+    assert step_counter.total_steps == 2
+    mock_cli_interactions.cli_confirm.assert_called_once()
+    assert mock_cli_interactions.cli_confirm.call_args[1]["initial_selection"] == 0
+
+    mock_cli_interactions.cli_confirm.reset_mock()
+    mock_cli_interactions.cli_confirm.return_value = 0
+    with patch(
+        "openhands_cli.user_actions.settings_action.get_features",
+        return_value=_features(True),
+    ):
+        step_counter2 = StepCounter(1)
+        result2 = choose_reasoning_summary(
+            step_counter2, "openai/gpt-5", existing_summary="concise"
+        )
+
+    assert result2 is None
+    assert step_counter2.total_steps == 2
+    mock_cli_interactions.cli_confirm.assert_called_once()
+    assert mock_cli_interactions.cli_confirm.call_args[1]["initial_selection"] == 1
 
 
 # -------------------------------

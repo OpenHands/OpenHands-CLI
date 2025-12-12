@@ -1,9 +1,11 @@
 from enum import Enum
+from typing import Literal
 
 from prompt_toolkit.completion import FuzzyWordCompleter
 from pydantic import SecretStr
 
 from openhands.sdk.llm import UNVERIFIED_MODELS_EXCLUDING_BEDROCK, VERIFIED_MODELS
+from openhands.sdk.llm.utils.model_features import get_features
 from openhands_cli.tui.utils import StepCounter
 from openhands_cli.user_actions.utils import (
     NonEmptyValueValidator,
@@ -94,6 +96,41 @@ def choose_llm_model(step_counter: StepCounter, provider: str, escapable=True) -
     return cli_text_input(
         question, escapable=True, completer=FuzzyWordCompleter(models, WORD=True)
     )
+
+
+def choose_reasoning_summary(
+    step_counter: StepCounter,
+    model: str,
+    existing_summary: Literal["auto", "concise", "detailed"] | None = None,
+    escapable=True,
+) -> Literal["auto", "concise", "detailed"] | None:
+    """Prompt for reasoning summary when supported by the selected model."""
+    if not get_features(model).supports_responses_api:
+        return None
+
+    step_counter.total_steps += 1
+    choices = [
+        "Disable reasoning summaries",
+        "Concise summary",
+        "Detailed summary",
+        "Auto (provider decides)",
+    ]
+    values: list[Literal["auto", "concise", "detailed"] | None] = [
+        None,
+        "concise",
+        "detailed",
+        "auto",
+    ]
+    default_index = values.index(existing_summary) if existing_summary in values else 0
+
+    question = step_counter.next_step("Enable reasoning summaries for this model?")
+    index = cli_confirm(
+        question,
+        choices,
+        initial_selection=default_index,
+        escapable=escapable,
+    )
+    return values[index]
 
 
 def prompt_api_key(

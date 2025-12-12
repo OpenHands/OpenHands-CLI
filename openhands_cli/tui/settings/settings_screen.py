@@ -1,11 +1,12 @@
 import os
-from typing import Any
+from typing import Any, Literal
 
 from prompt_toolkit import HTML, print_formatted_text
 from prompt_toolkit.shortcuts import print_container
 from prompt_toolkit.widgets import Frame, TextArea
 
 from openhands.sdk import LLM, BaseConversation, LLMSummarizingCondenser, LocalFileStore
+from openhands.sdk.llm.utils.model_features import get_features
 from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
 from openhands_cli.pt_style import COLOR_GREY
 from openhands_cli.tui.settings.store import AgentStore
@@ -15,6 +16,7 @@ from openhands_cli.user_actions.settings_action import (
     choose_llm_model,
     choose_llm_provider,
     choose_memory_condensation,
+    choose_reasoning_summary,
     prompt_api_key,
     prompt_base_url,
     prompt_custom_model,
@@ -66,6 +68,14 @@ class SettingsScreen:
                 ("   API Key", "********" if llm.api_key else "Not Set"),
             ]
         )
+
+        if get_features(llm.model).supports_responses_api:
+            labels_and_values.append(
+                (
+                    "   Reasoning Summary",
+                    llm.reasoning_summary if llm.reasoning_summary else "Disabled",
+                )
+            )
 
         if self.conversation:
             labels_and_values.extend(
@@ -137,11 +147,30 @@ class SettingsScreen:
         elif settings_type == SettingsType.ADVANCED:
             self.handle_advanced_settings()
 
+    def _get_existing_reasoning_summary(
+        self,
+    ) -> Literal["auto", "concise", "detailed"] | None:
+        if self.conversation and getattr(self.conversation, "state", None):
+            try:
+                return self.conversation.state.agent.llm.reasoning_summary
+            except Exception:
+                pass
+
+        agent = self.agent_store.load()
+        return agent.llm.reasoning_summary if agent else None
+
     def handle_basic_settings(self):
         step_counter = StepCounter(3)
         try:
             provider = choose_llm_provider(step_counter, escapable=True)
             llm_model = choose_llm_model(step_counter, provider, escapable=True)
+            model_name = f"{provider}/{llm_model}"
+            reasoning_summary = choose_reasoning_summary(
+                step_counter,
+                model_name,
+                existing_summary=self._get_existing_reasoning_summary(),
+                escapable=True,
+            )
             api_key = prompt_api_key(
                 step_counter,
                 provider,
@@ -156,7 +185,9 @@ class SettingsScreen:
             return
 
         # Store the collected settings for persistence
-        self._save_llm_settings(f"{provider}/{llm_model}", api_key)
+        self._save_llm_settings(
+            model_name, api_key, reasoning_summary=reasoning_summary
+        )
 
     def handle_advanced_settings(self, escapable=True):
         """Handle advanced settings configuration with clean step-by-step flow."""
@@ -164,6 +195,12 @@ class SettingsScreen:
         try:
             custom_model = prompt_custom_model(step_counter)
             base_url = prompt_base_url(step_counter)
+            reasoning_summary = choose_reasoning_summary(
+                step_counter,
+                custom_model,
+                existing_summary=self._get_existing_reasoning_summary(),
+                escapable=escapable,
+            )
             api_key = prompt_api_key(
                 step_counter,
                 custom_model.split("/")[0] if len(custom_model.split("/")) > 1 else "",
@@ -182,10 +219,16 @@ class SettingsScreen:
 
         # Store the collected settings for persistence
         self._save_advanced_settings(
-            custom_model, base_url, api_key, memory_condensation
+            custom_model, base_url, api_key, memory_condensation, reasoning_summary
         )
 
-    def _save_llm_settings(self, model, api_key, base_url: str | None = None) -> None:
+    def _save_llm_settings(
+        self,
+        model,
+        api_key,
+        base_url: str | None = None,
+        reasoning_summary: Literal["auto", "concise", "detailed"] | None = None,
+    ) -> None:
         extra_kwargs: dict[str, Any] = {}
         if should_set_litellm_extra_body(model):
             extra_kwargs["litellm_extra_body"] = {
@@ -200,6 +243,7 @@ class SettingsScreen:
             model=model,
             api_key=api_key,
             base_url=base_url,
+            reasoning_summary=reasoning_summary,
             usage_id="agent",
             **extra_kwargs,
         )
@@ -217,9 +261,19 @@ class SettingsScreen:
         self.agent_store.save(agent)
 
     def _save_advanced_settings(
-        self, custom_model: str, base_url: str, api_key: str, memory_condensation: bool
+        self,
+        custom_model: str,
+        base_url: str,
+        api_key: str,
+        memory_condensation: bool,
+        reasoning_summary: Literal["auto", "concise", "detailed"] | None,
     ):
-        self._save_llm_settings(custom_model, api_key, base_url=base_url)
+        self._save_llm_settings(
+            custom_model,
+            api_key,
+            base_url=base_url,
+            reasoning_summary=reasoning_summary,
+        )
 
         agent_spec = self.agent_store.load()
         if not agent_spec:
