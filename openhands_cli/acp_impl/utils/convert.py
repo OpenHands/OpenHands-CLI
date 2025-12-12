@@ -101,29 +101,3 @@ def convert_acp_prompt_to_message_content(
             # https://agentclientprotocol.com/protocol/content#embedded-resource
             message_content.append(convert_resources_to_content(block))
     return message_content
-
-
-def extract_text_from_message_content(
-    message_content: list[TextContent | ImageContent],
-) -> str | None:
-    """Extract text from message content for slash command detection.
-
-    This function is specifically designed for slash command detection and only
-    accepts single text content blocks. Multiple blocks or image content are
-    not valid slash commands.
-
-    Args:
-        message_content: Message content (typically a list of content blocks)
-
-    Returns:
-        The text content if exactly one TextContent block, None otherwise
-    """
-    if not isinstance(message_content, list) or len(message_content) != 1:
-        return None
-
-    # Only accept single TextContent blocks for slash commands
-    if not isinstance(message_content[0], TextContent):
-        return None
-
-    # Use SDK utility to extract text - content_to_str handles the conversion
-    return message_content[0].text

@@ -8,8 +8,8 @@ from typing import Any
 from pydantic import BaseModel
 
 from openhands.sdk import MessageEvent
-from openhands.sdk.llm.message import TextContent
 from openhands_cli.locations import CONVERSATIONS_DIR
+from openhands_cli.utils import extract_text_from_message_content
 
 
 class ConversationInfo(BaseModel):
@@ -120,7 +120,9 @@ class ConversationLister:
             if message_event is None or message_event.source != "user":
                 continue
 
-            text = self._extract_text_from_message_event(message_event)
+            text = extract_text_from_message_content(
+                list(message_event.llm_message.content), has_exactly_one=False
+            )
             if text:
                 return text
 
@@ -140,21 +142,6 @@ class ConversationLister:
             return MessageEvent(**event_data)
         except Exception:
             return None
-
-    def _extract_text_from_message_event(
-        self, message_event: MessageEvent
-    ) -> str | None:
-        """Extract the first non-empty text content from a MessageEvent."""
-        llm_message = getattr(message_event, "llm_message", None)
-        if llm_message is None:
-            return None
-
-        for content_item in getattr(llm_message, "content", []):
-            if isinstance(content_item, TextContent):
-                text = content_item.text.strip()
-                if text:
-                    return text
-        return None
 
     def get_latest_conversation_id(self) -> str | None:
         """Get the ID of the most recent conversation.
