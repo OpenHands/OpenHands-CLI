@@ -430,7 +430,10 @@ class OpenHandsACPAgent(ACPAgent):
                 return PromptResponse(stop_reason="end_turn")
 
             # Check if this is a slash command (single text block starting with "/")
-            text = extract_text_from_message_content(message_content)
+            # multiple blocks not valid slash commands -> has_exactly_one = True
+            text = extract_text_from_message_content(
+                message_content, has_exactly_one=True
+            )
             slash_cmd = parse_slash_command(text) if text else None
             if slash_cmd:
                 command, argument = slash_cmd

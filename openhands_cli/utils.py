@@ -127,15 +127,11 @@ def extract_text_from_message_content(
 ) -> str | None:
     """Extract text from message content for slash command detection.
 
-    This function is specifically designed for slash command detection and only
-    accepts single text content blocks. Multiple blocks or image content are
-    not valid slash commands.
-
     Args:
         message_content: Message content (typically a list of content blocks)
 
     Returns:
-        The text content if exactly one TextContent block, None otherwise
+        The text content of first TextContent block, None otherwise
     """
 
     if len(message_content) == 0:
