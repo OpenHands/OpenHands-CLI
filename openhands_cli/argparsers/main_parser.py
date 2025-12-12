@@ -1,42 +1,45 @@
 """Main argument parser for OpenHands CLI."""
 
 import argparse
+import sys
+from collections.abc import Sequence
 
 from openhands_cli import __version__
 from openhands_cli.argparsers.mcp_parser import add_mcp_parser
 from openhands_cli.argparsers.serve_parser import add_serve_parser
+from openhands_cli.argparsers.utils import (
+    add_confirmation_mode_args,
+    preprocess_mcp_args,
+)
 
 
-def add_confirmation_mode_args(
-    parser_or_group: argparse.ArgumentParser | argparse._MutuallyExclusiveGroup,
-) -> None:
-    """Add confirmation mode arguments to a parser or mutually exclusive group.
+class MainArgumentParser(argparse.ArgumentParser):
+    """ArgumentParser that knows how to preprocess MCP-specific arguments."""
 
-    Args:
-        parser_or_group: Either an ArgumentParser or a mutually exclusive group
-    """
-    parser_or_group.add_argument(
-        "--always-approve",
-        action="store_true",
-        help="Auto-approve all actions without asking for confirmation",
-    )
-    parser_or_group.add_argument(
-        "--llm-approve",
-        action="store_true",
-        help=(
-            "Enable LLM-based security analyzer "
-            "(only confirm LLM-predicted high-risk actions)"
-        ),
-    )
+    def _preprocess(self, args: Sequence[str] | None) -> list[str]:
+        """Normalize raw CLI args before passing them to argparse."""
+        if args is None:
+            args = sys.argv[1:]
+        return preprocess_mcp_args(list(args))
+
+    def parse_args(self, args=None, namespace=None):  # type: ignore[override]
+        """Parse arguments with MCP preprocessing."""
+        processed = self._preprocess(args)
+        return super().parse_args(processed, namespace)
+
+    def parse_known_args(self, args=None, namespace=None):  # type: ignore[override]
+        """Parse known arguments with MCP preprocessing."""
+        processed = self._preprocess(args)
+        return super().parse_known_args(processed, namespace)
 
 
-def create_main_parser() -> argparse.ArgumentParser:
+def create_main_parser() -> MainArgumentParser:
     """Create the main argument parser with CLI as default and serve as subcommand.
 
     Returns:
         The configured argument parser
     """
-    parser = argparse.ArgumentParser(
+    parser = MainArgumentParser(
         description="OpenHands CLI - Terminal User Interface for OpenHands AI Agent",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
