@@ -135,17 +135,9 @@ class ConversationLister:
             return None
 
     def _to_message_event(self, event_data: dict[str, Any]) -> MessageEvent | None:
-        """Convert raw event data to a MessageEvent, handling old formats."""
-        # Try new format first
+        """Convert raw event data to a MessageEvent."""
         try:
             return MessageEvent(**event_data)
-        except Exception:
-            pass
-
-        # Try transformed old format
-        try:
-            transformed_data = self._transform_old_message_format(event_data)
-            return MessageEvent(**transformed_data)
         except Exception:
             return None
 
@@ -163,29 +155,6 @@ class ConversationLister:
                 if text:
                     return text
         return None
-
-    def _transform_old_message_format(self, event_data: dict) -> dict:
-        """Transform old message format to new MessageEvent format.
-
-        Args:
-            event_data: Event data in old format.
-
-        Returns:
-            Event data in new format.
-        """
-        if (
-            event_data.get("kind") == "MessageEvent"
-            and "message" in event_data
-            and "llm_message" not in event_data
-        ):
-            transformed = event_data.copy()
-            # Move message to llm_message and add role
-            transformed["llm_message"] = event_data["message"].copy()
-            transformed["llm_message"]["role"] = event_data["source"]
-            del transformed["message"]
-            return transformed
-
-        return event_data
 
     def get_latest_conversation_id(self) -> str | None:
         """Get the ID of the most recent conversation.
