@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from uuid import UUID
 
-from prompt_toolkit import print_formatted_text
+from prompt_toolkit import print_formatted_text, PromptSession
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion
 from prompt_toolkit.document import Document
 from prompt_toolkit.formatted_text import HTML
@@ -10,6 +10,8 @@ from prompt_toolkit.shortcuts import clear
 from openhands.sdk.security.confirmation_policy import ConfirmationPolicyBase
 from openhands_cli.pt_style import get_cli_style
 from openhands_cli.version_check import check_for_updates
+
+
 
 
 DEFAULT_STYLE = get_cli_style()
@@ -131,3 +133,15 @@ def display_welcome(
         )
     )
     print()
+    
+class InputManager:
+    def __init__(self):
+        self.session = PromptSession(style=get_cli_style())
+    
+    async def read_input(self):
+        from prompt_toolkit.patch_stdout import patch_stdout
+        with patch_stdout():
+            try:
+                return await self.session.prompt_async("> ")
+            except (EOFError, KeyboardInterrupt):
+                return "/exit"
