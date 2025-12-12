@@ -63,11 +63,11 @@ from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
     convert_acp_mcp_servers_to_agent_format,
     convert_acp_prompt_to_message_content,
-    extract_text_from_message_content,
 )
 from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
+from openhands_cli.utils import extract_text_from_message_content
 
 
 logger = logging.getLogger(__name__)
@@ -430,7 +430,10 @@ class OpenHandsACPAgent(ACPAgent):
                 return PromptResponse(stop_reason="end_turn")
 
             # Check if this is a slash command (single text block starting with "/")
-            text = extract_text_from_message_content(message_content)
+            # multiple blocks not valid slash commands -> has_exactly_one = True
+            text = extract_text_from_message_content(
+                message_content, has_exactly_one=True
+            )
             slash_cmd = parse_slash_command(text) if text else None
             if slash_cmd:
                 command, argument = slash_cmd
