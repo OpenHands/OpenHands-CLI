@@ -123,7 +123,7 @@ async def test_new_session_with_malformed_mcp_json(acp_agent, tmp_path, monkeypa
     """Test that malformed mcp.json raises a clear error in ACP."""
     from acp import RequestError
 
-    from openhands_cli.tui.settings.store import MCPConfigurationError
+    from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 
     request = NewSessionRequest(cwd=str(tmp_path), mcp_servers=[])
 
@@ -154,7 +154,8 @@ async def test_new_session_with_malformed_mcp_json_integration(
     """Integration test verifying error handling with malformed mcp.json."""
     from acp import RequestError
 
-    from openhands_cli.tui.settings.store import AgentStore, MCPConfigurationError
+    from openhands_cli.mcp.mcp_utils import MCPConfigurationError
+    from openhands_cli.tui.settings.store import AgentStore
 
     request = NewSessionRequest(cwd=str(tmp_path), mcp_servers=[])
 

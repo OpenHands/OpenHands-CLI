@@ -1,17 +1,18 @@
 """MCP side panel widget for displaying MCP server information."""
 
 import json
-from pathlib import Path
 from typing import Any
 
-from fastmcp.mcp_config import MCPConfig
+from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
 from textual.app import App
 from textual.containers import Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.widgets import Static
 
 from openhands.sdk import Agent
-from openhands_cli.locations import MCP_CONFIG_FILE, PERSISTENCE_DIR
+from openhands_cli.locations import MCP_CONFIG_FILE
+from openhands_cli.mcp.mcp_display_utils import normalize_server_object
+from openhands_cli.mcp.mcp_utils import get_config_status
 from openhands_cli.refactor.core.theme import OPENHANDS_THEME
 from openhands_cli.refactor.panels.mcp_panel_style import MCP_PANEL_STYLE
 
@@ -89,7 +90,7 @@ class MCPSidePanel(VerticalScroll):
             return
 
         # Get MCP configuration status
-        status = self._check_mcp_config_status()
+        status = get_config_status()
         current_servers = self.agent.mcp_config.get("mcpServers", {})
 
         # Build content string
@@ -170,25 +171,29 @@ class MCPSidePanel(VerticalScroll):
         content_text = "\n".join(content_parts)
         content_widget.update(content_text)
 
-    def _format_server_details(self, server_spec: dict[str, Any]) -> list[str]:
+    def _format_server_details(
+        self, server: StdioMCPServer | RemoteMCPServer | dict[str, Any]
+    ) -> list[str]:
         """Format server specification details for display."""
         details = []
 
-        if isinstance(server_spec, dict):
-            if "command" in server_spec:
-                cmd = server_spec.get("command", "")
-                args = server_spec.get("args", [])
-                args_str = " ".join(args) if args else ""
-                details.append("Type: Command-based")
-                if cmd or args_str:
-                    details.append(f"Command: {cmd} {args_str}")
-            elif "url" in server_spec:
-                url = server_spec.get("url", "")
-                auth = server_spec.get("auth", "none")
-                details.append("Type: URL-based")
-                if url:
-                    details.append(f"URL: {url}")
-                details.append(f"Auth: {auth}")
+        # Convert to FastMCP object if needed
+        server_obj = normalize_server_object(server)
+
+        if isinstance(server_obj, StdioMCPServer):
+            details.append("Type: Command-based")
+            if server_obj.command or server_obj.args:
+                command_parts = [server_obj.command] if server_obj.command else []
+                if server_obj.args:
+                    command_parts.extend(server_obj.args)
+                command_str = " ".join(command_parts)
+                if command_str:
+                    details.append(f"Command: {command_str}")
+        elif isinstance(server_obj, RemoteMCPServer):
+            details.append("Type: URL-based")
+            if server_obj.url:
+                details.append(f"URL: {server_obj.url}")
+            details.append(f"Auth: {server_obj.auth or 'none'}")
 
         return details
 
@@ -199,38 +204,3 @@ class MCPSidePanel(VerticalScroll):
         first_stringified_server_spec = json.dumps(first_server_spec, sort_keys=True)
         second_stringified_server_spec = json.dumps(second_server_spec, sort_keys=True)
         return first_stringified_server_spec == second_stringified_server_spec
-
-    def _check_mcp_config_status(self) -> dict:
-        """Check the status of the MCP configuration file and return information
-        about it."""
-        config_path = Path(PERSISTENCE_DIR) / MCP_CONFIG_FILE
-
-        if not config_path.exists():
-            return {
-                "exists": False,
-                "valid": False,
-                "servers": {},
-                "message": (
-                    f"MCP configuration file not found at "
-                    f"~/.openhands/{MCP_CONFIG_FILE}"
-                ),
-            }
-
-        try:
-            mcp_config = MCPConfig.from_file(config_path)
-            servers = mcp_config.to_dict().get("mcpServers", {})
-            return {
-                "exists": True,
-                "valid": True,
-                "servers": servers,
-                "message": (
-                    f"Valid MCP configuration found with {len(servers)} server(s)"
-                ),
-            }
-        except Exception as e:
-            return {
-                "exists": True,
-                "valid": False,
-                "servers": {},
-                "message": f"Invalid MCP configuration file: {str(e)}",
-            }

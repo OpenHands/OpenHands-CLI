@@ -5,6 +5,7 @@ import argparse
 from openhands_cli import __version__
 from openhands_cli.argparsers.acp_parser import add_acp_parser
 from openhands_cli.argparsers.auth_parser import add_login_parser, add_logout_parser
+from openhands_cli.argparsers.mcp_parser import add_mcp_parser
 from openhands_cli.argparsers.serve_parser import add_serve_parser
 from openhands_cli.argparsers.util import add_confirmation_mode_args
 
@@ -65,7 +66,19 @@ def create_main_parser() -> argparse.ArgumentParser:
     )
 
     # CLI arguments at top level (default mode)
-    parser.add_argument("--resume", type=str, help="Conversation ID to resume")
+    parser.add_argument(
+        "--resume",
+        type=str,
+        nargs="?",
+        const="",
+        help="Conversation ID to resume. If no ID provided, shows list of recent "
+        "conversations",
+    )
+    parser.add_argument(
+        "--last",
+        action="store_true",
+        help="Resume the most recent conversation (use with --resume)",
+    )
     parser.add_argument(
         "--exp",
         action="store_true",
@@ -99,7 +112,11 @@ def create_main_parser() -> argparse.ArgumentParser:
     # Add serve subcommand
     add_serve_parser(subparsers)
 
+    # Add MCP subcommand
+    add_mcp_parser(subparsers)
+
     # Add authentication subcommands
     add_login_parser(subparsers)
     add_logout_parser(subparsers)
+
     return parser

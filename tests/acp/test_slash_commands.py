@@ -17,7 +17,7 @@ from openhands_cli.acp_impl.slash_commands import (
     parse_slash_command,
     validate_confirmation_mode,
 )
-from openhands_cli.acp_impl.utils import extract_text_from_message_content
+from openhands_cli.utils import extract_text_from_message_content
 
 
 class TestParseSlashCommand:
