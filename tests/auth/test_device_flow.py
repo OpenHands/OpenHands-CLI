@@ -281,16 +281,60 @@ class TestDeviceFlowClient:
                 }
 
                 with patch("openhands_cli.auth.device_flow._p") as mock_print:
-                    result = await client.authenticate()
+                    with patch("webbrowser.open") as mock_browser:
+                        result = await client.authenticate()
 
-                    assert result == {
-                        "access_token": "token123",
-                        "token_type": "Bearer",
-                    }
+                        assert result == {
+                            "access_token": "token123",
+                            "token_type": "Bearer",
+                        }
 
-                    # Verify print calls for user instructions
-                    assert mock_print.call_count >= 5  # Multiple print statements
-                    mock_poll.assert_called_once_with("device123", 5)
+                        # Verify print calls for user instructions
+                        assert mock_print.call_count >= 5  # Multiple print statements
+                        mock_poll.assert_called_once_with("device123", 5)
+
+                        # Verify browser was opened with correct URL
+                        mock_browser.assert_called_once_with(
+                            "https://example.com/device?user_code=USER123"
+                        )
+
+    @pytest.mark.asyncio
+    async def test_authenticate_browser_open_failure(self):
+        """Test authentication when browser fails to open."""
+        client = DeviceFlowClient("https://api.example.com")
+
+        with patch.object(client, "start_device_flow") as mock_start:
+            mock_start.return_value = (
+                "device123",
+                "USER123",
+                "https://example.com/device",
+                5,
+            )
+
+            with patch.object(client, "poll_for_token") as mock_poll:
+                mock_poll.return_value = {
+                    "access_token": "token123",
+                    "token_type": "Bearer",
+                }
+
+                with patch("openhands_cli.auth.device_flow._p"):
+                    with patch("webbrowser.open") as mock_browser:
+                        mock_browser.side_effect = Exception("Browser not available")
+
+                        result = await client.authenticate()
+
+                        assert result == {
+                            "access_token": "token123",
+                            "token_type": "Bearer",
+                        }
+
+                        # Verify browser open was attempted
+                        mock_browser.assert_called_once_with(
+                            "https://example.com/device?user_code=USER123"
+                        )
+
+                        # Should still complete successfully even if browser fails
+                        mock_poll.assert_called_once_with("device123", 5)
 
     @pytest.mark.asyncio
     async def test_authenticate_start_flow_error(self):

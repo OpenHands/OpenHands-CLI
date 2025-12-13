@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import webbrowser
 from typing import Any
 
 from prompt_toolkit import print_formatted_text
@@ -139,14 +140,24 @@ class DeviceFlowClient(BaseHttpClient):
             _p(f"<red>Error: {e}</red>")
             raise
 
-        # Step 2: Show instructions
-        _p("\n<yellow>To authenticate, please follow these steps:</yellow>")
+        # Step 2: Construct URL with user_code parameter and open browser
+        verification_url = f"{verification_uri}?user_code={user_code}"
+
+        _p("\n<yellow>Opening your web browser for authentication...</yellow>")
+        _p(f"<white>URL: <b>{verification_url}</b></white>")
+
+        # Automatically open the browser
+        try:
+            webbrowser.open(verification_url)
+            _p("<green>✓ Browser opened successfully</green>")
+        except Exception as e:
+            _p(f"<yellow>Could not open browser automatically: {e}</yellow>")
+            _p(f"<white>Please manually open: <b>{verification_url}</b></white>")
+
         _p(
-            f"<white>1. Open your web browser and go to: "
-            f"<b>{verification_uri}</b></white>"
+            "<white>Follow the instructions in your browser to complete "
+            "authentication</white>"
         )
-        _p(f"<white>2. Enter this code: <b>{user_code}</b></white>")
-        _p("<white>3. Follow the instructions to complete authentication</white>")
         _p("\n<cyan>Waiting for authentication to complete...</cyan>")
 
         # Step 3: Poll for token
