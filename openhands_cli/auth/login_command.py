@@ -1,6 +1,7 @@
 """Login command implementation for OpenHands CLI."""
 
 import asyncio
+import html
 
 from openhands_cli.auth.api_client import ApiClientError, fetch_user_data_after_oauth
 from openhands_cli.auth.device_flow import (
@@ -34,8 +35,14 @@ async def _fetch_user_data_with_context(
 
     except ApiClientError as e:
         # --- FAILURE MESSAGES ---
-        _p(f"\n<yellow>Warning: Could not fetch user data: {e}</yellow>")
-        _p("<white>Please try: <b>openhands logout && openhands login</b></white>")
+        safe_error = html.escape(str(e))
+
+        _p(f"\n<yellow>Warning: Could not fetch user data: {safe_error}</yellow>")
+        _p(
+            f"<white>Please try: <b>"
+            f"{html.escape('openhands logout && openhands login')}"
+            "</b></white>"
+        )
 
 
 async def login_command(server_url: str) -> bool:
