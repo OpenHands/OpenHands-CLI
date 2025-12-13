@@ -2,10 +2,7 @@
 
 from typing import Any
 
-from openhands.sdk import Agent
 from openhands.sdk.context.condenser import LLMSummarizingCondenser
-from openhands.sdk.llm import LLM
-from openhands.tools.preset.default import get_default_tools
 from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
 from openhands_cli.auth.utils import _p
 from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
@@ -18,8 +15,6 @@ class ApiClientError(Exception):
     pass
 
 
-DEFAULT_MODEL = "gpt-4o-mini"
-DEFAULT_LLM_BASE_URL = "https://llm-proxy.app.all-hands.dev/"
 SETTINGS_PATH = f"{PERSISTENCE_DIR}/{AGENT_SETTINGS_PATH}"
 
 
@@ -68,46 +63,16 @@ def _print_settings_summary(settings: dict[str, Any]) -> None:
         _p("    <yellow>! No LLM API key configured in settings</yellow>")
 
 
-def create_agent_from_settings(
+def create_and_save_agent_configuration(
     llm_api_key: str,
     settings: dict[str, Any],
-    base_url: str = DEFAULT_LLM_BASE_URL,
-) -> Agent:
-    """Create an Agent instance from user settings and API key."""
-    model = settings.get("llm_model", DEFAULT_MODEL)
-
-    llm = LLM(
-        model=model,
-        api_key=llm_api_key,
-        base_url=base_url,
-        usage_id="agent",
-    )
-
-    condenser_llm = LLM(
-        model=model,
-        api_key=llm_api_key,
-        base_url=base_url,
-        usage_id="condenser",
-    )
-
-    condenser = LLMSummarizingCondenser(
-        llm=condenser_llm,
-        max_size=10000,
-        keep_first=1000,
-    )
-
-    return Agent(
-        llm=llm,
-        tools=get_default_tools(enable_browser=False),
-        mcp_config={},
-        condenser=condenser,
-    )
-
-
-def save_agent_configuration(agent: Agent) -> None:
-    """Persist the Agent configuration and print details."""
+) -> None:
+    """Create and save an Agent configuration using AgentStore."""
     store = AgentStore()
-    store.save(agent)
+    agent = store.create_and_save_from_settings(
+        llm_api_key=llm_api_key,
+        settings=settings,
+    )
 
     _p("<green>✓ Agent configuration created and saved!</green>")
     _p("<white>Configuration details:</white>")
@@ -125,7 +90,8 @@ def save_agent_configuration(agent: Agent) -> None:
     condenser = agent.condenser
     if isinstance(condenser, LLMSummarizingCondenser):
         _p(
-            f"  • Condenser: <cyan>LLM Summarizing (max_size: {condenser.max_size}, "
+            f"  • Condenser: <cyan>LLM Summarizing "
+            f"(max_size: {condenser.max_size}, "
             f"keep_first: {condenser.keep_first})</cyan>"
         )
 
@@ -167,8 +133,7 @@ async def fetch_user_data_after_oauth(
         # Create agent if possible
         if llm_api_key and settings:
             try:
-                agent = create_agent_from_settings(llm_api_key, settings)
-                save_agent_configuration(agent)
+                create_and_save_agent_configuration(llm_api_key, settings)
             except Exception as e:
                 _p(
                     f"<yellow>Warning: Could not create "
