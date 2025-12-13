@@ -28,8 +28,7 @@ class TestLogoutCommand:
                 # Check that appropriate messages were printed
                 print_calls = [call[0][0] for call in mock_print.call_args_list]
                 assert any(
-                    "Successfully logged out from" in call and server_url in call
-                    for call in print_calls
+                    "Logged out of OpenHands Cloud" in call for call in print_calls
                 )
 
     def test_logout_command_specific_server_not_logged_in(self):
@@ -52,8 +51,7 @@ class TestLogoutCommand:
                 # Check that appropriate messages were printed
                 print_calls = [call[0][0] for call in mock_print.call_args_list]
                 assert any(
-                    "not logged in to" in call and server_url in call
-                    for call in print_calls
+                    "not logged in to OpenHands Cloud" in call for call in print_calls
                 )
 
     def test_logout_command_global_logged_in(self):
@@ -74,7 +72,9 @@ class TestLogoutCommand:
 
                 # Check that appropriate messages were printed
                 print_calls = [call[0][0] for call in mock_print.call_args_list]
-                assert any("Successfully logged out" in call for call in print_calls)
+                assert any(
+                    "Logged out of OpenHands Cloud" in call for call in print_calls
+                )
 
     def test_logout_command_global_not_logged_in(self):
         """Test global logout when not logged in."""
@@ -95,7 +95,7 @@ class TestLogoutCommand:
                 # Check that appropriate messages were printed
                 print_calls = [call[0][0] for call in mock_print.call_args_list]
                 assert any(
-                    "not logged in to any servers" in call for call in print_calls
+                    "not logged in to OpenHands Cloud" in call for call in print_calls
                 )
 
     def test_logout_command_exception_handling(self):
@@ -205,8 +205,12 @@ class TestLogoutCommand:
 
                 # Empty string is falsy, so it should be treated as global logout
                 print_calls = [call[0][0] for call in mock_print.call_args_list]
-                assert any("Logging out..." in call for call in print_calls)
-                assert any("Successfully logged out" in call for call in print_calls)
+                assert any(
+                    "Logging out from OpenHands Cloud" in call for call in print_calls
+                )
+                assert any(
+                    "Logged out of OpenHands Cloud" in call for call in print_calls
+                )
 
     def test_run_logout_command_default_parameter(self):
         """Test run_logout_command with default parameter."""

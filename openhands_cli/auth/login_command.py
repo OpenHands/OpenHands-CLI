@@ -2,20 +2,13 @@
 
 import asyncio
 
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import HTML
-
 from openhands_cli.auth.api_client import ApiClientError, fetch_user_data_after_oauth
 from openhands_cli.auth.device_flow import (
     DeviceFlowError,
     authenticate_with_device_flow,
 )
 from openhands_cli.auth.token_storage import TokenStorage
-
-
-def _p(message: str) -> None:
-    """Print formatted text via prompt_toolkit."""
-    print_formatted_text(HTML(message))
+from openhands_cli.auth.utils import _p
 
 
 async def _fetch_user_data_with_context(
@@ -27,7 +20,7 @@ async def _fetch_user_data_with_context(
 
     # Initial context output
     if already_logged_in:
-        _p("<yellow>You are already logged in to this server.</yellow>")
+        _p("<yellow>You are already logged in to OpenHands Cloud.</yellow>")
         _p("<white>Pulling latest settings from remote...</white>")
 
     try:
@@ -42,6 +35,7 @@ async def _fetch_user_data_with_context(
     except ApiClientError as e:
         # --- FAILURE MESSAGES ---
         _p(f"\n<yellow>Warning: Could not fetch user data: {e}</yellow>")
+        _p("<white>Please try: <b>openhands logout && openhands login</b></white>")
 
 
 async def login_command(server_url: str) -> bool:
@@ -53,7 +47,7 @@ async def login_command(server_url: str) -> bool:
     Returns:
         True if login was successful, False otherwise
     """
-    _p(f"<cyan>Logging in to OpenHands at {server_url}...</cyan>")
+    _p("<cyan>Logging in to OpenHands Cloud...</cyan>")
 
     # First, try to read any existing token
     token_storage = TokenStorage()
@@ -86,7 +80,7 @@ async def login_command(server_url: str) -> bool:
     # Store the API key securely
     token_storage.store_api_key(api_key)
 
-    _p(f"<green>✓ Successfully logged in to {server_url}</green>")
+    _p("<green>✓ Logged into OpenHands Cloud</green>")
     _p("<white>Your authentication tokens have been stored securely.</white>")
 
     # Fetch user data and configure local agent

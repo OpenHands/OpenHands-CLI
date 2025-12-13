@@ -2,24 +2,18 @@
 
 import asyncio
 import json
+import time
 import webbrowser
 from typing import Any
 
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import HTML
-
 from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
+from openhands_cli.auth.utils import _p
 
 
 class DeviceFlowError(Exception):
     """Base exception for device flow errors."""
 
     pass
-
-
-def _p(message: str) -> None:
-    """Print formatted text through prompt_toolkit."""
-    print_formatted_text(HTML(message))
 
 
 class DeviceFlowClient(BaseHttpClient):
@@ -55,12 +49,15 @@ class DeviceFlowClient(BaseHttpClient):
         except (AuthHttpError, KeyError) as e:
             raise DeviceFlowError(f"Failed to start device flow: {e}") from e
 
-    async def poll_for_token(self, device_code: str, interval: int) -> dict[str, Any]:
+    async def poll_for_token(
+        self, device_code: str, interval: int, timeout: float = 600.0
+    ) -> dict[str, Any]:
         """Poll for the API key after user authorization.
 
         Args:
             device_code: The device code from start_device_flow
             interval: Polling interval in seconds
+            timeout: Maximum time to wait for authorization in seconds (default: 10 min)
 
         Returns:
             Dictionary containing access_token (API key), token_type, etc.
@@ -69,9 +66,9 @@ class DeviceFlowClient(BaseHttpClient):
             DeviceFlowError: If polling fails or user denies access
         """
         data = {"device_code": device_code}
-        max_attempts = 120  # ~10 minutes at 5s, but interval may vary
+        start_time = time.time()
 
-        for _ in range(max_attempts):
+        while time.time() - start_time < timeout:
             try:
                 response = await self.post(
                     "/oauth/device/token",

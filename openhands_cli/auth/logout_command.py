@@ -1,14 +1,7 @@
 """Logout command implementation for OpenHands CLI."""
 
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import HTML
-
 from openhands_cli.auth.token_storage import TokenStorage
-
-
-def _p(message: str) -> None:
-    """Print formatted text via prompt_toolkit."""
-    print_formatted_text(HTML(message))
+from openhands_cli.auth.utils import _p
 
 
 def logout_command(server_url: str | None = None) -> bool:
@@ -25,24 +18,24 @@ def logout_command(server_url: str | None = None) -> bool:
 
         # Logging out from a specific server (conceptually; we only store one key)
         if server_url:
-            _p(f"<cyan>Logging out from {server_url}...</cyan>")
+            _p("<cyan>Logging out from OpenHands Cloud...</cyan>")
 
             was_logged_in = token_storage.remove_api_key()
             if was_logged_in:
-                _p(f"<green>✓ Successfully logged out from {server_url}</green>")
+                _p("<green>✓ Logged out of OpenHands Cloud</green>")
             else:
-                _p(f"<yellow>You were not logged in to {server_url}</yellow>")
+                _p("<yellow>You were not logged in to OpenHands Cloud</yellow>")
 
             return True
 
         # Logging out globally (no server specified)
         if not token_storage.has_api_key():
-            _p("<yellow>You are not logged in to any servers.</yellow>")
+            _p("<yellow>You are not logged in to OpenHands Cloud.</yellow>")
             return True
 
-        _p("<cyan>Logging out...</cyan>")
+        _p("<cyan>Logging out from OpenHands Cloud...</cyan>")
         token_storage.remove_api_key()
-        _p("<green>✓ Successfully logged out</green>")
+        _p("<green>✓ Logged out of OpenHands Cloud</green>")
         return True
 
     except Exception as e:

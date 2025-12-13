@@ -259,7 +259,8 @@ class TestDeviceFlowClient:
                 with pytest.raises(
                     DeviceFlowError, match="Timeout waiting for user authorization"
                 ):
-                    await client.poll_for_token("device123", 1)
+                    # Use a very short timeout to make the test fast
+                    await client.poll_for_token("device123", 1, timeout=0.1)
 
     @pytest.mark.asyncio
     async def test_authenticate_success(self):

@@ -2,14 +2,12 @@
 
 from typing import Any
 
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import HTML
-
 from openhands.sdk import Agent
 from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands.sdk.llm import LLM
 from openhands.tools.preset.default import get_default_tools
 from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
+from openhands_cli.auth.utils import _p
 from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
 from openhands_cli.tui.settings.store import AgentStore
 
@@ -23,11 +21,6 @@ class ApiClientError(Exception):
 DEFAULT_MODEL = "gpt-4o-mini"
 DEFAULT_LLM_BASE_URL = "https://llm-proxy.app.all-hands.dev/"
 SETTINGS_PATH = f"{PERSISTENCE_DIR}/{AGENT_SETTINGS_PATH}"
-
-
-def _p(message: str) -> None:
-    """Unified formatted print helper."""
-    print_formatted_text(HTML(message))
 
 
 class OpenHandsApiClient(BaseHttpClient):
@@ -153,7 +146,7 @@ async def fetch_user_data_after_oauth(
         _p("<white>• Getting LLM API key...</white>")
         llm_api_key = await client.get_llm_api_key()
         if llm_api_key:
-            _p(f"<green>  ✓ LLM API key retrieved: {llm_api_key[:10]}...</green>")
+            _p(f"<green>  ✓ LLM API key retrieved: {llm_api_key[:3]}...</green>")
         else:
             _p("<yellow>  ! No LLM API key available</yellow>")
 

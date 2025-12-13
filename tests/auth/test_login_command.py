@@ -303,6 +303,7 @@ class TestLoginCommand:
                         # Verify success messages
                         print_calls = [call[0][0] for call in mock_print.call_args_list]
                         assert any(
-                            "Successfully logged in" in call for call in print_calls
+                            "Logged into OpenHands Cloud" in call
+                            for call in print_calls
                         )
                         assert any("stored securely" in call for call in print_calls)
