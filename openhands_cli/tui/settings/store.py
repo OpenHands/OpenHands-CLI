@@ -9,6 +9,7 @@ from prompt_toolkit import HTML, print_formatted_text
 from openhands.sdk import Agent, AgentContext, LocalFileStore
 from openhands.sdk.context import load_skills_from_dir
 from openhands.sdk.context.condenser import LLMSummarizingCondenser
+from openhands.sdk.llm import LLM
 from openhands.tools.preset.default import get_default_tools
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
@@ -135,3 +136,51 @@ class AgentStore:
     def save(self, agent: Agent) -> None:
         serialized_spec = agent.model_dump_json(context={"expose_secrets": True})
         self.file_store.write(AGENT_SETTINGS_PATH, serialized_spec)
+
+    def create_and_save_from_settings(
+        self,
+        llm_api_key: str,
+        settings: dict[str, Any],
+        base_url: str = "https://llm-proxy.app.all-hands.dev/",
+        default_model: str = "claude-sonnet-4-5-20250929",
+    ) -> Agent:
+        """Create an Agent instance from user settings and API key, then save it.
+
+        Args:
+            llm_api_key: The LLM API key to use
+            settings: User settings dictionary containing model and other config
+            base_url: Base URL for the LLM service
+            default_model: Default model to use if not specified in settings
+
+        Returns:
+            The created Agent instance
+        """
+        model = settings.get("llm_model", default_model)
+
+        llm = LLM(
+            model=model,
+            api_key=llm_api_key,
+            base_url=base_url,
+            usage_id="agent",
+        )
+
+        condenser_llm = LLM(
+            model=model,
+            api_key=llm_api_key,
+            base_url=base_url,
+            usage_id="condenser",
+        )
+
+        condenser = LLMSummarizingCondenser(llm=condenser_llm)
+
+        agent = Agent(
+            llm=llm,
+            tools=get_default_tools(enable_browser=False),
+            mcp_config={},
+            condenser=condenser,
+        )
+
+        # Save the agent configuration
+        self.save(agent)
+
+        return agent
