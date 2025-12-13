@@ -7,6 +7,7 @@ This is a simplified version that demonstrates the TUI functionality.
 import html
 import logging
 import os
+import sys
 import warnings
 from pathlib import Path
 
@@ -126,13 +127,13 @@ def main() -> None:
 
             success = run_login_command(args.server_url)
             if not success:
-                exit(1)
+                sys.exit(1)
         elif args.command == "logout":
             from openhands_cli.auth.logout_command import run_logout_command
 
             success = run_logout_command(args.server_url)
             if not success:
-                exit(1)
+                sys.exit(1)
         elif args.command == "mcp":
             # Import MCP command handler only when needed
             from openhands_cli.mcp.mcp_commands import handle_mcp_command
