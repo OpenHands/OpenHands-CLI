@@ -248,9 +248,7 @@ class TestBaseHttpClient:
 
             form_data = {"device_code": "test123"}
 
-            response = await client._make_request(
-                "POST", "/test", form_data=form_data
-            )
+            response = await client._make_request("POST", "/test", form_data=form_data)
 
             assert response == mock_response
             mock_client.request.assert_called_once_with(
