@@ -45,29 +45,61 @@ jobs:
               with:
                   fetch-depth: 0
 
-            - name: Set up Python
+            # Windows-specific: Set up WSL
+            - name: Set up WSL (Windows only)
+              if: matrix.platform == 'windows'
+              uses: Vampire/setup-wsl@v3
+              with:
+                  distribution: Ubuntu-22.04
+                  additional-packages:
+                      python3
+                      python3-pip
+                      python3-venv
+                      build-essential
+                      curl
+
+            # Non-Windows: Set up Python normally
+            - name: Set up Python (Non-Windows)
+              if: matrix.platform != 'windows'
               uses: actions/setup-python@v5
               with:
                   python-version: 3.12
 
-            - name: Install uv
+            # Non-Windows: Install uv normally
+            - name: Install uv (Non-Windows)
+              if: matrix.platform != 'windows'
               uses: astral-sh/setup-uv@v3
               with:
                   version: latest
 
-            - name: Install dependencies
+            # Windows WSL: Install uv in WSL
+            - name: Install uv (Windows WSL)
+              if: matrix.platform == 'windows'
+              shell: wsl-bash {0}
+              run: |
+                  curl -LsSf https://astral.sh/uv/install.sh | sh
+                  echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
+                  source ~/.bashrc
+
+            # Non-Windows: Install dependencies normally
+            - name: Install dependencies (Non-Windows)
+              if: matrix.platform != 'windows'
               run: |
                   uv sync
 
-            - name: Build binary executable
+            # Windows WSL: Install dependencies in WSL
+            - name: Install dependencies (Windows WSL)
+              if: matrix.platform == 'windows'
+              shell: wsl-bash {0}
               run: |
-                  if [ "${{ matrix.platform }}" = "windows" ]; then
-                    # On Windows, run the Python build script directly
-                    uv run python build.py --install-pyinstaller | tee output.log
-                  else
-                    # On Unix systems, use the bash script
-                    ./build.sh --install-pyinstaller | tee output.log
-                  fi
+                  source ~/.bashrc
+                  uv sync
+
+            # Non-Windows: Build normally
+            - name: Build binary executable (Non-Windows)
+              if: matrix.platform != 'windows'
+              run: |
+                  ./build.sh --install-pyinstaller | tee output.log
                   echo "Full output:"
                   cat output.log
 
@@ -79,7 +111,37 @@ jobs:
                   echo "✅ Build & test finished without ❌ markers"
               shell: bash
 
-            - name: Verify binary files exist
+            # Windows WSL: Build in WSL
+            - name: Build binary executable (Windows WSL)
+              if: matrix.platform == 'windows'
+              shell: wsl-bash {0}
+              run: |
+                  source ~/.bashrc
+                  ./build.sh --install-pyinstaller | tee output.log
+                  echo "Full output:"
+                  cat output.log
+
+                  if grep -q "❌" output.log; then
+                    echo "❌ Found failure marker in output"
+                    exit 1
+                  fi
+
+                  echo "✅ Build & test finished without ❌ markers"
+
+            # Non-Windows: Verify binary files exist normally
+            - name: Verify binary files exist (Non-Windows)
+              if: matrix.platform != 'windows'
+              run: |
+                  if ! ls dist/openhands* 1> /dev/null 2>&1; then
+                    echo "❌ No binaries found to upload!"
+                    exit 1
+                  fi
+                  echo "✅ Found binaries to upload."
+
+            # Windows WSL: Verify binary files exist in WSL
+            - name: Verify binary files exist (Windows WSL)
+              if: matrix.platform == 'windows'
+              shell: wsl-bash {0}
               run: |
                   if ! ls dist/openhands* 1> /dev/null 2>&1; then
                     echo "❌ No binaries found to upload!"
