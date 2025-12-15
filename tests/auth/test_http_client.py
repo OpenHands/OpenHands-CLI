@@ -95,7 +95,6 @@ class TestBaseHttpClient:
                 method="GET",
                 url="https://api.example.com/test",
                 headers=None,
-                json=None,
             )
 
     @pytest.mark.asyncio
@@ -214,7 +213,7 @@ class TestBaseHttpClient:
 
             assert response == mock_response
             mock_make_request.assert_called_once_with(
-                "POST", "/test", headers, json_data, True
+                "POST", "/test", headers, json_data, None, True
             )
 
     @pytest.mark.asyncio
@@ -230,5 +229,50 @@ class TestBaseHttpClient:
 
             assert response == mock_response
             mock_make_request.assert_called_once_with(
-                "POST", "/test", None, None, False
+                "POST", "/test", None, None, None, False
+            )
+
+    @pytest.mark.asyncio
+    async def test_make_request_with_form_data(self):
+        """Test HTTP request with form data."""
+        client = BaseHttpClient("https://api.example.com")
+
+        # Create a proper mock response with request set
+        mock_request = httpx.Request("POST", "https://api.example.com/test")
+        mock_response = httpx.Response(status_code=200, request=mock_request)
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client_class.return_value.__aenter__.return_value = mock_client
+            mock_client.request.return_value = mock_response
+
+            form_data = {"device_code": "test123"}
+
+            response = await client._make_request(
+                "POST", "/test", form_data=form_data
+            )
+
+            assert response == mock_response
+            mock_client.request.assert_called_once_with(
+                method="POST",
+                url="https://api.example.com/test",
+                headers=None,
+                data=form_data,
+            )
+
+    @pytest.mark.asyncio
+    async def test_post_method_with_form_data(self):
+        """Test POST method wrapper with form data."""
+        client = BaseHttpClient("https://api.example.com")
+
+        with patch.object(client, "_make_request") as mock_make_request:
+            mock_response = httpx.Response(status_code=200)
+            mock_make_request.return_value = mock_response
+
+            form_data = {"device_code": "test123"}
+            response = await client.post("/test", form_data=form_data)
+
+            assert response == mock_response
+            mock_make_request.assert_called_once_with(
+                "POST", "/test", None, None, form_data, True
             )

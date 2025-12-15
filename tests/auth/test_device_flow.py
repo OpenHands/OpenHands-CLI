@@ -99,7 +99,7 @@ class TestDeviceFlowClient:
             assert result == {"access_token": "token123", "token_type": "Bearer"}
             mock_post.assert_called_once_with(
                 "/oauth/device/token",
-                json_data={"device_code": "device123"},
+                form_data={"device_code": "device123"},
                 raise_for_status=False,
             )
 

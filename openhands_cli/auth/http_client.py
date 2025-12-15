@@ -58,6 +58,7 @@ class BaseHttpClient:
         endpoint: str,
         headers: dict[str, str] | None = None,
         json_data: dict[str, Any] | None = None,
+        form_data: dict[str, Any] | None = None,
         raise_for_status: bool = True,
     ) -> httpx.Response:
         """Make HTTP request with common error handling.
@@ -67,6 +68,7 @@ class BaseHttpClient:
             endpoint: API endpoint path
             headers: Optional request headers
             json_data: Optional JSON data for request body
+            form_data: Optional form data for request body (application/x-www-form-urlencoded)
             raise_for_status: Whether to raise exception for HTTP errors
 
         Returns:
@@ -79,12 +81,20 @@ class BaseHttpClient:
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.request(
-                    method=method,
-                    url=url,
-                    headers=headers,
-                    json=json_data,
-                )
+                # Prepare request parameters
+                request_kwargs = {
+                    "method": method,
+                    "url": url,
+                    "headers": headers,
+                }
+                
+                # Add either JSON or form data, but not both
+                if json_data is not None:
+                    request_kwargs["json"] = json_data
+                elif form_data is not None:
+                    request_kwargs["data"] = form_data
+                
+                response = await client.request(**request_kwargs)
 
                 if raise_for_status:
                     response.raise_for_status()
@@ -123,6 +133,7 @@ class BaseHttpClient:
         endpoint: str,
         headers: dict[str, str] | None = None,
         json_data: dict[str, Any] | None = None,
+        form_data: dict[str, Any] | None = None,
         raise_for_status: bool = True,
     ) -> httpx.Response:
         """Make POST request.
@@ -131,11 +142,12 @@ class BaseHttpClient:
             endpoint: API endpoint path
             headers: Optional request headers
             json_data: Optional JSON data for request body
+            form_data: Optional form data for request body (application/x-www-form-urlencoded)
             raise_for_status: Whether to raise exception for HTTP errors
 
         Returns:
             HTTP response object
         """
         return await self._make_request(
-            "POST", endpoint, headers, json_data, raise_for_status
+            "POST", endpoint, headers, json_data, form_data, raise_for_status
         )

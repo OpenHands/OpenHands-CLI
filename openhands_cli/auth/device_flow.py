@@ -72,7 +72,7 @@ class DeviceFlowClient(BaseHttpClient):
             try:
                 response = await self.post(
                     "/oauth/device/token",
-                    json_data=data,
+                    form_data=data,
                     raise_for_status=False,
                 )
             except AuthHttpError as e:
