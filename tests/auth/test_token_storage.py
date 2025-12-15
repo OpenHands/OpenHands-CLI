@@ -1,5 +1,7 @@
 """Unit tests for token storage functionality."""
 
+import os
+import stat
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -160,5 +162,26 @@ class TestTokenStorage:
             ):
                 storage = TokenStorage()
 
-                # Should use the patched PERSISTENCE_DIR
-                assert str(storage.config_dir) == test_persistence_dir
+                # Should use the patched PERSISTENCE_DIR/cloud
+                expected_path = str(Path(test_persistence_dir) / "cloud")
+                assert str(storage.config_dir) == expected_path
+
+    def test_api_key_file_permissions(self):
+        """Test that API key file is created with secure permissions (600)."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            storage = TokenStorage(Path(temp_dir))
+            test_key = "sk-test-api-key-12345"
+
+            # Store API key
+            storage.store_api_key(test_key)
+
+            # Check file permissions
+            file_stat = os.stat(storage.api_key_file)
+            file_mode = stat.filemode(file_stat.st_mode)
+
+            # Should be -rw------- (600)
+            assert file_mode == "-rw-------"
+
+            # Also check using octal representation
+            permissions = oct(file_stat.st_mode)[-3:]
+            assert permissions == "600"

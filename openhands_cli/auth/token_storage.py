@@ -1,5 +1,6 @@
 """Simple API key storage for OpenHands CLI authentication."""
 
+import os
 from pathlib import Path
 
 from openhands_cli.locations import PERSISTENCE_DIR
@@ -12,25 +13,27 @@ class TokenStorage:
         """Initialize token storage.
 
         Args:
-            config_dir: Directory to store API keys (defaults to PERSISTENCE_DIR)
+            config_dir: Directory to store API keys (defaults to PERSISTENCE_DIR/cloud)
         """
         if config_dir is None:
-            config_dir = Path(PERSISTENCE_DIR)
+            config_dir = Path(PERSISTENCE_DIR) / "cloud"
 
         self.config_dir = config_dir
-        self.config_dir.mkdir(exist_ok=True)
+        self.config_dir.mkdir(parents=True, exist_ok=True)
 
         self.api_key_file = self.config_dir / "api_key.txt"
 
     def store_api_key(self, api_key: str) -> None:
-        """Store API key as plain text.
+        """Store API key as plain text with secure permissions.
 
         Args:
             api_key: The API key to store
         """
-
         with open(self.api_key_file, "w") as f:
             f.write(api_key)
+
+        # Set secure permissions (read/write for owner only)
+        os.chmod(self.api_key_file, 0o600)
 
     def get_api_key(self) -> str | None:
         """Get stored API key.
