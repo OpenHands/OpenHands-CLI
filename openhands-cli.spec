@@ -34,6 +34,8 @@ a = Analysis(
         *collect_data_files('mcp'),
         # Include all data files from openhands.sdk (templates, configs, etc.)
         *collect_data_files('openhands.sdk'),
+        # Include all data files from openhands_cli package
+        *collect_data_files('openhands_cli'),
         # Include package metadata for importlib.metadata
         *copy_metadata('fastmcp'),
         *copy_metadata('agent-client-protocol'),

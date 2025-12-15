@@ -4,83 +4,179 @@ import asyncio
 import logging
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from acp import (
     Agent as ACPAgent,
-    AgentSideConnection,
+    Client,
     InitializeResponse,
     NewSessionResponse,
     PromptResponse,
     RequestError,
-    SessionNotification,
     stdio_streams,
 )
+from acp.core import AgentSideConnection
+from acp.helpers import update_current_mode
 from acp.schema import (
     AgentCapabilities,
     AgentMessageChunk,
     AuthenticateResponse,
+    AvailableCommandsUpdate,
     Implementation,
     ListSessionsResponse,
     LoadSessionResponse,
     McpCapabilities,
     PromptCapabilities,
+    SessionModeState,
     SetSessionModelResponse,
     SetSessionModeResponse,
     TextContentBlock,
 )
 
 from openhands.sdk import (
-    BaseConversation,
     Conversation,
+    LocalConversation,
     Message,
     Workspace,
 )
 from openhands.sdk.event import Event
 from openhands_cli import __version__
+from openhands_cli.acp_impl.confirmation import (
+    ConfirmationMode,
+    get_available_modes,
+)
 from openhands_cli.acp_impl.event import EventSubscriber
+from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
+from openhands_cli.acp_impl.slash_commands import (
+    VALID_CONFIRMATION_MODE,
+    apply_confirmation_mode_to_conversation,
+    create_help_text,
+    get_available_slash_commands,
+    get_confirmation_mode_from_conversation,
+    get_unknown_command_text,
+    handle_confirm_argument,
+    parse_slash_command,
+    validate_confirmation_mode,
+)
 from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
     convert_acp_mcp_servers_to_agent_format,
     convert_acp_prompt_to_message_content,
 )
 from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
+from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
-from openhands_cli.tui.settings.store import MCPConfigurationError
+from openhands_cli.utils import extract_text_from_message_content
 
 
 logger = logging.getLogger(__name__)
 
 
+def get_session_mode_state(current_mode: ConfirmationMode) -> SessionModeState:
+    """Get the session mode state for a given confirmation mode.
+
+    Args:
+        current_mode: The current confirmation mode
+
+    Returns:
+        SessionModeState with available modes and current mode
+    """
+    return SessionModeState(
+        current_mode_id=current_mode,
+        available_modes=get_available_modes(),
+    )
+
+
 class OpenHandsACPAgent(ACPAgent):
     """OpenHands Agent Client Protocol implementation."""
 
-    def __init__(self, conn: AgentSideConnection):
+    def __init__(self, conn: Client, initial_confirmation_mode: ConfirmationMode):
         """Initialize the OpenHands ACP agent.
 
         Args:
             conn: ACP connection for sending notifications
+            initial_confirmation_mode: Default confirmation mode for new sessions
         """
         self._conn = conn
         # Cache of active conversations to preserve state (pause, confirmation, etc.)
         # across multiple operations on the same session
-        self._active_sessions: dict[str, BaseConversation] = {}
+        self._active_sessions: dict[str, LocalConversation] = {}
         # Track running tasks for each session to ensure proper cleanup on cancel
         self._running_tasks: dict[str, asyncio.Task] = {}
+        # Default confirmation mode for new sessions
+        self._initial_confirmation_mode: ConfirmationMode = initial_confirmation_mode
+        logger.info(
+            f"OpenHands ACP Agent initialized with "
+            f"confirmation mode: {initial_confirmation_mode}"
+        )
 
-        logger.info("OpenHands ACP Agent initialized")
+    async def _cmd_confirm(self, session_id: str, argument: str) -> str:
+        """Handle /confirm command.
 
-    def on_connect(self, conn: AgentSideConnection) -> None:  # noqa: ARG002
-        """Called when connection is established."""
-        logger.info("ACP connection established")
+        Args:
+            session_id: The session ID
+            argument: Command argument (always-ask|always-approve|llm-approve)
+
+        Returns:
+            Status message
+        """
+        # Get current mode from conversation if it exists
+        if session_id in self._active_sessions:
+            current_mode = get_confirmation_mode_from_conversation(
+                self._active_sessions[session_id]
+            )
+        else:
+            current_mode = self._initial_confirmation_mode
+
+        response_text, new_mode = handle_confirm_argument(current_mode, argument)
+        if new_mode is not None:
+            await self._set_confirmation_mode(session_id, new_mode)
+
+        return response_text
+
+    async def _set_confirmation_mode(
+        self, session_id: str, mode: ConfirmationMode
+    ) -> None:
+        """Set confirmation mode for a session.
+
+        Args:
+            session_id: The session ID
+            mode: Confirmation mode (always-ask|always-approve|llm-approve)
+        """
+        if session_id in self._active_sessions:
+            conversation = self._active_sessions[session_id]
+            apply_confirmation_mode_to_conversation(conversation, mode, session_id)
+            logger.debug(f"Confirmation mode for session {session_id}: {mode}")
+        else:
+            logger.warning(
+                f"Cannot set confirmation mode for session {session_id}: "
+                "session not found"
+            )
+
+    async def _send_available_commands(self, session_id: str) -> None:
+        """Send available slash commands to the client.
+
+        Args:
+            session_id: The session ID
+        """
+        await self._conn.session_update(
+            session_id=session_id,
+            update=AvailableCommandsUpdate(
+                session_update="available_commands_update",
+                available_commands=get_available_slash_commands(),
+            ),
+        )
+
+    def on_connect(self, conn: Client) -> None:
+        pass
 
     def _get_or_create_conversation(
         self,
         session_id: str,
         working_dir: str | None = None,
         mcp_servers: dict[str, dict[str, Any]] | None = None,
-    ) -> BaseConversation:
+    ) -> LocalConversation:
         """Get an active conversation from cache or create/load it.
 
         This maintains conversation state (pause, confirmation, etc.) across
@@ -107,6 +203,12 @@ class OpenHandsACPAgent(ACPAgent):
             mcp_servers=mcp_servers,
         )
 
+        # Initialize confirmation mode to the configured default
+        # Set the confirmation policy on the conversation
+        apply_confirmation_mode_to_conversation(
+            conversation, self._initial_confirmation_mode, session_id
+        )
+
         # Cache it for future operations
         self._active_sessions[session_id] = conversation
         return conversation
@@ -116,7 +218,7 @@ class OpenHandsACPAgent(ACPAgent):
         session_id: str,
         working_dir: str | None = None,
         mcp_servers: dict[str, dict[str, Any]] | None = None,
-    ) -> BaseConversation:
+    ) -> LocalConversation:
         """Set up a conversation for ACP with event streaming support.
 
         This function reuses the resume logic from
@@ -275,18 +377,26 @@ class OpenHandsACPAgent(ACPAgent):
 
             # Create conversation and cache it for future operations
             # This reuses the same pattern as openhands --resume
-            conversation = self._get_or_create_conversation(
+            _ = self._get_or_create_conversation(
                 session_id=session_id,
                 working_dir=working_dir,
                 mcp_servers=mcp_servers_dict,
             )
 
-            logger.info(
-                f"Created new session {session_id} with model: "
-                f"{conversation.agent.llm.model}"  # type: ignore[attr-defined]
-            )
+            logger.info(f"Created new session {session_id}")
 
-            return NewSessionResponse(session_id=session_id)
+            # Send available slash commands to client
+            await self._send_available_commands(session_id)
+
+            # Get current confirmation mode for this session
+            conversation = self._active_sessions[session_id]
+            current_mode = get_confirmation_mode_from_conversation(conversation)
+
+            # Return response with modes
+            return NewSessionResponse(
+                session_id=session_id,
+                modes=get_session_mode_state(current_mode),
+            )
 
         except MissingAgentSpec as e:
             logger.error(f"Agent not configured: {e}")
@@ -319,15 +429,51 @@ class OpenHandsACPAgent(ACPAgent):
             if not message_content:
                 return PromptResponse(stop_reason="end_turn")
 
+            # Check if this is a slash command (single text block starting with "/")
+            # multiple blocks not valid slash commands -> has_exactly_one = True
+            text = extract_text_from_message_content(
+                message_content, has_exactly_one=True
+            )
+            slash_cmd = parse_slash_command(text) if text else None
+            if slash_cmd:
+                command, argument = slash_cmd
+                logger.info(f"Executing slash command: /{command} {argument}")
+
+                # Execute the slash command
+                if command == "help":
+                    response_text = create_help_text()
+                elif command == "confirm":
+                    response_text = await self._cmd_confirm(session_id, argument)
+                else:
+                    response_text = get_unknown_command_text(command)
+
+                # Send response to client
+                await self._conn.session_update(
+                    session_id=session_id,
+                    update=AgentMessageChunk(
+                        session_update="agent_message_chunk",
+                        content=TextContentBlock(type="text", text=response_text),
+                    ),
+                )
+
+                return PromptResponse(stop_reason="end_turn")
+
             # Send the message with potentially multiple content types
             # (text + images)
             message = Message(role="user", content=message_content)
             conversation.send_message(message)
 
-            # Run the conversation asynchronously
-            # Callbacks are already set up when conversation was created
+            # Run the conversation with confirmation mode via runner function
+            # The runner handles the confirmation flow for all modes
             # Track the running task so cancel() can wait for proper cleanup
-            run_task = asyncio.create_task(asyncio.to_thread(conversation.run))
+            run_task = asyncio.create_task(
+                run_conversation_with_confirmation(
+                    conversation=conversation,
+                    conn=self._conn,
+                    session_id=session_id,
+                )
+            )
+
             self._running_tasks[session_id] = run_task
             try:
                 await run_task
@@ -344,14 +490,12 @@ class OpenHandsACPAgent(ACPAgent):
         except Exception as e:
             logger.error(f"Error processing prompt: {e}", exc_info=True)
             # Send error notification to client
-            await self._conn.sessionUpdate(
-                SessionNotification(
-                    session_id=session_id,
-                    update=AgentMessageChunk(
-                        session_update="agent_message_chunk",
-                        content=TextContentBlock(type="text", text=f"Error: {str(e)}"),
-                    ),
-                )
+            await self._conn.session_update(
+                session_id=session_id,
+                update=AgentMessageChunk(
+                    session_update="agent_message_chunk",
+                    content=TextContentBlock(type="text", text=f"Error: {str(e)}"),
+                ),
             )
             raise RequestError.internal_error(
                 {"reason": "Failed to process prompt", "details": str(e)}
@@ -446,7 +590,9 @@ class OpenHandsACPAgent(ACPAgent):
                 logger.warning(
                     f"Session {session_id} has no history (new or empty session)"
                 )
-                return LoadSessionResponse()
+                # Get current confirmation mode for this session
+                current_mode = get_confirmation_mode_from_conversation(conversation)
+                return LoadSessionResponse(modes=get_session_mode_state(current_mode))
 
             # Stream conversation history to client by reusing EventSubscriber
             # This ensures consistent event handling with live conversations
@@ -459,7 +605,15 @@ class OpenHandsACPAgent(ACPAgent):
                 await subscriber(event)
 
             logger.info(f"Successfully loaded session {session_id}")
-            return LoadSessionResponse()
+
+            # Send available slash commands to client
+            await self._send_available_commands(session_id)
+
+            # Get current confirmation mode for this session
+            current_mode = get_confirmation_mode_from_conversation(conversation)
+
+            # Return response with modes
+            return LoadSessionResponse(modes=get_session_mode_state(current_mode))
 
         except RequestError:
             # Re-raise RequestError as-is
@@ -482,12 +636,41 @@ class OpenHandsACPAgent(ACPAgent):
 
     async def set_session_mode(
         self,
-        mode_id: str,  # noqa: ARG002
+        mode_id: str,
         session_id: str,
         **_kwargs: Any,
     ) -> SetSessionModeResponse | None:
-        """Set session mode (no-op for now)."""
-        logger.info(f"Set session mode requested: {session_id}")
+        """Set session mode by updating confirmation mode.
+
+        Args:
+            mode_id: The mode ID to switch to (ask, auto, analyze)
+            session_id: The session ID to update
+
+        Returns:
+            SetSessionModeResponse if successful
+
+        Raises:
+            RequestError: If mode_id is invalid
+        """
+        logger.info(f"Set session mode requested: {session_id} -> {mode_id}")
+
+        mode = validate_confirmation_mode(mode_id)
+        if mode is None:
+            raise RequestError.invalid_params(
+                {
+                    "reason": f"Invalid mode ID: {mode_id}",
+                    "validModes": sorted(VALID_CONFIRMATION_MODE),
+                }
+            )
+
+        confirmation_mode: ConfirmationMode = cast(ConfirmationMode, mode_id)
+        await self._set_confirmation_mode(session_id, confirmation_mode)
+
+        await self._conn.session_update(
+            session_id=session_id,
+            update=update_current_mode(current_mode_id=mode_id),
+        )
+
         return SetSessionModeResponse()
 
     async def set_session_model(
@@ -510,14 +693,23 @@ class OpenHandsACPAgent(ACPAgent):
         logger.info(f"Extension notification '{method}' received with params: {params}")
 
 
-async def run_acp_server() -> None:
-    """Run the OpenHands ACP server."""
-    logger.info("Starting OpenHands ACP server...")
+async def run_acp_server(
+    initial_confirmation_mode: ConfirmationMode = "always-ask",
+) -> None:
+    """Run the OpenHands ACP server.
+
+    Args:
+        initial_confirmation_mode: Default confirmation mode for new sessions
+    """
+    logger.info(
+        f"Starting OpenHands ACP server with confirmation mode: "
+        f"{initial_confirmation_mode}..."
+    )
 
     reader, writer = await stdio_streams()
 
-    def create_agent(conn: AgentSideConnection) -> OpenHandsACPAgent:
-        return OpenHandsACPAgent(conn)
+    def create_agent(conn: Client) -> OpenHandsACPAgent:
+        return OpenHandsACPAgent(conn, initial_confirmation_mode)
 
     AgentSideConnection(create_agent, writer, reader)
 
