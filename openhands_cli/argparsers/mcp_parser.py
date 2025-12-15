@@ -35,32 +35,31 @@ You can add HTTP/SSE servers with authentication or stdio-based local servers.
 Examples:
 
   # Add an HTTP server with Bearer token authentication
-  openhands mcp add --transport http \\
+  openhands mcp add my-api --transport http \\
     --header "Authorization: Bearer your-token-here" \\
-    my-api https://api.example.com/mcp
+    https://api.example.com/mcp
 
   # Add an HTTP server with API key authentication
-  openhands mcp add --transport http \\
+  openhands mcp add weather-api --transport http \\
     --header "X-API-Key: your-api-key" \\
-    weather-api https://weather.api.com
+    https://weather.api.com
 
   # Add an HTTP server with multiple headers
-  openhands mcp add --transport http \\
+  openhands mcp add secure-api --transport http \\
     --header "Authorization: Bearer token123" \\
     --header "X-Client-ID: client456" \\
-    secure-api https://api.example.com
+    https://api.example.com
 
   # Add a local stdio server with environment variables
-  openhands mcp add --transport stdio \\
+  openhands mcp add local-server --transport stdio \\
     --env "API_KEY=secret123" \\
     --env "DATABASE_URL=postgresql://..." \\
-    local-server python \\
-    -- -m my_mcp_server --config config.json
+    python -- -m my_mcp_server --config config.json
 
   # Add an OAuth-based server (like Notion MCP)
-  openhands mcp add --transport http \\
+  openhands mcp add notion-server --transport http \\
     --auth oauth \\
-    notion-server https://mcp.notion.com/mcp
+    https://mcp.notion.com/mcp
 
   # List all configured servers
   openhands mcp list
@@ -88,37 +87,34 @@ Examples:
     add_description = """
 Add a new MCP server configuration.
 
-Usage: openhands mcp add [OPTIONS] NAME TARGET [-- ARGS...]
-
 Examples:
 
   # Add an HTTP server with Bearer token authentication
-  openhands mcp add --transport http \\
+  openhands mcp add my-api --transport http \\
     --header "Authorization: Bearer your-token-here" \\
-    my-api https://api.example.com/mcp
+    https://api.example.com/mcp
 
   # Add an HTTP server with API key authentication
-  openhands mcp add --transport http \\
+  openhands mcp add weather-api --transport http \\
     --header "X-API-Key: your-api-key" \\
-    weather-api https://weather.api.com
+    https://weather.api.com
 
   # Add an HTTP server with multiple headers
-  openhands mcp add --transport http \\
+  openhands mcp add secure-api --transport http \\
     --header "Authorization: Bearer token123" \\
     --header "X-Client-ID: client456" \\
-    secure-api https://api.example.com
+    https://api.example.com
 
   # Add a local stdio server with environment variables
-  openhands mcp add --transport stdio \\
+  openhands mcp add local-server --transport stdio \\
     --env "API_KEY=secret123" \\
     --env "DATABASE_URL=postgresql://..." \\
-    local-server python \\
-    -- -m my_mcp_server --config config.json
+    python -- -m my_mcp_server --config config.json
 
   # Add an OAuth-based server (like Notion MCP)
-  openhands mcp add --transport http \\
+  openhands mcp add notion-server --transport http \\
     --auth oauth \\
-    notion-server https://mcp.notion.com/mcp
+    https://mcp.notion.com/mcp
 """
     add_parser = mcp_subparsers.add_parser(
         "add",

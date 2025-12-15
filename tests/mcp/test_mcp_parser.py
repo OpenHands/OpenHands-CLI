@@ -149,8 +149,8 @@ class TestMCPParserErrorHandling:
         # Verify key examples are present
         expected_examples = [
             "Add an HTTP server with Bearer token authentication",
-            "openhands mcp add --transport http",
-            "my-api https://api.example.com/mcp",
+            "openhands mcp add my-api --transport http",
+            "https://api.example.com/mcp",
             '--header "Authorization: Bearer your-token-here"',
             "--transport stdio",
             "--auth oauth",
