@@ -3,7 +3,7 @@
 import html
 from typing import Any
 
-from prompt_toolkit import HTML, print_formatted_text, prompt
+from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
@@ -107,16 +107,11 @@ def _ask_user_consent_for_overwrite(
 
     try:
         response = (
-            prompt(
-                HTML(
-                    "\n<white>Do you want to overwrite your existing configuration? "
-                    "(y/N): </white>"
-                ),
-                default="n",
-            )
+            input("\nDo you want to overwrite your existing configuration?(y/N): ")
             .lower()
             .strip()
         )
+        print("\n")
 
         return response in ("y", "yes")
 
@@ -212,6 +207,7 @@ async def fetch_user_data_after_oauth(
                 create_and_save_agent_configuration(llm_api_key, settings)
             except ValueError as e:
                 # User declined to overwrite existing configuration
+                _p("\n")
                 _p(f"<yellow>{e}</yellow>")
                 _p("<white>Keeping existing agent configuration.</white>")
             except Exception as e:
