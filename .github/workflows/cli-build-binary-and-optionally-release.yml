@@ -33,6 +33,10 @@ jobs:
                     - os: macos-15
                       platform: macos
                       artifact_name: openhands-cli-macos
+          # Build on Windows 2025 for Windows users
+                    - os: windows-2025
+                      platform: windows
+                      artifact_name: openhands-cli-windows
         runs-on: ${{ matrix.os }}
 
         steps:
@@ -57,7 +61,13 @@ jobs:
 
             - name: Build binary executable
               run: |
-                  ./build.sh --install-pyinstaller | tee output.log
+                  if [ "${{ matrix.platform }}" = "windows" ]; then
+                    # On Windows, run the Python build script directly
+                    uv run python build.py --install-pyinstaller | tee output.log
+                  else
+                    # On Unix systems, use the bash script
+                    ./build.sh --install-pyinstaller | tee output.log
+                  fi
                   echo "Full output:"
                   cat output.log
 
@@ -67,6 +77,7 @@ jobs:
                   fi
 
                   echo "✅ Build & test finished without ❌ markers"
+              shell: bash
 
             - name: Verify binary files exist
               run: |
@@ -106,6 +117,9 @@ jobs:
                   fi
                   if [ -f artifacts/openhands-cli-macos/openhands ]; then
                     cp artifacts/openhands-cli-macos/openhands release-assets/openhands-macos
+                  fi
+                  if [ -f artifacts/openhands-cli-windows/openhands.exe ]; then
+                    cp artifacts/openhands-cli-windows/openhands.exe release-assets/openhands-windows.exe
                   fi
                   ls -la release-assets/
 
