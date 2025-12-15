@@ -271,3 +271,46 @@ class TestVisualizerIntegration:
         if "[" in action.command or "]" in action.command:
             # The title extraction should have escaped them
             assert r"\[" in title_str or r"\]" in title_str
+
+    def test_visualizer_handles_mistral_xml_function_call_syntax(self):
+        """Test that visualizer can handle ActionEvent with Mistral XML function call.
+
+        This test reproduces the issue described in GitHub issue #93 where Mistral
+        models generate function call syntax like '<function=execute_bash>' that
+        causes XML parsing errors in the CLI confirmation dialog. While this test is
+        for the visualizer component, it demonstrates the same type of XML content
+        that causes issues in the CLI.
+        """
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+        # Create an action with XML-like function call syntax that caused the issue
+        xml_command = (
+            "<function=execute_bash>\n"
+            "<parameter=command>pwd && ls</parameter>\n"
+            "<parameter=security_risk>LOW</parameter>"
+        )
+        action = RichLogMockAction(command=xml_command)
+        tool_call = create_tool_call("call_1", "execute_bash")
+
+        action_event = ActionEvent(
+            thought=[TextContent(text="I need to check the current directory")],
+            action=action,
+            tool_name="execute_bash",
+            tool_call_id="call_1",
+            tool_call=tool_call,
+            llm_response_id="response_1",
+        )
+
+        # This should not raise an XML parsing error or any other exception
+        # The key test is that it doesn't crash, even if content isn't escaped
+        collapsible = visualizer._create_event_collapsible(action_event)
+        assert collapsible is not None
+        assert collapsible.title is not None
+
+        # Verify that the visualizer successfully created a collapsible widget
+        # The content should be present in some form, even if not escaped
+        title_str = str(collapsible.title)
+        assert "execute_bash" in title_str  # The function name should be present
+        assert len(title_str) > 0  # Title should not be empty
