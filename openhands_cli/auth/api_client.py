@@ -134,6 +134,10 @@ async def fetch_user_data_after_oauth(
         if llm_api_key and settings:
             try:
                 create_and_save_agent_configuration(llm_api_key, settings)
+            except ValueError as e:
+                # User declined to overwrite existing configuration
+                _p(f"<yellow>{e}</yellow>")
+                _p("<white>Keeping existing agent configuration.</white>")
             except Exception as e:
                 _p(
                     f"<yellow>Warning: Could not create "

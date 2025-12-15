@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from prompt_toolkit import HTML, print_formatted_text
+from prompt_toolkit import HTML, print_formatted_text, prompt
 
 from openhands.sdk import Agent, AgentContext, LocalFileStore
 from openhands.sdk.context import load_skills_from_dir
@@ -143,6 +143,7 @@ class AgentStore:
         settings: dict[str, Any],
         base_url: str = "https://llm-proxy.app.all-hands.dev/",
         default_model: str = "claude-sonnet-4-5-20250929",
+        force_overwrite: bool = False,
     ) -> Agent:
         """Create an Agent instance from user settings and API key, then save it.
 
@@ -151,10 +152,50 @@ class AgentStore:
             settings: User settings dictionary containing model and other config
             base_url: Base URL for the LLM service
             default_model: Default model to use if not specified in settings
+            force_overwrite: If True, skip consent check and overwrite existing config
 
         Returns:
             The created Agent instance
+
+        Raises:
+            ValueError: If user declines to overwrite existing configuration
         """
+        # Check if existing configuration exists and ask for consent
+        if not force_overwrite:
+            existing_agent = self.load()
+            if existing_agent is not None:
+                print_formatted_text(
+                    HTML(
+                        "\n<yellow>⚠️  Existing agent configuration found!</yellow>\n"
+                        "<white>This will overwrite your current settings with "
+                        "the ones from OpenHands Cloud.</white>\n"
+                    )
+                )
+                
+                # Show current vs new settings comparison
+                current_model = existing_agent.llm.model
+                new_model = settings.get("llm_model", default_model)
+                
+                print_formatted_text(HTML("<white>Current configuration:</white>"))
+                print_formatted_text(HTML(f"  • Model: <cyan>{current_model}</cyan>"))
+                print_formatted_text(HTML(f"  • Base URL: <cyan>{existing_agent.llm.base_url}</cyan>"))
+                
+                print_formatted_text(HTML("\n<white>New configuration from cloud:</white>"))
+                print_formatted_text(HTML(f"  • Model: <cyan>{new_model}</cyan>"))
+                print_formatted_text(HTML(f"  • Base URL: <cyan>{base_url}</cyan>"))
+                
+                try:
+                    response = prompt(
+                        HTML("\n<white>Do you want to overwrite your existing configuration? (y/N): </white>"),
+                        default="n"
+                    ).lower().strip()
+                    
+                    if response not in ("y", "yes"):
+                        raise ValueError("User declined to overwrite existing configuration")
+                        
+                except (KeyboardInterrupt, EOFError):
+                    raise ValueError("User cancelled configuration overwrite")
+
         model = settings.get("llm_model", default_model)
 
         llm = LLM(
