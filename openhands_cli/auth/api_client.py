@@ -1,7 +1,9 @@
 """API client for fetching user data after OAuth authentication."""
 
+import html
 from typing import Any
 
+from prompt_toolkit import HTML, print_formatted_text, prompt
 from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
 from openhands_cli.auth.utils import _p
@@ -63,12 +65,76 @@ def _print_settings_summary(settings: dict[str, Any]) -> None:
         _p("    <yellow>! No LLM API key configured in settings</yellow>")
 
 
+def _ask_user_consent_for_overwrite(
+    existing_agent,
+    new_settings: dict[str, Any],
+    base_url: str = "https://llm-proxy.app.all-hands.dev/",
+    default_model: str = "claude-sonnet-4-5-20250929",
+) -> bool:
+    """Ask user for consent to overwrite existing agent configuration.
+    
+    Args:
+        existing_agent: The existing agent configuration
+        new_settings: New settings from cloud
+        base_url: Base URL for the new configuration
+        default_model: Default model if not specified in settings
+        
+    Returns:
+        True if user consents to overwrite, False otherwise
+    """
+    print_formatted_text(
+        HTML(
+            "\n<yellow>⚠️  Existing agent configuration found!</yellow>\n"
+            "<white>This will overwrite your current settings with "
+            "the ones from OpenHands Cloud.</white>\n"
+        )
+    )
+    
+    # Show current vs new settings comparison
+    current_model = existing_agent.llm.model
+    new_model = new_settings.get("llm_model", default_model)
+    
+    print_formatted_text(HTML("<white>Current configuration:</white>"))
+    print_formatted_text(HTML(f"  • Model: <cyan>{html.escape(current_model)}</cyan>"))
+    print_formatted_text(HTML(f"  • Base URL: <cyan>{html.escape(existing_agent.llm.base_url)}</cyan>"))
+    
+    print_formatted_text(HTML("\n<white>New configuration from cloud:</white>"))
+    print_formatted_text(HTML(f"  • Model: <cyan>{html.escape(new_model)}</cyan>"))
+    print_formatted_text(HTML(f"  • Base URL: <cyan>{html.escape(base_url)}</cyan>"))
+    
+    try:
+        response = prompt(
+            HTML("\n<white>Do you want to overwrite your existing configuration? (y/N): </white>"),
+            default="n"
+        ).lower().strip()
+        
+        return response in ("y", "yes")
+        
+    except (KeyboardInterrupt, EOFError):
+        return False
+
+
 def create_and_save_agent_configuration(
     llm_api_key: str,
     settings: dict[str, Any],
 ) -> None:
-    """Create and save an Agent configuration using AgentStore."""
+    """Create and save an Agent configuration using AgentStore.
+    
+    This function handles the consent logic by:
+    1. Loading existing agent configuration
+    2. If exists, asking user for consent to overwrite
+    3. Only proceeding if user consents or no existing config
+    """
     store = AgentStore()
+    
+    # First, check if existing configuration exists
+    existing_agent = store.load()
+    if existing_agent is not None:
+        # Ask for user consent
+        if not _ask_user_consent_for_overwrite(existing_agent, settings):
+            raise ValueError("User declined to overwrite existing configuration")
+    
+    # User consented or no existing config - proceed with creation
     agent = store.create_and_save_from_settings(
         llm_api_key=llm_api_key,
         settings=settings,

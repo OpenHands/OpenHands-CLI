@@ -128,6 +128,7 @@ class TestHelperFunctions:
                 mock_agent.condenser = MagicMock()
 
                 mock_store.create_and_save_from_settings.return_value = mock_agent
+                mock_store.load.return_value = None  # No existing agent
                 mock_store_class.return_value = mock_store
 
                 create_and_save_agent_configuration(llm_api_key, settings)
