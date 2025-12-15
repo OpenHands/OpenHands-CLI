@@ -13,6 +13,46 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Fix encoding issues on Windows
+if sys.platform == "win32":
+    import locale
+    # Try to set UTF-8 encoding for Windows
+    try:
+        # For Python 3.7+, try to use UTF-8 mode
+        if hasattr(sys, 'set_int_max_str_digits'):
+            os.environ['PYTHONIOENCODING'] = 'utf-8'
+        # Reconfigure stdout/stderr to use UTF-8
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8')
+            sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        # If UTF-8 setup fails, we'll use ASCII alternatives below
+        pass
+
+
+# =================================================
+# SECTION: Utility Functions
+# =================================================
+
+
+def safe_print(message: str) -> None:
+    """Print message with fallback for encoding issues on Windows."""
+    try:
+        print(message)
+    except UnicodeEncodeError:
+        # Fallback: replace emoji with ASCII alternatives
+        fallback_message = (
+            message.replace("🚀", "[*]")
+            .replace("🧹", "[CLEAN]")
+            .replace("✅", "[OK]")
+            .replace("❌", "[ERROR]")
+            .replace("🔨", "[BUILD]")
+            .replace("📁", "[FILES]")
+            .replace("⚠️", "[WARN]")
+            .replace("🎉", "[DONE]")
+        )
+        print(fallback_message)
+
 
 # =================================================
 # SECTION: Build Binary
@@ -21,7 +61,7 @@ from pathlib import Path
 
 def clean_build_directories() -> None:
     """Clean up previous build artifacts."""
-    print("🧹 Cleaning up previous build artifacts...")
+    safe_print("🧹 Cleaning up previous build artifacts...")
 
     build_dirs = ["build", "dist", "__pycache__"]
     for dir_name in build_dirs:
@@ -35,7 +75,7 @@ def clean_build_directories() -> None:
             if file.endswith(".pyc"):
                 os.remove(os.path.join(root, file))
 
-    print("✅ Cleanup complete!")
+    safe_print("✅ Cleanup complete!")
 
 
 def check_pyinstaller() -> bool:
@@ -46,7 +86,7 @@ def check_pyinstaller() -> bool:
         )
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print(
+        safe_print(
             "❌ PyInstaller is not available. Use --install-pyinstaller flag or "
             "install manually with:"
         )
@@ -66,7 +106,7 @@ def build_executable(
     if not check_pyinstaller():
         return False
 
-    print(f"🔨 Building executable using {spec_file}...")
+    safe_print(f"🔨 Building executable using {spec_file}...")
 
     try:
         # Run PyInstaller with uv
@@ -75,24 +115,24 @@ def build_executable(
         print(f"Running: {' '.join(cmd)}")
         subprocess.run(cmd, check=True, capture_output=True, text=True)
 
-        print("✅ Build completed successfully!")
+        safe_print("✅ Build completed successfully!")
 
         # Check if the executable was created
         dist_dir = Path("dist")
         if dist_dir.exists():
             executables = list(dist_dir.glob("*"))
             if executables:
-                print("📁 Executable(s) created in dist/:")
+                safe_print("📁 Executable(s) created in dist/:")
                 for exe in executables:
                     size = exe.stat().st_size / (1024 * 1024)  # Size in MB
                     print(f"  - {exe.name} ({size:.1f} MB)")
             else:
-                print("⚠️  No executables found in dist/ directory")
+                safe_print("⚠️  No executables found in dist/ directory")
 
         return True
 
     except subprocess.CalledProcessError as e:
-        print(f"❌ Build failed: {e}")
+        safe_print(f"❌ Build failed: {e}")
         if e.stdout:
             print("STDOUT:", e.stdout)
         if e.stderr:
@@ -134,12 +174,12 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    print("🚀 OpenHands CLI Build Script")
+    safe_print("🚀 OpenHands CLI Build Script")
     print("=" * 40)
 
     # Check if spec file exists
     if not os.path.exists(args.spec):
-        print(f"❌ Spec file '{args.spec}' not found!")
+        safe_print(f"❌ Spec file '{args.spec}' not found!")
         return 1
 
     # Build the executable
@@ -154,11 +194,11 @@ def main() -> int:
         print_detailed_results(summary)
 
         if not summary.all_passed:
-            print(f"\n❌ {summary.failed_tests} test(s) failed, build process failed")
+            safe_print(f"\n❌ {summary.failed_tests} test(s) failed, build process failed")
             return 1
 
-    print("\n🎉 Build process completed!")
-    print("📁 Check the 'dist/' directory for your executable")
+    safe_print("\n🎉 Build process completed!")
+    safe_print("📁 Check the 'dist/' directory for your executable")
 
     return 0
 
@@ -168,5 +208,5 @@ if __name__ == "__main__":
         sys.exit(main())
     except Exception as e:
         print(e)
-        print("❌ Executable test failed")
+        safe_print("❌ Executable test failed")
         sys.exit(1)
