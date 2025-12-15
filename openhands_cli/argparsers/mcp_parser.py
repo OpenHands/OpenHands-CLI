@@ -35,32 +35,32 @@ You can add HTTP/SSE servers with authentication or stdio-based local servers.
 Examples:
 
   # Add an HTTP server with Bearer token authentication
-  openhands mcp add my-api https://api.example.com/mcp \\
-    --transport http \\
-    --header "Authorization: Bearer your-token-here"
+  openhands mcp add --transport http \\
+    --header "Authorization: Bearer your-token-here" \\
+    my-api https://api.example.com/mcp
 
   # Add an HTTP server with API key authentication
-  openhands mcp add weather-api https://weather.api.com \\
-    --transport http \\
-    --header "X-API-Key: your-api-key"
+  openhands mcp add --transport http \\
+    --header "X-API-Key: your-api-key" \\
+    weather-api https://weather.api.com
 
   # Add an HTTP server with multiple headers
-  openhands mcp add secure-api https://api.example.com \\
-    --transport http \\
+  openhands mcp add --transport http \\
     --header "Authorization: Bearer token123" \\
-    --header "X-Client-ID: client456"
+    --header "X-Client-ID: client456" \\
+    secure-api https://api.example.com
 
   # Add a local stdio server with environment variables
-  openhands mcp add local-server python \\
-    --transport stdio \\
+  openhands mcp add --transport stdio \\
     --env "API_KEY=secret123" \\
     --env "DATABASE_URL=postgresql://..." \\
+    local-server python \\
     -- -m my_mcp_server --config config.json
 
   # Add an OAuth-based server (like Notion MCP)
-  openhands mcp add notion-server https://mcp.notion.com/mcp \\
-    --transport http \\
-    --auth oauth
+  openhands mcp add --transport http \\
+    --auth oauth \\
+    notion-server https://mcp.notion.com/mcp
 
   # List all configured servers
   openhands mcp list
@@ -88,35 +88,37 @@ Examples:
     add_description = """
 Add a new MCP server configuration.
 
+Usage: openhands mcp add [OPTIONS] NAME TARGET [-- ARGS...]
+
 Examples:
 
   # Add an HTTP server with Bearer token authentication
-  openhands mcp add my-api https://api.example.com/mcp \\
-    --transport http \\
-    --header "Authorization: Bearer your-token-here"
+  openhands mcp add --transport http \\
+    --header "Authorization: Bearer your-token-here" \\
+    my-api https://api.example.com/mcp
 
   # Add an HTTP server with API key authentication
-  openhands mcp add weather-api https://weather.api.com \\
-    --transport http \\
-    --header "X-API-Key: your-api-key"
+  openhands mcp add --transport http \\
+    --header "X-API-Key: your-api-key" \\
+    weather-api https://weather.api.com
 
   # Add an HTTP server with multiple headers
-  openhands mcp add secure-api https://api.example.com \\
-    --transport http \\
+  openhands mcp add --transport http \\
     --header "Authorization: Bearer token123" \\
-    --header "X-Client-ID: client456"
+    --header "X-Client-ID: client456" \\
+    secure-api https://api.example.com
 
   # Add a local stdio server with environment variables
-  openhands mcp add local-server python \\
-    --transport stdio \\
+  openhands mcp add --transport stdio \\
     --env "API_KEY=secret123" \\
     --env "DATABASE_URL=postgresql://..." \\
+    local-server python \\
     -- -m my_mcp_server --config config.json
 
   # Add an OAuth-based server (like Notion MCP)
-  openhands mcp add notion-server https://mcp.notion.com/mcp \\
-    --transport http \\
-    --auth oauth
+  openhands mcp add --transport http \\
+    --auth oauth \\
+    notion-server https://mcp.notion.com/mcp
 """
     add_parser = mcp_subparsers.add_parser(
         "add",
@@ -124,20 +126,12 @@ Examples:
         description=add_description,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    # Optional arguments first
     add_parser.add_argument(
         "--transport",
         choices=["http", "sse", "stdio"],
         required=True,
         help="Transport type for the MCP server",
-    )
-    add_parser.add_argument("name", help="Name of the MCP server")
-    add_parser.add_argument(
-        "target", help="URL for http/sse transports or command for stdio transport"
-    )
-    add_parser.add_argument(
-        "args",
-        nargs=argparse.REMAINDER,
-        help="Additional arguments for stdio transport (after --)",
     )
     add_parser.add_argument(
         "--header",
@@ -153,6 +147,17 @@ Examples:
         "--auth",
         choices=["oauth"],
         help="Authentication method for the MCP server",
+    )
+
+    # Positional arguments after optional arguments
+    add_parser.add_argument("name", help="Name of the MCP server")
+    add_parser.add_argument(
+        "target", help="URL for http/sse transports or command for stdio transport"
+    )
+    add_parser.add_argument(
+        "args",
+        nargs=argparse.REMAINDER,
+        help="Additional arguments for stdio transport (after --)",
     )
 
     # MCP list command

@@ -7,10 +7,6 @@ from contextlib import redirect_stderr
 import pytest
 
 from openhands_cli.argparsers.mcp_parser import MCPArgumentParser, add_mcp_parser
-from openhands_cli.argparsers.utils import (
-    preprocess_mcp_args,
-    split_flags_and_positionals,
-)
 
 
 class TestMCPParserErrorHandling:
@@ -153,8 +149,8 @@ class TestMCPParserErrorHandling:
         # Verify key examples are present
         expected_examples = [
             "Add an HTTP server with Bearer token authentication",
-            "openhands mcp add my-api https://api.example.com/mcp",
-            "--transport http",
+            "openhands mcp add --transport http",
+            "my-api https://api.example.com/mcp",
             '--header "Authorization: Bearer your-token-here"',
             "--transport stdio",
             "--auth oauth",
@@ -196,77 +192,6 @@ class TestMCPParserErrorHandling:
 
 
 @pytest.mark.parametrize(
-    "tokens, expected_flags, expected_positionals",
-    [
-        # No flags at all
-        (["name", "target"], [], ["name", "target"]),
-        # Single flag with value
-        (["--foo", "bar"], ["--foo", "bar"], []),
-        # Flag with value followed by positional
-        (["--foo", "bar", "pos"], ["--foo", "bar"], ["pos"]),
-        # Positional before and after a flag
-        (
-            ["pos1", "--foo", "bar", "pos2"],
-            ["--foo", "bar"],
-            ["pos1", "pos2"],
-        ),
-        # Multiple flags with values and a positional
-        (
-            ["--foo", "bar", "--baz", "qux", "pos"],
-            ["--foo", "bar", "--baz", "qux"],
-            ["pos"],
-        ),
-        # Flag without value followed by another flag with value
-        (
-            ["--verbose", "--model", "gpt4", "name"],
-            ["--verbose", "--model", "gpt4"],
-            ["name"],
-        ),
-    ],
-)
-def test_split_flags_and_positionals(tokens, expected_flags, expected_positionals):
-    flag_args, positional_args = split_flags_and_positionals(tokens)
-    assert flag_args == expected_flags
-    assert positional_args == expected_positionals
-
-
-@pytest.mark.parametrize(
-    "argv, expected",
-    [
-        # Non-MCP command: should be returned unchanged
-        (["--foo", "bar"], ["--foo", "bar"]),
-        # MCP command without `--`: no normalization
-        (
-            ["mcp", "add", "my-mcp", "--target", "python"],
-            ["mcp", "add", "my-mcp", "--target", "python"],
-        ),
-        # Simple MCP with mixed ordering before `--`
-        (
-            ["mcp", "add", "my-mcp", "--target", "python", "--", "echo", "hi"],
-            ["mcp", "add", "--target", "python", "my-mcp", "--", "echo", "hi"],
-        ),
-        # MCP where flags come after both positionals
-        (
-            ["mcp", "add", "my-mcp", "python", "--foo", "bar", "--", "echo", "hi"],
-            ["mcp", "add", "--foo", "bar", "my-mcp", "python", "--", "echo", "hi"],
-        ),
-        # MCP where flags are already first: normalization should be a no-op
-        (
-            ["mcp", "add", "--foo", "bar", "my-mcp", "python", "--", "echo"],
-            ["mcp", "add", "--foo", "bar", "my-mcp", "python", "--", "echo"],
-        ),
-        # MCP with `--` but no trailing command args
-        (
-            ["mcp", "add", "my-mcp", "--foo", "bar", "--"],
-            ["mcp", "add", "--foo", "bar", "my-mcp", "--"],
-        ),
-    ],
-)
-def test_preprocess_mcp_args(argv, expected):
-    assert preprocess_mcp_args(argv) == expected
-
-
-@pytest.mark.parametrize(
     "cli_args, expected",
     [
         # Basic case with command and args
@@ -274,10 +199,10 @@ def test_preprocess_mcp_args(argv, expected):
             [
                 "mcp",
                 "add",
-                "server1",
-                "python",
                 "--transport",
                 "stdio",
+                "server1",
+                "python",
                 "--",
                 "-m",
                 "module",
@@ -294,12 +219,12 @@ def test_preprocess_mcp_args(argv, expected):
             [
                 "mcp",
                 "add",
-                "server2",
-                "node",
                 "--transport",
                 "stdio",
                 "--env",
                 "KEY=value",
+                "server2",
+                "node",
                 "--",
                 "script.js",
                 "--port",
@@ -319,11 +244,11 @@ def test_preprocess_mcp_args(argv, expected):
                 "add",
                 "--transport",
                 "stdio",
-                "airtable",
                 "--env",
                 "API_KEY=test",
-                "--",
+                "airtable",
                 "npx",
+                "--",
                 "-y",
                 "airtable-mcp-server",
             ],
@@ -366,10 +291,10 @@ def test_stdio_command_with_double_dash_comprehensive(cli_args, expected):
             [
                 "mcp",
                 "add",
-                "empty-args",
-                "python",
                 "--transport",
                 "stdio",
+                "empty-args",
+                "python",
                 "--",
             ],
             {
@@ -383,10 +308,10 @@ def test_stdio_command_with_double_dash_comprehensive(cli_args, expected):
             [
                 "mcp",
                 "add",
-                "single-arg",
-                "node",
                 "--transport",
                 "stdio",
+                "single-arg",
+                "node",
                 "--",
                 "script.js",
             ],
