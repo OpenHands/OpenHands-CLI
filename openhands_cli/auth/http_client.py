@@ -68,7 +68,7 @@ class BaseHttpClient:
             endpoint: API endpoint path
             headers: Optional request headers
             json_data: Optional JSON data for request body
-            form_data: Optional form data for request body (application/x-www-form-urlencoded)
+            form_data: Optional form data for request body (form-urlencoded)
             raise_for_status: Whether to raise exception for HTTP errors
 
         Returns:
@@ -87,13 +87,13 @@ class BaseHttpClient:
                     "url": url,
                     "headers": headers,
                 }
-                
+
                 # Add either JSON or form data, but not both
                 if json_data is not None:
                     request_kwargs["json"] = json_data
                 elif form_data is not None:
                     request_kwargs["data"] = form_data
-                
+
                 response = await client.request(**request_kwargs)
 
                 if raise_for_status:
@@ -142,7 +142,7 @@ class BaseHttpClient:
             endpoint: API endpoint path
             headers: Optional request headers
             json_data: Optional JSON data for request body
-            form_data: Optional form data for request body (application/x-www-form-urlencoded)
+            form_data: Optional form data for request body (form-urlencoded)
             raise_for_status: Whether to raise exception for HTTP errors
 
         Returns:
