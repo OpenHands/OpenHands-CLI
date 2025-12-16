@@ -151,11 +151,15 @@ def main() -> None:
                     exit_without_confirmation=args.exit_without_confirmation,
                     headless=args.headless,
                 )
-                print("Goodbye! 👋")
-                print(f"Conversation ID: {conversation_id.hex}")
-                print(
+                console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
+                console.print(
+                    f"Conversation ID: {conversation_id.hex}",
+                    style=OPENHANDS_THEME.accent,
+                )
+                console.print(
                     f"Hint: run openhands --resume {conversation_id} "
-                    "to resume this conversation."
+                    "to resume this conversation.",
+                    style=OPENHANDS_THEME.secondary,
                 )
 
             else:

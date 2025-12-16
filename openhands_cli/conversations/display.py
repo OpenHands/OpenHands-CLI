@@ -55,7 +55,7 @@ def display_recent_conversations(limit: int = 15) -> None:
                 "    (No user message)", style=f"{OPENHANDS_THEME.secondary} dim"
             )
 
-        print()  # Add spacing between entries
+        console.print()  # Add spacing between entries
 
     console.print("-" * 80, style=f"{OPENHANDS_THEME.secondary} dim")
     console.print(
