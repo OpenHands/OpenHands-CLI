@@ -193,9 +193,7 @@ def main() -> None:
     except EOFError:
         console.print("\nGoodbye! 👋", style=OPENHANDS_THEME.warning)
     except Exception as e:
-        import html
-
-        console.print(f"Error: {html.escape(str(e))}", style=OPENHANDS_THEME.error)
+        console.print(f"Error: {str(e)}", style=OPENHANDS_THEME.error, markup=False)
         import traceback
 
         traceback.print_exc()

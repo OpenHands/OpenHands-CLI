@@ -42,15 +42,14 @@ def display_recent_conversations(limit: int = 15) -> None:
         prompt_preview = _truncate_prompt(conv.first_user_prompt)
 
         # Format the conversation entry
-        console.print(
-            f"[{OPENHANDS_THEME.primary} bold]{i:2d}.[/{OPENHANDS_THEME.primary}] "
-            f"[{OPENHANDS_THEME.accent}]{conv.id}[/{OPENHANDS_THEME.accent}] "
-            f"[{OPENHANDS_THEME.secondary} dim]({date_str})"
-            f"[/{OPENHANDS_THEME.secondary}]"
-        )
+        console.print(f"{i:2d}. ", style=f"{OPENHANDS_THEME.primary} bold", end="")
+        console.print(f"{conv.id} ", style=OPENHANDS_THEME.accent, end="")
+        console.print(f"({date_str})", style=f"{OPENHANDS_THEME.secondary} dim")
 
         if prompt_preview:
-            console.print(f"    {prompt_preview}", style=OPENHANDS_THEME.foreground)
+            console.print(
+                f"    {prompt_preview}", style=OPENHANDS_THEME.foreground, markup=False
+            )
         else:
             console.print(
                 "    (No user message)", style=f"{OPENHANDS_THEME.secondary} dim"
