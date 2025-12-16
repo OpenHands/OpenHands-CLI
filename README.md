@@ -1,4 +1,4 @@
-# OpenHands CLI 🎛️
+# OpenHands V1 CLI
 
 OpenHands CLI is a fast, extensible command-line client for OpenHands AI Agents. It provides:
 
