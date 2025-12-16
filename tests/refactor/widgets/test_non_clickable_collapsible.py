@@ -4,7 +4,7 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Static
 
-from openhands_cli.refactor.core.theme import OPENHANDS_THEME
+from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.refactor.widgets.non_clickable_collapsible import (
     NonClickableCollapsible,
     NonClickableCollapsibleTitle,

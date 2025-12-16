@@ -6,7 +6,7 @@ from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 
 from openhands_cli.conversations.lister import ConversationLister
-from openhands_cli.refactor.core.theme import OPENHANDS_THEME
+from openhands_cli.theme import OPENHANDS_THEME
 
 
 def display_recent_conversations(limit: int = 15) -> None:

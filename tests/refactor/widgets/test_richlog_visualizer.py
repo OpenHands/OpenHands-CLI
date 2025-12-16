@@ -301,7 +301,7 @@ class TestConversationErrorEventHandling:
         assert not collapsible.collapsed
 
         # Verify it has error border color (should be the error theme color)
-        from openhands_cli.refactor.core.theme import OPENHANDS_THEME
+        from openhands_cli.theme import OPENHANDS_THEME
         from openhands_cli.refactor.widgets.richlog_visualizer import (
             _get_event_border_color,
         )

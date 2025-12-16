@@ -6,7 +6,7 @@ from openhands_cli.refactor.content.splash import (
     get_openhands_banner,
     get_splash_content,
 )
-from openhands_cli.refactor.core.theme import OPENHANDS_THEME
+from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.version_check import VersionInfo
 
 
