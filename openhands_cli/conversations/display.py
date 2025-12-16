@@ -2,11 +2,13 @@
 
 from datetime import datetime
 
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import HTML
+from rich.console import Console
 
 from openhands_cli.conversations.lister import ConversationLister
 from openhands_cli.theme import OPENHANDS_THEME
+
+
+console = Console()
 
 
 def display_recent_conversations(limit: int = 15) -> None:
@@ -19,36 +21,18 @@ def display_recent_conversations(limit: int = 15) -> None:
     conversations = lister.list()
 
     if not conversations:
-        print_formatted_text(
-            HTML(
-                f"<{OPENHANDS_THEME.warning}>No conversations found."
-                f"</{OPENHANDS_THEME.warning}>"
-            )
-        )
-        print_formatted_text(
-            HTML(
-                f"<{OPENHANDS_THEME.secondary} dim>Start a new conversation with: "
-                f"openhands</{OPENHANDS_THEME.secondary}>"
-            )
+        console.print("No conversations found.", style=OPENHANDS_THEME.warning)
+        console.print(
+            "Start a new conversation with: openhands",
+            style=f"{OPENHANDS_THEME.secondary} dim",
         )
         return
 
     # Limit to the requested number of conversations
     conversations = conversations[:limit]
 
-    print_formatted_text(
-        HTML(
-            f"<{OPENHANDS_THEME.primary} bold>Recent Conversations:"
-            f"</{OPENHANDS_THEME.primary}>"
-        )
-    )
-    print_formatted_text(
-        HTML(
-            f"<{OPENHANDS_THEME.secondary} dim>"
-            + "-" * 80
-            + f"</{OPENHANDS_THEME.secondary}>"
-        )
-    )
+    console.print("Recent Conversations:", style=f"{OPENHANDS_THEME.primary} bold")
+    console.print("-" * 80, style=f"{OPENHANDS_THEME.secondary} dim")
 
     for i, conv in enumerate(conversations, 1):
         # Format the date nicely
@@ -58,46 +42,31 @@ def display_recent_conversations(limit: int = 15) -> None:
         prompt_preview = _truncate_prompt(conv.first_user_prompt)
 
         # Format the conversation entry
-        print_formatted_text(
-            HTML(
-                f"<{OPENHANDS_THEME.primary} bold>{i:2d}.</{OPENHANDS_THEME.primary}> "
-                f"<{OPENHANDS_THEME.accent}>{conv.id}</{OPENHANDS_THEME.accent}> "
-                f"<{OPENHANDS_THEME.secondary} dim>({date_str})"
-                f"</{OPENHANDS_THEME.secondary}>"
-            )
+        console.print(
+            f"[{OPENHANDS_THEME.primary} bold]{i:2d}.[/{OPENHANDS_THEME.primary}] "
+            f"[{OPENHANDS_THEME.accent}]{conv.id}[/{OPENHANDS_THEME.accent}] "
+            f"[{OPENHANDS_THEME.secondary} dim]({date_str})"
+            f"[/{OPENHANDS_THEME.secondary}]"
         )
 
         if prompt_preview:
-            print_formatted_text(
-                HTML(
-                    f"    <{OPENHANDS_THEME.foreground}>{prompt_preview}"
-                    f"</{OPENHANDS_THEME.foreground}>"
-                )
-            )
+            console.print(f"    {prompt_preview}", style=OPENHANDS_THEME.foreground)
         else:
-            print_formatted_text(
-                HTML(
-                    f"    <{OPENHANDS_THEME.secondary} dim>(No user message)"
-                    f"</{OPENHANDS_THEME.secondary}>"
-                )
+            console.print(
+                "    (No user message)", style=f"{OPENHANDS_THEME.secondary} dim"
             )
 
         print()  # Add spacing between entries
 
-    print_formatted_text(
-        HTML(
-            f"<{OPENHANDS_THEME.secondary} dim>"
-            + "-" * 80
-            + f"</{OPENHANDS_THEME.secondary}>"
-        )
+    console.print("-" * 80, style=f"{OPENHANDS_THEME.secondary} dim")
+    console.print(
+        "To resume a conversation, use: ",
+        style=f"{OPENHANDS_THEME.secondary} dim",
+        end="",
     )
-    print_formatted_text(
-        HTML(
-            f"<{OPENHANDS_THEME.secondary} dim>To resume a conversation, use: "
-            f"</{OPENHANDS_THEME.secondary}>"
-            f"<{OPENHANDS_THEME.primary} bold>openhands --resume "
-            f"&lt;conversation-id&gt;</{OPENHANDS_THEME.primary}>"
-        )
+    console.print(
+        "openhands --resume <conversation-id>",
+        style=f"{OPENHANDS_THEME.primary} bold",
     )
 
 
