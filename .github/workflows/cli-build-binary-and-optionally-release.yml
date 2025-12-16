@@ -25,14 +25,22 @@ jobs:
         strategy:
             matrix:
                 include:
-          # Build on Ubuntu 22.04 for maximum GLIBC compatibility (GLIBC 2.31)
+          # Build on Ubuntu 22.04 x86_64 for maximum GLIBC compatibility (GLIBC 2.31)
                     - os: ubuntu-22.04
                       platform: linux
-                      artifact_name: openhands-cli-linux
+                      artifact_name: openhands-cli-linux-x86_64
+          # Build on Ubuntu 22.04 ARM64
+                    - os: ubuntu-22.04-arm
+                      platform: linux
+                      artifact_name: openhands-cli-linux-arm64
           # Build on macOS for macOS users
                     - os: macos-15
                       platform: macos
-                      artifact_name: openhands-cli-macos
+                      artifact_name: openhands-cli-macos-arm64
+          # Build on macOS Intel
+                    - os: macos-15-intel
+                      platform: macos
+                      artifact_name: openhands-cli-macos-intel
         runs-on: ${{ matrix.os }}
 
         steps:
@@ -101,11 +109,17 @@ jobs:
               run: |
                   mkdir -p release-assets
                   # Copy binaries with appropriate names for release
-                  if [ -f artifacts/openhands-cli-linux/openhands ]; then
-                    cp artifacts/openhands-cli-linux/openhands release-assets/openhands-linux
+                  if [ -f artifacts/openhands-cli-linux-x86_64/openhands ]; then
+                    cp artifacts/openhands-cli-linux-x86_64/openhands release-assets/openhands-linux-x86_64
                   fi
-                  if [ -f artifacts/openhands-cli-macos/openhands ]; then
-                    cp artifacts/openhands-cli-macos/openhands release-assets/openhands-macos
+                  if [ -f artifacts/openhands-cli-linux-arm64/openhands ]; then
+                    cp artifacts/openhands-cli-linux-arm64/openhands release-assets/openhands-linux-arm64
+                  fi
+                  if [ -f artifacts/openhands-cli-macos-arm64/openhands ]; then
+                    cp artifacts/openhands-cli-macos-arm64/openhands release-assets/openhands-macos-arm64
+                  fi
+                  if [ -f artifacts/openhands-cli-macos-intel/openhands ]; then
+                    cp artifacts/openhands-cli-macos-intel/openhands release-assets/openhands-macos-intel
                   fi
                   ls -la release-assets/
 

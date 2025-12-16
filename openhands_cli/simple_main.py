@@ -4,7 +4,6 @@ Simple main entry point for OpenHands CLI.
 This is a simplified version that demonstrates the TUI functionality.
 """
 
-import html
 import logging
 import os
 import sys
@@ -12,8 +11,7 @@ import warnings
 from pathlib import Path
 
 from dotenv import load_dotenv
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import HTML
+from rich.console import Console
 
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
@@ -23,7 +21,11 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.argparsers.main_parser import create_main_parser
+from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.utils import create_seeded_instructions_from_args
+
+
+console = Console()
 
 
 env_path = Path.cwd() / ".env"
@@ -49,8 +51,8 @@ def handle_resume_logic(args) -> str | None:
     # Check if --last flag is used
     if args.last:
         if args.resume is None:
-            print_formatted_text(
-                HTML("<yellow>Error: --last flag requires --resume</yellow>")
+            console.print(
+                "Error: --last flag requires --resume", style=OPENHANDS_THEME.warning
             )
             return None
 
@@ -61,13 +63,14 @@ def handle_resume_logic(args) -> str | None:
         latest_id = lister.get_latest_conversation_id()
 
         if latest_id is None:
-            print_formatted_text(
-                HTML("<yellow>No conversations found to resume.</yellow>")
+            console.print(
+                "No conversations found to resume.", style=OPENHANDS_THEME.warning
             )
             return None
 
-        print_formatted_text(
-            HTML(f"<green>Resuming latest conversation: {latest_id}</green>")
+        console.print(
+            f"Resuming latest conversation: {latest_id}",
+            style=OPENHANDS_THEME.success,
         )
         return latest_id
 
@@ -161,11 +164,15 @@ def main() -> None:
                     exit_without_confirmation=args.exit_without_confirmation,
                     headless=args.headless,
                 )
-                print("Goodbye! 👋")
-                print(f"Conversation ID: {conversation_id.hex}")
-                print(
+                console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
+                console.print(
+                    f"Conversation ID: {conversation_id.hex}",
+                    style=OPENHANDS_THEME.accent,
+                )
+                console.print(
                     f"Hint: run openhands --resume {conversation_id} "
-                    "to resume this conversation."
+                    "to resume this conversation.",
+                    style=OPENHANDS_THEME.secondary,
                 )
 
             else:
@@ -199,11 +206,11 @@ def main() -> None:
                     queued_inputs=queued_inputs,
                 )
     except KeyboardInterrupt:
-        print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
+        console.print("\nGoodbye! 👋", style=OPENHANDS_THEME.warning)
     except EOFError:
-        print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
+        console.print("\nGoodbye! 👋", style=OPENHANDS_THEME.warning)
     except Exception as e:
-        print_formatted_text(HTML(f"<red>Error: {html.escape(str(e))}</red>"))
+        console.print(f"Error: {str(e)}", style=OPENHANDS_THEME.error, markup=False)
         import traceback
 
         traceback.print_exc()

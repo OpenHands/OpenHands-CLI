@@ -7,7 +7,7 @@ from openhands_cli.argparsers.acp_parser import add_acp_parser
 from openhands_cli.argparsers.auth_parser import add_login_parser, add_logout_parser
 from openhands_cli.argparsers.mcp_parser import add_mcp_parser
 from openhands_cli.argparsers.serve_parser import add_serve_parser
-from openhands_cli.argparsers.util import add_confirmation_mode_args
+from openhands_cli.argparsers.utils import add_confirmation_mode_args
 
 
 def create_main_parser() -> argparse.ArgumentParser:

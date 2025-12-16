@@ -8,7 +8,7 @@ from textual.containers import VerticalScroll
 from textual.widgets import Static
 from textual_autocomplete import DropdownItem
 
-from .theme import OPENHANDS_THEME
+from openhands_cli.theme import OPENHANDS_THEME
 
 
 # Available commands with descriptions after the command
