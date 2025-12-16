@@ -22,6 +22,7 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.argparsers.main_parser import create_main_parser
+from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.utils import create_seeded_instructions_from_args
 
 
@@ -49,7 +50,7 @@ def handle_resume_logic(args) -> str | None:
     if args.last:
         if args.resume is None:
             print_formatted_text(
-                HTML("<yellow>Error: --last flag requires --resume</yellow>")
+                HTML(f"<{OPENHANDS_THEME.warning}>Error: --last flag requires --resume</{OPENHANDS_THEME.warning}>")
             )
             return None
 
@@ -61,12 +62,12 @@ def handle_resume_logic(args) -> str | None:
 
         if latest_id is None:
             print_formatted_text(
-                HTML("<yellow>No conversations found to resume.</yellow>")
+                HTML(f"<{OPENHANDS_THEME.warning}>No conversations found to resume.</{OPENHANDS_THEME.warning}>")
             )
             return None
 
         print_formatted_text(
-            HTML(f"<green>Resuming latest conversation: {latest_id}</green>")
+            HTML(f"<{OPENHANDS_THEME.success}>Resuming latest conversation: {latest_id}</{OPENHANDS_THEME.success}>")
         )
         return latest_id
 
@@ -186,11 +187,11 @@ def main() -> None:
                     queued_inputs=queued_inputs,
                 )
     except KeyboardInterrupt:
-        print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
+        print_formatted_text(HTML(f"\n<{OPENHANDS_THEME.warning}>Goodbye! 👋</{OPENHANDS_THEME.warning}>"))
     except EOFError:
-        print_formatted_text(HTML("\n<yellow>Goodbye! 👋</yellow>"))
+        print_formatted_text(HTML(f"\n<{OPENHANDS_THEME.warning}>Goodbye! 👋</{OPENHANDS_THEME.warning}>"))
     except Exception as e:
-        print_formatted_text(HTML(f"<red>Error: {html.escape(str(e))}</red>"))
+        print_formatted_text(HTML(f"<{OPENHANDS_THEME.error}>Error: {html.escape(str(e))}</{OPENHANDS_THEME.error}>"))
         import traceback
 
         traceback.print_exc()
