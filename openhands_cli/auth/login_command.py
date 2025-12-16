@@ -35,16 +35,10 @@ async def _fetch_user_data_with_context(
         await fetch_user_data_after_oauth(server_url, api_key)
 
         # --- SUCCESS MESSAGES ---
-        if already_logged_in:
-            _p(
-                f"\n[{OPENHANDS_THEME.success}]✓ Settings synchronized "
-                f"successfully![/{OPENHANDS_THEME.success}]"
-            )
-        else:
-            _p(
-                f"\n[{OPENHANDS_THEME.secondary}]You can now use OpenHands CLI with "
-                f"cloud features.[/{OPENHANDS_THEME.secondary}]"
-            )
+        _p(
+            f"\n[{OPENHANDS_THEME.success}]✓ Settings synchronized "
+            f"successfully![/{OPENHANDS_THEME.success}]"
+        )
 
     except ApiClientError as e:
         # --- FAILURE MESSAGES ---
