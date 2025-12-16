@@ -50,7 +50,10 @@ def handle_resume_logic(args) -> str | None:
     if args.last:
         if args.resume is None:
             print_formatted_text(
-                HTML(f"<{OPENHANDS_THEME.warning}>Error: --last flag requires --resume</{OPENHANDS_THEME.warning}>")
+                HTML(
+                    f"<{OPENHANDS_THEME.warning}>Error: --last flag requires --resume"
+                    f"</{OPENHANDS_THEME.warning}>"
+                )
             )
             return None
 
@@ -62,12 +65,18 @@ def handle_resume_logic(args) -> str | None:
 
         if latest_id is None:
             print_formatted_text(
-                HTML(f"<{OPENHANDS_THEME.warning}>No conversations found to resume.</{OPENHANDS_THEME.warning}>")
+                HTML(
+                    f"<{OPENHANDS_THEME.warning}>No conversations found to resume."
+                    f"</{OPENHANDS_THEME.warning}>"
+                )
             )
             return None
 
         print_formatted_text(
-            HTML(f"<{OPENHANDS_THEME.success}>Resuming latest conversation: {latest_id}</{OPENHANDS_THEME.success}>")
+            HTML(
+                f"<{OPENHANDS_THEME.success}>Resuming latest conversation: {latest_id}"
+                f"</{OPENHANDS_THEME.success}>"
+            )
         )
         return latest_id
 
@@ -187,11 +196,24 @@ def main() -> None:
                     queued_inputs=queued_inputs,
                 )
     except KeyboardInterrupt:
-        print_formatted_text(HTML(f"\n<{OPENHANDS_THEME.warning}>Goodbye! 👋</{OPENHANDS_THEME.warning}>"))
+        print_formatted_text(
+            HTML(
+                f"\n<{OPENHANDS_THEME.warning}>Goodbye! 👋</{OPENHANDS_THEME.warning}>"
+            )
+        )
     except EOFError:
-        print_formatted_text(HTML(f"\n<{OPENHANDS_THEME.warning}>Goodbye! 👋</{OPENHANDS_THEME.warning}>"))
+        print_formatted_text(
+            HTML(
+                f"\n<{OPENHANDS_THEME.warning}>Goodbye! 👋</{OPENHANDS_THEME.warning}>"
+            )
+        )
     except Exception as e:
-        print_formatted_text(HTML(f"<{OPENHANDS_THEME.error}>Error: {html.escape(str(e))}</{OPENHANDS_THEME.error}>"))
+        print_formatted_text(
+            HTML(
+                f"<{OPENHANDS_THEME.error}>Error: {html.escape(str(e))}"
+                f"</{OPENHANDS_THEME.error}>"
+            )
+        )
         import traceback
 
         traceback.print_exc()

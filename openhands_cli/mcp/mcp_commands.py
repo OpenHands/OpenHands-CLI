@@ -10,7 +10,6 @@ from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
 from prompt_toolkit import HTML, print_formatted_text
 
 from openhands_cli.mcp.mcp_display_utils import mask_sensitive_value
-from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.mcp.mcp_utils import (
     MCPConfigurationError,
     add_server,
@@ -18,6 +17,7 @@ from openhands_cli.mcp.mcp_utils import (
     list_servers,
     remove_server,
 )
+from openhands_cli.theme import OPENHANDS_THEME
 
 
 def handle_mcp_add(args: argparse.Namespace) -> None:
@@ -37,10 +37,15 @@ def handle_mcp_add(args: argparse.Namespace) -> None:
             auth=args.auth if args.auth else None,
         )
         print_formatted_text(
-            HTML(f"<{OPENHANDS_THEME.success}>Successfully added MCP server '{args.name}'</{OPENHANDS_THEME.success}>")
+            HTML(
+                f"<{OPENHANDS_THEME.success}>Successfully added MCP server "
+                f"'{args.name}'</{OPENHANDS_THEME.success}>"
+            )
         )
     except MCPConfigurationError as e:
-        print_formatted_text(HTML(f"<{OPENHANDS_THEME.error}>Error: {e}</{OPENHANDS_THEME.error}>"))
+        print_formatted_text(
+            HTML(f"<{OPENHANDS_THEME.error}>Error: {e}</{OPENHANDS_THEME.error}>")
+        )
         raise SystemExit(1)
 
 
@@ -53,13 +58,21 @@ def handle_mcp_remove(args: argparse.Namespace) -> None:
     try:
         remove_server(args.name)
         print_formatted_text(
-            HTML(f"<{OPENHANDS_THEME.success}>Successfully removed MCP server '{args.name}'</{OPENHANDS_THEME.success}>")
+            HTML(
+                f"<{OPENHANDS_THEME.success}>Successfully removed MCP server "
+                f"'{args.name}'</{OPENHANDS_THEME.success}>"
+            )
         )
         print_formatted_text(
-            HTML(f"<{OPENHANDS_THEME.warning}>Restart your OpenHands session to apply the changes</{OPENHANDS_THEME.warning}>")
+            HTML(
+                f"<{OPENHANDS_THEME.warning}>Restart your OpenHands session to apply "
+                f"the changes</{OPENHANDS_THEME.warning}>"
+            )
         )
     except MCPConfigurationError as e:
-        print_formatted_text(HTML(f"<{OPENHANDS_THEME.error}>Error: {e}</{OPENHANDS_THEME.error}>"))
+        print_formatted_text(
+            HTML(f"<{OPENHANDS_THEME.error}>Error: {e}</{OPENHANDS_THEME.error}>")
+        )
         raise SystemExit(1)
 
 
@@ -73,17 +86,27 @@ def handle_mcp_list(_args: argparse.Namespace) -> None:
         servers = list_servers()
 
         if not servers:
-            print_formatted_text(HTML(f"<{OPENHANDS_THEME.warning}>No MCP servers configured</{OPENHANDS_THEME.warning}>"))
             print_formatted_text(
                 HTML(
-                    f"Use <{OPENHANDS_THEME.accent}>openhands mcp add</{OPENHANDS_THEME.accent}> to add a server, "
-                    f"or create <{OPENHANDS_THEME.accent}>~/.openhands/mcp.json</{OPENHANDS_THEME.accent}> manually"
+                    f"<{OPENHANDS_THEME.warning}>No MCP servers configured"
+                    f"</{OPENHANDS_THEME.warning}>"
+                )
+            )
+            print_formatted_text(
+                HTML(
+                    f"Use <{OPENHANDS_THEME.accent}>openhands mcp add"
+                    f"</{OPENHANDS_THEME.accent}> to add a server, "
+                    f"or create <{OPENHANDS_THEME.accent}>~/.openhands/mcp.json"
+                    f"</{OPENHANDS_THEME.accent}> manually"
                 )
             )
             return
 
         print_formatted_text(
-            HTML(f"<{OPENHANDS_THEME.foreground}>Configured MCP servers ({len(servers)}):</{OPENHANDS_THEME.foreground}>")
+            HTML(
+                f"<{OPENHANDS_THEME.foreground}>Configured MCP servers "
+                f"({len(servers)}):</{OPENHANDS_THEME.foreground}>"
+            )
         )
         print_formatted_text("")
 
@@ -92,7 +115,9 @@ def handle_mcp_list(_args: argparse.Namespace) -> None:
             print_formatted_text("")
 
     except MCPConfigurationError as e:
-        print_formatted_text(HTML(f"<{OPENHANDS_THEME.error}>Error: {e}</{OPENHANDS_THEME.error}>"))
+        print_formatted_text(
+            HTML(f"<{OPENHANDS_THEME.error}>Error: {e}</{OPENHANDS_THEME.error}>")
+        )
         raise SystemExit(1)
 
 
@@ -105,12 +130,19 @@ def handle_mcp_get(args: argparse.Namespace) -> None:
     try:
         server = get_server(args.name)
 
-        print_formatted_text(HTML(f"<{OPENHANDS_THEME.foreground}>MCP server '{args.name}':</{OPENHANDS_THEME.foreground}>"))
+        print_formatted_text(
+            HTML(
+                f"<{OPENHANDS_THEME.foreground}>MCP server '{args.name}':"
+                f"</{OPENHANDS_THEME.foreground}>"
+            )
+        )
         print_formatted_text("")
         _render_server_details(args.name, server, show_name=False)
 
     except MCPConfigurationError as e:
-        print_formatted_text(HTML(f"<{OPENHANDS_THEME.error}>Error: {e}</{OPENHANDS_THEME.error}>"))
+        print_formatted_text(
+            HTML(f"<{OPENHANDS_THEME.error}>Error: {e}</{OPENHANDS_THEME.error}>")
+        )
         raise SystemExit(1)
 
 
@@ -125,20 +157,42 @@ def _render_server_details(
         show_name: Whether to show the server name
     """
     if show_name:
-        print_formatted_text(HTML(f"  <{OPENHANDS_THEME.accent}>• {name}</{OPENHANDS_THEME.accent}>"))
+        print_formatted_text(
+            HTML(f"  <{OPENHANDS_THEME.accent}>• {name}</{OPENHANDS_THEME.accent}>")
+        )
 
-    print_formatted_text(HTML(f"    <{OPENHANDS_THEME.secondary}>Transport:</{OPENHANDS_THEME.secondary}> {server.transport}"))
+    print_formatted_text(
+        HTML(
+            f"    <{OPENHANDS_THEME.secondary}>Transport:"
+            f"</{OPENHANDS_THEME.secondary}> {server.transport}"
+        )
+    )
 
     # Show authentication method if specified (only for RemoteMCPServer)
     if isinstance(server, RemoteMCPServer) and server.auth:
-        print_formatted_text(HTML(f"    <{OPENHANDS_THEME.secondary}>Authentication:</{OPENHANDS_THEME.secondary}> {server.auth}"))
+        print_formatted_text(
+            HTML(
+                f"    <{OPENHANDS_THEME.secondary}>Authentication:"
+                f"</{OPENHANDS_THEME.secondary}> {server.auth}"
+            )
+        )
 
     if isinstance(server, RemoteMCPServer):
         if server.url:
-            print_formatted_text(HTML(f"    <{OPENHANDS_THEME.secondary}>URL:</{OPENHANDS_THEME.secondary}> {server.url}"))
+            print_formatted_text(
+                HTML(
+                    f"    <{OPENHANDS_THEME.secondary}>URL:"
+                    f"</{OPENHANDS_THEME.secondary}> {server.url}"
+                )
+            )
 
         if server.headers:
-            print_formatted_text(HTML(f"    <{OPENHANDS_THEME.secondary}>Headers:</{OPENHANDS_THEME.secondary}>"))
+            print_formatted_text(
+                HTML(
+                    f"    <{OPENHANDS_THEME.secondary}>Headers:"
+                    f"</{OPENHANDS_THEME.secondary}>"
+                )
+            )
             for key, value in server.headers.items():
                 # Mask potential sensitive values
                 display_value = mask_sensitive_value(key, value)
@@ -146,14 +200,29 @@ def _render_server_details(
 
     elif isinstance(server, StdioMCPServer):
         if server.command:
-            print_formatted_text(HTML(f"    <{OPENHANDS_THEME.secondary}>Command:</{OPENHANDS_THEME.secondary}> {server.command}"))
+            print_formatted_text(
+                HTML(
+                    f"    <{OPENHANDS_THEME.secondary}>Command:"
+                    f"</{OPENHANDS_THEME.secondary}> {server.command}"
+                )
+            )
 
         if server.args:
             args_str = " ".join(server.args)
-            print_formatted_text(HTML(f"    <{OPENHANDS_THEME.secondary}>Arguments:</{OPENHANDS_THEME.secondary}> {args_str}"))
+            print_formatted_text(
+                HTML(
+                    f"    <{OPENHANDS_THEME.secondary}>Arguments:"
+                    f"</{OPENHANDS_THEME.secondary}> {args_str}"
+                )
+            )
 
         if server.env:
-            print_formatted_text(HTML(f"    <{OPENHANDS_THEME.secondary}>Environment:</{OPENHANDS_THEME.secondary}>"))
+            print_formatted_text(
+                HTML(
+                    f"    <{OPENHANDS_THEME.secondary}>Environment:"
+                    f"</{OPENHANDS_THEME.secondary}>"
+                )
+            )
             for key, value in server.env.items():
                 # Mask potential sensitive values
                 display_value = mask_sensitive_value(key, value)
@@ -175,5 +244,10 @@ def handle_mcp_command(args: argparse.Namespace) -> None:
     elif args.mcp_command == "get":
         handle_mcp_get(args)
     else:
-        print_formatted_text(HTML(f"<{OPENHANDS_THEME.error}>Unknown MCP command</{OPENHANDS_THEME.error}>"))
+        print_formatted_text(
+            HTML(
+                f"<{OPENHANDS_THEME.error}>Unknown MCP command"
+                f"</{OPENHANDS_THEME.error}>"
+            )
+        )
         raise SystemExit(1)

@@ -19,10 +19,10 @@ from openhands.sdk.event import (
 from openhands.sdk.event.base import Event
 from openhands.sdk.event.condenser import Condensation, CondensationRequest
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
-from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.refactor.widgets.non_clickable_collapsible import (
     NonClickableCollapsible,
 )
+from openhands_cli.theme import OPENHANDS_THEME
 
 
 if TYPE_CHECKING:
@@ -399,11 +399,25 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         # Build with theme color scheme
         parts: list[str] = []
-        parts.append(f"[{OPENHANDS_THEME.accent}]↑ input {input_tokens}[/{OPENHANDS_THEME.accent}]")
-        parts.append(f"[{OPENHANDS_THEME.primary}]cache hit {cache_rate}[/{OPENHANDS_THEME.primary}]")
+        parts.append(
+            f"[{OPENHANDS_THEME.accent}]↑ input {input_tokens}"
+            f"[/{OPENHANDS_THEME.accent}]"
+        )
+        parts.append(
+            f"[{OPENHANDS_THEME.primary}]cache hit {cache_rate}"
+            f"[/{OPENHANDS_THEME.primary}]"
+        )
         if reasoning_tokens > 0:
-            parts.append(f"[{OPENHANDS_THEME.warning}] reasoning {abbr(reasoning_tokens)}[/{OPENHANDS_THEME.warning}]")
-        parts.append(f"[{OPENHANDS_THEME.accent}]↓ output {output_tokens}[/{OPENHANDS_THEME.accent}]")
-        parts.append(f"[{OPENHANDS_THEME.success}]$ {cost_str}[/{OPENHANDS_THEME.success}]")
+            parts.append(
+                f"[{OPENHANDS_THEME.warning}] reasoning {abbr(reasoning_tokens)}"
+                f"[/{OPENHANDS_THEME.warning}]"
+            )
+        parts.append(
+            f"[{OPENHANDS_THEME.accent}]↓ output {output_tokens}"
+            f"[/{OPENHANDS_THEME.accent}]"
+        )
+        parts.append(
+            f"[{OPENHANDS_THEME.success}]$ {cost_str}[/{OPENHANDS_THEME.success}]"
+        )
 
         return "Tokens: " + " • ".join(parts)
