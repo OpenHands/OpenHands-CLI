@@ -1,5 +1,5 @@
 import html
-
+import os
 from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk.security.confirmation_policy import (
@@ -7,8 +7,35 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
+from openhands.tools.file_editor.definition import FileEditorAction
+from openhands_cli.locations import WORK_DIR
 from openhands_cli.user_actions.types import ConfirmationResult, UserConfirmation
 from openhands_cli.user_actions.utils import cli_confirm, cli_text_input
+
+
+def format_action_content(action_obj) -> str:
+    """Format action content with paths replaced with relative paths to CWD.
+    
+    Args:
+        action_obj: The action object (e.g., FileEditorAction), or None
+        
+    Returns:
+        Formatted string representation of the action with truncated paths,
+        truncated to 100 characters with newlines replaced by spaces
+    """
+    if action_obj is None:
+        return "[unknown action]"
+    
+    result = str(action_obj)
+    
+    if isinstance(action_obj, FileEditorAction) and action_obj.path:
+        try:
+            relative_path = os.path.relpath(action_obj.path, WORK_DIR)
+            result = result.replace(action_obj.path, relative_path)
+        except (ValueError, OSError):
+            pass
+    
+    return result[:100].replace("\n", " ")
 
 
 def ask_user_confirmation(
@@ -35,10 +62,8 @@ def ask_user_confirmation(
 
     for i, action in enumerate(pending_actions, 1):
         tool_name = getattr(action, "tool_name", "[unknown tool]")
-        action_content = (
-            str(getattr(action, "action", ""))[:100].replace("\n", " ")
-            or "[unknown action]"
-        )
+        action_obj = getattr(action, "action", None)
+        action_content = format_action_content(action_obj)
         print_formatted_text(
             HTML(f"<grey>  {i}. {tool_name}: {html.escape(action_content)}...</grey>")
         )
