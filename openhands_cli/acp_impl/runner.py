@@ -4,9 +4,8 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-from openhands.sdk import BaseConversation
+from openhands.sdk import BaseConversation, ConversationExecutionStatus
 from openhands.sdk.conversation.state import (
-    ConversationExecutionStatus,
     ConversationState,
 )
 from openhands.sdk.security.confirmation_policy import (
