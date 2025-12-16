@@ -6,7 +6,7 @@ A **lightweight, modern CLI** to interact with the OpenHands agent (powered by [
 
 ## Quickstart
 
-- Prerequisites: Python 3.12+, curl
+- Prerequisites: Python 3.12, curl
 - Install uv (package manager):
 
   ```bash
@@ -35,3 +35,5 @@ uv run openhands
 ./dist/openhands            # macOS/Linux
 # dist/openhands.exe        # Windows
 ```
+> ⚠️ Note: Development instructions are currently written for Linux/macOS.
+> Windows support is not fully documented yet.

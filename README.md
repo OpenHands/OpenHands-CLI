@@ -49,7 +49,8 @@ uv run openhands
 ```
 
 Notes:
-- The project targets Python 3.11+. See `DEVELOPMENT.md` for environment setup using `uv`.
+- The project targets Python 3.12. See `DEVELOPMENT.md` for environment setup using `uv`.
+
 - `uv` is used here to ensure pinned dependencies and repeatable commands.
 
 ### Run headless (automation)
