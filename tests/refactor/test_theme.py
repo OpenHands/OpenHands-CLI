@@ -2,7 +2,7 @@
 
 from textual.theme import Theme
 
-from openhands_cli.refactor.core.theme import OPENHANDS_THEME, create_openhands_theme
+from openhands_cli.theme import OPENHANDS_THEME, create_openhands_theme
 
 
 class TestOpenHandsTheme:

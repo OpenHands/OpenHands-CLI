@@ -2,10 +2,13 @@
 
 from datetime import datetime
 
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import HTML
+from rich.console import Console
 
 from openhands_cli.conversations.lister import ConversationLister
+from openhands_cli.theme import OPENHANDS_THEME
+
+
+console = Console()
 
 
 def display_recent_conversations(limit: int = 15) -> None:
@@ -18,17 +21,18 @@ def display_recent_conversations(limit: int = 15) -> None:
     conversations = lister.list()
 
     if not conversations:
-        print_formatted_text(HTML("<yellow>No conversations found.</yellow>"))
-        print_formatted_text(
-            HTML("<dim>Start a new conversation with: openhands</dim>")
+        console.print("No conversations found.", style=OPENHANDS_THEME.warning)
+        console.print(
+            "Start a new conversation with: openhands",
+            style=f"{OPENHANDS_THEME.secondary} dim",
         )
         return
 
     # Limit to the requested number of conversations
     conversations = conversations[:limit]
 
-    print_formatted_text(HTML("<bold>Recent Conversations:</bold>"))
-    print_formatted_text(HTML("<dim>" + "-" * 80 + "</dim>"))
+    console.print("Recent Conversations:", style=f"{OPENHANDS_THEME.primary} bold")
+    console.print("-" * 80, style=f"{OPENHANDS_THEME.secondary} dim")
 
     for i, conv in enumerate(conversations, 1):
         # Format the date nicely
@@ -38,23 +42,30 @@ def display_recent_conversations(limit: int = 15) -> None:
         prompt_preview = _truncate_prompt(conv.first_user_prompt)
 
         # Format the conversation entry
-        print_formatted_text(
-            HTML(f"<bold>{i:2d}.</bold> <cyan>{conv.id}</cyan> <dim>({date_str})</dim>")
-        )
+        console.print(f"{i:2d}. ", style=f"{OPENHANDS_THEME.primary} bold", end="")
+        console.print(f"{conv.id} ", style=OPENHANDS_THEME.accent, end="")
+        console.print(f"({date_str})", style=f"{OPENHANDS_THEME.secondary} dim")
 
         if prompt_preview:
-            print_formatted_text(HTML(f"    <white>{prompt_preview}</white>"))
+            console.print(
+                f"    {prompt_preview}", style=OPENHANDS_THEME.foreground, markup=False
+            )
         else:
-            print_formatted_text(HTML("    <dim>(No user message)</dim>"))
+            console.print(
+                "    (No user message)", style=f"{OPENHANDS_THEME.secondary} dim"
+            )
 
-        print()  # Add spacing between entries
+        console.print()  # Add spacing between entries
 
-    print_formatted_text(HTML("<dim>" + "-" * 80 + "</dim>"))
-    print_formatted_text(
-        HTML(
-            "<dim>To resume a conversation, use: </dim>"
-            "<bold>openhands --resume &lt;conversation-id&gt;</bold>"
-        )
+    console.print("-" * 80, style=f"{OPENHANDS_THEME.secondary} dim")
+    console.print(
+        "To resume a conversation, use: ",
+        style=f"{OPENHANDS_THEME.secondary} dim",
+        end="",
+    )
+    console.print(
+        "openhands --resume <conversation-id>",
+        style=f"{OPENHANDS_THEME.primary} bold",
     )
 
 
