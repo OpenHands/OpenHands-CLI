@@ -180,9 +180,9 @@ class OpenHandsApp(App):
 
                 console = Console()
                 console.print(
-                    "[red]Headless mode requires existing settings.[/red]\n"
-                    "[bold]Please run:[/bold] [green]openhands --exp[/green] "
-                    "to configure your settings before using [cyan]--headless[/cyan]."
+                    f"[{OPENHANDS_THEME.error}]Headless mode requires existing settings.[/{OPENHANDS_THEME.error}]\n"
+                    f"[bold]Please run:[/bold] [{OPENHANDS_THEME.success}]openhands --exp[/{OPENHANDS_THEME.success}] "
+                    f"to configure your settings before using [{OPENHANDS_THEME.accent}]--headless[/{OPENHANDS_THEME.accent}]."
                 )
                 self.exit()
                 return
@@ -406,7 +406,7 @@ class OpenHandsApp(App):
         except RuntimeError:
             # In test environment, just show a placeholder message
             placeholder_widget = Static(
-                "[green]Message would be processed by conversation runner[/green]",
+                f"[{OPENHANDS_THEME.success}]Message would be processed by conversation runner[/{OPENHANDS_THEME.success}]",
                 classes="status-message",
             )
             self.main_display.mount(placeholder_widget)
