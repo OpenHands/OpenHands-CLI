@@ -10,7 +10,7 @@ from openhands_cli.auth.device_flow import (
 )
 from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.auth.utils import _p
-from openhands_cli.refactor.core.theme import OPENHANDS_THEME
+from openhands_cli.theme import OPENHANDS_THEME
 
 
 async def _fetch_user_data_with_context(

@@ -8,7 +8,7 @@ from typing import Any
 
 from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
 from openhands_cli.auth.utils import _p
-from openhands_cli.refactor.core.theme import OPENHANDS_THEME
+from openhands_cli.theme import OPENHANDS_THEME
 
 
 class DeviceFlowError(Exception):

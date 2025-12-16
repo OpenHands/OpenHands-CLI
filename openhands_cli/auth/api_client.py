@@ -7,7 +7,7 @@ from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
 from openhands_cli.auth.utils import _p
 from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
-from openhands_cli.refactor.core.theme import OPENHANDS_THEME
+from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.settings.store import AgentStore
 
 
@@ -288,7 +288,7 @@ async def fetch_user_data_after_oauth(
         else:
             _p(
                 f"[{OPENHANDS_THEME.warning}]Skipping agent configuration; "
-                "missing key or settings.[/{OPENHANDS_THEME.warning}]"
+                f"missing key or settings.[/{OPENHANDS_THEME.warning}]"
             )
 
         _p(

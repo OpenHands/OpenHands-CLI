@@ -2,7 +2,7 @@
 
 from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.auth.utils import _p
-from openhands_cli.refactor.core.theme import OPENHANDS_THEME
+from openhands_cli.theme import OPENHANDS_THEME
 
 
 def logout_command(server_url: str | None = None) -> bool:
