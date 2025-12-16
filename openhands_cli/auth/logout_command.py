@@ -2,6 +2,7 @@
 
 from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.auth.utils import _p
+from openhands_cli.refactor.core.theme import OPENHANDS_THEME
 
 
 def logout_command(server_url: str | None = None) -> bool:
@@ -18,28 +19,49 @@ def logout_command(server_url: str | None = None) -> bool:
 
         # Logging out from a specific server (conceptually; we only store one key)
         if server_url:
-            _p("<cyan>Logging out from OpenHands Cloud...</cyan>")
+            _p(
+                f"[{OPENHANDS_THEME.accent}]Logging out from OpenHands Cloud..."
+                f"[/{OPENHANDS_THEME.accent}]"
+            )
 
             was_logged_in = token_storage.remove_api_key()
             if was_logged_in:
-                _p("<green>✓ Logged out of OpenHands Cloud</green>")
+                _p(
+                    f"[{OPENHANDS_THEME.success}]✓ Logged "
+                    f"out of OpenHands Cloud[/{OPENHANDS_THEME.success}]"
+                )
             else:
-                _p("<yellow>You were not logged in to OpenHands Cloud</yellow>")
+                _p(
+                    f"[{OPENHANDS_THEME.warning}]You were not logged in to "
+                    f"OpenHands Cloud[/{OPENHANDS_THEME.warning}]"
+                )
 
             return True
 
         # Logging out globally (no server specified)
         if not token_storage.has_api_key():
-            _p("<yellow>You are not logged in to OpenHands Cloud.</yellow>")
+            _p(
+                f"[{OPENHANDS_THEME.warning}]You are not logged in to "
+                f"OpenHands Cloud.[/{OPENHANDS_THEME.warning}]"
+            )
             return True
 
-        _p("<cyan>Logging out from OpenHands Cloud...</cyan>")
+        _p(
+            f"[{OPENHANDS_THEME.accent}]Logging out from OpenHands Cloud..."
+            f"[/{OPENHANDS_THEME.accent}]"
+        )
         token_storage.remove_api_key()
-        _p("<green>✓ Logged out of OpenHands Cloud</green>")
+        _p(
+            f"[{OPENHANDS_THEME.success}]✓ Logged "
+            f"out of OpenHands Cloud[/{OPENHANDS_THEME.success}]"
+        )
         return True
 
     except Exception as e:
-        _p(f"<red>Unexpected error during logout: {e}</red>")
+        _p(
+            f"[{OPENHANDS_THEME.error}]Unexpected error during logout: "
+            f"{e}[/{OPENHANDS_THEME.error}]"
+        )
         return False
 
 

@@ -10,6 +10,7 @@ from openhands_cli.auth.device_flow import (
 )
 from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.auth.utils import _p
+from openhands_cli.refactor.core.theme import OPENHANDS_THEME
 
 
 async def _fetch_user_data_with_context(
@@ -21,27 +22,42 @@ async def _fetch_user_data_with_context(
 
     # Initial context output
     if already_logged_in:
-        _p("<yellow>You are already logged in to OpenHands Cloud.</yellow>")
-        _p("<white>Pulling latest settings from remote...</white>")
+        _p(
+            f"[{OPENHANDS_THEME.warning}]You are already logged in to "
+            f"OpenHands Cloud.[/{OPENHANDS_THEME.warning}]"
+        )
+        _p(
+            f"[{OPENHANDS_THEME.secondary}]Pulling latest settings from remote..."
+            f"[/{OPENHANDS_THEME.secondary}]"
+        )
 
     try:
         await fetch_user_data_after_oauth(server_url, api_key)
 
         # --- SUCCESS MESSAGES ---
         if already_logged_in:
-            _p("\n<green>✓ Settings synchronized successfully!</green>")
+            _p(
+                f"\n[{OPENHANDS_THEME.success}]✓ Settings synchronized "
+                f"successfully![/{OPENHANDS_THEME.success}]"
+            )
         else:
-            _p("\n<white>You can now use OpenHands CLI with cloud features.</white>")
+            _p(
+                f"\n[{OPENHANDS_THEME.secondary}]You can now use OpenHands CLI with "
+                f"cloud features.[/{OPENHANDS_THEME.secondary}]"
+            )
 
     except ApiClientError as e:
         # --- FAILURE MESSAGES ---
         safe_error = html.escape(str(e))
 
-        _p(f"\n<yellow>Warning: Could not fetch user data: {safe_error}</yellow>")
         _p(
-            f"<white>Please try: <b>"
+            f"\n[{OPENHANDS_THEME.warning}]Warning: "
+            f"Could not fetch user data: {safe_error}[/{OPENHANDS_THEME.warning}]"
+        )
+        _p(
+            f"[{OPENHANDS_THEME.secondary}]Please try: [bold]"
             f"{html.escape('openhands logout && openhands login')}"
-            "</b></white>"
+            f"[/bold][/{OPENHANDS_THEME.secondary}]"
         )
 
 
@@ -54,7 +70,10 @@ async def login_command(server_url: str) -> bool:
     Returns:
         True if login was successful, False otherwise
     """
-    _p("<cyan>Logging in to OpenHands Cloud...</cyan>")
+    _p(
+        f"[{OPENHANDS_THEME.accent}]Logging in to OpenHands Cloud..."
+        f"[/{OPENHANDS_THEME.accent}]"
+    )
 
     # First, try to read any existing token
     token_storage = TokenStorage()
@@ -73,22 +92,37 @@ async def login_command(server_url: str) -> bool:
     try:
         tokens = await authenticate_with_device_flow(server_url)
     except DeviceFlowError as e:
-        _p(f"<red>Authentication failed: {e}</red>")
+        _p(
+            f"[{OPENHANDS_THEME.error}]Authentication failed: "
+            f"{e}[/{OPENHANDS_THEME.error}]"
+        )
         return False
 
     api_key = tokens.get("access_token")
 
     if not api_key:
-        _p("\n<yellow>Warning: No access token found in OAuth response.</yellow>")
-        _p("<white>You can still use OpenHands CLI with cloud features.</white>")
+        _p(
+            f"\n[{OPENHANDS_THEME.warning}]Warning: "
+            f"No access token found in OAuth response.[/{OPENHANDS_THEME.warning}]"
+        )
+        _p(
+            f"[{OPENHANDS_THEME.secondary}]You can still use OpenHands CLI with "
+            f"cloud features.[/{OPENHANDS_THEME.secondary}]"
+        )
         # Authentication technically succeeded, even if we lack a token
         return True
 
     # Store the API key securely
     token_storage.store_api_key(api_key)
 
-    _p("<green>✓ Logged into OpenHands Cloud</green>")
-    _p("<white>Your authentication tokens have been stored securely.</white>")
+    _p(
+        f"[{OPENHANDS_THEME.success}]✓ Logged "
+        f"into OpenHands Cloud[/{OPENHANDS_THEME.success}]"
+    )
+    _p(
+        f"[{OPENHANDS_THEME.secondary}]Your authentication "
+        f"tokens have been stored securely.[/{OPENHANDS_THEME.secondary}]"
+    )
 
     # Fetch user data and configure local agent
     await _fetch_user_data_with_context(
@@ -111,5 +145,8 @@ def run_login_command(server_url: str) -> bool:
     try:
         return asyncio.run(login_command(server_url))
     except KeyboardInterrupt:
-        _p("\n<yellow>Login cancelled by user.</yellow>")
+        _p(
+            f"\n[{OPENHANDS_THEME.warning}]Login cancelled by "
+            f"user.[/{OPENHANDS_THEME.warning}]"
+        )
         return False

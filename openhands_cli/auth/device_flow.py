@@ -8,6 +8,7 @@ from typing import Any
 
 from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
 from openhands_cli.auth.utils import _p
+from openhands_cli.refactor.core.theme import OPENHANDS_THEME
 
 
 class DeviceFlowError(Exception):
@@ -123,7 +124,10 @@ class DeviceFlowClient(BaseHttpClient):
         Raises:
             DeviceFlowError: If authentication fails
         """
-        _p("<cyan>Starting OpenHands authentication...</cyan>")
+        _p(
+            f"[{OPENHANDS_THEME.accent}]Starting OpenHands authentication..."
+            f"[/{OPENHANDS_THEME.accent}]"
+        )
 
         # Step 1: Start device flow
         try:
@@ -134,36 +138,57 @@ class DeviceFlowClient(BaseHttpClient):
                 interval,
             ) = await self.start_device_flow()
         except DeviceFlowError as e:
-            _p(f"<red>Error: {e}</red>")
+            _p(f"[{OPENHANDS_THEME.error}]Error: {e}[/{OPENHANDS_THEME.error}]")
             raise
 
         # Step 2: Construct URL with user_code parameter and open browser
         verification_url = f"{verification_uri}?user_code={user_code}"
 
-        _p("\n<yellow>Opening your web browser for authentication...</yellow>")
-        _p(f"<white>URL: <b>{verification_url}</b></white>")
+        _p(
+            f"\n[{OPENHANDS_THEME.warning}]Opening your web browser for "
+            f"authentication...[/{OPENHANDS_THEME.warning}]"
+        )
+        _p(
+            f"[{OPENHANDS_THEME.secondary}]URL: [bold]{verification_url}[/bold]"
+            f"[/{OPENHANDS_THEME.secondary}]"
+        )
 
         # Automatically open the browser
         try:
             webbrowser.open(verification_url)
-            _p("<green>✓ Browser opened successfully</green>")
+            _p(
+                f"[{OPENHANDS_THEME.success}]✓ Browser "
+                f"opened successfully[/{OPENHANDS_THEME.success}]"
+            )
         except Exception as e:
-            _p(f"<yellow>Could not open browser automatically: {e}</yellow>")
-            _p(f"<white>Please manually open: <b>{verification_url}</b></white>")
+            _p(
+                f"[{OPENHANDS_THEME.warning}]Could not open browser automatically: "
+                f"{e}[/{OPENHANDS_THEME.warning}]"
+            )
+            _p(
+                f"[{OPENHANDS_THEME.secondary}]Please manually open: "
+                f"[bold]{verification_url}[/bold][/{OPENHANDS_THEME.secondary}]"
+            )
 
         _p(
-            "<white>Follow the instructions in your browser to complete "
-            "authentication</white>"
+            f"[{OPENHANDS_THEME.secondary}]Follow the instructions in your browser "
+            f"to complete authentication[/{OPENHANDS_THEME.secondary}]"
         )
-        _p("\n<cyan>Waiting for authentication to complete...</cyan>")
+        _p(
+            f"\n[{OPENHANDS_THEME.accent}]Waiting for authentication to complete..."
+            f"[/{OPENHANDS_THEME.accent}]"
+        )
 
         # Step 3: Poll for token
         try:
             tokens = await self.poll_for_token(device_code, interval)
-            _p("<green>✓ Authentication successful!</green>")
+            _p(
+                f"[{OPENHANDS_THEME.success}]✓ Authentication "
+                f"successful![/{OPENHANDS_THEME.success}]"
+            )
             return tokens
         except DeviceFlowError as e:
-            _p(f"<red>Error: {e}</red>")
+            _p(f"[{OPENHANDS_THEME.error}]Error: {e}[/{OPENHANDS_THEME.error}]")
             raise
 
 
