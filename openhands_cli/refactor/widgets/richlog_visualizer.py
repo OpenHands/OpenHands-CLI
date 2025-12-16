@@ -18,6 +18,7 @@ from openhands.sdk.event import (
 )
 from openhands.sdk.event.base import Event
 from openhands.sdk.event.condenser import Condensation, CondensationRequest
+from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands_cli.refactor.core.theme import OPENHANDS_THEME
 from openhands_cli.refactor.widgets.non_clickable_collapsible import (
     NonClickableCollapsible,
@@ -46,6 +47,8 @@ def _get_event_border_color(event: Event) -> str:
         else:
             return OPENHANDS_THEME.accent or DEFAULT_COLOR
     elif isinstance(event, AgentErrorEvent):
+        return OPENHANDS_THEME.error or DEFAULT_COLOR
+    elif isinstance(event, ConversationErrorEvent):
         return OPENHANDS_THEME.error or DEFAULT_COLOR
     elif isinstance(event, PauseEvent):
         return OPENHANDS_THEME.primary
@@ -296,6 +299,19 @@ class ConversationVisualizer(ConversationVisualizerBase):
             )
         elif isinstance(event, AgentErrorEvent):
             title = self._extract_meaningful_title(event, "Agent Error")
+            content_string = self._escape_rich_markup(str(content))
+            metrics = self._format_metrics_subtitle()
+            if metrics:
+                content_string = f"{content_string}\n\n{metrics}"
+
+            return NonClickableCollapsible(
+                content_string,
+                title=title,
+                collapsed=False,  # Start expanded by default
+                border_color=_get_event_border_color(event),
+            )
+        elif isinstance(event, ConversationErrorEvent):
+            title = self._extract_meaningful_title(event, "Conversation Error")
             content_string = self._escape_rich_markup(str(content))
             metrics = self._format_metrics_subtitle()
             if metrics:
