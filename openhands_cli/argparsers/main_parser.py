@@ -3,6 +3,8 @@
 import argparse
 
 from openhands_cli import __version__
+from openhands_cli.argparsers.acp_parser import add_acp_parser
+from openhands_cli.argparsers.auth_parser import add_login_parser, add_logout_parser
 from openhands_cli.argparsers.mcp_parser import add_mcp_parser
 from openhands_cli.argparsers.serve_parser import add_serve_parser
 from openhands_cli.argparsers.utils import add_confirmation_mode_args
@@ -35,6 +37,8 @@ def create_main_parser() -> argparse.ArgumentParser:
                 openhands serve --gpu               # Launch with GPU support
                 openhands acp                       # Agent-Client Protocol
                                                       server (e.g., Zed IDE)
+                openhands login                     # Authenticate with OpenHands Cloud
+                openhands logout                    # Log out from OpenHands Cloud
         """,
     )
 
@@ -102,19 +106,17 @@ def create_main_parser() -> argparse.ArgumentParser:
     # Subcommands
     subparsers = parser.add_subparsers(dest="command", help="Additional commands")
 
+    # Add acp subcommands
+    add_acp_parser(subparsers)
+
     # Add serve subcommand
     add_serve_parser(subparsers)
 
-    # Add ACP subcommand
-    acp_parser = subparsers.add_parser(
-        "acp", help="Start OpenHands as an Agent Client Protocol (ACP) agent"
-    )
-
-    # ACP confirmation mode options (mutually exclusive)
-    acp_confirmation_group = acp_parser.add_mutually_exclusive_group()
-    add_confirmation_mode_args(acp_confirmation_group)
-
     # Add MCP subcommand
     add_mcp_parser(subparsers)
+
+    # Add authentication subcommands
+    add_login_parser(subparsers)
+    add_logout_parser(subparsers)
 
     return parser
