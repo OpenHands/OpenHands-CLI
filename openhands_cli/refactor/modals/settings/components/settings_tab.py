@@ -5,7 +5,6 @@ from textual.containers import Container, VerticalScroll
 from textual.widgets import Input, Label, Select, Static
 
 from openhands_cli.refactor.modals.settings.choices import (
-    get_model_options,
     provider_options,
 )
 
@@ -60,9 +59,7 @@ class SettingsTab(Container):
                     with Container(classes="form_group"):
                         yield Label("Custom Model:", classes="form_label")
                         yield Input(
-                            placeholder=(
-                                "e.g., gpt-4o-mini, claude-3-sonnet"
-                            ),
+                            placeholder=("e.g., gpt-4o-mini, claude-3-sonnet"),
                             id="custom_model_input",
                             classes="form_input",
                             # Disabled until Advanced mode is selected
@@ -98,9 +95,7 @@ class SettingsTab(Container):
 
                 # Memory Condensation
                 with Container(classes="form_group"):
-                    yield Label(
-                        "Memory Condensation:", classes="form_label"
-                    )
+                    yield Label("Memory Condensation:", classes="form_label")
                     yield Select(
                         [("Enabled", True), ("Disabled", False)],
                         value=False,
@@ -116,9 +111,7 @@ class SettingsTab(Container):
 
                 # Help Section
                 with Container(classes="form_group"):
-                    yield Static(
-                        "Configuration Help", classes="form_section_title"
-                    )
+                    yield Static("Configuration Help", classes="form_section_title")
                     yield Static(
                         "• Basic Mode: Choose from verified LLM providers "
                         "and models\n"

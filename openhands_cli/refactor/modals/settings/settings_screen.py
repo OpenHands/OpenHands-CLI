@@ -22,6 +22,7 @@ from textual.widgets import (
 )
 from textual.widgets._select import NoSelection
 
+from openhands_cli.refactor.modals.settings.app_config import save_app_config
 from openhands_cli.refactor.modals.settings.choices import (
     get_model_options,
 )
@@ -95,9 +96,10 @@ class SettingsScreen(ModalScreen):
                 with TabPane("Settings", id="settings_tab"):
                     yield SettingsTab()
 
-                # App Configurations Tab
-                with TabPane("App Configurations", id="app_config_tab"):
-                    yield AppConfigurationsTab()
+                # App Configurations Tab - only show if not first-time setup
+                if not self.is_initial_setup:
+                    with TabPane("App Configurations", id="app_config_tab"):
+                        yield AppConfigurationsTab()
 
             # Buttons
             with Horizontal(id="button_container"):
@@ -372,6 +374,27 @@ class SettingsScreen(ModalScreen):
         if not result.success:
             self._show_message(result.error_message or "Unknown error", is_error=True)
             return
+
+        # Save app configurations if not in initial setup mode
+        if not self.is_initial_setup:
+            try:
+                app_config_tab = self.query_one("#app_config_tab", TabPane)
+                app_config_component = app_config_tab.query_one(AppConfigurationsTab)
+                app_config = app_config_component.get_app_config()
+
+                app_config_result = save_app_config(app_config)
+                if not app_config_result.success:
+                    error_msg = app_config_result.error_message
+                    self._show_message(
+                        f"Settings saved, but app config failed: {error_msg}",
+                        is_error=True,
+                    )
+                    return
+            except Exception as e:
+                self._show_message(
+                    f"Settings saved, but app config failed: {str(e)}", is_error=True
+                )
+                return
 
         message = (
             "Settings saved successfully! Welcome to OpenHands CLI!"
