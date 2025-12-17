@@ -57,7 +57,7 @@ class TestLoginCommand:
 
                 # Check that appropriate messages were printed
                 print_calls = [call[0][0] for call in mock_print.call_args_list]
-                assert any("cloud features" in call for call in print_calls)
+                assert any("synchronized successfully" in call for call in print_calls)
 
     @pytest.mark.asyncio
     async def test_fetch_user_data_with_context_api_error(self):
