@@ -33,6 +33,7 @@ def create_main_parser() -> argparse.ArgumentParser:
                 openhands --resume conversation-id  # Resume conversation
                 openhands --always-approve          # Auto-approve all actions
                 openhands --llm-approve             # LLM-based approval mode
+                openhands --cloud --task "Fix bug"  # Create cloud conversation
                 openhands serve                     # Launch GUI server
                 openhands serve --gpu               # Launch with GPU support
                 openhands acp                       # Agent-Client Protocol
@@ -91,6 +92,17 @@ def create_main_parser() -> argparse.ArgumentParser:
             "Run in headless mode (no UI output, auto-approve actions). "
             "Requires --task or --file."
         ),
+    )
+    parser.add_argument(
+        "--cloud",
+        action="store_true",
+        help="Create a new conversation in OpenHands Cloud instead of running locally",
+    )
+    parser.add_argument(
+        "--server-url",
+        type=str,
+        default="https://app.all-hands.dev",
+        help="OpenHands server URL for cloud operations (default: https://app.all-hands.dev)",
     )
 
     # Confirmation mode options (mutually exclusive)

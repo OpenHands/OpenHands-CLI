@@ -100,6 +100,10 @@ def main() -> None:
     if args.headless and not args.task and not args.file:
         parser.error("--headless requires either --task or --file to be specified")
 
+    # Validate cloud mode requirements
+    if args.cloud and not args.task and not args.file:
+        parser.error("--cloud requires either --task or --file to be specified")
+
     # Automatically set exit_without_confirmation when headless mode is used
     if args.headless:
         args.exit_without_confirmation = True
@@ -144,8 +148,70 @@ def main() -> None:
             handle_mcp_command(args)
 
         else:
+            # Check if cloud flag is used
+            if args.cloud:
+                import asyncio
+
+                from openhands_cli.cloud.conversation import (
+                    CloudConversationError,
+                    create_cloud_conversation,
+                    extract_repository_from_cwd,
+                )
+
+                try:
+                    # Get the initial message from args
+                    queued_inputs = create_seeded_instructions_from_args(args)
+                    if not queued_inputs:
+                        console.print(
+                            f"[{OPENHANDS_THEME.error}]Error: No initial message "
+                            f"provided for cloud conversation."
+                            f"[/{OPENHANDS_THEME.error}]"
+                        )
+                        console.print(
+                            f"[{OPENHANDS_THEME.secondary}]Use --task or --file to "
+                            f"provide an initial message.[/{OPENHANDS_THEME.secondary}]"
+                        )
+                        return
+
+                    initial_message = queued_inputs[0]
+
+                    # Try to extract repository from current directory
+                    repository = extract_repository_from_cwd()
+                    if repository:
+                        console.print(
+                            f"[{OPENHANDS_THEME.secondary}]Detected repository: "
+                            f"[{OPENHANDS_THEME.accent}]{repository}"
+                            f"[/{OPENHANDS_THEME.accent}][/{OPENHANDS_THEME.secondary}]"
+                        )
+
+                    # Create cloud conversation
+                    asyncio.run(
+                        create_cloud_conversation(
+                            server_url=args.server_url,
+                            initial_user_msg=initial_message,
+                            repository=repository,
+                        )
+                    )
+
+                    console.print(
+                        f"[{OPENHANDS_THEME.success}]Cloud conversation created "
+                        f"successfully! 🚀[/{OPENHANDS_THEME.success}]"
+                    )
+
+                except CloudConversationError:
+                    # Error already printed in the function
+                    sys.exit(1)
+                except Exception as e:
+                    console.print(
+                        f"[{OPENHANDS_THEME.error}]Unexpected error: "
+                        f"{str(e)}[/{OPENHANDS_THEME.error}]"
+                    )
+                    sys.exit(1)
+
+                return
+
             # Check if experimental flag is used
-            if args.exp:
+            elif args.exp:
                 # Handle resume logic (including --last and conversation list)
                 resume_id = handle_resume_logic(args)
                 if resume_id is None and (args.last or args.resume == ""):
