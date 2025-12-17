@@ -154,7 +154,6 @@ def main() -> None:
             from openhands_cli.cloud.conversation import (
                 CloudConversationError,
                 create_cloud_conversation,
-                extract_repository_from_cwd,
             )
 
             try:
@@ -174,21 +173,11 @@ def main() -> None:
 
                 initial_message = queued_inputs[0]
 
-                # Try to extract repository from current directory
-                repository = extract_repository_from_cwd()
-                if repository:
-                    console.print(
-                        f"[{OPENHANDS_THEME.secondary}]Detected repository: "
-                        f"[{OPENHANDS_THEME.accent}]{repository}"
-                        f"[/{OPENHANDS_THEME.accent}][/{OPENHANDS_THEME.secondary}]"
-                    )
-
                 # Create cloud conversation
                 asyncio.run(
                     create_cloud_conversation(
                         server_url=args.server_url,
                         initial_user_msg=initial_message,
-                        repository=repository,
                     )
                 )
 

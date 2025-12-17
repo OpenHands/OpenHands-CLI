@@ -67,14 +67,12 @@ def check_user_authentication(_server_url: str) -> str:
 async def create_cloud_conversation(
     server_url: str,
     initial_user_msg: str,
-    repository: str | None = None,
 ) -> dict[str, Any]:
     """Create a new conversation in OpenHands Cloud.
 
     Args:
         server_url: The OpenHands server URL
         initial_user_msg: Initial message to seed the conversation
-        repository: Optional repository name (format: username/repo)
 
     Returns:
         The created conversation data
@@ -88,6 +86,23 @@ async def create_cloud_conversation(
 
         # Create API client
         client = OpenHandsApiClient(server_url, api_key)
+
+        # Try to extract repository from current directory
+        repository = None
+        try:
+            repository = extract_repository_from_cwd()
+            if repository:
+                console.print(
+                    f"[{OPENHANDS_THEME.secondary}]Detected repository: "
+                    f"[{OPENHANDS_THEME.accent}]{repository}"
+                    f"[/{OPENHANDS_THEME.accent}][/{OPENHANDS_THEME.secondary}]"
+                )
+        except Exception as e:
+            console.print(
+                f"[{OPENHANDS_THEME.warning}]Warning: Could not detect "
+                f"repository from current directory: {str(e)}"
+                f"[/{OPENHANDS_THEME.warning}]"
+            )
 
         # Prepare conversation data
         conversation_data = {
