@@ -118,21 +118,19 @@ async def create_cloud_conversation(
         )
 
         # Make API request to create conversation
-        response = await client.post(
-            "/api/conversations",
+        response = await client.create_conversation(
             json_data=conversation_data,
         )
 
         conversation = response.json()
 
-        console.print(
-            f"[{OPENHANDS_THEME.success}]✓ Cloud conversation created "
-            f"successfully![/{OPENHANDS_THEME.success}]"
-        )
-
         # Display conversation details
-        conversation_id = conversation.get("id", "Unknown")
-        conversation_url = conversation.get("url")
+        conversation_id = conversation.get("conversation_id")
+        conversation_url = (
+            server_url + f"/conversations/{conversation_id}"
+            if conversation_id
+            else None
+        )
 
         console.print(
             f"[{OPENHANDS_THEME.secondary}]Conversation ID: "

@@ -25,6 +25,7 @@ class BaseHttpClient:
         """
         self.server_url = server_url.rstrip("/")
         self.timeout = httpx.Timeout(timeout)
+        self._headers = {}
 
     def _build_url(self, endpoint: str) -> str:
         """Build full URL from endpoint.

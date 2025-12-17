@@ -46,6 +46,9 @@ class OpenHandsApiClient(BaseHttpClient):
     async def get_user_settings(self) -> dict[str, Any]:
         return await self._get_json("/api/settings")
 
+    async def create_conversation(self, json_data=None):
+        return await self.post("/api/conversations", self._headers, json_data)
+
 
 def _print_settings_summary(settings: dict[str, Any]) -> None:
     _p(
