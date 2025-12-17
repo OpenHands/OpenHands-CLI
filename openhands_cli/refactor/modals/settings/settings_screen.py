@@ -10,15 +10,13 @@ from typing import ClassVar, Literal, cast
 
 from textual import getters
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, VerticalScroll
+from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
     Input,
-    Label,
     Select,
     Static,
-    Switch,
     TabbedContent,
     TabPane,
 )
@@ -26,7 +24,10 @@ from textual.widgets._select import NoSelection
 
 from openhands_cli.refactor.modals.settings.choices import (
     get_model_options,
-    provider_options,
+)
+from openhands_cli.refactor.modals.settings.components import (
+    AppConfigurationsTab,
+    SettingsTab,
 )
 from openhands_cli.refactor.modals.settings.utils import SettingsFormData, save_settings
 from openhands_cli.tui.settings.store import AgentStore
@@ -92,146 +93,11 @@ class SettingsScreen(ModalScreen):
             with TabbedContent(id="settings_tabs"):
                 # Settings Tab
                 with TabPane("Settings", id="settings_tab"):
-                    with VerticalScroll(id="settings_form"):
-                        with Container(id="form_content"):
-                            # Basic Settings Section
-                            with Container(classes="form_group"):
-                                yield Label("Settings Mode:", classes="form_label")
-                                yield Select(
-                                    [("Basic", "basic"), ("Advanced", "advanced")],
-                                    value="basic",
-                                    id="mode_select",
-                                    classes="form_select",
-                                    type_to_search=True,
-                                )
-
-                            # Basic Settings Section (shown in Basic mode)
-                            with Container(id="basic_section", classes="form_group"):
-                                # LLM Provider
-                                with Container(classes="form_group"):
-                                    yield Label("LLM Provider:", classes="form_label")
-                                    yield Select(
-                                        provider_options,
-                                        id="provider_select",
-                                        classes="form_select",
-                                        type_to_search=True,
-                                        # Always enabled after mode selection
-                                        disabled=False,
-                                    )
-
-                                # LLM Model
-                                with Container(classes="form_group"):
-                                    yield Label("LLM Model:", classes="form_label")
-                                    yield Select(
-                                        [("Select provider first", "")],
-                                        id="model_select",
-                                        classes="form_select",
-                                        type_to_search=True,
-                                        # Disabled until provider is selected
-                                        disabled=True,
-                                    )
-
-                            # Advanced Settings Section (shown in Advanced mode)
-                            with Container(id="advanced_section", classes="form_group"):
-                                # Custom Model
-                                with Container(classes="form_group"):
-                                    yield Label("Custom Model:", classes="form_label")
-                                    yield Input(
-                                        placeholder=(
-                                            "e.g., gpt-4o-mini, claude-3-sonnet"
-                                        ),
-                                        id="custom_model_input",
-                                        classes="form_input",
-                                        # Disabled until Advanced mode is selected
-                                        disabled=True,
-                                    )
-
-                                # Base URL
-                                with Container(classes="form_group"):
-                                    yield Label("Base URL:", classes="form_label")
-                                    yield Input(
-                                        placeholder=(
-                                            "e.g., https://api.openai.com/v1, "
-                                            "https://api.anthropic.com"
-                                        ),
-                                        id="base_url_input",
-                                        classes="form_input",
-                                        # Disabled until custom model is entered
-                                        disabled=True,
-                                    )
-
-                            # API Key (shown in both modes)
-                            with Container(classes="form_group"):
-                                yield Label("API Key:", classes="form_label")
-                                yield Input(
-                                    placeholder="Enter your API key",
-                                    password=True,
-                                    id="api_key_input",
-                                    classes="form_input",
-                                    # Disabled until model is selected (Basic) or
-                                    # custom model entered (Advanced)
-                                    disabled=True,
-                                )
-
-                            # Memory Condensation
-                            with Container(classes="form_group"):
-                                yield Label(
-                                    "Memory Condensation:", classes="form_label"
-                                )
-                                yield Select(
-                                    [("Enabled", True), ("Disabled", False)],
-                                    value=False,
-                                    id="memory_condensation_select",
-                                    classes="form_select",
-                                    disabled=True,  # Disabled until API key is entered
-                                )
-                                yield Static(
-                                    "Memory condensation helps reduce token usage by "
-                                    "summarizing old conversation history.",
-                                    classes="form_help",
-                                )
-
-                            # Help Section
-                            with Container(classes="form_group"):
-                                yield Static(
-                                    "Configuration Help", classes="form_section_title"
-                                )
-                                yield Static(
-                                    "• Basic Mode: Choose from verified LLM providers "
-                                    "and models\n"
-                                    "• Advanced Mode: Use custom models with your own "
-                                    "API endpoints\n"
-                                    "• API Keys are stored securely and masked in the "
-                                    "interface\n"
-                                    "• Changes take effect immediately after saving",
-                                    classes="form_help",
-                                )
+                    yield SettingsTab()
 
                 # App Configurations Tab
                 with TabPane("App Configurations", id="app_config_tab"):
-                    with Container(id="app_config_content"):
-                        yield Static(
-                            "App Configurations",
-                            classes="form_section_title",
-                        )
-                        
-                        # Display Cost Per Action Setting
-                        with Container(classes="form_group"):
-                            with Horizontal(classes="switch_container"):
-                                yield Label(
-                                    "Display Cost Per Action:",
-                                    classes="form_label switch_label",
-                                )
-                                yield Switch(
-                                    value=False,
-                                    id="display_cost_switch",
-                                    classes="form_switch",
-                                )
-                            yield Static(
-                                "Show the estimated cost for each action performed "
-                                "by the agent in the interface.",
-                                classes="form_help switch_help",
-                            )
+                    yield AppConfigurationsTab()
 
             # Buttons
             with Horizontal(id="button_container"):
