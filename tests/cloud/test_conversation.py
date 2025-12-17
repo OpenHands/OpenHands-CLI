@@ -128,11 +128,13 @@ def test_extract_repository_from_cwd_subprocess_error():
 @pytest.mark.asyncio
 async def test_validate_token_success():
     """Test successful token validation."""
+    from unittest.mock import AsyncMock
+
     with patch(
         "openhands_cli.cloud.conversation.OpenHandsApiClient"
     ) as mock_client_class:
         mock_client = Mock()
-        mock_client.get_user_info = Mock(return_value={"id": "user123"})
+        mock_client.get_user_info = AsyncMock(return_value={"id": "user123"})
         mock_client_class.return_value = mock_client
 
         result = await validate_token("https://example.com", "valid-token")
@@ -143,13 +145,17 @@ async def test_validate_token_success():
 @pytest.mark.asyncio
 async def test_validate_token_unauthenticated():
     """Test token validation with unauthenticated error."""
+    from unittest.mock import AsyncMock
+
     from openhands_cli.auth.api_client import UnauthenticatedError
 
     with patch(
         "openhands_cli.cloud.conversation.OpenHandsApiClient"
     ) as mock_client_class:
         mock_client = Mock()
-        mock_client.get_user_info.side_effect = UnauthenticatedError("Invalid token")
+        mock_client.get_user_info = AsyncMock(
+            side_effect=UnauthenticatedError("Invalid token")
+        )
         mock_client_class.return_value = mock_client
 
         result = await validate_token("https://example.com", "invalid-token")
@@ -159,11 +165,13 @@ async def test_validate_token_unauthenticated():
 @pytest.mark.asyncio
 async def test_validate_token_other_error():
     """Test token validation with other errors."""
+    from unittest.mock import AsyncMock
+
     with patch(
         "openhands_cli.cloud.conversation.OpenHandsApiClient"
     ) as mock_client_class:
         mock_client = Mock()
-        mock_client.get_user_info.side_effect = Exception("Network error")
+        mock_client.get_user_info = AsyncMock(side_effect=Exception("Network error"))
         mock_client_class.return_value = mock_client
 
         with pytest.raises(
