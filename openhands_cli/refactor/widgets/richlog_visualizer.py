@@ -19,6 +19,7 @@ from openhands.sdk.event import (
 from openhands.sdk.event.base import Event
 from openhands.sdk.event.condenser import Condensation, CondensationRequest
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
+from openhands_cli.refactor.modals.settings.app_config import AppConfiguration
 from openhands_cli.refactor.widgets.non_clickable_collapsible import (
     NonClickableCollapsible,
 )
@@ -361,6 +362,11 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     def _format_metrics_subtitle(self) -> str | None:
         """Format LLM metrics as a visually appealing subtitle string."""
+        # Check app configuration to see if metrics should be displayed
+        app_config = AppConfiguration.load()
+        if not app_config.display_cost_per_action:
+            return None
+
         stats = self.conversation_stats
         if not stats:
             return None
