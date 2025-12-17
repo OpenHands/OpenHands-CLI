@@ -8,10 +8,14 @@ from rich.console import Console
 from rich.text import Text
 from textual.notifications import SeverityLevel
 
-from openhands.sdk import BaseConversation, Message, TextContent
+from openhands.sdk import (
+    BaseConversation,
+    ConversationExecutionStatus,
+    Message,
+    TextContent,
+)
 from openhands.sdk.conversation.exceptions import ConversationRunError
 from openhands.sdk.conversation.state import (
-    ConversationExecutionStatus,
     ConversationState,
 )
 from openhands.sdk.security.confirmation_policy import (

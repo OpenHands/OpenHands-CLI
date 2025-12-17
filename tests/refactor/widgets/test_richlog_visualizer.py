@@ -9,9 +9,10 @@ from textual.app import App
 from textual.containers import VerticalScroll
 from textual.widgets import Static
 
-from openhands.sdk.event import ActionEvent, MessageEvent
-from openhands.sdk.llm import MessageToolCall, TextContent
-from openhands.sdk.tool import Action
+from openhands.sdk import Action, MessageEvent, TextContent
+from openhands.sdk.event import ActionEvent
+from openhands.sdk.event.conversation_error import ConversationErrorEvent
+from openhands.sdk.llm import MessageToolCall
 from openhands_cli.refactor.widgets.richlog_visualizer import ConversationVisualizer
 
 
@@ -149,7 +150,7 @@ class TestChineseCharacterMarkupHandling:
         visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
         # Create a message with problematic Chinese content
-        from openhands.sdk.llm import Message
+        from openhands.sdk import Message
 
         message = Message(
             role="assistant",
@@ -271,3 +272,40 @@ class TestVisualizerIntegration:
         if "[" in action.command or "]" in action.command:
             # The title extraction should have escaped them
             assert r"\[" in title_str or r"\]" in title_str
+
+
+class TestConversationErrorEventHandling:
+    """Tests for ConversationErrorEvent handling in the visualizer."""
+
+    def test_conversation_error_event_creates_collapsible_with_error_styling(self):
+        """Test that ConversationErrorEvent is properly handled with error styling."""
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+        # Create a ConversationErrorEvent with test content
+        error_event = ConversationErrorEvent(
+            source="agent", code="test_error", detail="Test conversation error message"
+        )
+
+        # Create the collapsible widget for the error event
+        collapsible = visualizer._create_event_collapsible(error_event)
+
+        # Verify the collapsible was created successfully
+        assert collapsible is not None
+
+        # Verify it has the correct title
+        assert "Conversation Error" in str(collapsible.title)
+
+        # Verify it starts expanded (collapsed=False)
+        assert not collapsible.collapsed
+
+        # Verify it has error border color (should be the error theme color)
+        from openhands_cli.refactor.widgets.richlog_visualizer import (
+            _get_event_border_color,
+        )
+        from openhands_cli.theme import OPENHANDS_THEME
+
+        expected_color = OPENHANDS_THEME.error or "#ff6b6b"
+        actual_color = _get_event_border_color(error_event)
+        assert actual_color == expected_color

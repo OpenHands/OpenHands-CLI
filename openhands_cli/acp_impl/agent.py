@@ -36,11 +36,11 @@ from acp.schema import (
 
 from openhands.sdk import (
     Conversation,
+    Event,
     LocalConversation,
     Message,
     Workspace,
 )
-from openhands.sdk.event import Event
 from openhands_cli import __version__
 from openhands_cli.acp_impl.confirmation import (
     ConfirmationMode,
