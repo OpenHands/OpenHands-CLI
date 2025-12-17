@@ -13,138 +13,140 @@ from openhands_cli.cloud.conversation import (
 )
 
 
-def test_check_user_authentication_no_api_key():
-    """Test authentication check when no API key is stored."""
+@pytest.mark.parametrize(
+    "has_api_key,api_key_value,expected_result,expected_error,error_message",
+    [
+        (False, None, None, CloudConversationError, "User not authenticated"),
+        (True, None, None, CloudConversationError, "Invalid API key"),
+        (True, "valid-api-key", "valid-api-key", None, None),
+    ],
+)
+def test_check_user_authentication(
+    has_api_key, api_key_value, expected_result, expected_error, error_message
+):
+    """Test authentication check with various API key scenarios."""
     with patch("openhands_cli.cloud.conversation.TokenStorage") as mock_storage_class:
         mock_storage = Mock()
-        mock_storage.has_api_key.return_value = False
+        mock_storage.has_api_key.return_value = has_api_key
+        mock_storage.get_api_key.return_value = api_key_value
         mock_storage_class.return_value = mock_storage
 
-        with pytest.raises(CloudConversationError, match="User not authenticated"):
-            check_user_authentication("https://example.com")
+        if expected_error:
+            with pytest.raises(expected_error, match=error_message):
+                check_user_authentication("https://example.com")
+        else:
+            result = check_user_authentication("https://example.com")
+            assert result == expected_result
 
 
-def test_check_user_authentication_invalid_api_key():
-    """Test authentication check when API key is invalid."""
-    with patch("openhands_cli.cloud.conversation.TokenStorage") as mock_storage_class:
-        mock_storage = Mock()
-        mock_storage.has_api_key.return_value = True
-        mock_storage.get_api_key.return_value = None
-        mock_storage_class.return_value = mock_storage
-
-        with pytest.raises(CloudConversationError, match="Invalid API key"):
-            check_user_authentication("https://example.com")
-
-
-def test_check_user_authentication_valid_api_key():
-    """Test authentication check when API key is valid."""
-    with patch("openhands_cli.cloud.conversation.TokenStorage") as mock_storage_class:
-        mock_storage = Mock()
-        mock_storage.has_api_key.return_value = True
-        mock_storage.get_api_key.return_value = "valid-api-key"
-        mock_storage_class.return_value = mock_storage
-
-        result = check_user_authentication("https://example.com")
-        assert result == "valid-api-key"
-
-
-def test_extract_repository_from_cwd_github_ssh():
-    """Test repository extraction from GitHub SSH URL."""
+@pytest.mark.parametrize(
+    "remote_url,branch_name,branch_success,expected_repo,expected_branch,test_description",
+    [
+        (
+            "git@github.com:username/repo.git\n",
+            "main\n",
+            True,
+            "username/repo",
+            "main",
+            "GitHub SSH URL with successful branch detection",
+        ),
+        (
+            "https://github.com/username/repo.git\n",
+            "develop\n",
+            True,
+            "username/repo",
+            "develop",
+            "GitHub HTTPS URL with successful branch detection",
+        ),
+        (
+            "git@github.com:username/repo.git\n",
+            None,
+            False,
+            "username/repo",
+            None,
+            "successful remote URL but branch detection fails",
+        ),
+    ],
+)
+def test_extract_repository_from_cwd_success_cases(
+    remote_url,
+    branch_name,
+    branch_success,
+    expected_repo,
+    expected_branch,
+    test_description,
+):
+    """Test repository extraction from various URL formats and branch scenarios."""
     with patch("subprocess.run") as mock_run:
-        # Mock the remote URL call
+        # Mock the remote URL call (always successful for these cases)
         remote_mock = Mock()
         remote_mock.returncode = 0
-        remote_mock.stdout = "git@github.com:username/repo.git\n"
+        remote_mock.stdout = remote_url
 
         # Mock the branch call
         branch_mock = Mock()
-        branch_mock.returncode = 0
-        branch_mock.stdout = "main\n"
+        branch_mock.returncode = 0 if branch_success else 1
+        if branch_success:
+            branch_mock.stdout = branch_name
 
         mock_run.side_effect = [remote_mock, branch_mock]
 
         repository, branch = extract_repository_from_cwd()
-        assert repository == "username/repo"
-        assert branch == "main"
+        assert repository == expected_repo, f"Failed for {test_description}"
+        assert branch == expected_branch, f"Failed for {test_description}"
 
 
-def test_extract_repository_from_cwd_github_https():
-    """Test repository extraction from GitHub HTTPS URL."""
-    with patch("subprocess.run") as mock_run:
-        # Mock the remote URL call
-        remote_mock = Mock()
-        remote_mock.returncode = 0
-        remote_mock.stdout = "https://github.com/username/repo.git\n"
-
-        # Mock the branch call
-        branch_mock = Mock()
-        branch_mock.returncode = 0
-        branch_mock.stdout = "develop\n"
-
-        mock_run.side_effect = [remote_mock, branch_mock]
-
-        repository, branch = extract_repository_from_cwd()
-        assert repository == "username/repo"
-        assert branch == "develop"
-
-
-def test_extract_repository_from_cwd_branch_detection_fails():
-    """Test repository extraction when branch detection fails."""
-    with patch("subprocess.run") as mock_run:
-        # Mock the remote URL call (success)
-        remote_mock = Mock()
-        remote_mock.returncode = 0
-        remote_mock.stdout = "git@github.com:username/repo.git\n"
-
-        # Mock the branch call (failure)
-        branch_mock = Mock()
-        branch_mock.returncode = 1
-
-        mock_run.side_effect = [remote_mock, branch_mock]
-
-        repository, branch = extract_repository_from_cwd()
-        assert repository == "username/repo"
-        assert branch is None
-
-
-def test_extract_repository_from_cwd_not_git_repo():
-    """Test repository extraction when not in a git repository."""
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value.returncode = 1
-
-        repository, branch = extract_repository_from_cwd()
-        assert repository is None
-        assert branch is None
-
-
-def test_extract_repository_from_cwd_subprocess_error():
-    """Test repository extraction when subprocess fails."""
-    with patch("subprocess.run", side_effect=FileNotFoundError):
-        repository, branch = extract_repository_from_cwd()
-        assert repository is None
-        assert branch is None
+@pytest.mark.parametrize(
+    "mock_setup,test_description",
+    [
+        (
+            lambda mock_run: setattr(mock_run.return_value, "returncode", 1),
+            "not in a git repository",
+        ),
+        (
+            lambda mock_run: None,  # Will use side_effect instead
+            "subprocess fails with FileNotFoundError",
+        ),
+    ],
+)
+def test_extract_repository_from_cwd_error_cases(mock_setup, test_description):
+    """Test repository extraction error scenarios."""
+    if "FileNotFoundError" in test_description:
+        with patch("subprocess.run", side_effect=FileNotFoundError):
+            repository, branch = extract_repository_from_cwd()
+            assert repository is None, f"Failed for {test_description}"
+            assert branch is None, f"Failed for {test_description}"
+    else:
+        with patch("subprocess.run") as mock_run:
+            mock_setup(mock_run)
+            repository, branch = extract_repository_from_cwd()
+            assert repository is None, f"Failed for {test_description}"
+            assert branch is None, f"Failed for {test_description}"
 
 
 @pytest.mark.asyncio
-async def test_validate_token_success():
-    """Test successful token validation."""
-    from unittest.mock import AsyncMock
-
-    with patch(
-        "openhands_cli.cloud.conversation.OpenHandsApiClient"
-    ) as mock_client_class:
-        mock_client = Mock()
-        mock_client.get_user_info = AsyncMock(return_value={"id": "user123"})
-        mock_client_class.return_value = mock_client
-
-        result = await validate_token("https://example.com", "valid-token")
-        assert result is True
-        mock_client.get_user_info.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_validate_token_unauthenticated():
-    """Test token validation with unauthenticated error."""
+@pytest.mark.parametrize(
+    "mock_side_effect,expected_result,expected_exception,exception_message",
+    [
+        (None, True, None, None),  # Success case - return_value will be set
+        (
+            "UnauthenticatedError",
+            False,
+            None,
+            None,
+        ),  # Unauthenticated case - returns False
+        (
+            Exception("Network error"),
+            None,
+            CloudConversationError,
+            "Failed to validate token: Network error",
+        ),  # Other error case
+    ],
+)
+async def test_validate_token(
+    mock_side_effect, expected_result, expected_exception, exception_message
+):
+    """Test token validation with various scenarios."""
     from unittest.mock import AsyncMock
 
     from openhands_cli.auth.api_client import UnauthenticatedError
@@ -153,31 +155,25 @@ async def test_validate_token_unauthenticated():
         "openhands_cli.cloud.conversation.OpenHandsApiClient"
     ) as mock_client_class:
         mock_client = Mock()
-        mock_client.get_user_info = AsyncMock(
-            side_effect=UnauthenticatedError("Invalid token")
-        )
+
+        if mock_side_effect == "UnauthenticatedError":
+            mock_client.get_user_info = AsyncMock(
+                side_effect=UnauthenticatedError("Invalid token")
+            )
+        elif mock_side_effect is None:
+            mock_client.get_user_info = AsyncMock(return_value={"id": "user123"})
+        else:
+            mock_client.get_user_info = AsyncMock(side_effect=mock_side_effect)
+
         mock_client_class.return_value = mock_client
 
-        result = await validate_token("https://example.com", "invalid-token")
-        assert result is False
-
-
-@pytest.mark.asyncio
-async def test_validate_token_other_error():
-    """Test token validation with other errors."""
-    from unittest.mock import AsyncMock
-
-    with patch(
-        "openhands_cli.cloud.conversation.OpenHandsApiClient"
-    ) as mock_client_class:
-        mock_client = Mock()
-        mock_client.get_user_info = AsyncMock(side_effect=Exception("Network error"))
-        mock_client_class.return_value = mock_client
-
-        with pytest.raises(
-            CloudConversationError, match="Failed to validate token: Network error"
-        ):
-            await validate_token("https://example.com", "token")
+        if expected_exception:
+            with pytest.raises(expected_exception, match=exception_message):
+                await validate_token("https://example.com", "test-token")
+        else:
+            result = await validate_token("https://example.com", "test-token")
+            assert result is expected_result
+            mock_client.get_user_info.assert_called_once()
 
 
 @pytest.mark.asyncio
