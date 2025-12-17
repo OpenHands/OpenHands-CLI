@@ -12,6 +12,7 @@ from openhands_cli.cloud.conversation import (
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.utils import create_seeded_instructions_from_args
 
+
 console = Console()
 
 

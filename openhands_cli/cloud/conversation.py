@@ -4,7 +4,8 @@ from typing import Any
 
 from rich.console import Console
 
-from openhands_cli.auth.api_client import OpenHandsApiClient
+from openhands_cli.auth.api_client import OpenHandsApiClient, UnauthenticatedError
+from openhands_cli.auth.logout_command import logout_command
 from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.theme import OPENHANDS_THEME
 
@@ -64,6 +65,30 @@ def check_user_authentication(_server_url: str) -> str:
     return api_key
 
 
+async def validate_token(server_url: str, api_key: str) -> bool:
+    """Validate the API token by making a test request.
+
+    Args:
+        server_url: The OpenHands server URL
+        api_key: The API key to validate
+
+    Returns:
+        True if token is valid, False if invalid
+
+    Raises:
+        CloudConversationError: For non-authentication related errors
+    """
+    try:
+        client = OpenHandsApiClient(server_url, api_key)
+        await client.get_user_info()
+        return True
+    except UnauthenticatedError:
+        return False
+    except Exception as e:
+        # For other errors, we still raise them as they might be network issues, etc.
+        raise CloudConversationError(f"Failed to validate token: {str(e)}")
+
+
 async def create_cloud_conversation(
     server_url: str,
     initial_user_msg: str,
@@ -83,6 +108,36 @@ async def create_cloud_conversation(
     try:
         # Check authentication
         api_key = check_user_authentication(server_url)
+
+        # Validate the token before proceeding
+        console.print(
+            f"[{OPENHANDS_THEME.secondary}]Validating authentication..."
+            f"[/{OPENHANDS_THEME.secondary}]"
+        )
+
+        is_valid = await validate_token(server_url, api_key)
+        if not is_valid:
+            # Token is invalid, log out the user
+            console.print(
+                f"[{OPENHANDS_THEME.warning}]Your connection with OpenHands Cloud "
+                f"has expired.[/{OPENHANDS_THEME.warning}]"
+            )
+            console.print(
+                f"[{OPENHANDS_THEME.accent}]Logging you out..."
+                f"[/{OPENHANDS_THEME.accent}]"
+            )
+
+            logout_command(server_url)
+
+            console.print(
+                f"[{OPENHANDS_THEME.secondary}]Please re-run the following command "
+                f"to reconnect and retry:[/{OPENHANDS_THEME.secondary}]"
+            )
+            console.print(
+                f"[{OPENHANDS_THEME.accent}]  openhands login"
+                f"[/{OPENHANDS_THEME.accent}]"
+            )
+            raise CloudConversationError("Authentication expired - user logged out")
 
         # Create API client
         client = OpenHandsApiClient(server_url, api_key)

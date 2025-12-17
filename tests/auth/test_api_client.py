@@ -9,6 +9,7 @@ import pytest
 from openhands_cli.auth.api_client import (
     ApiClientError,
     OpenHandsApiClient,
+    UnauthenticatedError,
     create_and_save_agent_configuration,
     fetch_user_data_after_oauth,
 )
@@ -105,6 +106,41 @@ class TestOpenHandsApiClient:
 
             assert result == expected_settings
             mock_get_json.assert_called_once_with("/api/settings")
+
+    @pytest.mark.asyncio
+    async def test_get_user_info_success(self):
+        """Test successful user info retrieval."""
+        client = OpenHandsApiClient("https://api.example.com", "test-key")
+
+        expected_user_info = {
+            "id": "user123",
+            "email": "user@example.com",
+            "name": "Test User",
+        }
+
+        with patch.object(client, "_get_json") as mock_get_json:
+            mock_get_json.return_value = expected_user_info
+
+            result = await client.get_user_info()
+
+            assert result == expected_user_info
+            mock_get_json.assert_called_once_with("/api/user/info")
+
+    @pytest.mark.asyncio
+    async def test_get_json_401_error(self):
+        """Test JSON GET request with 401 Unauthorized error."""
+        client = OpenHandsApiClient("https://api.example.com", "test-key")
+
+        with patch.object(client, "get") as mock_get:
+            from openhands_cli.auth.http_client import AuthHttpError
+
+            mock_get.side_effect = AuthHttpError("HTTP 401: Unauthorized")
+
+            with pytest.raises(
+                UnauthenticatedError,
+                match="Authentication failed for '/test': HTTP 401: Unauthorized",
+            ):
+                await client._get_json("/test")
 
 
 class TestHelperFunctions:

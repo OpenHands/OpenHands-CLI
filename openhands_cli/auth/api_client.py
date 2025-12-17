@@ -17,6 +17,12 @@ class ApiClientError(Exception):
     pass
 
 
+class UnauthenticatedError(ApiClientError):
+    """Exception raised when user is not authenticated (401 response)."""
+
+    pass
+
+
 SETTINGS_PATH = f"{PERSISTENCE_DIR}/{AGENT_SETTINGS_PATH}"
 
 
@@ -36,8 +42,25 @@ class OpenHandsApiClient(BaseHttpClient):
         try:
             response = await self.get(path, headers=self._headers)
         except AuthHttpError as e:
+            # Check if this is a 401 Unauthorized error
+            if "HTTP 401" in str(e):
+                raise UnauthenticatedError(
+                    f"Authentication failed for {path!r}: {e}"
+                ) from e
             raise ApiClientError(f"Request to {path!r} failed: {e}") from e
         return response.json()
+
+    async def get_user_info(self) -> dict[str, Any]:
+        """Get user information from the API.
+
+        Returns:
+            User information dictionary
+
+        Raises:
+            UnauthenticatedError: If the user is not authenticated (401 response)
+            ApiClientError: For other API errors
+        """
+        return await self._get_json("/api/user/info")
 
     async def get_llm_api_key(self) -> str | None:
         result = await self._get_json("/api/keys/llm/byor")

@@ -9,6 +9,7 @@ from openhands_cli.cloud.conversation import (
     check_user_authentication,
     create_cloud_conversation,
     extract_repository_from_cwd,
+    validate_token,
 )
 
 
@@ -125,6 +126,93 @@ def test_extract_repository_from_cwd_subprocess_error():
 
 
 @pytest.mark.asyncio
+async def test_validate_token_success():
+    """Test successful token validation."""
+    with patch(
+        "openhands_cli.cloud.conversation.OpenHandsApiClient"
+    ) as mock_client_class:
+        mock_client = Mock()
+        mock_client.get_user_info = Mock(return_value={"id": "user123"})
+        mock_client_class.return_value = mock_client
+
+        result = await validate_token("https://example.com", "valid-token")
+        assert result is True
+        mock_client.get_user_info.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_validate_token_unauthenticated():
+    """Test token validation with unauthenticated error."""
+    from openhands_cli.auth.api_client import UnauthenticatedError
+
+    with patch(
+        "openhands_cli.cloud.conversation.OpenHandsApiClient"
+    ) as mock_client_class:
+        mock_client = Mock()
+        mock_client.get_user_info.side_effect = UnauthenticatedError("Invalid token")
+        mock_client_class.return_value = mock_client
+
+        result = await validate_token("https://example.com", "invalid-token")
+        assert result is False
+
+
+@pytest.mark.asyncio
+async def test_validate_token_other_error():
+    """Test token validation with other errors."""
+    with patch(
+        "openhands_cli.cloud.conversation.OpenHandsApiClient"
+    ) as mock_client_class:
+        mock_client = Mock()
+        mock_client.get_user_info.side_effect = Exception("Network error")
+        mock_client_class.return_value = mock_client
+
+        with pytest.raises(
+            CloudConversationError, match="Failed to validate token: Network error"
+        ):
+            await validate_token("https://example.com", "token")
+
+
+@pytest.mark.asyncio
+async def test_create_cloud_conversation_token_validation_failure():
+    """Test that token validation failure logs out user and raises error."""
+
+    with patch(
+        "openhands_cli.cloud.conversation.check_user_authentication"
+    ) as mock_auth:
+        mock_auth.return_value = "invalid-api-key"
+
+        with patch("openhands_cli.cloud.conversation.validate_token") as mock_validate:
+            mock_validate.return_value = False
+
+            with patch(
+                "openhands_cli.cloud.conversation.logout_command"
+            ) as mock_logout:
+                with patch("openhands_cli.cloud.conversation.console") as mock_console:
+                    with pytest.raises(
+                        CloudConversationError,
+                        match="Authentication expired - user logged out",
+                    ):
+                        await create_cloud_conversation(
+                            server_url="https://test.com",
+                            initial_user_msg="Test message",
+                        )
+
+                    # Verify logout was called
+                    mock_logout.assert_called_once_with("https://test.com")
+
+                    # Verify appropriate messages were printed
+                    print_calls = [
+                        str(call) for call in mock_console.print.call_args_list
+                    ]
+                    assert any(
+                        "connection with OpenHands Cloud has expired" in call
+                        for call in print_calls
+                    )
+                    assert any("Logging you out" in call for call in print_calls)
+                    assert any("openhands login" in call for call in print_calls)
+
+
+@pytest.mark.asyncio
 async def test_create_cloud_conversation_repository_extraction_error():
     """Test that repository extraction errors are logged but don't fail creation."""
     from unittest.mock import AsyncMock
@@ -134,43 +222,51 @@ async def test_create_cloud_conversation_repository_extraction_error():
     ) as mock_auth:
         mock_auth.return_value = "test-api-key"
 
-        with patch(
-            "openhands_cli.cloud.conversation.OpenHandsApiClient"
-        ) as mock_client_class:
-            mock_client = Mock()
-            mock_response = Mock()
-            mock_response.json.return_value = {
-                "id": "test-id",
-                "url": "https://example.com",
-            }
-            mock_client.create_conversation = AsyncMock(return_value=mock_response)
-            mock_client_class.return_value = mock_client
+        with patch("openhands_cli.cloud.conversation.validate_token") as mock_validate:
+            mock_validate.return_value = True
 
             with patch(
-                "openhands_cli.cloud.conversation.extract_repository_from_cwd"
-            ) as mock_extract:
-                mock_extract.side_effect = Exception("Git command failed")
+                "openhands_cli.cloud.conversation.OpenHandsApiClient"
+            ) as mock_client_class:
+                mock_client = Mock()
+                mock_response = Mock()
+                mock_response.json.return_value = {
+                    "id": "test-id",
+                    "url": "https://example.com",
+                }
+                mock_client.create_conversation = AsyncMock(return_value=mock_response)
+                mock_client_class.return_value = mock_client
 
-                with patch("openhands_cli.cloud.conversation.console") as mock_console:
-                    result = await create_cloud_conversation(
-                        server_url="https://test.com", initial_user_msg="Test message"
-                    )
+                with patch(
+                    "openhands_cli.cloud.conversation.extract_repository_from_cwd"
+                ) as mock_extract:
+                    mock_extract.side_effect = Exception("Git command failed")
 
-                    # Verify the warning was printed
-                    warning_calls = [
-                        call
-                        for call in mock_console.print.call_args_list
-                        if "Warning: Could not detect repository" in str(call)
-                    ]
-                    assert len(warning_calls) > 0, "Expected warning message not found"
+                    with patch(
+                        "openhands_cli.cloud.conversation.console"
+                    ) as mock_console:
+                        result = await create_cloud_conversation(
+                            server_url="https://test.com",
+                            initial_user_msg="Test message",
+                        )
 
-                    # Verify conversation was still created successfully
-                    assert result["id"] == "test-id"
+                        # Verify the warning was printed
+                        warning_calls = [
+                            call
+                            for call in mock_console.print.call_args_list
+                            if "Warning: Could not detect repository" in str(call)
+                        ]
+                        assert len(warning_calls) > 0, (
+                            "Expected warning message not found"
+                        )
 
-                    # Verify API was called without repository
-                    mock_client.create_conversation.assert_called_once_with(
-                        json_data={"initial_user_msg": "Test message"},
-                    )
+                        # Verify conversation was still created successfully
+                        assert result["id"] == "test-id"
+
+                        # Verify API was called without repository
+                        mock_client.create_conversation.assert_called_once_with(
+                            json_data={"initial_user_msg": "Test message"},
+                        )
 
 
 @pytest.mark.asyncio
@@ -183,39 +279,43 @@ async def test_create_cloud_conversation_with_repository_and_branch():
     ) as mock_auth:
         mock_auth.return_value = "test-api-key"
 
-        with patch(
-            "openhands_cli.cloud.conversation.OpenHandsApiClient"
-        ) as mock_client_class:
-            mock_client = Mock()
-            mock_response = Mock()
-            mock_response.json.return_value = {
-                "conversation_id": "test-conversation-id",
-                "url": "https://example.com",
-            }
-            mock_client.create_conversation = AsyncMock(return_value=mock_response)
-            mock_client_class.return_value = mock_client
+        with patch("openhands_cli.cloud.conversation.validate_token") as mock_validate:
+            mock_validate.return_value = True
 
             with patch(
-                "openhands_cli.cloud.conversation.extract_repository_from_cwd"
-            ) as mock_extract:
-                mock_extract.return_value = ("username/repo", "feature-branch")
+                "openhands_cli.cloud.conversation.OpenHandsApiClient"
+            ) as mock_client_class:
+                mock_client = Mock()
+                mock_response = Mock()
+                mock_response.json.return_value = {
+                    "conversation_id": "test-conversation-id",
+                    "url": "https://example.com",
+                }
+                mock_client.create_conversation = AsyncMock(return_value=mock_response)
+                mock_client_class.return_value = mock_client
 
-                with patch("openhands_cli.cloud.conversation.console"):
-                    result = await create_cloud_conversation(
-                        server_url="https://test.com", initial_user_msg="Test message"
-                    )
+                with patch(
+                    "openhands_cli.cloud.conversation.extract_repository_from_cwd"
+                ) as mock_extract:
+                    mock_extract.return_value = ("username/repo", "feature-branch")
 
-                    # Verify conversation was created successfully
-                    assert result["conversation_id"] == "test-conversation-id"
+                    with patch("openhands_cli.cloud.conversation.console"):
+                        result = await create_cloud_conversation(
+                            server_url="https://test.com",
+                            initial_user_msg="Test message",
+                        )
 
-                    # Verify API was called with repository and selected_branch
-                    mock_client.create_conversation.assert_called_once_with(
-                        json_data={
-                            "initial_user_msg": "Test message",
-                            "repository": "username/repo",
-                            "selected_branch": "feature-branch",
-                        },
-                    )
+                        # Verify conversation was created successfully
+                        assert result["conversation_id"] == "test-conversation-id"
+
+                        # Verify API was called with repository and selected_branch
+                        mock_client.create_conversation.assert_called_once_with(
+                            json_data={
+                                "initial_user_msg": "Test message",
+                                "repository": "username/repo",
+                                "selected_branch": "feature-branch",
+                            },
+                        )
 
 
 @pytest.mark.asyncio
@@ -228,35 +328,39 @@ async def test_create_cloud_conversation_with_repository_only():
     ) as mock_auth:
         mock_auth.return_value = "test-api-key"
 
-        with patch(
-            "openhands_cli.cloud.conversation.OpenHandsApiClient"
-        ) as mock_client_class:
-            mock_client = Mock()
-            mock_response = Mock()
-            mock_response.json.return_value = {
-                "conversation_id": "test-conversation-id",
-                "url": "https://example.com",
-            }
-            mock_client.create_conversation = AsyncMock(return_value=mock_response)
-            mock_client_class.return_value = mock_client
+        with patch("openhands_cli.cloud.conversation.validate_token") as mock_validate:
+            mock_validate.return_value = True
 
             with patch(
-                "openhands_cli.cloud.conversation.extract_repository_from_cwd"
-            ) as mock_extract:
-                mock_extract.return_value = ("username/repo", None)
+                "openhands_cli.cloud.conversation.OpenHandsApiClient"
+            ) as mock_client_class:
+                mock_client = Mock()
+                mock_response = Mock()
+                mock_response.json.return_value = {
+                    "conversation_id": "test-conversation-id",
+                    "url": "https://example.com",
+                }
+                mock_client.create_conversation = AsyncMock(return_value=mock_response)
+                mock_client_class.return_value = mock_client
 
-                with patch("openhands_cli.cloud.conversation.console"):
-                    result = await create_cloud_conversation(
-                        server_url="https://test.com", initial_user_msg="Test message"
-                    )
+                with patch(
+                    "openhands_cli.cloud.conversation.extract_repository_from_cwd"
+                ) as mock_extract:
+                    mock_extract.return_value = ("username/repo", None)
 
-                    # Verify conversation was created successfully
-                    assert result["conversation_id"] == "test-conversation-id"
+                    with patch("openhands_cli.cloud.conversation.console"):
+                        result = await create_cloud_conversation(
+                            server_url="https://test.com",
+                            initial_user_msg="Test message",
+                        )
 
-                    # Verify API was called with repository but no selected_branch
-                    mock_client.create_conversation.assert_called_once_with(
-                        json_data={
-                            "initial_user_msg": "Test message",
-                            "repository": "username/repo",
-                        },
-                    )
+                        # Verify conversation was created successfully
+                        assert result["conversation_id"] == "test-conversation-id"
+
+                        # Verify API was called with repository but no selected_branch
+                        mock_client.create_conversation.assert_called_once_with(
+                            json_data={
+                                "initial_user_msg": "Test message",
+                                "repository": "username/repo",
+                            },
+                        )
