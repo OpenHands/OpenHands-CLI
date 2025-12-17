@@ -38,6 +38,28 @@ SettingsScreen {
     height: 1fr;
 }
 
+.switch_container {
+    height: auto;
+    align: left middle;
+    margin-bottom: 1;
+}
+
+.switch_label {
+    width: auto;
+    margin-right: 2;
+}
+
+.form_switch {
+    width: auto;
+    height: auto;
+}
+
+.switch_help {
+    margin-left: 0;
+    margin-top: 0;
+    padding-left: 0;
+}
+
 #form_content {
     height: auto;
     min-height: 100%;

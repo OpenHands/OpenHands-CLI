@@ -12,7 +12,16 @@ from textual import getters
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, Select, Static, TabbedContent, TabPane
+from textual.widgets import (
+    Button,
+    Input,
+    Label,
+    Select,
+    Static,
+    Switch,
+    TabbedContent,
+    TabPane,
+)
 from textual.widgets._select import NoSelection
 
 from openhands_cli.refactor.modals.settings.choices import (
@@ -198,18 +207,31 @@ class SettingsScreen(ModalScreen):
                                     classes="form_help",
                                 )
 
-                # App Configurations Tab (empty for now)
+                # App Configurations Tab
                 with TabPane("App Configurations", id="app_config_tab"):
                     with Container(id="app_config_content"):
                         yield Static(
                             "App Configurations",
                             classes="form_section_title",
                         )
-                        yield Static(
-                            "This section will contain application-specific "
-                            "configuration options.",
-                            classes="form_help",
-                        )
+                        
+                        # Display Cost Per Action Setting
+                        with Container(classes="form_group"):
+                            with Horizontal(classes="switch_container"):
+                                yield Label(
+                                    "Display Cost Per Action:",
+                                    classes="form_label switch_label",
+                                )
+                                yield Switch(
+                                    value=False,
+                                    id="display_cost_switch",
+                                    classes="form_switch",
+                                )
+                            yield Static(
+                                "Show the estimated cost for each action performed "
+                                "by the agent in the interface.",
+                                classes="form_help switch_help",
+                            )
 
             # Buttons
             with Horizontal(id="button_container"):
