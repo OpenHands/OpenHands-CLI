@@ -1,8 +1,7 @@
 from prompt_toolkit import HTML, print_formatted_text
 
-from openhands.sdk import BaseConversation, Message
+from openhands.sdk import BaseConversation, ConversationExecutionStatus, Message
 from openhands.sdk.conversation.state import (
-    ConversationExecutionStatus,
     ConversationState,
 )
 from openhands.sdk.security.confirmation_policy import (

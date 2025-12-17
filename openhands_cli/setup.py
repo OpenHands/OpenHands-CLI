@@ -3,8 +3,8 @@ from uuid import UUID
 
 from prompt_toolkit import HTML, print_formatted_text
 
-from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
-from openhands.sdk.context import AgentContext, Skill
+from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, Workspace
+from openhands.sdk.context import Skill
 from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
 )

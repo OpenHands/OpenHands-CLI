@@ -9,10 +9,10 @@ from textual.app import App
 from textual.containers import VerticalScroll
 from textual.widgets import Static
 
-from openhands.sdk.event import ActionEvent, MessageEvent
+from openhands.sdk import Action, MessageEvent, TextContent
+from openhands.sdk.event import ActionEvent
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
-from openhands.sdk.llm import MessageToolCall, TextContent
-from openhands.sdk.tool import Action
+from openhands.sdk.llm import MessageToolCall
 from openhands_cli.refactor.widgets.richlog_visualizer import ConversationVisualizer
 
 
@@ -150,7 +150,7 @@ class TestChineseCharacterMarkupHandling:
         visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
         # Create a message with problematic Chinese content
-        from openhands.sdk.llm import Message
+        from openhands.sdk import Message
 
         message = Message(
             role="assistant",

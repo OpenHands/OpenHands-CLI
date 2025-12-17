@@ -6,10 +6,14 @@ from typing import Any
 
 from prompt_toolkit import HTML, print_formatted_text
 
-from openhands.sdk import Agent, AgentContext, LocalFileStore
+from openhands.sdk import (
+    LLM,
+    Agent,
+    AgentContext,
+    LLMSummarizingCondenser,
+    LocalFileStore,
+)
 from openhands.sdk.context import load_skills_from_dir
-from openhands.sdk.context.condenser import LLMSummarizingCondenser
-from openhands.sdk.llm import LLM
 from openhands.tools.preset.default import get_default_tools
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
