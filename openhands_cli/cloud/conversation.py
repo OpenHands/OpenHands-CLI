@@ -87,16 +87,23 @@ async def create_cloud_conversation(
         # Create API client
         client = OpenHandsApiClient(server_url, api_key)
 
-        # Try to extract repository from current directory
+        # Try to extract repository and branch from current directory
         repository = None
+        selected_branch = None
         try:
-            repository = extract_repository_from_cwd()
+            repository, selected_branch = extract_repository_from_cwd()
             if repository:
                 console.print(
                     f"[{OPENHANDS_THEME.secondary}]Detected repository: "
                     f"[{OPENHANDS_THEME.accent}]{repository}"
                     f"[/{OPENHANDS_THEME.accent}][/{OPENHANDS_THEME.secondary}]"
                 )
+                if selected_branch:
+                    console.print(
+                        f"[{OPENHANDS_THEME.secondary}]Detected branch: "
+                        f"[{OPENHANDS_THEME.accent}]{selected_branch}"
+                        f"[/{OPENHANDS_THEME.accent}][/{OPENHANDS_THEME.secondary}]"
+                    )
         except Exception as e:
             console.print(
                 f"[{OPENHANDS_THEME.warning}]Warning: Could not detect "
@@ -111,6 +118,9 @@ async def create_cloud_conversation(
 
         if repository:
             conversation_data["repository"] = repository
+
+        if selected_branch:
+            conversation_data["selected_branch"] = selected_branch
 
         console.print(
             f"[{OPENHANDS_THEME.accent}]Creating cloud "
@@ -158,11 +168,13 @@ async def create_cloud_conversation(
         raise CloudConversationError(f"Failed to create conversation: {str(e)}")
 
 
-def extract_repository_from_cwd() -> str | None:
-    """Extract repository name from current working directory if it's a git repo.
+def extract_repository_from_cwd() -> tuple[str | None, str | None]:
+    """Extract repository name and current branch from current working directory.
 
     Returns:
-        Repository name in format 'username/repo' or None if not a git repo
+        Tuple of (repository_name, branch_name) where:
+        - repository_name: Repository name in format 'username/repo' or None
+        - branch_name: Current branch name or None if detection fails
     """
     import os
     import subprocess
@@ -177,9 +189,10 @@ def extract_repository_from_cwd() -> str | None:
         )
 
         if result.returncode != 0:
-            return None
+            return None, None
 
         remote_url = result.stdout.strip()
+        repository = None
 
         # Parse GitHub/GitLab URLs
         if "github.com" in remote_url or "gitlab.com" in remote_url:
@@ -189,16 +202,32 @@ def extract_repository_from_cwd() -> str | None:
                 parts = remote_url.split(":")
                 if len(parts) >= 2:
                     repo_part = parts[1].replace(".git", "")
-                    return repo_part
+                    repository = repo_part
             elif remote_url.startswith("https://"):
                 # HTTPS format: https://github.com/username/repo.git
                 parts = remote_url.split("/")
                 if len(parts) >= 5:
                     username = parts[-2]
                     repo = parts[-1].replace(".git", "")
-                    return f"{username}/{repo}"
+                    repository = f"{username}/{repo}"
 
-        return None
+        # Get current branch name
+        branch = None
+        if repository:  # Only get branch if we have a valid repository
+            try:
+                branch_result = subprocess.run(
+                    ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                    capture_output=True,
+                    text=True,
+                    cwd=os.getcwd(),
+                )
+                if branch_result.returncode == 0:
+                    branch = branch_result.stdout.strip()
+            except (subprocess.SubprocessError, FileNotFoundError):
+                # Branch detection failed, but we still have repository info
+                pass
+
+        return repository, branch
 
     except (subprocess.SubprocessError, FileNotFoundError):
-        return None
+        return None, None

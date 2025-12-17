@@ -50,21 +50,60 @@ def test_check_user_authentication_valid_api_key():
 def test_extract_repository_from_cwd_github_ssh():
     """Test repository extraction from GitHub SSH URL."""
     with patch("subprocess.run") as mock_run:
-        mock_run.return_value.returncode = 0
-        mock_run.return_value.stdout = "git@github.com:username/repo.git\n"
+        # Mock the remote URL call
+        remote_mock = Mock()
+        remote_mock.returncode = 0
+        remote_mock.stdout = "git@github.com:username/repo.git\n"
 
-        result = extract_repository_from_cwd()
-        assert result == "username/repo"
+        # Mock the branch call
+        branch_mock = Mock()
+        branch_mock.returncode = 0
+        branch_mock.stdout = "main\n"
+
+        mock_run.side_effect = [remote_mock, branch_mock]
+
+        repository, branch = extract_repository_from_cwd()
+        assert repository == "username/repo"
+        assert branch == "main"
 
 
 def test_extract_repository_from_cwd_github_https():
     """Test repository extraction from GitHub HTTPS URL."""
     with patch("subprocess.run") as mock_run:
-        mock_run.return_value.returncode = 0
-        mock_run.return_value.stdout = "https://github.com/username/repo.git\n"
+        # Mock the remote URL call
+        remote_mock = Mock()
+        remote_mock.returncode = 0
+        remote_mock.stdout = "https://github.com/username/repo.git\n"
 
-        result = extract_repository_from_cwd()
-        assert result == "username/repo"
+        # Mock the branch call
+        branch_mock = Mock()
+        branch_mock.returncode = 0
+        branch_mock.stdout = "develop\n"
+
+        mock_run.side_effect = [remote_mock, branch_mock]
+
+        repository, branch = extract_repository_from_cwd()
+        assert repository == "username/repo"
+        assert branch == "develop"
+
+
+def test_extract_repository_from_cwd_branch_detection_fails():
+    """Test repository extraction when branch detection fails."""
+    with patch("subprocess.run") as mock_run:
+        # Mock the remote URL call (success)
+        remote_mock = Mock()
+        remote_mock.returncode = 0
+        remote_mock.stdout = "git@github.com:username/repo.git\n"
+
+        # Mock the branch call (failure)
+        branch_mock = Mock()
+        branch_mock.returncode = 1
+
+        mock_run.side_effect = [remote_mock, branch_mock]
+
+        repository, branch = extract_repository_from_cwd()
+        assert repository == "username/repo"
+        assert branch is None
 
 
 def test_extract_repository_from_cwd_not_git_repo():
@@ -72,15 +111,17 @@ def test_extract_repository_from_cwd_not_git_repo():
     with patch("subprocess.run") as mock_run:
         mock_run.return_value.returncode = 1
 
-        result = extract_repository_from_cwd()
-        assert result is None
+        repository, branch = extract_repository_from_cwd()
+        assert repository is None
+        assert branch is None
 
 
 def test_extract_repository_from_cwd_subprocess_error():
     """Test repository extraction when subprocess fails."""
     with patch("subprocess.run", side_effect=FileNotFoundError):
-        result = extract_repository_from_cwd()
-        assert result is None
+        repository, branch = extract_repository_from_cwd()
+        assert repository is None
+        assert branch is None
 
 
 @pytest.mark.asyncio
@@ -102,7 +143,7 @@ async def test_create_cloud_conversation_repository_extraction_error():
                 "id": "test-id",
                 "url": "https://example.com",
             }
-            mock_client.post = AsyncMock(return_value=mock_response)
+            mock_client.create_conversation = AsyncMock(return_value=mock_response)
             mock_client_class.return_value = mock_client
 
             with patch(
@@ -127,7 +168,95 @@ async def test_create_cloud_conversation_repository_extraction_error():
                     assert result["id"] == "test-id"
 
                     # Verify API was called without repository
-                    mock_client.post.assert_called_once_with(
-                        "/api/conversations",
+                    mock_client.create_conversation.assert_called_once_with(
                         json_data={"initial_user_msg": "Test message"},
+                    )
+
+
+@pytest.mark.asyncio
+async def test_create_cloud_conversation_with_repository_and_branch():
+    """Test that repository and branch are included when detected."""
+    from unittest.mock import AsyncMock
+
+    with patch(
+        "openhands_cli.cloud.conversation.check_user_authentication"
+    ) as mock_auth:
+        mock_auth.return_value = "test-api-key"
+
+        with patch(
+            "openhands_cli.cloud.conversation.OpenHandsApiClient"
+        ) as mock_client_class:
+            mock_client = Mock()
+            mock_response = Mock()
+            mock_response.json.return_value = {
+                "conversation_id": "test-conversation-id",
+                "url": "https://example.com",
+            }
+            mock_client.create_conversation = AsyncMock(return_value=mock_response)
+            mock_client_class.return_value = mock_client
+
+            with patch(
+                "openhands_cli.cloud.conversation.extract_repository_from_cwd"
+            ) as mock_extract:
+                mock_extract.return_value = ("username/repo", "feature-branch")
+
+                with patch("openhands_cli.cloud.conversation.console"):
+                    result = await create_cloud_conversation(
+                        server_url="https://test.com", initial_user_msg="Test message"
+                    )
+
+                    # Verify conversation was created successfully
+                    assert result["conversation_id"] == "test-conversation-id"
+
+                    # Verify API was called with repository and selected_branch
+                    mock_client.create_conversation.assert_called_once_with(
+                        json_data={
+                            "initial_user_msg": "Test message",
+                            "repository": "username/repo",
+                            "selected_branch": "feature-branch",
+                        },
+                    )
+
+
+@pytest.mark.asyncio
+async def test_create_cloud_conversation_with_repository_only():
+    """Test that only repository is included when branch detection fails."""
+    from unittest.mock import AsyncMock
+
+    with patch(
+        "openhands_cli.cloud.conversation.check_user_authentication"
+    ) as mock_auth:
+        mock_auth.return_value = "test-api-key"
+
+        with patch(
+            "openhands_cli.cloud.conversation.OpenHandsApiClient"
+        ) as mock_client_class:
+            mock_client = Mock()
+            mock_response = Mock()
+            mock_response.json.return_value = {
+                "conversation_id": "test-conversation-id",
+                "url": "https://example.com",
+            }
+            mock_client.create_conversation = AsyncMock(return_value=mock_response)
+            mock_client_class.return_value = mock_client
+
+            with patch(
+                "openhands_cli.cloud.conversation.extract_repository_from_cwd"
+            ) as mock_extract:
+                mock_extract.return_value = ("username/repo", None)
+
+                with patch("openhands_cli.cloud.conversation.console"):
+                    result = await create_cloud_conversation(
+                        server_url="https://test.com", initial_user_msg="Test message"
+                    )
+
+                    # Verify conversation was created successfully
+                    assert result["conversation_id"] == "test-conversation-id"
+
+                    # Verify API was called with repository but no selected_branch
+                    mock_client.create_conversation.assert_called_once_with(
+                        json_data={
+                            "initial_user_msg": "Test message",
+                            "repository": "username/repo",
+                        },
                     )
