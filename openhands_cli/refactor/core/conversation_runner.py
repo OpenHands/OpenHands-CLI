@@ -52,10 +52,7 @@ class ConversationRunner:
                                         If None, defaults to AlwaysConfirm.
         """
         starting_confirmation_policy = initial_confirmation_policy or AlwaysConfirm()
-
-        # Store visualizer reference for external access
         self.visualizer = visualizer
-
         self.conversation: BaseConversation = setup_conversation(
             conversation_id,
             confirmation_policy=starting_confirmation_policy,

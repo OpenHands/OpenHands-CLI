@@ -336,17 +336,17 @@ class TestAppConfigurationCaching:
             mock_load.return_value = mock_config
 
             # First call should load from file
-            config1 = visualizer._get_app_config()
+            config1 = visualizer.app_config
             assert config1 == mock_config
             assert mock_load.call_count == 1
 
             # Second call should use cached version
-            config2 = visualizer._get_app_config()
+            config2 = visualizer.app_config
             assert config2 == mock_config
             assert mock_load.call_count == 1  # Should still be 1, not 2
 
             # Third call should also use cached version
-            config3 = visualizer._get_app_config()
+            config3 = visualizer.app_config
             assert config3 == mock_config
             assert mock_load.call_count == 1  # Should still be 1, not 3
 
@@ -373,7 +373,7 @@ class TestAppConfigurationCaching:
             mock_load.side_effect = [mock_config1, mock_config2]
 
             # First call should load from file
-            config1 = visualizer._get_app_config()
+            config1 = visualizer.app_config
             assert config1 == mock_config1
             assert mock_load.call_count == 1
 
@@ -382,7 +382,7 @@ class TestAppConfigurationCaching:
             assert mock_load.call_count == 2
 
             # Next call should use the new cached version
-            config2 = visualizer._get_app_config()
+            config2 = visualizer.app_config
             assert config2 == mock_config2
             assert mock_load.call_count == 2  # Should still be 2, not 3
 

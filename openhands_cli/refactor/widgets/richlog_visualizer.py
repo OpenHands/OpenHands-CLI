@@ -89,22 +89,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Cache app configuration to avoid repeated file system reads
         self._app_config: AppConfiguration | None = None
 
-    def _get_app_config(self) -> AppConfiguration:
-        """Get app configuration, loading from cache or file system as needed.
-
-        Returns:
-            AppConfiguration instance with current settings
-        """
+    @property
+    def app_config(self) -> AppConfiguration:
         if self._app_config is None:
             self._app_config = AppConfiguration.load()
         return self._app_config
 
     def reload_configuration(self) -> None:
-        """Reload the cached app configuration from file system.
-
-        This should be called when app configuration settings are updated
-        to ensure the visualizer uses the latest settings.
-        """
         self._app_config = AppConfiguration.load()
 
     def on_event(self, event: Event) -> None:
@@ -383,8 +374,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def _format_metrics_subtitle(self) -> str | None:
         """Format LLM metrics as a visually appealing subtitle string."""
         # Check app configuration to see if metrics should be displayed
-        app_config = self._get_app_config()
-        if not app_config.display_cost_per_action:
+        if not self.app_config.display_cost_per_action:
             return None
 
         stats = self.conversation_stats

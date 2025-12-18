@@ -112,6 +112,11 @@ class OpenHandsApp(App):
 
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
+        self._reload_visualizer = (
+            lambda: self.conversation_runner.visualizer.reload_configuration()
+            if self.conversation_runner
+            else None
+        )
 
         # Confirmation panel tracking
         self.confirmation_panel: ConfirmationSidePanel | None = None
@@ -200,7 +205,7 @@ class OpenHandsApp(App):
         settings_screen = SettingsScreen(
             on_settings_saved=[
                 self._initialize_main_ui,
-                self._reload_visualizer_config,
+                self._reload_visualizer,
             ],
             on_first_time_settings_cancelled=self._handle_initial_setup_cancelled,
         )
@@ -270,14 +275,9 @@ class OpenHandsApp(App):
 
         # Open the settings screen for existing users
         settings_screen = SettingsScreen(
-            on_settings_saved=[self._reload_visualizer_config],
+            on_settings_saved=[self._reload_visualizer],
         )
         self.push_screen(settings_screen)
-
-    def _reload_visualizer_config(self) -> None:
-        """Reload visualizer configuration when settings are updated."""
-        if self.conversation_runner and hasattr(self.conversation_runner, "visualizer"):
-            self.conversation_runner.visualizer.reload_configuration()
 
     def _initialize_main_ui(self) -> None:
         """Initialize the main UI components."""
