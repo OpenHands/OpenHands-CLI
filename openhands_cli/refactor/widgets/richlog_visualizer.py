@@ -86,6 +86,26 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._skip_user_messages = skip_user_messages
         # Store the main thread ID for thread safety checks
         self._main_thread_id = threading.get_ident()
+        # Cache app configuration to avoid repeated file system reads
+        self._app_config: AppConfiguration | None = None
+
+    def _get_app_config(self) -> AppConfiguration:
+        """Get app configuration, loading from cache or file system as needed.
+
+        Returns:
+            AppConfiguration instance with current settings
+        """
+        if self._app_config is None:
+            self._app_config = AppConfiguration.load()
+        return self._app_config
+
+    def refresh_app_config(self) -> None:
+        """Refresh the cached app configuration by reloading from file system.
+
+        This should be called when app configuration settings are updated
+        to ensure the visualizer uses the latest settings.
+        """
+        self._app_config = AppConfiguration.load()
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates Collapsible widgets for events."""
@@ -363,7 +383,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def _format_metrics_subtitle(self) -> str | None:
         """Format LLM metrics as a visually appealing subtitle string."""
         # Check app configuration to see if metrics should be displayed
-        app_config = AppConfiguration.load()
+        app_config = self._get_app_config()
         if not app_config.display_cost_per_action:
             return None
 

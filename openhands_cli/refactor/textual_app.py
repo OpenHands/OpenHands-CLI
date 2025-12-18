@@ -112,6 +112,7 @@ class OpenHandsApp(App):
 
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
+        self.conversation_visualizer = None
 
         # Confirmation panel tracking
         self.confirmation_panel: ConfirmationSidePanel | None = None
@@ -198,7 +199,7 @@ class OpenHandsApp(App):
     def _show_initial_settings(self) -> None:
         """Show settings screen for first-time users."""
         settings_screen = SettingsScreen(
-            on_settings_saved=self._initialize_main_ui,
+            on_settings_saved=self._on_first_time_settings_saved,
             on_first_time_settings_cancelled=self._handle_initial_setup_cancelled,
         )
         self.push_screen(settings_screen)
@@ -266,8 +267,21 @@ class OpenHandsApp(App):
             return
 
         # Open the settings screen for existing users
-        settings_screen = SettingsScreen()
+        settings_screen = SettingsScreen(
+            on_settings_saved=self._on_settings_updated,
+        )
         self.push_screen(settings_screen)
+
+    def _on_settings_updated(self) -> None:
+        """Handle when settings are updated - refresh cached configurations."""
+        # Refresh the visualizer's app config cache if it exists
+        if self.conversation_visualizer:
+            self.conversation_visualizer.refresh_app_config()
+
+    def _on_first_time_settings_saved(self) -> None:
+        """Handle when first-time settings are saved."""
+        self._on_settings_updated()  # Refresh cached configurations
+        self._initialize_main_ui()  # Initialize the main UI
 
     def _initialize_main_ui(self) -> None:
         """Initialize the main UI components."""
@@ -310,7 +324,7 @@ class OpenHandsApp(App):
     def create_conversation_runner(self) -> ConversationRunner:
         # Initialize conversation runner with visualizer that can add widgets
         # Skip user messages since we display them immediately in the UI
-        visualizer = ConversationVisualizer(
+        self.conversation_visualizer = ConversationVisualizer(
             self.main_display, self, skip_user_messages=True
         )
 
@@ -321,7 +335,7 @@ class OpenHandsApp(App):
             lambda title, message, severity: (
                 self.notify(title=title, message=message, severity=severity)
             ),
-            visualizer,
+            self.conversation_visualizer,
             self.initial_confirmation_policy,
         )
 

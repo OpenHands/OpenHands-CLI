@@ -309,3 +309,118 @@ class TestConversationErrorEventHandling:
         expected_color = OPENHANDS_THEME.error or "#ff6b6b"
         actual_color = _get_event_border_color(error_event)
         assert actual_color == expected_color
+
+
+class TestAppConfigurationCaching:
+    """Tests for app configuration caching in ConversationVisualizer."""
+
+    def test_app_config_caching(self):
+        """Test that app configuration is cached and not loaded repeatedly."""
+        from unittest.mock import patch
+
+        # Create a mock app and container for the visualizer
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+        # Mock AppConfiguration.load to track how many times it's called
+        with patch(
+            "openhands_cli.refactor.modals.settings.app_config.AppConfiguration.load"
+        ) as mock_load:
+            from openhands_cli.refactor.modals.settings.app_config import (
+                AppConfiguration,
+            )
+
+            # Create a mock config
+            mock_config = AppConfiguration(display_cost_per_action=True)
+            mock_load.return_value = mock_config
+
+            # First call should load from file
+            config1 = visualizer._get_app_config()
+            assert config1 == mock_config
+            assert mock_load.call_count == 1
+
+            # Second call should use cached version
+            config2 = visualizer._get_app_config()
+            assert config2 == mock_config
+            assert mock_load.call_count == 1  # Should still be 1, not 2
+
+            # Third call should also use cached version
+            config3 = visualizer._get_app_config()
+            assert config3 == mock_config
+            assert mock_load.call_count == 1  # Should still be 1, not 3
+
+    def test_app_config_refresh(self):
+        """Test that refresh_app_config reloads the configuration."""
+        from unittest.mock import patch
+
+        # Create a mock app and container for the visualizer
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+        # Mock AppConfiguration.load to track how many times it's called
+        with patch(
+            "openhands_cli.refactor.modals.settings.app_config.AppConfiguration.load"
+        ) as mock_load:
+            from openhands_cli.refactor.modals.settings.app_config import (
+                AppConfiguration,
+            )
+
+            # Create mock configs
+            mock_config1 = AppConfiguration(display_cost_per_action=False)
+            mock_config2 = AppConfiguration(display_cost_per_action=True)
+            mock_load.side_effect = [mock_config1, mock_config2]
+
+            # First call should load from file
+            config1 = visualizer._get_app_config()
+            assert config1 == mock_config1
+            assert mock_load.call_count == 1
+
+            # Refresh should reload from file
+            visualizer.refresh_app_config()
+            assert mock_load.call_count == 2
+
+            # Next call should use the new cached version
+            config2 = visualizer._get_app_config()
+            assert config2 == mock_config2
+            assert mock_load.call_count == 2  # Should still be 2, not 3
+
+    def test_format_metrics_subtitle_uses_cached_config(self):
+        """Test that _format_metrics_subtitle uses cached app configuration."""
+        from unittest.mock import MagicMock, patch
+
+        # Create a mock app and container for the visualizer
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+        # Mock the state to return None for stats (no metrics)
+        mock_state = MagicMock()
+        mock_state.stats = None
+        visualizer._state = mock_state
+
+        # Mock AppConfiguration.load to track how many times it's called
+        with patch(
+            "openhands_cli.refactor.modals.settings.app_config.AppConfiguration.load"
+        ) as mock_load:
+            from openhands_cli.refactor.modals.settings.app_config import (
+                AppConfiguration,
+            )
+
+            # Create a mock config with display_cost_per_action=False
+            mock_config = AppConfiguration(display_cost_per_action=False)
+            mock_load.return_value = mock_config
+
+            # Call _format_metrics_subtitle multiple times
+            result1 = visualizer._format_metrics_subtitle()
+            result2 = visualizer._format_metrics_subtitle()
+            result3 = visualizer._format_metrics_subtitle()
+
+            # All should return None because display_cost_per_action=False
+            assert result1 is None
+            assert result2 is None
+            assert result3 is None
+
+            # AppConfiguration.load should only be called once due to caching
+            assert mock_load.call_count == 1
