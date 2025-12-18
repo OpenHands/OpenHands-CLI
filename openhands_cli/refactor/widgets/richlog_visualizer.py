@@ -99,8 +99,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
             self._app_config = AppConfiguration.load()
         return self._app_config
 
-    def refresh_app_config(self) -> None:
-        """Refresh the cached app configuration by reloading from file system.
+    def reload_configuration(self) -> None:
+        """Reload the cached app configuration from file system.
 
         This should be called when app configuration settings are updated
         to ensure the visualizer uses the latest settings.

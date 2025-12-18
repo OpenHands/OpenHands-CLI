@@ -351,7 +351,7 @@ class TestAppConfigurationCaching:
             assert mock_load.call_count == 1  # Should still be 1, not 3
 
     def test_app_config_refresh(self):
-        """Test that refresh_app_config reloads the configuration."""
+        """Test that reload_configuration reloads the configuration."""
         from unittest.mock import patch
 
         # Create a mock app and container for the visualizer
@@ -378,7 +378,7 @@ class TestAppConfigurationCaching:
             assert mock_load.call_count == 1
 
             # Refresh should reload from file
-            visualizer.refresh_app_config()
+            visualizer.reload_configuration()
             assert mock_load.call_count == 2
 
             # Next call should use the new cached version

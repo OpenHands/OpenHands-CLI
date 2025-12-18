@@ -60,7 +60,7 @@ class SettingsScreen(ModalScreen):
 
     def __init__(
         self,
-        on_settings_saved: Callable[[], None] | None = None,
+        on_settings_saved: Callable[[], None] | list[Callable[[], None]] | None = None,
         on_first_time_settings_cancelled: Callable[[], None] | None = None,
         **kwargs,
     ):
@@ -68,7 +68,7 @@ class SettingsScreen(ModalScreen):
 
         Args:
             is_initial_setup: True if this is the initial setup for a new user
-            on_settings_saved: Callback to invoke when settings are successfully saved
+            on_settings_saved: Callback(s) to invoke when settings are saved
             on_settings_cancelled: Callback to invoke when settings are cancelled
         """
         super().__init__(**kwargs)
@@ -77,7 +77,15 @@ class SettingsScreen(ModalScreen):
         self.is_advanced_mode = False
         self.message_widget = None
         self.is_initial_setup = SettingsScreen.is_initial_setup_required()
-        self.on_settings_saved = on_settings_saved
+
+        # Convert single callback to list for uniform handling
+        if on_settings_saved is None:
+            self.on_settings_saved = []
+        elif callable(on_settings_saved):
+            self.on_settings_saved = [on_settings_saved]
+        else:
+            self.on_settings_saved = on_settings_saved
+
         self.on_first_time_settings_cancelled = on_first_time_settings_cancelled
 
     def compose(self) -> ComposeResult:
@@ -394,10 +402,10 @@ class SettingsScreen(ModalScreen):
             else "Settings saved successfully!"
         )
         self._show_message(message, is_error=False)
-        # Invoke callback if provided, then close screen
-        if self.on_settings_saved:
+        # Invoke all callbacks if provided, then close screen
+        for callback in self.on_settings_saved:
             try:
-                self.on_settings_saved()
+                callback()
             except Exception as e:
                 self.notify(
                     f"Error occurred when saving settings: {e}", severity="error"
