@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from textual.app import App, ComposeResult
+from textual.css.query import NoMatches
 from textual.widgets import Button, Static
 
 from openhands.sdk import LLM, Agent
@@ -217,6 +218,20 @@ async def test_mode_toggle_shows_correct_section(app):
 #
 # 4. Dependency chain behavior (real widgets, but direct value mutation)
 #
+
+
+@pytest.mark.asyncio
+async def test_app_config_tab_not_shown_during_initial_setup(fake_agent_store):
+    """App Configurations tab should NOT be rendered during initial setup."""
+    with patch.object(SettingsScreen, "is_initial_setup_required", return_value=True):
+        app = SettingsTestApp()
+
+    async with app.run_test():
+        screen = app.settings_screen
+        assert screen.is_initial_setup is True
+
+        with pytest.raises(NoMatches):
+            screen.query_one("#app_config_tab")
 
 
 @pytest.mark.asyncio
