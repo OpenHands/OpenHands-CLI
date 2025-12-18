@@ -7,8 +7,7 @@ This directory contains end-to-end tests for the OpenHands CLI executable built 
 - `models.py` - Pydantic models for test results (`TestResult` and `TestSummary`)
 - `runner.py` - Test runner that coordinates all tests and provides summary reporting
 - `test_version.py` - Tests the `--version` flag functionality
-- `test_executable.py` - Tests the main CLI executable with welcome prompt and `/help` command
-- `test_experimental_ui.py` - Tests the experimental textual UI with `--exp` flag
+- `test_experimental_ui.py` - Tests the textual UI functionality
 - `test_acp.py` - Tests the ACP server functionality with JSON-RPC messages
 
 ## Usage
