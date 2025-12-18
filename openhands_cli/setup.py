@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -5,6 +7,8 @@ from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, Workspace
 from openhands.sdk.context import Skill
+from openhands.sdk.conversation.persistence_const import BASE_STATE
+from openhands.sdk.io import LocalFileStore
 from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
 )
@@ -118,6 +122,82 @@ def setup_conversation(
 
     agent = load_agent_specs(str(conversation_id))
 
+    # Check if we're resuming an existing conversation by looking for persisted state
+    conv_state_dir = Path(CONVERSATIONS_DIR) / conversation_id.hex
+    is_resuming = False
+
+    if conv_state_dir.exists():
+        try:
+            file_store = LocalFileStore(str(conv_state_dir))
+            base_text = file_store.read(BASE_STATE)
+            if base_text:
+                is_resuming = True
+                # Load persisted state to get the original agent's LLM settings
+                state_data = json.loads(base_text)
+                persisted_agent_data = state_data.get("agent", {})
+
+                # Create agent with persisted LLM settings but current
+                # runtime values. This allows resuming with the original
+                # model/settings while updating runtime-specific fields
+                # like API keys and metadata
+                if persisted_agent_data:
+                    persisted_agent = Agent.model_validate(persisted_agent_data)
+
+                    # Save reference to current agent from AgentStore
+                    current_agent = agent
+
+                    # Update only fields allowed to change
+                    # (from OVERRIDE_ON_SERIALIZE)
+                    llm_updates = {}
+                    for field in persisted_agent.llm.OVERRIDE_ON_SERIALIZE:
+                        llm_updates[field] = getattr(current_agent.llm, field)
+
+                    # Use persisted agent with updated runtime secrets
+                    agent = persisted_agent.model_copy(
+                        update={
+                            "llm": persisted_agent.llm.model_copy(update=llm_updates),
+                            # Keep current tools, context, and MCP config
+                            "tools": current_agent.tools,
+                            "agent_context": current_agent.agent_context,
+                            "mcp_config": current_agent.mcp_config,
+                        }
+                    )
+
+                    # Also update condenser LLM if present
+                    if persisted_agent.condenser and hasattr(
+                        persisted_agent.condenser, "llm"
+                    ):
+                        # Get runtime secrets from current agent's condenser
+                        condenser_llm_updates = {}
+                        current_condenser = (
+                            current_agent.condenser if current_agent.condenser else None
+                        )
+                        if current_condenser and hasattr(current_condenser, "llm"):
+                            persisted_condenser_llm = getattr(
+                                persisted_agent.condenser, "llm"
+                            )
+                            current_condenser_llm = getattr(current_condenser, "llm")
+                            for field in persisted_condenser_llm.OVERRIDE_ON_SERIALIZE:
+                                condenser_llm_updates[field] = getattr(
+                                    current_condenser_llm,
+                                    field,
+                                )
+                            # Apply updates to persisted condenser LLM
+                            agent = agent.model_copy(
+                                update={
+                                    "condenser": persisted_agent.condenser.model_copy(
+                                        update={
+                                            "llm": persisted_condenser_llm.model_copy(
+                                                update=condenser_llm_updates
+                                            )
+                                        }
+                                    )
+                                }
+                            )
+        except (FileNotFoundError, json.JSONDecodeError, Exception):
+            # If we can't read the state, just proceed with the current agent
+            pass
+
     # Create conversation - agent context is now set in AgentStore.load()
     conversation: BaseConversation = Conversation(
         agent=agent,
@@ -131,7 +211,12 @@ def setup_conversation(
     conversation.set_security_analyzer(LLMSecurityAnalyzer())
     conversation.set_confirmation_policy(confirmation_policy)
 
-    print_formatted_text(
-        HTML(f"<green>✓ Agent initialized with model: {agent.llm.model}</green>")
-    )
+    if is_resuming:
+        print_formatted_text(
+            HTML(f"<green>✓ Resumed conversation with model: {agent.llm.model}</green>")
+        )
+    else:
+        print_formatted_text(
+            HTML(f"<green>✓ Agent initialized with model: {agent.llm.model}</green>")
+        )
     return conversation
