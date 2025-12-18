@@ -22,7 +22,6 @@ from textual.widgets import (
 )
 from textual.widgets._select import NoSelection
 
-from openhands_cli.refactor.modals.settings.app_config import save_app_config
 from openhands_cli.refactor.modals.settings.choices import (
     get_model_options,
 )
@@ -382,14 +381,7 @@ class SettingsScreen(ModalScreen):
                 app_config_component = app_config_tab.query_one(AppConfigurationsTab)
                 app_config = app_config_component.get_app_config()
 
-                app_config_result = save_app_config(app_config)
-                if not app_config_result.success:
-                    error_msg = app_config_result.error_message
-                    self._show_message(
-                        f"Settings saved, but app config failed: {error_msg}",
-                        is_error=True,
-                    )
-                    return
+                app_config.save()
             except Exception as e:
                 self._show_message(
                     f"Settings saved, but app config failed: {str(e)}", is_error=True

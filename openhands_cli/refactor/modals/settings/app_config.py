@@ -51,26 +51,3 @@ class AppConfiguration(BaseModel):
 
         with open(config_path, "w") as f:
             json.dump(self.model_dump(), f, indent=2)
-
-
-class AppConfigSaveResult(BaseModel):
-    """Result of attempting to save app configuration."""
-
-    success: bool
-    error_message: str | None = None
-
-
-def save_app_config(config: AppConfiguration) -> AppConfigSaveResult:
-    """Save app configuration with error handling.
-
-    Args:
-        config: The app configuration to save
-
-    Returns:
-        AppConfigSaveResult indicating success or failure
-    """
-    try:
-        config.save()
-        return AppConfigSaveResult(success=True)
-    except Exception as e:
-        return AppConfigSaveResult(success=False, error_message=str(e))
