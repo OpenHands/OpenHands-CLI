@@ -1,7 +1,7 @@
 from typing import Any
 from uuid import UUID
 
-from prompt_toolkit import HTML, print_formatted_text
+from rich.console import Console
 
 from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, Workspace
 from openhands.sdk.context import Skill
@@ -16,9 +16,7 @@ from openhands.tools.task_tracker import TaskTrackerTool  # noqa: F401
 from openhands.tools.terminal import TerminalTool  # noqa: F401
 from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
 from openhands_cli.refactor.widgets.richlog_visualizer import ConversationVisualizer
-from openhands_cli.tui.settings.settings_screen import SettingsScreen
 from openhands_cli.tui.settings.store import AgentStore
-from openhands_cli.tui.visualizer import CLIVisualizer
 
 
 class MissingAgentSpec(Exception):
@@ -81,21 +79,6 @@ def load_agent_specs(
     return agent
 
 
-def verify_agent_exists_or_setup_agent() -> Agent:
-    """Verify agent specs exists by attempting to load it."""
-    settings_screen = SettingsScreen()
-    try:
-        agent = load_agent_specs()
-        return agent
-    except MissingAgentSpec:
-        # For first-time users, show the full settings flow with choice
-        # between basic/advanced
-        settings_screen.configure_settings(first_time=True)
-
-    # Try once again after settings setup attempt
-    return load_agent_specs()
-
-
 def setup_conversation(
     conversation_id: UUID,
     confirmation_policy: ConfirmationPolicyBase,
@@ -108,13 +91,13 @@ def setup_conversation(
         conversation_id: conversation ID to use. If not provided, a random UUID
             will be generated.
         confirmation_policy: Confirmation policy to use.
-        visualizer: Optional visualizer to use. If None, defaults to CLIVisualizer
+        visualizer: Optional visualizer to use. If None, a default will be used
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
     """
-
-    print_formatted_text(HTML("<white>Initializing agent...</white>"))
+    console = Console()
+    console.print("Initializing agent...", style="white")
 
     agent = load_agent_specs(str(conversation_id))
 
@@ -125,13 +108,11 @@ def setup_conversation(
         # Conversation will add /<conversation_id> to this path
         persistence_dir=CONVERSATIONS_DIR,
         conversation_id=conversation_id,
-        visualizer=visualizer if visualizer is not None else CLIVisualizer,
+        visualizer=visualizer,
     )
 
     conversation.set_security_analyzer(LLMSecurityAnalyzer())
     conversation.set_confirmation_policy(confirmation_policy)
 
-    print_formatted_text(
-        HTML(f"<green>✓ Agent initialized with model: {agent.llm.model}</green>")
-    )
+    console.print(f"✓ Agent initialized with model: {agent.llm.model}", style="green")
     return conversation

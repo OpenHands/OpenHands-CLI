@@ -1,14 +1,15 @@
+# Minimal replacement for removed TUI components
+
+
 class StepCounter:
-    """Automatically manages step numbering for settings flows."""
+    """Minimal step counter placeholder."""
 
-    def __init__(self, total_steps: int):
-        self.current_step = 0
+    def __init__(self, total_steps=1):
         self.total_steps = total_steps
+        self.current_step = 0
 
-    def next_step(self, prompt: str) -> str:
-        """Get the next step prompt with automatic numbering."""
+    def next_step(self):
         self.current_step += 1
-        return f"(Step {self.current_step}/{self.total_steps}) {prompt}"
 
-    def existing_step(self, prompt: str) -> str:
-        return f"(Step {self.current_step}/{self.total_steps}) {prompt}"
+    def get_progress(self):
+        return f"{self.current_step}/{self.total_steps}"

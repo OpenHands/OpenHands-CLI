@@ -13,13 +13,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 from rich.console import Console
 
-from openhands.sdk.security.confirmation_policy import (
-    AlwaysConfirm,
-    ConfirmationPolicyBase,
-    ConfirmRisky,
-    NeverConfirm,
-)
-from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.argparsers.main_parser import create_main_parser
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.utils import create_seeded_instructions_from_args
@@ -154,67 +147,35 @@ def main() -> None:
             handle_cloud_command(args)
 
         else:
-            # Check if experimental flag is used
-            if args.exp:
-                # Handle resume logic (including --last and conversation list)
-                resume_id = handle_resume_logic(args)
-                if resume_id is None and (args.last or args.resume == ""):
-                    # Either showed conversation list or had an error
-                    return
+            # Handle resume logic (including --last and conversation list)
+            resume_id = handle_resume_logic(args)
+            if resume_id is None and (args.last or args.resume == ""):
+                # Either showed conversation list or had an error
+                return
 
-                # Use experimental textual-based UI
-                from openhands_cli.refactor.textual_app import main as textual_main
+            # Use textual-based UI as default (experimental UI is now the default)
+            # The --exp flag is kept for compatibility but does the same thing
+            from openhands_cli.refactor.textual_app import main as textual_main
 
-                queued_inputs = create_seeded_instructions_from_args(args)
-                conversation_id = textual_main(
-                    resume_conversation_id=resume_id,
-                    queued_inputs=queued_inputs,
-                    always_approve=args.always_approve,
-                    llm_approve=args.llm_approve,
-                    exit_without_confirmation=args.exit_without_confirmation,
-                    headless=args.headless,
-                )
-                console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
-                console.print(
-                    f"Conversation ID: {conversation_id.hex}",
-                    style=OPENHANDS_THEME.accent,
-                )
-                console.print(
-                    f"Hint: run openhands --resume {conversation_id} "
-                    "to resume this conversation.",
-                    style=OPENHANDS_THEME.secondary,
-                )
-
-            else:
-                # Handle resume logic (including --last and conversation list)
-                resume_id = handle_resume_logic(args)
-                if resume_id is None and (args.last or args.resume == ""):
-                    # Either showed conversation list or had an error
-                    return
-
-                # Default CLI behavior - no subcommand needed
-                # Import agent_chat only when needed
-                from openhands_cli.agent_chat import run_cli_entry
-
-                # Determine confirmation mode from args
-                # Default is "always-ask" (handled in setup_conversation)
-                confirmation_policy: ConfirmationPolicyBase = AlwaysConfirm()
-                if args.headless:
-                    # Headless mode always uses NeverConfirm (auto-approve)
-                    confirmation_policy = NeverConfirm()
-                elif args.always_approve:
-                    confirmation_policy = NeverConfirm()
-                elif args.llm_approve:
-                    confirmation_policy = ConfirmRisky(threshold=SecurityRisk.HIGH)
-
-                queued_inputs = create_seeded_instructions_from_args(args)
-
-                # Start agent chat
-                run_cli_entry(
-                    resume_conversation_id=resume_id,
-                    confirmation_policy=confirmation_policy,
-                    queued_inputs=queued_inputs,
-                )
+            queued_inputs = create_seeded_instructions_from_args(args)
+            conversation_id = textual_main(
+                resume_conversation_id=resume_id,
+                queued_inputs=queued_inputs,
+                always_approve=args.always_approve,
+                llm_approve=args.llm_approve,
+                exit_without_confirmation=args.exit_without_confirmation,
+                headless=args.headless,
+            )
+            console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
+            console.print(
+                f"Conversation ID: {conversation_id.hex}",
+                style=OPENHANDS_THEME.accent,
+            )
+            console.print(
+                f"Hint: run openhands --resume {conversation_id} "
+                "to resume this conversation.",
+                style=OPENHANDS_THEME.secondary,
+            )
     except KeyboardInterrupt:
         console.print("\nGoodbye! 👋", style=OPENHANDS_THEME.warning)
     except EOFError:

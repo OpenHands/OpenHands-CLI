@@ -21,16 +21,16 @@ def create_main_parser() -> argparse.ArgumentParser:
         description="OpenHands CLI - Terminal User Interface for OpenHands AI Agent",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-            By default, OpenHands runs in CLI mode (terminal interface)
+            By default, OpenHands runs in textual UI mode (terminal interface)
             with 'always-ask' confirmation mode, where all agent actions
             require user confirmation.
 
             Use 'serve' subcommand to launch the GUI server instead.
 
             Examples:
-                openhands                           # Start CLI mode
-                openhands --exp                     # Start experimental textual UI
-                openhands --exp --headless          # Start textual UI in headless mode
+                openhands                           # Start textual UI mode
+                openhands --exp                     # Start textual UI (same as default)
+                openhands --headless                # Start textual UI in headless mode
                 openhands --resume conversation-id  # Resume conversation
                 openhands --always-approve          # Auto-approve all actions
                 openhands --llm-approve             # LLM-based approval mode
@@ -84,7 +84,7 @@ def create_main_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--exp",
         action="store_true",
-        help="Use experimental textual-based UI instead of the default CLI interface",
+        help="Use textual-based UI (now default, flag kept for compatibility)",
     )
     parser.add_argument(
         "--headless",
