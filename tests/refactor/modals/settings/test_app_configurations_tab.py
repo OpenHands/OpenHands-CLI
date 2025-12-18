@@ -1,6 +1,6 @@
 """Tests for AppConfigurationsTab component."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 from textual.app import App, ComposeResult
@@ -21,7 +21,9 @@ class AppConfigTabTestApp(App):
 
     def compose(self) -> ComposeResult:
         if self.initial_config:
-            with patch.object(AppConfiguration, "load", return_value=self.initial_config):
+            with patch.object(
+                AppConfiguration, "load", return_value=self.initial_config
+            ):
                 yield AppConfigurationsTab()
         else:
             yield AppConfigurationsTab()
@@ -60,7 +62,7 @@ class TestAppConfigurationsTab:
         config = AppConfiguration(display_cost_per_action=False)
         app = AppConfigTabTestApp(initial_config=config)
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(AppConfigurationsTab)
 
             # Check that main container exists
@@ -85,7 +87,7 @@ class TestAppConfigurationsTab:
         config = AppConfiguration(display_cost_per_action=initial_value)
         app = AppConfigTabTestApp(initial_config=config)
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(AppConfigurationsTab)
             switch = tab.query_one("#display_cost_switch", Switch)
 
@@ -102,12 +104,14 @@ class TestAppConfigurationsTab:
     async def test_get_app_config_returns_current_form_values(
         self, switch_value, expected_config_value
     ):
-        """Test that get_app_config returns configuration based on current form values."""
-        # Start with opposite value to ensure we're testing form state, not initial state
+        """Test that get_app_config returns configuration based on current form
+        values."""
+        # Start with opposite value to ensure we're testing form state,
+        # not initial state
         initial_config = AppConfiguration(display_cost_per_action=not switch_value)
         app = AppConfigTabTestApp(initial_config=initial_config)
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(AppConfigurationsTab)
             switch = tab.query_one("#display_cost_switch", Switch)
 
@@ -126,7 +130,7 @@ class TestAppConfigurationsTab:
         config = AppConfiguration(display_cost_per_action=True)
         app = AppConfigTabTestApp(initial_config=config)
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(AppConfigurationsTab)
 
             result_config = tab.get_app_config()
@@ -141,7 +145,7 @@ class TestAppConfigurationsTab:
         config = AppConfiguration(display_cost_per_action=False)
         app = AppConfigTabTestApp(initial_config=config)
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(AppConfigurationsTab)
 
             # Check main content container
@@ -204,7 +208,7 @@ class TestAppConfigurationsTab:
         config = AppConfiguration(display_cost_per_action=False)
         app = AppConfigTabTestApp(initial_config=config)
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(AppConfigurationsTab)
 
             # Check for help text elements
@@ -221,7 +225,7 @@ class TestAppConfigurationsTab:
         config = AppConfiguration(display_cost_per_action=False)
         app = AppConfigTabTestApp(initial_config=config)
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(AppConfigurationsTab)
 
             # Check for section title
@@ -233,8 +237,11 @@ class TestAppConfigurationsTab:
             assert "App Configurations" in title_text
 
     def test_initialization_handles_load_error(self):
-        """Test that initialization handles AppConfiguration.load() errors gracefully."""
-        with patch.object(AppConfiguration, "load", side_effect=Exception("Load failed")):
+        """Test that initialization handles AppConfiguration.load() errors
+        gracefully."""
+        with patch.object(
+            AppConfiguration, "load", side_effect=Exception("Load failed")
+        ):
             # Should not raise exception, should use default config
             with pytest.raises(Exception, match="Load failed"):
                 AppConfigurationsTab()
@@ -245,11 +252,13 @@ class TestAppConfigurationsTab:
         config = AppConfiguration(display_cost_per_action=False)
         app = AppConfigTabTestApp(initial_config=config)
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(AppConfigurationsTab)
 
             # Mock query_one to simulate missing switch
-            with patch.object(tab, "query_one", side_effect=Exception("Widget not found")):
+            with patch.object(
+                tab, "query_one", side_effect=Exception("Widget not found")
+            ):
                 with pytest.raises(Exception, match="Widget not found"):
                     tab.get_app_config()
 
@@ -270,8 +279,17 @@ class TestAppConfigurationsTab:
 
         # Should be separate instances
         assert tab1 is not tab2
-        assert tab1.app_config.display_cost_per_action == config_values["display_cost_per_action"]
-        assert tab2.app_config.display_cost_per_action == config_values["display_cost_per_action"]
+        assert (
+            tab1.app_config.display_cost_per_action
+            == config_values["display_cost_per_action"]
+        )
+        assert (
+            tab2.app_config.display_cost_per_action
+            == config_values["display_cost_per_action"]
+        )
 
         # But configs should be equal in value
-        assert tab1.app_config.display_cost_per_action == tab2.app_config.display_cost_per_action
+        assert (
+            tab1.app_config.display_cost_per_action
+            == tab2.app_config.display_cost_per_action
+        )

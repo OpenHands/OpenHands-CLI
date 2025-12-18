@@ -429,15 +429,16 @@ class TestAppConfigurationCaching:
         "display_cost_per_action, has_stats, expected_result",
         [
             (False, False, None),  # Config disabled, no stats
-            (False, True, None),   # Config disabled, has stats
-            (True, False, None),   # Config enabled, no stats
+            (False, True, None),  # Config disabled, has stats
+            (True, False, None),  # Config enabled, no stats
             (True, True, "formatted_metrics"),  # Config enabled, has stats
         ],
     )
     def test_format_metrics_subtitle_conditional_display(
         self, display_cost_per_action, has_stats, expected_result
     ):
-        """Test that metrics display is conditional on both config and stats availability."""
+        """Test that metrics display is conditional on both config and stats
+        availability."""
         from unittest.mock import MagicMock, patch
 
         # Create a mock app and container for the visualizer
@@ -454,11 +455,11 @@ class TestAppConfigurationCaching:
             mock_usage.completion_tokens = 200
             mock_usage.cache_read_tokens = 100
             mock_usage.reasoning_tokens = 0
-            
+
             mock_combined_metrics = MagicMock()
             mock_combined_metrics.accumulated_token_usage = mock_usage
             mock_combined_metrics.accumulated_cost = 0.05
-            
+
             mock_stats = MagicMock()
             mock_stats.get_combined_metrics.return_value = mock_combined_metrics
             mock_state.stats = mock_stats
@@ -474,20 +475,25 @@ class TestAppConfigurationCaching:
             )
 
             # Create config with specified display setting
-            mock_config = AppConfiguration(display_cost_per_action=display_cost_per_action)
+            mock_config = AppConfiguration(
+                display_cost_per_action=display_cost_per_action
+            )
             mock_load.return_value = mock_config
 
             # Mock the actual formatting logic for when we have stats and config enabled
             if expected_result == "formatted_metrics":
                 with patch.object(
-                    visualizer, "_format_metrics_subtitle", 
-                    wraps=visualizer._format_metrics_subtitle
-                ) as mock_format:
+                    visualizer,
+                    "_format_metrics_subtitle",
+                    wraps=visualizer._format_metrics_subtitle,
+                ):
                     # Let the real method run but intercept the result
                     result = visualizer._format_metrics_subtitle()
                     if display_cost_per_action and has_stats:
                         # Should have called the real formatting logic
-                        assert result is not None or result == ""  # Could be empty string if no formatting
+                        assert (
+                            result is not None or result == ""
+                        )  # Could be empty string if no formatting
                     else:
                         assert result is None
             else:
@@ -544,7 +550,10 @@ class TestAppConfigurationCaching:
 
         # Set initial cache state
         if initial_cache_state == "cached_config":
-            from openhands_cli.refactor.modals.settings.app_config import AppConfiguration
+            from openhands_cli.refactor.modals.settings.app_config import (
+                AppConfiguration,
+            )
+
             visualizer._app_config = AppConfiguration(display_cost_per_action=True)
         else:
             visualizer._app_config = None
@@ -586,17 +595,18 @@ class TestAppConfigurationCaching:
         mock_usage.completion_tokens = 400
         mock_usage.cache_read_tokens = 200
         mock_usage.reasoning_tokens = 0
-        
+
         mock_combined_metrics = MagicMock()
         mock_combined_metrics.accumulated_token_usage = mock_usage
         mock_combined_metrics.accumulated_cost = 0.10
-        
+
         mock_stats = MagicMock()
         mock_stats.get_combined_metrics.return_value = mock_combined_metrics
 
         with patch.object(
-            type(visualizer), 'conversation_stats', 
-            new_callable=lambda: property(lambda self: mock_stats)
+            type(visualizer),
+            "conversation_stats",
+            new_callable=lambda: property(lambda self: mock_stats),
         ):
             with patch(
                 "openhands_cli.refactor.modals.settings.app_config.AppConfiguration.load"
@@ -611,6 +621,6 @@ class TestAppConfigurationCaching:
 
                 # Should not return None when both config and stats are available
                 result = visualizer._format_metrics_subtitle()
-                # The actual formatting depends on the implementation, 
+                # The actual formatting depends on the implementation,
                 # but it should not be None when enabled and stats exist
                 assert result is not None or mock_stats is not None

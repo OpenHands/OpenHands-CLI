@@ -32,13 +32,16 @@ class TestAppConfiguration:
     def test_model_validation_invalid_type(self):
         """Test that AppConfiguration raises ValidationError for invalid types."""
         with pytest.raises(ValidationError):
-            AppConfiguration(display_cost_per_action="invalid")
+            AppConfiguration(display_cost_per_action="invalid")  # type: ignore
 
     @pytest.mark.parametrize(
         "persistence_dir, expected_filename",
         [
             ("/custom/path", "/custom/path/cli_config.json"),
-            ("~/test", "~/test/cli_config.json"),  # Tilde is NOT expanded when from env var
+            (
+                "~/test",
+                "~/test/cli_config.json",
+            ),  # Tilde is NOT expanded when from env var
         ],
     )
     def test_get_config_path(self, persistence_dir, expected_filename):
@@ -54,11 +57,11 @@ class TestAppConfiguration:
         env_copy = os.environ.copy()
         if "PERSISTENCE_DIR" in env_copy:
             del env_copy["PERSISTENCE_DIR"]
-        
+
         with patch.dict(os.environ, env_copy, clear=True):
             with patch("os.path.expanduser") as mock_expanduser:
                 mock_expanduser.return_value = "/home/user/.openhands"
-                
+
                 result = AppConfiguration.get_config_path()
                 expected_path = Path("/home/user/.openhands/cli_config.json")
                 assert result == expected_path
@@ -69,7 +72,9 @@ class TestAppConfiguration:
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "nonexistent_config.json"
 
-            with patch.object(AppConfiguration, "get_config_path", return_value=config_path):
+            with patch.object(
+                AppConfiguration, "get_config_path", return_value=config_path
+            ):
                 config = AppConfiguration.load()
 
             assert isinstance(config, AppConfiguration)
@@ -89,7 +94,9 @@ class TestAppConfiguration:
             config_path = Path(temp_dir) / "cli_config.json"
             config_path.write_text(json.dumps(config_data))
 
-            with patch.object(AppConfiguration, "get_config_path", return_value=config_path):
+            with patch.object(
+                AppConfiguration, "get_config_path", return_value=config_path
+            ):
                 config = AppConfiguration.load()
 
             assert config.display_cost_per_action == expected_display_cost
@@ -108,7 +115,9 @@ class TestAppConfiguration:
             config_path = Path(temp_dir) / "cli_config.json"
             config_path.write_text(invalid_content)
 
-            with patch.object(AppConfiguration, "get_config_path", return_value=config_path):
+            with patch.object(
+                AppConfiguration, "get_config_path", return_value=config_path
+            ):
                 config = AppConfiguration.load()
 
             # Should return defaults when file is corrupted
@@ -121,14 +130,17 @@ class TestAppConfiguration:
             config_path = Path(temp_dir) / "cli_config.json"
             config_path.write_text('{"display_cost_per_action": true}')
 
-            with patch.object(AppConfiguration, "get_config_path", return_value=config_path):
+            with patch.object(
+                AppConfiguration, "get_config_path", return_value=config_path
+            ):
                 # Mock open to raise PermissionError, but only for the specific file
                 original_open = open
+
                 def mock_open(*args, **kwargs):
                     if str(args[0]) == str(config_path):
                         raise PermissionError("Access denied")
                     return original_open(*args, **kwargs)
-                
+
                 with patch("builtins.open", side_effect=mock_open):
                     # This should catch the PermissionError and return defaults
                     # But the current implementation doesn't catch PermissionError
@@ -146,7 +158,9 @@ class TestAppConfiguration:
             config_path = Path(temp_dir) / "nested" / "path" / "cli_config.json"
             config = AppConfiguration(display_cost_per_action=display_cost_per_action)
 
-            with patch.object(AppConfiguration, "get_config_path", return_value=config_path):
+            with patch.object(
+                AppConfiguration, "get_config_path", return_value=config_path
+            ):
                 config.save()
 
             # Directory should be created
@@ -171,14 +185,19 @@ class TestAppConfiguration:
 
             # Create and save config
             original_config = AppConfiguration(**config_values)
-            with patch.object(AppConfiguration, "get_config_path", return_value=config_path):
+            with patch.object(
+                AppConfiguration, "get_config_path", return_value=config_path
+            ):
                 original_config.save()
 
                 # Load config back
                 loaded_config = AppConfiguration.load()
 
             # Should match original
-            assert loaded_config.display_cost_per_action == original_config.display_cost_per_action
+            assert (
+                loaded_config.display_cost_per_action
+                == original_config.display_cost_per_action
+            )
 
     def test_save_overwrites_existing_file(self):
         """Test that save overwrites existing configuration file."""
@@ -187,7 +206,9 @@ class TestAppConfiguration:
 
             # Create initial config
             initial_config = AppConfiguration(display_cost_per_action=False)
-            with patch.object(AppConfiguration, "get_config_path", return_value=config_path):
+            with patch.object(
+                AppConfiguration, "get_config_path", return_value=config_path
+            ):
                 initial_config.save()
 
                 # Verify initial state
@@ -208,9 +229,13 @@ class TestAppConfiguration:
             config_path = Path(temp_dir) / "cli_config.json"
             config = AppConfiguration(display_cost_per_action=True)
 
-            with patch.object(AppConfiguration, "get_config_path", return_value=config_path):
+            with patch.object(
+                AppConfiguration, "get_config_path", return_value=config_path
+            ):
                 # Mock open to raise PermissionError
-                with patch("builtins.open", side_effect=PermissionError("Access denied")):
+                with patch(
+                    "builtins.open", side_effect=PermissionError("Access denied")
+                ):
                     with pytest.raises(PermissionError):
                         config.save()
 
@@ -220,7 +245,9 @@ class TestAppConfiguration:
             config_path = Path(temp_dir) / "cli_config.json"
             config = AppConfiguration(display_cost_per_action=True)
 
-            with patch.object(AppConfiguration, "get_config_path", return_value=config_path):
+            with patch.object(
+                AppConfiguration, "get_config_path", return_value=config_path
+            ):
                 config.save()
 
             # Check file content format

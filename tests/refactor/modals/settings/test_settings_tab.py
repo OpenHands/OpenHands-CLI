@@ -2,7 +2,7 @@
 
 import pytest
 from textual.app import App, ComposeResult
-from textual.widgets import Input, Select, Static
+from textual.widgets import Input, Select
 
 from openhands_cli.refactor.modals.settings.components.settings_tab import SettingsTab
 
@@ -22,7 +22,7 @@ class TestSettingsTab:
         """Test that compose creates all expected form widgets."""
         app = SettingsTabTestApp()
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(SettingsTab)
 
             # Check main form container
@@ -64,7 +64,7 @@ class TestSettingsTab:
         """Test that widgets have correct initial states and values."""
         app = SettingsTabTestApp()
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(SettingsTab)
 
             # Mode select should default to basic
@@ -99,20 +99,24 @@ class TestSettingsTab:
         """Test that mode select has correct options."""
         app = SettingsTabTestApp()
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(SettingsTab)
             mode_select = tab.query_one("#mode_select", Select)
 
             # Check options (includes blank option)
             options = list(mode_select._options)
             assert len(options) == 3  # blank + basic + advanced
-            
+
             # Check basic option (options are tuples: (prompt, value))
-            basic_option = next(opt for opt in options if len(opt) > 1 and opt[1] == "basic")
+            basic_option = next(
+                opt for opt in options if len(opt) > 1 and opt[1] == "basic"
+            )
             assert basic_option[0] == "Basic"
-            
+
             # Check advanced option
-            advanced_option = next(opt for opt in options if len(opt) > 1 and opt[1] == "advanced")
+            advanced_option = next(
+                opt for opt in options if len(opt) > 1 and opt[1] == "advanced"
+            )
             assert advanced_option[0] == "Advanced"
 
     @pytest.mark.asyncio
@@ -120,20 +124,24 @@ class TestSettingsTab:
         """Test that memory condensation select has correct options."""
         app = SettingsTabTestApp()
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(SettingsTab)
             memory_select = tab.query_one("#memory_condensation_select", Select)
 
             # Check options (includes blank option)
             options = list(memory_select._options)
             assert len(options) == 3  # blank + enabled + disabled
-            
+
             # Check enabled option (options are tuples: (prompt, value))
-            enabled_option = next(opt for opt in options if len(opt) > 1 and opt[1] is True)
+            enabled_option = next(
+                opt for opt in options if len(opt) > 1 and opt[1] is True
+            )
             assert enabled_option[0] == "Enabled"
-            
+
             # Check disabled option
-            disabled_option = next(opt for opt in options if len(opt) > 1 and opt[1] is False)
+            disabled_option = next(
+                opt for opt in options if len(opt) > 1 and opt[1] is False
+            )
             assert disabled_option[0] == "Disabled"
 
             # Default should be disabled
@@ -144,7 +152,7 @@ class TestSettingsTab:
         """Test that input fields have appropriate placeholders."""
         app = SettingsTabTestApp()
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(SettingsTab)
 
             # Custom model input placeholder
@@ -166,7 +174,7 @@ class TestSettingsTab:
         """Test that all form sections are present."""
         app = SettingsTabTestApp()
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(SettingsTab)
 
             # Check for basic section
@@ -186,7 +194,7 @@ class TestSettingsTab:
         """Test that all form labels are present with correct text."""
         app = SettingsTabTestApp()
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(SettingsTab)
 
             # Get all labels
@@ -205,19 +213,23 @@ class TestSettingsTab:
             ]
 
             for expected_label in expected_labels:
-                assert any(expected_label in text for text in label_texts), f"Missing label: {expected_label}"
+                assert any(expected_label in text for text in label_texts), (
+                    f"Missing label: {expected_label}"
+                )
 
     @pytest.mark.asyncio
     async def test_help_section_present(self):
         """Test that help section is present with correct content."""
         app = SettingsTabTestApp()
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(SettingsTab)
 
             # Check for help section title
             section_titles = tab.query(".form_section_title")
-            help_title_found = any("Configuration Help" in str(title.render()) for title in section_titles)
+            help_title_found = any(
+                "Configuration Help" in str(title.render()) for title in section_titles
+            )
             assert help_title_found
 
             # Check for help text
@@ -235,7 +247,7 @@ class TestSettingsTab:
         """Test that widgets have correct CSS classes for styling."""
         app = SettingsTabTestApp()
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(SettingsTab)
 
             # Check select widgets have form_select class
@@ -257,40 +269,40 @@ class TestSettingsTab:
         """Test that select widgets have type-to-search enabled."""
         app = SettingsTabTestApp()
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(SettingsTab)
 
             # Check mode select
-            mode_select = tab.query_one("#mode_select", Select)
-            # Note: type_to_search is not directly accessible, but we can verify it was set
+            tab.query_one("#mode_select", Select)
+            # Note: type_to_search is not directly accessible
 
             # Check provider select
-            provider_select = tab.query_one("#provider_select", Select)
-            # Note: type_to_search is not directly accessible, but we can verify it was set
+            tab.query_one("#provider_select", Select)
+            # Note: type_to_search is not directly accessible
 
             # Check model select
-            model_select = tab.query_one("#model_select", Select)
-            # Note: type_to_search is not directly accessible, but we can verify it was set
+            tab.query_one("#model_select", Select)
+            # Note: type_to_search is not directly accessible
 
     @pytest.mark.asyncio
     async def test_memory_condensation_help_text(self):
         """Test that memory condensation has appropriate help text."""
         app = SettingsTabTestApp()
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(SettingsTab)
 
             # Find help text related to memory condensation
             help_texts = tab.query(".form_help")
             memory_help_found = False
-            
+
             for help_text in help_texts:
                 content = str(help_text.render())
                 if "Memory condensation" in content and "token usage" in content:
                     memory_help_found = True
                     assert "summarizing old conversation history" in content
                     break
-            
+
             assert memory_help_found, "Memory condensation help text not found"
 
     @pytest.mark.asyncio
@@ -310,7 +322,7 @@ class TestSettingsTab:
         """Test that widgets have correct types and IDs."""
         app = SettingsTabTestApp()
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(SettingsTab)
             widget = tab.query_one(f"#{widget_id}", expected_type)
             assert widget is not None
@@ -321,7 +333,7 @@ class TestSettingsTab:
         """Test that form has correct hierarchical structure."""
         app = SettingsTabTestApp()
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(SettingsTab)
 
             # Check main form container
@@ -340,7 +352,7 @@ class TestSettingsTab:
         """Test that model select has correct initial state and options."""
         app = SettingsTabTestApp()
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             tab = app.query_one(SettingsTab)
             model_select = tab.query_one("#model_select", Select)
 
@@ -350,7 +362,12 @@ class TestSettingsTab:
             # Should have placeholder option (plus blank option)
             options = list(model_select._options)
             assert len(options) == 2  # blank + placeholder
-            
-            # Find the placeholder option (not the blank one) - options are tuples: (prompt, value)
-            placeholder_option = next(opt for opt in options if len(opt) > 1 and opt[0] == "Select provider first")
+
+            # Find the placeholder option (not the blank one)
+            # options are tuples: (prompt, value)
+            placeholder_option = next(
+                opt
+                for opt in options
+                if len(opt) > 1 and opt[0] == "Select provider first"
+            )
             assert placeholder_option[1] == ""
