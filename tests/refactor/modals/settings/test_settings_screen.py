@@ -297,7 +297,7 @@ async def test_save_button_success_flow(app, fake_agent_store: InMemoryAgentStor
     screen._show_message = Mock()
     screen.dismiss = Mock()
     on_saved = Mock()
-    screen.on_settings_saved = on_saved
+    screen.on_settings_saved = [on_saved]  # Should be a list of callbacks
 
     save_button = screen.query_one("#save_button", Button)
 
