@@ -4,19 +4,23 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastmcp.mcp_config import MCPConfig
 from prompt_toolkit import HTML, print_formatted_text
 
-from openhands.sdk import Agent, AgentContext, LocalFileStore
+from openhands.sdk import (
+    LLM,
+    Agent,
+    AgentContext,
+    LLMSummarizingCondenser,
+    LocalFileStore,
+)
 from openhands.sdk.context import load_skills_from_dir
-from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands.tools.preset.default import get_default_tools
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
-    MCP_CONFIG_FILE,
     PERSISTENCE_DIR,
     WORK_DIR,
 )
+from openhands_cli.mcp.mcp_utils import load_mcp_config
 from openhands_cli.utils import get_llm_metadata, should_set_litellm_extra_body
 
 
@@ -27,12 +31,17 @@ class AgentStore:
         self.file_store = LocalFileStore(root=PERSISTENCE_DIR)
 
     def load_mcp_configuration(self) -> dict[str, Any]:
-        try:
-            mcp_config_path = Path(self.file_store.root) / MCP_CONFIG_FILE
-            mcp_config = MCPConfig.from_file(mcp_config_path)
-            return mcp_config.to_dict()["mcpServers"]
-        except Exception:
-            return {}
+        """Load MCP configuration from file.
+
+        Returns:
+            Dictionary of MCP servers configuration, or empty dict if file doesn't exist
+
+        Raises:
+            MCPConfigurationError: If the configuration file exists but is invalid
+        """
+        # Use the same implementation as load_mcp_config
+        config = load_mcp_config()
+        return config.to_dict().get("mcpServers", {})
 
     def load_project_skills(self) -> list:
         """Load skills project-specific directories."""
@@ -74,6 +83,7 @@ class AgentStore:
                 skills=skills,
                 system_message_suffix=f"You current working directory is: {WORK_DIR}",
                 load_user_skills=True,
+                load_public_skills=True,
             )
 
             mcp_config: dict = self.load_mcp_configuration()
@@ -130,3 +140,51 @@ class AgentStore:
     def save(self, agent: Agent) -> None:
         serialized_spec = agent.model_dump_json(context={"expose_secrets": True})
         self.file_store.write(AGENT_SETTINGS_PATH, serialized_spec)
+
+    def create_and_save_from_settings(
+        self,
+        llm_api_key: str,
+        settings: dict[str, Any],
+        base_url: str = "https://llm-proxy.app.all-hands.dev/",
+        default_model: str = "claude-sonnet-4-5-20250929",
+    ) -> Agent:
+        """Create an Agent instance from user settings and API key, then save it.
+
+        Args:
+            llm_api_key: The LLM API key to use
+            settings: User settings dictionary containing model and other config
+            base_url: Base URL for the LLM service
+            default_model: Default model to use if not specified in settings
+
+        Returns:
+            The created Agent instance
+        """
+        model = settings.get("llm_model", default_model)
+
+        llm = LLM(
+            model=model,
+            api_key=llm_api_key,
+            base_url=base_url,
+            usage_id="agent",
+        )
+
+        condenser_llm = LLM(
+            model=model,
+            api_key=llm_api_key,
+            base_url=base_url,
+            usage_id="condenser",
+        )
+
+        condenser = LLMSummarizingCondenser(llm=condenser_llm)
+
+        agent = Agent(
+            llm=llm,
+            tools=get_default_tools(enable_browser=False),
+            mcp_config={},
+            condenser=condenser,
+        )
+
+        # Save the agent configuration
+        self.save(agent)
+
+        return agent

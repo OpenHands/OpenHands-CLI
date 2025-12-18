@@ -2,11 +2,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-from fastmcp.mcp_config import MCPConfig
+from fastmcp.mcp_config import MCPConfig, RemoteMCPServer, StdioMCPServer
 from prompt_toolkit import HTML, print_formatted_text
 
 from openhands.sdk import Agent
 from openhands_cli.locations import MCP_CONFIG_FILE, PERSISTENCE_DIR
+from openhands_cli.mcp.mcp_display_utils import normalize_server_object
 
 
 class MCPScreen:
@@ -144,30 +145,37 @@ class MCPScreen:
         print_formatted_text("")
 
     def _render_server_summary(
-        self, server_name: str | None, server_spec: dict[str, Any], indent: int = 2
+        self,
+        server_name: str | None,
+        server: StdioMCPServer | RemoteMCPServer | dict[str, Any],
+        indent: int = 2,
     ) -> None:
         pad = " " * indent
 
         if server_name:
             print_formatted_text(HTML(f"{pad}<white>• {server_name}</white>"))
 
-        if isinstance(server_spec, dict):
-            if "command" in server_spec:
-                cmd = server_spec.get("command", "")
-                args = server_spec.get("args", [])
-                args_str = " ".join(args) if args else ""
-                print_formatted_text(HTML(f"{pad}  <grey>Type: Command-based</grey>"))
-                if cmd or args_str:
+        # Convert to FastMCP object if needed
+        server_obj = normalize_server_object(server)
+
+        if isinstance(server_obj, StdioMCPServer):
+            print_formatted_text(HTML(f"{pad}  <grey>Type: Command-based</grey>"))
+            if server_obj.command or server_obj.args:
+                command_parts = [server_obj.command] if server_obj.command else []
+                if server_obj.args:
+                    command_parts.extend(server_obj.args)
+                command_str = " ".join(command_parts)
+                if command_str:
                     print_formatted_text(
-                        HTML(f"{pad}  <grey>Command: {cmd} {args_str}</grey>")
+                        HTML(f"{pad}  <grey>Command: {command_str}</grey>")
                     )
-            elif "url" in server_spec:
-                url = server_spec.get("url", "")
-                auth = server_spec.get("auth", "none")
-                print_formatted_text(HTML(f"{pad}  <grey>Type: URL-based</grey>"))
-                if url:
-                    print_formatted_text(HTML(f"{pad}  <grey>URL: {url}</grey>"))
-                print_formatted_text(HTML(f"{pad}  <grey>Auth: {auth}</grey>"))
+        elif isinstance(server_obj, RemoteMCPServer):
+            print_formatted_text(HTML(f"{pad}  <grey>Type: URL-based</grey>"))
+            if server_obj.url:
+                print_formatted_text(HTML(f"{pad}  <grey>URL: {server_obj.url}</grey>"))
+            print_formatted_text(
+                HTML(f"{pad}  <grey>Auth: {server_obj.auth or 'none'}</grey>")
+            )
 
     def _display_information_header(self) -> None:
         print_formatted_text(

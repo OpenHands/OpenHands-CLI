@@ -9,6 +9,8 @@ class UserConfirmation(Enum):
     ACCEPT = "accept"
     REJECT = "reject"
     DEFER = "defer"
+    ALWAYS_PROCEED = "always_proceed"
+    CONFIRM_RISKY = "confirm_risky"
 
 
 class ConfirmationResult(BaseModel):

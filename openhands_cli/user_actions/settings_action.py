@@ -72,7 +72,8 @@ def choose_llm_model(step_counter: StepCounter, provider: str, escapable=True) -
     if provider == "openhands":
         question = (
             step_counter.next_step("Select Available OpenHands Model:\n")
-            + "LLM usage is billed at the providers’ rates with no markup. Details: https://docs.all-hands.dev/usage/llms/openhands-llms"
+            + "LLM usage is billed at the providers’ rates with no markup.\n"
+            + "Details: https://docs.all-hands.dev/usage/llms/openhands-llms"
         )
     else:
         question = step_counter.next_step(
@@ -108,7 +109,7 @@ def prompt_api_key(
     )
     helper_text = (
         "\nYou can find your OpenHands LLM API Key in the API Keys tab of "
-        "OpenHands Cloud: "
+        "OpenHands Cloud:\n"
         "https://app.all-hands.dev/settings/api-keys\n"
         if provider == "openhands"
         else ""

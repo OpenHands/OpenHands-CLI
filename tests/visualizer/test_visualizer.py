@@ -6,16 +6,13 @@ from typing import ClassVar
 from rich.console import Group
 from rich.text import Text
 
+from openhands.sdk import Action, TextContent
 from openhands.sdk.event import (
     ActionEvent,
     SystemPromptEvent,
     UserRejectObservation,
 )
-from openhands.sdk.llm import (
-    MessageToolCall,
-    TextContent,
-)
-from openhands.sdk.tool import Action
+from openhands.sdk.llm import MessageToolCall
 from openhands_cli.tui.visualizer import (
     CLIVisualizer,
 )

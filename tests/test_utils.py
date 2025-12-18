@@ -51,7 +51,7 @@ def test_convert_acp_mcp_servers_with_empty_env():
     assert result["test-server"]["command"] == "/usr/bin/node"
     assert result["test-server"]["args"] == ["server.js"]
     assert result["test-server"]["env"] == {}
-    assert result["test-server"]["type"] == "stdio"
+    assert result["test-server"]["transport"] == "stdio"
     assert "name" not in result["test-server"]
 
 

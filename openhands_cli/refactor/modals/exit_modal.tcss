@@ -1,0 +1,39 @@
+ExitConfirmationModal {
+    align: center middle;
+    background: rgba(0, 0, 0, 0.8);
+}
+
+#dialog {
+    grid-size: 2;
+    grid-gutter: 1 2;
+    grid-rows: auto auto;
+    padding: 1 2;
+    width: 60;
+    height: auto;
+    min-width: 40;
+    border: $primary 80%;
+    background: $surface 90%;
+    margin: 1 1;
+}
+
+#question {
+    column-span: 2;
+    height: auto;
+    width: 1fr;
+    content-align: center middle;
+    padding: 2 0;
+}
+
+Button {
+    width: 100%;
+    height: 3;
+    margin: 0 1;
+}
+
+#yes {
+    content-align: center middle;
+}
+
+#no {
+    content-align: center middle;
+}

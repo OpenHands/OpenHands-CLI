@@ -4,11 +4,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ConfigDict, SecretStr, model_validator
 
-from openhands.sdk import Conversation, ConversationCallbackType, LocalConversation
-from openhands.sdk.agent.base import AgentBase
+from openhands.sdk import (
+    LLM,
+    AgentBase,
+    Conversation,
+    ConversationCallbackType,
+    ConversationExecutionStatus,
+    LocalConversation,
+    TokenCallbackType,
+)
 from openhands.sdk.conversation import ConversationState
-from openhands.sdk.conversation.state import ConversationExecutionStatus
-from openhands.sdk.llm import LLM
 from openhands.sdk.security.confirmation_policy import AlwaysConfirm, NeverConfirm
 from openhands_cli.runner import ConversationRunner
 from openhands_cli.user_actions.types import UserConfirmation
@@ -41,7 +46,10 @@ class FakeAgent(AgentBase):
         pass
 
     def step(
-        self, conversation: LocalConversation, on_event: ConversationCallbackType
+        self,
+        conversation: LocalConversation,
+        on_event: ConversationCallbackType,
+        on_token: TokenCallbackType | None = None,
     ) -> None:
         self.step_count += 1
         if self.step_count == self.finish_on_step:
