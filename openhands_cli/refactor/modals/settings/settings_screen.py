@@ -1,7 +1,7 @@
 """Settings screen for OpenHands CLI using Textual.
 
 This module provides a modern form-based settings interface that overlays
-the main UI, allowing users to configure their agent settings including
+the main UI, allowing users to configure their settings including
 LLM provider, model, API keys, and advanced options.
 """
 
@@ -34,7 +34,7 @@ from openhands_cli.tui.settings.store import AgentStore
 
 
 class SettingsScreen(ModalScreen):
-    """A modal screen for configuring agent settings."""
+    """A modal screen for configuring settings."""
 
     BINDINGS: ClassVar = [
         ("escape", "cancel", "Cancel"),
@@ -83,7 +83,7 @@ class SettingsScreen(ModalScreen):
     def compose(self) -> ComposeResult:
         """Create the settings form with tabs."""
         with Container(id="settings_container"):
-            yield Static("Agent Settings", id="settings_title")
+            yield Static("Settings", id="settings_title")
 
             # Message area for errors/success
             self.message_widget = Static("", id="message_area")
@@ -144,7 +144,7 @@ class SettingsScreen(ModalScreen):
         self.memory_select.value = False
 
     def _load_current_settings(self) -> None:
-        """Load current agent settings into the form."""
+        """Load current settings into the form."""
         if not self.current_agent:
             return
 

@@ -161,9 +161,7 @@ class OpenHandsApp(App):
         yield SystemCommand(
             "MCP", "View MCP configurations", lambda: MCPSidePanel.toggle(self)
         )
-        yield SystemCommand(
-            "AGENT SETTINGS", "Configure agent settings", self.action_open_settings
-        )
+        yield SystemCommand("SETTINGS", "Configure settings", self.action_open_settings)
 
     def on_mount(self) -> None:
         """Called when app starts."""

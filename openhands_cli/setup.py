@@ -49,7 +49,7 @@ def load_agent_specs(
     agent = agent_store.load(session_id=conversation_id)
     if not agent:
         raise MissingAgentSpec(
-            "Agent specification not found. Please configure your agent settings."
+            "Agent specification not found. Please configure your settings."
         )
 
     # If MCP servers are provided, augment the agent's MCP configuration
