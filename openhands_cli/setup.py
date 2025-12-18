@@ -104,7 +104,7 @@ def setup_conversation(
     conversation_id: UUID,
     confirmation_policy: ConfirmationPolicyBase,
     visualizer: ConversationVisualizer | None = None,
-) -> BaseConversation:
+) -> BaseConversation:  # type: ignore[reportUndefinedVariable]
     """
     Setup the conversation with agent.
 
@@ -199,7 +199,7 @@ def setup_conversation(
             pass
 
     # Create conversation - agent context is now set in AgentStore.load()
-    conversation: BaseConversation = Conversation(
+    conversation: BaseConversation = Conversation(  # type: ignore[reportUndefinedVariable]
         agent=agent,
         workspace=Workspace(working_dir=WORK_DIR),
         # Conversation will add /<conversation_id> to this path
