@@ -70,7 +70,7 @@ class TestSimpleMainHeadlessValidation:
     ):
         # Mock textual_main to return a UUID
         mock_textual_main.return_value = uuid.uuid4()
-        
+
         test_args = ["openhands", "--headless", "--task", "test task"]
 
         with patch.object(sys, "argv", test_args):
@@ -87,7 +87,7 @@ class TestSimpleMainHeadlessValidation:
     def test_headless_with_file_calls_textual_main(self, mock_textual_main):
         # Mock textual_main to return a UUID
         mock_textual_main.return_value = uuid.uuid4()
-        
+
         # minimal coverage that file-only headless works
         with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write("test content")
@@ -107,7 +107,7 @@ class TestSimpleMainHeadlessValidation:
         """Regression guard that headless implies exit_without_confirmation."""
         # Mock textual_main to return a UUID
         mock_textual_main.return_value = uuid.uuid4()
-        
+
         test_args = ["openhands", "--headless", "--task", "test task"]
 
         with patch.object(sys, "argv", test_args):

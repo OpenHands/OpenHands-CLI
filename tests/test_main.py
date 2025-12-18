@@ -7,12 +7,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from openhands.sdk.security.confirmation_policy import (
-    AlwaysConfirm,
-    ConfirmRisky,
-    NeverConfirm,
-)
-from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli import simple_main
 from openhands_cli.argparsers.main_parser import create_main_parser
 from openhands_cli.simple_main import main
@@ -95,9 +89,7 @@ class TestMainEntryPoint:
 
     @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands"])
-    def test_main_handles_general_exception(
-        self, mock_textual_main: MagicMock
-    ) -> None:
+    def test_main_handles_general_exception(self, mock_textual_main: MagicMock) -> None:
         """Test that main() handles general exceptions."""
         mock_textual_main.side_effect = Exception("Unexpected error")
 
@@ -111,7 +103,7 @@ class TestMainEntryPoint:
     @patch("sys.argv", ["openhands", "--resume", "test-conversation-id"])
     def test_main_with_resume_argument(self, mock_textual_main: MagicMock) -> None:
         """Test that main() passes resume conversation ID when provided."""
-        # Mock textual_main to return a UUID and raise KeyboardInterrupt to exit gracefully
+        # Mock textual_main to return a UUID and raise KeyboardInterrupt to exit
         mock_textual_main.return_value = uuid.uuid4()
         mock_textual_main.side_effect = KeyboardInterrupt()
 
@@ -145,9 +137,7 @@ class TestMainEntryPoint:
 
     @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands", "--llm-approve"])
-    def test_main_with_llm_approve_argument(
-        self, mock_textual_main: MagicMock
-    ) -> None:
+    def test_main_with_llm_approve_argument(self, mock_textual_main: MagicMock) -> None:
         """Test that main() passes llm_approve=True with --llm-approve."""
         # Mock textual_main to raise KeyboardInterrupt to exit gracefully
         mock_textual_main.side_effect = KeyboardInterrupt()
@@ -185,13 +175,16 @@ def test_main_cli_calls_textual_main(
     monkeypatch.setattr(sys, "argv", argv, raising=False)
 
     called = {}
+
     def mock_textual_main(**kw):
         called.setdefault("kwargs", kw)
         return uuid.uuid4()
-    
+
     fake_textual_app = SimpleNamespace(main=mock_textual_main)
     # Provide the symbol that main() will import
-    monkeypatch.setitem(sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app)
+    monkeypatch.setitem(
+        sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app
+    )
 
     # Execute (no SystemExit expected on success)
     main()
@@ -216,9 +209,11 @@ def test_main_cli_task_sets_queued_inputs(monkeypatch):
     def mock_textual_main(**kw):
         called.setdefault("kwargs", kw)
         return uuid.uuid4()
-    
+
     fake_textual_app = SimpleNamespace(main=mock_textual_main)
-    monkeypatch.setitem(sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app)
+    monkeypatch.setitem(
+        sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app
+    )
 
     main()
 
@@ -244,9 +239,11 @@ def test_main_cli_file_sets_queued_inputs(monkeypatch, tmp_path):
     def mock_textual_main(**kw):
         called.setdefault("kwargs", kw)
         return uuid.uuid4()
-    
+
     fake_textual_app = SimpleNamespace(main=mock_textual_main)
-    monkeypatch.setitem(sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app)
+    monkeypatch.setitem(
+        sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app
+    )
 
     main()
 
@@ -287,9 +284,11 @@ def test_main_cli_file_takes_precedence_over_task(monkeypatch, tmp_path):
     def mock_textual_main(**kw):
         called.setdefault("kwargs", kw)
         return uuid.uuid4()
-    
+
     fake_textual_app = SimpleNamespace(main=mock_textual_main)
-    monkeypatch.setitem(sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app)
+    monkeypatch.setitem(
+        sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app
+    )
 
     main()
 
