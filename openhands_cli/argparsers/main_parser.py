@@ -36,7 +36,7 @@ def create_main_parser() -> argparse.ArgumentParser:
                 openhands serve                     # Launch GUI server
                 openhands serve --gpu               # Launch with GPU support
                 openhands acp                       # Agent-Client Protocol
-                                                      server (e.g., Zed IDE)
+                                                      server (e.g., Toad CLI, Zed IDE)
                 openhands login                     # Authenticate with OpenHands Cloud
                 openhands logout                    # Log out from OpenHands Cloud
         """,
