@@ -6,6 +6,7 @@ This is a simplified version that demonstrates the TUI functionality.
 
 import logging
 import os
+import sys
 import warnings
 from pathlib import Path
 
@@ -124,11 +125,33 @@ def main() -> None:
 
             asyncio.run(run_acp_server(initial_confirmation_mode=confirmation_mode))
 
+        elif args.command == "login":
+            from openhands_cli.auth.login_command import run_login_command
+
+            success = run_login_command(args.server_url)
+            if not success:
+                sys.exit(1)
+        elif args.command == "logout":
+            from openhands_cli.auth.logout_command import run_logout_command
+
+            success = run_logout_command(args.server_url)
+            if not success:
+                sys.exit(1)
         elif args.command == "mcp":
             # Import MCP command handler only when needed
             from openhands_cli.mcp.mcp_commands import handle_mcp_command
 
             handle_mcp_command(args)
+        elif args.command == "cloud":
+            # Validate cloud mode requirements
+            if not args.task and not args.file:
+                parser.error(
+                    "cloud subcommand requires either --task or --file to be specified"
+                )
+
+            from openhands_cli.cloud.command import handle_cloud_command
+
+            handle_cloud_command(args)
 
         else:
             # Check if experimental flag is used
