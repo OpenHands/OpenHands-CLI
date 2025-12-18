@@ -150,7 +150,7 @@ class SettingsScreen:
     def _get_existing_reasoning_summary(
         self,
     ) -> Literal["auto", "concise", "detailed"] | None:
-        if self.conversation and getattr(self.conversation, "state", None):
+        if self.conversation:
             try:
                 return self.conversation.state.agent.llm.reasoning_summary
             except Exception:
