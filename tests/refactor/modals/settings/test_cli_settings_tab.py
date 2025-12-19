@@ -8,10 +8,10 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Switch
 
-from openhands_cli.refactor.modals.settings.cli_settings import CliSettings
 from openhands_cli.refactor.modals.settings.components.cli_settings_tab import (
     CliSettingsTab,
 )
+from openhands_cli.stores import CliSettings
 
 
 class _TestApp(App):

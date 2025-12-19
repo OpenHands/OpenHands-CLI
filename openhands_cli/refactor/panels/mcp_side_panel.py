@@ -55,7 +55,7 @@ class MCPSidePanel(VerticalScroll):
         # agent = cls._load_agent_safe()
         agent = None
         try:
-            from openhands_cli.tui.settings.store import AgentStore
+            from openhands_cli.stores import AgentStore
 
             agent_store = AgentStore()
             agent = agent_store.load()

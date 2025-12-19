@@ -324,10 +324,8 @@ class TestCliSettingsCaching:
         visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
         # Mock CliSettings.load to track how many times it's called
-        with patch(
-            "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
-        ) as mock_load:
-            from openhands_cli.refactor.modals.settings.cli_settings import (
+        with patch("openhands_cli.stores.CliSettings.load") as mock_load:
+            from openhands_cli.stores import (
                 CliSettings,
             )
 
@@ -360,10 +358,8 @@ class TestCliSettingsCaching:
         visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
         # Mock CliSettings.load to track how many times it's called
-        with patch(
-            "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
-        ) as mock_load:
-            from openhands_cli.refactor.modals.settings.cli_settings import (
+        with patch("openhands_cli.stores.CliSettings.load") as mock_load:
+            from openhands_cli.stores import (
                 CliSettings,
             )
 
@@ -401,10 +397,8 @@ class TestCliSettingsCaching:
         visualizer._state = mock_state
 
         # Mock CliSettings.load to track how many times it's called
-        with patch(
-            "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
-        ) as mock_load:
-            from openhands_cli.refactor.modals.settings.cli_settings import (
+        with patch("openhands_cli.stores.CliSettings.load") as mock_load:
+            from openhands_cli.stores import (
                 CliSettings,
             )
 
@@ -467,10 +461,8 @@ class TestCliSettingsCaching:
             mock_state.stats = None
         visualizer._state = mock_state
 
-        with patch(
-            "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
-        ) as mock_load:
-            from openhands_cli.refactor.modals.settings.cli_settings import (
+        with patch("openhands_cli.stores.CliSettings.load") as mock_load:
+            from openhands_cli.stores import (
                 CliSettings,
             )
 
@@ -507,10 +499,8 @@ class TestCliSettingsCaching:
         container = VerticalScroll()
         visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
-        with patch(
-            "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
-        ) as mock_load:
-            from openhands_cli.refactor.modals.settings.cli_settings import (
+        with patch("openhands_cli.stores.CliSettings.load") as mock_load:
+            from openhands_cli.stores import (
                 CliSettings,
             )
 
@@ -548,7 +538,7 @@ class TestCliSettingsCaching:
 
         # Set initial cache state
         if initial_cache_state == "cached_config":
-            from openhands_cli.refactor.modals.settings.cli_settings import (
+            from openhands_cli.stores import (
                 CliSettings,
             )
 
@@ -556,10 +546,8 @@ class TestCliSettingsCaching:
         else:
             visualizer._cli_settings = None
 
-        with patch(
-            "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
-        ) as mock_load:
-            from openhands_cli.refactor.modals.settings.cli_settings import (
+        with patch("openhands_cli.stores.CliSettings.load") as mock_load:
+            from openhands_cli.stores import (
                 CliSettings,
             )
 
@@ -606,10 +594,8 @@ class TestCliSettingsCaching:
             "conversation_stats",
             new_callable=lambda: property(lambda self: mock_stats),
         ):
-            with patch(
-                "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
-            ) as mock_load:
-                from openhands_cli.refactor.modals.settings.cli_settings import (
+            with patch("openhands_cli.stores.CliSettings.load") as mock_load:
+                from openhands_cli.stores import (
                     CliSettings,
                 )
 
