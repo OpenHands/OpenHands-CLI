@@ -13,7 +13,10 @@ from openhands_cli.mcp.mcp_display_utils import mask_sensitive_value
 from openhands_cli.mcp.mcp_utils import (
     MCPConfigurationError,
     add_server,
+    disable_server,
+    enable_server,
     get_server,
+    is_server_enabled,
     list_servers,
     remove_server,
 )
@@ -30,6 +33,7 @@ def handle_mcp_add(args: argparse.Namespace) -> None:
         args: Parsed command line arguments
     """
     try:
+        enabled = getattr(args, "enabled", True)
         add_server(
             name=args.name,
             transport=args.transport,
@@ -38,9 +42,11 @@ def handle_mcp_add(args: argparse.Namespace) -> None:
             headers=args.header if args.header else None,
             env_vars=args.env if args.env else None,
             auth=args.auth if args.auth else None,
+            enabled=enabled,
         )
+        status = "enabled" if enabled else "disabled"
         console.print(
-            f"Successfully added MCP server '{args.name}'",
+            f"Successfully added MCP server '{args.name}' ({status})",
             style=OPENHANDS_THEME.success,
         )
     except MCPConfigurationError as e:
@@ -131,7 +137,12 @@ def _render_server_details(
         show_name: Whether to show the server name
     """
     if show_name:
-        console.print(f"  • {name}", style=OPENHANDS_THEME.accent)
+        # Show enabled/disabled status
+        enabled = is_server_enabled(name)
+        status = "✓ enabled" if enabled else "✗ disabled"
+        status_style = OPENHANDS_THEME.success if enabled else OPENHANDS_THEME.warning
+        console.print(f"  • {name}", style=OPENHANDS_THEME.accent, end="")
+        console.print(f" [{status}]", style=status_style)
 
     console.print(f"    Transport: {server.transport}", style=OPENHANDS_THEME.secondary)
 
@@ -170,6 +181,48 @@ def _render_server_details(
                 console.print(f"      {key}={display_value}")
 
 
+def handle_mcp_enable(args: argparse.Namespace) -> None:
+    """Handle the 'mcp enable' command.
+
+    Args:
+        args: Parsed command line arguments
+    """
+    try:
+        enable_server(args.name)
+        console.print(
+            f"Successfully enabled MCP server '{args.name}'",
+            style=OPENHANDS_THEME.success,
+        )
+        console.print(
+            "Restart your OpenHands session to apply the changes",
+            style=OPENHANDS_THEME.warning,
+        )
+    except MCPConfigurationError as e:
+        console.print(f"Error: {e}", style=OPENHANDS_THEME.error)
+        raise SystemExit(1)
+
+
+def handle_mcp_disable(args: argparse.Namespace) -> None:
+    """Handle the 'mcp disable' command.
+
+    Args:
+        args: Parsed command line arguments
+    """
+    try:
+        disable_server(args.name)
+        console.print(
+            f"Successfully disabled MCP server '{args.name}'",
+            style=OPENHANDS_THEME.success,
+        )
+        console.print(
+            "Restart your OpenHands session to apply the changes",
+            style=OPENHANDS_THEME.warning,
+        )
+    except MCPConfigurationError as e:
+        console.print(f"Error: {e}", style=OPENHANDS_THEME.error)
+        raise SystemExit(1)
+
+
 def handle_mcp_command(args: argparse.Namespace) -> None:
     """Main handler for MCP commands.
 
@@ -184,6 +237,10 @@ def handle_mcp_command(args: argparse.Namespace) -> None:
         handle_mcp_list(args)
     elif args.mcp_command == "get":
         handle_mcp_get(args)
+    elif args.mcp_command == "enable":
+        handle_mcp_enable(args)
+    elif args.mcp_command == "disable":
+        handle_mcp_disable(args)
     else:
         console.print("Unknown MCP command", style=OPENHANDS_THEME.error)
         raise SystemExit(1)

@@ -20,7 +20,7 @@ from openhands_cli.locations import (
     PERSISTENCE_DIR,
     WORK_DIR,
 )
-from openhands_cli.mcp.mcp_utils import load_mcp_config
+from openhands_cli.mcp.mcp_utils import list_enabled_servers
 from openhands_cli.utils import get_llm_metadata, should_set_litellm_extra_body
 
 
@@ -29,19 +29,6 @@ class AgentStore:
 
     def __init__(self) -> None:
         self.file_store = LocalFileStore(root=PERSISTENCE_DIR)
-
-    def load_mcp_configuration(self) -> dict[str, Any]:
-        """Load MCP configuration from file.
-
-        Returns:
-            Dictionary of MCP servers configuration, or empty dict if file doesn't exist
-
-        Raises:
-            MCPConfigurationError: If the configuration file exists but is invalid
-        """
-        # Use the same implementation as load_mcp_config
-        config = load_mcp_config()
-        return config.to_dict().get("mcpServers", {})
 
     def load_project_skills(self) -> list:
         """Load skills project-specific directories."""
@@ -86,7 +73,8 @@ class AgentStore:
                 load_public_skills=True,
             )
 
-            mcp_config: dict = self.load_mcp_configuration()
+            # Get only enabled MCP servers
+            enabled_servers = list_enabled_servers()
 
             # Update LLM metadata with current information
             llm_update = {}
@@ -120,7 +108,9 @@ class AgentStore:
                 update={
                     "llm": updated_llm,
                     "tools": updated_tools,
-                    "mcp_config": {"mcpServers": mcp_config} if mcp_config else {},
+                    "mcp_config": {"mcpServers": enabled_servers}
+                    if enabled_servers
+                    else {},
                     "agent_context": agent_context,
                     "condenser": agent.condenser.model_copy(update=condenser_updates)
                     if agent.condenser

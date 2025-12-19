@@ -78,16 +78,14 @@ def test_load_overrides_persisted_mcp_with_mcp_json_file(
     loaded = agent_store.load()
     assert loaded is not None
     # Expect ONLY the MCP json file's config
-    assert loaded.mcp_config == {
-        "mcpServers": {
-            "file_server": {
-                "command": "uvx",
-                "args": ["mcp-server-fetch"],
-                "env": {},
-                "transport": "stdio",
-            }
-        }
-    }
+    assert "mcpServers" in loaded.mcp_config
+    assert "file_server" in loaded.mcp_config["mcpServers"]
+
+    # Check server properties
+    file_server = loaded.mcp_config["mcpServers"]["file_server"]
+    assert file_server.command == "uvx"
+    assert file_server.args == ["mcp-server-fetch"]
+    assert file_server.transport == "stdio"
 
 
 @patch("openhands_cli.tui.settings.store.get_default_tools", return_value=[])
@@ -112,4 +110,93 @@ def test_load_when_mcp_file_missing_ignores_persisted_mcp(
 
     loaded = agent_store.load()
     assert loaded is not None
-    assert loaded.mcp_config == {}  # persisted MCP is ignored if file is missin
+    assert loaded.mcp_config == {}  # persisted MCP is ignored if file is missing
+
+
+@patch("openhands_cli.tui.settings.store.get_default_tools", return_value=[])
+@patch("openhands_cli.tui.settings.store.get_llm_metadata", return_value={})
+def test_load_mcp_configuration_filters_disabled_servers(
+    mock_meta, mock_tools, persistence_dir, agent_store
+):
+    """Test that load_mcp_configuration filters out disabled servers."""
+    # Persist a basic agent first
+    persisted_agent = Agent(
+        llm=LLM(model="gpt-4", api_key=SecretStr("k"), usage_id="svc"),
+        tools=[],
+    )
+    write_agent(persistence_dir, persisted_agent)
+
+    # Create mcp.json with enabled and disabled servers
+    write_json(
+        persistence_dir / MCP_CONFIG_FILE,
+        {
+            "mcpServers": {
+                "enabled_server": {
+                    "command": "uvx",
+                    "args": ["mcp-server-fetch"],
+                    "enabled": True,
+                },
+                "disabled_server": {
+                    "command": "python",
+                    "args": ["-m", "disabled"],
+                    "enabled": False,
+                },
+                "default_enabled_server": {
+                    "command": "node",
+                    "args": ["server.js"],
+                    # No 'enabled' field - should default to True
+                },
+            }
+        },
+    )
+
+    loaded = agent_store.load()
+    assert loaded is not None
+
+    # Should only load enabled servers (enabled_server and default_enabled_server)
+    assert "enabled_server" in loaded.mcp_config["mcpServers"]
+    assert "default_enabled_server" in loaded.mcp_config["mcpServers"]
+    assert "disabled_server" not in loaded.mcp_config["mcpServers"]
+
+    # Verify the loaded servers have correct properties
+    assert loaded.mcp_config["mcpServers"]["enabled_server"].command == "uvx"
+    default_enabled = loaded.mcp_config["mcpServers"]["default_enabled_server"]
+    assert default_enabled.command == "node"
+
+
+@patch("openhands_cli.tui.settings.store.get_default_tools", return_value=[])
+@patch("openhands_cli.tui.settings.store.get_llm_metadata", return_value={})
+def test_load_mcp_configuration_all_disabled(
+    mock_meta, mock_tools, persistence_dir, agent_store
+):
+    """Test load_mcp_configuration returns empty dict when all servers disabled."""
+    # Persist a basic agent first
+    persisted_agent = Agent(
+        llm=LLM(model="gpt-4", api_key=SecretStr("k"), usage_id="svc"),
+        tools=[],
+    )
+    write_agent(persistence_dir, persisted_agent)
+
+    # Create mcp.json with all disabled servers
+    write_json(
+        persistence_dir / MCP_CONFIG_FILE,
+        {
+            "mcpServers": {
+                "disabled_server1": {
+                    "command": "python",
+                    "args": ["-m", "server1"],
+                    "enabled": False,
+                },
+                "disabled_server2": {
+                    "command": "python",
+                    "args": ["-m", "server2"],
+                    "enabled": False,
+                },
+            }
+        },
+    )
+
+    loaded = agent_store.load()
+    assert loaded is not None
+    # When all servers are disabled, mcp_config becomes empty dict
+    assert loaded.mcp_config == {}
