@@ -409,7 +409,7 @@ class TestJsonArgumentValidation:
             # Mock sys.argv for argument parsing
             with patch("sys.argv", ["openhands", "--json", "--task", "test task"]):
                 simple_main()
-                
+
             # Verify textual_main was called with json_mode=False
             mock_textual.assert_called_once()
             args, kwargs = mock_textual.call_args
@@ -419,9 +419,11 @@ class TestJsonArgumentValidation:
         """Test that JSON + headless enables JSON mode."""
         with patch("openhands_cli.refactor.textual_app.main") as mock_textual:
             # Mock sys.argv for argument parsing
-            with patch("sys.argv", ["openhands", "--headless", "--json", "--task", "test task"]):
+            with patch(
+                "sys.argv", ["openhands", "--headless", "--json", "--task", "test task"]
+            ):
                 simple_main()
-                
+
             # Verify textual_main was called with json_mode=True
             mock_textual.assert_called_once()
             args, kwargs = mock_textual.call_args
@@ -434,15 +436,16 @@ class TestJsonModeIntegration:
     def test_json_callback_function_exists_and_callable(self):
         """Test that json_callback function exists and is callable."""
         from openhands_cli.utils import json_callback
-        
+
         # Verify the function exists and is callable
         assert callable(json_callback)
-        
+
         # Test that it can be used as an event callback (basic compatibility)
         from openhands.sdk.event import Event
+
         mock_event = Mock(spec=Event)
         mock_event.model_dump.return_value = {"test": "data"}
-        
+
         # Should not raise an exception
         with patch("builtins.print"):
             json_callback(mock_event)

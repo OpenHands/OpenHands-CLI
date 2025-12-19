@@ -2,14 +2,11 @@
 
 import json
 from argparse import Namespace
-from io import StringIO
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
-import pytest
 from acp.schema import EnvVariable, StdioMcpServer
 
 from openhands.sdk.event import MessageEvent, SystemPromptEvent
-from openhands.sdk.event.base import Event
 from openhands.sdk.llm import Message, TextContent
 from openhands_cli.acp_impl.utils import convert_acp_mcp_servers_to_agent_format
 from openhands_cli.utils import (
@@ -131,12 +128,10 @@ class TestJsonCallback:
     """Minimal tests for json_callback function core behavior."""
 
     def test_json_callback_filters_system_events_and_outputs_others(self):
-        """Test that SystemPromptEvent is filtered and other events are output as JSON."""
+        """Test that SystemPromptEvent is filtered and other events output as JSON."""
         # Test SystemPromptEvent filtering
         system_event = SystemPromptEvent(
-            system_prompt=TextContent(text="test prompt"),
-            tools=[],
-            source="agent"
+            system_prompt=TextContent(text="test prompt"), tools=[], source="agent"
         )
 
         with patch("builtins.print") as mock_print:
@@ -145,8 +140,10 @@ class TestJsonCallback:
 
         # Test non-system event JSON output
         message_event = MessageEvent(
-            llm_message=Message(role="user", content="test message"),
-            source="user"
+            llm_message=Message(
+                role="user", content=[TextContent(text="test message")]
+            ),
+            source="user",
         )
 
         with patch("builtins.print") as mock_print:
@@ -164,7 +161,9 @@ class TestJsonCallback:
     def test_json_callback_real_message_event_processing(self):
         """Test json_callback with realistic MessageEvent processing."""
         event = MessageEvent(
-            llm_message=Message(role="user", content="Hello, this is a test message"),
+            llm_message=Message(
+                role="user", content=[TextContent(text="Hello, this is a test message")]
+            ),
             source="user",
         )
 
@@ -183,7 +182,7 @@ class TestJsonCallback:
             assert "llm_message" in parsed_json
             assert "source" in parsed_json
             assert parsed_json["source"] == "user"
-            
+
             # Check the message content structure
             llm_message = parsed_json["llm_message"]
             assert "content" in llm_message
