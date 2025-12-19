@@ -112,6 +112,11 @@ class OpenHandsApp(App):
 
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
+        self._reload_visualizer = (
+            lambda: self.conversation_runner.visualizer.reload_configuration()
+            if self.conversation_runner
+            else None
+        )
 
         # Confirmation panel tracking
         self.confirmation_panel: ConfirmationSidePanel | None = None
@@ -161,9 +166,7 @@ class OpenHandsApp(App):
         yield SystemCommand(
             "MCP", "View MCP configurations", lambda: MCPSidePanel.toggle(self)
         )
-        yield SystemCommand(
-            "AGENT SETTINGS", "Configure agent settings", self.action_open_settings
-        )
+        yield SystemCommand("SETTINGS", "Configure settings", self.action_open_settings)
 
     def on_mount(self) -> None:
         """Called when app starts."""
@@ -200,7 +203,10 @@ class OpenHandsApp(App):
     def _show_initial_settings(self) -> None:
         """Show settings screen for first-time users."""
         settings_screen = SettingsScreen(
-            on_settings_saved=self._initialize_main_ui,
+            on_settings_saved=[
+                self._initialize_main_ui,
+                self._reload_visualizer,
+            ],
             on_first_time_settings_cancelled=self._handle_initial_setup_cancelled,
         )
         self.push_screen(settings_screen)
@@ -268,7 +274,9 @@ class OpenHandsApp(App):
             return
 
         # Open the settings screen for existing users
-        settings_screen = SettingsScreen()
+        settings_screen = SettingsScreen(
+            on_settings_saved=[self._reload_visualizer],
+        )
         self.push_screen(settings_screen)
 
     def _initialize_main_ui(self) -> None:

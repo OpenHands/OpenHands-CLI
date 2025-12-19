@@ -83,7 +83,7 @@ class MCPSidePanel(VerticalScroll):
             content_parts = [
                 f"[{OPENHANDS_THEME.error}]Failed to load MCP configurations."
                 f"[/{OPENHANDS_THEME.error}]",
-                f"[{OPENHANDS_THEME.error}]Agent settings file is corrupted!"
+                f"[{OPENHANDS_THEME.error}]Settings file is corrupted!"
                 f"[/{OPENHANDS_THEME.error}]",
             ]
             content_widget.update("\n".join(content_parts))

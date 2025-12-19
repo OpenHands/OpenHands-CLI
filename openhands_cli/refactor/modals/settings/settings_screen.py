@@ -1,7 +1,7 @@
 """Settings screen for OpenHands CLI using Textual.
 
 This module provides a modern form-based settings interface that overlays
-the main UI, allowing users to configure their agent settings including
+the main UI, allowing users to configure their settings including
 LLM provider, model, API keys, and advanced options.
 """
 
@@ -10,21 +10,31 @@ from typing import ClassVar, Literal, cast
 
 from textual import getters
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, VerticalScroll
+from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, Select, Static
+from textual.widgets import (
+    Button,
+    Input,
+    Select,
+    Static,
+    TabbedContent,
+    TabPane,
+)
 from textual.widgets._select import NoSelection
 
 from openhands_cli.refactor.modals.settings.choices import (
     get_model_options,
-    provider_options,
+)
+from openhands_cli.refactor.modals.settings.components import (
+    CliSettingsTab,
+    SettingsTab,
 )
 from openhands_cli.refactor.modals.settings.utils import SettingsFormData, save_settings
 from openhands_cli.tui.settings.store import AgentStore
 
 
 class SettingsScreen(ModalScreen):
-    """A modal screen for configuring agent settings."""
+    """A modal screen for configuring settings."""
 
     BINDINGS: ClassVar = [
         ("escape", "cancel", "Cancel"),
@@ -50,7 +60,7 @@ class SettingsScreen(ModalScreen):
 
     def __init__(
         self,
-        on_settings_saved: Callable[[], None] | None = None,
+        on_settings_saved: Callable[[], None] | list[Callable[[], None]] | None = None,
         on_first_time_settings_cancelled: Callable[[], None] | None = None,
         **kwargs,
     ):
@@ -58,7 +68,7 @@ class SettingsScreen(ModalScreen):
 
         Args:
             is_initial_setup: True if this is the initial setup for a new user
-            on_settings_saved: Callback to invoke when settings are successfully saved
+            on_settings_saved: Callback(s) to invoke when settings are saved
             on_settings_cancelled: Callback to invoke when settings are cancelled
         """
         super().__init__(**kwargs)
@@ -67,120 +77,36 @@ class SettingsScreen(ModalScreen):
         self.is_advanced_mode = False
         self.message_widget = None
         self.is_initial_setup = SettingsScreen.is_initial_setup_required()
-        self.on_settings_saved = on_settings_saved
+
+        # Convert single callback to list for uniform handling
+        if on_settings_saved is None:
+            self.on_settings_saved = []
+        elif callable(on_settings_saved):
+            self.on_settings_saved = [on_settings_saved]
+        else:
+            self.on_settings_saved = on_settings_saved
+
         self.on_first_time_settings_cancelled = on_first_time_settings_cancelled
 
     def compose(self) -> ComposeResult:
-        """Create the settings form."""
+        """Create the settings form with tabs."""
         with Container(id="settings_container"):
-            yield Static("Agent Settings", id="settings_title")
+            yield Static("Settings", id="settings_title")
 
             # Message area for errors/success
             self.message_widget = Static("", id="message_area")
             yield self.message_widget
 
-            with VerticalScroll(id="settings_form"):
-                with Container(id="form_content"):
-                    # Basic Settings Section
-                    with Container(classes="form_group"):
-                        yield Label("Settings Mode:", classes="form_label")
-                        yield Select(
-                            [("Basic", "basic"), ("Advanced", "advanced")],
-                            value="basic",
-                            id="mode_select",
-                            classes="form_select",
-                            type_to_search=True,
-                        )
+            # Tabbed content
+            with TabbedContent(id="settings_tabs"):
+                # Settings Tab
+                with TabPane("Agent Settings", id="settings_tab"):
+                    yield SettingsTab()
 
-                    # Basic Settings Section (shown in Basic mode)
-                    with Container(id="basic_section", classes="form_group"):
-                        # LLM Provider
-                        with Container(classes="form_group"):
-                            yield Label("LLM Provider:", classes="form_label")
-                            yield Select(
-                                provider_options,
-                                id="provider_select",
-                                classes="form_select",
-                                type_to_search=True,
-                                disabled=False,  # Always enabled after mode selection
-                            )
-
-                        # LLM Model
-                        with Container(classes="form_group"):
-                            yield Label("LLM Model:", classes="form_label")
-                            yield Select(
-                                [("Select provider first", "")],
-                                id="model_select",
-                                classes="form_select",
-                                type_to_search=True,
-                                disabled=True,  # Disabled until provider is selected
-                            )
-
-                    # Advanced Settings Section (shown in Advanced mode)
-                    with Container(id="advanced_section", classes="form_group"):
-                        # Custom Model
-                        with Container(classes="form_group"):
-                            yield Label("Custom Model:", classes="form_label")
-                            yield Input(
-                                placeholder="e.g., gpt-4o-mini, claude-3-sonnet",
-                                id="custom_model_input",
-                                classes="form_input",
-                                # Disabled until Advanced mode is selected
-                                disabled=True,
-                            )
-
-                        # Base URL
-                        with Container(classes="form_group"):
-                            yield Label("Base URL:", classes="form_label")
-                            yield Input(
-                                placeholder="e.g., https://api.openai.com/v1, https://api.anthropic.com",
-                                id="base_url_input",
-                                classes="form_input",
-                                disabled=True,  # Disabled until custom model is entered
-                            )
-
-                    # API Key (shown in both modes)
-                    with Container(classes="form_group"):
-                        yield Label("API Key:", classes="form_label")
-                        yield Input(
-                            placeholder="Enter your API key",
-                            password=True,
-                            id="api_key_input",
-                            classes="form_input",
-                            # Disabled until model is selected (Basic) or custom model
-                            # entered (Advanced)
-                            disabled=True,
-                        )
-
-                    # Memory Condensation
-                    with Container(classes="form_group"):
-                        yield Label("Memory Condensation:", classes="form_label")
-                        yield Select(
-                            [("Enabled", True), ("Disabled", False)],
-                            value=False,
-                            id="memory_condensation_select",
-                            classes="form_select",
-                            disabled=True,  # Disabled until API key is entered
-                        )
-                        yield Static(
-                            "Memory condensation helps reduce token usage by "
-                            "summarizing old conversation history.",
-                            classes="form_help",
-                        )
-
-                    # Help Section
-                    with Container(classes="form_group"):
-                        yield Static("Configuration Help", classes="form_section_title")
-                        yield Static(
-                            "• Basic Mode: Choose from verified LLM providers and "
-                            "models\n"
-                            "• Advanced Mode: Use custom models with your own API "
-                            "endpoints\n"
-                            "• API Keys are stored securely and masked in the "
-                            "interface\n"
-                            "• Changes take effect immediately after saving",
-                            classes="form_help",
-                        )
+                # CLI Settings Tab - only show if not first-time setup
+                if not self.is_initial_setup:
+                    with TabPane("CLI Settings", id="cli_settings_tab"):
+                        yield CliSettingsTab()
 
             # Buttons
             with Horizontal(id="button_container"):
@@ -226,7 +152,7 @@ class SettingsScreen(ModalScreen):
         self.memory_select.value = False
 
     def _load_current_settings(self) -> None:
-        """Load current agent settings into the form."""
+        """Load current settings into the form."""
         if not self.current_agent:
             return
 
@@ -456,16 +382,30 @@ class SettingsScreen(ModalScreen):
             self._show_message(result.error_message or "Unknown error", is_error=True)
             return
 
+        # Save CLI settings if not in initial setup mode
+        if not self.is_initial_setup:
+            try:
+                cli_settings_tab = self.query_one("#cli_settings_tab", TabPane)
+                cli_settings_component = cli_settings_tab.query_one(CliSettingsTab)
+                cli_settings = cli_settings_component.get_cli_settings()
+
+                cli_settings.save()
+            except Exception as e:
+                self._show_message(
+                    f"Settings saved, but CLI settings failed: {str(e)}", is_error=True
+                )
+                return
+
         message = (
             "Settings saved successfully! Welcome to OpenHands CLI!"
             if self.is_initial_setup
             else "Settings saved successfully!"
         )
         self._show_message(message, is_error=False)
-        # Invoke callback if provided, then close screen
-        if self.on_settings_saved:
+        # Invoke all callbacks if provided, then close screen
+        for callback in self.on_settings_saved:
             try:
-                self.on_settings_saved()
+                callback()
             except Exception as e:
                 self.notify(
                     f"Error occurred when saving settings: {e}", severity="error"
