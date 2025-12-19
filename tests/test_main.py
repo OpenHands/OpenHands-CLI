@@ -328,39 +328,20 @@ def test_main_serve_calls_launch_gui_server(monkeypatch, argv, expected_kwargs):
 
 
 @pytest.mark.parametrize(
-    "argv,expected_kwargs",
+    "argv, expected",
     [
-        (["openhands", "web"], {"host": "0.0.0.0", "port": 12000, "debug": False}),
-        (
-            ["openhands", "web", "--host", "127.0.0.1"],
-            {"host": "127.0.0.1", "port": 12000, "debug": False},
-        ),
-        (
-            ["openhands", "web", "--port", "8080"],
-            {"host": "0.0.0.0", "port": 8080, "debug": False},
-        ),
-        (
-            ["openhands", "web", "--debug"],
-            {"host": "0.0.0.0", "port": 12000, "debug": True},
-        ),
+        (["openhands", "web"], dict(host="0.0.0.0", port=12000, debug=False)),
         (
             ["openhands", "web", "--host", "localhost", "--port", "3000", "--debug"],
-            {"host": "localhost", "port": 3000, "debug": True},
+            dict(host="localhost", port=3000, debug=True),
         ),
     ],
 )
-def test_main_web_calls_launch_web_server(monkeypatch, argv, expected_kwargs):
-    """Test that web command calls launch_web_server with correct arguments."""
-    monkeypatch.setattr(sys, "argv", argv, raising=False)
-
-    called = {}
-    fake_serve = SimpleNamespace(
-        launch_web_server=lambda **kw: called.setdefault("kwargs", kw)
-    )
-    monkeypatch.setitem(sys.modules, "openhands_cli.serve", fake_serve)
-
-    main()
-    assert called["kwargs"] == expected_kwargs
+@patch("openhands_cli.serve.launch_web_server")
+def test_main_web_calls_launch_web_server(mock_launch, argv, expected):
+    with patch("sys.argv", argv):
+        main()
+    mock_launch.assert_called_once_with(**expected)
 
 
 @pytest.mark.parametrize(

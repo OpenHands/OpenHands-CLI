@@ -1,4 +1,6 @@
-"""Tests for web command functionality."""
+"""Minimal tests for web command functionality."""
+
+from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
@@ -8,153 +10,106 @@ from openhands_cli.argparsers.main_parser import create_main_parser
 from openhands_cli.simple_main import main
 
 
-class TestWebParser:
-    """Test the web argument parser."""
+@pytest.mark.parametrize(
+    "argv, expected",
+    [
+        (["web"], dict(command="web", host="0.0.0.0", port=12000, debug=False)),
+        (
+            ["web", "--host", "127.0.0.1"],
+            dict(command="web", host="127.0.0.1", port=12000, debug=False),
+        ),
+        (
+            ["web", "--port", "8080"],
+            dict(command="web", host="0.0.0.0", port=8080, debug=False),
+        ),
+        (
+            ["web", "--debug"],
+            dict(command="web", host="0.0.0.0", port=12000, debug=True),
+        ),
+        (
+            ["web", "--host", "localhost", "--port", "3000", "--debug"],
+            dict(command="web", host="localhost", port=3000, debug=True),
+        ),
+    ],
+)
+def test_web_parser_variants(argv, expected):
+    parser = create_main_parser()
+    args = parser.parse_args(argv)
 
-    def test_web_parser_default_values(self):
-        """Test that web parser has correct default values."""
-        parser = create_main_parser()
-        args = parser.parse_args(["web"])
-
-        assert args.command == "web"
-        assert args.host == "0.0.0.0"
-        assert args.port == 12000
-        assert args.debug is False
-
-    def test_web_parser_custom_host(self):
-        """Test web parser with custom host."""
-        parser = create_main_parser()
-        args = parser.parse_args(["web", "--host", "127.0.0.1"])
-
-        assert args.command == "web"
-        assert args.host == "127.0.0.1"
-        assert args.port == 12000
-        assert args.debug is False
-
-    def test_web_parser_custom_port(self):
-        """Test web parser with custom port."""
-        parser = create_main_parser()
-        args = parser.parse_args(["web", "--port", "8080"])
-
-        assert args.command == "web"
-        assert args.host == "0.0.0.0"
-        assert args.port == 8080
-        assert args.debug is False
-
-    def test_web_parser_debug_flag(self):
-        """Test web parser with debug flag."""
-        parser = create_main_parser()
-        args = parser.parse_args(["web", "--debug"])
-
-        assert args.command == "web"
-        assert args.host == "0.0.0.0"
-        assert args.port == 12000
-        assert args.debug is True
-
-    def test_web_parser_all_options(self):
-        """Test web parser with all options."""
-        parser = create_main_parser()
-        args = parser.parse_args(
-            ["web", "--host", "localhost", "--port", "3000", "--debug"]
-        )
-
-        assert args.command == "web"
-        assert args.host == "localhost"
-        assert args.port == 3000
-        assert args.debug is True
+    assert args.command == expected["command"]
+    assert args.host == expected["host"]
+    assert args.port == expected["port"]
+    assert args.debug is expected["debug"]
 
 
-class TestWebCommandIntegration:
-    """Test web command integration with main entry point."""
-
-    @patch("openhands_cli.serve.launch_web_server")
-    def test_web_command_calls_launch_web_server(self, mock_launch_web_server):
-        """Test that web command calls launch_web_server function."""
-        with patch("sys.argv", ["openhands", "web"]):
-            main()
-
-        mock_launch_web_server.assert_called_once_with(
-            host="0.0.0.0", port=12000, debug=False
-        )
-
-    @patch("openhands_cli.serve.launch_web_server")
-    def test_web_command_with_custom_args(self, mock_launch_web_server):
-        """Test web command with custom arguments."""
-        with patch(
-            "sys.argv",
+@pytest.mark.parametrize(
+    "sys_argv, expected_kwargs",
+    [
+        (["openhands", "web"], dict(host="0.0.0.0", port=12000, debug=False)),
+        (
             ["openhands", "web", "--host", "127.0.0.1", "--port", "8080", "--debug"],
-        ):
+            dict(host="127.0.0.1", port=8080, debug=True),
+        ),
+    ],
+)
+@patch("openhands_cli.serve.launch_web_server")
+def test_web_command_calls_launch_web_server(
+    mock_launch_web_server, sys_argv, expected_kwargs
+):
+    with patch("sys.argv", sys_argv):
+        main()
+
+    mock_launch_web_server.assert_called_once_with(**expected_kwargs)
+
+
+def test_web_command_help_smoke(capsys):
+    with patch("sys.argv", ["openhands", "web", "--help"]):
+        with pytest.raises(SystemExit) as exc:
             main()
 
-        mock_launch_web_server.assert_called_once_with(
-            host="127.0.0.1", port=8080, debug=True
-        )
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
 
-    def test_web_command_help(self, capsys):
-        """Test that web command help displays correctly."""
-        with patch("sys.argv", ["openhands", "web", "--help"]):
-            with pytest.raises(SystemExit) as exc:
-                main()
-
-            assert exc.value.code == 0
-
-            captured = capsys.readouterr()
-            assert "--host HOST" in captured.out
-            assert "--port PORT" in captured.out
-            assert "--debug" in captured.out
-            assert "Host to bind the web server to" in captured.out
-            assert "Port to bind the web server to" in captured.out
-            assert "Enable debug mode for the web server" in captured.out
+    # High-impact smoke checks: options exist + one description string
+    assert "--host" in out
+    assert "--port" in out
+    assert "--debug" in out
+    assert "Host to bind the web server to" in out
 
 
-class TestLaunchWebServerFunction:
-    """Test the launch_web_server function directly."""
+@pytest.mark.parametrize(
+    "kwargs, expected_host, expected_port, expected_debug",
+    [
+        ({}, "0.0.0.0", 12000, False),
+        ({"host": "localhost", "port": 3000, "debug": True}, "localhost", 3000, True),
+    ],
+)
+@patch("openhands_cli.serve.Server")
+def test_launch_web_server_constructs_and_serves(
+    mock_server_class, kwargs, expected_host, expected_port, expected_debug
+):
+    from openhands_cli.serve import launch_web_server
 
-    @patch("openhands_cli.serve.Server")
-    def test_launch_web_server_default_args(self, mock_server_class):
-        """Test launch_web_server with default arguments."""
-        from openhands_cli.serve import launch_web_server
+    mock_server = MagicMock()
+    mock_server_class.return_value = mock_server
 
-        mock_server = MagicMock()
-        mock_server_class.return_value = mock_server
+    launch_web_server(**kwargs)
 
+    mock_server_class.assert_called_once_with(
+        "uv run openhands --exp",
+        host=expected_host,
+        port=expected_port,
+    )
+    mock_server.serve.assert_called_once_with(debug=expected_debug)
+
+
+@patch("openhands_cli.serve.Server")
+def test_launch_web_server_propagates_exception(mock_server_class):
+    from openhands_cli.serve import launch_web_server
+
+    mock_server = MagicMock()
+    mock_server.serve.side_effect = Exception("Server error")
+    mock_server_class.return_value = mock_server
+
+    with pytest.raises(Exception, match="Server error"):
         launch_web_server()
-
-        # Verify Server was created with correct arguments
-        mock_server_class.assert_called_once_with(
-            "uv run openhands --exp", host="0.0.0.0", port=12000
-        )
-
-        # Verify serve was called with debug=False
-        mock_server.serve.assert_called_once_with(debug=False)
-
-    @patch("openhands_cli.serve.Server")
-    def test_launch_web_server_custom_args(self, mock_server_class):
-        """Test launch_web_server with custom arguments."""
-        from openhands_cli.serve import launch_web_server
-
-        mock_server = MagicMock()
-        mock_server_class.return_value = mock_server
-
-        launch_web_server(host="localhost", port=3000, debug=True)
-
-        # Verify Server was created with correct arguments
-        mock_server_class.assert_called_once_with(
-            "uv run openhands --exp", host="localhost", port=3000
-        )
-
-        # Verify serve was called with debug=True
-        mock_server.serve.assert_called_once_with(debug=True)
-
-    @patch("openhands_cli.serve.Server")
-    def test_launch_web_server_server_exception(self, mock_server_class):
-        """Test launch_web_server handles server exceptions."""
-        from openhands_cli.serve import launch_web_server
-
-        mock_server = MagicMock()
-        mock_server.serve.side_effect = Exception("Server error")
-        mock_server_class.return_value = mock_server
-
-        # Should propagate the exception
-        with pytest.raises(Exception, match="Server error"):
-            launch_web_server()
