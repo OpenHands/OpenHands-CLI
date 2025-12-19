@@ -30,7 +30,7 @@ from openhands_cli.refactor.modals.settings.components import (
     SettingsTab,
 )
 from openhands_cli.refactor.modals.settings.utils import SettingsFormData, save_settings
-from openhands_cli.tui.settings.store import AgentStore
+from openhands_cli.stores import AgentStore
 
 
 class SettingsScreen(ModalScreen):

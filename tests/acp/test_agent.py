@@ -155,7 +155,7 @@ async def test_new_session_with_malformed_mcp_json_integration(
     from acp import RequestError
 
     from openhands_cli.mcp.mcp_utils import MCPConfigurationError
-    from openhands_cli.tui.settings.store import AgentStore
+    from openhands_cli.stores import AgentStore
 
     request = NewSessionRequest(cwd=str(tmp_path), mcp_servers=[])
 

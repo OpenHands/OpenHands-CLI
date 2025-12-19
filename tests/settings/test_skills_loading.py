@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from openhands_cli.tui.settings.store import AgentStore
+from openhands_cli.stores import AgentStore
 
 
 @pytest.fixture

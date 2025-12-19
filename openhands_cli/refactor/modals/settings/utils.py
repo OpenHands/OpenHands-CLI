@@ -3,7 +3,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, SecretStr, field_validator
 
 from openhands.sdk import LLM, Agent, LLMSummarizingCondenser
-from openhands_cli.tui.settings.store import AgentStore
+from openhands_cli.stores import AgentStore
 from openhands_cli.utils import (
     get_default_cli_agent,
     get_llm_metadata,

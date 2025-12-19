@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from openhands.sdk import LLM, Agent, Tool
 from openhands_cli.locations import PERSISTENCE_DIR, WORK_DIR
-from openhands_cli.tui.settings.store import AgentStore
+from openhands_cli.stores import AgentStore
 
 
 class TestDirectorySeparation:

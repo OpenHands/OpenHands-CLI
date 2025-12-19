@@ -9,7 +9,7 @@ from pydantic import SecretStr
 
 from openhands.sdk import LLM, Agent
 from openhands_cli.locations import AGENT_SETTINGS_PATH, MCP_CONFIG_FILE
-from openhands_cli.tui.settings.store import AgentStore
+from openhands_cli.stores import AgentStore
 
 
 # ---------------------- tiny helpers ----------------------
