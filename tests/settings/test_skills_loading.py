@@ -55,7 +55,7 @@ This is a test skill for testing purposes.
 @pytest.fixture
 def agent_store(temp_project_dir):
     """Create an AgentStore with the temporary project directory."""
-    with patch("openhands_cli.tui.settings.store.WORK_DIR", temp_project_dir):
+    with patch("openhands_cli.locations.WORK_DIR", temp_project_dir):
         yield AgentStore()
 
 
@@ -134,7 +134,7 @@ This is a user microagent for testing.
                 "openhands.sdk.context.skills.skill.USER_SKILLS_DIRS", mock_user_dirs
             ):
                 with patch(
-                    "openhands_cli.tui.settings.store.WORK_DIR", temp_project_dir
+                    "openhands_cli.locations.WORK_DIR", temp_project_dir
                 ):
                     # Create a minimal agent configuration for testing
                     agent_store = AgentStore()
@@ -182,7 +182,7 @@ This is a user microagent for testing.
         )
 
         with (
-            patch("openhands_cli.tui.settings.store.WORK_DIR", temp_project_dir),
+            patch("openhands_cli.locations.WORK_DIR", temp_project_dir),
             patch(
                 "openhands.sdk.context.agent_context.load_public_skills"
             ) as mock_load_public,
