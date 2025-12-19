@@ -311,10 +311,10 @@ class TestConversationErrorEventHandling:
         assert actual_color == expected_color
 
 
-class TestAppConfigurationCaching:
+class TestCliSettingsCaching:
     """Tests for app configuration caching in ConversationVisualizer."""
 
-    def test_app_config_caching(self):
+    def test_cli_settings_caching(self):
         """Test that app configuration is cached and not loaded repeatedly."""
         from unittest.mock import patch
 
@@ -323,34 +323,34 @@ class TestAppConfigurationCaching:
         container = VerticalScroll()
         visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
-        # Mock AppConfiguration.load to track how many times it's called
+        # Mock CliSettings.load to track how many times it's called
         with patch(
-            "openhands_cli.refactor.modals.settings.app_config.AppConfiguration.load"
+            "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
         ) as mock_load:
-            from openhands_cli.refactor.modals.settings.app_config import (
-                AppConfiguration,
+            from openhands_cli.refactor.modals.settings.cli_settings import (
+                CliSettings,
             )
 
             # Create a mock config
-            mock_config = AppConfiguration(display_cost_per_action=True)
+            mock_config = CliSettings(display_cost_per_action=True)
             mock_load.return_value = mock_config
 
             # First call should load from file
-            config1 = visualizer.app_config
+            config1 = visualizer.cli_settings
             assert config1 == mock_config
             assert mock_load.call_count == 1
 
             # Second call should use cached version
-            config2 = visualizer.app_config
+            config2 = visualizer.cli_settings
             assert config2 == mock_config
             assert mock_load.call_count == 1  # Should still be 1, not 2
 
             # Third call should also use cached version
-            config3 = visualizer.app_config
+            config3 = visualizer.cli_settings
             assert config3 == mock_config
             assert mock_load.call_count == 1  # Should still be 1, not 3
 
-    def test_app_config_refresh(self):
+    def test_cli_settings_refresh(self):
         """Test that reload_configuration reloads the configuration."""
         from unittest.mock import patch
 
@@ -359,21 +359,21 @@ class TestAppConfigurationCaching:
         container = VerticalScroll()
         visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
-        # Mock AppConfiguration.load to track how many times it's called
+        # Mock CliSettings.load to track how many times it's called
         with patch(
-            "openhands_cli.refactor.modals.settings.app_config.AppConfiguration.load"
+            "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
         ) as mock_load:
-            from openhands_cli.refactor.modals.settings.app_config import (
-                AppConfiguration,
+            from openhands_cli.refactor.modals.settings.cli_settings import (
+                CliSettings,
             )
 
             # Create mock configs
-            mock_config1 = AppConfiguration(display_cost_per_action=False)
-            mock_config2 = AppConfiguration(display_cost_per_action=True)
+            mock_config1 = CliSettings(display_cost_per_action=False)
+            mock_config2 = CliSettings(display_cost_per_action=True)
             mock_load.side_effect = [mock_config1, mock_config2]
 
             # First call should load from file
-            config1 = visualizer.app_config
+            config1 = visualizer.cli_settings
             assert config1 == mock_config1
             assert mock_load.call_count == 1
 
@@ -382,7 +382,7 @@ class TestAppConfigurationCaching:
             assert mock_load.call_count == 2
 
             # Next call should use the new cached version
-            config2 = visualizer.app_config
+            config2 = visualizer.cli_settings
             assert config2 == mock_config2
             assert mock_load.call_count == 2  # Should still be 2, not 3
 
@@ -400,16 +400,16 @@ class TestAppConfigurationCaching:
         mock_state.stats = None
         visualizer._state = mock_state
 
-        # Mock AppConfiguration.load to track how many times it's called
+        # Mock CliSettings.load to track how many times it's called
         with patch(
-            "openhands_cli.refactor.modals.settings.app_config.AppConfiguration.load"
+            "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
         ) as mock_load:
-            from openhands_cli.refactor.modals.settings.app_config import (
-                AppConfiguration,
+            from openhands_cli.refactor.modals.settings.cli_settings import (
+                CliSettings,
             )
 
             # Create a mock config with display_cost_per_action=False
-            mock_config = AppConfiguration(display_cost_per_action=False)
+            mock_config = CliSettings(display_cost_per_action=False)
             mock_load.return_value = mock_config
 
             # Call _format_metrics_subtitle multiple times
@@ -422,7 +422,7 @@ class TestAppConfigurationCaching:
             assert result2 is None
             assert result3 is None
 
-            # AppConfiguration.load should only be called once due to caching
+            # CliSettings.load should only be called once due to caching
             assert mock_load.call_count == 1
 
     @pytest.mark.parametrize(
@@ -468,16 +468,14 @@ class TestAppConfigurationCaching:
         visualizer._state = mock_state
 
         with patch(
-            "openhands_cli.refactor.modals.settings.app_config.AppConfiguration.load"
+            "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
         ) as mock_load:
-            from openhands_cli.refactor.modals.settings.app_config import (
-                AppConfiguration,
+            from openhands_cli.refactor.modals.settings.cli_settings import (
+                CliSettings,
             )
 
             # Create config with specified display setting
-            mock_config = AppConfiguration(
-                display_cost_per_action=display_cost_per_action
-            )
+            mock_config = CliSettings(display_cost_per_action=display_cost_per_action)
             mock_load.return_value = mock_config
 
             # Mock the actual formatting logic for when we have stats and config enabled
@@ -510,19 +508,19 @@ class TestAppConfigurationCaching:
         visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
         with patch(
-            "openhands_cli.refactor.modals.settings.app_config.AppConfiguration.load"
+            "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
         ) as mock_load:
-            from openhands_cli.refactor.modals.settings.app_config import (
-                AppConfiguration,
+            from openhands_cli.refactor.modals.settings.cli_settings import (
+                CliSettings,
             )
 
             # Create different configs for each load
-            config1 = AppConfiguration(display_cost_per_action=False)
-            config2 = AppConfiguration(display_cost_per_action=True)
+            config1 = CliSettings(display_cost_per_action=False)
+            config2 = CliSettings(display_cost_per_action=True)
             mock_load.side_effect = [config1, config2]
 
             # First access should load config1
-            first_config = visualizer.app_config
+            first_config = visualizer.cli_settings
             assert first_config.display_cost_per_action is False
             assert mock_load.call_count == 1
 
@@ -531,7 +529,7 @@ class TestAppConfigurationCaching:
             assert mock_load.call_count == 2
 
             # Next access should return config2 (from cache)
-            second_config = visualizer.app_config
+            second_config = visualizer.cli_settings
             assert second_config.display_cost_per_action is True
             assert mock_load.call_count == 2  # No additional load
 
@@ -539,8 +537,8 @@ class TestAppConfigurationCaching:
         "initial_cache_state",
         [None, "cached_config"],
     )
-    def test_app_config_property_initialization(self, initial_cache_state):
-        """Test app_config property behavior with different initial cache states."""
+    def test_cli_settings_property_initialization(self, initial_cache_state):
+        """Test cli_settings property behavior with different initial cache states."""
         from unittest.mock import patch
 
         # Create a mock app and container for the visualizer
@@ -550,26 +548,26 @@ class TestAppConfigurationCaching:
 
         # Set initial cache state
         if initial_cache_state == "cached_config":
-            from openhands_cli.refactor.modals.settings.app_config import (
-                AppConfiguration,
+            from openhands_cli.refactor.modals.settings.cli_settings import (
+                CliSettings,
             )
 
-            visualizer._app_config = AppConfiguration(display_cost_per_action=True)
+            visualizer._cli_settings = CliSettings(display_cost_per_action=True)
         else:
-            visualizer._app_config = None
+            visualizer._cli_settings = None
 
         with patch(
-            "openhands_cli.refactor.modals.settings.app_config.AppConfiguration.load"
+            "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
         ) as mock_load:
-            from openhands_cli.refactor.modals.settings.app_config import (
-                AppConfiguration,
+            from openhands_cli.refactor.modals.settings.cli_settings import (
+                CliSettings,
             )
 
-            mock_config = AppConfiguration(display_cost_per_action=False)
+            mock_config = CliSettings(display_cost_per_action=False)
             mock_load.return_value = mock_config
 
-            # Access app_config property
-            result = visualizer.app_config
+            # Access cli_settings property
+            result = visualizer.cli_settings
 
             if initial_cache_state is None:
                 # Should load from file
@@ -609,14 +607,14 @@ class TestAppConfigurationCaching:
             new_callable=lambda: property(lambda self: mock_stats),
         ):
             with patch(
-                "openhands_cli.refactor.modals.settings.app_config.AppConfiguration.load"
+                "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
             ) as mock_load:
-                from openhands_cli.refactor.modals.settings.app_config import (
-                    AppConfiguration,
+                from openhands_cli.refactor.modals.settings.cli_settings import (
+                    CliSettings,
                 )
 
                 # Test with display enabled
-                mock_config = AppConfiguration(display_cost_per_action=True)
+                mock_config = CliSettings(display_cost_per_action=True)
                 mock_load.return_value = mock_config
 
                 # Should not return None when both config and stats are available

@@ -1,4 +1,4 @@
-"""Tests for AppConfigurationsTab component (minimal, high-impact)."""
+"""Tests for CliSettingsTab component (minimal, high-impact)."""
 
 from __future__ import annotations
 
@@ -8,43 +8,43 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Switch
 
-from openhands_cli.refactor.modals.settings.app_config import AppConfiguration
-from openhands_cli.refactor.modals.settings.components.app_configurations_tab import (
-    AppConfigurationsTab,
+from openhands_cli.refactor.modals.settings.cli_settings import CliSettings
+from openhands_cli.refactor.modals.settings.components.cli_settings_tab import (
+    CliSettingsTab,
 )
 
 
 class _TestApp(App):
     """Small Textual app to mount the tab under test."""
 
-    def __init__(self, cfg: AppConfiguration):
+    def __init__(self, cfg: CliSettings):
         super().__init__()
         self.cfg = cfg
 
     def compose(self) -> ComposeResult:
-        with patch.object(AppConfiguration, "load", return_value=self.cfg) as _:
-            yield AppConfigurationsTab()
+        with patch.object(CliSettings, "load", return_value=self.cfg) as _:
+            yield CliSettingsTab()
 
 
-class TestAppConfigurationsTab:
+class TestCliSettingsTab:
     @pytest.mark.parametrize("display_cost_per_action", [True, False])
     def test_init_calls_load_and_stores_config(self, display_cost_per_action: bool):
-        cfg = AppConfiguration(display_cost_per_action=display_cost_per_action)
+        cfg = CliSettings(display_cost_per_action=display_cost_per_action)
 
-        with patch.object(AppConfiguration, "load", return_value=cfg) as mock_load:
-            tab = AppConfigurationsTab()
+        with patch.object(CliSettings, "load", return_value=cfg) as mock_load:
+            tab = CliSettingsTab()
 
         mock_load.assert_called_once()
-        assert tab.app_config == cfg
+        assert tab.cli_settings == cfg
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("initial_value", [True, False])
     async def test_compose_renders_switch_with_loaded_value(self, initial_value: bool):
-        cfg = AppConfiguration(display_cost_per_action=initial_value)
+        cfg = CliSettings(display_cost_per_action=initial_value)
         app = _TestApp(cfg)
 
         async with app.run_test():
-            tab = app.query_one(AppConfigurationsTab)
+            tab = app.query_one(CliSettingsTab)
             switch = tab.query_one("#display_cost_switch", Switch)
             assert switch.value is initial_value
 
@@ -56,30 +56,30 @@ class TestAppConfigurationsTab:
             (True, False),
         ],
     )
-    async def test_get_app_config_reflects_current_switch_value(
+    async def test_get_cli_settings_reflects_current_switch_value(
         self, initial_value: bool, new_value: bool
     ):
-        cfg = AppConfiguration(display_cost_per_action=initial_value)
+        cfg = CliSettings(display_cost_per_action=initial_value)
         app = _TestApp(cfg)
 
         async with app.run_test():
-            tab = app.query_one(AppConfigurationsTab)
+            tab = app.query_one(CliSettingsTab)
             switch = tab.query_one("#display_cost_switch", Switch)
 
             # simulate user change
             switch.value = new_value
 
-            result = tab.get_app_config()
-            assert isinstance(result, AppConfiguration)
+            result = tab.get_cli_settings()
+            assert isinstance(result, CliSettings)
             assert result.display_cost_per_action is new_value
 
     @pytest.mark.asyncio
     async def test_switch_click_toggles_state(self):
-        cfg = AppConfiguration(display_cost_per_action=False)
+        cfg = CliSettings(display_cost_per_action=False)
         app = _TestApp(cfg)
 
         async with app.run_test() as pilot:
-            tab = app.query_one(AppConfigurationsTab)
+            tab = app.query_one(CliSettingsTab)
             switch = tab.query_one("#display_cost_switch", Switch)
 
             assert switch.value is False

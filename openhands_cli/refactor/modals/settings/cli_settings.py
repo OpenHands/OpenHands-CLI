@@ -1,4 +1,4 @@
-"""App configuration models and utilities."""
+"""CLI settings models and utilities."""
 
 import json
 import os
@@ -7,8 +7,8 @@ from pathlib import Path
 from pydantic import BaseModel
 
 
-class AppConfiguration(BaseModel):
-    """Model for application-level configurations."""
+class CliSettings(BaseModel):
+    """Model for CLI-level settings."""
 
     display_cost_per_action: bool = False
 
@@ -22,11 +22,11 @@ class AppConfiguration(BaseModel):
         return Path(persistence_dir) / "cli_config.json"
 
     @classmethod
-    def load(cls) -> "AppConfiguration":
-        """Load app configuration from file.
+    def load(cls) -> "CliSettings":
+        """Load CLI settings from file.
 
         Returns:
-            AppConfiguration instance with loaded settings, or defaults if file doesn't
+            CliSettings instance with loaded settings, or defaults if file doesn't
             exist
         """
         config_path = cls.get_config_path()
@@ -43,7 +43,7 @@ class AppConfiguration(BaseModel):
             return cls()
 
     def save(self) -> None:
-        """Save app configuration to file."""
+        """Save CLI settings to file."""
         config_path = self.get_config_path()
 
         # Ensure the persistence directory exists

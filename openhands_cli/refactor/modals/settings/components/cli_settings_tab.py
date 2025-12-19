@@ -1,25 +1,25 @@
-"""App Configurations tab component for the settings modal."""
+"""CLI Settings tab component for the settings modal."""
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.widgets import Label, Static, Switch
 
-from openhands_cli.refactor.modals.settings.app_config import AppConfiguration
+from openhands_cli.refactor.modals.settings.cli_settings import CliSettings
 
 
-class AppConfigurationsTab(Container):
-    """App Configurations tab component containing application-specific settings."""
+class CliSettingsTab(Container):
+    """CLI Settings tab component containing CLI-specific settings."""
 
     def __init__(self, **kwargs):
-        """Initialize the app configurations tab."""
+        """Initialize the CLI settings tab."""
         super().__init__(**kwargs)
-        self.app_config = AppConfiguration.load()
+        self.cli_settings = CliSettings.load()
 
     def compose(self) -> ComposeResult:
-        """Compose the app configurations tab content."""
-        with Container(id="app_config_content"):
+        """Compose the CLI settings tab content."""
+        with Container(id="cli_settings_content"):
             yield Static(
-                "App Configurations",
+                "CLI Settings",
                 classes="form_section_title",
             )
 
@@ -31,7 +31,7 @@ class AppConfigurationsTab(Container):
                         classes="form_label switch_label",
                     )
                     yield Switch(
-                        value=self.app_config.display_cost_per_action,
+                        value=self.cli_settings.display_cost_per_action,
                         id="display_cost_switch",
                         classes="form_switch",
                     )
@@ -41,8 +41,8 @@ class AppConfigurationsTab(Container):
                     classes="form_help switch_help",
                 )
 
-    def get_app_config(self) -> AppConfiguration:
-        """Get the current app configuration from the form."""
+    def get_cli_settings(self) -> CliSettings:
+        """Get the current CLI settings from the form."""
         display_cost_switch = self.query_one("#display_cost_switch", Switch)
 
-        return AppConfiguration(display_cost_per_action=display_cost_switch.value)
+        return CliSettings(display_cost_per_action=display_cost_switch.value)

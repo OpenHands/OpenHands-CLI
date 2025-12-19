@@ -221,8 +221,8 @@ async def test_mode_toggle_shows_correct_section(app):
 
 
 @pytest.mark.asyncio
-async def test_app_config_tab_not_shown_during_initial_setup(fake_agent_store):
-    """App Configurations tab should NOT be rendered during initial setup."""
+async def test_cli_settings_tab_not_shown_during_initial_setup(fake_agent_store):
+    """CLI Settings tab should NOT be rendered during initial setup."""
     with patch.object(SettingsScreen, "is_initial_setup_required", return_value=True):
         app = SettingsTestApp()
 
@@ -231,7 +231,7 @@ async def test_app_config_tab_not_shown_during_initial_setup(fake_agent_store):
         assert screen.is_initial_setup is True
 
         with pytest.raises(NoMatches):
-            screen.query_one("#app_config_tab")
+            screen.query_one("#cli_settings_tab")
 
 
 @pytest.mark.asyncio

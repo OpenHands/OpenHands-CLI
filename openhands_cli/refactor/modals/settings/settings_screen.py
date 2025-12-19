@@ -26,7 +26,7 @@ from openhands_cli.refactor.modals.settings.choices import (
     get_model_options,
 )
 from openhands_cli.refactor.modals.settings.components import (
-    AppConfigurationsTab,
+    CliSettingsTab,
     SettingsTab,
 )
 from openhands_cli.refactor.modals.settings.utils import SettingsFormData, save_settings
@@ -103,10 +103,10 @@ class SettingsScreen(ModalScreen):
                 with TabPane("Settings", id="settings_tab"):
                     yield SettingsTab()
 
-                # App Configurations Tab - only show if not first-time setup
+                # CLI Settings Tab - only show if not first-time setup
                 if not self.is_initial_setup:
-                    with TabPane("App Configurations", id="app_config_tab"):
-                        yield AppConfigurationsTab()
+                    with TabPane("CLI Settings", id="cli_settings_tab"):
+                        yield CliSettingsTab()
 
             # Buttons
             with Horizontal(id="button_container"):
@@ -382,17 +382,17 @@ class SettingsScreen(ModalScreen):
             self._show_message(result.error_message or "Unknown error", is_error=True)
             return
 
-        # Save app configurations if not in initial setup mode
+        # Save CLI settings if not in initial setup mode
         if not self.is_initial_setup:
             try:
-                app_config_tab = self.query_one("#app_config_tab", TabPane)
-                app_config_component = app_config_tab.query_one(AppConfigurationsTab)
-                app_config = app_config_component.get_app_config()
+                cli_settings_tab = self.query_one("#cli_settings_tab", TabPane)
+                cli_settings_component = cli_settings_tab.query_one(CliSettingsTab)
+                cli_settings = cli_settings_component.get_cli_settings()
 
-                app_config.save()
+                cli_settings.save()
             except Exception as e:
                 self._show_message(
-                    f"Settings saved, but app config failed: {str(e)}", is_error=True
+                    f"Settings saved, but CLI settings failed: {str(e)}", is_error=True
                 )
                 return
 

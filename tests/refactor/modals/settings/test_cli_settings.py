@@ -5,17 +5,17 @@ from unittest.mock import patch
 
 import pytest
 
-from openhands_cli.refactor.modals.settings.app_config import AppConfiguration
+from openhands_cli.refactor.modals.settings.cli_settings import CliSettings
 
 
-class TestAppConfiguration:
+class TestCliSettings:
     def test_defaults(self):
-        cfg = AppConfiguration()
+        cfg = CliSettings()
         assert cfg.display_cost_per_action is False
 
     @pytest.mark.parametrize("value", [True, False])
     def test_model_accepts_bool(self, value: bool):
-        cfg = AppConfiguration(display_cost_per_action=value)
+        cfg = CliSettings(display_cost_per_action=value)
         assert cfg.display_cost_per_action is value
 
     @pytest.mark.parametrize(
@@ -29,7 +29,7 @@ class TestAppConfiguration:
     )
     def test_get_config_path_uses_env_value_as_is(self, env_value: str, expected: Path):
         with patch.dict(os.environ, {"PERSISTENCE_DIR": env_value}):
-            assert AppConfiguration.get_config_path() == expected
+            assert CliSettings.get_config_path() == expected
 
     def test_get_config_path_default_uses_expanduser(self):
         # Ensure env var is not set, then assert expanduser is used for default.
@@ -40,17 +40,17 @@ class TestAppConfiguration:
             with patch(
                 "os.path.expanduser", return_value="/home/user/.openhands"
             ) as ex:
-                path = AppConfiguration.get_config_path()
+                path = CliSettings.get_config_path()
                 assert path == Path("/home/user/.openhands/cli_config.json")
                 ex.assert_called_once_with("~/.openhands")
 
     def test_load_returns_defaults_when_file_missing(self, tmp_path: Path):
         config_path = tmp_path / "cli_config.json"
         with patch.object(
-            AppConfiguration, "get_config_path", return_value=config_path
+            CliSettings, "get_config_path", return_value=config_path
         ):
-            cfg = AppConfiguration.load()
-        assert cfg == AppConfiguration()
+            cfg = CliSettings.load()
+        assert cfg == CliSettings()
 
     @pytest.mark.parametrize(
         "file_content, expected",
@@ -76,9 +76,9 @@ class TestAppConfiguration:
         config_path.write_text(file_content)
 
         with patch.object(
-            AppConfiguration, "get_config_path", return_value=config_path
+            CliSettings, "get_config_path", return_value=config_path
         ):
-            cfg = AppConfiguration.load()
+            cfg = CliSettings.load()
 
         assert cfg.display_cost_per_action is expected
 
@@ -87,32 +87,32 @@ class TestAppConfiguration:
         config_path.write_text(json.dumps({"display_cost_per_action": True}))
 
         with patch.object(
-            AppConfiguration, "get_config_path", return_value=config_path
+            CliSettings, "get_config_path", return_value=config_path
         ):
             with patch("builtins.open", side_effect=PermissionError("Access denied")):
                 with pytest.raises(PermissionError):
-                    AppConfiguration.load()
+                    CliSettings.load()
 
     @pytest.mark.parametrize("value", [True, False])
     def test_save_creates_parent_dir_and_roundtrips(self, tmp_path: Path, value: bool):
         config_path = tmp_path / "nested" / "dir" / "cli_config.json"
-        cfg = AppConfiguration(display_cost_per_action=value)
+        cfg = CliSettings(display_cost_per_action=value)
 
         with patch.object(
-            AppConfiguration, "get_config_path", return_value=config_path
+            CliSettings, "get_config_path", return_value=config_path
         ):
             cfg.save()
             assert config_path.exists()
-            loaded = AppConfiguration.load()
+            loaded = CliSettings.load()
 
         assert loaded.display_cost_per_action is value
 
     def test_save_writes_expected_json_format(self, tmp_path: Path):
         config_path = tmp_path / "cli_config.json"
-        cfg = AppConfiguration(display_cost_per_action=True)
+        cfg = CliSettings(display_cost_per_action=True)
 
         with patch.object(
-            AppConfiguration, "get_config_path", return_value=config_path
+            CliSettings, "get_config_path", return_value=config_path
         ):
             cfg.save()
 
@@ -122,10 +122,10 @@ class TestAppConfiguration:
 
     def test_save_permission_error_propagates(self, tmp_path: Path):
         config_path = tmp_path / "cli_config.json"
-        cfg = AppConfiguration(display_cost_per_action=True)
+        cfg = CliSettings(display_cost_per_action=True)
 
         with patch.object(
-            AppConfiguration, "get_config_path", return_value=config_path
+            CliSettings, "get_config_path", return_value=config_path
         ):
             with patch("builtins.open", side_effect=PermissionError("Access denied")):
                 with pytest.raises(PermissionError):
