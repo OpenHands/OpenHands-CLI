@@ -28,7 +28,7 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
-from openhands_cli.json_callback import create_json_event_callback
+from openhands_cli.json_callback import json_callback
 from openhands_cli.refactor.content.splash import get_splash_content
 from openhands_cli.refactor.core.commands import is_valid_command, show_help
 from openhands_cli.refactor.core.conversation_runner import ConversationRunner
@@ -334,7 +334,7 @@ class OpenHandsApp(App):
         # Create JSON callback if in JSON mode
         event_callback = None
         if self.json_mode:
-            event_callback = create_json_event_callback()
+            event_callback = json_callback
 
         return ConversationRunner(
             self.conversation_id,
