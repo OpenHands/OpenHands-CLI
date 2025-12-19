@@ -46,9 +46,7 @@ class TestCliSettings:
 
     def test_load_returns_defaults_when_file_missing(self, tmp_path: Path):
         config_path = tmp_path / "cli_config.json"
-        with patch.object(
-            CliSettings, "get_config_path", return_value=config_path
-        ):
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
             cfg = CliSettings.load()
         assert cfg == CliSettings()
 
@@ -75,9 +73,7 @@ class TestCliSettings:
         config_path = tmp_path / "cli_config.json"
         config_path.write_text(file_content)
 
-        with patch.object(
-            CliSettings, "get_config_path", return_value=config_path
-        ):
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
             cfg = CliSettings.load()
 
         assert cfg.display_cost_per_action is expected
@@ -86,9 +82,7 @@ class TestCliSettings:
         config_path = tmp_path / "cli_config.json"
         config_path.write_text(json.dumps({"display_cost_per_action": True}))
 
-        with patch.object(
-            CliSettings, "get_config_path", return_value=config_path
-        ):
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
             with patch("builtins.open", side_effect=PermissionError("Access denied")):
                 with pytest.raises(PermissionError):
                     CliSettings.load()
@@ -98,9 +92,7 @@ class TestCliSettings:
         config_path = tmp_path / "nested" / "dir" / "cli_config.json"
         cfg = CliSettings(display_cost_per_action=value)
 
-        with patch.object(
-            CliSettings, "get_config_path", return_value=config_path
-        ):
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
             cfg.save()
             assert config_path.exists()
             loaded = CliSettings.load()
@@ -111,9 +103,7 @@ class TestCliSettings:
         config_path = tmp_path / "cli_config.json"
         cfg = CliSettings(display_cost_per_action=True)
 
-        with patch.object(
-            CliSettings, "get_config_path", return_value=config_path
-        ):
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
             cfg.save()
 
         assert config_path.read_text() == json.dumps(
@@ -124,9 +114,7 @@ class TestCliSettings:
         config_path = tmp_path / "cli_config.json"
         cfg = CliSettings(display_cost_per_action=True)
 
-        with patch.object(
-            CliSettings, "get_config_path", return_value=config_path
-        ):
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
             with patch("builtins.open", side_effect=PermissionError("Access denied")):
                 with pytest.raises(PermissionError):
                     cfg.save()
