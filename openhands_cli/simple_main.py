@@ -89,6 +89,9 @@ def main() -> None:
     parser = create_main_parser()
     args = parser.parse_args()
 
+    # Handle --json flag (only works with --headless)
+    json_mode = args.json and args.headless
+
     # Validate headless mode requirements
     if args.headless and not args.task and not args.file:
         parser.error("--headless requires either --task or --file to be specified")
@@ -103,6 +106,11 @@ def main() -> None:
             from openhands_cli.gui_launcher import launch_gui_server
 
             launch_gui_server(mount_cwd=args.mount_cwd, gpu=args.gpu)
+        elif args.command == "web":
+            # Import web server launcher only when needed
+            from openhands_cli.serve import launch_web_server
+
+            launch_web_server(host=args.host, port=args.port, debug=args.debug)
         elif args.command == "acp":
             import asyncio
 
@@ -165,6 +173,7 @@ def main() -> None:
                 llm_approve=args.llm_approve,
                 exit_without_confirmation=args.exit_without_confirmation,
                 headless=args.headless,
+                json_mode=json_mode,
             )
             console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
             console.print(

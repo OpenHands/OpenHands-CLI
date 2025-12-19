@@ -8,8 +8,8 @@ from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
 from openhands_cli.auth.utils import _p
 from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
+from openhands_cli.stores import AgentStore
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.settings.store import AgentStore
 
 
 class ApiClientError(Exception):

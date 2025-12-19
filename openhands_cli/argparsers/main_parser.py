@@ -9,6 +9,7 @@ from openhands_cli.argparsers.cloud_parser import add_cloud_parser
 from openhands_cli.argparsers.mcp_parser import add_mcp_parser
 from openhands_cli.argparsers.serve_parser import add_serve_parser
 from openhands_cli.argparsers.utils import add_confirmation_mode_args
+from openhands_cli.argparsers.web_parser import add_web_parser
 
 
 def create_main_parser() -> argparse.ArgumentParser:
@@ -31,12 +32,15 @@ def create_main_parser() -> argparse.ArgumentParser:
                 openhands                           # Start textual UI mode
                 openhands --exp                     # Start textual UI (same as default)
                 openhands --headless                # Start textual UI in headless mode
+                openhands --headless --json -t "Fix bug"  # Headless with JSON output
                 openhands --resume conversation-id  # Resume conversation
                 openhands --always-approve          # Auto-approve all actions
                 openhands --llm-approve             # LLM-based approval mode
                 openhands cloud -t "Fix bug"        # Create cloud conversation
                 openhands serve                     # Launch GUI server
                 openhands serve --gpu               # Launch with GPU support
+                openhands web                       # Launch CLI as web app
+                openhands web --port 8080           # Launch web app on custom port
                 openhands acp                       # Agent-Client Protocol
                                                       server (e.g., Toad CLI, Zed IDE)
                 openhands login                     # Authenticate with OpenHands Cloud
@@ -94,6 +98,14 @@ def create_main_parser() -> argparse.ArgumentParser:
             "Requires --task or --file."
         ),
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help=(
+            "Enable JSON output mode for headless operation. "
+            "Streams JSONL event outputs to terminal. Must be used with --headless."
+        ),
+    )
 
     # Confirmation mode options (mutually exclusive)
     confirmation_group = parser.add_mutually_exclusive_group()
@@ -113,6 +125,9 @@ def create_main_parser() -> argparse.ArgumentParser:
 
     # Add serve subcommand
     add_serve_parser(subparsers)
+
+    # Add web subcommand
+    add_web_parser(subparsers)
 
     # Add MCP subcommand
     add_mcp_parser(subparsers)

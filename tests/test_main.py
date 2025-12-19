@@ -328,6 +328,23 @@ def test_main_serve_calls_launch_gui_server(monkeypatch, argv, expected_kwargs):
 
 
 @pytest.mark.parametrize(
+    "argv, expected",
+    [
+        (["openhands", "web"], dict(host="0.0.0.0", port=12000, debug=False)),
+        (
+            ["openhands", "web", "--host", "localhost", "--port", "3000", "--debug"],
+            dict(host="localhost", port=3000, debug=True),
+        ),
+    ],
+)
+@patch("openhands_cli.serve.launch_web_server")
+def test_main_web_calls_launch_web_server(mock_launch, argv, expected):
+    with patch("sys.argv", argv):
+        main()
+    mock_launch.assert_called_once_with(**expected)
+
+
+@pytest.mark.parametrize(
     "argv,expected_exit_code",
     [
         (["openhands", "invalid-command"], 2),  # argparse error

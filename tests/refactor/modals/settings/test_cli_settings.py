@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from openhands_cli.refactor.modals.settings.cli_settings import CliSettings
+from openhands_cli.stores import CliSettings
 
 
 class TestCliSettings:
