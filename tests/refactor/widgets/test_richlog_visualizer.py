@@ -294,6 +294,12 @@ class TestVisualizerIntegration:
         action = RichLogMockAction(command=xml_command)
         tool_call = create_tool_call("call_1", "execute_bash")
 
+        # RichLogMockAction does not parse XML; it stores the command as-is
+        assert action.command == xml_command
+        # Sanity-check the XML-like content is present in the command string
+        assert "<function=execute_bash" in action.command
+        assert "<parameter=command>" in action.command
+
         action_event = ActionEvent(
             thought=[TextContent(text="I need to check the current directory")],
             action=action,
@@ -312,5 +318,7 @@ class TestVisualizerIntegration:
         # Verify that the visualizer successfully created a collapsible widget
         # The content should be present in some form, even if not escaped
         title_str = str(collapsible.title)
+        # Title should include a visible snippet of the XML-like command
+        assert "<function=execute_bash" in title_str
         assert "execute_bash" in title_str  # The function name should be present
         assert len(title_str) > 0  # Title should not be empty
