@@ -100,7 +100,7 @@ class SettingsScreen(ModalScreen):
             # Tabbed content
             with TabbedContent(id="settings_tabs"):
                 # Settings Tab
-                with TabPane("Settings", id="settings_tab"):
+                with TabPane("Agent Settings", id="settings_tab"):
                     yield SettingsTab()
 
                 # CLI Settings Tab - only show if not first-time setup
