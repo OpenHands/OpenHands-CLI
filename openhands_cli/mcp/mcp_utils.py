@@ -170,7 +170,6 @@ def add_server(
             args=args or [],
             env=_parse_env_vars(env_vars) if env_vars else {},
             transport="stdio",
-            enabled=enabled,
         )
     elif transport in ["http", "sse"]:
         server = RemoteMCPServer(
@@ -178,10 +177,13 @@ def add_server(
             transport=cast(Literal["http", "sse"], transport),
             headers=_parse_headers(headers) if headers else {},
             auth=auth,
-            enabled=enabled,
         )
     else:
         raise MCPConfigurationError(f"Invalid transport type: {transport}")
+
+    # Add the enabled field to the server
+    # These models have extra='allow', so we can set additional fields
+    setattr(server, 'enabled', enabled)
 
     # Add the server to the configuration
     config.add_server(name, server)
