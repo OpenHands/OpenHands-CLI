@@ -285,6 +285,31 @@ def test_openhands_provider_respects_explicit_base_url():
         assert saved_spec.llm.base_url == custom_base_url
 
 
+def test_save_llm_settings_persists_reasoning_summary():
+    screen = SettingsScreen(conversation=None)
+    initial_llm = LLM(
+        model="openai/gpt-4o-mini",
+        api_key=SecretStr("sk-initial"),
+        usage_id="test-service",
+    )
+    initial_agent = get_default_cli_agent(llm=initial_llm)
+
+    with (
+        patch.object(screen.agent_store, "load", return_value=initial_agent),
+        patch.object(screen.agent_store, "save") as mock_save,
+    ):
+        screen._save_llm_settings(
+            model="openai/gpt-5",
+            api_key="sk-new",
+            reasoning_summary="detailed",
+        )
+
+    mock_save.assert_called_once()
+    saved_agent = mock_save.call_args[0][0]
+    assert saved_agent.llm.reasoning_summary == "detailed"
+    assert saved_agent.condenser.llm.reasoning_summary == "detailed"
+
+
 def test_non_openhands_provider_no_base_url():
     """Test that non-OpenHands providers don't get automatic base_url."""
     screen = SettingsScreen(conversation=None)
