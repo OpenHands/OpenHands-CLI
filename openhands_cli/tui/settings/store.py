@@ -20,7 +20,7 @@ from openhands_cli.locations import (
     PERSISTENCE_DIR,
     WORK_DIR,
 )
-from openhands_cli.mcp.mcp_utils import list_enabled_servers, load_mcp_config
+from openhands_cli.mcp.mcp_utils import list_enabled_servers
 from openhands_cli.utils import get_llm_metadata, should_set_litellm_extra_body
 
 
@@ -34,10 +34,12 @@ class AgentStore:
         """Load MCP configuration from file, filtering out disabled servers.
 
         Returns:
-            Dictionary of enabled MCP servers configuration, or empty dict if file doesn't exist
+            Dictionary of enabled MCP servers configuration, or empty dict
+            if file doesn't exist
 
         Raises:
-            MCPConfigurationError: If the configuration file exists but is invalid
+            MCPConfigurationError: If the configuration file exists but is
+            invalid
         """
         # Get only enabled servers
         enabled_servers = list_enabled_servers()
