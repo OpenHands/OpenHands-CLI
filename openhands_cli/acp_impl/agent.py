@@ -4,7 +4,7 @@ import asyncio
 import logging
 import uuid
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 from uuid import UUID
 
 from acp import (
@@ -106,10 +106,136 @@ class OpenHandsACPAgent(ACPAgent):
         self._running_tasks: dict[str, asyncio.Task] = {}
         # Default confirmation mode for new sessions
         self._initial_confirmation_mode: ConfirmationMode = initial_confirmation_mode
+        # Track streaming state across token calls for boundary detection
+        self._streaming_states: dict[
+            str, Literal["thinking", "content", "tool_name", "tool_args"] | None
+        ] = {}
         logger.info(
             f"OpenHands ACP Agent initialized with "
             f"confirmation mode: {initial_confirmation_mode}"
         )
+
+    def _create_token_callback(self, session_id: str):
+        """Create a token streaming callback for a specific session.
+
+        Args:
+            session_id: The session ID for this callback
+
+        Returns:
+            Token callback function that processes streaming chunks
+        """
+        # Initialize streaming state for this session
+        self._streaming_states[session_id] = None
+
+        def on_token(chunk: Any) -> None:
+            """Handle streaming tokens and convert them to ACP AgentMessageChunk
+            updates.
+
+            This processes different types of streaming content including regular
+            content, tool calls, and thinking blocks with dynamic boundary detection.
+
+            Args:
+                chunk: Streaming chunk from the LLM
+            """
+            try:
+                current_state = self._streaming_states.get(session_id)
+
+                choices = chunk.choices
+                for choice in choices:
+                    delta = choice.delta
+                    if delta is not None:
+                        # Handle thinking blocks (reasoning content)
+                        reasoning_content = getattr(delta, "reasoning_content", None)
+                        if isinstance(reasoning_content, str) and reasoning_content:
+                            if current_state != "thinking":
+                                self._streaming_states[session_id] = "thinking"
+
+                            # Send reasoning content as AgentMessageChunk
+                            asyncio.create_task(
+                                self._send_streaming_chunk(
+                                    session_id, reasoning_content, is_reasoning=True
+                                )
+                            )
+
+                        # Handle regular content
+                        content = getattr(delta, "content", None)
+                        if isinstance(content, str) and content:
+                            if current_state != "content":
+                                self._streaming_states[session_id] = "content"
+
+                            # Send content as AgentMessageChunk
+                            asyncio.create_task(
+                                self._send_streaming_chunk(
+                                    session_id, content, is_reasoning=False
+                                )
+                            )
+
+                        # Handle tool calls
+                        tool_calls = getattr(delta, "tool_calls", None)
+                        if tool_calls:
+                            for tool_call in tool_calls:
+                                tool_name = (
+                                    tool_call.function.name
+                                    if tool_call.function.name
+                                    else ""
+                                )
+                                tool_args = (
+                                    tool_call.function.arguments
+                                    if tool_call.function.arguments
+                                    else ""
+                                )
+                                if tool_name:
+                                    if current_state != "tool_name":
+                                        self._streaming_states[session_id] = "tool_name"
+                                    asyncio.create_task(
+                                        self._send_streaming_chunk(
+                                            session_id,
+                                            f"**Tool**: {tool_name}\n",
+                                            is_reasoning=False,
+                                        )
+                                    )
+                                if tool_args:
+                                    if current_state != "tool_args":
+                                        self._streaming_states[session_id] = "tool_args"
+                                    asyncio.create_task(
+                                        self._send_streaming_chunk(
+                                            session_id, tool_args, is_reasoning=False
+                                        )
+                                    )
+            except Exception as e:
+                logger.debug(f"Error processing streaming token: {e}", exc_info=True)
+
+        return on_token
+
+    async def _send_streaming_chunk(
+        self, session_id: str, content: str, is_reasoning: bool = False
+    ):
+        """Send a streaming chunk as an ACP AgentMessageChunk update.
+
+        Args:
+            session_id: The session ID
+            content: The content to send
+            is_reasoning: Whether this is reasoning content (for formatting)
+        """
+        try:
+            # Format reasoning content differently
+            if is_reasoning:
+                formatted_content = f"**Reasoning**: {content}"
+            else:
+                formatted_content = content
+
+            await self._conn.session_update(
+                session_id=session_id,
+                update=AgentMessageChunk(
+                    session_update="agent_message_chunk",
+                    content=TextContentBlock(
+                        type="text",
+                        text=formatted_content,
+                    ),
+                ),
+            )
+        except Exception as e:
+            logger.debug(f"Error sending streaming chunk: {e}", exc_info=True)
 
     async def _cmd_confirm(self, session_id: str, argument: str) -> str:
         """Handle /confirm command.
@@ -248,6 +374,12 @@ class OpenHandsACPAgent(ACPAgent):
                 mcp_servers=mcp_servers,
                 skills=[RESOURCE_SKILL],
             )
+
+            # Enable streaming on the agent's LLM
+            agent = agent.model_copy(
+                update={"llm": agent.llm.model_copy(update={"stream": True})}
+            )
+
         except MCPConfigurationError as e:
             logger.error(f"Invalid MCP configuration: {e}")
             raise RequestError.invalid_params(
@@ -289,7 +421,10 @@ class OpenHandsACPAgent(ACPAgent):
             """Synchronous wrapper that schedules async event handling."""
             asyncio.run_coroutine_threadsafe(subscriber(event), loop)
 
-        # Create conversation with persistence support
+        # Create token callback for streaming
+        token_callback = self._create_token_callback(session_id)
+
+        # Create conversation with persistence support and token streaming
         # The SDK automatically loads from disk if conversation_id exists
         conversation = Conversation(
             agent=agent,
@@ -297,6 +432,7 @@ class OpenHandsACPAgent(ACPAgent):
             persistence_dir=CONVERSATIONS_DIR,
             conversation_id=UUID(session_id),
             callbacks=[sync_callback],
+            token_callbacks=[token_callback],  # Enable token streaming
             visualizer=None,  # No visualizer needed for ACP
         )
 
@@ -478,8 +614,9 @@ class OpenHandsACPAgent(ACPAgent):
             try:
                 await run_task
             finally:
-                # Clean up task tracking
+                # Clean up task tracking and streaming state
                 self._running_tasks.pop(session_id, None)
+                self._streaming_states.pop(session_id, None)
 
             # Return the final response
             return PromptResponse(stop_reason="end_turn")
@@ -536,12 +673,17 @@ class OpenHandsACPAgent(ACPAgent):
 
             running_task = self._running_tasks.get(session_id)
             if not running_task or running_task.done():
+                # Clean up streaming state
+                self._streaming_states.pop(session_id, None)
                 return
 
             logger.debug(
                 f"Waiting for conversation thread to terminate for session {session_id}"
             )
             await self._wait_for_task_completion(running_task, session_id)
+
+            # Clean up streaming state after task completion
+            self._streaming_states.pop(session_id, None)
 
         except RequestError:
             raise
