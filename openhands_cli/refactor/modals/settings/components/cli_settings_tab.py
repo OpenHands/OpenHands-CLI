@@ -4,7 +4,7 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.widgets import Label, Static, Switch
 
-from openhands_cli.refactor.modals.settings.cli_settings import CliSettings
+from openhands_cli.stores import CliSettings
 
 
 class CliSettingsTab(Container):

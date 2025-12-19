@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from openhands.sdk import LLM, Agent, Tool
 from openhands_cli.locations import PERSISTENCE_DIR, WORK_DIR
-from openhands_cli.tui.settings.store import AgentStore
+from openhands_cli.stores import AgentStore
 
 
 class TestDirectorySeparation:
@@ -47,7 +47,7 @@ class TestToolFix:
 
         # Mock the file store to return our test agent
         with patch(
-            "openhands_cli.tui.settings.store.LocalFileStore"
+            "openhands_cli.stores.agent_store.LocalFileStore"
         ) as mock_file_store:
             mock_store_instance = MagicMock()
             mock_file_store.return_value = mock_store_instance
