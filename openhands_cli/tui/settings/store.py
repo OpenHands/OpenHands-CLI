@@ -75,24 +75,12 @@ class AgentStore:
             # controlled via the AgentContext.load_user_skills flag.
             skills = self.load_project_skills()
 
-            try:
-                agent_context = AgentContext(
-                    skills=skills,
-                    system_message_suffix=(
-                        f"You current working directory is: {WORK_DIR}"
-                    ),
-                    load_user_skills=load_user_skills,
-                )
-            except TypeError:
-                # Fallback for older AgentContext implementations that do not
-                # accept the load_user_skills keyword argument.
-                agent_context = AgentContext(
-                    skills=skills,
-                    system_message_suffix=(
-                        f"You current working directory is: {WORK_DIR}"
-                    ),
-                )
-
+            agent_context = AgentContext(
+                skills=skills,
+                system_message_suffix=(f"You current working directory is: {WORK_DIR}"),
+                load_user_skills=load_user_skills,
+            )
+            
             mcp_config: dict = self.load_mcp_configuration()
 
             # Update LLM metadata with current information
