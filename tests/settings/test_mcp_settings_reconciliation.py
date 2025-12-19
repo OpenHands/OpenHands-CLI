@@ -78,6 +78,7 @@ def test_load_overrides_persisted_mcp_with_mcp_json_file(
     loaded = agent_store.load()
     assert loaded is not None
     # Expect ONLY the MCP json file's config
+    # Note: Pydantic models now include all fields with defaults
     assert loaded.mcp_config == {
         "mcpServers": {
             "file_server": {
@@ -85,6 +86,12 @@ def test_load_overrides_persisted_mcp_with_mcp_json_file(
                 "args": ["mcp-server-fetch"],
                 "env": {},
                 "transport": "stdio",
+                "type": None,
+                "cwd": None,
+                "timeout": None,
+                "description": None,
+                "icon": None,
+                "authentication": None,
             }
         }
     }

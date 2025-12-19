@@ -183,7 +183,7 @@ def add_server(
 
     # Add the enabled field to the server
     # These models have extra='allow', so we can set additional fields
-    setattr(server, 'enabled', enabled)
+    setattr(server, "enabled", enabled)
 
     # Add the server to the configuration
     config.add_server(name, server)
