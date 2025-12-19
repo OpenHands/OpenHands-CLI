@@ -168,7 +168,6 @@ def _ask_user_consent_for_overwrite(
         f"[/{OPENHANDS_THEME.accent}]"
     )
 
-    print("prompting user")
     try:
         response = (
             input("\nDo you want to overwrite your existing configuration?(y/N): ")
