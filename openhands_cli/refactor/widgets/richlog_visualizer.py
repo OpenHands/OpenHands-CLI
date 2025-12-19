@@ -19,6 +19,7 @@ from openhands.sdk.event import (
 from openhands.sdk.event.base import Event
 from openhands.sdk.event.condenser import Condensation, CondensationRequest
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
+from openhands_cli.refactor.modals.settings.cli_settings import CliSettings
 from openhands_cli.refactor.widgets.non_clickable_collapsible import (
     NonClickableCollapsible,
 )
@@ -85,6 +86,17 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._skip_user_messages = skip_user_messages
         # Store the main thread ID for thread safety checks
         self._main_thread_id = threading.get_ident()
+        # Cache CLI settings to avoid repeated file system reads
+        self._cli_settings: CliSettings | None = None
+
+    @property
+    def cli_settings(self) -> CliSettings:
+        if self._cli_settings is None:
+            self._cli_settings = CliSettings.load()
+        return self._cli_settings
+
+    def reload_configuration(self) -> None:
+        self._cli_settings = CliSettings.load()
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates Collapsible widgets for events."""
@@ -361,6 +373,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     def _format_metrics_subtitle(self) -> str | None:
         """Format LLM metrics as a visually appealing subtitle string."""
+        # Check CLI settings to see if metrics should be displayed
+        if not self.cli_settings.display_cost_per_action:
+            return None
+
         stats = self.conversation_stats
         if not stats:
             return None

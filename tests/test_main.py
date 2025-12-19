@@ -1,17 +1,12 @@
 """Tests for main entry point functionality."""
 
 import sys
+import uuid
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from openhands.sdk.security.confirmation_policy import (
-    AlwaysConfirm,
-    ConfirmRisky,
-    NeverConfirm,
-)
-from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli import simple_main
 from openhands_cli.argparsers.main_parser import create_main_parser
 from openhands_cli.simple_main import main
@@ -40,31 +35,29 @@ def test_main_parser_accepts_task_and_file_flags():
 class TestMainEntryPoint:
     """Test the main entry point behavior."""
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands"])
-    def test_main_starts_agent_chat_directly(
-        self, mock_run_agent_chat: MagicMock
+    def test_main_starts_textual_ui_directly(
+        self, mock_textual_main: MagicMock
     ) -> None:
-        """Test that main() starts agent chat directly when setup succeeds."""
-        # Mock run_cli_entry to raise KeyboardInterrupt to exit gracefully
-        mock_run_agent_chat.side_effect = KeyboardInterrupt()
+        """Test that main() starts textual UI directly when setup succeeds."""
+        # Mock textual_main to raise KeyboardInterrupt to exit gracefully
+        mock_textual_main.side_effect = KeyboardInterrupt()
 
         # Should complete without raising an exception (graceful exit)
         simple_main.main()
 
-        # Should call run_cli_entry with no resume conversation ID,
-        # AlwaysConfirm policy (default), and no queued inputs
-        mock_run_agent_chat.assert_called_once()
-        kwargs = mock_run_agent_chat.call_args.kwargs
+        # Should call textual_main with no resume conversation ID and no queued inputs
+        mock_textual_main.assert_called_once()
+        kwargs = mock_textual_main.call_args.kwargs
         assert kwargs["resume_conversation_id"] is None
-        assert isinstance(kwargs["confirmation_policy"], AlwaysConfirm)
         assert kwargs["queued_inputs"] is None
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands"])
-    def test_main_handles_import_error(self, mock_run_agent_chat: MagicMock) -> None:
+    def test_main_handles_import_error(self, mock_textual_main: MagicMock) -> None:
         """Test that main() handles ImportError gracefully."""
-        mock_run_agent_chat.side_effect = ImportError("Missing dependency")
+        mock_textual_main.side_effect = ImportError("Missing dependency")
 
         # Should raise ImportError (re-raised after handling)
         with pytest.raises(ImportError) as exc_info:
@@ -72,35 +65,33 @@ class TestMainEntryPoint:
 
         assert str(exc_info.value) == "Missing dependency"
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands"])
     def test_main_handles_keyboard_interrupt(
-        self, mock_run_agent_chat: MagicMock
+        self, mock_textual_main: MagicMock
     ) -> None:
         """Test that main() handles KeyboardInterrupt gracefully."""
-        # Mock run_cli_entry to raise KeyboardInterrupt
-        mock_run_agent_chat.side_effect = KeyboardInterrupt()
+        # Mock textual_main to raise KeyboardInterrupt
+        mock_textual_main.side_effect = KeyboardInterrupt()
 
         # Should complete without raising an exception (graceful exit)
         simple_main.main()
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands"])
-    def test_main_handles_eof_error(self, mock_run_agent_chat: MagicMock) -> None:
+    def test_main_handles_eof_error(self, mock_textual_main: MagicMock) -> None:
         """Test that main() handles EOFError gracefully."""
-        # Mock run_cli_entry to raise EOFError
-        mock_run_agent_chat.side_effect = EOFError()
+        # Mock textual_main to raise EOFError
+        mock_textual_main.side_effect = EOFError()
 
         # Should complete without raising an exception (graceful exit)
         simple_main.main()
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands"])
-    def test_main_handles_general_exception(
-        self, mock_run_agent_chat: MagicMock
-    ) -> None:
+    def test_main_handles_general_exception(self, mock_textual_main: MagicMock) -> None:
         """Test that main() handles general exceptions."""
-        mock_run_agent_chat.side_effect = Exception("Unexpected error")
+        mock_textual_main.side_effect = Exception("Unexpected error")
 
         # Should raise Exception (re-raised after handling)
         with pytest.raises(Exception) as exc_info:
@@ -108,104 +99,99 @@ class TestMainEntryPoint:
 
         assert str(exc_info.value) == "Unexpected error"
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands", "--resume", "test-conversation-id"])
-    def test_main_with_resume_argument(self, mock_run_agent_chat: MagicMock) -> None:
+    def test_main_with_resume_argument(self, mock_textual_main: MagicMock) -> None:
         """Test that main() passes resume conversation ID when provided."""
-        # Mock run_cli_entry to raise KeyboardInterrupt to exit gracefully
-        mock_run_agent_chat.side_effect = KeyboardInterrupt()
+        # Mock textual_main to return a UUID and raise KeyboardInterrupt to exit
+        mock_textual_main.return_value = uuid.uuid4()
+        mock_textual_main.side_effect = KeyboardInterrupt()
 
         # Should complete without raising an exception (graceful exit)
         simple_main.main()
 
-        # Should call run_cli_entry with the provided resume conversation ID
-        mock_run_agent_chat.assert_called_once()
-        kwargs = mock_run_agent_chat.call_args.kwargs
+        # Should call textual_main with the provided resume conversation ID
+        mock_textual_main.assert_called_once()
+        kwargs = mock_textual_main.call_args.kwargs
         assert kwargs["resume_conversation_id"] == "test-conversation-id"
-        assert isinstance(kwargs["confirmation_policy"], AlwaysConfirm)
         assert kwargs["queued_inputs"] is None
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands", "--always-approve"])
     def test_main_with_always_approve_argument(
-        self, mock_run_agent_chat: MagicMock
+        self, mock_textual_main: MagicMock
     ) -> None:
-        """Test that main() passes NeverConfirm policy with --always-approve."""
-        # Mock run_cli_entry to raise KeyboardInterrupt to exit gracefully
-        mock_run_agent_chat.side_effect = KeyboardInterrupt()
+        """Test that main() passes always_approve=True with --always-approve."""
+        # Mock textual_main to raise KeyboardInterrupt to exit gracefully
+        mock_textual_main.side_effect = KeyboardInterrupt()
 
         # Should complete without raising an exception (graceful exit)
         simple_main.main()
 
-        # Should call run_cli_entry with NeverConfirm policy
-        mock_run_agent_chat.assert_called_once()
-        kwargs = mock_run_agent_chat.call_args.kwargs
+        # Should call textual_main with always_approve=True
+        mock_textual_main.assert_called_once()
+        kwargs = mock_textual_main.call_args.kwargs
         assert kwargs["resume_conversation_id"] is None
-        assert isinstance(kwargs["confirmation_policy"], NeverConfirm)
+        assert kwargs["always_approve"] is True
         assert kwargs["queued_inputs"] is None
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands", "--llm-approve"])
-    def test_main_with_llm_approve_argument(
-        self, mock_run_agent_chat: MagicMock
-    ) -> None:
-        """Test that main() passes ConfirmRisky policy with --llm-approve."""
-        # Mock run_cli_entry to raise KeyboardInterrupt to exit gracefully
-        mock_run_agent_chat.side_effect = KeyboardInterrupt()
+    def test_main_with_llm_approve_argument(self, mock_textual_main: MagicMock) -> None:
+        """Test that main() passes llm_approve=True with --llm-approve."""
+        # Mock textual_main to raise KeyboardInterrupt to exit gracefully
+        mock_textual_main.side_effect = KeyboardInterrupt()
 
         # Should complete without raising an exception (graceful exit)
         simple_main.main()
 
-        # Should call run_cli_entry with ConfirmRisky policy
-        mock_run_agent_chat.assert_called_once()
-        kwargs = mock_run_agent_chat.call_args.kwargs
+        # Should call textual_main with llm_approve=True
+        mock_textual_main.assert_called_once()
+        kwargs = mock_textual_main.call_args.kwargs
         assert kwargs["resume_conversation_id"] is None
-        policy = kwargs["confirmation_policy"]
-        assert isinstance(policy, ConfirmRisky)
-        assert policy.threshold == SecurityRisk.HIGH
+        assert kwargs["llm_approve"] is True
         assert kwargs["queued_inputs"] is None
 
 
 @pytest.mark.parametrize(
-    "argv,expected_resume_id,expected_policy_cls,expected_threshold",
+    "argv,expected_resume_id,expected_always_approve,expected_llm_approve",
     [
-        (["openhands"], None, AlwaysConfirm, None),
-        (["openhands", "--resume", "test-id"], "test-id", AlwaysConfirm, None),
-        (["openhands", "--always-approve"], None, NeverConfirm, None),
-        (
-            ["openhands", "--llm-approve"],
-            None,
-            ConfirmRisky,
-            SecurityRisk.HIGH,
-        ),
+        (["openhands"], None, False, False),
+        (["openhands", "--resume", "test-id"], "test-id", False, False),
+        (["openhands", "--always-approve"], None, True, False),
+        (["openhands", "--llm-approve"], None, False, True),
         (
             ["openhands", "--resume", "test-id", "--always-approve"],
             "test-id",
-            NeverConfirm,
-            None,
+            True,
+            False,
         ),
     ],
 )
-def test_main_cli_calls_run_cli_entry(
-    monkeypatch, argv, expected_resume_id, expected_policy_cls, expected_threshold
+def test_main_cli_calls_textual_main(
+    monkeypatch, argv, expected_resume_id, expected_always_approve, expected_llm_approve
 ):
     # Patch sys.argv since main() takes no params
     monkeypatch.setattr(sys, "argv", argv, raising=False)
 
     called = {}
-    fake_agent_chat = SimpleNamespace(
-        run_cli_entry=lambda **kw: called.setdefault("kwargs", kw)
-    )
+
+    def mock_textual_main(**kw):
+        called.setdefault("kwargs", kw)
+        return uuid.uuid4()
+
+    fake_textual_app = SimpleNamespace(main=mock_textual_main)
     # Provide the symbol that main() will import
-    monkeypatch.setitem(sys.modules, "openhands_cli.agent_chat", fake_agent_chat)
+    monkeypatch.setitem(
+        sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app
+    )
 
     # Execute (no SystemExit expected on success)
     main()
     kwargs = called["kwargs"]
     assert kwargs["resume_conversation_id"] == expected_resume_id
-    assert isinstance(kwargs["confirmation_policy"], expected_policy_cls)
-    if expected_threshold is not None:
-        assert kwargs["confirmation_policy"].threshold == expected_threshold
+    assert kwargs["always_approve"] == expected_always_approve
+    assert kwargs["llm_approve"] == expected_llm_approve
     assert kwargs["queued_inputs"] is None
 
 
@@ -220,10 +206,14 @@ def test_main_cli_task_sets_queued_inputs(monkeypatch):
 
     called = {}
 
-    fake_agent_chat = SimpleNamespace(
-        run_cli_entry=lambda **kw: called.setdefault("kwargs", kw)
+    def mock_textual_main(**kw):
+        called.setdefault("kwargs", kw)
+        return uuid.uuid4()
+
+    fake_textual_app = SimpleNamespace(main=mock_textual_main)
+    monkeypatch.setitem(
+        sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app
     )
-    monkeypatch.setitem(sys.modules, "openhands_cli.agent_chat", fake_agent_chat)
 
     main()
 
@@ -246,10 +236,14 @@ def test_main_cli_file_sets_queued_inputs(monkeypatch, tmp_path):
 
     called = {}
 
-    fake_agent_chat = SimpleNamespace(
-        run_cli_entry=lambda **kw: called.setdefault("kwargs", kw)
+    def mock_textual_main(**kw):
+        called.setdefault("kwargs", kw)
+        return uuid.uuid4()
+
+    fake_textual_app = SimpleNamespace(main=mock_textual_main)
+    monkeypatch.setitem(
+        sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app
     )
-    monkeypatch.setitem(sys.modules, "openhands_cli.agent_chat", fake_agent_chat)
 
     main()
 
@@ -287,10 +281,14 @@ def test_main_cli_file_takes_precedence_over_task(monkeypatch, tmp_path):
 
     called = {}
 
-    fake_agent_chat = SimpleNamespace(
-        run_cli_entry=lambda **kw: called.setdefault("kwargs", kw)
+    def mock_textual_main(**kw):
+        called.setdefault("kwargs", kw)
+        return uuid.uuid4()
+
+    fake_textual_app = SimpleNamespace(main=mock_textual_main)
+    monkeypatch.setitem(
+        sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app
     )
-    monkeypatch.setitem(sys.modules, "openhands_cli.agent_chat", fake_agent_chat)
 
     main()
 
