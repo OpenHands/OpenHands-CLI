@@ -30,25 +30,6 @@ class AgentStore:
     def __init__(self) -> None:
         self.file_store = LocalFileStore(root=PERSISTENCE_DIR)
 
-    def load_mcp_configuration(self) -> dict[str, Any]:
-        """Load MCP configuration from file, filtering out disabled servers.
-
-        Returns:
-            Dictionary of enabled MCP servers configuration, or empty dict
-            if file doesn't exist
-
-        Raises:
-            MCPConfigurationError: If the configuration file exists but is
-            invalid
-        """
-        # Get only enabled servers
-        enabled_servers = list_enabled_servers()
-        # Convert server objects to dict format
-        result = {}
-        for name, server in enabled_servers.items():
-            result[name] = server.model_dump()
-        return result
-
     def load_project_skills(self) -> list:
         """Load skills project-specific directories."""
         all_skills = []
@@ -92,7 +73,8 @@ class AgentStore:
                 load_public_skills=True,
             )
 
-            mcp_config: dict = self.load_mcp_configuration()
+            # Get only enabled MCP servers
+            enabled_servers = list_enabled_servers()
 
             # Update LLM metadata with current information
             llm_update = {}
@@ -126,7 +108,9 @@ class AgentStore:
                 update={
                     "llm": updated_llm,
                     "tools": updated_tools,
-                    "mcp_config": {"mcpServers": mcp_config} if mcp_config else {},
+                    "mcp_config": {"mcpServers": enabled_servers}
+                    if enabled_servers
+                    else {},
                     "agent_context": agent_context,
                     "condenser": agent.condenser.model_copy(update=condenser_updates)
                     if agent.condenser

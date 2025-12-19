@@ -78,23 +78,14 @@ def test_load_overrides_persisted_mcp_with_mcp_json_file(
     loaded = agent_store.load()
     assert loaded is not None
     # Expect ONLY the MCP json file's config
-    # Note: Pydantic models now include all fields with defaults
-    assert loaded.mcp_config == {
-        "mcpServers": {
-            "file_server": {
-                "command": "uvx",
-                "args": ["mcp-server-fetch"],
-                "env": {},
-                "transport": "stdio",
-                "type": None,
-                "cwd": None,
-                "timeout": None,
-                "description": None,
-                "icon": None,
-                "authentication": None,
-            }
-        }
-    }
+    assert "mcpServers" in loaded.mcp_config
+    assert "file_server" in loaded.mcp_config["mcpServers"]
+
+    # Check server properties
+    file_server = loaded.mcp_config["mcpServers"]["file_server"]
+    assert file_server.command == "uvx"
+    assert file_server.args == ["mcp-server-fetch"]
+    assert file_server.transport == "stdio"
 
 
 @patch("openhands_cli.tui.settings.store.get_default_tools", return_value=[])
@@ -168,9 +159,9 @@ def test_load_mcp_configuration_filters_disabled_servers(
     assert "disabled_server" not in loaded.mcp_config["mcpServers"]
 
     # Verify the loaded servers have correct properties
-    assert loaded.mcp_config["mcpServers"]["enabled_server"]["command"] == "uvx"
+    assert loaded.mcp_config["mcpServers"]["enabled_server"].command == "uvx"
     default_enabled = loaded.mcp_config["mcpServers"]["default_enabled_server"]
-    assert default_enabled["command"] == "node"
+    assert default_enabled.command == "node"
 
 
 @patch("openhands_cli.tui.settings.store.get_default_tools", return_value=[])

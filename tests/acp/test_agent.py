@@ -155,29 +155,11 @@ async def test_new_session_with_malformed_mcp_json_integration(
     from acp import RequestError
 
     from openhands_cli.mcp.mcp_utils import MCPConfigurationError
-    from openhands_cli.tui.settings.store import AgentStore
 
     request = NewSessionRequest(cwd=str(tmp_path), mcp_servers=[])
 
-    # Mock AgentStore to inject our own load_mcp_configuration behavior
-    original_init = AgentStore.__init__
-
-    def mock_init(self):
-        # Call original init
-        original_init(self)
-
-    def mock_load_mcp(self):
-        # Simulate malformed mcp.json being detected
-        raise MCPConfigurationError(
-            "Invalid JSON: trailing characters at line 20 column 1"
-        )
-
-    with (
-        patch.object(AgentStore, "__init__", mock_init),
-        patch.object(AgentStore, "load_mcp_configuration", mock_load_mcp),
-        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load_specs,
-    ):
-        # Mock load_agent_specs to propagate the MCPConfigurationError
+    # Mock load_agent_specs to propagate the MCPConfigurationError
+    with patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load_specs:
         mock_load_specs.side_effect = MCPConfigurationError(
             "Invalid JSON: trailing characters at line 20 column 1"
         )
