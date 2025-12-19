@@ -133,9 +133,7 @@ This is a user microagent for testing.
             with patch(
                 "openhands.sdk.context.skills.skill.USER_SKILLS_DIRS", mock_user_dirs
             ):
-                with patch(
-                    "openhands_cli.locations.WORK_DIR", temp_project_dir
-                ):
+                with patch("openhands_cli.locations.WORK_DIR", temp_project_dir):
                     # Create a minimal agent configuration for testing
                     agent_store = AgentStore()
 
