@@ -366,7 +366,14 @@ def test_mcp_disable_subcommand():
     "cli_args,expected_enabled",
     [
         (
-            ["mcp", "add", "--transport", "http", "test_server", "https://api.example.com"],
+            [
+                "mcp",
+                "add",
+                "--transport",
+                "http",
+                "test_server",
+                "https://api.example.com",
+            ],
             True,  # Default is enabled
         ),
         (

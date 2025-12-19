@@ -264,14 +264,14 @@ class TestMCPFunctions:
     def test_add_server_with_enabled_flag(self, temp_config_path):
         """Test adding a server with enabled flag set to True."""
         add_server("test", "http", "https://example.com", enabled=True)
-        
+
         assert server_exists("test")
         assert is_server_enabled("test") is True
 
     def test_add_server_with_disabled_flag(self, temp_config_path):
         """Test adding a server with enabled flag set to False."""
         add_server("test", "http", "https://example.com", enabled=False)
-        
+
         assert server_exists("test")
         assert is_server_enabled("test") is False
 
@@ -280,7 +280,7 @@ class TestMCPFunctions:
         # Add a disabled server
         add_server("test", "http", "https://example.com", enabled=False)
         assert is_server_enabled("test") is False
-        
+
         # Enable it
         enable_server("test")
         assert is_server_enabled("test") is True
@@ -295,7 +295,7 @@ class TestMCPFunctions:
         # Add an enabled server
         add_server("test", "http", "https://example.com", enabled=True)
         assert is_server_enabled("test") is True
-        
+
         # Disable it
         disable_server("test")
         assert is_server_enabled("test") is False
@@ -319,7 +319,7 @@ class TestMCPFunctions:
         """Test listing enabled servers when all are enabled."""
         add_server("test1", "http", "https://example1.com", enabled=True)
         add_server("test2", "http", "https://example2.com", enabled=True)
-        
+
         enabled_servers = list_enabled_servers()
         assert len(enabled_servers) == 2
         assert "test1" in enabled_servers
@@ -330,7 +330,7 @@ class TestMCPFunctions:
         add_server("enabled1", "http", "https://example1.com", enabled=True)
         add_server("disabled", "http", "https://example2.com", enabled=False)
         add_server("enabled2", "http", "https://example3.com", enabled=True)
-        
+
         enabled_servers = list_enabled_servers()
         assert len(enabled_servers) == 2
         assert "enabled1" in enabled_servers
@@ -341,7 +341,7 @@ class TestMCPFunctions:
         """Test listing enabled servers when all are disabled."""
         add_server("test1", "http", "https://example1.com", enabled=False)
         add_server("test2", "http", "https://example2.com", enabled=False)
-        
+
         enabled_servers = list_enabled_servers()
         assert len(enabled_servers) == 0
 
@@ -353,18 +353,18 @@ class TestMCPFunctions:
     def test_enable_disable_toggle(self, temp_config_path):
         """Test toggling server enabled state multiple times."""
         add_server("test", "http", "https://example.com", enabled=True)
-        
+
         # Initially enabled
         assert is_server_enabled("test") is True
-        
+
         # Disable
         disable_server("test")
         assert is_server_enabled("test") is False
-        
+
         # Enable again
         enable_server("test")
         assert is_server_enabled("test") is True
-        
+
         # Disable again
         disable_server("test")
         assert is_server_enabled("test") is False

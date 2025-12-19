@@ -162,7 +162,8 @@ def test_load_mcp_configuration_filters_disabled_servers(
 
     # Verify the loaded servers have correct properties
     assert loaded.mcp_config["mcpServers"]["enabled_server"]["command"] == "uvx"
-    assert loaded.mcp_config["mcpServers"]["default_enabled_server"]["command"] == "node"
+    default_enabled = loaded.mcp_config["mcpServers"]["default_enabled_server"]
+    assert default_enabled["command"] == "node"
 
 
 @patch("openhands_cli.tui.settings.store.get_default_tools", return_value=[])
@@ -170,7 +171,7 @@ def test_load_mcp_configuration_filters_disabled_servers(
 def test_load_mcp_configuration_all_disabled(
     mock_meta, mock_tools, persistence_dir, agent_store
 ):
-    """Test that load_mcp_configuration returns empty dict when all servers are disabled."""
+    """Test load_mcp_configuration returns empty dict when all servers disabled."""
     # Persist a basic agent first
     persisted_agent = Agent(
         llm=LLM(model="gpt-4", api_key=SecretStr("k"), usage_id="svc"),

@@ -349,10 +349,13 @@ class TestMCPCommands:
             with patch(
                 "openhands_cli.mcp.mcp_commands.is_server_enabled"
             ) as mock_is_enabled:
-                # Mock is_server_enabled to return True for enabled_server, False for disabled_server
+                # Mock is_server_enabled to return True for enabled_server,
+                # False for disabled_server
                 mock_is_enabled.side_effect = lambda name: name == "enabled_server"
 
-                with patch("openhands_cli.mcp.mcp_commands.console.print") as mock_print:
+                with patch(
+                    "openhands_cli.mcp.mcp_commands.console.print"
+                ) as mock_print:
                     handle_mcp_list(args)
 
                     # Should call is_server_enabled for each server

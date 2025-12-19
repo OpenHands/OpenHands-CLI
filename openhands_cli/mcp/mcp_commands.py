@@ -33,7 +33,7 @@ def handle_mcp_add(args: argparse.Namespace) -> None:
         args: Parsed command line arguments
     """
     try:
-        enabled = getattr(args, 'enabled', True)
+        enabled = getattr(args, "enabled", True)
         add_server(
             name=args.name,
             transport=args.transport,
