@@ -69,6 +69,12 @@ Examples:
 
   # Remove a server
   openhands mcp remove my-api
+
+  # Enable a server
+  openhands mcp enable my-api
+
+  # Disable a server
+  openhands mcp disable my-api
 """
     mcp_parser = subparsers.add_parser(
         "mcp",
@@ -144,6 +150,18 @@ Examples:
         choices=["oauth"],
         help="Authentication method for the MCP server",
     )
+    add_parser.add_argument(
+        "--enabled",
+        action="store_true",
+        default=True,
+        help="Enable the server immediately after adding (default: True)",
+    )
+    add_parser.add_argument(
+        "--disabled",
+        dest="enabled",
+        action="store_false",
+        help="Add the server in disabled state",
+    )
 
     # Positional arguments after optional arguments
     add_parser.add_argument("name", help="Name of the MCP server")
@@ -205,5 +223,39 @@ Examples:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     remove_parser.add_argument("name", help="Name of the MCP server to remove")
+
+    # MCP enable command
+    enable_description = """
+Enable an MCP server configuration.
+
+Examples:
+
+  # Enable a server
+  openhands mcp enable my-api
+"""
+    enable_parser = mcp_subparsers.add_parser(
+        "enable",
+        help="Enable an MCP server",
+        description=enable_description,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    enable_parser.add_argument("name", help="Name of the MCP server to enable")
+
+    # MCP disable command
+    disable_description = """
+Disable an MCP server configuration.
+
+Examples:
+
+  # Disable a server
+  openhands mcp disable my-api
+"""
+    disable_parser = mcp_subparsers.add_parser(
+        "disable",
+        help="Disable an MCP server",
+        description=disable_description,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    disable_parser.add_argument("name", help="Name of the MCP server to disable")
 
     return mcp_parser

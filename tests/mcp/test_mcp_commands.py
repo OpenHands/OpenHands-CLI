@@ -56,6 +56,7 @@ class TestMCPCommands:
                         headers=["Authorization: Bearer token"],
                         env_vars=None,
                         auth=None,
+                        enabled=True,
                     )
 
     def test_handle_mcp_add_stdio_success(self):
@@ -82,6 +83,7 @@ class TestMCPCommands:
                     headers=None,
                     env_vars=["API_KEY=secret"],
                     auth=None,
+                    enabled=True,
                 )
 
     def test_handle_mcp_add_oauth_success(self):
@@ -109,6 +111,7 @@ class TestMCPCommands:
                         headers=None,
                         env_vars=None,
                         auth="oauth",
+                        enabled=True,
                     )
 
     def test_handle_mcp_add_error(self):

@@ -20,7 +20,7 @@ from openhands_cli.locations import (
     PERSISTENCE_DIR,
     WORK_DIR,
 )
-from openhands_cli.mcp.mcp_utils import load_mcp_config
+from openhands_cli.mcp.mcp_utils import list_enabled_servers, load_mcp_config
 from openhands_cli.utils import get_llm_metadata, should_set_litellm_extra_body
 
 
@@ -31,17 +31,21 @@ class AgentStore:
         self.file_store = LocalFileStore(root=PERSISTENCE_DIR)
 
     def load_mcp_configuration(self) -> dict[str, Any]:
-        """Load MCP configuration from file.
+        """Load MCP configuration from file, filtering out disabled servers.
 
         Returns:
-            Dictionary of MCP servers configuration, or empty dict if file doesn't exist
+            Dictionary of enabled MCP servers configuration, or empty dict if file doesn't exist
 
         Raises:
             MCPConfigurationError: If the configuration file exists but is invalid
         """
-        # Use the same implementation as load_mcp_config
-        config = load_mcp_config()
-        return config.to_dict().get("mcpServers", {})
+        # Get only enabled servers
+        enabled_servers = list_enabled_servers()
+        # Convert server objects to dict format
+        result = {}
+        for name, server in enabled_servers.items():
+            result[name] = server.model_dump()
+        return result
 
     def load_project_skills(self) -> list:
         """Load skills project-specific directories."""
