@@ -327,7 +327,7 @@ class TestCliSettingsCaching:
         with patch(
             "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
         ) as mock_load:
-            from openhands_cli.refactor.modals.settings.cli_settings import (
+            from openhands_cli.stores import (
                 CliSettings,
             )
 
@@ -363,7 +363,7 @@ class TestCliSettingsCaching:
         with patch(
             "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
         ) as mock_load:
-            from openhands_cli.refactor.modals.settings.cli_settings import (
+            from openhands_cli.stores import (
                 CliSettings,
             )
 
@@ -404,7 +404,7 @@ class TestCliSettingsCaching:
         with patch(
             "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
         ) as mock_load:
-            from openhands_cli.refactor.modals.settings.cli_settings import (
+            from openhands_cli.stores import (
                 CliSettings,
             )
 
@@ -470,7 +470,7 @@ class TestCliSettingsCaching:
         with patch(
             "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
         ) as mock_load:
-            from openhands_cli.refactor.modals.settings.cli_settings import (
+            from openhands_cli.stores import (
                 CliSettings,
             )
 
@@ -510,7 +510,7 @@ class TestCliSettingsCaching:
         with patch(
             "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
         ) as mock_load:
-            from openhands_cli.refactor.modals.settings.cli_settings import (
+            from openhands_cli.stores import (
                 CliSettings,
             )
 
@@ -548,7 +548,7 @@ class TestCliSettingsCaching:
 
         # Set initial cache state
         if initial_cache_state == "cached_config":
-            from openhands_cli.refactor.modals.settings.cli_settings import (
+            from openhands_cli.stores import (
                 CliSettings,
             )
 
@@ -559,7 +559,7 @@ class TestCliSettingsCaching:
         with patch(
             "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
         ) as mock_load:
-            from openhands_cli.refactor.modals.settings.cli_settings import (
+            from openhands_cli.stores import (
                 CliSettings,
             )
 
@@ -609,7 +609,7 @@ class TestCliSettingsCaching:
             with patch(
                 "openhands_cli.refactor.modals.settings.cli_settings.CliSettings.load"
             ) as mock_load:
-                from openhands_cli.refactor.modals.settings.cli_settings import (
+                from openhands_cli.stores import (
                     CliSettings,
                 )
 

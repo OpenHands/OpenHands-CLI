@@ -19,10 +19,10 @@ from openhands.sdk.event import (
 from openhands.sdk.event.base import Event
 from openhands.sdk.event.condenser import Condensation, CondensationRequest
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
-from openhands_cli.refactor.modals.settings.cli_settings import CliSettings
 from openhands_cli.refactor.widgets.non_clickable_collapsible import (
     NonClickableCollapsible,
 )
+from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
 
 
