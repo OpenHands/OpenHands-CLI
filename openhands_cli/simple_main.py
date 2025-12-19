@@ -89,6 +89,9 @@ def main() -> None:
     parser = create_main_parser()
     args = parser.parse_args()
 
+    # Handle --json flag (only works with --headless)
+    json_mode = args.json and args.headless
+
     # Validate headless mode requirements
     if args.headless and not args.task and not args.file:
         parser.error("--headless requires either --task or --file to be specified")
@@ -165,6 +168,7 @@ def main() -> None:
                 llm_approve=args.llm_approve,
                 exit_without_confirmation=args.exit_without_confirmation,
                 headless=args.headless,
+                json_mode=json_mode,
             )
             console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
             console.print(

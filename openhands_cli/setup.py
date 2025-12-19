@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Any
 from uuid import UUID
 
@@ -5,6 +6,7 @@ from rich.console import Console
 
 from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, Workspace
 from openhands.sdk.context import Skill
+from openhands.sdk.event.base import Event
 from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
 )
@@ -83,6 +85,7 @@ def setup_conversation(
     conversation_id: UUID,
     confirmation_policy: ConfirmationPolicyBase,
     visualizer: ConversationVisualizer | None = None,
+    event_callback: Callable[[Event], None] | None = None,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
@@ -92,6 +95,7 @@ def setup_conversation(
             will be generated.
         confirmation_policy: Confirmation policy to use.
         visualizer: Optional visualizer to use. If None, a default will be used
+        event_callback: Optional callback function to handle events (e.g., JSON output)
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
@@ -101,6 +105,9 @@ def setup_conversation(
 
     agent = load_agent_specs(str(conversation_id))
 
+    # Prepare callbacks list
+    callbacks = [event_callback] if event_callback else None
+
     # Create conversation - agent context is now set in AgentStore.load()
     conversation: BaseConversation = Conversation(
         agent=agent,
@@ -109,6 +116,7 @@ def setup_conversation(
         persistence_dir=CONVERSATIONS_DIR,
         conversation_id=conversation_id,
         visualizer=visualizer,
+        callbacks=callbacks,
     )
 
     conversation.set_security_analyzer(LLMSecurityAnalyzer())

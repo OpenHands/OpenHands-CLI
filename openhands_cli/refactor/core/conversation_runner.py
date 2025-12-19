@@ -18,6 +18,7 @@ from openhands.sdk.conversation.exceptions import ConversationRunError
 from openhands.sdk.conversation.state import (
     ConversationState,
 )
+from openhands.sdk.event.base import Event
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmationPolicyBase,
@@ -40,6 +41,7 @@ class ConversationRunner:
         notification_callback: Callable[[str, str, SeverityLevel], None],
         visualizer: ConversationVisualizer,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
+        event_callback: Callable[[Event], None] | None = None,
     ):
         """Initialize the conversation runner.
 
@@ -57,6 +59,7 @@ class ConversationRunner:
             conversation_id,
             confirmation_policy=starting_confirmation_policy,
             visualizer=visualizer,
+            event_callback=event_callback,
         )
 
         self._running = False

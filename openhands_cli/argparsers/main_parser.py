@@ -31,6 +31,7 @@ def create_main_parser() -> argparse.ArgumentParser:
                 openhands                           # Start textual UI mode
                 openhands --exp                     # Start textual UI (same as default)
                 openhands --headless                # Start textual UI in headless mode
+                openhands --headless --json -t "Fix bug"  # Headless with JSON output
                 openhands --resume conversation-id  # Resume conversation
                 openhands --always-approve          # Auto-approve all actions
                 openhands --llm-approve             # LLM-based approval mode
@@ -92,6 +93,14 @@ def create_main_parser() -> argparse.ArgumentParser:
         help=(
             "Run in headless mode (no UI output, auto-approve actions). "
             "Requires --task or --file."
+        ),
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help=(
+            "Enable JSON output mode for headless operation. "
+            "Streams JSONL event outputs to terminal. Must be used with --headless."
         ),
     )
 
