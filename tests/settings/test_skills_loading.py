@@ -6,8 +6,6 @@ from unittest.mock import patch
 
 import pytest
 
-from openhands_cli.stores import AgentStore
-
 
 @pytest.fixture
 def temp_project_dir():
@@ -55,7 +53,9 @@ This is a test skill for testing purposes.
 @pytest.fixture
 def agent_store(temp_project_dir):
     """Create an AgentStore with the temporary project directory."""
-    with patch("openhands_cli.locations.WORK_DIR", temp_project_dir):
+    with patch("openhands_cli.stores.agent_store.WORK_DIR", temp_project_dir):
+        from openhands_cli.stores import AgentStore
+
         yield AgentStore()
 
 
@@ -133,8 +133,12 @@ This is a user microagent for testing.
             with patch(
                 "openhands.sdk.context.skills.skill.USER_SKILLS_DIRS", mock_user_dirs
             ):
-                with patch("openhands_cli.locations.WORK_DIR", temp_project_dir):
+                with patch(
+                    "openhands_cli.stores.agent_store.WORK_DIR", temp_project_dir
+                ):
                     # Create a minimal agent configuration for testing
+                    from openhands_cli.stores import AgentStore
+
                     agent_store = AgentStore()
 
                     # Create a test agent to save first
@@ -180,13 +184,15 @@ This is a user microagent for testing.
         )
 
         with (
-            patch("openhands_cli.locations.WORK_DIR", temp_project_dir),
+            patch("openhands_cli.stores.agent_store.WORK_DIR", temp_project_dir),
             patch(
                 "openhands.sdk.context.agent_context.load_public_skills"
             ) as mock_load_public,
         ):
             # Mock load_public_skills to return our test skill
             mock_load_public.return_value = [mock_public_skill]
+
+            from openhands_cli.stores import AgentStore
 
             agent_store = AgentStore()
 
