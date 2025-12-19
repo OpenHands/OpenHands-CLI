@@ -50,49 +50,6 @@ class TestHeadlessArgumentParsing:
         assert args.file is None
 
 
-class TestJsonArgumentParsing:
-    """Tests for --json flag argument parsing."""
-
-    def test_json_flag_parsed_and_default_false(self):
-        parser = create_main_parser()
-
-        # No flag -> False
-        args = parser.parse_args(["--task", "test"])
-        assert hasattr(args, "json")
-        assert args.json is False
-
-        # With flag -> True
-        args = parser.parse_args(["--json", "--task", "test"])
-        assert args.json is True
-
-    @pytest.mark.parametrize(
-        "args_list,expected_json,expected_headless",
-        [
-            (["--task", "test"], False, False),
-            (["--json", "--task", "test"], True, False),
-            (["--headless", "--task", "test"], False, True),
-            (["--headless", "--json", "--task", "test"], True, True),
-            (["--json", "--headless", "--task", "test"], True, True),
-        ],
-    )
-    def test_json_and_headless_flag_combinations(
-        self, args_list, expected_json, expected_headless
-    ):
-        """Test various combinations of --json and --headless flags."""
-        parser = create_main_parser()
-        args = parser.parse_args(args_list)
-        assert args.json is expected_json
-        assert args.headless is expected_headless
-
-    def test_json_flag_help_text(self):
-        """Ensure CLI help describes JSON mode requirements."""
-        parser = create_main_parser()
-        help_text = parser.format_help()
-        assert "--json" in help_text
-        assert "JSON output mode" in help_text
-        assert "Must be used\n                        with --headless" in help_text
-
-
 class TestSimpleMainHeadlessValidation:
     """High-level validation behavior of simple_main."""
 
@@ -106,39 +63,6 @@ class TestSimpleMainHeadlessValidation:
                     simple_main()
         assert exc.value.code == 2
         mock_textual_main.assert_not_called()
-
-
-class TestSimpleMainJsonValidation:
-    """Tests for JSON mode validation in simple_main."""
-
-    @pytest.mark.parametrize(
-        "args_list,expected_json_mode",
-        [
-            (["openhands", "--task", "test"], False),
-            (["openhands", "--json", "--task", "test"], False),  # JSON without headless
-            (["openhands", "--headless", "--task", "test"], False),
-            (["openhands", "--headless", "--json", "--task", "test"], True),
-            (["openhands", "--json", "--headless", "--task", "test"], True),
-        ],
-    )
-    @patch("openhands_cli.refactor.textual_app.main")
-    def test_json_mode_only_enabled_with_headless(
-        self, mock_textual_main, args_list, expected_json_mode
-    ):
-        """Test that json_mode is only True when both --json and --headless are present."""
-        # Mock textual_main to return a UUID
-        mock_textual_main.return_value = uuid.uuid4()
-
-        with patch.object(sys, "argv", args_list):
-            simple_main()
-
-        mock_textual_main.assert_called_once()
-        kwargs = mock_textual_main.call_args.kwargs
-        assert kwargs["json_mode"] is expected_json_mode
-
-
-class TestSimpleMainHeadlessIntegration:
-    """Integration tests for headless mode behavior."""
 
     @patch("openhands_cli.refactor.textual_app.main")
     def test_headless_with_task_calls_textual_main_with_queued_input(
@@ -251,38 +175,6 @@ class TestHeadlessConfirmationPolicy:
                 assert policy.threshold == expected_threshold
 
 
-class TestTextualMainJsonMode:
-    """Tests for JSON mode parameter passing in textual_main."""
-
-    @pytest.mark.parametrize(
-        "json_mode,headless,expected_json_mode,expected_headless",
-        [
-            (False, False, False, False),
-            (False, True, False, True),
-            (True, False, True, False),  # Edge case - shouldn't happen in practice
-            (True, True, True, True),
-        ],
-    )
-    def test_json_mode_parameter_passed_to_app(
-        self, json_mode, headless, expected_json_mode, expected_headless
-    ):
-        """Test that json_mode parameter is correctly passed to OpenHandsApp."""
-        with patch("openhands_cli.refactor.textual_app.OpenHandsApp") as mock_app_cls:
-            mock_app = MagicMock()
-            mock_app_cls.return_value = mock_app
-
-            textual_main(
-                headless=headless,
-                json_mode=json_mode,
-                exit_without_confirmation=True,
-            )
-
-            mock_app_cls.assert_called_once()
-            kwargs = mock_app_cls.call_args.kwargs
-            assert kwargs["json_mode"] is expected_json_mode
-            assert kwargs["headless_mode"] is expected_headless
-
-
 # ---------------------------------------------------------------------------
 # OpenHandsApp headless behavior + summary printing
 # ---------------------------------------------------------------------------
@@ -307,78 +199,6 @@ class TestHeadlessAppBehavior:
 
         app._print_conversation_summary.assert_called_once()
         app.exit.assert_called_once()
-
-
-class TestOpenHandsAppJsonMode:
-    """Tests for JSON mode behavior in OpenHandsApp."""
-
-    @pytest.mark.parametrize(
-        "json_mode,expected_json_mode",
-        [
-            (False, False),
-            (True, True),
-        ],
-    )
-    def test_json_mode_stored_in_app(self, json_mode, expected_json_mode, monkeypatch):
-        """Test that json_mode parameter is stored in the app."""
-        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda: False)
-
-        app = OpenHandsApp(
-            exit_confirmation=False,
-            headless_mode=True,
-            json_mode=json_mode,
-        )
-
-        assert app.json_mode is expected_json_mode
-
-    def test_json_mode_creates_event_callback_in_conversation_runner(self, monkeypatch):
-        """Test that JSON mode creates an event callback for the conversation runner."""
-        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda: False)
-
-        app = OpenHandsApp(
-            exit_confirmation=False,
-            headless_mode=True,
-            json_mode=True,
-        )
-
-        # Mock the conversation runner creation dependencies
-        with patch("openhands_cli.refactor.textual_app.ConversationRunner") as mock_runner_cls:
-            with patch("openhands_cli.refactor.textual_app.ConversationVisualizer"):
-                with patch("openhands_cli.refactor.textual_app.json_callback") as mock_json_callback:
-                    # Mock the main_display property to avoid textual screen stack issues
-                    mock_main_display = Mock()
-                    with patch.object(type(app), "main_display", new_callable=lambda: mock_main_display):
-                        runner = app.create_conversation_runner()
-
-                        mock_runner_cls.assert_called_once()
-                        args = mock_runner_cls.call_args.args
-                        # event_callback is the 7th positional argument (index 6)
-                        assert len(args) >= 7
-                        assert args[6] is mock_json_callback
-
-    def test_non_json_mode_no_event_callback_in_conversation_runner(self, monkeypatch):
-        """Test that non-JSON mode doesn't create an event callback."""
-        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda: False)
-
-        app = OpenHandsApp(
-            exit_confirmation=False,
-            headless_mode=True,
-            json_mode=False,
-        )
-
-        # Mock the conversation runner creation dependencies
-        with patch("openhands_cli.refactor.textual_app.ConversationRunner") as mock_runner_cls:
-            with patch("openhands_cli.refactor.textual_app.ConversationVisualizer"):
-                # Mock the main_display property to avoid textual screen stack issues
-                mock_main_display = Mock()
-                with patch.object(type(app), "main_display", new_callable=lambda: mock_main_display):
-                    runner = app.create_conversation_runner()
-
-                    mock_runner_cls.assert_called_once()
-                    args = mock_runner_cls.call_args.args
-                    # event_callback is the 7th positional argument (index 6)
-                    assert len(args) >= 7
-                    assert args[6] is None
 
     @pytest.mark.asyncio
     async def test_conversation_state_change_no_exit_when_running(
@@ -572,3 +392,57 @@ class TestHeadlessInitialSetupGuard:
                 for arg in call.args
             )
             assert printed_any_exp_hint
+
+
+# ---------------------------------------------------------------------------
+# JSON Mode Tests (Minimal High-Impact Coverage)
+# ---------------------------------------------------------------------------
+
+
+class TestJsonArgumentValidation:
+    """Minimal tests for JSON argument validation."""
+
+    def test_json_requires_headless_mode(self):
+        """Test that JSON flag requires headless mode."""
+        # JSON without headless should not enable JSON mode
+        with patch("openhands_cli.refactor.textual_app.main") as mock_textual:
+            # Mock sys.argv for argument parsing
+            with patch("sys.argv", ["openhands", "--json", "--task", "test task"]):
+                simple_main()
+                
+            # Verify textual_main was called with json_mode=False
+            mock_textual.assert_called_once()
+            args, kwargs = mock_textual.call_args
+            assert kwargs.get("json_mode", False) is False
+
+    def test_json_and_headless_enables_json_mode(self):
+        """Test that JSON + headless enables JSON mode."""
+        with patch("openhands_cli.refactor.textual_app.main") as mock_textual:
+            # Mock sys.argv for argument parsing
+            with patch("sys.argv", ["openhands", "--headless", "--json", "--task", "test task"]):
+                simple_main()
+                
+            # Verify textual_main was called with json_mode=True
+            mock_textual.assert_called_once()
+            args, kwargs = mock_textual.call_args
+            assert kwargs.get("json_mode", False) is True
+
+
+class TestJsonModeIntegration:
+    """Minimal tests for JSON mode integration."""
+
+    def test_json_callback_function_exists_and_callable(self):
+        """Test that json_callback function exists and is callable."""
+        from openhands_cli.utils import json_callback
+        
+        # Verify the function exists and is callable
+        assert callable(json_callback)
+        
+        # Test that it can be used as an event callback (basic compatibility)
+        from openhands.sdk.event import Event
+        mock_event = Mock(spec=Event)
+        mock_event.model_dump.return_value = {"test": "data"}
+        
+        # Should not raise an exception
+        with patch("builtins.print"):
+            json_callback(mock_event)

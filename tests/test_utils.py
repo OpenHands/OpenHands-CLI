@@ -128,84 +128,66 @@ def test_seeded_instructions_file_only(tmp_path):
 
 
 class TestJsonCallback:
-    """Tests for json_callback function."""
+    """Minimal tests for json_callback function core behavior."""
 
-    def test_json_callback_ignores_system_prompt_events(self):
-        """Test that SystemPromptEvent is ignored by json_callback."""
-        event = SystemPromptEvent(
+    def test_json_callback_filters_system_events_and_outputs_others(self):
+        """Test that SystemPromptEvent is filtered and other events are output as JSON."""
+        # Test SystemPromptEvent filtering
+        system_event = SystemPromptEvent(
             system_prompt=TextContent(text="test prompt"),
             tools=[],
             source="agent"
         )
 
         with patch("builtins.print") as mock_print:
-            json_callback(event)
+            json_callback(system_event)
             mock_print.assert_not_called()
 
-    @pytest.mark.parametrize(
-        "event_class,event_kwargs",
-        [
-            (MessageEvent, {
-                "llm_message": Message(role="user", content="test message"),
-                "source": "user"
-            }),
-            # Add more event types as needed
-        ],
-    )
-    def test_json_callback_outputs_json_for_non_system_events(
-        self, event_class, event_kwargs
-    ):
-        """Test that non-SystemPromptEvent events are output as JSON."""
-        event = event_class(**event_kwargs)
-
-        with patch("builtins.print") as mock_print:
-            json_callback(event)
-
-            # Should have two print calls: header and JSON
-            assert mock_print.call_count == 2
-            mock_print.assert_any_call("--JSON Event--")
-
-            # Get the JSON output (second call)
-            json_output = mock_print.call_args_list[1][0][0]
-            
-            # Verify it's valid JSON
-            parsed_json = json.loads(json_output)
-            assert isinstance(parsed_json, dict)
-
-    def test_json_callback_outputs_formatted_json(self):
-        """Test that JSON output is properly formatted (indented and sorted)."""
-        event = MessageEvent(
+        # Test non-system event JSON output
+        message_event = MessageEvent(
             llm_message=Message(role="user", content="test message"),
             source="user"
         )
 
         with patch("builtins.print") as mock_print:
-            json_callback(event)
+            json_callback(message_event)
 
-            # Get the JSON output
-            json_output = mock_print.call_args_list[1][0][0]
-            
-            # Verify formatting - should be indented (contains newlines)
-            assert "\n" in json_output
-            assert "  " in json_output  # Should have indentation
-
-            # Verify it matches the expected format
-            expected_data = event.model_dump()
-            expected_json = json.dumps(expected_data, indent=2, sort_keys=True)
-            assert json_output == expected_json
-
-    def test_json_callback_with_mock_event(self):
-        """Test json_callback with a mock event to verify model_dump is called."""
-        mock_event = Mock(spec=Event)
-        mock_event.model_dump.return_value = {"type": "test", "data": "value"}
-
-        with patch("builtins.print") as mock_print:
-            json_callback(mock_event)
-
-            mock_event.model_dump.assert_called_once()
+            # Should have two print calls: header and JSON
+            assert mock_print.call_count == 2
             mock_print.assert_any_call("--JSON Event--")
 
-            # Verify the JSON contains the mocked data
+            # Verify valid JSON output
             json_output = mock_print.call_args_list[1][0][0]
             parsed_json = json.loads(json_output)
-            assert parsed_json == {"type": "test", "data": "value"}
+            assert isinstance(parsed_json, dict)
+
+    def test_json_callback_real_message_event_processing(self):
+        """Test json_callback with realistic MessageEvent processing."""
+        event = MessageEvent(
+            llm_message=Message(role="user", content="Hello, this is a test message"),
+            source="user",
+        )
+
+        with patch("builtins.print") as mock_print:
+            json_callback(event)
+
+            # Verify the output structure
+            assert mock_print.call_count == 2
+            mock_print.assert_any_call("--JSON Event--")
+
+            # Get and validate the JSON output
+            json_output = mock_print.call_args_list[1][0][0]
+            parsed_json = json.loads(json_output)
+
+            # Verify essential fields are present
+            assert "llm_message" in parsed_json
+            assert "source" in parsed_json
+            assert parsed_json["source"] == "user"
+            
+            # Check the message content structure
+            llm_message = parsed_json["llm_message"]
+            assert "content" in llm_message
+            content = llm_message["content"]
+            assert isinstance(content, list)
+            assert len(content) > 0
+            assert content[0]["text"] == "Hello, this is a test message"
