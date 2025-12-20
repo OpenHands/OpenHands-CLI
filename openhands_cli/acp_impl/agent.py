@@ -43,6 +43,7 @@ from openhands.sdk import (
     Message,
     Workspace,
 )
+from openhands.sdk.llm.streaming import LLMStreamChunk
 from openhands_cli import __version__
 from openhands_cli.acp_impl.confirmation import (
     ConfirmationMode,
@@ -70,7 +71,7 @@ from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
 from openhands_cli.utils import extract_text_from_message_content
-from openhands.sdk.llm.streaming import LLMStreamChunk
+
 
 logger = logging.getLogger(__name__)
 
@@ -145,9 +146,13 @@ class OpenHandsACPAgent(ACPAgent):
                 for choice in choices:
                     delta = choice.delta
                     if delta is not None:
-                        # Handle thinking blocks (reasoning content)
-                        # reasoning_content = delta.reasoning_content
-                        reasoning_content = delta.thinking_blocks
+                        # Handle reasoning content (try multiple attribute names)
+                        reasoning_content = (
+                            getattr(delta, "reasoning_content", None)
+                            or getattr(delta, "thinking_blocks", None)
+                            or getattr(delta, "reasoning", None)
+                            or getattr(delta, "thoughts", None)
+                        )
 
                         if isinstance(reasoning_content, str) and reasoning_content:
                             if current_state != "thinking":
