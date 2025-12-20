@@ -70,7 +70,7 @@ from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
 from openhands_cli.utils import extract_text_from_message_content
-
+from openhands.sdk.llm.streaming import LLMStreamChunk
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +128,7 @@ class OpenHandsACPAgent(ACPAgent):
         # Initialize streaming state for this session
         self._streaming_states[session_id] = None
 
-        def on_token(chunk: Any) -> None:
+        def on_token(chunk: LLMStreamChunk) -> None:
             """Handle streaming tokens and convert them to ACP AgentMessageChunk
             updates.
 
@@ -146,7 +146,9 @@ class OpenHandsACPAgent(ACPAgent):
                     delta = choice.delta
                     if delta is not None:
                         # Handle thinking blocks (reasoning content)
-                        reasoning_content = getattr(delta, "reasoning_content", None)
+                        # reasoning_content = delta.reasoning_content
+                        reasoning_content = delta.thinking_blocks
+
                         if isinstance(reasoning_content, str) and reasoning_content:
                             if current_state != "thinking":
                                 self._streaming_states[session_id] = "thinking"
