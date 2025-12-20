@@ -146,18 +146,27 @@ class OpenHandsACPAgent(ACPAgent):
                     if not delta:
                         continue
 
-                    # Handle regular content
-                    content = getattr(delta, "content", None)
-                    if not isinstance(content, str) or not content:
-                        continue
-
-                    # Send content as AgentMessageChunk
                     asyncio.run_coroutine_threadsafe(
                         self._send_streaming_chunk(
-                            session_id, content, is_reasoning=False
+                            session_id, delta.model_dump_json(), is_reasoning=False
                         ),
                         loop,
                     )
+
+                    continue
+
+                    # Handle regular content
+                    # content = getattr(delta, "content", None)
+                    # if not isinstance(content, str) or not content:
+                    #     continue
+
+                    # # Send content as AgentMessageChunk
+                    # asyncio.run_coroutine_threadsafe(
+                    #     self._send_streaming_chunk(
+                    #         session_id, content, is_reasoning=False
+                    #     ),
+                    #     loop,
+                    # )
 
                         
             except Exception as e:
