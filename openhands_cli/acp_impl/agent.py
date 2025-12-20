@@ -108,9 +108,7 @@ class OpenHandsACPAgent(ACPAgent):
         # Default confirmation mode for new sessions
         self._initial_confirmation_mode: ConfirmationMode = initial_confirmation_mode
         # Track streaming state across token calls for boundary detection
-        self._streaming_states: dict[
-            str, Literal["thinking", "content", "tool_name", "tool_args"] | None
-        ] = {}
+        self._streaming_states: dict[str, Literal["thinking", "content"] | None] = {}
         logger.info(
             f"OpenHands ACP Agent initialized with "
             f"confirmation mode: {initial_confirmation_mode}"
@@ -174,40 +172,9 @@ class OpenHandsACPAgent(ACPAgent):
                                 loop,
                             )
 
-                        # Handle tool calls
-                        tool_calls = getattr(delta, "tool_calls", None)
-                        if tool_calls:
-                            for tool_call in tool_calls:
-                                tool_name = (
-                                    tool_call.function.name
-                                    if tool_call.function.name
-                                    else ""
-                                )
-                                tool_args = (
-                                    tool_call.function.arguments
-                                    if tool_call.function.arguments
-                                    else ""
-                                )
-                                if tool_name:
-                                    if current_state != "tool_name":
-                                        self._streaming_states[session_id] = "tool_name"
-                                    asyncio.run_coroutine_threadsafe(
-                                        self._send_streaming_chunk(
-                                            session_id,
-                                            f"**Tool**: {tool_name}\n",
-                                            is_reasoning=False,
-                                        ),
-                                        loop,
-                                    )
-                                if tool_args:
-                                    if current_state != "tool_args":
-                                        self._streaming_states[session_id] = "tool_args"
-                                    asyncio.run_coroutine_threadsafe(
-                                        self._send_streaming_chunk(
-                                            session_id, tool_args, is_reasoning=False
-                                        ),
-                                        loop,
-                                    )
+                        # Note: Tool calls are handled by the event system through
+                        # ActionEvent -> ToolCallStart notifications, so we skip
+                        # streaming them here to avoid duplication
             except Exception as e:
                 raise RequestError.internal_error(
                     {
