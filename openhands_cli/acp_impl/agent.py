@@ -203,7 +203,14 @@ class OpenHandsACPAgent(ACPAgent):
                                         )
                                     )
             except Exception as e:
-                logger.debug(f"Error processing streaming token: {e}", exc_info=True)
+                raise RequestError.internal_error(
+                    {
+                        "reason": "Error during conversation cancellation",
+                        "details": str(e),
+                    }
+                )
+
+
 
         return on_token
 
