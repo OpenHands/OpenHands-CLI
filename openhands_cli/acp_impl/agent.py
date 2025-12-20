@@ -166,18 +166,18 @@ class OpenHandsACPAgent(ACPAgent):
                             )
 
                         # Handle regular content - attribute may be deleted if None
-                        content = delta.content if hasattr(delta, "content") else None
-                        if isinstance(content, str) and content:
-                            if current_state != "content":
-                                self._streaming_states[session_id] = "content"
+                        # content = delta.content if hasattr(delta, "content") else None
+                        # if isinstance(content, str) and content:
+                        #     if current_state != "content":
+                        #         self._streaming_states[session_id] = "content"
 
-                            # Send content as AgentMessageChunk
-                            asyncio.run_coroutine_threadsafe(
-                                self._send_streaming_chunk(
-                                    session_id, content, is_reasoning=False
-                                ),
-                                loop,
-                            )
+                        #     # Send content as AgentMessageChunk
+                        #     asyncio.run_coroutine_threadsafe(
+                        #         self._send_streaming_chunk(
+                        #             session_id, content, is_reasoning=False
+                        #         ),
+                        #         loop,
+                        #     )
 
                         # Note: Tool calls are handled by the event system through
                         # ActionEvent -> ToolCallStart notifications, so we skip
