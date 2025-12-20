@@ -143,7 +143,7 @@ class OpenHandsACPAgent(ACPAgent):
                 choices = chunk.choices
                 for choice in choices:
                     delta = choice.delta
-                    if delta is not None:
+                    if not delta:
                         continue
 
                     # Handle regular content
