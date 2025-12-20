@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import traceback
 import uuid
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -642,8 +643,13 @@ class OpenHandsACPAgent(ACPAgent):
                     content=TextContentBlock(type="text", text=f"Error: {str(e)}"),
                 ),
             )
+            tb = "".join(
+                traceback.format_exception(type(e), e, e.__traceback__)
+            )
+
+
             raise RequestError.internal_error(
-                {"reason": "Failed to process prompt", "details": str(e)}
+                {"reason": "Failed to process prompt", "details": tb}
             )
 
     async def _wait_for_task_completion(
