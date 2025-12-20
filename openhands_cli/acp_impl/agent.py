@@ -146,13 +146,12 @@ class OpenHandsACPAgent(ACPAgent):
                 for choice in choices:
                     delta = choice.delta
                     if delta is not None:
-                        # Handle reasoning content (try multiple attribute names)
-                        reasoning_content = (
-                            getattr(delta, "reasoning_content", None)
-                            or getattr(delta, "thinking_blocks", None)
-                            or getattr(delta, "reasoning", None)
-                            or getattr(delta, "thoughts", None)
-                        )
+                        # Handle reasoning content - attributes are deleted if None
+                        reasoning_content = None
+                        if hasattr(delta, "reasoning_content"):
+                            reasoning_content = delta.reasoning_content
+                        elif hasattr(delta, "thinking_blocks"):
+                            reasoning_content = delta.thinking_blocks
 
                         if isinstance(reasoning_content, str) and reasoning_content:
                             if current_state != "thinking":
@@ -166,8 +165,8 @@ class OpenHandsACPAgent(ACPAgent):
                                 loop,
                             )
 
-                        # Handle regular content
-                        content = getattr(delta, "content", None)
+                        # Handle regular content - attribute may be deleted if None
+                        content = delta.content if hasattr(delta, "content") else None
                         if isinstance(content, str) and content:
                             if current_state != "content":
                                 self._streaming_states[session_id] = "content"
