@@ -116,11 +116,12 @@ class OpenHandsACPAgent(ACPAgent):
             f"confirmation mode: {initial_confirmation_mode}"
         )
 
-    def _create_token_callback(self, session_id: str):
+    def _create_token_callback(self, session_id: str, loop: asyncio.AbstractEventLoop):
         """Create a token streaming callback for a specific session.
 
         Args:
             session_id: The session ID for this callback
+            loop: The event loop to schedule coroutines on
 
         Returns:
             Token callback function that processes streaming chunks
@@ -152,10 +153,11 @@ class OpenHandsACPAgent(ACPAgent):
                                 self._streaming_states[session_id] = "thinking"
 
                             # Send reasoning content as AgentMessageChunk
-                            asyncio.create_task(
+                            asyncio.run_coroutine_threadsafe(
                                 self._send_streaming_chunk(
                                     session_id, reasoning_content, is_reasoning=True
-                                )
+                                ),
+                                loop,
                             )
 
                         # Handle regular content
@@ -165,10 +167,11 @@ class OpenHandsACPAgent(ACPAgent):
                                 self._streaming_states[session_id] = "content"
 
                             # Send content as AgentMessageChunk
-                            asyncio.create_task(
+                            asyncio.run_coroutine_threadsafe(
                                 self._send_streaming_chunk(
                                     session_id, content, is_reasoning=False
-                                )
+                                ),
+                                loop,
                             )
 
                         # Handle tool calls
@@ -188,30 +191,30 @@ class OpenHandsACPAgent(ACPAgent):
                                 if tool_name:
                                     if current_state != "tool_name":
                                         self._streaming_states[session_id] = "tool_name"
-                                    asyncio.create_task(
+                                    asyncio.run_coroutine_threadsafe(
                                         self._send_streaming_chunk(
                                             session_id,
                                             f"**Tool**: {tool_name}\n",
                                             is_reasoning=False,
-                                        )
+                                        ),
+                                        loop,
                                     )
                                 if tool_args:
                                     if current_state != "tool_args":
                                         self._streaming_states[session_id] = "tool_args"
-                                    asyncio.create_task(
+                                    asyncio.run_coroutine_threadsafe(
                                         self._send_streaming_chunk(
                                             session_id, tool_args, is_reasoning=False
-                                        )
+                                        ),
+                                        loop,
                                     )
             except Exception as e:
                 raise RequestError.internal_error(
                     {
-                        "reason": "Error during conversation cancellation",
+                        "reason": "Error during token streaming",
                         "details": str(e),
                     }
                 )
-
-
 
         return on_token
 
@@ -431,7 +434,7 @@ class OpenHandsACPAgent(ACPAgent):
             asyncio.run_coroutine_threadsafe(subscriber(event), loop)
 
         # Create token callback for streaming
-        token_callback = self._create_token_callback(session_id)
+        token_callback = self._create_token_callback(session_id, loop)
 
         # Create conversation with persistence support and token streaming
         # The SDK automatically loads from disk if conversation_id exists
@@ -643,10 +646,7 @@ class OpenHandsACPAgent(ACPAgent):
                     content=TextContentBlock(type="text", text=f"Error: {str(e)}"),
                 ),
             )
-            tb = "".join(
-                traceback.format_exception(type(e), e, e.__traceback__)
-            )
-
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
 
             raise RequestError.internal_error(
                 {"reason": "Failed to process prompt", "details": tb}
