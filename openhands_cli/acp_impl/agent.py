@@ -171,13 +171,13 @@ class OpenHandsACPAgent(ACPAgent):
                         #     if current_state != "content":
                         #         self._streaming_states[session_id] = "content"
 
-                        #     # Send content as AgentMessageChunk
-                        #     asyncio.run_coroutine_threadsafe(
-                        #         self._send_streaming_chunk(
-                        #             session_id, content, is_reasoning=False
-                        #         ),
-                        #         loop,
-                        #     )
+                        # Send content as AgentMessageChunk
+                        asyncio.run_coroutine_threadsafe(
+                            self._send_streaming_chunk(
+                                session_id, delta.model_dump_json(), is_reasoning=False
+                            ),
+                            loop,
+                        )
 
                         # Note: Tool calls are handled by the event system through
                         # ActionEvent -> ToolCallStart notifications, so we skip
