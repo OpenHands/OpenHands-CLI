@@ -5,7 +5,7 @@ import logging
 import traceback
 import uuid
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, cast
 from uuid import UUID
 
 from acp import (
@@ -22,7 +22,6 @@ from acp.helpers import update_current_mode
 from acp.schema import (
     AgentCapabilities,
     AgentMessageChunk,
-    AgentThoughtChunk,
     AuthenticateResponse,
     AvailableCommandsUpdate,
     Implementation,
@@ -70,7 +69,7 @@ from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
 from openhands_cli.utils import extract_text_from_message_content
-from openhands.sdk.llm.streaming import LLMStreamChunk
+
 
 logger = logging.getLogger(__name__)
 
@@ -112,114 +111,6 @@ class OpenHandsACPAgent(ACPAgent):
             f"OpenHands ACP Agent initialized with "
             f"confirmation mode: {initial_confirmation_mode}"
         )
-
-    def _create_token_callback(self, session_id: str, loop: asyncio.AbstractEventLoop):
-        """Create a token streaming callback for a specific session.
-
-        Args:
-            session_id: The session ID for this callback
-            loop: The event loop to schedule coroutines on
-
-        Returns:
-            Token callback function that processes streaming chunks
-        """
-
-        def on_token(chunk: LLMStreamChunk) -> None:
-            """Handle streaming tokens and convert them to ACP AgentMessageChunk
-            updates.
-
-            This processes different types of streaming content including regular
-            content, tool calls, and thinking blocks with dynamic boundary detection.
-
-            Args:
-                chunk: Streaming chunk from the LLM
-            """
-            # Note: Tool calls are handled by the event system through
-            # ActionEvent -> ToolCallStart notifications, so we skip
-            # streaming them here to avoid duplication
-
-
-            try:
-                choices = chunk.choices
-                for choice in choices:
-                    delta = choice.delta
-                    if not delta:
-                        continue
-                    
-                    content_to_send = None
-                    is_reasoning_content = False
-
-                    # Handle reasoning content
-                    reasoning_content = getattr(delta, "reasoning_content", None)
-                    if isinstance(reasoning_content, str) and reasoning_content:
-                        content_to_send = reasoning_content
-                        is_reasoning_content = True
-
-                    # Handle regular content
-                    content = getattr(delta, "content", None)
-                    if isinstance(content, str) and content:
-                        content_to_send = content
-
-
-                    if not content_to_send:
-                        continue
-                
-                    # Send content as AgentMessageChunk
-                    asyncio.run_coroutine_threadsafe(
-                        self._send_streaming_chunk(
-                            session_id, content_to_send, is_reasoning=is_reasoning_content
-                        ),
-                        loop,
-                    )
-
-                        
-            except Exception as e:
-                raise RequestError.internal_error(
-                    {
-                        "reason": "Error during token streaming",
-                        "details": str(e),
-                    }
-                )
-
-        return on_token
-
-    async def _send_streaming_chunk(
-        self, session_id: str, content: str, is_reasoning: bool = False
-    ):
-        """Send a streaming chunk as an ACP update.
-
-        Args:
-            session_id: The session ID
-            content: The content to send
-            is_reasoning: Whether this is reasoning content (sent as AgentThoughtChunk)
-        """
-        try:
-            if is_reasoning:
-                # Send reasoning content as AgentThoughtChunk
-                await self._conn.session_update(
-                    session_id=session_id,
-                    update=AgentThoughtChunk(
-                        session_update="agent_thought_chunk",
-                        content=TextContentBlock(
-                            type="text",
-                            text=content,
-                        ),
-                    ),
-                )
-            else:
-                # Send regular content as AgentMessageChunk
-                await self._conn.session_update(
-                    session_id=session_id,
-                    update=AgentMessageChunk(
-                        session_update="agent_message_chunk",
-                        content=TextContentBlock(
-                            type="text",
-                            text=content,
-                        ),
-                    ),
-                )
-        except Exception as e:
-            logger.debug(f"Error sending streaming chunk: {e}", exc_info=True)
 
     async def _cmd_confirm(self, session_id: str, argument: str) -> str:
         """Handle /confirm command.
@@ -406,8 +297,8 @@ class OpenHandsACPAgent(ACPAgent):
             """Synchronous wrapper that schedules async event handling."""
             asyncio.run_coroutine_threadsafe(subscriber(event), loop)
 
-        # Create token callback for streaming
-        token_callback = self._create_token_callback(session_id, loop)
+        # Create token callback for streaming using EventSubscriber
+        token_callback = subscriber.create_token_callback(loop)
 
         # Create conversation with persistence support and token streaming
         # The SDK automatically loads from disk if conversation_id exists
