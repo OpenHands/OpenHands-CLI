@@ -43,7 +43,6 @@ from openhands.sdk import (
     Message,
     Workspace,
 )
-from openhands.sdk.llm.streaming import LLMStreamChunk
 from openhands_cli import __version__
 from openhands_cli.acp_impl.confirmation import (
     ConfirmationMode,
@@ -71,7 +70,7 @@ from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
 from openhands_cli.utils import extract_text_from_message_content
-
+from openhands.sdk.llm.streaming import LLMStreamChunk
 
 logger = logging.getLogger(__name__)
 
@@ -109,8 +108,6 @@ class OpenHandsACPAgent(ACPAgent):
         self._running_tasks: dict[str, asyncio.Task] = {}
         # Default confirmation mode for new sessions
         self._initial_confirmation_mode: ConfirmationMode = initial_confirmation_mode
-        # Track streaming state across token calls for boundary detection
-        self._streaming_states: dict[str, Literal["thinking", "content"] | None] = {}
         logger.info(
             f"OpenHands ACP Agent initialized with "
             f"confirmation mode: {initial_confirmation_mode}"
@@ -126,8 +123,6 @@ class OpenHandsACPAgent(ACPAgent):
         Returns:
             Token callback function that processes streaming chunks
         """
-        # Initialize streaming state for this session
-        self._streaming_states[session_id] = None
 
         def on_token(chunk: LLMStreamChunk) -> None:
             """Handle streaming tokens and convert them to ACP AgentMessageChunk
@@ -139,49 +134,32 @@ class OpenHandsACPAgent(ACPAgent):
             Args:
                 chunk: Streaming chunk from the LLM
             """
-            try:
-                current_state = self._streaming_states.get(session_id)
+            # Note: Tool calls are handled by the event system through
+            # ActionEvent -> ToolCallStart notifications, so we skip
+            # streaming them here to avoid duplication
 
+
+            try:
                 choices = chunk.choices
                 for choice in choices:
                     delta = choice.delta
                     if delta is not None:
-                        # Handle reasoning content - attributes are deleted if None
-                        reasoning_content = None
-                        if hasattr(delta, "reasoning_content"):
-                            reasoning_content = delta.reasoning_content
-                        elif hasattr(delta, "thinking_blocks"):
-                            reasoning_content = delta.thinking_blocks
+                        continue
 
-                        if isinstance(reasoning_content, str) and reasoning_content:
-                            if current_state != "thinking":
-                                self._streaming_states[session_id] = "thinking"
+                    # Handle regular content
+                    content = getattr(delta, "content", None)
+                    if not isinstance(content, str) or not content:
+                        continue
 
-                            # Send reasoning content as AgentMessageChunk
-                            asyncio.run_coroutine_threadsafe(
-                                self._send_streaming_chunk(
-                                    session_id, reasoning_content, is_reasoning=True
-                                ),
-                                loop,
-                            )
+                    # Send content as AgentMessageChunk
+                    asyncio.run_coroutine_threadsafe(
+                        self._send_streaming_chunk(
+                            session_id, content, is_reasoning=False
+                        ),
+                        loop,
+                    )
 
-                        # Handle regular content - attribute may be deleted if None
-                        # content = delta.content if hasattr(delta, "content") else None
-                        # if isinstance(content, str) and content:
-                        #     if current_state != "content":
-                        #         self._streaming_states[session_id] = "content"
-
-                        # Send content as AgentMessageChunk
-                        asyncio.run_coroutine_threadsafe(
-                            self._send_streaming_chunk(
-                                session_id, delta.model_dump_json(), is_reasoning=False
-                            ),
-                            loop,
-                        )
-
-                        # Note: Tool calls are handled by the event system through
-                        # ActionEvent -> ToolCallStart notifications, so we skip
-                        # streaming them here to avoid duplication
+                        
             except Exception as e:
                 raise RequestError.internal_error(
                     {
@@ -610,7 +588,6 @@ class OpenHandsACPAgent(ACPAgent):
             finally:
                 # Clean up task tracking and streaming state
                 self._running_tasks.pop(session_id, None)
-                self._streaming_states.pop(session_id, None)
 
             # Return the final response
             return PromptResponse(stop_reason="end_turn")
@@ -669,17 +646,12 @@ class OpenHandsACPAgent(ACPAgent):
 
             running_task = self._running_tasks.get(session_id)
             if not running_task or running_task.done():
-                # Clean up streaming state
-                self._streaming_states.pop(session_id, None)
                 return
 
             logger.debug(
                 f"Waiting for conversation thread to terminate for session {session_id}"
             )
             await self._wait_for_task_completion(running_task, session_id)
-
-            # Clean up streaming state after task completion
-            self._streaming_states.pop(session_id, None)
 
         except RequestError:
             raise
