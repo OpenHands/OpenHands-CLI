@@ -412,7 +412,8 @@ class OpenHandsACPAgent(ACPAgent):
         workspace = Workspace(working_dir=str(working_path))
 
         # Create event subscriber for streaming updates (ACP-specific)
-        subscriber = EventSubscriber(session_id, self._conn)
+        # Pass streaming_enabled=True to indicate token streaming is active
+        subscriber = EventSubscriber(session_id, self._conn, streaming_enabled=True)
 
         # Get the current event loop for the callback
         loop = asyncio.get_event_loop()

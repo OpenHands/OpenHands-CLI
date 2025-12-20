@@ -310,3 +310,41 @@ async def test_send_streaming_chunk_error_handling(acp_agent, mock_connection):
         pytest.fail(
             f"_send_streaming_chunk should handle errors gracefully, but raised: {e}"
         )
+
+
+@pytest.mark.asyncio
+async def test_event_subscriber_streaming_enabled(acp_agent):
+    """Test that EventSubscriber is created with streaming_enabled=True."""
+    session_id = str(uuid4())
+
+    with (
+        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load_specs,
+        patch("openhands_cli.acp_impl.agent.Conversation"),
+        patch(
+            "openhands_cli.acp_impl.agent.EventSubscriber"
+        ) as mock_event_subscriber_class,
+    ):
+        # Mock agent with LLM
+        mock_agent = MagicMock()
+        mock_llm = MagicMock()
+        mock_agent.llm = mock_llm
+        mock_load_specs.return_value = mock_agent
+
+        # Mock LLM model_copy to return updated LLM with streaming enabled
+        mock_updated_llm = MagicMock()
+        mock_llm.model_copy.return_value = mock_updated_llm
+
+        # Mock agent model_copy to return updated agent
+        mock_updated_agent = MagicMock()
+        mock_updated_agent.llm = mock_updated_llm
+        mock_agent.model_copy.return_value = mock_updated_agent
+
+        # Call the method
+        acp_agent._setup_acp_conversation(session_id)
+
+        # Verify that EventSubscriber was created with streaming_enabled=True
+        mock_event_subscriber_class.assert_called_once()
+        call_args = mock_event_subscriber_class.call_args
+        assert call_args[0][0] == session_id  # session_id
+        assert call_args[0][1] == acp_agent._conn  # conn
+        assert call_args[1]["streaming_enabled"] is True  # streaming_enabled kwarg

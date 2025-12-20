@@ -499,3 +499,92 @@ async def test_format_status_line_abbreviations(mock_connection):
     assert "1.23M" in status_line  # 1,234,567 abbreviated
     assert "50.00%" in status_line  # Cache hit rate
     assert "12.3456" in status_line  # Cost
+
+
+@pytest.mark.asyncio
+async def test_event_subscriber_streaming_enabled_skips_assistant_messages():
+    """Test that EventSubscriber skips assistant messages when streaming is enabled."""
+    from openhands.sdk import Message, TextContent
+
+    mock_connection = AsyncMock()
+    session_id = "test-session"
+
+    # Create subscriber with streaming enabled
+    subscriber = EventSubscriber(session_id, mock_connection, streaming_enabled=True)
+
+    # Create a mock MessageEvent from assistant
+    message = Message(role="assistant", content=[TextContent(text="Hello world")])
+    event = MessageEvent(source="agent", llm_message=message)
+
+    # Handle the message event
+    await subscriber._handle_message_event(event)
+
+    # Verify that session_update was NOT called
+    mock_connection.session_update.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_event_subscriber_streaming_disabled_sends_assistant_messages():
+    """Test that EventSubscriber sends assistant messages when streaming is disabled."""
+    from openhands.sdk import Message, TextContent
+
+    mock_connection = AsyncMock()
+    session_id = "test-session"
+
+    # Create subscriber with streaming disabled (default)
+    subscriber = EventSubscriber(session_id, mock_connection, streaming_enabled=False)
+
+    # Create a mock MessageEvent from assistant
+    message = Message(role="assistant", content=[TextContent(text="Hello world")])
+    event = MessageEvent(source="agent", llm_message=message)
+
+    # Handle the message event
+    await subscriber._handle_message_event(event)
+
+    # Verify that session_update was called
+    mock_connection.session_update.assert_called_once()
+    call_kwargs = mock_connection.session_update.call_args[1]
+    assert call_kwargs["session_id"] == session_id
+    update = call_kwargs["update"]
+    assert isinstance(update, SessionUpdate2)
+    assert update.session_update == "agent_message_chunk"
+
+
+@pytest.mark.asyncio
+async def test_event_subscriber_streaming_default_is_false():
+    """Test that EventSubscriber defaults to streaming_enabled=False."""
+    mock_connection = AsyncMock()
+    session_id = "test-session"
+
+    subscriber = EventSubscriber(session_id, mock_connection)
+
+    assert subscriber.streaming_enabled is False
+
+
+@pytest.mark.asyncio
+async def test_event_subscriber_streaming_enabled_still_skips_user_messages():
+    """Test that EventSubscriber always skips user messages regardless of streaming."""
+    from openhands.sdk import Message, TextContent
+
+    mock_connection = AsyncMock()
+    session_id = "test-session"
+
+    # Test with streaming enabled
+    subscriber_streaming = EventSubscriber(
+        session_id, mock_connection, streaming_enabled=True
+    )
+    message = Message(role="user", content=[TextContent(text="User message")])
+    event = MessageEvent(source="user", llm_message=message)
+
+    await subscriber_streaming._handle_message_event(event)
+    mock_connection.session_update.assert_not_called()
+
+    # Reset mock
+    mock_connection.reset_mock()
+
+    # Test with streaming disabled
+    subscriber_no_streaming = EventSubscriber(
+        session_id, mock_connection, streaming_enabled=False
+    )
+    await subscriber_no_streaming._handle_message_event(event)
+    mock_connection.session_update.assert_not_called()

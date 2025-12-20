@@ -105,6 +105,7 @@ class EventSubscriber:
         session_id: str,
         conn: "Client",
         conversation: BaseConversation | None = None,
+        streaming_enabled: bool = False,
     ):
         """Initialize the event subscriber.
 
@@ -112,10 +113,12 @@ class EventSubscriber:
             session_id: The ACP session ID
             conn: The ACP connection for sending notifications
             conversation: Optional conversation instance for accessing metrics
+            streaming_enabled: Whether token streaming is enabled
         """
         self.session_id = session_id
         self.conn = conn
         self.conversation = conversation
+        self.streaming_enabled = streaming_enabled
 
     def _format_status_line(self, usage, cost: float) -> str:
         """Format metrics as a status line string.
@@ -464,6 +467,14 @@ class EventSubscriber:
                 # if we update it again, they will be duplicated
                 pass
             else:  # assistant or other roles
+                # Skip sending complete assistant messages when streaming is enabled
+                # since token callbacks are already streaming the content
+                if self.streaming_enabled:
+                    logger.debug(
+                        "Skipping complete message event due to streaming being enabled"
+                    )
+                    return
+
                 await self.conn.session_update(
                     session_id=self.session_id,
                     update=AgentMessageChunk(
