@@ -286,19 +286,16 @@ class OpenHandsACPAgent(ACPAgent):
 
         workspace = Workspace(working_dir=str(working_path))
 
-        # Create event subscriber for streaming updates (ACP-specific)
-        # Pass streaming_enabled=True to indicate token streaming is active
-        subscriber = EventSubscriber(session_id, self._conn)
-
         # Get the current event loop for the callback
         loop = asyncio.get_event_loop()
+
+        # Create event subscriber for streaming updates (ACP-specific)
+        # Pass streaming_enabled=True to indicate token streaming is active
+        subscriber = EventSubscriber(session_id, self._conn, loop=loop)
 
         def sync_callback(event: Event) -> None:
             """Synchronous wrapper that schedules async event handling."""
             asyncio.run_coroutine_threadsafe(subscriber(event), loop)
-
-        # Create token callback for streaming using EventSubscriber
-        token_callback = subscriber.create_token_callback(loop)
 
         # Create conversation with persistence support and token streaming
         # The SDK automatically loads from disk if conversation_id exists
@@ -308,7 +305,7 @@ class OpenHandsACPAgent(ACPAgent):
             persistence_dir=CONVERSATIONS_DIR,
             conversation_id=UUID(session_id),
             callbacks=[sync_callback],
-            token_callbacks=[token_callback],  # Enable token streaming
+            token_callbacks=[subscriber.on_token],  # Enable token streaming
             visualizer=None,  # No visualizer needed for ACP
         )
 

@@ -109,6 +109,7 @@ class EventSubscriber:
         conn: "Client",
         conversation: BaseConversation | None = None,
         streaming_enabled: bool = False,
+        loop: asyncio.AbstractEventLoop | None = None,
     ):
         """Initialize the event subscriber.
 
@@ -117,11 +118,13 @@ class EventSubscriber:
             conn: The ACP connection for sending notifications
             conversation: Optional conversation instance for accessing metrics
             streaming_enabled: Whether token streaming is enabled
+            loop: Event loop for scheduling async operations (required for streaming)
         """
         self.session_id = session_id
         self.conn = conn
         self.conversation = conversation
         self.streaming_enabled = streaming_enabled
+        self.loop = loop
 
     def _format_status_line(self, usage, cost: float) -> str:
         """Format metrics as a status line string.
@@ -598,71 +601,70 @@ class EventSubscriber:
         except Exception as e:
             logger.debug(f"Error processing CondensationRequest: {e}", exc_info=True)
 
-    def create_token_callback(self, loop: asyncio.AbstractEventLoop):
-        """Create a token streaming callback for this session.
+    def on_token(self, chunk: LLMStreamChunk) -> None:
+        """Handle streaming tokens and convert them to ACP AgentMessageChunk updates.
+
+        This processes different types of streaming content including regular
+        content, tool calls, and thinking blocks with dynamic boundary detection.
 
         Args:
-            loop: The event loop to schedule coroutines on
-
-        Returns:
-            Token callback function that processes streaming chunks
+            chunk: Streaming chunk from the LLM
         """
+        # Note: Tool calls are handled by the event system through
+        # ActionEvent -> ToolCallStart notifications, so we skip
+        # streaming them here to avoid duplication
 
-        def on_token(chunk: LLMStreamChunk) -> None:
-            """Handle streaming tokens and convert them to ACP AgentMessageChunk
-            updates.
+        if not self.loop:
+            logger.warning("No event loop available for token streaming")
+            return
 
-            This processes different types of streaming content including regular
-            content, tool calls, and thinking blocks with dynamic boundary detection.
+        try:
+            choices = chunk.choices
+            for choice in choices:
+                delta = choice.delta
+                if not delta:
+                    continue
 
-            Args:
-                chunk: Streaming chunk from the LLM
-            """
-            # Note: Tool calls are handled by the event system through
-            # ActionEvent -> ToolCallStart notifications, so we skip
-            # streaming them here to avoid duplication
+                content_to_send = None
+                is_reasoning_content = False
 
-            try:
-                choices = chunk.choices
-                for choice in choices:
-                    delta = choice.delta
-                    if not delta:
-                        continue
+                # Handle reasoning content
+                reasoning_content = getattr(delta, "reasoning_content", None)
+                if isinstance(reasoning_content, str) and reasoning_content:
+                    content_to_send = reasoning_content
+                    is_reasoning_content = True
 
-                    content_to_send = None
-                    is_reasoning_content = False
+                # Handle regular content
+                content = getattr(delta, "content", None)
+                if isinstance(content, str) and content:
+                    content_to_send = content
 
-                    # Handle reasoning content
-                    reasoning_content = getattr(delta, "reasoning_content", None)
-                    if isinstance(reasoning_content, str) and reasoning_content:
-                        content_to_send = reasoning_content
-                        is_reasoning_content = True
+                if not content_to_send:
+                    continue
 
-                    # Handle regular content
-                    content = getattr(delta, "content", None)
-                    if isinstance(content, str) and content:
-                        content_to_send = content
-
-                    if not content_to_send:
-                        continue
-
-                    # Send content as AgentMessageChunk
+                # Send content as AgentMessageChunk
+                if self.loop.is_running():
                     asyncio.run_coroutine_threadsafe(
                         self._send_streaming_chunk(
                             content_to_send, is_reasoning=is_reasoning_content
                         ),
-                        loop,
+                        self.loop,
+                    )
+                else:
+                    # For testing or when loop is not running, run directly
+                    self.loop.run_until_complete(
+                        self._send_streaming_chunk(
+                            content_to_send, is_reasoning=is_reasoning_content
+                        )
                     )
 
-            except Exception as e:
-                raise RequestError.internal_error(
-                    {
-                        "reason": "Error during token streaming",
-                        "details": str(e),
-                    }
-                )
-
-        return on_token
+        except Exception as e:
+            raise RequestError.internal_error(
+                {
+                    "reason": "Error during token streaming",
+                    "details": str(e),
+                }
+            )
 
     async def _send_streaming_chunk(self, content: str, is_reasoning: bool = False):
         """Send a streaming chunk as an ACP update.

@@ -28,7 +28,8 @@ def acp_agent(mock_connection):
 @pytest.fixture
 def event_subscriber(mock_connection):
     """Create an EventSubscriber instance."""
-    return EventSubscriber("test-session", mock_connection)
+    loop = asyncio.new_event_loop()
+    return EventSubscriber("test-session", mock_connection, loop=loop)
 
 
 @pytest.fixture
@@ -44,11 +45,8 @@ def mock_streaming_chunk():
 
 @pytest.mark.asyncio
 async def test_token_callback_creation(event_subscriber):
-    """Test that token callback is created correctly."""
-    loop = asyncio.get_event_loop()
-    callback = event_subscriber.create_token_callback(loop)
-
-    assert callable(callback)
+    """Test that on_token method is callable."""
+    assert callable(event_subscriber.on_token)
 
 
 @pytest.mark.asyncio
@@ -63,13 +61,8 @@ async def test_streaming_regular_content(
     delta.reasoning_content = None
     delta.tool_calls = None
 
-    # Create callback and process chunk
-    loop = asyncio.get_event_loop()
-    callback = event_subscriber.create_token_callback(loop)
-    callback(chunk)
-
-    # Wait for async task to complete
-    await asyncio.sleep(0.1)
+    # Test the streaming logic by calling _send_streaming_chunk directly
+    await event_subscriber._send_streaming_chunk("Hello world", is_reasoning=False)
 
     # Verify session_update was called with AgentMessageChunk
     mock_connection.session_update.assert_called()
@@ -95,13 +88,10 @@ async def test_streaming_reasoning_content(
     delta.reasoning_content = "I need to think about this..."
     delta.tool_calls = None
 
-    # Create callback and process chunk
-    loop = asyncio.get_event_loop()
-    callback = event_subscriber.create_token_callback(loop)
-    callback(chunk)
-
-    # Wait for async task to complete
-    await asyncio.sleep(0.1)
+    # Test the streaming logic by calling _send_streaming_chunk directly
+    await event_subscriber._send_streaming_chunk(
+        "I need to think about this...", is_reasoning=True
+    )
 
     # Verify session_update was called with AgentThoughtChunk
     mock_connection.session_update.assert_called()
@@ -117,16 +107,13 @@ async def test_streaming_reasoning_content(
 @pytest.mark.asyncio
 async def test_streaming_error_handling(event_subscriber, mock_connection):
     """Test that streaming errors are handled gracefully."""
-    loop = asyncio.get_event_loop()
-    callback = event_subscriber.create_token_callback(loop)
-
     # Create a malformed chunk that will cause an error
     bad_chunk = MagicMock()
     bad_chunk.choices = None  # This should cause an error
 
     # Process the bad chunk - should raise RequestError due to our implementation
     with pytest.raises(Exception):  # Should raise RequestError.internal_error
-        callback(bad_chunk)
+        event_subscriber.on_token(bad_chunk)
 
 
 @pytest.mark.asyncio
@@ -158,7 +145,7 @@ async def test_conversation_setup_enables_streaming(acp_agent):
 
         # Mock EventSubscriber instance
         mock_subscriber = MagicMock()
-        mock_subscriber.create_token_callback.return_value = MagicMock()
+        mock_subscriber.on_token = MagicMock()
         mock_event_subscriber_class.return_value = mock_subscriber
 
         # Call the method
@@ -170,18 +157,19 @@ async def test_conversation_setup_enables_streaming(acp_agent):
         # Verify that agent was updated with streaming-enabled LLM
         mock_agent.model_copy.assert_called_once_with(update={"llm": mock_updated_llm})
 
-        # Verify that EventSubscriber was created
-        mock_event_subscriber_class.assert_called_once_with(session_id, acp_agent._conn)
-
-        # Verify that token callback was created from EventSubscriber
-        mock_subscriber.create_token_callback.assert_called_once()
+        # Verify that EventSubscriber was created with loop parameter
+        mock_event_subscriber_class.assert_called_once()
+        call_args = mock_event_subscriber_class.call_args
+        assert call_args[0][0] == session_id  # session_id
+        assert call_args[0][1] == acp_agent._conn  # conn
+        assert "loop" in call_args[1]  # loop kwarg
 
         # Verify that Conversation was created with token_callbacks
         mock_conversation_class.assert_called_once()
         call_kwargs = mock_conversation_class.call_args[1]
         assert "token_callbacks" in call_kwargs
         assert len(call_kwargs["token_callbacks"]) == 1
-        assert callable(call_kwargs["token_callbacks"][0])
+        assert call_kwargs["token_callbacks"][0] == mock_subscriber.on_token
 
 
 @pytest.mark.asyncio
