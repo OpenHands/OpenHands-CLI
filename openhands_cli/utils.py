@@ -1,5 +1,6 @@
 """Utility functions for LLM configuration in OpenHands CLI."""
 
+import json
 import os
 from argparse import Namespace
 from pathlib import Path
@@ -8,7 +9,9 @@ from typing import Any
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 
-from openhands.sdk import LLM
+from openhands.sdk import LLM, ImageContent, TextContent
+from openhands.sdk.event import SystemPromptEvent
+from openhands.sdk.event.base import Event
 from openhands.tools.preset import get_default_agent
 
 
@@ -120,3 +123,39 @@ def create_seeded_instructions_from_args(args: Namespace) -> list[str] | None:
         return [args.task]
 
     return None
+
+
+def extract_text_from_message_content(
+    message_content: list[TextContent | ImageContent], has_exactly_one=True
+) -> str | None:
+    """Extract text from message content for slash command detection.
+
+    Args:
+        message_content: Message content (typically a list of content blocks)
+
+    Returns:
+        The text content of first TextContent block, None otherwise
+    """
+
+    if len(message_content) == 0:
+        return None
+
+    if has_exactly_one and len(message_content) != 1:
+        return None
+
+    # Only accept single TextContent blocks for slash commands
+    if not isinstance(message_content[0], TextContent):
+        return None
+
+    # Use SDK utility to extract text - content_to_str handles the conversion
+    return message_content[0].text
+
+
+def json_callback(event: Event) -> None:
+    if isinstance(event, SystemPromptEvent):
+        return
+
+    data = event.model_dump()
+    pretty_json = json.dumps(data, indent=2, sort_keys=True)
+    print("--JSON Event--")
+    print(pretty_json)

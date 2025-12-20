@@ -34,6 +34,8 @@ a = Analysis(
         *collect_data_files('mcp'),
         # Include all data files from openhands.sdk (templates, configs, etc.)
         *collect_data_files('openhands.sdk'),
+        # Include all data files from openhands_cli package
+        *collect_data_files('openhands_cli'),
         # Include package metadata for importlib.metadata
         *copy_metadata('fastmcp'),
         *copy_metadata('agent-client-protocol'),
@@ -59,6 +61,10 @@ a = Analysis(
         'openhands.tools.terminal',
         'openhands.tools.str_replace_editor',
         'openhands.tools.task_tracker',
+        # Include textual internal modules that might not be auto-detected
+        'textual.widgets._tab_pane',
+        'textual.widgets._select',
+        'textual.widgets._tabbed_content',
     ],
     hookspath=[],
     hooksconfig={},

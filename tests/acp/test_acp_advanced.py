@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from acp import CancelNotification, LoadSessionRequest
 
 from openhands.tools.file_editor.definition import FileEditorAction
 from openhands_cli.acp_impl.agent import OpenHandsACPAgent
@@ -21,7 +20,7 @@ def mock_connection():
 @pytest.fixture
 def acp_agent(mock_connection):
     """Create an OpenHands ACP agent instance."""
-    return OpenHandsACPAgent(mock_connection)
+    return OpenHandsACPAgent(mock_connection, "always-ask")
 
 
 @pytest.mark.asyncio
@@ -60,13 +59,12 @@ async def test_get_or_create_conversation_caching(acp_agent, tmp_path):
 async def test_cancel_pauses_conversation(acp_agent):
     """Test that cancelling a session pauses the conversation."""
     session_id = str(uuid4())
-    notification = CancelNotification(sessionId=session_id)
 
     # Create a mock conversation and add it to active sessions
     mock_conversation = MagicMock()
     acp_agent._active_sessions[session_id] = mock_conversation
 
-    await acp_agent.cancel(notification)
+    await acp_agent.cancel(session_id=session_id)
 
     # Verify pause was called
     mock_conversation.pause.assert_called_once()
@@ -76,7 +74,6 @@ async def test_cancel_pauses_conversation(acp_agent):
 async def test_load_session_with_no_history(acp_agent, mock_connection):
     """Test loading a session with no history."""
     session_id = str(uuid4())
-    request = LoadSessionRequest(sessionId=session_id, cwd="/test/path", mcpServers=[])
 
     # Create mock conversation with empty history
     mock_conversation = MagicMock()
@@ -85,10 +82,12 @@ async def test_load_session_with_no_history(acp_agent, mock_connection):
     with patch.object(acp_agent, "_get_or_create_conversation") as mock_get:
         mock_get.return_value = mock_conversation
 
-        await acp_agent.loadSession(request)
+        await acp_agent.load_session(
+            session_id=session_id, cwd="/test/path", mcp_servers=[]
+        )
 
         # Verify no sessionUpdate was called
-        mock_connection.sessionUpdate.assert_not_called()
+        mock_connection.session_update.assert_not_called()
 
 
 def test_extract_action_locations_file_editor():

@@ -1,12 +1,14 @@
+from collections.abc import Callable
 from typing import Any
 from uuid import UUID
 
-from prompt_toolkit import HTML, print_formatted_text
+from rich.console import Console
 
-from openhands.sdk import Agent, BaseConversation, Conversation, Workspace
-from openhands.sdk.context import AgentContext, Skill
+from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, Workspace
+from openhands.sdk.context import Skill
+from openhands.sdk.event.base import Event
 from openhands.sdk.security.confirmation_policy import (
-    AlwaysConfirm,
+    ConfirmationPolicyBase,
 )
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 
@@ -15,9 +17,8 @@ from openhands.tools.file_editor import FileEditorTool  # noqa: F401
 from openhands.tools.task_tracker import TaskTrackerTool  # noqa: F401
 from openhands.tools.terminal import TerminalTool  # noqa: F401
 from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
-from openhands_cli.tui.settings.settings_screen import SettingsScreen
-from openhands_cli.tui.settings.store import AgentStore
-from openhands_cli.tui.visualizer import CLIVisualizer
+from openhands_cli.refactor.widgets.richlog_visualizer import ConversationVisualizer
+from openhands_cli.stores import AgentStore
 
 
 class MissingAgentSpec(Exception):
@@ -49,7 +50,7 @@ def load_agent_specs(
     agent = agent_store.load(session_id=conversation_id, load_user_skills=user_skills)
     if not agent:
         raise MissingAgentSpec(
-            "Agent specification not found. Please configure your agent settings."
+            "Agent specification not found. Please configure your settings."
         )
 
     # If MCP servers are provided, augment the agent's MCP configuration
@@ -81,24 +82,12 @@ def load_agent_specs(
     return agent
 
 
-def verify_agent_exists_or_setup_agent(user_skills: bool = True) -> Agent:
-    """Verify agent specs exists by attempting to load it."""
-    settings_screen = SettingsScreen()
-    try:
-        agent = load_agent_specs(user_skills=user_skills)
-        return agent
-    except MissingAgentSpec:
-        # For first-time users, show the full settings flow with choice
-        # between basic/advanced
-        settings_screen.configure_settings(first_time=True)
-
-    # Try once again after settings setup attempt
-    return load_agent_specs(user_skills=user_skills)
-
 
 def setup_conversation(
     conversation_id: UUID,
-    include_security_analyzer: bool = True,
+    confirmation_policy: ConfirmationPolicyBase,
+    visualizer: ConversationVisualizer | None = None,
+    event_callback: Callable[[Event], None] | None = None,
     user_skills: bool = True,
 ) -> BaseConversation:
     """
@@ -107,14 +96,20 @@ def setup_conversation(
     Args:
         conversation_id: conversation ID to use. If not provided, a random UUID
             will be generated.
+        confirmation_policy: Confirmation policy to use.
+        visualizer: Optional visualizer to use. If None, a default will be used
+        event_callback: Optional callback function to handle events (e.g., JSON output)
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
     """
-
-    print_formatted_text(HTML("<white>Initializing agent...</white>"))
+    console = Console()
+    console.print("Initializing agent...", style="white")
 
     agent = load_agent_specs(str(conversation_id), user_skills=user_skills)
+
+    # Prepare callbacks list
+    callbacks = [event_callback] if event_callback else None
 
     # Create conversation - agent context is now set in AgentStore.load()
     conversation: BaseConversation = Conversation(
@@ -123,17 +118,12 @@ def setup_conversation(
         # Conversation will add /<conversation_id> to this path
         persistence_dir=CONVERSATIONS_DIR,
         conversation_id=conversation_id,
-        visualizer=CLIVisualizer,
+        visualizer=visualizer,
+        callbacks=callbacks,
     )
 
-    # Security analyzer is set though conversation API now
-    if not include_security_analyzer:
-        conversation.set_security_analyzer(None)
-    else:
-        conversation.set_security_analyzer(LLMSecurityAnalyzer())
-        conversation.set_confirmation_policy(AlwaysConfirm())
+    conversation.set_security_analyzer(LLMSecurityAnalyzer())
+    conversation.set_confirmation_policy(confirmation_policy)
 
-    print_formatted_text(
-        HTML(f"<green>✓ Agent initialized with model: {agent.llm.model}</green>")
-    )
+    console.print(f"✓ Agent initialized with model: {agent.llm.model}", style="green")
     return conversation

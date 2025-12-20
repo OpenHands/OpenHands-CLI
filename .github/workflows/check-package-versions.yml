@@ -36,9 +36,14 @@ jobs:
                       print(f"❌ ERROR: Failed to parse pyproject.toml: {e}")
                       sys.exit(1)
 
-                  poetry = data.get("tool", {}).get("poetry", {})
+                  # Check both Poetry and UV dependency sections
+                  tool_section = data.get("tool", {})
+                  poetry = tool_section.get("poetry", {})
+                  uv_sources = tool_section.get("uv", {}).get("sources", {})
+
                   sections = {
-                      "dependencies": poetry.get("dependencies", {}),
+                      "tool.poetry.dependencies": poetry.get("dependencies", {}),
+                      "tool.uv.sources": uv_sources,
                   }
 
                   errors = []
@@ -48,6 +53,7 @@ jobs:
                       if not isinstance(deps, dict):
                           continue
 
+                      print(f"Checking section: {section_name}")
                       for pkg_name, cfg in deps.items():
                           if isinstance(cfg, dict) and "rev" in cfg:
                               msg = f"  ✖ {pkg_name} in [{section_name}] uses rev='{cfg['rev']}' (NOT ALLOWED)"
@@ -60,6 +66,8 @@ jobs:
                       print("\n❌ FAILED: Found dependencies using 'rev' fields:\n" + "\n".join(errors))
                       print("\nPlease use versioned releases instead, e.g.:")
                       print('  my-package = "1.0.0"')
+                      print("\nFor uv sources, use tagged versions:")
+                      print('  my-package = { git = "https://github.com/user/repo.git", tag = "v1.0.0" }')
                       sys.exit(1)
 
                   print("\n✅ SUCCESS: No 'rev' fields found. All dependencies are using proper versioned releases.")

@@ -1,6 +1,7 @@
 """Tests for main entry point functionality."""
 
 import sys
+import uuid
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -34,29 +35,29 @@ def test_main_parser_accepts_task_and_file_flags():
 class TestMainEntryPoint:
     """Test the main entry point behavior."""
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands"])
-    def test_main_starts_agent_chat_directly(
-        self, mock_run_agent_chat: MagicMock
+    def test_main_starts_textual_ui_directly(
+        self, mock_textual_main: MagicMock
     ) -> None:
-        """Test that main() starts agent chat directly when setup succeeds."""
-        # Mock run_cli_entry to raise KeyboardInterrupt to exit gracefully
-        mock_run_agent_chat.side_effect = KeyboardInterrupt()
+        """Test that main() starts textual UI directly when setup succeeds."""
+        # Mock textual_main to raise KeyboardInterrupt to exit gracefully
+        mock_textual_main.side_effect = KeyboardInterrupt()
 
         # Should complete without raising an exception (graceful exit)
         simple_main.main()
 
-        # Should call run_cli_entry with no resume conversation ID
-        mock_run_agent_chat.assert_called_once()
-        kwargs = mock_run_agent_chat.call_args.kwargs
+        # Should call textual_main with no resume conversation ID and no queued inputs
+        mock_textual_main.assert_called_once()
+        kwargs = mock_textual_main.call_args.kwargs
         assert kwargs["resume_conversation_id"] is None
         assert kwargs["queued_inputs"] is None
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands"])
-    def test_main_handles_import_error(self, mock_run_agent_chat: MagicMock) -> None:
+    def test_main_handles_import_error(self, mock_textual_main: MagicMock) -> None:
         """Test that main() handles ImportError gracefully."""
-        mock_run_agent_chat.side_effect = ImportError("Missing dependency")
+        mock_textual_main.side_effect = ImportError("Missing dependency")
 
         # Should raise ImportError (re-raised after handling)
         with pytest.raises(ImportError) as exc_info:
@@ -64,35 +65,33 @@ class TestMainEntryPoint:
 
         assert str(exc_info.value) == "Missing dependency"
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands"])
     def test_main_handles_keyboard_interrupt(
-        self, mock_run_agent_chat: MagicMock
+        self, mock_textual_main: MagicMock
     ) -> None:
         """Test that main() handles KeyboardInterrupt gracefully."""
-        # Mock run_cli_entry to raise KeyboardInterrupt
-        mock_run_agent_chat.side_effect = KeyboardInterrupt()
+        # Mock textual_main to raise KeyboardInterrupt
+        mock_textual_main.side_effect = KeyboardInterrupt()
 
         # Should complete without raising an exception (graceful exit)
         simple_main.main()
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands"])
-    def test_main_handles_eof_error(self, mock_run_agent_chat: MagicMock) -> None:
+    def test_main_handles_eof_error(self, mock_textual_main: MagicMock) -> None:
         """Test that main() handles EOFError gracefully."""
-        # Mock run_cli_entry to raise EOFError
-        mock_run_agent_chat.side_effect = EOFError()
+        # Mock textual_main to raise EOFError
+        mock_textual_main.side_effect = EOFError()
 
         # Should complete without raising an exception (graceful exit)
         simple_main.main()
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands"])
-    def test_main_handles_general_exception(
-        self, mock_run_agent_chat: MagicMock
-    ) -> None:
+    def test_main_handles_general_exception(self, mock_textual_main: MagicMock) -> None:
         """Test that main() handles general exceptions."""
-        mock_run_agent_chat.side_effect = Exception("Unexpected error")
+        mock_textual_main.side_effect = Exception("Unexpected error")
 
         # Should raise Exception (re-raised after handling)
         with pytest.raises(Exception) as exc_info:
@@ -100,50 +99,100 @@ class TestMainEntryPoint:
 
         assert str(exc_info.value) == "Unexpected error"
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
+    @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands", "--resume", "test-conversation-id"])
-    def test_main_with_resume_argument(self, mock_run_agent_chat: MagicMock) -> None:
+    def test_main_with_resume_argument(self, mock_textual_main: MagicMock) -> None:
         """Test that main() passes resume conversation ID when provided."""
-        # Mock run_cli_entry to raise KeyboardInterrupt to exit gracefully
-        mock_run_agent_chat.side_effect = KeyboardInterrupt()
+        # Mock textual_main to return a UUID and raise KeyboardInterrupt to exit
+        mock_textual_main.return_value = uuid.uuid4()
+        mock_textual_main.side_effect = KeyboardInterrupt()
 
         # Should complete without raising an exception (graceful exit)
         simple_main.main()
 
-        # Should call run_cli_entry with the provided resume conversation ID
-        mock_run_agent_chat.assert_called_once()
-        kwargs = mock_run_agent_chat.call_args.kwargs
+        # Should call textual_main with the provided resume conversation ID
+        mock_textual_main.assert_called_once()
+        kwargs = mock_textual_main.call_args.kwargs
         assert kwargs["resume_conversation_id"] == "test-conversation-id"
+        assert kwargs["queued_inputs"] is None
+
+    @patch("openhands_cli.refactor.textual_app.main")
+    @patch("sys.argv", ["openhands", "--always-approve"])
+    def test_main_with_always_approve_argument(
+        self, mock_textual_main: MagicMock
+    ) -> None:
+        """Test that main() passes always_approve=True with --always-approve."""
+        # Mock textual_main to raise KeyboardInterrupt to exit gracefully
+        mock_textual_main.side_effect = KeyboardInterrupt()
+
+        # Should complete without raising an exception (graceful exit)
+        simple_main.main()
+
+        # Should call textual_main with always_approve=True
+        mock_textual_main.assert_called_once()
+        kwargs = mock_textual_main.call_args.kwargs
+        assert kwargs["resume_conversation_id"] is None
+        assert kwargs["always_approve"] is True
+        assert kwargs["queued_inputs"] is None
+
+    @patch("openhands_cli.refactor.textual_app.main")
+    @patch("sys.argv", ["openhands", "--llm-approve"])
+    def test_main_with_llm_approve_argument(self, mock_textual_main: MagicMock) -> None:
+        """Test that main() passes llm_approve=True with --llm-approve."""
+        # Mock textual_main to raise KeyboardInterrupt to exit gracefully
+        mock_textual_main.side_effect = KeyboardInterrupt()
+
+        # Should complete without raising an exception (graceful exit)
+        simple_main.main()
+
+        # Should call textual_main with llm_approve=True
+        mock_textual_main.assert_called_once()
+        kwargs = mock_textual_main.call_args.kwargs
+        assert kwargs["resume_conversation_id"] is None
+        assert kwargs["llm_approve"] is True
         assert kwargs["queued_inputs"] is None
 
 
 @pytest.mark.parametrize(
-    "argv,expected_kwargs",
+    "argv,expected_resume_id,expected_always_approve,expected_llm_approve",
     [
+        (["openhands"], None, False, False),
+        (["openhands", "--resume", "test-id"], "test-id", False, False),
+        (["openhands", "--always-approve"], None, True, False),
+        (["openhands", "--llm-approve"], None, False, True),
         (
-            ["openhands"],
-            {"resume_conversation_id": None, "queued_inputs": None},
-        ),
-        (
-            ["openhands", "--resume", "test-id"],
-            {"resume_conversation_id": "test-id", "queued_inputs": None},
+            ["openhands", "--resume", "test-id", "--always-approve"],
+            "test-id",
+            True,
+            False,
         ),
     ],
 )
-def test_main_cli_calls_run_cli_entry(monkeypatch, argv, expected_kwargs):
+def test_main_cli_calls_textual_main(
+    monkeypatch, argv, expected_resume_id, expected_always_approve, expected_llm_approve
+):
     # Patch sys.argv since main() takes no params
     monkeypatch.setattr(sys, "argv", argv, raising=False)
 
     called = {}
-    fake_agent_chat = SimpleNamespace(
-        run_cli_entry=lambda **kw: called.setdefault("kwargs", kw)
-    )
+
+    def mock_textual_main(**kw):
+        called.setdefault("kwargs", kw)
+        return uuid.uuid4()
+
+    fake_textual_app = SimpleNamespace(main=mock_textual_main)
     # Provide the symbol that main() will import
-    monkeypatch.setitem(sys.modules, "openhands_cli.agent_chat", fake_agent_chat)
+    monkeypatch.setitem(
+        sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app
+    )
 
     # Execute (no SystemExit expected on success)
     main()
-    assert called["kwargs"] == expected_kwargs
+    kwargs = called["kwargs"]
+    assert kwargs["resume_conversation_id"] == expected_resume_id
+    assert kwargs["always_approve"] == expected_always_approve
+    assert kwargs["llm_approve"] == expected_llm_approve
+    assert kwargs["queued_inputs"] is None
 
 
 def test_main_cli_task_sets_queued_inputs(monkeypatch):
@@ -157,10 +206,14 @@ def test_main_cli_task_sets_queued_inputs(monkeypatch):
 
     called = {}
 
-    fake_agent_chat = SimpleNamespace(
-        run_cli_entry=lambda **kw: called.setdefault("kwargs", kw)
+    def mock_textual_main(**kw):
+        called.setdefault("kwargs", kw)
+        return uuid.uuid4()
+
+    fake_textual_app = SimpleNamespace(main=mock_textual_main)
+    monkeypatch.setitem(
+        sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app
     )
-    monkeypatch.setitem(sys.modules, "openhands_cli.agent_chat", fake_agent_chat)
 
     main()
 
@@ -183,10 +236,14 @@ def test_main_cli_file_sets_queued_inputs(monkeypatch, tmp_path):
 
     called = {}
 
-    fake_agent_chat = SimpleNamespace(
-        run_cli_entry=lambda **kw: called.setdefault("kwargs", kw)
+    def mock_textual_main(**kw):
+        called.setdefault("kwargs", kw)
+        return uuid.uuid4()
+
+    fake_textual_app = SimpleNamespace(main=mock_textual_main)
+    monkeypatch.setitem(
+        sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app
     )
-    monkeypatch.setitem(sys.modules, "openhands_cli.agent_chat", fake_agent_chat)
 
     main()
 
@@ -224,10 +281,14 @@ def test_main_cli_file_takes_precedence_over_task(monkeypatch, tmp_path):
 
     called = {}
 
-    fake_agent_chat = SimpleNamespace(
-        run_cli_entry=lambda **kw: called.setdefault("kwargs", kw)
+    def mock_textual_main(**kw):
+        called.setdefault("kwargs", kw)
+        return uuid.uuid4()
+
+    fake_textual_app = SimpleNamespace(main=mock_textual_main)
+    monkeypatch.setitem(
+        sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app
     )
-    monkeypatch.setitem(sys.modules, "openhands_cli.agent_chat", fake_agent_chat)
 
     main()
 
@@ -267,11 +328,32 @@ def test_main_serve_calls_launch_gui_server(monkeypatch, argv, expected_kwargs):
 
 
 @pytest.mark.parametrize(
+    "argv, expected",
+    [
+        (["openhands", "web"], dict(host="0.0.0.0", port=12000, debug=False)),
+        (
+            ["openhands", "web", "--host", "localhost", "--port", "3000", "--debug"],
+            dict(host="localhost", port=3000, debug=True),
+        ),
+    ],
+)
+@patch("openhands_cli.serve.launch_web_server")
+def test_main_web_calls_launch_web_server(mock_launch, argv, expected):
+    with patch("sys.argv", argv):
+        main()
+    mock_launch.assert_called_once_with(**expected)
+
+
+@pytest.mark.parametrize(
     "argv,expected_exit_code",
     [
         (["openhands", "invalid-command"], 2),  # argparse error
         (["openhands", "--help"], 0),  # top-level help
         (["openhands", "serve", "--help"], 0),  # subcommand help
+        (
+            ["openhands", "--always-approve", "--llm-approve"],
+            2,
+        ),  # mutually exclusive
     ],
 )
 def test_help_and_invalid(monkeypatch, argv, expected_exit_code):
@@ -305,3 +387,98 @@ def test_version_flag(monkeypatch, capsys, argv):
     import re
 
     assert re.search(r"\d+\.\d+\.\d+", captured.out)
+
+
+def test_main_cloud_command_calls_handle_cloud_command(monkeypatch):
+    """Test that cloud command calls handle_cloud_command function."""
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["openhands", "cloud", "--task", "Test task"],
+        raising=False,
+    )
+
+    called = {}
+
+    def mock_handle_cloud_command(args):
+        called["args"] = args
+
+    # Mock the handle_cloud_command function
+    monkeypatch.setattr(
+        "openhands_cli.cloud.command.handle_cloud_command", mock_handle_cloud_command
+    )
+
+    main()
+
+    # Verify handle_cloud_command was called with correct args
+    assert "args" in called
+    args = called["args"]
+    assert args.command == "cloud"
+    assert args.task == "Test task"
+
+
+def test_handle_cloud_command_with_task(monkeypatch):
+    """Test handle_cloud_command function with task argument."""
+    from unittest.mock import Mock, patch
+
+    from openhands_cli.cloud.command import handle_cloud_command
+
+    # Create mock args
+    args = Mock()
+    args.task = "Test task"
+    args.file = None
+    args.server_url = "https://test.com"
+
+    # Mock the dependencies
+    with patch(
+        "openhands_cli.cloud.command.create_seeded_instructions_from_args"
+    ) as mock_create_seeded:
+        mock_create_seeded.return_value = ["Test task"]
+
+        with patch("asyncio.run") as mock_asyncio_run:
+            with patch("openhands_cli.cloud.command.console") as mock_console:
+                handle_cloud_command(args)
+
+                # Verify create_seeded_instructions_from_args was called
+                mock_create_seeded.assert_called_once_with(args)
+
+                # Verify asyncio.run was called
+                mock_asyncio_run.assert_called_once()
+
+                # Verify success message was printed
+                success_calls = [
+                    call
+                    for call in mock_console.print.call_args_list
+                    if "successfully" in str(call)
+                ]
+                assert len(success_calls) > 0
+
+
+def test_handle_cloud_command_no_initial_message(monkeypatch):
+    """Test handle_cloud_command function when no initial message is provided."""
+    from unittest.mock import Mock, patch
+
+    from openhands_cli.cloud.command import handle_cloud_command
+
+    # Create mock args
+    args = Mock()
+    args.task = None
+    args.file = None
+    args.server_url = "https://test.com"
+
+    # Mock the dependencies
+    with patch(
+        "openhands_cli.cloud.command.create_seeded_instructions_from_args"
+    ) as mock_create_seeded:
+        mock_create_seeded.return_value = []  # No initial message
+
+        with patch("openhands_cli.cloud.command.console") as mock_console:
+            handle_cloud_command(args)
+
+            # Verify error message was printed
+            error_calls = [
+                call
+                for call in mock_console.print.call_args_list
+                if "Error: No initial message" in str(call)
+            ]
+            assert len(error_calls) > 0

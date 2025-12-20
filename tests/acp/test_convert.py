@@ -60,7 +60,7 @@ def test_convert_image_content():
         ImageContentBlock(
             type="image",
             data=test_image_data,
-            mimeType="image/png",
+            mime_type="image/png",
         )
     ]
 
@@ -85,7 +85,7 @@ def test_convert_mixed_content():
         ImageContentBlock(
             type="image",
             data=test_image_data,
-            mimeType="image/png",
+            mime_type="image/png",
         ),
         TextContentBlock(type="text", text="What do you see?"),
     ]
@@ -130,7 +130,7 @@ def test_convert_image_with_different_mime_types():
             ImageContentBlock(
                 type="image",
                 data=test_data,
-                mimeType=mime_type,
+                mime_type=mime_type,
             )
         ]
 
@@ -154,7 +154,7 @@ def test_convert_unsupported_image_mime_type_with_conversion():
         ImageContentBlock(
             type="image",
             data=bmp_data,
-            mimeType="image/bmp",
+            mime_type="image/bmp",
         )
     ]
 
@@ -174,7 +174,7 @@ def test_convert_corrupted_image_falls_back():
         ImageContentBlock(
             type="image",
             data=invalid_data,
-            mimeType="image/bmp",
+            mime_type="image/bmp",
         )
     ]
 
@@ -195,7 +195,7 @@ def test_convert_resource_content_block():
             type="resource_link",
             uri="file:///example.txt",
             name="example.txt",
-            mimeType="text/plain",
+            mime_type="text/plain",
             size=1234,
         )
     ]
@@ -215,7 +215,7 @@ def test_convert_embedded_text_resource():
     """Test converting EmbeddedResourceContentBlock with text content."""
     text_resource = TextResourceContents(
         uri="file:///example.txt",
-        mimeType="text/plain",
+        mime_type="text/plain",
         text="Hello from embedded resource!",
     )
     acp_prompt: list = [
@@ -245,7 +245,7 @@ def test_convert_embedded_image_blob():
 
     blob_resource = BlobResourceContents(
         uri="file:///example.png",
-        mimeType="image/png",
+        mime_type="image/png",
         blob=test_image_data,
     )
     acp_prompt: list = [
@@ -274,7 +274,7 @@ def test_convert_embedded_unsupported_image_blob():
 
     blob_resource = BlobResourceContents(
         uri="file:///example.bmp",
-        mimeType="image/bmp",
+        mime_type="image/bmp",
         blob=bmp_data,
     )
     acp_prompt: list = [
@@ -297,7 +297,7 @@ def test_convert_embedded_non_image_blob():
     test_data = base64.b64encode(b"binary data").decode("utf-8")
     blob_resource = BlobResourceContents(
         uri="file:///example.bin",
-        mimeType="application/octet-stream",
+        mime_type="application/octet-stream",
         blob=test_data,
     )
     acp_prompt: list = [
@@ -324,7 +324,7 @@ def test_convert_mixed_content_with_resources():
 
     text_resource = TextResourceContents(
         uri="file:///notes.txt",
-        mimeType="text/plain",
+        mime_type="text/plain",
         text="Some notes",
     )
 
@@ -333,13 +333,13 @@ def test_convert_mixed_content_with_resources():
         ImageContentBlock(
             type="image",
             data=test_image_data,
-            mimeType="image/png",
+            mime_type="image/png",
         ),
         ResourceContentBlock(
             type="resource_link",
             uri="file:///data.csv",
             name="data.csv",
-            mimeType="text/csv",
+            mime_type="text/csv",
             size=5678,
         ),
         EmbeddedResourceContentBlock(
