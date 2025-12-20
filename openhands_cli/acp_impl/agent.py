@@ -22,6 +22,7 @@ from acp.helpers import update_current_mode
 from acp.schema import (
     AgentCapabilities,
     AgentMessageChunk,
+    AgentThoughtChunk,
     AuthenticateResponse,
     AvailableCommandsUpdate,
     Implementation,
@@ -188,30 +189,38 @@ class OpenHandsACPAgent(ACPAgent):
     async def _send_streaming_chunk(
         self, session_id: str, content: str, is_reasoning: bool = False
     ):
-        """Send a streaming chunk as an ACP AgentMessageChunk update.
+        """Send a streaming chunk as an ACP update.
 
         Args:
             session_id: The session ID
             content: The content to send
-            is_reasoning: Whether this is reasoning content (for formatting)
+            is_reasoning: Whether this is reasoning content (sent as AgentThoughtChunk)
         """
         try:
-            # Format reasoning content differently
             if is_reasoning:
-                formatted_content = f"**Reasoning**: {content}"
-            else:
-                formatted_content = content
-
-            await self._conn.session_update(
-                session_id=session_id,
-                update=AgentMessageChunk(
-                    session_update="agent_message_chunk",
-                    content=TextContentBlock(
-                        type="text",
-                        text=formatted_content,
+                # Send reasoning content as AgentThoughtChunk
+                await self._conn.session_update(
+                    session_id=session_id,
+                    update=AgentThoughtChunk(
+                        session_update="agent_thought_chunk",
+                        content=TextContentBlock(
+                            type="text",
+                            text=content,
+                        ),
                     ),
-                ),
-            )
+                )
+            else:
+                # Send regular content as AgentMessageChunk
+                await self._conn.session_update(
+                    session_id=session_id,
+                    update=AgentMessageChunk(
+                        session_update="agent_message_chunk",
+                        content=TextContentBlock(
+                            type="text",
+                            text=content,
+                        ),
+                    ),
+                )
         except Exception as e:
             logger.debug(f"Error sending streaming chunk: {e}", exc_info=True)
 
