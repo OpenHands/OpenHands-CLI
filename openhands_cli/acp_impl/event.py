@@ -125,8 +125,8 @@ class EventSubscriber:
         self.conversation = conversation
         self.streaming_enabled = streaming_enabled
         self.loop = loop
-        # Track tool call indices that are "think" tools for streaming thoughts
-        self._streaming_think_tool_indices: set[int] = set()
+        # Track streaming tool calls: index -> {tool_call_id, name, is_think}
+        self._streaming_tool_calls: dict[int, dict[str, str | bool | None]] = {}
 
     def _format_status_line(self, usage, cost: float) -> str:
         """Format metrics as a status line string.
@@ -675,10 +675,11 @@ class EventSubscriber:
             )
 
     def _handle_tool_call_streaming(self, tool_call) -> None:
-        """Handle streaming of tool calls, specifically detecting think tool.
+        """Handle streaming of tool calls.
 
-        When a think tool call is detected, streams the thought argument
-        via AgentThoughtChunk.
+        Tracks tool calls and streams their arguments:
+        - Think tool: streams via AgentThoughtChunk
+        - Other tools: streams via ToolCallProgress
 
         Args:
             tool_call: Tool call object from the LLM streaming delta
@@ -687,6 +688,7 @@ class EventSubscriber:
             return
 
         index = getattr(tool_call, "index", 0) or 0
+        tool_call_id = getattr(tool_call, "id", None)
         function = getattr(tool_call, "function", None)
         if not function:
             return
@@ -694,25 +696,51 @@ class EventSubscriber:
         name = getattr(function, "name", None)
         arguments = getattr(function, "arguments", None)
 
-        # When we see the tool name, register if it's a think tool
-        if name == "think":
-            self._streaming_think_tool_indices.add(index)
+        # Register new tool call when we see the id and/or name
+        if index not in self._streaming_tool_calls:
+            if tool_call_id or name:
+                self._streaming_tool_calls[index] = {
+                    "tool_call_id": tool_call_id,
+                    "name": name,
+                    "is_think": name == "think" if name else False,
+                }
+        else:
+            # Update existing tool call info if we get new data
+            if tool_call_id:
+                self._streaming_tool_calls[index]["tool_call_id"] = tool_call_id
+            if name:
+                self._streaming_tool_calls[index]["name"] = name
+                self._streaming_tool_calls[index]["is_think"] = name == "think"
 
-        # Stream arguments for think tools as AgentThoughtChunk
-        if index in self._streaming_think_tool_indices and arguments:
-            # Extract the actual thought content from JSON arguments
-            # Arguments come as incremental JSON like: {"thought": "..."}
-            thought_content = self._extract_thought_from_args(arguments)
-            if thought_content:
-                if self.loop and self.loop.is_running():
-                    asyncio.run_coroutine_threadsafe(
-                        self._send_streaming_chunk(thought_content, is_reasoning=True),
-                        self.loop,
-                    )
-                elif self.loop:
-                    self.loop.run_until_complete(
+        # Stream arguments if we have them and the tool is registered
+        if index in self._streaming_tool_calls and arguments:
+            tool_info = self._streaming_tool_calls[index]
+            is_think = tool_info.get("is_think", False)
+            stored_tool_call_id = tool_info.get("tool_call_id")
+
+            if is_think:
+                # Stream think tool arguments as AgentThoughtChunk
+                thought_content = self._extract_thought_from_args(arguments)
+                if thought_content:
+                    self._schedule_async(
                         self._send_streaming_chunk(thought_content, is_reasoning=True)
                     )
+            elif stored_tool_call_id and isinstance(stored_tool_call_id, str):
+                # Stream other tools via ToolCallProgress
+                self._schedule_async(
+                    self._send_tool_call_progress(stored_tool_call_id, arguments)
+                )
+
+    def _schedule_async(self, coro) -> None:
+        """Schedule an async coroutine to run on the event loop.
+
+        Args:
+            coro: Coroutine to schedule
+        """
+        if self.loop and self.loop.is_running():
+            asyncio.run_coroutine_threadsafe(coro, self.loop)
+        elif self.loop:
+            self.loop.run_until_complete(coro)
 
     def _extract_thought_from_args(self, arguments: str) -> str | None:
         """Extract thought content from streaming tool call arguments.
@@ -745,6 +773,33 @@ class EventSubscriber:
 
         # Return the content that is part of the actual thought text
         return arguments
+
+    async def _send_tool_call_progress(self, tool_call_id: str, arguments: str) -> None:
+        """Send tool call progress update via ToolCallProgress.
+
+        Args:
+            tool_call_id: The ID of the tool call
+            arguments: The streaming arguments content
+        """
+        try:
+            await self.conn.session_update(
+                session_id=self.session_id,
+                update=ToolCallProgress(
+                    session_update="tool_call_update",
+                    tool_call_id=tool_call_id,
+                    content=[
+                        ContentToolCallContent(
+                            type="content",
+                            content=TextContentBlock(
+                                type="text",
+                                text=arguments,
+                            ),
+                        )
+                    ],
+                ),
+            )
+        except Exception as e:
+            logger.debug(f"Error sending tool call progress: {e}", exc_info=True)
 
     async def _send_streaming_chunk(self, content: str, is_reasoning: bool = False):
         """Send a streaming chunk as an ACP update.

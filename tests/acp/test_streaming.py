@@ -239,17 +239,20 @@ async def test_send_streaming_chunk_error_handling(event_subscriber, mock_connec
 async def test_think_tool_detection(event_subscriber, mock_tool_call):
     """Test that think tool is properly detected during streaming."""
     tool_call, function = mock_tool_call
+    tool_call.id = "tool_123"
     function.name = "think"
     function.arguments = None
 
-    # Initially, no think tool indices should be tracked
-    assert 0 not in event_subscriber._streaming_think_tool_indices
+    # Initially, no tool calls should be tracked
+    assert 0 not in event_subscriber._streaming_tool_calls
 
     # Handle the tool call with think name
     event_subscriber._handle_tool_call_streaming(tool_call)
 
-    # Now the index should be tracked
-    assert 0 in event_subscriber._streaming_think_tool_indices
+    # Now the index should be tracked with is_think=True
+    assert 0 in event_subscriber._streaming_tool_calls
+    assert event_subscriber._streaming_tool_calls[0]["is_think"] is True
+    assert event_subscriber._streaming_tool_calls[0]["name"] == "think"
 
 
 @pytest.mark.asyncio
@@ -258,6 +261,7 @@ async def test_think_tool_arguments_streaming(
 ):
     """Test that think tool arguments are streamed as AgentThoughtChunk."""
     tool_call, function = mock_tool_call
+    tool_call.id = "tool_123"
 
     # First call: register the think tool
     function.name = "think"
@@ -313,6 +317,7 @@ async def test_think_tool_streaming_via_on_token(
     # Create tool calls list with think tool
     tool_call = MagicMock()
     tool_call.index = 0
+    tool_call.id = "tool_123"
     function = MagicMock()
     function.name = "think"
     function.arguments = ""
@@ -323,18 +328,105 @@ async def test_think_tool_streaming_via_on_token(
     event_subscriber.on_token(chunk)
 
     # Verify think tool is registered
-    assert 0 in event_subscriber._streaming_think_tool_indices
+    assert 0 in event_subscriber._streaming_tool_calls
+    assert event_subscriber._streaming_tool_calls[0]["is_think"] is True
 
 
 @pytest.mark.asyncio
-async def test_non_think_tool_not_tracked(event_subscriber, mock_tool_call):
-    """Test that non-think tools are not tracked for thought streaming."""
+async def test_non_think_tool_tracked_for_progress(event_subscriber, mock_tool_call):
+    """Test that non-think tools are tracked for ToolCallProgress streaming."""
     tool_call, function = mock_tool_call
+    tool_call.id = "tool_456"
     function.name = "terminal"
     function.arguments = None
 
     # Handle the tool call with non-think name
     event_subscriber._handle_tool_call_streaming(tool_call)
 
-    # The index should NOT be tracked
-    assert 0 not in event_subscriber._streaming_think_tool_indices
+    # The index should be tracked but is_think should be False
+    assert 0 in event_subscriber._streaming_tool_calls
+    assert event_subscriber._streaming_tool_calls[0]["is_think"] is False
+    assert event_subscriber._streaming_tool_calls[0]["name"] == "terminal"
+    assert event_subscriber._streaming_tool_calls[0]["tool_call_id"] == "tool_456"
+
+
+@pytest.mark.asyncio
+async def test_tool_call_progress_streaming(event_subscriber, mock_connection):
+    """Test that non-think tools stream via ToolCallProgress."""
+    from acp.schema import ToolCallProgress
+
+    tool_call_id = "tool_789"
+    arguments = '{"command": "ls -la"}'
+
+    await event_subscriber._send_tool_call_progress(tool_call_id, arguments)
+
+    # Verify session_update was called with ToolCallProgress
+    mock_connection.session_update.assert_called()
+    call_args = mock_connection.session_update.call_args
+
+    assert call_args[1]["session_id"] == "test-session"
+    update = call_args[1]["update"]
+    assert isinstance(update, ToolCallProgress)
+    assert update.tool_call_id == tool_call_id
+    assert update.session_update == "tool_call_update"
+    assert update.content is not None
+    assert len(update.content) == 1
+    assert update.content[0].content.text == arguments
+
+
+@pytest.mark.asyncio
+async def test_multiple_tool_calls_streaming(event_subscriber, mock_streaming_chunk):
+    """Test streaming multiple concurrent tool calls."""
+    chunk, delta = mock_streaming_chunk
+    delta.content = None
+    delta.reasoning_content = None
+
+    # Create two tool calls
+    tool_call_0 = MagicMock()
+    tool_call_0.index = 0
+    tool_call_0.id = "tool_think"
+    function_0 = MagicMock()
+    function_0.name = "think"
+    function_0.arguments = ""
+    tool_call_0.function = function_0
+
+    tool_call_1 = MagicMock()
+    tool_call_1.index = 1
+    tool_call_1.id = "tool_terminal"
+    function_1 = MagicMock()
+    function_1.name = "terminal"
+    function_1.arguments = ""
+    tool_call_1.function = function_1
+
+    delta.tool_calls = [tool_call_0, tool_call_1]
+
+    # Process the chunk
+    event_subscriber.on_token(chunk)
+
+    # Both tools should be tracked
+    assert 0 in event_subscriber._streaming_tool_calls
+    assert 1 in event_subscriber._streaming_tool_calls
+    assert event_subscriber._streaming_tool_calls[0]["is_think"] is True
+    assert event_subscriber._streaming_tool_calls[1]["is_think"] is False
+
+
+@pytest.mark.asyncio
+async def test_tool_call_id_update(event_subscriber, mock_tool_call):
+    """Test that tool call ID can be updated after initial registration."""
+    tool_call, function = mock_tool_call
+    tool_call.id = None  # ID might come in a later chunk
+    function.name = "file_editor"
+    function.arguments = None
+
+    # Register with name but no ID
+    event_subscriber._handle_tool_call_streaming(tool_call)
+    assert event_subscriber._streaming_tool_calls[0]["tool_call_id"] is None
+
+    # Update with ID in subsequent chunk
+    tool_call.id = "tool_updated_id"
+    function.name = None  # Name might be None in subsequent chunks
+    event_subscriber._handle_tool_call_streaming(tool_call)
+
+    assert (
+        event_subscriber._streaming_tool_calls[0]["tool_call_id"] == "tool_updated_id"
+    )
