@@ -74,3 +74,47 @@ def get_splash_content(conversation_id: str, *, theme: Theme) -> dict:
         )
 
     return content
+
+
+def get_splash_content_css_based(conversation_id: str) -> dict:
+    """Get structured splash screen content using CSS classes for theming.
+    
+    This version uses CSS classes instead of hardcoded colors, allowing
+    automatic theme updates without regenerating content.
+
+    Args:
+        conversation_id: Optional conversation ID to display
+    """
+    # Use plain text for banner - CSS will handle coloring
+    banner = get_openhands_banner()
+
+    # Get version information
+    version_info = check_for_updates()
+
+    # Create structured content as dictionary - no hardcoded colors
+    content = {
+        "banner": banner,
+        "version": f"OpenHands CLI v{version_info.current_version}",
+        "status_text": "All set up!",
+        "conversation_text": f"Initialized conversation {conversation_id}",
+        "conversation_id": conversation_id,
+        "instructions_header": "What do you want to build?",
+        "instructions": [
+            "1. Ask questions, edit files, or run commands.",
+            "2. Use @ to look up a file in the folder structure",
+            (
+                "3. Type /help for help or / to immediately scroll through "
+                "available commands"
+            ),
+        ],
+        "update_notice": None,
+    }
+
+    # Add update notification if needed
+    if version_info.needs_update and version_info.latest_version:
+        content["update_notice"] = (
+            f"⚠ Update available: {version_info.latest_version}\n"
+            "Run 'uv tool upgrade openhands' to update"
+        )
+
+    return content

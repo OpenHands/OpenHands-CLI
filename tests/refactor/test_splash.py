@@ -5,6 +5,7 @@ import unittest.mock as mock
 from openhands_cli.refactor.content.splash import (
     get_openhands_banner,
     get_splash_content,
+    get_splash_content_css_based,
 )
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.version_check import VersionInfo
@@ -152,3 +153,86 @@ class TestGetSplashContent:
                 "[" in content["conversation_text"]
                 and "]" in content["conversation_text"]
             )
+
+
+class TestGetSplashContentCssBased:
+    """Tests for get_splash_content_css_based function."""
+
+    def test_css_based_splash_content_structure(self):
+        """Test that CSS-based splash content has correct structure."""
+        with mock.patch(
+            "openhands_cli.refactor.content.splash.check_for_updates"
+        ) as mock_check:
+            mock_check.return_value = VersionInfo(
+                current_version="1.0.0",
+                latest_version="1.0.0",
+                needs_update=False,
+                error=None,
+            )
+
+            content = get_splash_content_css_based("test-123")
+
+            # Check that all expected keys are present
+            expected_keys = [
+                "banner",
+                "version",
+                "status_text",
+                "conversation_text",
+                "conversation_id",
+                "instructions_header",
+                "instructions",
+            ]
+
+            for key in expected_keys:
+                assert key in content
+
+            # Check types
+            assert isinstance(content["banner"], str)
+            assert isinstance(content["version"], str)
+            assert isinstance(content["status_text"], str)
+            assert isinstance(content["conversation_text"], str)
+            assert isinstance(content["conversation_id"], str)
+            assert isinstance(content["instructions_header"], str)
+            assert isinstance(content["instructions"], list)
+
+    def test_css_based_content_no_hardcoded_colors(self):
+        """Test that CSS-based content doesn't contain hardcoded color markup."""
+        with mock.patch(
+            "openhands_cli.refactor.content.splash.check_for_updates"
+        ) as mock_check:
+            mock_check.return_value = VersionInfo(
+                current_version="1.0.0",
+                latest_version="1.0.0",
+                needs_update=False,
+                error=None,
+            )
+
+            content = get_splash_content_css_based("test-123")
+
+            # Should NOT contain Rich markup for colors (no [#color] patterns)
+            assert "#" not in content["banner"]
+            assert "#" not in content["instructions_header"]
+            assert "#" not in content["conversation_text"]
+            
+            # Should contain plain text
+            assert "What do you want to build?" in content["instructions_header"]
+            assert "Initialized conversation test-123" in content["conversation_text"]
+
+    def test_css_based_content_with_conversation_id(self):
+        """Test CSS-based splash content generation with conversation ID."""
+        with mock.patch(
+            "openhands_cli.refactor.content.splash.check_for_updates"
+        ) as mock_check:
+            mock_check.return_value = VersionInfo(
+                current_version="1.0.0",
+                latest_version="1.0.0",
+                needs_update=False,
+                error=None,
+            )
+
+            content = get_splash_content_css_based("test-conversation-456")
+
+            # Should contain conversation ID
+            assert "conversation_text" in content
+            assert "Initialized conversation test-conversation-456" in content["conversation_text"]
+            assert content["conversation_id"] == "test-conversation-456"

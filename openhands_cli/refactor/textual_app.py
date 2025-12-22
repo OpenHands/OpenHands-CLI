@@ -28,7 +28,7 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
-from openhands_cli.refactor.content.splash import get_splash_content
+from openhands_cli.refactor.content.splash import get_splash_content_css_based
 from openhands_cli.refactor.core.commands import is_valid_command, show_help
 from openhands_cli.refactor.core.conversation_runner import ConversationRunner
 from openhands_cli.refactor.modals import SettingsScreen
@@ -292,9 +292,9 @@ class OpenHandsApp(App):
         if self.is_ui_initialized:
             return
 
-        # Get structured splash content
-        splash_content = get_splash_content(
-            conversation_id=self.conversation_id.hex, theme=OPENHANDS_THEME
+        # Get structured splash content (CSS-based, no hardcoded colors)
+        splash_content = get_splash_content_css_based(
+            conversation_id=self.conversation_id.hex
         )
 
         # Update individual splash widgets
