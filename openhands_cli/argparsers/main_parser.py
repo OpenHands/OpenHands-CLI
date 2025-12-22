@@ -117,6 +117,15 @@ def create_main_parser() -> argparse.ArgumentParser:
         help="Exit the application without showing confirmation dialog",
     )
 
+    # User skills toggle: default on, disable with --no-user-skills
+    parser.add_argument(
+        "--no-user-skills",
+        dest="user_skills",
+        action="store_false",
+        help="Disable loading user skills from ~/.openhands",
+    )
+    parser.set_defaults(user_skills=True)
+
     # Subcommands
     subparsers = parser.add_subparsers(dest="command", help="Additional commands")
 

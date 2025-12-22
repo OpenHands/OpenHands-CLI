@@ -42,6 +42,7 @@ class ConversationRunner:
         visualizer: ConversationVisualizer,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
         event_callback: Callable[[Event], None] | None = None,
+        user_skills: bool = True,
     ):
         """Initialize the conversation runner.
 
@@ -60,6 +61,7 @@ class ConversationRunner:
             confirmation_policy=starting_confirmation_policy,
             visualizer=visualizer,
             event_callback=event_callback,
+            user_skills=user_skills,
         )
 
         self._running = False

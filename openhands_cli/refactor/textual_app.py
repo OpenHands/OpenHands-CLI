@@ -76,6 +76,7 @@ class OpenHandsApp(App):
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
         headless_mode: bool = False,
         json_mode: bool = False,
+        user_skills: bool = True,
         **kwargs,
     ):
         """Initialize the app with custom OpenHands theme.
@@ -116,6 +117,9 @@ class OpenHandsApp(App):
         self.initial_confirmation_policy = (
             initial_confirmation_policy or AlwaysConfirm()
         )
+
+        # Track user_skills toggle
+        self.user_skills = user_skills
 
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
@@ -346,6 +350,7 @@ class OpenHandsApp(App):
             visualizer,
             self.initial_confirmation_policy,
             event_callback,
+            user_skills=self.user_skills,
         )
 
     def _process_queued_inputs(self) -> None:
@@ -587,6 +592,7 @@ def main(
     exit_without_confirmation: bool = False,
     headless: bool = False,
     json_mode: bool = False,
+    user_skills: bool = True,
 ):
     """Run the textual app.
 
@@ -616,6 +622,7 @@ def main(
         initial_confirmation_policy=initial_confirmation_policy,
         headless_mode=headless,
         json_mode=json_mode,
+        user_skills=user_skills,
     )
     app.run(headless=headless)
 

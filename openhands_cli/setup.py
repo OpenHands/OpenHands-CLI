@@ -31,6 +31,7 @@ def load_agent_specs(
     conversation_id: str | None = None,
     mcp_servers: dict[str, dict[str, Any]] | None = None,
     skills: list[Skill] | None = None,
+    user_skills: bool = True,
 ) -> Agent:
     """Load agent specifications.
 
@@ -46,7 +47,7 @@ def load_agent_specs(
         MissingAgentSpec: If agent specification is not found or invalid
     """
     agent_store = AgentStore()
-    agent = agent_store.load(session_id=conversation_id)
+    agent = agent_store.load(session_id=conversation_id, load_user_skills=user_skills)
     if not agent:
         raise MissingAgentSpec(
             "Agent specification not found. Please configure your settings."
@@ -81,11 +82,13 @@ def load_agent_specs(
     return agent
 
 
+
 def setup_conversation(
     conversation_id: UUID,
     confirmation_policy: ConfirmationPolicyBase,
     visualizer: ConversationVisualizer | None = None,
     event_callback: Callable[[Event], None] | None = None,
+    user_skills: bool = True,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
@@ -103,7 +106,7 @@ def setup_conversation(
     console = Console()
     console.print("Initializing agent...", style="white")
 
-    agent = load_agent_specs(str(conversation_id))
+    agent = load_agent_specs(str(conversation_id), user_skills=user_skills)
 
     # Prepare callbacks list
     callbacks = [event_callback] if event_callback else None
