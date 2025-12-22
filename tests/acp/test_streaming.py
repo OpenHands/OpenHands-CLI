@@ -43,6 +43,16 @@ def mock_streaming_chunk():
     return chunk, delta
 
 
+@pytest.fixture
+def mock_tool_call():
+    """Create a mock tool call for streaming."""
+    tool_call = MagicMock()
+    tool_call.index = 0
+    function = MagicMock()
+    tool_call.function = function
+    return tool_call, function
+
+
 @pytest.mark.asyncio
 async def test_token_callback_creation(event_subscriber):
     """Test that on_token method is callable."""
@@ -223,3 +233,108 @@ async def test_send_streaming_chunk_error_handling(event_subscriber, mock_connec
         pytest.fail(
             f"_send_streaming_chunk should handle errors gracefully, but raised: {e}"
         )
+
+
+@pytest.mark.asyncio
+async def test_think_tool_detection(event_subscriber, mock_tool_call):
+    """Test that think tool is properly detected during streaming."""
+    tool_call, function = mock_tool_call
+    function.name = "think"
+    function.arguments = None
+
+    # Initially, no think tool indices should be tracked
+    assert 0 not in event_subscriber._streaming_think_tool_indices
+
+    # Handle the tool call with think name
+    event_subscriber._handle_tool_call_streaming(tool_call)
+
+    # Now the index should be tracked
+    assert 0 in event_subscriber._streaming_think_tool_indices
+
+
+@pytest.mark.asyncio
+async def test_think_tool_arguments_streaming(
+    event_subscriber, mock_connection, mock_tool_call
+):
+    """Test that think tool arguments are streamed as AgentThoughtChunk."""
+    tool_call, function = mock_tool_call
+
+    # First call: register the think tool
+    function.name = "think"
+    function.arguments = ""
+    event_subscriber._handle_tool_call_streaming(tool_call)
+
+    # Second call: stream the thought argument
+    function.name = None  # Name is None in subsequent chunks
+    function.arguments = "This is my thought"
+
+    await event_subscriber._send_streaming_chunk(
+        "This is my thought", is_reasoning=True
+    )
+
+    # Verify session_update was called with AgentThoughtChunk
+    mock_connection.session_update.assert_called()
+    call_args = mock_connection.session_update.call_args
+
+    assert call_args[1]["session_id"] == "test-session"
+    update = call_args[1]["update"]
+    assert isinstance(update, AgentThoughtChunk)
+    assert update.content.text == "This is my thought"
+
+
+@pytest.mark.asyncio
+async def test_extract_thought_filters_json_syntax(event_subscriber):
+    """Test that JSON syntax is filtered out from thought arguments."""
+    # These should return None (JSON syntax only)
+    assert event_subscriber._extract_thought_from_args("{") is None
+    assert event_subscriber._extract_thought_from_args("}") is None
+    assert event_subscriber._extract_thought_from_args('"') is None
+    assert event_subscriber._extract_thought_from_args('{"thought') is None
+    assert event_subscriber._extract_thought_from_args('": "') is None
+    assert event_subscriber._extract_thought_from_args('"}') is None
+
+    # These should return the actual thought content
+    assert event_subscriber._extract_thought_from_args("Hello world") == "Hello world"
+    assert (
+        event_subscriber._extract_thought_from_args("I need to think")
+        == "I need to think"
+    )
+
+
+@pytest.mark.asyncio
+async def test_think_tool_streaming_via_on_token(
+    event_subscriber, mock_connection, mock_streaming_chunk
+):
+    """Test complete think tool streaming through on_token method."""
+    chunk, delta = mock_streaming_chunk
+    delta.content = None
+    delta.reasoning_content = None
+
+    # Create tool calls list with think tool
+    tool_call = MagicMock()
+    tool_call.index = 0
+    function = MagicMock()
+    function.name = "think"
+    function.arguments = ""
+    tool_call.function = function
+    delta.tool_calls = [tool_call]
+
+    # Process first chunk (registers think tool)
+    event_subscriber.on_token(chunk)
+
+    # Verify think tool is registered
+    assert 0 in event_subscriber._streaming_think_tool_indices
+
+
+@pytest.mark.asyncio
+async def test_non_think_tool_not_tracked(event_subscriber, mock_tool_call):
+    """Test that non-think tools are not tracked for thought streaming."""
+    tool_call, function = mock_tool_call
+    function.name = "terminal"
+    function.arguments = None
+
+    # Handle the tool call with non-think name
+    event_subscriber._handle_tool_call_streaming(tool_call)
+
+    # The index should NOT be tracked
+    assert 0 not in event_subscriber._streaming_think_tool_indices

@@ -125,6 +125,8 @@ class EventSubscriber:
         self.conversation = conversation
         self.streaming_enabled = streaming_enabled
         self.loop = loop
+        # Track tool call indices that are "think" tools for streaming thoughts
+        self._streaming_think_tool_indices: set[int] = set()
 
     def _format_status_line(self, usage, cost: float) -> str:
         """Format metrics as a status line string.
@@ -625,6 +627,12 @@ class EventSubscriber:
                 if not delta:
                     continue
 
+                # Handle tool calls - specifically detect and stream think tool
+                tool_calls = getattr(delta, "tool_calls", None)
+                if tool_calls:
+                    for tool_call in tool_calls:
+                        self._handle_tool_call_streaming(tool_call)
+
                 content_to_send = None
                 is_reasoning_content = False
 
@@ -665,6 +673,78 @@ class EventSubscriber:
                     "details": str(e),
                 }
             )
+
+    def _handle_tool_call_streaming(self, tool_call) -> None:
+        """Handle streaming of tool calls, specifically detecting think tool.
+
+        When a think tool call is detected, streams the thought argument
+        via AgentThoughtChunk.
+
+        Args:
+            tool_call: Tool call object from the LLM streaming delta
+        """
+        if not tool_call:
+            return
+
+        index = getattr(tool_call, "index", 0) or 0
+        function = getattr(tool_call, "function", None)
+        if not function:
+            return
+
+        name = getattr(function, "name", None)
+        arguments = getattr(function, "arguments", None)
+
+        # When we see the tool name, register if it's a think tool
+        if name == "think":
+            self._streaming_think_tool_indices.add(index)
+
+        # Stream arguments for think tools as AgentThoughtChunk
+        if index in self._streaming_think_tool_indices and arguments:
+            # Extract the actual thought content from JSON arguments
+            # Arguments come as incremental JSON like: {"thought": "..."}
+            thought_content = self._extract_thought_from_args(arguments)
+            if thought_content:
+                if self.loop and self.loop.is_running():
+                    asyncio.run_coroutine_threadsafe(
+                        self._send_streaming_chunk(thought_content, is_reasoning=True),
+                        self.loop,
+                    )
+                elif self.loop:
+                    self.loop.run_until_complete(
+                        self._send_streaming_chunk(thought_content, is_reasoning=True)
+                    )
+
+    def _extract_thought_from_args(self, arguments: str) -> str | None:
+        """Extract thought content from streaming tool call arguments.
+
+        Filters out JSON syntax to extract just the thought text.
+
+        Args:
+            arguments: Incremental arguments string from tool call
+
+        Returns:
+            Extracted thought text or None if only JSON syntax
+        """
+        if not arguments:
+            return None
+
+        # Filter out JSON syntax characters that shouldn't be displayed
+        # These are the structural parts of {"thought": "..."}
+        json_syntax = {"{", "}", '"', ":", "thought", "\\"}
+
+        # Check if this is purely JSON syntax
+        stripped = arguments.strip()
+        if stripped in json_syntax:
+            return None
+        if stripped == '{"thought':
+            return None
+        if stripped == '": "':
+            return None
+        if stripped == '"}':
+            return None
+
+        # Return the content that is part of the actual thought text
+        return arguments
 
     async def _send_streaming_chunk(self, content: str, is_reasoning: bool = False):
         """Send a streaming chunk as an ACP update.
