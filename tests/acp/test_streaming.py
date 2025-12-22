@@ -340,8 +340,10 @@ async def test_non_think_tool_tracked_for_progress(event_subscriber, mock_tool_c
     function.name = "terminal"
     function.arguments = None
 
-    # Handle the tool call with non-think name
-    event_subscriber._handle_tool_call_streaming(tool_call)
+    # Mock _schedule_async to avoid event loop issues in test
+    with patch.object(event_subscriber, "_schedule_async"):
+        # Handle the tool call with non-think name
+        event_subscriber._handle_tool_call_streaming(tool_call)
 
     # The index should be tracked but is_think should be False
     assert 0 in event_subscriber._streaming_tool_calls
@@ -400,8 +402,10 @@ async def test_multiple_tool_calls_streaming(event_subscriber, mock_streaming_ch
 
     delta.tool_calls = [tool_call_0, tool_call_1]
 
-    # Process the chunk
-    event_subscriber.on_token(chunk)
+    # Mock _schedule_async to avoid event loop issues in test
+    with patch.object(event_subscriber, "_schedule_async"):
+        # Process the chunk
+        event_subscriber.on_token(chunk)
 
     # Both tools should be tracked
     assert 0 in event_subscriber._streaming_tool_calls
@@ -418,15 +422,137 @@ async def test_tool_call_id_update(event_subscriber, mock_tool_call):
     function.name = "file_editor"
     function.arguments = None
 
-    # Register with name but no ID
-    event_subscriber._handle_tool_call_streaming(tool_call)
-    assert event_subscriber._streaming_tool_calls[0]["tool_call_id"] is None
+    # Mock _schedule_async to avoid event loop issues in test
+    with patch.object(event_subscriber, "_schedule_async"):
+        # Register with name but no ID
+        event_subscriber._handle_tool_call_streaming(tool_call)
+        assert event_subscriber._streaming_tool_calls[0]["tool_call_id"] is None
 
-    # Update with ID in subsequent chunk
-    tool_call.id = "tool_updated_id"
-    function.name = None  # Name might be None in subsequent chunks
-    event_subscriber._handle_tool_call_streaming(tool_call)
+        # Update with ID in subsequent chunk
+        tool_call.id = "tool_updated_id"
+        function.name = None  # Name might be None in subsequent chunks
+        event_subscriber._handle_tool_call_streaming(tool_call)
 
     assert (
         event_subscriber._streaming_tool_calls[0]["tool_call_id"] == "tool_updated_id"
     )
+
+
+@pytest.mark.asyncio
+async def test_tool_call_start_sent_for_non_think_tools(
+    event_subscriber, mock_connection
+):
+    """Test that ToolCallStart is sent when a non-think tool starts streaming."""
+    from acp.schema import ToolCallStart
+
+    tool_call_id = "tool_abc"
+    tool_name = "terminal"
+
+    await event_subscriber._send_tool_call_start(tool_call_id, tool_name)
+
+    # Verify session_update was called with ToolCallStart
+    mock_connection.session_update.assert_called()
+    call_args = mock_connection.session_update.call_args
+
+    assert call_args[1]["session_id"] == "test-session"
+    update = call_args[1]["update"]
+    assert isinstance(update, ToolCallStart)
+    assert update.tool_call_id == tool_call_id
+    assert update.title == tool_name
+    assert update.kind == "execute"
+    assert update.status == "in_progress"
+    assert update.session_update == "tool_call"
+
+
+@pytest.mark.asyncio
+async def test_tool_call_start_triggered_on_first_detection(
+    event_subscriber, mock_connection, mock_streaming_chunk
+):
+    """Test that ToolCallStart is sent only once when tool is first detected."""
+    chunk, delta = mock_streaming_chunk
+    delta.content = None
+    delta.reasoning_content = None
+
+    # First chunk: tool with id and name
+    tool_call = MagicMock()
+    tool_call.index = 0
+    tool_call.id = "tool_xyz"
+    function = MagicMock()
+    function.name = "terminal"
+    function.arguments = ""
+    tool_call.function = function
+    delta.tool_calls = [tool_call]
+
+    # Mock _schedule_async to avoid event loop issues in test
+    with patch.object(event_subscriber, "_schedule_async") as mock_schedule:
+        # Process chunk - should trigger ToolCallStart
+        event_subscriber.on_token(chunk)
+
+        # Verify _schedule_async was called with _send_tool_call_start coroutine
+        assert mock_schedule.called
+
+    # Verify tool is registered and marked as started
+    assert 0 in event_subscriber._streaming_tool_calls
+    assert event_subscriber._streaming_tool_calls[0]["started"] is True
+
+
+@pytest.mark.asyncio
+async def test_tool_call_start_not_sent_for_think_tool(
+    event_subscriber, mock_tool_call
+):
+    """Test that ToolCallStart is NOT sent for think tools."""
+    tool_call, function = mock_tool_call
+    tool_call.id = "tool_think_123"
+    function.name = "think"
+    function.arguments = None
+
+    # Process think tool
+    event_subscriber._handle_tool_call_streaming(tool_call)
+
+    # Verify think tool is registered but started should remain False
+    # (since we don't send ToolCallStart for think tools)
+    assert 0 in event_subscriber._streaming_tool_calls
+    assert event_subscriber._streaming_tool_calls[0]["is_think"] is True
+    assert event_subscriber._streaming_tool_calls[0]["started"] is False
+
+
+@pytest.mark.asyncio
+async def test_tool_kind_mapping(event_subscriber):
+    """Test that tool names are correctly mapped to ToolKind."""
+    assert event_subscriber._get_tool_kind_from_name("terminal") == "execute"
+    assert event_subscriber._get_tool_kind_from_name("browser_navigate") == "fetch"
+    assert event_subscriber._get_tool_kind_from_name("browser_click") == "fetch"
+    assert event_subscriber._get_tool_kind_from_name("file_editor") == "edit"
+    assert event_subscriber._get_tool_kind_from_name("think") == "think"
+    assert event_subscriber._get_tool_kind_from_name("unknown_tool") == "other"
+
+
+@pytest.mark.asyncio
+async def test_tool_call_start_waits_for_id_and_name(event_subscriber, mock_tool_call):
+    """Test that ToolCallStart is not sent until both id and name are available."""
+    tool_call, function = mock_tool_call
+
+    # First chunk: only name, no id
+    tool_call.id = None
+    function.name = "terminal"
+    function.arguments = None
+
+    # Mock _schedule_async to avoid event loop issues in test
+    with patch.object(event_subscriber, "_schedule_async") as mock_schedule:
+        event_subscriber._handle_tool_call_streaming(tool_call)
+
+        # Tool should be registered but not started (no id yet)
+        assert 0 in event_subscriber._streaming_tool_calls
+        assert event_subscriber._streaming_tool_calls[0]["started"] is False
+        assert not mock_schedule.called  # Should not have been called yet
+
+        # Second chunk: id arrives
+        tool_call.id = "tool_delayed_id"
+        function.name = None  # Name might be None in subsequent chunks
+
+        event_subscriber._handle_tool_call_streaming(tool_call)
+
+        # Now started should be True and _schedule_async called
+        assert mock_schedule.called
+
+    assert event_subscriber._streaming_tool_calls[0]["started"] is True

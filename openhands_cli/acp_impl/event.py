@@ -677,7 +677,7 @@ class EventSubscriber:
     def _handle_tool_call_streaming(self, tool_call) -> None:
         """Handle streaming of tool calls.
 
-        Tracks tool calls and streams their arguments:
+        Sends ToolCallStart when a new tool call is detected, then streams arguments:
         - Think tool: streams via AgentThoughtChunk
         - Other tools: streams via ToolCallProgress
 
@@ -699,10 +699,12 @@ class EventSubscriber:
         # Register new tool call when we see the id and/or name
         if index not in self._streaming_tool_calls:
             if tool_call_id or name:
+                is_think = name == "think" if name else False
                 self._streaming_tool_calls[index] = {
                     "tool_call_id": tool_call_id,
                     "name": name,
-                    "is_think": name == "think" if name else False,
+                    "is_think": is_think,
+                    "started": False,  # Track if ToolCallStart has been sent
                 }
         else:
             # Update existing tool call info if we get new data
@@ -712,12 +714,29 @@ class EventSubscriber:
                 self._streaming_tool_calls[index]["name"] = name
                 self._streaming_tool_calls[index]["is_think"] = name == "think"
 
+        # Send ToolCallStart for non-think tools when we have enough info
+        tool_info = self._streaming_tool_calls.get(index, {})
+        stored_tool_call_id = tool_info.get("tool_call_id")
+        stored_name = tool_info.get("name")
+        is_think = tool_info.get("is_think", False)
+        has_started = tool_info.get("started", False)
+
+        # Send ToolCallStart when we have tool_call_id and name, but haven't started yet
+        if (
+            stored_tool_call_id
+            and stored_name
+            and not has_started
+            and not is_think
+            and isinstance(stored_tool_call_id, str)
+            and isinstance(stored_name, str)
+        ):
+            self._streaming_tool_calls[index]["started"] = True
+            self._schedule_async(
+                self._send_tool_call_start(stored_tool_call_id, stored_name)
+            )
+
         # Stream arguments if we have them and the tool is registered
         if index in self._streaming_tool_calls and arguments:
-            tool_info = self._streaming_tool_calls[index]
-            is_think = tool_info.get("is_think", False)
-            stored_tool_call_id = tool_info.get("tool_call_id")
-
             if is_think:
                 # Stream think tool arguments as AgentThoughtChunk
                 thought_content = self._extract_thought_from_args(arguments)
@@ -773,6 +792,58 @@ class EventSubscriber:
 
         # Return the content that is part of the actual thought text
         return arguments
+
+    def _get_tool_kind_from_name(self, tool_name: str) -> ToolKind:
+        """Map tool name to ToolKind.
+
+        Args:
+            tool_name: The name of the tool
+
+        Returns:
+            The appropriate ToolKind for the tool
+        """
+        tool_kind_mapping: dict[str, ToolKind] = {
+            "terminal": "execute",
+            "browser_use": "fetch",
+            "browser": "fetch",
+            "browser_navigate": "fetch",
+            "browser_click": "fetch",
+            "browser_type": "fetch",
+            "browser_scroll": "fetch",
+            "browser_get_state": "fetch",
+            "browser_get_content": "fetch",
+            "browser_go_back": "fetch",
+            "browser_list_tabs": "fetch",
+            "browser_switch_tab": "fetch",
+            "browser_close_tab": "fetch",
+            "file_editor": "edit",
+            "think": "think",
+            "finish": "other",
+            "task_tracker": "other",
+        }
+        return tool_kind_mapping.get(tool_name, "other")
+
+    async def _send_tool_call_start(self, tool_call_id: str, tool_name: str) -> None:
+        """Send ToolCallStart notification when a tool call begins streaming.
+
+        Args:
+            tool_call_id: The ID of the tool call
+            tool_name: The name of the tool being called
+        """
+        try:
+            tool_kind = self._get_tool_kind_from_name(tool_name)
+            await self.conn.session_update(
+                session_id=self.session_id,
+                update=ToolCallStart(
+                    session_update="tool_call",
+                    tool_call_id=tool_call_id,
+                    title=tool_name,
+                    kind=tool_kind,
+                    status="in_progress",
+                ),
+            )
+        except Exception as e:
+            logger.debug(f"Error sending tool call start: {e}", exc_info=True)
 
     async def _send_tool_call_progress(self, tool_call_id: str, arguments: str) -> None:
         """Send tool call progress update via ToolCallProgress.
