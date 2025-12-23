@@ -89,7 +89,7 @@ class TokenBasedEventSubscriber:
             return
 
         if isinstance(event, ActionEvent):
-            await self._handle_action_event(event)
+            await self.shared_events_handler.handle_action_event(self, event)
         if isinstance(event, UserRejectObservation) or isinstance(
             event, AgentErrorEvent
         ):
@@ -223,20 +223,3 @@ class TokenBasedEventSubscriber:
                     content=format_content_blocks(state.args),
                 ),
             )
-
-    async def send_acp_event(
-        self,
-        update: ACPUpdate,
-    ):
-        await self.conn.session_update(session_id=self.session_id, update=update)
-
-    async def _handle_action_event(self, event: ActionEvent):
-        """Handle ActionEvent: send thought as agent_message_chunk, then tool_call.
-
-        Args:
-            event: ActionEvent to process
-        """
-        try:
-            await self.shared_events_handler.handle_action_event(self, event)
-        except Exception as e:
-            logger.debug(f"Error processing ActionEvent: {e}", exc_info=True)
