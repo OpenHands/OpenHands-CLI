@@ -1,8 +1,9 @@
+from acp import tool_content, text_block
+
 from acp.schema import (
     ContentToolCallContent,
     FileEditToolCallContent,
     TerminalToolCallContent,
-    TextContentBlock,
     ToolCallLocation,
     ToolKind,
 )
@@ -123,9 +124,8 @@ def format_content_blocks(text: str | None) -> list[ToolCallContent] | None:
     if not text or not text.strip():
         return None
     return [
-        ContentToolCallContent(
-            type="content",
-            content=TextContentBlock(type="text", text=text),
+        tool_content(
+            block=text_block(text=text),
         )
     ]
 

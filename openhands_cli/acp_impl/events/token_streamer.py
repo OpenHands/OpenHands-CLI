@@ -19,12 +19,15 @@ from acp import (
     update_agent_message_text,
     update_agent_thought_text,
     update_tool_call,
+    text_block,
+    update_tool_call,
+    update_agent_thought_text,
+    update_agent_message_text
 )
 from acp.schema import (
     AgentMessageChunk,
     AgentPlanUpdate,
     AgentThoughtChunk,
-    TextContentBlock,
     ToolCallProgress,
     ToolCallStart,
 )
@@ -279,25 +282,15 @@ class TokenBasedEventSubscriber:
                 elif isinstance(event.action, ThinkAction):
                     await self.conn.session_update(
                         session_id=self.session_id,
-                        update=AgentThoughtChunk(
-                            session_update="agent_thought_chunk",
-                            content=TextContentBlock(
-                                type="text",
-                                text=action_viz,
-                            ),
-                        ),
+                        update=update_agent_thought_text(action_viz),
                         field_meta=get_metadata(self.conversation),
                     )
                     return
                 elif isinstance(event.action, FinishAction):
                     await self.conn.session_update(
                         session_id=self.session_id,
-                        update=AgentMessageChunk(
-                            session_update="agent_message_chunk",
-                            content=TextContentBlock(
-                                type="text",
-                                text=action_viz,
-                            ),
+                        update=update_agent_message_text(
+                            action_viz,
                         ),
                         field_meta=get_metadata(self.conversation),
                     )
@@ -305,8 +298,7 @@ class TokenBasedEventSubscriber:
 
             await self.conn.session_update(
                 session_id=self.session_id,
-                update=ToolCallProgress(
-                    session_update="tool_call_update",
+                update=update_tool_call(
                     tool_call_id=event.tool_call_id,
                     title=title,
                     kind=tool_kind,
