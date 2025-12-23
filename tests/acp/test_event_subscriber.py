@@ -27,7 +27,7 @@ from openhands.tools.task_tracker.definition import (
     TaskItem,
     TaskTrackerObservation,
 )
-from openhands_cli.acp_impl.event import EventSubscriber
+from openhands_cli.acp_impl.events.event import EventSubscriber
 
 
 @pytest.fixture

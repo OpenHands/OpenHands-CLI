@@ -9,7 +9,7 @@ from acp.schema import AgentMessageChunk, AgentThoughtChunk, TextContentBlock
 from litellm.types.utils import ModelResponseStream
 
 from openhands_cli.acp_impl.agent import OpenHandsACPAgent
-from openhands_cli.acp_impl.event import EventSubscriber
+from openhands_cli.acp_impl.events.event import EventSubscriber
 
 
 @pytest.fixture

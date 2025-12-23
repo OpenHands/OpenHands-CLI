@@ -47,7 +47,8 @@ from openhands_cli.acp_impl.confirmation import (
     ConfirmationMode,
     get_available_modes,
 )
-from openhands_cli.acp_impl.event import EventSubscriber
+from openhands_cli.acp_impl.events.event import EventSubscriber
+from openhands_cli.acp_impl.events.token_streamer import TokenBasedEventSubscriber
 from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
 from openhands_cli.acp_impl.slash_commands import (
     VALID_CONFIRMATION_MODE,
@@ -292,6 +293,9 @@ class OpenHandsACPAgent(ACPAgent):
         # Create event subscriber for streaming updates (ACP-specific)
         # Pass streaming_enabled=True to indicate token streaming is active
         subscriber = EventSubscriber(session_id, self._conn, loop=loop)
+        token_subscriber = TokenBasedEventSubscriber(
+            session_id=session_id, conn=self._conn, loop=loop
+        )
 
         def sync_callback(event: Event) -> None:
             """Synchronous wrapper that schedules async event handling."""
@@ -305,7 +309,7 @@ class OpenHandsACPAgent(ACPAgent):
             persistence_dir=CONVERSATIONS_DIR,
             conversation_id=UUID(session_id),
             callbacks=[sync_callback],
-            token_callbacks=[subscriber.on_token],  # Enable token streaming
+            token_callbacks=[token_subscriber.on_token],  # Enable token streaming
             visualizer=None,  # No visualizer needed for ACP
         )
 

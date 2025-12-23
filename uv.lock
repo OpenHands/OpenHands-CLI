@@ -1506,6 +1506,7 @@ dependencies = [
     { name = "prompt-toolkit" },
     { name = "pydantic" },
     { name = "pyperclip" },
+    { name = "streamingjson" },
     { name = "textual" },
     { name = "textual-autocomplete" },
     { name = "textual-dev" },
@@ -1538,6 +1539,7 @@ requires-dist = [
     { name = "prompt-toolkit", specifier = ">=3" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyperclip", specifier = ">=1.9.0" },
+    { name = "streamingjson", specifier = ">=0.0.2" },
     { name = "textual", specifier = ">=0.79.0" },
     { name = "textual-autocomplete", specifier = ">=4.0.6" },
     { name = "textual-dev", specifier = ">=1.8.0" },
@@ -4923,6 +4925,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/15/b9/cc3017f9a9c9b6e27c5106cc10cc7904653c3eec0729793aec10479dd669/starlette-0.47.3.tar.gz", hash = "sha256:6bc94f839cc176c4858894f1f8908f0ab79dfec1a6b8402f6da9be26ebea52e9", size = 2584144, upload-time = "2025-08-24T13:36:42.122Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ce/fd/901cfa59aaa5b30a99e16876f11abe38b59a1a2c51ffb3d7142bb6089069/starlette-0.47.3-py3-none-any.whl", hash = "sha256:89c0778ca62a76b826101e7c709e70680a1699ca7da6b44d38eb0a7e61fe4b51", size = 72991, upload-time = "2025-08-24T13:36:40.887Z" },
+]
+
+[[package]]
+name = "streamingjson"
+version = "0.0.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b8/bf/733575d718ba8c667ce7b6505d9b64077777ac5cef0877854f5cee4fba2b/streamingjson-0.0.5.tar.gz", hash = "sha256:93b0287ce4ad4089308fbe5745b8bfd63b39e445a6f3891474ea8491284a23e3", size = 15544, upload-time = "2024-09-20T01:56:23.221Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/47/60/3b1680ea91cc95a2088164ae67f91960b93ec568027ccb4b47784b7f5efa/streamingjson-0.0.5-py3-none-any.whl", hash = "sha256:c7baece0ff7ebce0a2a6baa0c1394dfdfe24a4a62f9635d4a17c2b548ff5eb76", size = 10183, upload-time = "2024-09-20T01:56:42.658Z" },
 ]
 
 [[package]]
