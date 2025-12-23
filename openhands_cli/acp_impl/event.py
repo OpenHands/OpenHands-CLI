@@ -766,7 +766,7 @@ class EventSubscriber:
             ):
                 # Stream accumulated args via ToolCallProgress
                 self._schedule_async(
-                    self._send_tool_call_progress(stored_tool_call_id, accumulated_args)
+                    self._send_tool_call_progress(stored_tool_call_id, accumulated_args, tool_name)
                 )
 
     def _schedule_async(self, coro) -> None:
@@ -858,13 +858,13 @@ class EventSubscriber:
                     tool_call_id=tool_call_id,
                     title=tool_name,
                     kind=tool_kind,
-                    status="in_progress",
+                    status="pending",
                 ),
             )
         except Exception as e:
             logger.debug(f"Error sending tool call start: {e}", exc_info=True)
 
-    async def _send_tool_call_progress(self, tool_call_id: str, arguments: str) -> None:
+    async def _send_tool_call_progress(self, tool_call_id: str, arguments: str, tool_name: str) -> None:
         """Send tool call progress update via ToolCallProgress.
 
         Sends the accumulated arguments as both content (for display) and
@@ -886,9 +886,10 @@ class EventSubscriber:
 
             await self.conn.session_update(
                 session_id=self.session_id,
-                update=ToolCallProgress(
-                    session_update="tool_call_update",
+                update=ToolCallStart(
+                    session_update="tool_call",
                     tool_call_id=tool_call_id,
+                    title=tool_name,
                     content=[
                         ContentToolCallContent(
                             type="content",
