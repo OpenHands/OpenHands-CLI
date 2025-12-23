@@ -244,17 +244,17 @@ class OpenHandsACPAgent(ACPAgent):
             RequestError: If MCP configuration is invalid
         """
         # Load agent specs (same as setup_conversation)
-        uses_completions_api = False
+        streaming_enabled = False
         try:
             agent = load_agent_specs(
                 conversation_id=session_id,
                 mcp_servers=mcp_servers,
                 skills=[RESOURCE_SKILL],
             )
-            uses_completions_api = not agent.llm.uses_responses_api()
+            streaming_enabled = not agent.llm.uses_responses_api()
 
-            if uses_completions_api:
-                # Enable streaming for completions api
+            if streaming_enabled:
+                # Enable streaming for llm
                 agent = agent.model_copy(
                     update={"llm": agent.llm.model_copy(update={"stream": True})}
                 )
@@ -302,7 +302,12 @@ class OpenHandsACPAgent(ACPAgent):
 
         def sync_callback(event: Event) -> None:
             """Synchronous wrapper that schedules async event handling."""
-            asyncio.run_coroutine_threadsafe(subscriber(event), loop)
+            if streaming_enabled:
+                asyncio.run_coroutine_threadsafe(
+                    token_subscriber.unstreamed_event_handler(event), loop
+                )
+            else:
+                asyncio.run_coroutine_threadsafe(subscriber(event), loop)
 
         # Create conversation with persistence support and token streaming
         # The SDK automatically loads from disk if conversation_id exists
@@ -313,7 +318,7 @@ class OpenHandsACPAgent(ACPAgent):
             conversation_id=UUID(session_id),
             callbacks=[sync_callback],
             token_callbacks=[token_subscriber.on_token]
-            if uses_completions_api
+            if streaming_enabled
             else None,  # Enable token streaming for completions api
             visualizer=None,  # No visualizer needed for ACP
         )

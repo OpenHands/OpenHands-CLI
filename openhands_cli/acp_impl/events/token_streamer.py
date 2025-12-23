@@ -23,8 +23,19 @@ from acp.schema import (
     ToolKind,
 )
 
-from openhands.sdk import get_logger
+from openhands.sdk import BaseConversation, Event, get_logger
+from openhands.sdk.event import (
+    AgentErrorEvent,
+    Condensation,
+    CondensationRequest,
+    ConversationStateUpdateEvent,
+    ObservationEvent,
+    PauseEvent,
+    SystemPromptEvent,
+    UserRejectObservation,
+)
 from openhands.sdk.llm.streaming import LLMStreamChunk
+from openhands_cli.acp_impl.events.shared_event_handler import SharedEventHandler
 from openhands_cli.acp_impl.events.tool_state import ToolCallState
 
 
@@ -35,14 +46,43 @@ class TokenBasedEventSubscriber:
     """Owns all token streaming logic + state (tool-call streaming included)."""
 
     def __init__(
-        self, *, session_id: str, conn: Client, loop: asyncio.AbstractEventLoop
+        self,
+        *,
+        session_id: str,
+        conn: Client,
+        loop: asyncio.AbstractEventLoop,
+        conversation: BaseConversation | None = None,
     ):
         self.session_id = session_id
         self.conn = conn
         self.loop = loop
+        self.conversation = conversation
 
         # index -> ToolCallState
         self._streaming_tool_calls: dict[int, ToolCallState] = {}
+        self.shared_events_handler = SharedEventHandler()
+
+    async def unstreamed_event_handler(self, event: Event):
+        # Skip ConversationStateUpdateEvent (internal state management)
+        if isinstance(event, ConversationStateUpdateEvent):
+            return
+
+        if isinstance(event, UserRejectObservation) or isinstance(
+            event, AgentErrorEvent
+        ):
+            await self.shared_events_handler.handle_user_reject_or_agent_error(
+                self, event
+            )
+        elif isinstance(event, ObservationEvent):
+            await self.shared_events_handler.handle_observation(self, event)
+        elif isinstance(event, SystemPromptEvent):
+            await self.shared_events_handler.handle_system_prompt(self, event)
+        elif isinstance(event, PauseEvent):
+            await self.shared_events_handler.handle_pause(self, event)
+        elif isinstance(event, Condensation):
+            await self.shared_events_handler.handle_condensation(self, event)
+        elif isinstance(event, CondensationRequest):
+            await self.shared_events_handler.handle_condensation_request(self, event)
 
     def on_token(self, chunk: LLMStreamChunk) -> None:
         try:
@@ -130,12 +170,6 @@ class TokenBasedEventSubscriber:
             state.started = True
             self._schedule(self._send_tool_call_start(state))
 
-        self._schedule(
-            self._send_streaming_chunk(
-                f"State reached\n\n{str(state)}", is_reasoning=True
-            )
-        )
-
         # Stream args
         if not arguments:
             return
@@ -149,12 +183,6 @@ class TokenBasedEventSubscriber:
                     self._send_streaming_chunk(thought_piece, is_reasoning=True)
                 )
             return
-
-        self._schedule(
-            self._send_streaming_chunk(
-                f"State reached\n\n{str(state)}", is_reasoning=True
-            )
-        )
 
         if state.started:
             self._schedule(self._send_tool_call_progress(state))
