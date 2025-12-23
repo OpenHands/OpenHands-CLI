@@ -4,12 +4,21 @@ from acp.schema import (
     TerminalToolCallContent,
     TextContentBlock,
     ToolCallLocation,
+    ToolKind,
 )
 
 from openhands.sdk import Action, BaseConversation
 from openhands.tools.file_editor.definition import (
     FileEditorAction,
 )
+
+
+# Shared mapping from tool names to ACP ToolKind values
+TOOL_KIND_MAPPING: dict[str, ToolKind] = {
+    "terminal": "execute",
+    "browser_use": "fetch",
+    "browser": "fetch",
+}
 
 
 def _format_status_line(usage, cost: float) -> str:

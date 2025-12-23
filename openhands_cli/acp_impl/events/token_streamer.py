@@ -61,6 +61,7 @@ from openhands_cli.acp_impl.events.shared_event_handler import (
 )
 from openhands_cli.acp_impl.events.tool_state import ToolCallState
 from openhands_cli.acp_impl.events.utils import (
+    TOOL_KIND_MAPPING,
     extract_action_locations,
     format_content_blocks,
     get_metadata,
@@ -242,13 +243,6 @@ class TokenBasedEventSubscriber:
         Keep tool->kind mapping consistent with _handle_action_event.
         If we have streaming args (state), we can refine file_editor view->read.
         """
-        # Same mapping as _handle_action_event
-        tool_kind_mapping: dict[str, ToolKind] = {
-            "terminal": "execute",
-            "browser_use": "fetch",
-            "browser": "fetch",
-        }
-
         if tool_name == "think":
             return "think"
 
@@ -268,7 +262,7 @@ class TokenBasedEventSubscriber:
             # Covers browser*, browser_use*, etc.
             return "fetch"
 
-        return tool_kind_mapping.get(tool_name, "other")
+        return TOOL_KIND_MAPPING.get(tool_name, "other")
 
     async def send_acp_event(
         self,
@@ -296,12 +290,7 @@ class TokenBasedEventSubscriber:
                 ]
                 | None
             ) = None
-            tool_kind_mapping: dict[str, ToolKind] = {
-                "terminal": "execute",
-                "browser_use": "fetch",
-                "browser": "fetch",
-            }
-            tool_kind = tool_kind_mapping.get(event.tool_name, "other")
+            tool_kind = TOOL_KIND_MAPPING.get(event.tool_name, "other")
             title = event.tool_name
             if event.action:
                 action_viz = _event_visualize_to_plain(event)
