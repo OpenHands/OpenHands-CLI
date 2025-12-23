@@ -3,6 +3,7 @@
 import asyncio
 import json
 
+import streamingjson  # type: ignore[import-untyped]
 from acp import Client, RequestError
 from acp.schema import (
     AgentMessageChunk,
@@ -54,191 +55,81 @@ logger = get_logger(__name__)
 
 
 def _shorten_middle(text: str, width: int = 50) -> str:
-    """Shorten a string by removing the middle part if it exceeds the width.
-
-    Args:
-        text: The string to shorten
-        width: Maximum width of the output string
-
-    Returns:
-        Shortened string with middle replaced by "..." if needed
-    """
+    """Shorten a string by removing the middle part if it exceeds the width."""
     if len(text) <= width:
         return text
     half = (width - 3) // 2
     return text[:half] + "..." + text[-half:]
 
 
-def _complete_partial_json(partial_json: str) -> str:
-    """Complete a partial JSON string to make it parseable.
-
-    This is a simplified version of what streamingjson.Lexer.complete_json() does.
-    It tracks open braces/brackets and string states to add missing closures.
-
-    Args:
-        partial_json: Incomplete JSON string
-
-    Returns:
-        A completed JSON string that should be parseable
-    """
-    if not partial_json:
-        return "{}"
-
-    result = partial_json
-    stack: list[str] = []  # Track open braces/brackets
-    in_string = False
-    escape_next = False
-
-    for char in partial_json:
-        if escape_next:
-            escape_next = False
-            continue
-
-        if char == "\\":
-            escape_next = True
-            continue
-
-        if char == '"' and not escape_next:
-            in_string = not in_string
-            continue
-
-        if in_string:
-            continue
-
-        if char == "{":
-            stack.append("}")
-        elif char == "[":
-            stack.append("]")
-        elif char in "]}":
-            if stack and stack[-1] == char:
-                stack.pop()
-
-    # Close any open string
-    if in_string:
-        result += '"'
-
-    # Close any open structures
-    while stack:
-        result += stack.pop()
-
-    return result
-
-
-def _extract_key_argument(json_content: str, tool_name: str) -> str | None:
+def _extract_key_argument(lexer: streamingjson.Lexer, tool_name: str) -> str | None:
     """Extract a key argument from tool call arguments for display.
 
-    Attempts to complete partial JSON and extract the most relevant
-    argument based on the tool name.
-
-    Args:
-        json_content: Raw JSON string (possibly incomplete)
-        tool_name: Name of the tool to determine which argument to extract
-
-    Returns:
-        The extracted key argument, shortened if necessary, or None
+    Uses streamingjson.Lexer to handle incomplete JSON and extracts
+    the most relevant argument based on the tool name.
     """
-    # Try to complete and parse the JSON
-    completed_json = _complete_partial_json(json_content)
-
     try:
-        curr_args = json.loads(completed_json)
+        curr_args = json.loads(lexer.complete_json())
     except json.JSONDecodeError:
         return None
 
     if not curr_args or not isinstance(curr_args, dict):
         return None
 
-    key_argument: str = ""
+    key_argument: str | None = None
 
     # Map tool names to their key arguments
     if tool_name == "terminal":
-        if not curr_args.get("command"):
-            return None
-        key_argument = str(curr_args["command"])
+        key_argument = curr_args.get("command")
     elif tool_name == "file_editor":
-        if not curr_args.get("path"):
-            return None
-        key_argument = str(curr_args["path"])
+        key_argument = curr_args.get("path")
     elif tool_name == "think":
-        if not curr_args.get("thought"):
-            return None
-        key_argument = str(curr_args["thought"])
+        key_argument = curr_args.get("thought")
     elif tool_name == "finish":
-        if not curr_args.get("message"):
-            return None
-        key_argument = str(curr_args["message"])
+        key_argument = curr_args.get("message")
     elif tool_name == "task_tracker":
-        # No key argument for task tracker
         return None
-    elif tool_name in (
-        "browser_navigate",
-        "browser_click",
-        "browser_type",
-        "browser_scroll",
-        "browser_get_state",
-        "browser_get_content",
-        "browser_go_back",
-        "browser_list_tabs",
-        "browser_switch_tab",
-        "browser_close_tab",
-    ):
-        # Browser tools - extract url or index
-        if curr_args.get("url"):
-            key_argument = str(curr_args["url"])
-        elif curr_args.get("index"):
-            key_argument = f"index={curr_args['index']}"
-        elif curr_args.get("text"):
-            key_argument = str(curr_args["text"])
-        else:
-            return None
+    elif tool_name.startswith("browser"):
+        key_argument = (
+            curr_args.get("url")
+            or (f"index={curr_args['index']}" if curr_args.get("index") else None)
+            or curr_args.get("text")
+        )
     else:
         # For unknown tools, try common argument names
         for key in ["path", "command", "query", "url", "text", "message"]:
             if curr_args.get(key):
-                key_argument = str(curr_args[key])
+                key_argument = curr_args[key]
                 break
-        if not key_argument:
-            return None
 
-    return _shorten_middle(key_argument, width=50)
+    if key_argument:
+        return _shorten_middle(str(key_argument), width=50)
+    return None
 
 
 class _ToolCallState:
     """Manages the state of a single streaming tool call.
 
-    Similar to kimi-cli's approach, this class tracks the accumulated
-    arguments for a tool call and extracts key arguments for dynamic titles.
+    Uses streamingjson.Lexer to incrementally parse JSON arguments
+    and extract key arguments for dynamic titles.
     """
 
     def __init__(self, tool_call_id: str, tool_name: str, is_think: bool = False):
-        """Initialize tool call state.
-
-        Args:
-            tool_call_id: The ID of the tool call
-            tool_name: The name of the tool being called
-            is_think: Whether this is a think tool call
-        """
         self.tool_call_id = tool_call_id
         self.tool_name = tool_name
         self.is_think = is_think
         self.args = ""
+        self.lexer = streamingjson.Lexer()
         self.started = False
 
     def append_args(self, args_part: str) -> None:
-        """Append new arguments part to the accumulated args.
-
-        Args:
-            args_part: The new arguments chunk to append
-        """
+        """Append new arguments part to the accumulated args and lexer."""
         self.args += args_part
+        self.lexer.append_string(args_part)
 
     def get_title(self) -> str:
-        """Get the current title with key argument if available.
-
-        Returns:
-            Title like "tool_name: key_arg" or just "tool_name"
-        """
-        subtitle = _extract_key_argument(self.args, self.tool_name)
+        """Get the current title with key argument if available."""
+        subtitle = _extract_key_argument(self.lexer, self.tool_name)
         if subtitle:
             return f"{self.tool_name}: {subtitle}"
         return self.tool_name
