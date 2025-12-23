@@ -1,11 +1,9 @@
 """Tests for LLM streaming functionality in ACP implementation."""
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from acp.schema import AgentMessageChunk, AgentThoughtChunk, TextContentBlock
 from litellm.types.utils import ModelResponseStream
 
 from openhands_cli.acp_impl.agent import OpenHandsACPAgent
@@ -52,9 +50,6 @@ def mock_tool_call():
     return tool_call, function
 
 
-
-
-
 @pytest.mark.asyncio
 async def test_conversation_setup_enables_streaming(acp_agent, tmp_path):
     """Test that conversation setup enables streaming on the LLM when appropriate."""
@@ -63,7 +58,9 @@ async def test_conversation_setup_enables_streaming(acp_agent, tmp_path):
     with (
         patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load_specs,
         patch("openhands_cli.acp_impl.agent.Conversation") as mock_conversation_class,
-        patch("openhands_cli.acp_impl.agent.EventSubscriber") as mock_event_subscriber_class,
+        patch(
+            "openhands_cli.acp_impl.agent.EventSubscriber"
+        ) as mock_event_subscriber_class,
     ):
         # Mock agent with LLM that doesn't use responses API (supports streaming)
         mock_agent = MagicMock()

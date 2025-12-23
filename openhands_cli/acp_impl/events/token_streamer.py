@@ -24,13 +24,9 @@ from acp.schema import (
     AgentMessageChunk,
     AgentPlanUpdate,
     AgentThoughtChunk,
-    ContentToolCallContent,
-    FileEditToolCallContent,
-    TerminalToolCallContent,
     TextContentBlock,
     ToolCallProgress,
     ToolCallStart,
-    ToolKind,
 )
 
 from openhands.sdk import BaseConversation, Event, get_logger
@@ -61,10 +57,10 @@ from openhands_cli.acp_impl.events.shared_event_handler import (
 )
 from openhands_cli.acp_impl.events.tool_state import ToolCallState
 from openhands_cli.acp_impl.events.utils import (
-    TOOL_KIND_MAPPING,
     extract_action_locations,
     format_content_blocks,
     get_metadata,
+    get_tool_kind,
 )
 
 
@@ -204,7 +200,7 @@ class TokenBasedEventSubscriber:
             tool_call_start = start_tool_call(
                 tool_call_id=state.tool_call_id,
                 title=state.title,
-                kind=self._get_tool_kind(state.tool_name, state),
+                kind=get_tool_kind(state.tool_name, state.lexer),
                 status="in_progress",
                 content=format_content_blocks(state.args),
             )
@@ -229,40 +225,12 @@ class TokenBasedEventSubscriber:
                     update_tool_call(
                         tool_call_id=state.tool_call_id,
                         title=state.title,
-                        kind=self._get_tool_kind(state.tool_name, state),
+                        kind=get_tool_kind(state.tool_name, state.lexer),
                         status="in_progress",
                         content=format_content_blocks(state.args),
                     ),
                 )
             )
-
-    def _get_tool_kind(
-        self, tool_name: str, state: ToolCallState | None = None
-    ) -> ToolKind:
-        """
-        Keep tool->kind mapping consistent with _handle_action_event.
-        If we have streaming args (state), we can refine file_editor view->read.
-        """
-        if tool_name == "think":
-            return "think"
-
-        if tool_name == "file_editor" and state is not None:
-            try:
-                import json
-
-                args = json.loads(state.lexer.complete_json())
-                if isinstance(args, dict) and args.get("command") == "view":
-                    return "read"
-                return "edit"
-            except Exception:
-                # If args are incomplete, default to edit (safe + consistent)
-                return "edit"
-
-        if tool_name.startswith("browser"):
-            # Covers browser*, browser_use*, etc.
-            return "fetch"
-
-        return TOOL_KIND_MAPPING.get(tool_name, "other")
 
     async def send_acp_event(
         self,
@@ -282,28 +250,20 @@ class TokenBasedEventSubscriber:
         """
         try:
             # Generate content for the tool call
-            content: (
-                list[
-                    ContentToolCallContent
-                    | FileEditToolCallContent
-                    | TerminalToolCallContent
-                ]
-                | None
-            ) = None
-            tool_kind = TOOL_KIND_MAPPING.get(event.tool_name, "other")
+            content = None
+
+            tool_kind = get_tool_kind(
+                event.tool_name,
+                command_literal=event.action.command
+                if isinstance(event.action, FileEditorAction)
+                else None,
+            )
+
             title = event.tool_name
             if event.action:
                 action_viz = _event_visualize_to_plain(event)
                 if action_viz.strip():
-                    content = [
-                        ContentToolCallContent(
-                            type="content",
-                            content=TextContentBlock(
-                                type="text",
-                                text=action_viz,
-                            ),
-                        )
-                    ]
+                    content = format_content_blocks(action_viz)
 
                 if isinstance(event.action, FileEditorAction):
                     if event.action.command == "view":

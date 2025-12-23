@@ -6,9 +6,11 @@ from acp.schema import (
     ToolCallLocation,
     ToolKind,
 )
+from streamingjson import Lexer
 
 from openhands.sdk import Action, BaseConversation
 from openhands.tools.file_editor.definition import (
+    CommandLiteral,
     FileEditorAction,
 )
 
@@ -155,3 +157,36 @@ def extract_action_locations(action: Action) -> list[ToolCallLocation] | None:
                 location.line = action.insert_line
             locations.append(location)
     return locations if locations else None
+
+
+def get_tool_kind(
+    tool_name: str,
+    partial_args: Lexer | None = None,
+    command_literal: CommandLiteral | None = None,
+) -> ToolKind:
+    if tool_name == "think":
+        return "think"
+
+    if tool_name == "file_editor" and partial_args is not None:
+        try:
+            import json
+
+            args = json.loads(partial_args.complete_json())
+            if isinstance(args, dict) and args.get("command") == "view":
+                return "read"
+            return "edit"
+        except Exception:
+            # If args are incomplete, default to edit (safe + consistent)
+            return "edit"
+
+    # FileEditorAction commands literals
+    if command_literal == "view":
+        return "read"
+    elif command_literal:
+        return "edit"
+
+    if tool_name.startswith("browser"):
+        # Covers browser*, browser_use*, etc.
+        return "fetch"
+
+    return TOOL_KIND_MAPPING.get(tool_name, "other")

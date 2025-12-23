@@ -333,7 +333,7 @@ async def test_handle_task_tracker_observation(event_subscriber, mock_connection
     call_kwargs = mock_connection.session_update.call_args[1]
     assert call_kwargs["session_id"] == "test-session"
     update = call_kwargs["update"]
-    
+
     assert isinstance(update, SessionUpdate6)
     # Verify plan structure
     assert update.session_update == "plan"
@@ -476,6 +476,3 @@ async def test_format_status_line_abbreviations(mock_connection):
     assert "1.23M" in status_line  # 1,234,567 abbreviated
     assert "50.00%" in status_line  # Cache hit rate
     assert "12.3456" in status_line  # Cost
-
-
-

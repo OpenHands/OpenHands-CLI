@@ -4,9 +4,6 @@ from acp import Client
 from acp.schema import (
     AgentMessageChunk,
     AgentThoughtChunk,
-    ContentToolCallContent,
-    FileEditToolCallContent,
-    TerminalToolCallContent,
     TextContentBlock,
     ToolCallStart,
 )
@@ -39,10 +36,10 @@ from openhands_cli.acp_impl.events.shared_event_handler import (
     _event_visualize_to_plain,
 )
 from openhands_cli.acp_impl.events.utils import (
-    TOOL_KIND_MAPPING,
     extract_action_locations,
     format_content_blocks,
     get_metadata,
+    get_tool_kind,
 )
 
 
@@ -146,15 +143,13 @@ class EventSubscriber:
                 )
 
             # Generate content for the tool call
-            content: (
-                list[
-                    ContentToolCallContent
-                    | FileEditToolCallContent
-                    | TerminalToolCallContent
-                ]
-                | None
-            ) = None
-            tool_kind = TOOL_KIND_MAPPING.get(event.tool_name, "other")
+            content = None
+            tool_kind = get_tool_kind(
+                event.tool_name,
+                command_literal=event.action.command
+                if isinstance(event.action, FileEditorAction)
+                else None,
+            )
             title = event.tool_name
             if event.action:
                 action_viz = _event_visualize_to_plain(event)
@@ -162,10 +157,8 @@ class EventSubscriber:
 
                 if isinstance(event.action, FileEditorAction):
                     if event.action.command == "view":
-                        tool_kind = "read"
                         title = f"Reading {event.action.path}"
                     else:
-                        tool_kind = "edit"
                         title = f"Editing {event.action.path}"
                 elif isinstance(event.action, TerminalAction):
                     title = f"{event.action.command}"
