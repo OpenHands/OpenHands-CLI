@@ -273,6 +273,7 @@ class TokenBasedEventSubscriber:
                     session_update="tool_call_update",
                     tool_call_id=state.tool_call_id,
                     title=state.title,
+                    kind=self._get_tool_kind(state.tool_name, state),
                     status="in_progress",
                     content=[
                         ContentToolCallContent(
@@ -382,8 +383,8 @@ class TokenBasedEventSubscriber:
 
             await self.conn.session_update(
                 session_id=self.session_id,
-                update=ToolCallStart(
-                    session_update="tool_call",
+                update=ToolCallProgress(
+                    session_update="tool_call_update",
                     tool_call_id=event.tool_call_id,
                     title=title,
                     kind=tool_kind,
