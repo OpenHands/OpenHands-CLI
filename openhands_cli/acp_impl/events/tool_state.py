@@ -60,6 +60,7 @@ class ToolCallState:
         self.args = ""
         self.lexer = streamingjson.Lexer()
         self.prev_emitted_thought_chunk = ""
+        self.started = False
 
 
 
@@ -84,15 +85,6 @@ class ToolCallState:
         self.prev_emitted_thought_chunk = thought
         return thought[len(self.prev_emitted_thought_chunk):]
 
-
-        # stripped = arguments.strip()
-        # # common incremental JSON fragments
-        # if stripped in {"{", "}", '"', ":", "thought", "\\"}:
-        #     return None
-        # if stripped in {'{"thought', '": "', '"}', '"}'}:
-        #     return None
-        # return arguments
-
     @property
     def title(self) -> str:
         """Get the current title with key argument if available."""
@@ -105,6 +97,7 @@ class ToolCallState:
             f"  tool={self.tool_name!r},\n"
             f"  title={self.title!r},\n"
             f"  is_think={self.is_think},\n"
+            f". is_started={self.started},\n"
             f"  args={self.args!r}\n"
             f")"
         )
