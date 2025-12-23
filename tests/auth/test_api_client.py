@@ -10,6 +10,7 @@ from openhands_cli.auth.api_client import (
     ApiClientError,
     OpenHandsApiClient,
     UnauthenticatedError,
+    _ask_user_consent_for_overwrite,
     create_and_save_agent_configuration,
     fetch_user_data_after_oauth,
 )
@@ -308,3 +309,43 @@ class TestHelperFunctions:
 
                 with pytest.raises(ApiClientError, match="API error"):
                     await fetch_user_data_after_oauth(server_url, api_key)
+
+    def test_ask_user_consent_for_overwrite_no_base_url_print(self):
+        """Test that Base URL print statement doesn't occur when base_url is None."""
+        # Create a mock agent with None base_url
+        mock_agent = MagicMock()
+        mock_llm = MagicMock()
+        mock_llm.model = "gpt-4o"
+        mock_llm.base_url = None  # This is the key test condition
+        mock_agent.llm = mock_llm
+
+        new_settings = {"llm_model": "claude-sonnet-4-5-20250929"}
+
+        with patch("openhands_cli.auth.api_client._p") as mock_print:
+            with patch("builtins.input", return_value="n"):  # User says no
+                result = _ask_user_consent_for_overwrite(mock_agent, new_settings)
+
+                # Verify the function returns False (user declined)
+                assert result is False
+
+                # Check all the print calls
+                print_calls = [call.args[0] for call in mock_print.call_args_list]
+
+                # Count Base URL prints - should be exactly 1 when base_url is None
+                all_base_url_prints = [
+                    call for call in print_calls if "Base URL" in call
+                ]
+                assert len(all_base_url_prints) == 1, (
+                    f"Expected exactly 1 Base URL print (for new config), "
+                    f"but found {len(all_base_url_prints)}: {all_base_url_prints}"
+                )
+
+                # Verify the Base URL print is for the new configuration
+                new_config_base_url_print = [
+                    call
+                    for call in all_base_url_prints
+                    if "https://llm-proxy.app.all-hands.dev/" in call
+                ]
+                assert len(new_config_base_url_print) == 1, (
+                    "The Base URL print should be for the new configuration"
+                )
