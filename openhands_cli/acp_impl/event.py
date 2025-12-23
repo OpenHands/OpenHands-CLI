@@ -766,7 +766,7 @@ class EventSubscriber:
             ):
                 # Stream accumulated args via ToolCallProgress
                 self._schedule_async(
-                    self._send_tool_call_progress(stored_tool_call_id, accumulated_args, tool_name)
+                    self._send_tool_call_progress(stored_tool_call_id, accumulated_args, stored_name)
                 )
 
     def _schedule_async(self, coro) -> None:
