@@ -186,24 +186,24 @@ class TokenBasedEventSubscriber:
             logger.debug(f"Error sending tool call start: {e}", exc_info=True)
 
     async def _send_tool_call_progress(self, state: ToolCallState) -> None:
-        try:
-            await self.conn.session_update(
-                session_id=self.session_id,
-                update=ToolCallProgress(
-                    session_update="tool_call_update",
-                    tool_call_id=state.tool_call_id,
-                    title=state.title,
-                    status="in_progress",
-                    content=[
-                        ContentToolCallContent(
-                            type="content",
-                            content=TextContentBlock(type="text", text=state.args),
-                        )
-                    ],
-                ),
-            )
-        except Exception as e:
-            logger.debug(f"Error sending tool call progress: {e}", exc_info=True)
+        # try:
+        await self.conn.session_update(
+            session_id=self.session_id,
+            update=ToolCallProgress(
+                session_update="tool_call_update",
+                tool_call_id=state.tool_call_id,
+                title=state.title,
+                status="in_progress",
+                content=[
+                    ContentToolCallContent(
+                        type="content",
+                        content=TextContentBlock(type="text", text=state.args),
+                    )
+                ],
+            ),
+        )
+        # except Exception as e:
+        #     logger.debug(f"Error sending tool call progress: {e}", exc_info=True)
 
     async def _send_streaming_chunk(self, content: str, *, is_reasoning: bool) -> None:
         try:
