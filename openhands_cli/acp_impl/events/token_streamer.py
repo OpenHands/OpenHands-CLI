@@ -45,10 +45,6 @@ class TokenBasedEventSubscriber:
         self._streaming_tool_calls: dict[int, ToolCallState] = {}
 
     def on_token(self, chunk: LLMStreamChunk) -> None:
-        if not self.loop:
-            logger.warning("No event loop available for token streaming")
-            return
-
         try:
             for choice in chunk.choices:
                 delta = getattr(choice, "delta", None)
