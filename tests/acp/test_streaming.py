@@ -556,3 +556,42 @@ async def test_tool_call_start_waits_for_id_and_name(event_subscriber, mock_tool
         assert mock_schedule.called
 
     assert event_subscriber._streaming_tool_calls[0]["started"] is True
+
+
+@pytest.mark.asyncio
+async def test_tool_call_arguments_accumulated(event_subscriber, mock_tool_call):
+    """Test that tool call arguments are accumulated across chunks."""
+    tool_call, function = mock_tool_call
+    tool_call.id = "tool_accum"
+    function.name = "terminal"
+
+    with patch.object(event_subscriber, "_schedule_async"):
+        # First chunk: register tool
+        function.arguments = ""
+        event_subscriber._handle_tool_call_streaming(tool_call)
+        assert event_subscriber._streaming_tool_calls[0]["accumulated_args"] == ""
+
+        # Second chunk: first argument piece
+        tool_call.id = None
+        function.name = None
+        function.arguments = '{"command'
+        event_subscriber._handle_tool_call_streaming(tool_call)
+        assert (
+            event_subscriber._streaming_tool_calls[0]["accumulated_args"] == '{"command'
+        )
+
+        # Third chunk: second argument piece
+        function.arguments = '": "ls'
+        event_subscriber._handle_tool_call_streaming(tool_call)
+        assert (
+            event_subscriber._streaming_tool_calls[0]["accumulated_args"]
+            == '{"command": "ls'
+        )
+
+        # Fourth chunk: final piece
+        function.arguments = ' -la"}'
+        event_subscriber._handle_tool_call_streaming(tool_call)
+        assert (
+            event_subscriber._streaming_tool_calls[0]["accumulated_args"]
+            == '{"command": "ls -la"}'
+        )

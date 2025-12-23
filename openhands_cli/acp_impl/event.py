@@ -1,6 +1,7 @@
 """Utility functions for ACP implementation."""
 
 import asyncio
+import json
 
 from acp import Client, RequestError
 from acp.schema import (
@@ -705,6 +706,7 @@ class EventSubscriber:
                     "name": name,
                     "is_think": is_think,
                     "started": False,  # Track if ToolCallStart has been sent
+                    "accumulated_args": "",  # Accumulate arguments for streaming
                 }
         else:
             # Update existing tool call info if we get new data
@@ -737,6 +739,19 @@ class EventSubscriber:
 
         # Stream arguments if we have them and the tool is registered
         if index in self._streaming_tool_calls and arguments:
+            # Accumulate the arguments
+            current_accumulated = self._streaming_tool_calls[index].get(
+                "accumulated_args", ""
+            )
+            if isinstance(current_accumulated, str):
+                self._streaming_tool_calls[index]["accumulated_args"] = (
+                    current_accumulated + arguments
+                )
+            else:
+                self._streaming_tool_calls[index]["accumulated_args"] = arguments
+
+            accumulated_args = self._streaming_tool_calls[index]["accumulated_args"]
+
             if is_think:
                 # Stream think tool arguments as AgentThoughtChunk
                 thought_content = self._extract_thought_from_args(arguments)
@@ -744,10 +759,14 @@ class EventSubscriber:
                     self._schedule_async(
                         self._send_streaming_chunk(thought_content, is_reasoning=True)
                     )
-            elif stored_tool_call_id and isinstance(stored_tool_call_id, str):
-                # Stream other tools via ToolCallProgress
+            elif (
+                stored_tool_call_id
+                and isinstance(stored_tool_call_id, str)
+                and isinstance(accumulated_args, str)
+            ):
+                # Stream accumulated args via ToolCallProgress
                 self._schedule_async(
-                    self._send_tool_call_progress(stored_tool_call_id, arguments)
+                    self._send_tool_call_progress(stored_tool_call_id, accumulated_args)
                 )
 
     def _schedule_async(self, coro) -> None:
@@ -848,11 +867,23 @@ class EventSubscriber:
     async def _send_tool_call_progress(self, tool_call_id: str, arguments: str) -> None:
         """Send tool call progress update via ToolCallProgress.
 
+        Sends the accumulated arguments as both content (for display) and
+        raw_input (for structured access). The content replaces the previous
+        content on each update to show the full accumulated arguments.
+
         Args:
             tool_call_id: The ID of the tool call
-            arguments: The streaming arguments content
+            arguments: The accumulated streaming arguments (full content so far)
         """
         try:
+            # Try to parse the arguments as JSON for raw_input
+            raw_input = None
+            try:
+                raw_input = json.loads(arguments)
+            except (json.JSONDecodeError, ValueError):
+                # Arguments are still incomplete JSON, use as string
+                raw_input = {"_partial": arguments}
+
             await self.conn.session_update(
                 session_id=self.session_id,
                 update=ToolCallProgress(
@@ -867,6 +898,7 @@ class EventSubscriber:
                             ),
                         )
                     ],
+                    raw_input=raw_input,
                 ),
             )
         except Exception as e:
