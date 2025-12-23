@@ -137,8 +137,8 @@ async def test_handle_observation_event(event_subscriber, mock_connection):
     event.tool_call_id = "test-call-123"
     event.observation = mock_observation
 
-    # Process the event
-    await event_subscriber._handle_observation_event(event)
+    # Process the event using the main event handler
+    await event_subscriber(event)
 
     # Verify session_update was called
     assert mock_connection.session_update.called
@@ -163,8 +163,8 @@ async def test_handle_agent_error_event(event_subscriber, mock_connection):
     event.error = "Something went wrong"
     event.model_dump = MagicMock(return_value={"error": "Something went wrong"})
 
-    # Process the event
-    await event_subscriber._handle_observation_event(event)
+    # Process the event using the main event handler
+    await event_subscriber(event)
 
     # Verify session_update was called
     assert mock_connection.session_update.called
@@ -323,53 +323,40 @@ async def test_handle_task_tracker_observation(event_subscriber, mock_connection
     event.tool_call_id = "task-call-123"
     event.model_dump = MagicMock(return_value={"command": "plan"})
 
-    # Process the event
-    await event_subscriber._handle_observation_event(event)
+    # Process the event using the main event handler
+    await event_subscriber(event)
 
-    # Verify session_update was called twice (plan + tool_call_update)
-    assert mock_connection.session_update.call_count == 2
+    # Verify session_update was called once (only plan update, no tool_call_update)
+    assert mock_connection.session_update.call_count == 1
 
     # Verify the plan update was sent
-    calls = mock_connection.session_update.call_args_list
-    plan_update_found = False
-    tool_call_update_found = False
+    call_kwargs = mock_connection.session_update.call_args[1]
+    assert call_kwargs["session_id"] == "test-session"
+    update = call_kwargs["update"]
+    
+    assert isinstance(update, SessionUpdate6)
+    # Verify plan structure
+    assert update.session_update == "plan"
+    assert len(update.entries) == 3
 
-    for call in calls:
-        call_kwargs = call[1]
-        update = call_kwargs["update"]
-        if isinstance(update, SessionUpdate6):
-            plan_update_found = True
-            # Verify plan structure
-            assert update.session_update == "plan"
-            assert len(update.entries) == 3
+    # Verify first entry (done -> completed)
+    # Note: notes are intentionally omitted for conciseness
+    entry1 = update.entries[0]
+    assert entry1.content == "Task 1"
+    assert entry1.status == "completed"
+    assert entry1.priority == "medium"
 
-            # Verify first entry (done -> completed)
-            # Note: notes are intentionally omitted for conciseness
-            entry1 = update.entries[0]
-            assert entry1.content == "Task 1"
-            assert entry1.status == "completed"
-            assert entry1.priority == "medium"
+    # Verify second entry (in_progress -> in_progress)
+    entry2 = update.entries[1]
+    assert entry2.content == "Task 2"
+    assert entry2.status == "in_progress"
+    assert entry2.priority == "medium"
 
-            # Verify second entry (in_progress -> in_progress)
-            entry2 = update.entries[1]
-            assert entry2.content == "Task 2"
-            assert entry2.status == "in_progress"
-            assert entry2.priority == "medium"
-
-            # Verify third entry (todo -> pending)
-            entry3 = update.entries[2]
-            assert entry3.content == "Task 3"
-            assert entry3.status == "pending"
-            assert entry3.priority == "medium"
-
-        elif isinstance(update, SessionUpdate5):
-            tool_call_update_found = True
-            assert update.session_update == "tool_call_update"
-            assert update.tool_call_id == "task-call-123"
-            assert update.status == "completed"
-
-    assert plan_update_found, "AgentPlanUpdate notification should be sent"
-    assert tool_call_update_found, "ToolCallProgress notification should be sent"
+    # Verify third entry (todo -> pending)
+    entry3 = update.entries[2]
+    assert entry3.content == "Task 3"
+    assert entry3.status == "pending"
+    assert entry3.priority == "medium"
 
 
 @pytest.mark.asyncio
@@ -386,29 +373,26 @@ async def test_handle_task_tracker_with_empty_list(event_subscriber, mock_connec
     event.tool_call_id = "task-call-456"
     event.model_dump = MagicMock(return_value={"command": "view"})
 
-    # Process the event
-    await event_subscriber._handle_observation_event(event)
+    # Process the event using the main event handler
+    await event_subscriber(event)
 
-    # Verify session_update was called twice (plan with empty list + tool_call_update)
-    assert mock_connection.session_update.call_count == 2
+    # Verify session_update was called once (only plan update, no tool_call_update)
+    assert mock_connection.session_update.call_count == 1
 
     # Verify empty plan was sent
-    calls = mock_connection.session_update.call_args_list
-    plan_found = False
-    for call in calls:
-        call_kwargs = call[1]
-        update = call_kwargs["update"]
-        if isinstance(update, SessionUpdate6):
-            plan_found = True
-            assert update.entries == []
-
-    assert plan_found, "AgentPlanUpdate with empty entries should be sent"
+    call_kwargs = mock_connection.session_update.call_args[1]
+    assert call_kwargs["session_id"] == "test-session"
+    update = call_kwargs["update"]
+    assert isinstance(update, SessionUpdate6)
+    assert update.entries == []
 
 
 @pytest.mark.asyncio
 async def test_get_metadata_with_status_line(mock_connection):
-    """Test that _get_metadata returns status_line along with raw metrics."""
+    """Test that get_metadata returns status_line along with raw metrics."""
     from unittest.mock import Mock
+
+    from openhands_cli.acp_impl.events.utils import get_metadata
 
     # Create a mock conversation with stats
     mock_conversation = Mock()
@@ -428,13 +412,8 @@ async def test_get_metadata_with_status_line(mock_connection):
     # Set up the mock to return our metrics
     mock_conversation.conversation_stats.get_combined_metrics.return_value = metrics
 
-    # Create EventSubscriber with conversation
-    event_subscriber = EventSubscriber(
-        "test-session", mock_connection, mock_conversation
-    )
-
-    # Get metadata
-    metadata = event_subscriber._get_metadata()
+    # Get metadata using the utility function
+    metadata = get_metadata(mock_conversation)
 
     # Verify metadata structure
     assert metadata is not None
@@ -468,6 +447,8 @@ async def test_format_status_line_abbreviations(mock_connection):
     """Test that _format_status_line correctly abbreviates large numbers."""
     from unittest.mock import Mock
 
+    from openhands_cli.acp_impl.events.utils import get_metadata
+
     # Create a mock conversation with large token counts
     mock_conversation = Mock()
 
@@ -484,12 +465,8 @@ async def test_format_status_line_abbreviations(mock_connection):
 
     mock_conversation.conversation_stats.get_combined_metrics.return_value = metrics
 
-    event_subscriber = EventSubscriber(
-        "test-session", mock_connection, mock_conversation
-    )
-
-    # Get status line
-    metadata = event_subscriber._get_metadata()
+    # Get status line using the utility function
+    metadata = get_metadata(mock_conversation)
     assert metadata is not None
     status_line = metadata["openhands.dev/metrics"]["status_line"]
     assert isinstance(status_line, str)
@@ -501,90 +478,4 @@ async def test_format_status_line_abbreviations(mock_connection):
     assert "12.3456" in status_line  # Cost
 
 
-@pytest.mark.asyncio
-async def test_event_subscriber_streaming_enabled_skips_assistant_messages():
-    """Test that EventSubscriber skips assistant messages when streaming is enabled."""
-    from openhands.sdk import Message, TextContent
 
-    mock_connection = AsyncMock()
-    session_id = "test-session"
-
-    # Create subscriber with streaming enabled
-    subscriber = EventSubscriber(session_id, mock_connection, streaming_enabled=True)
-
-    # Create a mock MessageEvent from assistant
-    message = Message(role="assistant", content=[TextContent(text="Hello world")])
-    event = MessageEvent(source="agent", llm_message=message)
-
-    # Handle the message event
-    await subscriber._handle_message_event(event)
-
-    # Verify that session_update was NOT called
-    mock_connection.session_update.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_event_subscriber_streaming_disabled_sends_assistant_messages():
-    """Test that EventSubscriber sends assistant messages when streaming is disabled."""
-    from openhands.sdk import Message, TextContent
-
-    mock_connection = AsyncMock()
-    session_id = "test-session"
-
-    # Create subscriber with streaming disabled (default)
-    subscriber = EventSubscriber(session_id, mock_connection, streaming_enabled=False)
-
-    # Create a mock MessageEvent from assistant
-    message = Message(role="assistant", content=[TextContent(text="Hello world")])
-    event = MessageEvent(source="agent", llm_message=message)
-
-    # Handle the message event
-    await subscriber._handle_message_event(event)
-
-    # Verify that session_update was called
-    mock_connection.session_update.assert_called_once()
-    call_kwargs = mock_connection.session_update.call_args[1]
-    assert call_kwargs["session_id"] == session_id
-    update = call_kwargs["update"]
-    assert isinstance(update, SessionUpdate2)
-    assert update.session_update == "agent_message_chunk"
-
-
-@pytest.mark.asyncio
-async def test_event_subscriber_streaming_default_is_false():
-    """Test that EventSubscriber defaults to streaming_enabled=False."""
-    mock_connection = AsyncMock()
-    session_id = "test-session"
-
-    subscriber = EventSubscriber(session_id, mock_connection)
-
-    assert subscriber.streaming_enabled is False
-
-
-@pytest.mark.asyncio
-async def test_event_subscriber_streaming_enabled_still_skips_user_messages():
-    """Test that EventSubscriber always skips user messages regardless of streaming."""
-    from openhands.sdk import Message, TextContent
-
-    mock_connection = AsyncMock()
-    session_id = "test-session"
-
-    # Test with streaming enabled
-    subscriber_streaming = EventSubscriber(
-        session_id, mock_connection, streaming_enabled=True
-    )
-    message = Message(role="user", content=[TextContent(text="User message")])
-    event = MessageEvent(source="user", llm_message=message)
-
-    await subscriber_streaming._handle_message_event(event)
-    mock_connection.session_update.assert_not_called()
-
-    # Reset mock
-    mock_connection.reset_mock()
-
-    # Test with streaming disabled
-    subscriber_no_streaming = EventSubscriber(
-        session_id, mock_connection, streaming_enabled=False
-    )
-    await subscriber_no_streaming._handle_message_event(event)
-    mock_connection.session_update.assert_not_called()
