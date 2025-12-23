@@ -17,6 +17,8 @@ from acp.schema import (
     AgentMessageChunk,
     AgentThoughtChunk,
     ContentToolCallContent,
+    FileEditToolCallContent,
+    TerminalToolCallContent,
     TextContentBlock,
     ToolCallProgress,
     ToolCallStart,
@@ -25,6 +27,7 @@ from acp.schema import (
 
 from openhands.sdk import BaseConversation, Event, get_logger
 from openhands.sdk.event import (
+    ActionEvent,
     AgentErrorEvent,
     Condensation,
     CondensationRequest,
@@ -35,8 +38,21 @@ from openhands.sdk.event import (
     UserRejectObservation,
 )
 from openhands.sdk.llm.streaming import LLMStreamChunk
-from openhands_cli.acp_impl.events.shared_event_handler import SharedEventHandler
+from openhands.sdk.tool.builtins.finish import FinishAction
+from openhands.sdk.tool.builtins.think import ThinkAction
+from openhands.tools.file_editor.definition import (
+    FileEditorAction,
+)
+from openhands.tools.task_tracker.definition import (
+    TaskTrackerAction,
+)
+from openhands.tools.terminal.definition import TerminalAction
+from openhands_cli.acp_impl.events.shared_event_handler import (
+    SharedEventHandler,
+    _event_visualize_to_plain,
+)
 from openhands_cli.acp_impl.events.tool_state import ToolCallState
+from openhands_cli.acp_impl.events.utils import extract_action_locations, get_metadata
 
 
 logger = get_logger(__name__)
@@ -67,6 +83,8 @@ class TokenBasedEventSubscriber:
         if isinstance(event, ConversationStateUpdateEvent):
             return
 
+        if isinstance(event, ActionEvent):
+            await self._handle_action_event(event)
         if isinstance(event, UserRejectObservation) or isinstance(
             event, AgentErrorEvent
         ):
@@ -280,3 +298,96 @@ class TokenBasedEventSubscriber:
                 )
         except Exception as e:
             logger.debug(f"Error sending streaming chunk: {e}", exc_info=True)
+
+    async def _handle_action_event(self, event: ActionEvent):
+        """Handle ActionEvent: send thought as agent_message_chunk, then tool_call.
+
+        Args:
+            event: ActionEvent to process
+        """
+        try:
+            # Generate content for the tool call
+            content: (
+                list[
+                    ContentToolCallContent
+                    | FileEditToolCallContent
+                    | TerminalToolCallContent
+                ]
+                | None
+            ) = None
+            tool_kind_mapping: dict[str, ToolKind] = {
+                "terminal": "execute",
+                "browser_use": "fetch",
+                "browser": "fetch",
+            }
+            tool_kind = tool_kind_mapping.get(event.tool_name, "other")
+            title = event.tool_name
+            if event.action:
+                action_viz = _event_visualize_to_plain(event)
+                if action_viz.strip():
+                    content = [
+                        ContentToolCallContent(
+                            type="content",
+                            content=TextContentBlock(
+                                type="text",
+                                text=action_viz,
+                            ),
+                        )
+                    ]
+
+                if isinstance(event.action, FileEditorAction):
+                    if event.action.command == "view":
+                        tool_kind = "read"
+                        title = f"Reading {event.action.path}"
+                    else:
+                        tool_kind = "edit"
+                        title = f"Editing {event.action.path}"
+                elif isinstance(event.action, TerminalAction):
+                    title = f"{event.action.command}"
+                elif isinstance(event.action, TaskTrackerAction):
+                    title = "Plan updated"
+                elif isinstance(event.action, ThinkAction):
+                    await self.conn.session_update(
+                        session_id=self.session_id,
+                        update=AgentThoughtChunk(
+                            session_update="agent_thought_chunk",
+                            content=TextContentBlock(
+                                type="text",
+                                text=action_viz,
+                            ),
+                        ),
+                        field_meta=get_metadata(self.conversation),
+                    )
+                    return
+                elif isinstance(event.action, FinishAction):
+                    await self.conn.session_update(
+                        session_id=self.session_id,
+                        update=AgentMessageChunk(
+                            session_update="agent_message_chunk",
+                            content=TextContentBlock(
+                                type="text",
+                                text=action_viz,
+                            ),
+                        ),
+                        field_meta=get_metadata(self.conversation),
+                    )
+                    return
+
+            await self.conn.session_update(
+                session_id=self.session_id,
+                update=ToolCallStart(
+                    session_update="tool_call",
+                    tool_call_id=event.tool_call_id,
+                    title=title,
+                    kind=tool_kind,
+                    status="in_progress",
+                    content=content,
+                    locations=extract_action_locations(event.action)
+                    if event.action
+                    else None,
+                    raw_input=event.action.model_dump() if event.action else None,
+                ),
+                field_meta=get_metadata(self.conversation),
+            )
+        except Exception as e:
+            logger.debug(f"Error processing ActionEvent: {e}", exc_info=True)

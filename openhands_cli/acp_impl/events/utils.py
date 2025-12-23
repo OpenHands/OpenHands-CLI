@@ -3,9 +3,13 @@ from acp.schema import (
     FileEditToolCallContent,
     TerminalToolCallContent,
     TextContentBlock,
+    ToolCallLocation,
 )
 
-from openhands.sdk import BaseConversation
+from openhands.sdk import Action, BaseConversation
+from openhands.tools.file_editor.definition import (
+    FileEditorAction,
+)
 
 
 def _format_status_line(usage, cost: float) -> str:
@@ -113,3 +117,32 @@ def format_content_blocks(text: str | None) -> list[ToolCallContent] | None:
             content=TextContentBlock(type="text", text=text),
         )
     ]
+
+
+def extract_action_locations(action: Action) -> list[ToolCallLocation] | None:
+    """Extract file locations from an action if available.
+
+    Returns a list of ToolCallLocation objects if the action contains location
+    information (e.g., file paths, directories), otherwise returns None.
+
+    Supports:
+    - file_editor: path, view_range, insert_line
+    - Other tools with 'path' or 'directory' attributes
+
+    Args:
+        action: Action to extract locations from
+
+    Returns:
+        List of ToolCallLocation objects or None
+    """
+    locations = []
+    if isinstance(action, FileEditorAction):
+        # Handle FileEditorAction specifically
+        if action.path:
+            location = ToolCallLocation(path=action.path)
+            if action.view_range and len(action.view_range) > 0:
+                location.line = action.view_range[0]
+            elif action.insert_line is not None:
+                location.line = action.insert_line
+            locations.append(location)
+    return locations if locations else None
