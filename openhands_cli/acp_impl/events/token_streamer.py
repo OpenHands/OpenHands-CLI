@@ -114,6 +114,12 @@ class TokenBasedEventSubscriber:
             state.started = True
             self._schedule(self._send_tool_call_start(state))
 
+        self._schedule(
+            self._send_streaming_chunk(
+                f"State reached\n\n{str(state)}", is_reasoning=True
+            )
+        )
+        
         # Stream args
         if not arguments:
             return
@@ -128,7 +134,11 @@ class TokenBasedEventSubscriber:
                 )
             return
 
-        self._schedule(self._send_streaming_chunk(f"State reached\n\n{str(state)}", is_reasoning=True))
+        self._schedule(
+            self._send_streaming_chunk(
+                f"State reached\n\n{str(state)}", is_reasoning=True
+            )
+        )
 
         if state.started:
             self._schedule(self._send_tool_call_progress(state))

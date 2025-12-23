@@ -83,7 +83,7 @@ class ToolCallState:
         if subtitle:
             return f"{self.tool_name}: {subtitle}"
         return self.tool_name
-    
+
     def __repr__(self) -> str:
         args_preview = _shorten_middle(self.args, width=80) if self.args else "∅"
 
