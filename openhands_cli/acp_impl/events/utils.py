@@ -180,7 +180,7 @@ def get_tool_kind(
             # If args are incomplete, default to edit (safe + consistent)
             return "edit"
 
-    if isinstance(action, TerminalAction):
+    if isinstance(action, FileEditorAction):
         # FileEditorAction commands literals
         if action.command == "view":
             return "read"
