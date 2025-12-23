@@ -22,9 +22,11 @@ from acp.schema import (
     ToolCallStart,
     ToolKind,
 )
+
 from openhands.sdk import get_logger
 from openhands.sdk.llm.streaming import LLMStreamChunk
 from openhands_cli.acp_impl.events.tool_state import ToolCallState
+
 
 logger = get_logger(__name__)
 
@@ -32,7 +34,9 @@ logger = get_logger(__name__)
 class TokenBasedEventSubscriber:
     """Owns all token streaming logic + state (tool-call streaming included)."""
 
-    def __init__(self, *, session_id: str, conn: Client, loop: asyncio.AbstractEventLoop):
+    def __init__(
+        self, *, session_id: str, conn: Client, loop: asyncio.AbstractEventLoop
+    ):
         self.session_id = session_id
         self.conn = conn
         self.loop = loop
@@ -62,10 +66,14 @@ class TokenBasedEventSubscriber:
                 content = getattr(delta, "content", None)
 
                 if isinstance(reasoning, str) and reasoning:
-                    self._schedule(self._send_streaming_chunk(reasoning, is_reasoning=True))
+                    self._schedule(
+                        self._send_streaming_chunk(reasoning, is_reasoning=True)
+                    )
 
                 if isinstance(content, str) and content:
-                    self._schedule(self._send_streaming_chunk(content, is_reasoning=False))
+                    self._schedule(
+                        self._send_streaming_chunk(content, is_reasoning=False)
+                    )
 
         except Exception as e:
             # NOTE: this surfaces as an ACP internal error (matches your ask)
@@ -119,7 +127,9 @@ class TokenBasedEventSubscriber:
         if state.is_think:
             thought_piece = self._extract_thought_piece(arguments)
             if thought_piece:
-                self._schedule(self._send_streaming_chunk(thought_piece, is_reasoning=True))
+                self._schedule(
+                    self._send_streaming_chunk(thought_piece, is_reasoning=True)
+                )
             return
 
         if state.started:
@@ -218,4 +228,3 @@ class TokenBasedEventSubscriber:
                 )
         except Exception as e:
             logger.debug(f"Error sending streaming chunk: {e}", exc_info=True)
-

@@ -1,6 +1,7 @@
+import json
 
-import json 
-import streamingjson 
+import streamingjson
+
 
 def _shorten_middle(text: str, width: int = 50) -> str:
     """Shorten a string by removing the middle part if it exceeds the width."""
@@ -82,4 +83,3 @@ class ToolCallState:
         if subtitle:
             return f"{self.tool_name}: {subtitle}"
         return self.tool_name
-    

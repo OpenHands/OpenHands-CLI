@@ -244,6 +244,7 @@ class OpenHandsACPAgent(ACPAgent):
             RequestError: If MCP configuration is invalid
         """
         # Load agent specs (same as setup_conversation)
+        uses_responses_api = False
         try:
             agent = load_agent_specs(
                 conversation_id=session_id,
@@ -255,6 +256,7 @@ class OpenHandsACPAgent(ACPAgent):
             agent = agent.model_copy(
                 update={"llm": agent.llm.model_copy(update={"stream": True})}
             )
+            uses_responses_api = agent.llm.uses_responses_api()
 
         except MCPConfigurationError as e:
             logger.error(f"Invalid MCP configuration: {e}")
@@ -309,7 +311,9 @@ class OpenHandsACPAgent(ACPAgent):
             persistence_dir=CONVERSATIONS_DIR,
             conversation_id=UUID(session_id),
             callbacks=[sync_callback],
-            token_callbacks=[token_subscriber.on_token],  # Enable token streaming
+            token_callbacks=[token_subscriber.on_token]
+            if uses_responses_api
+            else None,  # Enable token streaming for completions api
             visualizer=None,  # No visualizer needed for ACP
         )
 
