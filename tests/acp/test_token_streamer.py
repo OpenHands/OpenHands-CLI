@@ -4,7 +4,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from acp.schema import SessionUpdate3, SessionUpdate4
+from acp.schema import SessionUpdate3
 
 from openhands_cli.acp_impl.events.token_streamer import TokenBasedEventSubscriber
 
@@ -67,13 +67,15 @@ class TestOnTokenContent:
         chunk.choices = [choice]
 
         # Process the token synchronously (using loop.run_until_complete)
-        with patch.object(event_loop, 'is_running', return_value=False):
+        with patch.object(event_loop, "is_running", return_value=False):
             token_subscriber.on_token(chunk)
 
         # Verify that session_update was called for content
         assert mock_connection.session_update.called
 
-    def test_on_token_with_reasoning(self, token_subscriber, mock_connection, event_loop):
+    def test_on_token_with_reasoning(
+        self, token_subscriber, mock_connection, event_loop
+    ):
         """Test that reasoning tokens trigger thought updates."""
         chunk = MagicMock()
         delta = MagicMock()
@@ -84,7 +86,7 @@ class TestOnTokenContent:
         choice.delta = delta
         chunk.choices = [choice]
 
-        with patch.object(event_loop, 'is_running', return_value=False):
+        with patch.object(event_loop, "is_running", return_value=False):
             token_subscriber.on_token(chunk)
 
         # Verify that session_update was called for reasoning
@@ -95,7 +97,9 @@ class TestOnTokenContent:
         assert isinstance(update, SessionUpdate3)
         assert update.session_update == "agent_thought_chunk"
 
-    def test_on_token_empty_content(self, token_subscriber, mock_connection, event_loop):
+    def test_on_token_empty_content(
+        self, token_subscriber, mock_connection, event_loop
+    ):
         """Test that empty content doesn't trigger updates."""
         chunk = MagicMock()
         delta = MagicMock()
@@ -106,7 +110,7 @@ class TestOnTokenContent:
         choice.delta = delta
         chunk.choices = [choice]
 
-        with patch.object(event_loop, 'is_running', return_value=False):
+        with patch.object(event_loop, "is_running", return_value=False):
             token_subscriber.on_token(chunk)
 
         # Verify that session_update was NOT called for empty content
@@ -119,7 +123,7 @@ class TestOnTokenContent:
         choice.delta = None
         chunk.choices = [choice]
 
-        with patch.object(event_loop, 'is_running', return_value=False):
+        with patch.object(event_loop, "is_running", return_value=False):
             token_subscriber.on_token(chunk)
 
         # Should not crash and should not call session_update
@@ -129,7 +133,9 @@ class TestOnTokenContent:
 class TestOnTokenToolCalls:
     """Tests for on_token handling of tool calls."""
 
-    def test_on_token_tool_call_start(self, token_subscriber, mock_connection, event_loop):
+    def test_on_token_tool_call_start(
+        self, token_subscriber, mock_connection, event_loop
+    ):
         """Test that tool call start triggers tool_call notification."""
         chunk = MagicMock()
         delta = MagicMock()
@@ -150,7 +156,7 @@ class TestOnTokenToolCalls:
         choice.delta = delta
         chunk.choices = [choice]
 
-        with patch.object(event_loop, 'is_running', return_value=False):
+        with patch.object(event_loop, "is_running", return_value=False):
             token_subscriber.on_token(chunk)
 
         # Verify tool call state was created
@@ -160,7 +166,9 @@ class TestOnTokenToolCalls:
         assert state.tool_name == "terminal"
         assert state.started is True
 
-    def test_on_token_think_tool_not_started(self, token_subscriber, mock_connection, event_loop):
+    def test_on_token_think_tool_not_started(
+        self, token_subscriber, mock_connection, event_loop
+    ):
         """Test that think tool calls are not started (streamed as thoughts)."""
         chunk = MagicMock()
         delta = MagicMock()
@@ -181,7 +189,7 @@ class TestOnTokenToolCalls:
         choice.delta = delta
         chunk.choices = [choice]
 
-        with patch.object(event_loop, 'is_running', return_value=False):
+        with patch.object(event_loop, "is_running", return_value=False):
             token_subscriber.on_token(chunk)
 
         # Think tool should be tracked but NOT started
@@ -190,7 +198,9 @@ class TestOnTokenToolCalls:
         assert state.is_think is True
         assert state.started is False
 
-    def test_on_token_tool_call_streaming_args(self, token_subscriber, mock_connection, event_loop):
+    def test_on_token_tool_call_streaming_args(
+        self, token_subscriber, mock_connection, event_loop
+    ):
         """Test that streaming arguments are accumulated."""
         # First chunk - start tool call
         chunk1 = MagicMock()
@@ -226,7 +236,7 @@ class TestOnTokenToolCalls:
         choice2.delta = delta2
         chunk2.choices = [choice2]
 
-        with patch.object(event_loop, 'is_running', return_value=False):
+        with patch.object(event_loop, "is_running", return_value=False):
             token_subscriber.on_token(chunk1)
             token_subscriber.on_token(chunk2)
 
@@ -234,7 +244,9 @@ class TestOnTokenToolCalls:
         state = token_subscriber._streaming_tool_calls[0]
         assert state.args == '{"command": "ls"}'
 
-    def test_on_token_multiple_tool_calls(self, token_subscriber, mock_connection, event_loop):
+    def test_on_token_multiple_tool_calls(
+        self, token_subscriber, mock_connection, event_loop
+    ):
         """Test handling multiple tool calls in same stream."""
         # First tool call
         chunk1 = MagicMock()
@@ -270,7 +282,7 @@ class TestOnTokenToolCalls:
         choice2.delta = delta2
         chunk2.choices = [choice2]
 
-        with patch.object(event_loop, 'is_running', return_value=False):
+        with patch.object(event_loop, "is_running", return_value=False):
             token_subscriber.on_token(chunk1)
             token_subscriber.on_token(chunk2)
 
@@ -285,11 +297,15 @@ class TestUnstreamedEventHandler:
     """Tests for unstreamed_event_handler method."""
 
     @pytest.mark.asyncio
-    async def test_skip_conversation_state_update(self, token_subscriber, mock_connection):
+    async def test_skip_conversation_state_update(
+        self, token_subscriber, mock_connection
+    ):
         """Test that ConversationStateUpdateEvent is skipped."""
         from openhands.sdk.event import ConversationStateUpdateEvent
 
-        event = ConversationStateUpdateEvent(source="environment", key="test", value="test")
+        event = ConversationStateUpdateEvent(
+            source="environment", key="test", value="test"
+        )
         await token_subscriber.unstreamed_event_handler(event)
 
         # Should not call session_update
@@ -332,13 +348,15 @@ class TestUnstreamedEventHandler:
 class TestScheduleUpdate:
     """Tests for _schedule_update method."""
 
-    def test_schedule_update_loop_not_running(self, token_subscriber, mock_connection, event_loop):
+    def test_schedule_update_loop_not_running(
+        self, token_subscriber, mock_connection, event_loop
+    ):
         """Test scheduling update when loop is not running."""
         from acp import update_agent_message_text
 
         update = update_agent_message_text("test")
 
-        with patch.object(event_loop, 'is_running', return_value=False):
+        with patch.object(event_loop, "is_running", return_value=False):
             token_subscriber._schedule_update(update)
 
         assert mock_connection.session_update.called
@@ -357,8 +375,8 @@ class TestScheduleUpdate:
         update = update_agent_message_text("test")
 
         # Simulate loop running by using run_coroutine_threadsafe
-        with patch.object(loop, 'is_running', return_value=True):
-            with patch('asyncio.run_coroutine_threadsafe') as mock_rcts:
+        with patch.object(loop, "is_running", return_value=True):
+            with patch("asyncio.run_coroutine_threadsafe") as mock_rcts:
                 subscriber._schedule_update(update)
                 mock_rcts.assert_called_once()
 

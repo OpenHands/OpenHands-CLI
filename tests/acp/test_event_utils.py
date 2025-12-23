@@ -39,10 +39,12 @@ class TestGetToolKind:
         result = get_tool_kind("file_editor", action=action)
         assert result == "read"
 
-    @pytest.mark.parametrize("command", ["str_replace", "create", "insert", "undo_edit"])
-    def test_file_editor_edit_actions(self, command: str):
+    @pytest.mark.parametrize(
+        "command", ["str_replace", "create", "insert", "undo_edit"]
+    )
+    def test_file_editor_edit_actions(self, command):
         """Test file_editor with edit commands returns 'edit'."""
-        action = FileEditorAction(command=command, path="/test.py")
+        action = FileEditorAction(command=command, path="/test.py")  # type: ignore[arg-type]
         result = get_tool_kind("file_editor", action=action)
         assert result == "edit"
 
@@ -95,9 +97,9 @@ class TestGetToolTitle:
             ("insert", "/code.py"),
         ],
     )
-    def test_file_editor_edit_actions(self, command: str, path: str):
+    def test_file_editor_edit_actions(self, command, path: str):
         """Test file_editor edit actions generate 'Editing' title."""
-        action = FileEditorAction(command=command, path=path)
+        action = FileEditorAction(command=command, path=path)  # type: ignore[arg-type]
         result = get_tool_title("file_editor", action=action)
         assert result == f"Editing {path}"
 
