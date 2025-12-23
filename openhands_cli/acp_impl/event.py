@@ -763,6 +763,8 @@ class EventSubscriber:
                 stored_tool_call_id
                 and isinstance(stored_tool_call_id, str)
                 and isinstance(accumulated_args, str)
+                and stored_name
+                and isinstance(stored_name, str)
             ):
                 # Stream accumulated args via ToolCallProgress
                 self._schedule_async(
