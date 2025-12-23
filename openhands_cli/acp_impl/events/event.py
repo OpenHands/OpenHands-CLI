@@ -1,6 +1,5 @@
 """Utility functions for ACP implementation."""
 
-import asyncio
 
 from acp import Client
 from acp.schema import (
@@ -60,8 +59,6 @@ class EventSubscriber:
         session_id: str,
         conn: "Client",
         conversation: BaseConversation | None = None,
-        streaming_enabled: bool = False,
-        loop: asyncio.AbstractEventLoop | None = None,
     ):
         """Initialize the event subscriber.
 
@@ -75,9 +72,6 @@ class EventSubscriber:
         self.session_id = session_id
         self.conn = conn
         self.conversation = conversation
-        self.streaming_enabled = streaming_enabled
-        self.loop = loop
-
         self.shared_events_handler = SharedEventHandler()
 
     async def __call__(self, event: Event):
@@ -254,14 +248,6 @@ class EventSubscriber:
                 # if we update it again, they will be duplicated
                 pass
             else:  # assistant or other roles
-                # Skip sending complete assistant messages when streaming is enabled
-                # since token callbacks are already streaming the content
-                if self.streaming_enabled:
-                    logger.debug(
-                        "Skipping complete message event due to streaming being enabled"
-                    )
-                    return
-
                 await self.conn.session_update(
                     session_id=self.session_id,
                     update=AgentMessageChunk(
