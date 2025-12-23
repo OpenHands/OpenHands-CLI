@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from typing import Protocol
 
 from acp import Client
@@ -8,7 +7,6 @@ from acp.schema import (
     AgentMessageChunk,
     AgentPlanUpdate,
     AgentThoughtChunk,
-    ContentToolCallContent,
     PlanEntry,
     PlanEntryStatus,
     TextContentBlock,
@@ -21,10 +19,7 @@ from openhands.sdk.event import (
     AgentErrorEvent,
     Condensation,
     CondensationRequest,
-    ConversationStateUpdateEvent,
     Event,
-    MessageEvent,
-    ObservationBaseEvent,
     ObservationEvent,
     PauseEvent,
     SystemPromptEvent,
@@ -37,6 +32,7 @@ from openhands.tools.task_tracker.definition import (
     TaskTrackerStatusType,
 )
 from openhands_cli.acp_impl.events.utils import format_content_blocks, get_metadata
+
 
 logger = get_logger(__name__)
 
@@ -90,8 +86,6 @@ class SharedEventHandler:
         text: str | None,
         raw_output: dict,
     ) -> None:
-        content = None
-        
         await ctx.conn.session_update(
             session_id=ctx.session_id,
             update=ToolCallProgress(
@@ -124,8 +118,8 @@ class SharedEventHandler:
     ) -> None:
         await self.send_thought(ctx, _event_visualize_to_plain(event))
 
-    async def handle_user_reject(
-        self, ctx: _ACPContext, event: UserRejectObservation
+    async def handle_user_reject_or_agent_error(
+        self, ctx: _ACPContext, event: UserRejectObservation | AgentErrorEvent
     ) -> None:
         await self.send_tool_progress(
             ctx,
@@ -146,9 +140,11 @@ class SharedEventHandler:
             raw_output=event.model_dump(),
         )
 
-    async def handle_observation(self, ctx: _ACPContext, event: ObservationEvent) -> None:
+    async def handle_observation(
+        self, ctx: _ACPContext, event: ObservationEvent
+    ) -> None:
         obs = event.observation
-        if isinstance(obs, (ThinkObservation, FinishObservation)):
+        if isinstance(obs, ThinkObservation) or isinstance(obs, FinishObservation):
             return
 
         if isinstance(obs, TaskTrackerObservation):
@@ -179,25 +175,3 @@ class SharedEventHandler:
             text=_event_visualize_to_plain(event),
             raw_output=event.model_dump(),
         )
-
-    async def handle_message(
-        self,
-        ctx: _ACPContext,
-        event: MessageEvent,
-        *,
-        streaming_enabled: bool,
-    ) -> None:
-        viz = _event_visualize_to_plain(event)
-        if not viz.strip():
-            return
-
-        if event.llm_message.role == "user":
-            # Keep your existing policy: don't re-emit user messages.
-            return
-
-        if streaming_enabled:
-            logger.debug("Skipping complete message event due to streaming being enabled")
-            return
-
-        await self.send_message(ctx, viz)
-

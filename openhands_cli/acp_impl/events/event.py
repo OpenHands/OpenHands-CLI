@@ -5,18 +5,13 @@ import asyncio
 from acp import Client
 from acp.schema import (
     AgentMessageChunk,
-    AgentPlanUpdate,
     AgentThoughtChunk,
     ContentToolCallContent,
     FileEditToolCallContent,
-    PlanEntry,
-    PlanEntryStatus,
     TerminalToolCallContent,
     TextContentBlock,
     ToolCallLocation,
-    ToolCallProgress,
     ToolCallStart,
-    ToolCallStatus,
     ToolKind,
 )
 
@@ -29,24 +24,21 @@ from openhands.sdk.event import (
     ConversationStateUpdateEvent,
     Event,
     MessageEvent,
-    ObservationBaseEvent,
     ObservationEvent,
     PauseEvent,
     SystemPromptEvent,
     UserRejectObservation,
 )
-from openhands.sdk.tool.builtins.finish import FinishAction, FinishObservation
-from openhands.sdk.tool.builtins.think import ThinkAction, ThinkObservation
+from openhands.sdk.tool.builtins.finish import FinishAction
+from openhands.sdk.tool.builtins.think import ThinkAction
 from openhands.tools.file_editor.definition import (
     FileEditorAction,
 )
 from openhands.tools.task_tracker.definition import (
     TaskTrackerAction,
-    TaskTrackerObservation,
-    TaskTrackerStatusType,
 )
 from openhands.tools.terminal.definition import TerminalAction
-from openhands_cli.acp_impl.events.tool_state import ToolCallState
+from openhands_cli.acp_impl.events.shared_event_handler import SharedEventHandler
 from openhands_cli.acp_impl.events.utils import get_metadata
 
 
@@ -126,10 +118,8 @@ class EventSubscriber:
         self.conversation = conversation
         self.streaming_enabled = streaming_enabled
         self.loop = loop
-        # Track streaming tool calls using _ToolCallState: index -> state
-        self._streaming_tool_calls: dict[int, ToolCallState] = {}
-        # Track the last tool call for appending streaming arguments
-        self._last_tool_call_state: ToolCallState | None = None
+
+        self.shared_events_handler = SharedEventHandler()
 
     async def __call__(self, event: Event):
         """Handle incoming events and convert them to ACP notifications.
@@ -144,20 +134,24 @@ class EventSubscriber:
         # Handle different event types
         if isinstance(event, ActionEvent):
             await self._handle_action_event(event)
-        elif isinstance(
-            event, ObservationEvent | UserRejectObservation | AgentErrorEvent
+        elif isinstance(event, UserRejectObservation) or isinstance(
+            event, AgentErrorEvent
         ):
-            await self._handle_observation_event(event)
+            await self.shared_events_handler.handle_user_reject_or_agent_error(
+                self, event
+            )
+        elif isinstance(event, ObservationEvent):
+            await self.shared_events_handler.handle_observation(self, event)
         elif isinstance(event, MessageEvent):
             await self._handle_message_event(event)
         elif isinstance(event, SystemPromptEvent):
-            await self._handle_system_prompt_event(event)
+            await self.shared_events_handler.handle_system_prompt(self, event)
         elif isinstance(event, PauseEvent):
-            await self._handle_pause_event(event)
+            await self.shared_events_handler.handle_pause(self, event)
         elif isinstance(event, Condensation):
-            await self._handle_condensation_event(event)
+            await self.shared_events_handler.handle_condensation(self, event)
         elif isinstance(event, CondensationRequest):
-            await self._handle_condensation_request_event(event)
+            await self.shared_events_handler.handle_condensation_request(self, event)
 
     async def _handle_action_event(self, event: ActionEvent):
         """Handle ActionEvent: send thought as agent_message_chunk, then tool_call.
@@ -282,96 +276,6 @@ class EventSubscriber:
             )
         except Exception as e:
             logger.debug(f"Error processing ActionEvent: {e}", exc_info=True)
-
-    async def _handle_observation_event(self, event: ObservationBaseEvent):
-        """Handle observation events by sending tool_call_update notification.
-
-        Handles special observation types (FileEditor, TaskTracker) with custom logic,
-        and generic observations with visualization text.
-
-        Args:
-            event: ObservationEvent, UserRejectObservation, or AgentErrorEvent
-        """
-        try:
-            content: ContentToolCallContent | None = None
-            status: ToolCallStatus = "completed"
-            if isinstance(event, ObservationEvent):
-                if isinstance(event.observation, ThinkObservation | FinishObservation):
-                    # Think and Finish observations are handled in action event
-                    return
-                # Special handling for TaskTrackerObservation
-                elif isinstance(event.observation, TaskTrackerObservation):
-                    observation = event.observation
-                    # Convert TaskItems to PlanEntries
-                    entries: list[PlanEntry] = []
-                    for task in observation.task_list:
-                        # Map status: todo→pending, in_progress→in_progress,
-                        # done→completed
-                        status_map: dict[TaskTrackerStatusType, PlanEntryStatus] = {
-                            "todo": "pending",
-                            "in_progress": "in_progress",
-                            "done": "completed",
-                        }
-                        task_status = status_map.get(task.status, "pending")
-                        task_content = task.title
-                        # NOTE: we ignore notes for now to keep it concise
-                        # if task.notes:
-                        #     task_content += f"\n{task.notes}"
-                        entries.append(
-                            PlanEntry(
-                                content=task_content,
-                                status=task_status,
-                                priority="medium",  # TaskItem doesn't have priority
-                            )
-                        )
-
-                    # Send AgentPlanUpdate
-                    await self.conn.session_update(
-                        session_id=self.session_id,
-                        update=AgentPlanUpdate(
-                            session_update="plan",
-                            entries=entries,
-                        ),
-                        field_meta=get_metadata(self.conversation),
-                    )
-                else:
-                    observation = event.observation
-                    # Use ContentToolCallContent for view commands and other operations
-                    viz_text = _event_visualize_to_plain(event)
-                    if viz_text.strip():
-                        content = ContentToolCallContent(
-                            type="content",
-                            content=TextContentBlock(
-                                type="text",
-                                text=viz_text,
-                            ),
-                        )
-            else:
-                # For UserRejectObservation or AgentErrorEvent
-                status = "failed"
-                viz_text = _event_visualize_to_plain(event)
-                if viz_text.strip():
-                    content = ContentToolCallContent(
-                        type="content",
-                        content=TextContentBlock(
-                            type="text",
-                            text=viz_text,
-                        ),
-                    )
-            # Send tool_call_update for all observation types
-            await self.conn.session_update(
-                session_id=self.session_id,
-                update=ToolCallProgress(
-                    session_update="tool_call_update",
-                    tool_call_id=event.tool_call_id,
-                    status=status,
-                    content=[content] if content else None,
-                    raw_output=event.model_dump(),
-                ),
-                field_meta=get_metadata(self.conversation),
-            )
-        except Exception as e:
-            logger.debug(f"Error processing observation event: {e}", exc_info=True)
 
     async def _handle_message_event(self, event: MessageEvent):
         """Handle MessageEvent by sending AgentMessageChunk or UserMessageChunk.
