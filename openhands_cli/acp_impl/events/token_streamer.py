@@ -51,6 +51,15 @@ from openhands_cli.acp_impl.events.utils import (
 )
 
 
+ACPUpdate = (
+    AgentMessageChunk
+    | AgentThoughtChunk
+    | ToolCallStart
+    | ToolCallProgress
+    | AgentPlanUpdate
+)
+
+
 logger = get_logger(__name__)
 
 
@@ -116,18 +125,14 @@ class TokenBasedEventSubscriber:
                 content = getattr(delta, "content", None)
 
                 if isinstance(reasoning, str) and reasoning:
-                    self._schedule(
-                        self.send_acp_event(
-                            update_agent_thought_text(
-                                reasoning,
-                            ),
+                    self._schedule_update(
+                        update_agent_thought_text(
+                            reasoning,
                         )
                     )
 
                 if isinstance(content, str) and content:
-                    self._schedule(
-                        self.send_acp_event(update_agent_message_text(content))
-                    )
+                    self._schedule_update(update_agent_message_text(content))
 
         except Exception as e:
             # NOTE: this surfaces as an ACP internal error (matches your ask)
@@ -139,11 +144,16 @@ class TokenBasedEventSubscriber:
     # internals
     # -----------------------
 
-    def _schedule(self, coro) -> None:
+    def _schedule_update(self, update: ACPUpdate) -> None:
+        """Schedule a session_update for an ACP update, thread-safe."""
+
+        async def _send() -> None:
+            await self.conn.session_update(session_id=self.session_id, update=update)
+
         if self.loop.is_running():
-            asyncio.run_coroutine_threadsafe(coro, self.loop)
+            asyncio.run_coroutine_threadsafe(_send(), self.loop)
         else:
-            self.loop.run_until_complete(coro)
+            self.loop.run_until_complete(_send())
 
     def _handle_tool_call_streaming(self, tool_call) -> None:
         if not tool_call:
@@ -188,7 +198,7 @@ class TokenBasedEventSubscriber:
                 status="in_progress",
                 content=format_content_blocks(state.args),
             )
-            self._schedule(self.send_acp_event(tool_call_start))
+            self._schedule_update(tool_call_start)
 
         # Stream args
         if not arguments_chunk:
@@ -198,33 +208,25 @@ class TokenBasedEventSubscriber:
 
         thought_piece = state.extract_thought_piece(arguments_chunk)
         if thought_piece:
-            self._schedule(
-                self.send_acp_event(update_agent_thought_text(thought_piece))
-            )
+            self._schedule_update(update_agent_thought_text(thought_piece))
             return
 
         if state.started:
-            self._schedule(
-                self.send_acp_event(
-                    update_tool_call(
-                        tool_call_id=state.tool_call_id,
-                        title=state.title,
-                        kind=get_tool_kind(
-                            tool_name=state.tool_name, partial_args=state.lexer
-                        ),
-                        status="in_progress",
-                        content=format_content_blocks(state.args),
+            self._schedule_update(
+                update_tool_call(
+                    tool_call_id=state.tool_call_id,
+                    title=state.title,
+                    kind=get_tool_kind(
+                        tool_name=state.tool_name, partial_args=state.lexer
                     ),
-                )
+                    status="in_progress",
+                    content=format_content_blocks(state.args),
+                ),
             )
 
     async def send_acp_event(
         self,
-        update: AgentMessageChunk
-        | AgentThoughtChunk
-        | ToolCallStart
-        | ToolCallProgress
-        | AgentPlanUpdate,
+        update: ACPUpdate,
     ):
         await self.conn.session_update(session_id=self.session_id, update=update)
 
