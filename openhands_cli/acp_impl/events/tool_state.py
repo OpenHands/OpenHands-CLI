@@ -59,7 +59,9 @@ class ToolCallState:
         self.is_think = tool_name == "think"
         self.args = ""
         self.lexer = streamingjson.Lexer()
-        self.started = False
+        self.prev_emitted_thought_chunk = ""
+
+
 
     def append_args(self, args_part: str) -> None:
         """Append new arguments part to the accumulated args and lexer."""
@@ -67,19 +69,29 @@ class ToolCallState:
         self.lexer.append_string(args_part)
 
     def extract_thought_piece(self, arguments: str) -> str | None:
-        if not self.is_think:
+        if not self.is_think or not arguments:
+            return None
+        
+        try:
+            args = json.loads(self.lexer.complete_json())
+        except Exception:
+            return None
+        
+        thought = args.get("thought", "")
+        if not thought:
             return None
 
-        if not arguments:
-            return None
+        self.prev_emitted_thought_chunk = thought
+        return thought[len(self.prev_emitted_thought_chunk):]
 
-        stripped = arguments.strip()
-        # common incremental JSON fragments
-        if stripped in {"{", "}", '"', ":", "thought", "\\"}:
-            return None
-        if stripped in {'{"thought', '": "', '"}', '"}'}:
-            return None
-        return arguments
+
+        # stripped = arguments.strip()
+        # # common incremental JSON fragments
+        # if stripped in {"{", "}", '"', ":", "thought", "\\"}:
+        #     return None
+        # if stripped in {'{"thought', '": "', '"}', '"}'}:
+        #     return None
+        # return arguments
 
     @property
     def title(self) -> str:
@@ -93,7 +105,6 @@ class ToolCallState:
             f"  tool={self.tool_name!r},\n"
             f"  title={self.title!r},\n"
             f"  is_think={self.is_think},\n"
-            f"  started={self.started},\n"
             f"  args={self.args!r}\n"
             f")"
         )
