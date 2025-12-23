@@ -9,12 +9,9 @@ from acp import (
     update_agent_thought_text,
 )
 from acp.schema import (
-    AgentMessageChunk,
     AgentPlanUpdate,
-    AgentThoughtChunk,
     PlanEntry,
     PlanEntryStatus,
-    TextContentBlock,
     ToolCallProgress,
     ToolCallStatus,
 )
@@ -66,26 +63,9 @@ class SharedEventHandler:
         return get_metadata(ctx.conversation)
 
     async def send_thought(self, ctx: _ACPContext, text: str) -> None:
-        if not text.strip():
-            return
         await ctx.conn.session_update(
             session_id=ctx.session_id,
-            update=AgentThoughtChunk(
-                session_update="agent_thought_chunk",
-                content=TextContentBlock(type="text", text=text),
-            ),
-            field_meta=self._meta(ctx),
-        )
-
-    async def send_message(self, ctx: _ACPContext, text: str) -> None:
-        if not text.strip():
-            return
-        await ctx.conn.session_update(
-            session_id=ctx.session_id,
-            update=AgentMessageChunk(
-                session_update="agent_message_chunk",
-                content=TextContentBlock(type="text", text=text),
-            ),
+            update=update_agent_thought_text(text=text),
             field_meta=self._meta(ctx),
         )
 
