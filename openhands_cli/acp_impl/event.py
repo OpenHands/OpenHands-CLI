@@ -53,6 +53,197 @@ from openhands.tools.terminal.definition import TerminalAction
 logger = get_logger(__name__)
 
 
+def _shorten_middle(text: str, width: int = 50) -> str:
+    """Shorten a string by removing the middle part if it exceeds the width.
+
+    Args:
+        text: The string to shorten
+        width: Maximum width of the output string
+
+    Returns:
+        Shortened string with middle replaced by "..." if needed
+    """
+    if len(text) <= width:
+        return text
+    half = (width - 3) // 2
+    return text[:half] + "..." + text[-half:]
+
+
+def _complete_partial_json(partial_json: str) -> str:
+    """Complete a partial JSON string to make it parseable.
+
+    This is a simplified version of what streamingjson.Lexer.complete_json() does.
+    It tracks open braces/brackets and string states to add missing closures.
+
+    Args:
+        partial_json: Incomplete JSON string
+
+    Returns:
+        A completed JSON string that should be parseable
+    """
+    if not partial_json:
+        return "{}"
+
+    result = partial_json
+    stack: list[str] = []  # Track open braces/brackets
+    in_string = False
+    escape_next = False
+
+    for char in partial_json:
+        if escape_next:
+            escape_next = False
+            continue
+
+        if char == "\\":
+            escape_next = True
+            continue
+
+        if char == '"' and not escape_next:
+            in_string = not in_string
+            continue
+
+        if in_string:
+            continue
+
+        if char == "{":
+            stack.append("}")
+        elif char == "[":
+            stack.append("]")
+        elif char in "]}":
+            if stack and stack[-1] == char:
+                stack.pop()
+
+    # Close any open string
+    if in_string:
+        result += '"'
+
+    # Close any open structures
+    while stack:
+        result += stack.pop()
+
+    return result
+
+
+def _extract_key_argument(json_content: str, tool_name: str) -> str | None:
+    """Extract a key argument from tool call arguments for display.
+
+    Attempts to complete partial JSON and extract the most relevant
+    argument based on the tool name.
+
+    Args:
+        json_content: Raw JSON string (possibly incomplete)
+        tool_name: Name of the tool to determine which argument to extract
+
+    Returns:
+        The extracted key argument, shortened if necessary, or None
+    """
+    # Try to complete and parse the JSON
+    completed_json = _complete_partial_json(json_content)
+
+    try:
+        curr_args = json.loads(completed_json)
+    except json.JSONDecodeError:
+        return None
+
+    if not curr_args or not isinstance(curr_args, dict):
+        return None
+
+    key_argument: str = ""
+
+    # Map tool names to their key arguments
+    if tool_name == "terminal":
+        if not curr_args.get("command"):
+            return None
+        key_argument = str(curr_args["command"])
+    elif tool_name == "file_editor":
+        if not curr_args.get("path"):
+            return None
+        key_argument = str(curr_args["path"])
+    elif tool_name == "think":
+        if not curr_args.get("thought"):
+            return None
+        key_argument = str(curr_args["thought"])
+    elif tool_name == "finish":
+        if not curr_args.get("message"):
+            return None
+        key_argument = str(curr_args["message"])
+    elif tool_name == "task_tracker":
+        # No key argument for task tracker
+        return None
+    elif tool_name in (
+        "browser_navigate",
+        "browser_click",
+        "browser_type",
+        "browser_scroll",
+        "browser_get_state",
+        "browser_get_content",
+        "browser_go_back",
+        "browser_list_tabs",
+        "browser_switch_tab",
+        "browser_close_tab",
+    ):
+        # Browser tools - extract url or index
+        if curr_args.get("url"):
+            key_argument = str(curr_args["url"])
+        elif curr_args.get("index"):
+            key_argument = f"index={curr_args['index']}"
+        elif curr_args.get("text"):
+            key_argument = str(curr_args["text"])
+        else:
+            return None
+    else:
+        # For unknown tools, try common argument names
+        for key in ["path", "command", "query", "url", "text", "message"]:
+            if curr_args.get(key):
+                key_argument = str(curr_args[key])
+                break
+        if not key_argument:
+            return None
+
+    return _shorten_middle(key_argument, width=50)
+
+
+class _ToolCallState:
+    """Manages the state of a single streaming tool call.
+
+    Similar to kimi-cli's approach, this class tracks the accumulated
+    arguments for a tool call and extracts key arguments for dynamic titles.
+    """
+
+    def __init__(self, tool_call_id: str, tool_name: str, is_think: bool = False):
+        """Initialize tool call state.
+
+        Args:
+            tool_call_id: The ID of the tool call
+            tool_name: The name of the tool being called
+            is_think: Whether this is a think tool call
+        """
+        self.tool_call_id = tool_call_id
+        self.tool_name = tool_name
+        self.is_think = is_think
+        self.args = ""
+        self.started = False
+
+    def append_args(self, args_part: str) -> None:
+        """Append new arguments part to the accumulated args.
+
+        Args:
+            args_part: The new arguments chunk to append
+        """
+        self.args += args_part
+
+    def get_title(self) -> str:
+        """Get the current title with key argument if available.
+
+        Returns:
+            Title like "tool_name: key_arg" or just "tool_name"
+        """
+        subtitle = _extract_key_argument(self.args, self.tool_name)
+        if subtitle:
+            return f"{self.tool_name}: {subtitle}"
+        return self.tool_name
+
+
 def extract_action_locations(action: Action) -> list[ToolCallLocation] | None:
     """Extract file locations from an action if available.
 
@@ -126,8 +317,10 @@ class EventSubscriber:
         self.conversation = conversation
         self.streaming_enabled = streaming_enabled
         self.loop = loop
-        # Track streaming tool calls: index -> {tool_call_id, name, is_think}
-        self._streaming_tool_calls: dict[int, dict[str, str | bool | None]] = {}
+        # Track streaming tool calls using _ToolCallState: index -> state
+        self._streaming_tool_calls: dict[int, _ToolCallState] = {}
+        # Track the last tool call for appending streaming arguments
+        self._last_tool_call_state: _ToolCallState | None = None
 
     def _format_status_line(self, usage, cost: float) -> str:
         """Format metrics as a status line string.
@@ -676,11 +869,14 @@ class EventSubscriber:
             )
 
     def _handle_tool_call_streaming(self, tool_call) -> None:
-        """Handle streaming of tool calls.
+        """Handle streaming of tool calls using _ToolCallState.
+
+        Uses kimi-cli's approach with streamingjson.Lexer to manage streaming
+        tool call state and extract key arguments for dynamic titles.
 
         Sends ToolCallStart when a new tool call is detected, then streams arguments:
         - Think tool: streams via AgentThoughtChunk
-        - Other tools: streams via ToolCallProgress
+        - Other tools: streams via ToolCallProgress with dynamic titles
 
         Args:
             tool_call: Tool call object from the LLM streaming delta
@@ -697,79 +893,47 @@ class EventSubscriber:
         name = getattr(function, "name", None)
         arguments = getattr(function, "arguments", None)
 
-        # Register new tool call when we see the id and/or name
+        # Create new _ToolCallState when we see a new tool call
         if index not in self._streaming_tool_calls:
-            if tool_call_id or name:
-                is_think = name == "think" if name else False
-                self._streaming_tool_calls[index] = {
-                    "tool_call_id": tool_call_id,
-                    "name": name,
-                    "is_think": is_think,
-                    "started": False,  # Track if ToolCallStart has been sent
-                    "accumulated_args": "",  # Accumulate arguments for streaming
-                }
-        else:
-            # Update existing tool call info if we get new data
-            if tool_call_id:
-                self._streaming_tool_calls[index]["tool_call_id"] = tool_call_id
-            if name:
-                self._streaming_tool_calls[index]["name"] = name
-                self._streaming_tool_calls[index]["is_think"] = name == "think"
+            if tool_call_id and name:
+                is_think = name == "think"
+                state = _ToolCallState(tool_call_id, name, is_think)
+                self._streaming_tool_calls[index] = state
+                self._last_tool_call_state = state
+        elif tool_call_id and name:
+            # Update existing state if we get new id/name (shouldn't happen often)
+            existing_state = self._streaming_tool_calls[index]
+            if existing_state.tool_call_id != tool_call_id:
+                # New tool call at same index - replace state
+                is_think = name == "think"
+                state = _ToolCallState(tool_call_id, name, is_think)
+                self._streaming_tool_calls[index] = state
+                self._last_tool_call_state = state
 
-        # Send ToolCallStart for non-think tools when we have enough info
-        tool_info = self._streaming_tool_calls.get(index, {})
-        stored_tool_call_id = tool_info.get("tool_call_id")
-        stored_name = tool_info.get("name")
-        is_think = tool_info.get("is_think", False)
-        has_started = tool_info.get("started", False)
+        state = self._streaming_tool_calls.get(index)
+        if not state:
+            return
 
-        # Send ToolCallStart when we have tool_call_id and name, but haven't started yet
-        if (
-            stored_tool_call_id
-            and stored_name
-            and not has_started
-            and not is_think
-            and isinstance(stored_tool_call_id, str)
-            and isinstance(stored_name, str)
-        ):
-            self._streaming_tool_calls[index]["started"] = True
-            self._schedule_async(
-                self._send_tool_call_start(stored_tool_call_id, stored_name)
-            )
+        # Send ToolCallStart for non-think tools when we haven't started yet
+        if not state.started and not state.is_think:
+            state.started = True
+            self._schedule_async(self._send_tool_call_start(state))
 
-        # Stream arguments if we have them and the tool is registered
-        if index in self._streaming_tool_calls and arguments:
-            # Accumulate the arguments
-            current_accumulated = self._streaming_tool_calls[index].get(
-                "accumulated_args", ""
-            )
-            if isinstance(current_accumulated, str):
-                self._streaming_tool_calls[index]["accumulated_args"] = (
-                    current_accumulated + arguments
-                )
-            else:
-                self._streaming_tool_calls[index]["accumulated_args"] = arguments
+        # Stream arguments if we have them
+        if arguments:
+            # Append to accumulated state
+            state.append_args(arguments)
 
-            accumulated_args = self._streaming_tool_calls[index]["accumulated_args"]
-
-            if is_think:
+            if state.is_think:
                 # Stream think tool arguments as AgentThoughtChunk
                 thought_content = self._extract_thought_from_args(arguments)
                 if thought_content:
                     self._schedule_async(
                         self._send_streaming_chunk(thought_content, is_reasoning=True)
                     )
-            elif (
-                stored_tool_call_id
-                and isinstance(stored_tool_call_id, str)
-                and isinstance(accumulated_args, str)
-                and stored_name
-                and isinstance(stored_name, str)
-            ):
-                # Stream accumulated args via ToolCallProgress
-                self._schedule_async(
-                    self._send_tool_call_progress(stored_tool_call_id, accumulated_args, stored_name)
-                )
+            elif state.started:
+                # Stream accumulated args via ToolCallProgress with dynamic title
+                self._schedule_async(self._send_tool_call_progress(state))
 
     def _schedule_async(self, coro) -> None:
         """Schedule an async coroutine to run on the event loop.
@@ -844,64 +1008,67 @@ class EventSubscriber:
         }
         return tool_kind_mapping.get(tool_name, "other")
 
-    async def _send_tool_call_start(self, tool_call_id: str, tool_name: str) -> None:
+    async def _send_tool_call_start(self, state: _ToolCallState) -> None:
         """Send ToolCallStart notification when a tool call begins streaming.
 
+        Uses the tool call state to send the initial notification with proper
+        status ("in_progress") and dynamic title.
+
         Args:
-            tool_call_id: The ID of the tool call
-            tool_name: The name of the tool being called
+            state: The tool call state containing id, name, and accumulated args
         """
         try:
-            tool_kind = self._get_tool_kind_from_name(tool_name)
+            tool_kind = self._get_tool_kind_from_name(state.tool_name)
             await self.conn.session_update(
                 session_id=self.session_id,
                 update=ToolCallStart(
                     session_update="tool_call",
-                    tool_call_id=tool_call_id,
-                    title=tool_name,
+                    tool_call_id=state.tool_call_id,
+                    title=state.get_title(),
                     kind=tool_kind,
-                    status="pending",
-                ),
-            )
-        except Exception as e:
-            logger.debug(f"Error sending tool call start: {e}", exc_info=True)
-
-    async def _send_tool_call_progress(self, tool_call_id: str, arguments: str, tool_name: str) -> None:
-        """Send tool call progress update via ToolCallProgress.
-
-        Sends the accumulated arguments as both content (for display) and
-        raw_input (for structured access). The content replaces the previous
-        content on each update to show the full accumulated arguments.
-
-        Args:
-            tool_call_id: The ID of the tool call
-            arguments: The accumulated streaming arguments (full content so far)
-        """
-        try:
-            # Try to parse the arguments as JSON for raw_input
-            raw_input = None
-            try:
-                raw_input = json.loads(arguments)
-            except (json.JSONDecodeError, ValueError):
-                # Arguments are still incomplete JSON, use as string
-                raw_input = {"_partial": arguments}
-
-            await self.conn.session_update(
-                session_id=self.session_id,
-                update=ToolCallStart(
-                    session_update="tool_call",
-                    tool_call_id=tool_call_id,
-                    title=tool_name,
+                    status="in_progress",
                     content=[
                         ContentToolCallContent(
                             type="content",
                             content=TextContentBlock(
                                 type="text",
-                                text=arguments,
+                                text=state.args,
+                            ),
+                        )
+                    ]
+                    if state.args
+                    else None,
+                ),
+            )
+        except Exception as e:
+            logger.debug(f"Error sending tool call start: {e}", exc_info=True)
+
+    async def _send_tool_call_progress(self, state: _ToolCallState) -> None:
+        """Send tool call progress update via ToolCallProgress.
+
+        Uses kimi-cli's approach: sends ToolCallProgress with the full accumulated
+        arguments and a dynamic title extracted from the partial JSON.
+
+        Args:
+            state: The tool call state containing accumulated args and lexer
+        """
+        try:
+            await self.conn.session_update(
+                session_id=self.session_id,
+                update=ToolCallProgress(
+                    session_update="tool_call_update",
+                    tool_call_id=state.tool_call_id,
+                    title=state.get_title(),
+                    status="in_progress",
+                    content=[
+                        ContentToolCallContent(
+                            type="content",
+                            content=TextContentBlock(
+                                type="text",
+                                text=state.args,
                             ),
                         )
                     ],
-                    raw_input=raw_input,
                 ),
             )
         except Exception as e:
