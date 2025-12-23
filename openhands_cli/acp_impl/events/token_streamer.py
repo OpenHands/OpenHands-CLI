@@ -253,7 +253,6 @@ class TokenBasedEventSubscriber:
 
         return tool_kind_mapping.get(tool_name, "other")
 
-
     async def _send_tool_call_start(self, state: ToolCallState) -> None:
         try:
             await self.conn.session_update(

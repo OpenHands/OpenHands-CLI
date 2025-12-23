@@ -3,57 +3,47 @@ import json
 import streamingjson
 
 
-def _shorten_middle(text: str, width: int = 50) -> str:
-    """Shorten a string by removing the middle part if it exceeds the width."""
-    if len(text) <= width:
-        return text
-    half = (width - 3) // 2
-    return text[:half] + "..." + text[-half:]
-
-
-def _extract_key_argument(lexer: streamingjson.Lexer, tool_name: str) -> str | None:
-    """Extract a key argument from tool call arguments for display.
-
-    Uses streamingjson.Lexer to handle incomplete JSON and extracts
-    the most relevant argument based on the tool name.
+def _title_from_streaming_args(tool_name: str, lexer: streamingjson.Lexer) -> str:
     """
+    Streaming equivalent of _handle_action_event's title logic.
+
+    _handle_action_event titles:
+      - file_editor: "Reading {path}" if command == "view" else "Editing {path}"
+      - terminal: "{command}"
+      - task_tracker: "Plan updated"
+      - everything else: tool_name
+    """
+    if tool_name == "task_tracker":
+        return "Plan updated"
+
+    # Best-effort parse of the (possibly incomplete) JSON args
     try:
-        curr_args = json.loads(lexer.complete_json())
-    except json.JSONDecodeError:
-        return None
+        args = json.loads(lexer.complete_json())
+    except Exception:
+        return tool_name
 
-    if not curr_args or not isinstance(curr_args, dict):
-        return None
+    if not isinstance(args, dict):
+        return tool_name
 
-    key_argument: str | None = None
+    if tool_name == "file_editor":
+        path = args.get("path")
+        command = args.get("command")
+        if isinstance(path, str) and path:
+            if command == "view":
+                return f"Reading {path}"
+            return f"Editing {path}"
+        return tool_name
 
-    # Map tool names to their key arguments
     if tool_name == "terminal":
-        key_argument = curr_args.get("command")
-    elif tool_name == "file_editor":
-        key_argument = curr_args.get("path")
-    elif tool_name == "think":
-        key_argument = curr_args.get("thought")
-    elif tool_name == "finish":
-        key_argument = curr_args.get("message")
-    elif tool_name == "task_tracker":
-        return None
-    elif tool_name.startswith("browser"):
-        key_argument = (
-            curr_args.get("url")
-            or (f"index={curr_args['index']}" if curr_args.get("index") else None)
-            or curr_args.get("text")
-        )
-    else:
-        # For unknown tools, try common argument names
-        for key in ["path", "command", "query", "url", "text", "message"]:
-            if curr_args.get(key):
-                key_argument = curr_args[key]
-                break
+        command = args.get("command")
+        # Match _handle_action_event which sets title to event.action.command
+        # (for terminal this is usually the shell command string)
+        if isinstance(command, str) and command:
+            return command
+        return tool_name
 
-    if key_argument:
-        return _shorten_middle(str(key_argument), width=50)
-    return None
+    # browser/browser_use/etc: _handle_action_event keeps title == tool_name
+    return tool_name
 
 
 class ToolCallState:
@@ -79,14 +69,9 @@ class ToolCallState:
     @property
     def title(self) -> str:
         """Get the current title with key argument if available."""
-        subtitle = _extract_key_argument(self.lexer, self.tool_name)
-        if subtitle:
-            return f"{self.tool_name}: {subtitle}"
-        return self.tool_name
+        return _title_from_streaming_args(self.tool_name, self.lexer)
 
     def __repr__(self) -> str:
-        args_preview = _shorten_middle(self.args, width=80) if self.args else "∅"
-
         return (
             f"ToolCallState(\n"
             f"  id={self.tool_call_id!r},\n"
@@ -94,6 +79,6 @@ class ToolCallState:
             f"  title={self.title!r},\n"
             f"  is_think={self.is_think},\n"
             f"  started={self.started},\n"
-            f"  args={args_preview!r}\n"
+            f"  args={self.args!r}\n"
             f")"
         )

@@ -37,7 +37,10 @@ from openhands.tools.task_tracker.definition import (
     TaskTrackerAction,
 )
 from openhands.tools.terminal.definition import TerminalAction
-from openhands_cli.acp_impl.events.shared_event_handler import SharedEventHandler, _event_visualize_to_plain
+from openhands_cli.acp_impl.events.shared_event_handler import (
+    SharedEventHandler,
+    _event_visualize_to_plain,
+)
 from openhands_cli.acp_impl.events.utils import extract_action_locations, get_metadata
 
 
