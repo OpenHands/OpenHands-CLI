@@ -1,6 +1,5 @@
 """Utility functions for ACP implementation."""
 
-
 from acp import Client
 from acp.schema import (
     AgentMessageChunk,
@@ -40,7 +39,11 @@ from openhands_cli.acp_impl.events.shared_event_handler import (
     SharedEventHandler,
     _event_visualize_to_plain,
 )
-from openhands_cli.acp_impl.events.utils import extract_action_locations, get_metadata
+from openhands_cli.acp_impl.events.utils import (
+    extract_action_locations,
+    format_content_blocks,
+    get_metadata,
+)
 
 
 logger = get_logger(__name__)
@@ -66,8 +69,6 @@ class EventSubscriber:
             session_id: The ACP session ID
             conn: The ACP connection for sending notifications
             conversation: Optional conversation instance for accessing metrics
-            streaming_enabled: Whether token streaming is enabled
-            loop: Event loop for scheduling async operations (required for streaming)
         """
         self.session_id = session_id
         self.conn = conn
@@ -162,16 +163,7 @@ class EventSubscriber:
             title = event.tool_name
             if event.action:
                 action_viz = _event_visualize_to_plain(event)
-                if action_viz.strip():
-                    content = [
-                        ContentToolCallContent(
-                            type="content",
-                            content=TextContentBlock(
-                                type="text",
-                                text=action_viz,
-                            ),
-                        )
-                    ]
+                content = format_content_blocks(action_viz)
 
                 if isinstance(event.action, FileEditorAction):
                     if event.action.command == "view":

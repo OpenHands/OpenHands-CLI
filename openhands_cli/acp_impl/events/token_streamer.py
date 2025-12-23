@@ -12,9 +12,17 @@ from __future__ import annotations
 
 import asyncio
 
-from acp import Client, RequestError
+from acp import (
+    Client,
+    RequestError,
+    start_tool_call,
+    update_agent_message_text,
+    update_agent_thought_text,
+    update_tool_call,
+)
 from acp.schema import (
     AgentMessageChunk,
+    AgentPlanUpdate,
     AgentThoughtChunk,
     ContentToolCallContent,
     FileEditToolCallContent,
@@ -52,7 +60,11 @@ from openhands_cli.acp_impl.events.shared_event_handler import (
     _event_visualize_to_plain,
 )
 from openhands_cli.acp_impl.events.tool_state import ToolCallState
-from openhands_cli.acp_impl.events.utils import extract_action_locations, get_metadata
+from openhands_cli.acp_impl.events.utils import (
+    extract_action_locations,
+    format_content_blocks,
+    get_metadata,
+)
 
 
 logger = get_logger(__name__)
@@ -121,12 +133,16 @@ class TokenBasedEventSubscriber:
 
                 if isinstance(reasoning, str) and reasoning:
                     self._schedule(
-                        self._send_streaming_chunk(reasoning, is_reasoning=True)
+                        self.send_acp_event(
+                            update_agent_thought_text(
+                                reasoning,
+                            ),
+                        )
                     )
 
                 if isinstance(content, str) and content:
                     self._schedule(
-                        self._send_streaming_chunk(content, is_reasoning=False)
+                        self.send_acp_event(update_agent_message_text(content))
                     )
 
         except Exception as e:
@@ -184,7 +200,14 @@ class TokenBasedEventSubscriber:
         # Start non-think tool calls once
         if not state.started and not state.is_think:
             state.started = True
-            self._schedule(self._send_tool_call_start(state))
+            tool_call_start = start_tool_call(
+                tool_call_id=state.tool_call_id,
+                title=state.title,
+                kind=self._get_tool_kind(state.tool_name, state),
+                status="in_progress",
+                content=format_content_blocks(state.args),
+            )
+            self._schedule(self.send_acp_event(tool_call_start))
 
         # Stream args
         if not arguments_chunk:
@@ -194,11 +217,23 @@ class TokenBasedEventSubscriber:
 
         thought_piece = state.extract_thought_piece(arguments_chunk)
         if thought_piece:
-            self._schedule(self._send_streaming_chunk(thought_piece, is_reasoning=True))
+            self._schedule(
+                self.send_acp_event(update_agent_message_text(thought_piece))
+            )
             return
 
         if state.started:
-            self._schedule(self._send_tool_call_progress(state))
+            self._schedule(
+                self.send_acp_event(
+                    update_tool_call(
+                        tool_call_id=state.tool_call_id,
+                        title=state.title,
+                        kind=self._get_tool_kind(state.tool_name, state),
+                        status="in_progress",
+                        content=format_content_blocks(state.args),
+                    ),
+                )
+            )
 
     def _get_tool_kind(
         self, tool_name: str, state: ToolCallState | None = None
@@ -235,72 +270,15 @@ class TokenBasedEventSubscriber:
 
         return tool_kind_mapping.get(tool_name, "other")
 
-    async def _send_tool_call_start(self, state: ToolCallState) -> None:
-        try:
-            await self.conn.session_update(
-                session_id=self.session_id,
-                update=ToolCallStart(
-                    session_update="tool_call",
-                    tool_call_id=state.tool_call_id,
-                    title=state.title,
-                    kind=self._get_tool_kind(state.tool_name, state),
-                    status="in_progress",
-                    content=(
-                        [
-                            ContentToolCallContent(
-                                type="content",
-                                content=TextContentBlock(type="text", text=state.args),
-                            )
-                        ]
-                        if state.args
-                        else None
-                    ),
-                ),
-            )
-        except Exception as e:
-            logger.debug(f"Error sending tool call start: {e}", exc_info=True)
-
-    async def _send_tool_call_progress(self, state: ToolCallState) -> None:
-        try:
-            await self.conn.session_update(
-                session_id=self.session_id,
-                update=ToolCallProgress(
-                    session_update="tool_call_update",
-                    tool_call_id=state.tool_call_id,
-                    title=state.title,
-                    kind=self._get_tool_kind(state.tool_name, state),
-                    status="in_progress",
-                    content=[
-                        ContentToolCallContent(
-                            type="content",
-                            content=TextContentBlock(type="text", text=state.args),
-                        )
-                    ],
-                ),
-            )
-        except Exception as e:
-            logger.debug(f"Error sending tool call progress: {e}", exc_info=True)
-
-    async def _send_streaming_chunk(self, content: str, *, is_reasoning: bool) -> None:
-        try:
-            if is_reasoning:
-                await self.conn.session_update(
-                    session_id=self.session_id,
-                    update=AgentThoughtChunk(
-                        session_update="agent_thought_chunk",
-                        content=TextContentBlock(type="text", text=content),
-                    ),
-                )
-            else:
-                await self.conn.session_update(
-                    session_id=self.session_id,
-                    update=AgentMessageChunk(
-                        session_update="agent_message_chunk",
-                        content=TextContentBlock(type="text", text=content),
-                    ),
-                )
-        except Exception as e:
-            logger.debug(f"Error sending streaming chunk: {e}", exc_info=True)
+    async def send_acp_event(
+        self,
+        update: AgentMessageChunk
+        | AgentThoughtChunk
+        | ToolCallStart
+        | ToolCallProgress
+        | AgentPlanUpdate,
+    ):
+        await self.conn.session_update(session_id=self.session_id, update=update)
 
     async def _handle_action_event(self, event: ActionEvent):
         """Handle ActionEvent: send thought as agent_message_chunk, then tool_call.
