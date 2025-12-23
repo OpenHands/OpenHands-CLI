@@ -1,11 +1,10 @@
 """Utility functions for ACP implementation."""
 
-from acp import Client
-from acp.schema import (
-    AgentMessageChunk,
-    AgentThoughtChunk,
-    TextContentBlock,
-    ToolCallStart,
+from acp import (
+    Client,
+    start_tool_call,
+    update_agent_message_text,
+    update_agent_thought_text,
 )
 
 from openhands.sdk import BaseConversation, get_logger
@@ -117,14 +116,8 @@ class EventSubscriber:
             if event.reasoning_content and event.reasoning_content.strip():
                 await self.conn.session_update(
                     session_id=self.session_id,
-                    update=AgentThoughtChunk(
-                        session_update="agent_thought_chunk",
-                        content=TextContentBlock(
-                            type="text",
-                            text="**Reasoning**:\n"
-                            + event.reasoning_content.strip()
-                            + "\n",
-                        ),
+                    update=update_agent_thought_text(
+                        "**Reasoning**:\n" + event.reasoning_content.strip() + "\n"
                     ),
                     field_meta=get_metadata(self.conversation),
                 )
@@ -132,12 +125,8 @@ class EventSubscriber:
             if thought_text.strip():
                 await self.conn.session_update(
                     session_id=self.session_id,
-                    update=AgentThoughtChunk(
-                        session_update="agent_thought_chunk",
-                        content=TextContentBlock(
-                            type="text",
-                            text="\n**Thought**:\n" + thought_text.strip() + "\n",
-                        ),
+                    update=update_agent_thought_text(
+                        "\n**Thought**:\n" + thought_text.strip() + "\n"
                     ),
                     field_meta=get_metadata(self.conversation),
                 )
@@ -167,34 +156,21 @@ class EventSubscriber:
                 elif isinstance(event.action, ThinkAction):
                     await self.conn.session_update(
                         session_id=self.session_id,
-                        update=AgentThoughtChunk(
-                            session_update="agent_thought_chunk",
-                            content=TextContentBlock(
-                                type="text",
-                                text=action_viz,
-                            ),
-                        ),
+                        update=update_agent_thought_text(action_viz),
                         field_meta=get_metadata(self.conversation),
                     )
                     return
                 elif isinstance(event.action, FinishAction):
                     await self.conn.session_update(
                         session_id=self.session_id,
-                        update=AgentMessageChunk(
-                            session_update="agent_message_chunk",
-                            content=TextContentBlock(
-                                type="text",
-                                text=action_viz,
-                            ),
-                        ),
+                        update=update_agent_message_text(action_viz),
                         field_meta=get_metadata(self.conversation),
                     )
                     return
 
             await self.conn.session_update(
                 session_id=self.session_id,
-                update=ToolCallStart(
-                    session_update="tool_call",
+                update=start_tool_call(
                     tool_call_id=event.tool_call_id,
                     title=title,
                     kind=tool_kind,
@@ -230,13 +206,7 @@ class EventSubscriber:
             else:  # assistant or other roles
                 await self.conn.session_update(
                     session_id=self.session_id,
-                    update=AgentMessageChunk(
-                        session_update="agent_message_chunk",
-                        content=TextContentBlock(
-                            type="text",
-                            text=viz_text,
-                        ),
-                    ),
+                    update=update_agent_message_text(viz_text),
                     field_meta=get_metadata(self.conversation),
                 )
         except Exception as e:

@@ -1,5 +1,4 @@
-from acp import tool_content, text_block
-
+from acp import text_block, tool_content
 from acp.schema import (
     ContentToolCallContent,
     FileEditToolCallContent,

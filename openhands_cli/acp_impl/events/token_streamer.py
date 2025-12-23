@@ -19,10 +19,6 @@ from acp import (
     update_agent_message_text,
     update_agent_thought_text,
     update_tool_call,
-    text_block,
-    update_tool_call,
-    update_agent_thought_text,
-    update_agent_message_text
 )
 from acp.schema import (
     AgentMessageChunk,
