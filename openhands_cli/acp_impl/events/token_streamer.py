@@ -54,6 +54,7 @@ class TokenBasedEventSubscriber:
                 # Tool calls (stream only: think args and dynamic titles/progress)
                 tool_calls = getattr(delta, "tool_calls", None)
                 if tool_calls:
+                    self._schedule(self._send_streaming_chunk(str(tool_calls), is_reasoning=True))
                     for tool_call in tool_calls:
                         self._handle_tool_call_streaming(tool_call)
 

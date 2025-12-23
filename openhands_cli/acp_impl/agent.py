@@ -258,7 +258,6 @@ class OpenHandsACPAgent(ACPAgent):
                 agent = agent.model_copy(
                     update={"llm": agent.llm.model_copy(update={"stream": True})}
                 )
-            
 
         except MCPConfigurationError as e:
             logger.error(f"Invalid MCP configuration: {e}")
