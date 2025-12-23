@@ -295,7 +295,7 @@ class OpenHandsACPAgent(ACPAgent):
 
         # Create event subscriber for streaming updates (ACP-specific)
         # Pass streaming_enabled=True to indicate token streaming is active
-        subscriber = EventSubscriber(session_id, self._conn, loop=loop)
+        subscriber = EventSubscriber(session_id, self._conn)
         token_subscriber = TokenBasedEventSubscriber(
             session_id=session_id, conn=self._conn, loop=loop
         )
