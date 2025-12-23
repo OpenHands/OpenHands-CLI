@@ -170,6 +170,19 @@ def get_tool_kind(
     if tool_name == "think":
         return "think"
 
+    if tool_name.startswith("browser"):
+        # Covers browser*, browser_use*, etc.
+        return "fetch"
+
+    # Handle complete action
+    if isinstance(action, FileEditorAction):
+        # FileEditorAction commands literals
+        if action.command == "view":
+            return "read"
+
+        return "edit"
+
+    # Handle incomplete tool call being streamed
     if tool_name == "file_editor" and partial_args is not None:
         try:
             args = json.loads(partial_args.complete_json())
@@ -179,17 +192,6 @@ def get_tool_kind(
         except Exception:
             # If args are incomplete, default to edit (safe + consistent)
             return "edit"
-
-    if isinstance(action, FileEditorAction):
-        # FileEditorAction commands literals
-        if action.command == "view":
-            return "read"
-
-        return "edit"
-
-    if tool_name.startswith("browser"):
-        # Covers browser*, browser_use*, etc.
-        return "fetch"
 
     return TOOL_KIND_MAPPING.get(tool_name, "other")
 
@@ -218,7 +220,7 @@ def get_tool_title(
     if action_based_title:
         return action_based_title
 
-    # Extract title from incomplete action undergoing streaming
+    # Extract title from incomplete tool call being streamed
     if not partial_args:
         return ""
 
