@@ -1,3 +1,5 @@
+import json
+
 from acp import text_block, tool_content
 from acp.schema import (
     ContentToolCallContent,
@@ -10,9 +12,10 @@ from streamingjson import Lexer
 
 from openhands.sdk import Action, BaseConversation
 from openhands.tools.file_editor.definition import (
-    CommandLiteral,
     FileEditorAction,
 )
+from openhands.tools.task_tracker import TaskTrackerAction
+from openhands.tools.terminal import TerminalAction
 
 
 # Shared mapping from tool names to ACP ToolKind values
@@ -160,16 +163,15 @@ def extract_action_locations(action: Action) -> list[ToolCallLocation] | None:
 
 def get_tool_kind(
     tool_name: str,
+    *,
     partial_args: Lexer | None = None,
-    command_literal: CommandLiteral | None = None,
+    action: Action | None = None,
 ) -> ToolKind:
     if tool_name == "think":
         return "think"
 
     if tool_name == "file_editor" and partial_args is not None:
         try:
-            import json
-
             args = json.loads(partial_args.complete_json())
             if isinstance(args, dict) and args.get("command") == "view":
                 return "read"
@@ -178,10 +180,11 @@ def get_tool_kind(
             # If args are incomplete, default to edit (safe + consistent)
             return "edit"
 
-    # FileEditorAction commands literals
-    if command_literal == "view":
-        return "read"
-    elif command_literal:
+    if isinstance(action, TerminalAction):
+        # FileEditorAction commands literals
+        if action.command == "view":
+            return "read"
+
         return "edit"
 
     if tool_name.startswith("browser"):
@@ -189,3 +192,57 @@ def get_tool_kind(
         return "fetch"
 
     return TOOL_KIND_MAPPING.get(tool_name, "other")
+
+
+def get_tool_title(
+    tool_name: str,
+    *,
+    partial_args: Lexer | None = None,
+    action: Action | None = None,
+) -> str:
+    if tool_name == "task_tracker":
+        return "Plan updated"
+
+    # Extract title from well formed action
+    action_based_title = None
+    if isinstance(action, FileEditorAction):
+        if action.command == "view":
+            action_based_title = f"Reading {action.path}"
+        else:
+            action_based_title = f"Editing {action.path}"
+    elif isinstance(action, TerminalAction):
+        action_based_title = f"{action.command}"
+    elif isinstance(action, TaskTrackerAction):
+        action_based_title = "Plan updated"
+
+    if action_based_title:
+        return action_based_title
+
+    # Extract title from incomplete action undergoing streaming
+    if not partial_args:
+        return ""
+
+    try:
+        args = json.loads(partial_args.complete_json())
+    except Exception:
+        return ""
+
+    if not isinstance(args, dict):
+        return tool_name
+
+    if tool_name == "file_editor":
+        path = args.get("path")
+        command = args.get("command")
+        if isinstance(path, str) and path:
+            if command == "view":
+                return f"Reading {path}"
+            return f"Editing {path}"
+
+    if tool_name == "terminal":
+        command = args.get("command")
+        # Match _handle_action_event which sets title to event.action.command
+        # (for terminal this is usually the shell command string)
+        if isinstance(command, str) and command:
+            return command
+
+    return tool_name

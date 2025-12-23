@@ -23,13 +23,6 @@ from openhands.sdk.event import (
 )
 from openhands.sdk.tool.builtins.finish import FinishAction
 from openhands.sdk.tool.builtins.think import ThinkAction
-from openhands.tools.file_editor.definition import (
-    FileEditorAction,
-)
-from openhands.tools.task_tracker.definition import (
-    TaskTrackerAction,
-)
-from openhands.tools.terminal.definition import TerminalAction
 from openhands_cli.acp_impl.events.shared_event_handler import (
     SharedEventHandler,
     _event_visualize_to_plain,
@@ -39,6 +32,7 @@ from openhands_cli.acp_impl.events.utils import (
     format_content_blocks,
     get_metadata,
     get_tool_kind,
+    get_tool_title,
 )
 
 
@@ -134,26 +128,16 @@ class EventSubscriber:
             # Generate content for the tool call
             content = None
             tool_kind = get_tool_kind(
-                event.tool_name,
-                command_literal=event.action.command
-                if isinstance(event.action, FileEditorAction)
-                else None,
+                tool_name=event.tool_name, action=getattr(event, "action", None)
             )
-            title = event.tool_name
+            title = get_tool_title(
+                tool_name=event.tool_name, action=getattr(event, "action", None)
+            )
             if event.action:
                 action_viz = _event_visualize_to_plain(event)
                 content = format_content_blocks(action_viz)
 
-                if isinstance(event.action, FileEditorAction):
-                    if event.action.command == "view":
-                        title = f"Reading {event.action.path}"
-                    else:
-                        title = f"Editing {event.action.path}"
-                elif isinstance(event.action, TerminalAction):
-                    title = f"{event.action.command}"
-                elif isinstance(event.action, TaskTrackerAction):
-                    title = "Plan updated"
-                elif isinstance(event.action, ThinkAction):
+                if isinstance(event.action, ThinkAction):
                     await self.conn.session_update(
                         session_id=self.session_id,
                         update=update_agent_thought_text(action_viz),

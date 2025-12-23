@@ -43,13 +43,6 @@ from openhands.sdk.event import (
 from openhands.sdk.llm.streaming import LLMStreamChunk
 from openhands.sdk.tool.builtins.finish import FinishAction
 from openhands.sdk.tool.builtins.think import ThinkAction
-from openhands.tools.file_editor.definition import (
-    FileEditorAction,
-)
-from openhands.tools.task_tracker.definition import (
-    TaskTrackerAction,
-)
-from openhands.tools.terminal.definition import TerminalAction
 from openhands_cli.acp_impl.events.shared_event_handler import (
     SharedEventHandler,
     _event_visualize_to_plain,
@@ -60,6 +53,7 @@ from openhands_cli.acp_impl.events.utils import (
     format_content_blocks,
     get_metadata,
     get_tool_kind,
+    get_tool_title,
 )
 
 
@@ -199,7 +193,7 @@ class TokenBasedEventSubscriber:
             tool_call_start = start_tool_call(
                 tool_call_id=state.tool_call_id,
                 title=state.title,
-                kind=get_tool_kind(state.tool_name, state.lexer),
+                kind=get_tool_kind(tool_name=state.tool_name, partial_args=state.lexer),
                 status="in_progress",
                 content=format_content_blocks(state.args),
             )
@@ -224,7 +218,9 @@ class TokenBasedEventSubscriber:
                     update_tool_call(
                         tool_call_id=state.tool_call_id,
                         title=state.title,
-                        kind=get_tool_kind(state.tool_name, state.lexer),
+                        kind=get_tool_kind(
+                            tool_name=state.tool_name, partial_args=state.lexer
+                        ),
                         status="in_progress",
                         content=format_content_blocks(state.args),
                     ),
@@ -252,30 +248,18 @@ class TokenBasedEventSubscriber:
             content = None
 
             tool_kind = get_tool_kind(
-                event.tool_name,
-                command_literal=event.action.command
-                if isinstance(event.action, FileEditorAction)
-                else None,
+                tool_name=event.tool_name, action=getattr(event, "action", None)
             )
 
-            title = event.tool_name
+            title = get_tool_title(
+                tool_name=event.tool_name, action=getattr(event, "action", None)
+            )
+
             if event.action:
                 action_viz = _event_visualize_to_plain(event)
-                if action_viz.strip():
-                    content = format_content_blocks(action_viz)
+                content = format_content_blocks(action_viz)
 
-                if isinstance(event.action, FileEditorAction):
-                    if event.action.command == "view":
-                        tool_kind = "read"
-                        title = f"Reading {event.action.path}"
-                    else:
-                        tool_kind = "edit"
-                        title = f"Editing {event.action.path}"
-                elif isinstance(event.action, TerminalAction):
-                    title = f"{event.action.command}"
-                elif isinstance(event.action, TaskTrackerAction):
-                    title = "Plan updated"
-                elif isinstance(event.action, ThinkAction):
+                if isinstance(event.action, ThinkAction):
                     await self.conn.session_update(
                         session_id=self.session_id,
                         update=update_agent_thought_text(action_viz),
