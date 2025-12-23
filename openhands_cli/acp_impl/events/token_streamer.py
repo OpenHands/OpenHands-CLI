@@ -101,13 +101,29 @@ class TokenBasedEventSubscriber:
         name = getattr(function, "name", None)
         arguments = getattr(function, "arguments", None)
 
-        if not tool_call_id or not name:
-            return
+        # if not tool_call_id or not name:
+        #     return
+
+        if index not in self._streaming_tool_calls:
+            if tool_call_id and name:
+                is_think = name == "think"
+                state = ToolCallState(tool_call_id, name, is_think)
+                self._streaming_tool_calls[index] = state
+                self._last_tool_call_state = state
+
+        elif tool_call_id and name:
+            # Update existing state if we get new id/name (shouldn't happen often)
+            existing_state = self._streaming_tool_calls[index]
+            if existing_state.tool_call_id != tool_call_id:
+                # New tool call at same index - replace state
+                is_think = name == "think"
+                state = ToolCallState(tool_call_id, name, is_think)
+                self._streaming_tool_calls[index] = state
+                self._last_tool_call_state = state
 
         state = self._streaming_tool_calls.get(index)
-        if state is None or state.tool_call_id != tool_call_id:
-            state = ToolCallState(tool_call_id, name, is_think=(name == "think"))
-            self._streaming_tool_calls[index] = state
+        if not state:
+            return
 
         # Start non-think tool calls once
         if not state.started and not state.is_think:
@@ -119,7 +135,7 @@ class TokenBasedEventSubscriber:
                 f"State reached\n\n{str(state)}", is_reasoning=True
             )
         )
-        
+
         # Stream args
         if not arguments:
             return
