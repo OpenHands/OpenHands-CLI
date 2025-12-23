@@ -157,7 +157,7 @@ class TokenBasedEventSubscriber:
             return
 
         name = getattr(function, "name", None)
-        arguments = getattr(function, "arguments", None)
+        arguments_chunk = getattr(function, "arguments", None)
 
         # if not tool_call_id or not name:
         #     return
@@ -187,12 +187,12 @@ class TokenBasedEventSubscriber:
             self._schedule(self._send_tool_call_start(state))
 
         # Stream args
-        if not arguments:
+        if not arguments_chunk:
             return
 
-        state.append_args(arguments)
+        state.append_args(arguments_chunk)
 
-        thought_piece = state.extract_thought_piece(arguments)
+        thought_piece = state.extract_thought_piece(arguments_chunk)
         if thought_piece:
             self._schedule(self._send_streaming_chunk(thought_piece, is_reasoning=True))
             return

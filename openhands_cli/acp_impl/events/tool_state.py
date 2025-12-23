@@ -20,7 +20,7 @@ def _title_from_streaming_args(tool_name: str, lexer: streamingjson.Lexer) -> st
     try:
         args = json.loads(lexer.complete_json())
     except Exception:
-        return tool_name
+        return ""
 
     if not isinstance(args, dict):
         return tool_name
