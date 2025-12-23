@@ -164,8 +164,7 @@ class TokenBasedEventSubscriber:
 
         if index not in self._streaming_tool_calls:
             if tool_call_id and name:
-                is_think = name == "think"
-                state = ToolCallState(tool_call_id, name, is_think)
+                state = ToolCallState(tool_call_id, name)
                 self._streaming_tool_calls[index] = state
                 self._last_tool_call_state = state
 
@@ -174,8 +173,7 @@ class TokenBasedEventSubscriber:
             existing_state = self._streaming_tool_calls[index]
             if existing_state.tool_call_id != tool_call_id:
                 # New tool call at same index - replace state
-                is_think = name == "think"
-                state = ToolCallState(tool_call_id, name, is_think)
+                state = ToolCallState(tool_call_id, name)
                 self._streaming_tool_calls[index] = state
                 self._last_tool_call_state = state
 
@@ -196,14 +194,11 @@ class TokenBasedEventSubscriber:
 
         thought_piece = state.extract_thought_piece(arguments)
         if thought_piece:
-            self._schedule(
-                self._send_streaming_chunk(thought_piece, is_reasoning=True)
-            )
+            self._schedule(self._send_streaming_chunk(thought_piece, is_reasoning=True))
             return
 
         if state.started:
             self._schedule(self._send_tool_call_progress(state))
-        
 
     def _get_tool_kind(
         self, tool_name: str, state: ToolCallState | None = None

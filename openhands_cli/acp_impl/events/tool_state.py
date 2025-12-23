@@ -53,10 +53,10 @@ class ToolCallState:
     and extract key arguments for dynamic titles.
     """
 
-    def __init__(self, tool_call_id: str, tool_name: str, is_think: bool = False):
+    def __init__(self, tool_call_id: str, tool_name: str):
         self.tool_call_id = tool_call_id
         self.tool_name = tool_name
-        self.is_think = is_think
+        self.is_think = tool_name == "think"
         self.args = ""
         self.lexer = streamingjson.Lexer()
         self.started = False
@@ -66,8 +66,10 @@ class ToolCallState:
         self.args += args_part
         self.lexer.append_string(args_part)
 
-
     def extract_thought_piece(self, arguments: str) -> str | None:
+        if not self.is_think:
+            return None
+
         if not arguments:
             return None
 
