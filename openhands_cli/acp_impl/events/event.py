@@ -2,7 +2,6 @@
 
 from acp import (
     Client,
-    start_tool_call,
     update_agent_message_text,
     update_agent_thought_text,
 )
@@ -21,18 +20,12 @@ from openhands.sdk.event import (
     SystemPromptEvent,
     UserRejectObservation,
 )
-from openhands.sdk.tool.builtins.finish import FinishAction
-from openhands.sdk.tool.builtins.think import ThinkAction
 from openhands_cli.acp_impl.events.shared_event_handler import (
     SharedEventHandler,
     _event_visualize_to_plain,
 )
 from openhands_cli.acp_impl.events.utils import (
-    extract_action_locations,
-    format_content_blocks,
     get_metadata,
-    get_tool_kind,
-    get_tool_title,
 )
 
 
@@ -126,47 +119,7 @@ class EventSubscriber:
                 )
 
             # Generate content for the tool call
-            content = None
-            tool_kind = get_tool_kind(
-                tool_name=event.tool_name, action=getattr(event, "action", None)
-            )
-            title = get_tool_title(
-                tool_name=event.tool_name, action=getattr(event, "action", None)
-            )
-            if event.action:
-                action_viz = _event_visualize_to_plain(event)
-                content = format_content_blocks(action_viz)
-
-                if isinstance(event.action, ThinkAction):
-                    await self.conn.session_update(
-                        session_id=self.session_id,
-                        update=update_agent_thought_text(action_viz),
-                        field_meta=get_metadata(self.conversation),
-                    )
-                    return
-                elif isinstance(event.action, FinishAction):
-                    await self.conn.session_update(
-                        session_id=self.session_id,
-                        update=update_agent_message_text(action_viz),
-                        field_meta=get_metadata(self.conversation),
-                    )
-                    return
-
-            await self.conn.session_update(
-                session_id=self.session_id,
-                update=start_tool_call(
-                    tool_call_id=event.tool_call_id,
-                    title=title,
-                    kind=tool_kind,
-                    status="in_progress",
-                    content=content,
-                    locations=extract_action_locations(event.action)
-                    if event.action
-                    else None,
-                    raw_input=event.action.model_dump() if event.action else None,
-                ),
-                field_meta=get_metadata(self.conversation),
-            )
+            await self.shared_events_handler.handle_action_event(self, event)
         except Exception as e:
             logger.debug(f"Error processing ActionEvent: {e}", exc_info=True)
 

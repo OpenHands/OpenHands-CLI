@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from acp import Client
+from acp import (
+    Client,
+    start_tool_call,
+    update_agent_message_text,
+    update_agent_thought_text,
+)
 from acp.schema import (
     AgentMessageChunk,
     AgentPlanUpdate,
@@ -16,6 +21,7 @@ from acp.schema import (
 
 from openhands.sdk import BaseConversation, get_logger
 from openhands.sdk.event import (
+    ActionEvent,
     AgentErrorEvent,
     Condensation,
     CondensationRequest,
@@ -25,13 +31,19 @@ from openhands.sdk.event import (
     SystemPromptEvent,
     UserRejectObservation,
 )
-from openhands.sdk.tool.builtins.finish import FinishObservation
-from openhands.sdk.tool.builtins.think import ThinkObservation
+from openhands.sdk.tool.builtins.finish import FinishAction, FinishObservation
+from openhands.sdk.tool.builtins.think import ThinkAction, ThinkObservation
 from openhands.tools.task_tracker.definition import (
     TaskTrackerObservation,
     TaskTrackerStatusType,
 )
-from openhands_cli.acp_impl.events.utils import format_content_blocks, get_metadata
+from openhands_cli.acp_impl.events.utils import (
+    extract_action_locations,
+    format_content_blocks,
+    get_metadata,
+    get_tool_kind,
+    get_tool_title,
+)
 
 
 logger = get_logger(__name__)
@@ -174,4 +186,47 @@ class SharedEventHandler:
             status="completed",
             text=_event_visualize_to_plain(event),
             raw_output=event.model_dump(),
+        )
+
+    async def handle_action_event(self, ctx: _ACPContext, event: ActionEvent):
+        content = None
+        tool_kind = get_tool_kind(
+            tool_name=event.tool_name, action=getattr(event, "action", None)
+        )
+        title = get_tool_title(
+            tool_name=event.tool_name, action=getattr(event, "action", None)
+        )
+        if event.action:
+            action_viz = _event_visualize_to_plain(event)
+            content = format_content_blocks(action_viz)
+
+            if isinstance(event.action, ThinkAction):
+                await ctx.conn.session_update(
+                    session_id=ctx.session_id,
+                    update=update_agent_thought_text(action_viz),
+                    field_meta=self._meta(ctx),
+                )
+                return
+            elif isinstance(event.action, FinishAction):
+                await ctx.conn.session_update(
+                    session_id=ctx.session_id,
+                    update=update_agent_message_text(action_viz),
+                    field_meta=self._meta(ctx),
+                )
+                return
+
+        await ctx.conn.session_update(
+            session_id=ctx.session_id,
+            update=start_tool_call(
+                tool_call_id=event.tool_call_id,
+                title=title,
+                kind=tool_kind,
+                status="in_progress",
+                content=content,
+                locations=extract_action_locations(event.action)
+                if event.action
+                else None,
+                raw_input=event.action.model_dump() if event.action else None,
+            ),
+            field_meta=self._meta(ctx),
         )

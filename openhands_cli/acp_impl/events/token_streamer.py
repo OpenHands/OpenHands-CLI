@@ -41,19 +41,13 @@ from openhands.sdk.event import (
     UserRejectObservation,
 )
 from openhands.sdk.llm.streaming import LLMStreamChunk
-from openhands.sdk.tool.builtins.finish import FinishAction
-from openhands.sdk.tool.builtins.think import ThinkAction
 from openhands_cli.acp_impl.events.shared_event_handler import (
     SharedEventHandler,
-    _event_visualize_to_plain,
 )
 from openhands_cli.acp_impl.events.tool_state import ToolCallState
 from openhands_cli.acp_impl.events.utils import (
-    extract_action_locations,
     format_content_blocks,
-    get_metadata,
     get_tool_kind,
-    get_tool_title,
 )
 
 
@@ -165,9 +159,6 @@ class TokenBasedEventSubscriber:
         name = getattr(function, "name", None)
         arguments_chunk = getattr(function, "arguments", None)
 
-        # if not tool_call_id or not name:
-        #     return
-
         if index not in self._streaming_tool_calls:
             if tool_call_id and name:
                 state = ToolCallState(tool_call_id, name)
@@ -208,7 +199,7 @@ class TokenBasedEventSubscriber:
         thought_piece = state.extract_thought_piece(arguments_chunk)
         if thought_piece:
             self._schedule(
-                self.send_acp_event(update_agent_message_text(thought_piece))
+                self.send_acp_event(update_agent_thought_text(thought_piece))
             )
             return
 
@@ -244,52 +235,6 @@ class TokenBasedEventSubscriber:
             event: ActionEvent to process
         """
         try:
-            # Generate content for the tool call
-            content = None
-
-            tool_kind = get_tool_kind(
-                tool_name=event.tool_name, action=getattr(event, "action", None)
-            )
-
-            title = get_tool_title(
-                tool_name=event.tool_name, action=getattr(event, "action", None)
-            )
-
-            if event.action:
-                action_viz = _event_visualize_to_plain(event)
-                content = format_content_blocks(action_viz)
-
-                if isinstance(event.action, ThinkAction):
-                    await self.conn.session_update(
-                        session_id=self.session_id,
-                        update=update_agent_thought_text(action_viz),
-                        field_meta=get_metadata(self.conversation),
-                    )
-                    return
-                elif isinstance(event.action, FinishAction):
-                    await self.conn.session_update(
-                        session_id=self.session_id,
-                        update=update_agent_message_text(
-                            action_viz,
-                        ),
-                        field_meta=get_metadata(self.conversation),
-                    )
-                    return
-
-            await self.conn.session_update(
-                session_id=self.session_id,
-                update=update_tool_call(
-                    tool_call_id=event.tool_call_id,
-                    title=title,
-                    kind=tool_kind,
-                    status="in_progress",
-                    content=content,
-                    locations=extract_action_locations(event.action)
-                    if event.action
-                    else None,
-                    raw_input=event.action.model_dump() if event.action else None,
-                ),
-                field_meta=get_metadata(self.conversation),
-            )
+            await self.shared_events_handler.handle_action_event(self, event)
         except Exception as e:
             logger.debug(f"Error processing ActionEvent: {e}", exc_info=True)
