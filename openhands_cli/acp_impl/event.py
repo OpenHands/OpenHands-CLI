@@ -349,22 +349,22 @@ class EventSubscriber:
                     )
                     return
 
-            # await self.conn.session_update(
-            #     session_id=self.session_id,
-            #     update=ToolCallStart(
-            #         session_update="tool_call",
-            #         tool_call_id=event.tool_call_id,
-            #         title=title,
-            #         kind=tool_kind,
-            #         status="in_progress",
-            #         content=content,
-            #         locations=extract_action_locations(event.action)
-            #         if event.action
-            #         else None,
-            #         raw_input=event.action.model_dump() if event.action else None,
-            #     ),
-            #     field_meta=self._get_metadata(),
-            # )
+            await self.conn.session_update(
+                session_id=self.session_id,
+                update=ToolCallStart(
+                    session_update="tool_call",
+                    tool_call_id=event.tool_call_id,
+                    title=title,
+                    kind=tool_kind,
+                    status="in_progress",
+                    content=content,
+                    locations=extract_action_locations(event.action)
+                    if event.action
+                    else None,
+                    raw_input=event.action.model_dump() if event.action else None,
+                ),
+                field_meta=self._get_metadata(),
+            )
         except Exception as e:
             logger.debug(f"Error processing ActionEvent: {e}", exc_info=True)
 
