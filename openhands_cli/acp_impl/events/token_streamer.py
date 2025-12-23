@@ -218,20 +218,41 @@ class TokenBasedEventSubscriber:
             return None
         return arguments
 
-    def _get_tool_kind(self, tool_name: str) -> ToolKind:
-        match tool_name:
-            case "terminal":
-                return "execute"
-            case "file_editor":
+    def _get_tool_kind(
+        self, tool_name: str, state: ToolCallState | None = None
+    ) -> ToolKind:
+        """
+        Keep tool->kind mapping consistent with _handle_action_event.
+        If we have streaming args (state), we can refine file_editor view->read.
+        """
+        # Same mapping as _handle_action_event
+        tool_kind_mapping: dict[str, ToolKind] = {
+            "terminal": "execute",
+            "browser_use": "fetch",
+            "browser": "fetch",
+        }
+
+        if tool_name == "think":
+            return "think"
+
+        if tool_name == "file_editor" and state is not None:
+            try:
+                import json
+
+                args = json.loads(state.lexer.complete_json())
+                if isinstance(args, dict) and args.get("command") == "view":
+                    return "read"
                 return "edit"
-            case "think":
-                return "think"
-            case "task_tracker" | "finish":
-                return "search"  # pick something acceptable for ACP schema
-            case _ if tool_name.startswith("browser"):
-                return "search"  # or "read" depending on how your UI treats it
-            case _:
-                return "search"
+            except Exception:
+                # If args are incomplete, default to edit (safe + consistent)
+                return "edit"
+
+        if tool_name.startswith("browser"):
+            # Covers browser*, browser_use*, etc.
+            return "fetch"
+
+        return tool_kind_mapping.get(tool_name, "other")
+
 
     async def _send_tool_call_start(self, state: ToolCallState) -> None:
         try:
@@ -241,7 +262,7 @@ class TokenBasedEventSubscriber:
                     session_update="tool_call",
                     tool_call_id=state.tool_call_id,
                     title=state.title,
-                    kind=self._get_tool_kind(state.tool_name),
+                    kind=self._get_tool_kind(state.tool_name, state),
                     status="in_progress",
                     content=(
                         [

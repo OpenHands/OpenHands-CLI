@@ -37,25 +37,11 @@ from openhands.tools.task_tracker.definition import (
     TaskTrackerAction,
 )
 from openhands.tools.terminal.definition import TerminalAction
-from openhands_cli.acp_impl.events.shared_event_handler import SharedEventHandler
+from openhands_cli.acp_impl.events.shared_event_handler import SharedEventHandler, _event_visualize_to_plain
 from openhands_cli.acp_impl.events.utils import extract_action_locations, get_metadata
 
 
 logger = get_logger(__name__)
-
-
-def _event_visualize_to_plain(event: Event) -> str:
-    """Convert Rich Text object to plain string.
-
-    Args:
-        text: Rich Text object or string
-
-    Returns:
-        Plain text string
-    """
-    text = event.visualize
-    text = text.plain
-    return str(text)
 
 
 class EventSubscriber:
