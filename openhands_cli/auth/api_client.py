@@ -3,6 +3,7 @@
 import html
 from typing import Any
 
+from openhands.sdk import Agent
 from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
 from openhands_cli.auth.utils import _p
@@ -110,7 +111,7 @@ def _print_settings_summary(settings: dict[str, Any]) -> None:
 
 
 def _ask_user_consent_for_overwrite(
-    existing_agent,
+    existing_agent: Agent,
     new_settings: dict[str, Any],
     base_url: str = "https://llm-proxy.app.all-hands.dev/",
     default_model: str = "claude-sonnet-4-5-20250929",
@@ -147,10 +148,12 @@ def _ask_user_consent_for_overwrite(
         f"  • Model: [{OPENHANDS_THEME.accent}]{html.escape(current_model)}"
         f"[/{OPENHANDS_THEME.accent}]"
     )
-    _p(
-        f"  • Base URL: [{OPENHANDS_THEME.accent}]"
-        f"{html.escape(existing_agent.llm.base_url)}[/{OPENHANDS_THEME.accent}]"
-    )
+
+    if existing_agent.llm.base_url:
+        _p(
+            f"  • Base URL: [{OPENHANDS_THEME.accent}]"
+            f"{html.escape(existing_agent.llm.base_url)}[/{OPENHANDS_THEME.accent}]"
+        )
 
     _p(
         f"\n[{OPENHANDS_THEME.secondary}]New configuration from "
