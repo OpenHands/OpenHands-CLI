@@ -54,7 +54,6 @@ class TokenBasedEventSubscriber:
                 # Tool calls (stream only: think args and dynamic titles/progress)
                 tool_calls = getattr(delta, "tool_calls", None)
                 if tool_calls:
-                    self._schedule(self._send_streaming_chunk(str(tool_calls), is_reasoning=True))
                     for tool_call in tool_calls:
                         self._handle_tool_call_streaming(tool_call)
 
@@ -128,6 +127,8 @@ class TokenBasedEventSubscriber:
                     self._send_streaming_chunk(thought_piece, is_reasoning=True)
                 )
             return
+
+        self._schedule(self._send_streaming_chunk(f"State reached\n\n{str(state)}", is_reasoning=True))
 
         if state.started:
             self._schedule(self._send_tool_call_progress(state))
