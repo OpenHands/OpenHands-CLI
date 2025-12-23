@@ -66,6 +66,19 @@ class ToolCallState:
         self.args += args_part
         self.lexer.append_string(args_part)
 
+
+    def extract_thought_piece(self, arguments: str) -> str | None:
+        if not arguments:
+            return None
+
+        stripped = arguments.strip()
+        # common incremental JSON fragments
+        if stripped in {"{", "}", '"', ":", "thought", "\\"}:
+            return None
+        if stripped in {'{"thought', '": "', '"}', '"}'}:
+            return None
+        return arguments
+
     @property
     def title(self) -> str:
         """Get the current title with key argument if available."""

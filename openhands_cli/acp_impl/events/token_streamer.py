@@ -194,29 +194,16 @@ class TokenBasedEventSubscriber:
 
         state.append_args(arguments)
 
-        if state.is_think:
-            thought_piece = self._extract_thought_piece(arguments)
-            if thought_piece:
-                self._schedule(
-                    self._send_streaming_chunk(thought_piece, is_reasoning=True)
-                )
+        thought_piece = state.extract_thought_piece(arguments)
+        if thought_piece:
+            self._schedule(
+                self._send_streaming_chunk(thought_piece, is_reasoning=True)
+            )
             return
 
         if state.started:
             self._schedule(self._send_tool_call_progress(state))
-
-    def _extract_thought_piece(self, arguments: str) -> str | None:
-        """Best-effort filter to avoid spamming JSON structure for think tool."""
-        if not arguments:
-            return None
-
-        stripped = arguments.strip()
-        # common incremental JSON fragments
-        if stripped in {"{", "}", '"', ":", "thought", "\\"}:
-            return None
-        if stripped in {'{"thought', '": "', '"}', '"}'}:
-            return None
-        return arguments
+        
 
     def _get_tool_kind(
         self, tool_name: str, state: ToolCallState | None = None
@@ -279,24 +266,24 @@ class TokenBasedEventSubscriber:
             logger.debug(f"Error sending tool call start: {e}", exc_info=True)
 
     async def _send_tool_call_progress(self, state: ToolCallState) -> None:
-        # try:
-        await self.conn.session_update(
-            session_id=self.session_id,
-            update=ToolCallProgress(
-                session_update="tool_call_update",
-                tool_call_id=state.tool_call_id,
-                title=state.title,
-                status="in_progress",
-                content=[
-                    ContentToolCallContent(
-                        type="content",
-                        content=TextContentBlock(type="text", text=state.args),
-                    )
-                ],
-            ),
-        )
-        # except Exception as e:
-        #     logger.debug(f"Error sending tool call progress: {e}", exc_info=True)
+        try:
+            await self.conn.session_update(
+                session_id=self.session_id,
+                update=ToolCallProgress(
+                    session_update="tool_call_update",
+                    tool_call_id=state.tool_call_id,
+                    title=state.title,
+                    status="in_progress",
+                    content=[
+                        ContentToolCallContent(
+                            type="content",
+                            content=TextContentBlock(type="text", text=state.args),
+                        )
+                    ],
+                ),
+            )
+        except Exception as e:
+            logger.debug(f"Error sending tool call progress: {e}", exc_info=True)
 
     async def _send_streaming_chunk(self, content: str, *, is_reasoning: bool) -> None:
         try:
