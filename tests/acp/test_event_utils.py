@@ -1,5 +1,7 @@
 """Tests for event utility functions in utils.py."""
 
+from __future__ import annotations
+
 import pytest
 import streamingjson
 
@@ -13,9 +15,13 @@ from openhands_cli.acp_impl.events.utils import (
 )
 
 
-class TestGetToolKind:
-    """Tests for get_tool_kind function."""
+def _lexer(s: str) -> streamingjson.Lexer:
+    lex = streamingjson.Lexer()
+    lex.append_string(s)
+    return lex
 
+
+class TestGetToolKind:
     @pytest.mark.parametrize(
         "tool_name,expected",
         [
@@ -26,152 +32,136 @@ class TestGetToolKind:
             ("terminal", "execute"),
             ("unknown_tool", "other"),
             ("custom_tool", "other"),
+            ("file_editor", "other"),  # falls back to mapping default if no args/action
         ],
     )
-    def test_tool_kind_by_name(self, tool_name: str, expected: str):
-        """Test tool kind mapping for various tool names."""
-        result = get_tool_kind(tool_name)
-        assert result == expected
-
-    def test_file_editor_view_action(self):
-        """Test file_editor with view command returns 'read'."""
-        action = FileEditorAction(command="view", path="/test.py")
-        result = get_tool_kind("file_editor", action=action)
-        assert result == "read"
+    def test_tool_kind_by_name_only(self, tool_name: str, expected: str):
+        assert get_tool_kind(tool_name) == expected
 
     @pytest.mark.parametrize(
-        "command", ["str_replace", "create", "insert", "undo_edit"]
+        "command,expected",
+        [
+            ("view", "read"),
+            ("str_replace", "edit"),
+            ("create", "edit"),
+            ("insert", "edit"),
+            ("undo_edit", "edit"),
+        ],
     )
-    def test_file_editor_edit_actions(self, command):
-        """Test file_editor with edit commands returns 'edit'."""
+    def test_file_editor_kind_from_action(self, command: str, expected: str):
         action = FileEditorAction(command=command, path="/test.py")  # type: ignore[arg-type]
-        result = get_tool_kind("file_editor", action=action)
-        assert result == "edit"
+        assert get_tool_kind("file_editor", action=action) == expected
 
-    def test_file_editor_streaming_view(self):
-        """Test file_editor with streaming partial args for view command."""
-        lexer = streamingjson.Lexer()
-        lexer.append_string('{"command": "view", "path": "/test.py"}')
-        result = get_tool_kind("file_editor", partial_args=lexer)
-        assert result == "read"
-
-    def test_file_editor_streaming_edit(self):
-        """Test file_editor with streaming partial args for non-view command."""
-        lexer = streamingjson.Lexer()
-        lexer.append_string('{"command": "str_replace", "path": "/test.py"}')
-        result = get_tool_kind("file_editor", partial_args=lexer)
-        assert result == "edit"
-
-    def test_file_editor_streaming_incomplete(self):
-        """Test file_editor with incomplete streaming args defaults to 'edit'."""
-        lexer = streamingjson.Lexer()
-        lexer.append_string('{"comma')  # Incomplete JSON
-        result = get_tool_kind("file_editor", partial_args=lexer)
-        assert result == "edit"
-
-    def test_file_editor_no_args_defaults_other(self):
-        """Test file_editor without action or partial_args returns from mapping."""
-        result = get_tool_kind("file_editor")
-        assert result == "other"  # Falls through to TOOL_KIND_MAPPING.get
+    @pytest.mark.parametrize(
+        "partial_json,expected",
+        [
+            # "view" should be detectable even if the JSON is truncated
+            ('{"command":"view","path":"/te', "read"),
+            # non-view / unknown command should default to edit
+            ('{"command":"str_rep', "edit"),
+            # totally borked => parse error => default edit
+            ('{"comma', "edit"),
+        ],
+    )
+    def test_file_editor_kind_from_streaming_partial_args(
+        self, partial_json: str, expected: str
+    ):
+        assert (
+            get_tool_kind("file_editor", partial_args=_lexer(partial_json)) == expected
+        )
 
 
 class TestGetToolTitle:
-    """Tests for get_tool_title function."""
-
-    def test_task_tracker_always_plan_updated(self):
-        """Test task_tracker always returns 'Plan updated'."""
-        result = get_tool_title("task_tracker")
-        assert result == "Plan updated"
-
-    def test_file_editor_view_action(self):
-        """Test file_editor view action generates 'Reading' title."""
-        action = FileEditorAction(command="view", path="/src/main.py")
-        result = get_tool_title("file_editor", action=action)
-        assert result == "Reading /src/main.py"
+    def test_task_tracker_title_constant(self):
+        assert get_tool_title("task_tracker") == "Plan updated"
 
     @pytest.mark.parametrize(
-        "command,path",
+        "action,expected",
         [
-            ("str_replace", "/src/main.py"),
-            ("create", "/new/file.txt"),
-            ("insert", "/code.py"),
+            (
+                FileEditorAction(command="view", path="/src/main.py"),
+                "Reading /src/main.py",
+            ),
+            (
+                FileEditorAction(command="str_replace", path="/src/main.py"),
+                "Editing /src/main.py",
+            ),
+            (TerminalAction(command="git status"), "git status"),
+            (TaskTrackerAction(command="plan", task_list=[]), "Plan updated"),
         ],
     )
-    def test_file_editor_edit_actions(self, command, path: str):
-        """Test file_editor edit actions generate 'Editing' title."""
-        action = FileEditorAction(command=command, path=path)  # type: ignore[arg-type]
-        result = get_tool_title("file_editor", action=action)
-        assert result == f"Editing {path}"
+    def test_title_from_action(self, action, expected: str):
+        tool_name = (
+            "file_editor"
+            if isinstance(action, FileEditorAction)
+            else "terminal"
+            if isinstance(action, TerminalAction)
+            else "task_tracker"
+        )
+        assert get_tool_title(tool_name, action=action) == expected
 
-    def test_terminal_action(self):
-        """Test terminal action uses command as title."""
-        action = TerminalAction(command="git status")
-        result = get_tool_title("terminal", action=action)
-        assert result == "git status"
+    @pytest.mark.parametrize(
+        "tool_name,partial_json,expected",
+        [
+            # file_editor, truncated but still enough to parse and extract fields
+            ("file_editor", '{"command":"view","path":"/test.py"', "Reading /test.py"),
+            (
+                "file_editor",
+                '{"command":"str_replace","path":"/test.py"',
+                "Editing /test.py",
+            ),
+            # terminal, truncated but parseable enough
+            ("terminal", '{"command":"ls -la"', "ls -la"),
+            # file_editor missing/empty path => falls through to tool_name
+            ("file_editor", '{"command":"view"', "file_editor"),
+            ("file_editor", '{"command":"view","path":""', "file_editor"),
+            # parses but not a dict => returns tool_name
+            (
+                "file_editor",
+                "[",
+                "file_editor",
+            ),  # Lexer may complete to [] depending on impl
+            ("terminal", "[]", "terminal"),  # guaranteed non-dict parse
+        ],
+    )
+    def test_title_from_streaming_partial_args(
+        self, tool_name: str, partial_json: str, expected: str
+    ):
+        assert get_tool_title(tool_name, partial_args=_lexer(partial_json)) == expected
 
-    def test_task_tracker_action(self):
-        """Test TaskTrackerAction returns 'Plan updated'."""
-        action = TaskTrackerAction(command="plan", task_list=[])
-        result = get_tool_title("task_tracker", action=action)
-        assert result == "Plan updated"
+    @pytest.mark.parametrize(
+        "tool_name,partial_json",
+        [
+            ("terminal", '{""command"'),  # parse error => ""
+            ("file_editor", "{'}'"),  # parse error => ""
+        ],
+    )
+    def test_title_streaming_parse_error_returns_empty(
+        self, tool_name: str, partial_json: str
+    ):
+        assert get_tool_title(tool_name, partial_args=_lexer(partial_json)) == ""
 
-    def test_streaming_file_editor_view(self):
-        """Test file_editor streaming args with view command."""
-        lexer = streamingjson.Lexer()
-        lexer.append_string('{"command": "view", "path": "/test.py"}')
-        result = get_tool_title("file_editor", partial_args=lexer)
-        assert result == "Reading /test.py"
-
-    def test_streaming_file_editor_edit(self):
-        """Test file_editor streaming args with edit command."""
-        lexer = streamingjson.Lexer()
-        lexer.append_string('{"command": "str_replace", "path": "/test.py"}')
-        result = get_tool_title("file_editor", partial_args=lexer)
-        assert result == "Editing /test.py"
-
-    def test_streaming_terminal(self):
-        """Test terminal streaming args extracts command."""
-        lexer = streamingjson.Lexer()
-        lexer.append_string('{"command": "ls -la"}')
-        result = get_tool_title("terminal", partial_args=lexer)
-        assert result == "ls -la"
-
-    def test_no_args_returns_empty(self):
-        """Test unknown tool without args returns empty string."""
-        result = get_tool_title("unknown_tool")
-        assert result == ""
-
-    def test_streaming_incomplete_json(self):
-        """Test incomplete JSON falls back to tool_name."""
-        lexer = streamingjson.Lexer()
-        lexer.append_string('{"incomplete')
-        result = get_tool_title("file_editor", partial_args=lexer)
-        # When args are incomplete, falls back to tool_name
-        assert result == "file_editor"
+    @pytest.mark.parametrize("tool_name", ["unknown_tool", "terminal", "file_editor"])
+    def test_title_no_partial_args_and_no_action_returns_empty(self, tool_name: str):
+        assert get_tool_title(tool_name) == ""
 
 
 class TestFormatContentBlocks:
-    """Tests for format_content_blocks function."""
+    @pytest.mark.parametrize(
+        "text,expected_none",
+        [
+            (None, True),
+            ("", True),
+            ("   \n\t  ", True),
+            ("Hello, world!", False),
+        ],
+    )
+    def test_format_content_blocks(self, text: str | None, expected_none: bool):
+        result = format_content_blocks(text)
+        if expected_none:
+            assert result is None
+            return
 
-    def test_format_text(self):
-        """Test formatting text into content blocks."""
-        result = format_content_blocks("Hello, world!")
         assert result is not None
         assert len(result) == 1
-        # ContentToolCallContent has 'content' which contains the text block
         assert result[0].content.text == "Hello, world!"
-
-    def test_format_empty_string(self):
-        """Test empty string returns None."""
-        result = format_content_blocks("")
-        assert result is None
-
-    def test_format_whitespace_only(self):
-        """Test whitespace-only string returns None."""
-        result = format_content_blocks("   \n\t  ")
-        assert result is None
-
-    def test_format_none(self):
-        """Test None input returns None."""
-        result = format_content_blocks(None)
-        assert result is None
