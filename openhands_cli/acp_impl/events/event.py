@@ -21,6 +21,8 @@ from openhands.sdk.event import (
     UserRejectObservation,
 )
 from openhands_cli.acp_impl.events.shared_event_handler import (
+    REASONING_HEADER,
+    THOUGHT_HEADER,
     SharedEventHandler,
     _event_visualize_to_plain,
 )
@@ -104,7 +106,7 @@ class EventSubscriber:
                 await self.conn.session_update(
                     session_id=self.session_id,
                     update=update_agent_thought_text(
-                        "**Reasoning**:\n" + event.reasoning_content.strip() + "\n"
+                        REASONING_HEADER + event.reasoning_content.strip() + "\n"
                     ),
                     field_meta=get_metadata(self.conversation),
                 )
@@ -113,7 +115,7 @@ class EventSubscriber:
                 await self.conn.session_update(
                     session_id=self.session_id,
                     update=update_agent_thought_text(
-                        "\n**Thought**:\n" + thought_text.strip() + "\n"
+                        THOUGHT_HEADER + thought_text.strip() + "\n"
                     ),
                     field_meta=get_metadata(self.conversation),
                 )

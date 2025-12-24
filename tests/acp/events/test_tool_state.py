@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from openhands_cli.acp_impl.events.shared_event_handler import THOUGHT_HEADER
 from openhands_cli.acp_impl.events.tool_state import ToolCallState
 
 
@@ -15,10 +16,12 @@ class TestToolCallStateBasics:
         assert state.is_think is False
         assert state.args == ""
         assert state.started is False
+        assert state.thought_header_emitted is False
 
     def test_init_think(self):
         state = ToolCallState("call-456", "think")
         assert state.is_think is True
+        assert state.thought_header_emitted is False
 
     def test_append_args_accumulates(self):
         state = ToolCallState("call-1", "terminal")
@@ -65,10 +68,11 @@ class TestExtractThoughtPiece:
     def test_incremental_diff_emits_only_new_suffix(
         self, monkeypatch: pytest.MonkeyPatch
     ):
-        """
-        Monotonic growth contract:
-          - thought grows: "" -> "hel" -> "hello" -> "hello world"
-          - emit only the delta at each step: "hel", "lo", " world"
+        """Monotonic growth contract with header on first delta only.
+
+        - thought grows: "" -> "hel" -> "hello" -> "hello world"
+        - first delta includes THOUGHT_HEADER: "**Thought**:\nhel"
+        - subsequent deltas are plain: "lo", " world"
         """
         state = ToolCallState("call-1", "think")
 
@@ -84,8 +88,9 @@ class TestExtractThoughtPiece:
 
         state.append_args('{"thought":"hel')
         out1 = state.extract_thought_piece()
-        assert out1 == "hel"
+        assert out1 == THOUGHT_HEADER + "hel"
         assert state.prev_emitted_thought_chunk == "hel"
+        assert state.thought_header_emitted is True
 
         state.append_args('lo"}')
         out2 = state.extract_thought_piece()
@@ -109,7 +114,8 @@ class TestExtractThoughtPiece:
         monkeypatch.setattr(state.lexer, "complete_json", lambda: next(snapshots))
 
         state.append_args('{"thought":"hello"}')
-        assert state.extract_thought_piece() == "hello"
+        out = state.extract_thought_piece()
+        assert out == THOUGHT_HEADER + "hello"
         assert state.prev_emitted_thought_chunk == "hello"
 
         # args can still "grow" by appending irrelevant tokens; thought

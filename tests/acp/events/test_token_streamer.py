@@ -132,6 +132,64 @@ class TestOnTokenContentAndReasoning:
 
         assert not mock_connection.session_update.called
 
+    def test_reasoning_header_prepended_on_first_chunk_only(
+        self, token_subscriber, mock_connection, event_loop
+    ):
+        """Verify that **Reasoning**: header is prepended only to the first chunk.
+
+        This ensures consistent formatting between streaming and non-streaming modes.
+        """
+        from openhands_cli.acp_impl.events.shared_event_handler import REASONING_HEADER
+
+        chunk1 = _chunk(content=None, reasoning="First part", tool_calls=None)
+        chunk2 = _chunk(content=None, reasoning=" second part", tool_calls=None)
+
+        with patch.object(event_loop, "is_running", return_value=False):
+            token_subscriber.on_token(chunk1)
+            token_subscriber.on_token(chunk2)
+
+        assert mock_connection.session_update.call_count == 2
+
+        # First chunk should have header prepended
+        update1 = mock_connection.session_update.call_args_list[0][1]["update"]
+        assert isinstance(update1, AgentThoughtChunk)
+        text1 = update1.content.text
+        assert text1.startswith(REASONING_HEADER)
+        assert "First part" in text1
+
+        # Second chunk should NOT have header
+        update2 = mock_connection.session_update.call_args_list[1][1]["update"]
+        assert isinstance(update2, AgentThoughtChunk)
+        text2 = update2.content.text
+        assert not text2.startswith(REASONING_HEADER)
+        assert text2 == " second part"
+
+    def test_reset_header_state_allows_new_header(
+        self, token_subscriber, mock_connection, event_loop
+    ):
+        """Verify that reset_header_state allows a new header to be emitted."""
+        from openhands_cli.acp_impl.events.shared_event_handler import REASONING_HEADER
+
+        chunk1 = _chunk(content=None, reasoning="First", tool_calls=None)
+        chunk2 = _chunk(content=None, reasoning="After reset", tool_calls=None)
+
+        with patch.object(event_loop, "is_running", return_value=False):
+            token_subscriber.on_token(chunk1)
+            token_subscriber.reset_header_state()
+            token_subscriber.on_token(chunk2)
+
+        assert mock_connection.session_update.call_count == 2
+
+        # First chunk has header
+        update1 = mock_connection.session_update.call_args_list[0][1]["update"]
+        text1 = update1.content.text
+        assert text1.startswith(REASONING_HEADER)
+
+        # Second chunk also has header (after reset)
+        update2 = mock_connection.session_update.call_args_list[1][1]["update"]
+        text2 = update2.content.text
+        assert text2.startswith(REASONING_HEADER)
+
 
 class TestToolCallStreaming:
     def test_non_think_tool_call_emits_start_then_progress(
@@ -239,6 +297,55 @@ class TestToolCallStreaming:
         ]
         assert "agent_thought_chunk" in updates
         assert "tool_call_start" not in updates
+
+    def test_think_tool_thought_header_prepended_on_first_piece_only(
+        self, token_subscriber, mock_connection, event_loop
+    ):
+        """Verify THOUGHT_HEADER is prepended only to the first thought piece.
+
+        This ensures consistent formatting with non-streaming mode.
+        The header tracking is per-ToolCallState, not global.
+        """
+        from openhands_cli.acp_impl.events.shared_event_handler import THOUGHT_HEADER
+
+        tc1 = _tool_call(
+            index=0,
+            tool_call_id="call-think-1",
+            name="think",
+            arguments='{"thought":"first',
+        )
+        tc2 = _tool_call(
+            index=0,
+            tool_call_id=None,
+            name=None,
+            arguments=' second"}',
+        )
+
+        with patch.object(event_loop, "is_running", return_value=False):
+            token_subscriber.on_token(_chunk(tool_calls=[tc1]))
+            token_subscriber.on_token(_chunk(tool_calls=[tc2]))
+
+        # Should have 2 thought updates
+        thought_updates = [
+            c.kwargs["update"]
+            for c in mock_connection.session_update.call_args_list
+            if c.kwargs["update"].session_update == "agent_thought_chunk"
+        ]
+        assert len(thought_updates) == 2
+
+        # First thought piece should have header
+        text1 = thought_updates[0].content.text
+        assert text1.startswith(THOUGHT_HEADER)
+        assert "first" in text1
+
+        # Second thought piece should NOT have header
+        text2 = thought_updates[1].content.text
+        assert not text2.startswith(THOUGHT_HEADER)
+        assert text2 == " second"
+
+        # Verify state tracks the header emission
+        state = token_subscriber._streaming_tool_calls[0]
+        assert state.thought_header_emitted is True
 
     def test_tool_call_state_replaced_when_new_id_at_same_index(
         self, token_subscriber, mock_connection, event_loop

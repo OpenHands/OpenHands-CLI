@@ -2,6 +2,7 @@ import json
 
 from streamingjson import Lexer
 
+from openhands_cli.acp_impl.events.shared_event_handler import THOUGHT_HEADER
 from openhands_cli.acp_impl.events.utils import get_tool_title
 
 
@@ -20,6 +21,7 @@ class ToolCallState:
         self.lexer = Lexer()
         self.prev_emitted_thought_chunk = ""
         self.started = False
+        self.thought_header_emitted = False
 
     def append_args(self, args_part: str) -> None:
         """Append new arguments part to the accumulated args and lexer."""
@@ -27,12 +29,12 @@ class ToolCallState:
         self.lexer.append_string(args_part)
 
     def extract_thought_piece(self) -> str | None:
-        """
-        Incrementally emit new text from the Think tool's `thought` argument by
-        reparsing the best-effort JSON args and diffing against the previously
-        emitted prefix.
-        """
+        """Incrementally emit new text from the Think tool's `thought` argument.
 
+        Reparses the best-effort JSON args and diffs against the previously
+        emitted prefix. Prepends THOUGHT_HEADER on the first non-empty delta
+        for consistent formatting with non-streaming mode.
+        """
         if not self.is_think:
             return None
 
@@ -47,8 +49,18 @@ class ToolCallState:
 
         prev = self.prev_emitted_thought_chunk
         delta = thought[len(prev) :]
+        if not delta:
+            return None
+
         self.prev_emitted_thought_chunk = thought
-        return delta or None
+
+        # Prepend header on first thought piece for consistency
+        # with non-streaming mode (EventSubscriber)
+        if not self.thought_header_emitted:
+            self.thought_header_emitted = True
+            delta = THOUGHT_HEADER + delta
+
+        return delta
 
     @property
     def title(self) -> str:

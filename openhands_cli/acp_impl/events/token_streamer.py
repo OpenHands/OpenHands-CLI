@@ -41,6 +41,7 @@ from openhands.sdk.event import (
 )
 from openhands.sdk.llm.streaming import LLMStreamChunk
 from openhands_cli.acp_impl.events.shared_event_handler import (
+    REASONING_HEADER,
     SharedEventHandler,
 )
 from openhands_cli.acp_impl.events.tool_state import ToolCallState
@@ -83,6 +84,17 @@ class TokenBasedEventSubscriber:
         self._streaming_tool_calls: dict[int, ToolCallState] = {}
         self.shared_events_handler = SharedEventHandler()
 
+        # Header tracking for consistent formatting with non-streaming mode
+        self._reasoning_header_emitted = False
+
+    def reset_header_state(self) -> None:
+        """Reset header tracking for a new LLM response.
+
+        Called when starting a new streaming response to ensure headers
+        are prepended to the first chunk of each section.
+        """
+        self._reasoning_header_emitted = False
+
     def _prune_tool_call_state(self, tool_call_id: str) -> None:
         """Remove any ToolCallState entries matching the given tool_call_id.
 
@@ -101,6 +113,9 @@ class TokenBasedEventSubscriber:
         # Skip ConversationStateUpdateEvent (internal state management)
         if isinstance(event, ConversationStateUpdateEvent):
             return
+
+        # Reset header state for next streaming response
+        self.reset_header_state()
 
         if isinstance(event, ActionEvent):
             await self.shared_events_handler.handle_action_event(self, event)
@@ -141,11 +156,12 @@ class TokenBasedEventSubscriber:
                 content = getattr(delta, "content", None)
 
                 if isinstance(reasoning, str) and reasoning:
-                    self._schedule_update(
-                        update_agent_thought_text(
-                            reasoning,
-                        )
-                    )
+                    # Prepend header on first reasoning chunk for consistency
+                    # with non-streaming mode (EventSubscriber)
+                    if not self._reasoning_header_emitted:
+                        self._reasoning_header_emitted = True
+                        reasoning = REASONING_HEADER + reasoning
+                    self._schedule_update(update_agent_thought_text(reasoning))
 
                 if isinstance(content, str) and content:
                     self._schedule_update(update_agent_message_text(content))
