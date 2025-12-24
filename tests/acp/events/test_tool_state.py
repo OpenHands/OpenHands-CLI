@@ -33,7 +33,9 @@ class TestExtractThoughtPiece:
         state.append_args('{"thought":"hi"}')
         assert state.extract_thought_piece() is None
 
-    def test_parse_error_returns_none_and_does_not_update_prev(self, monkeypatch: pytest.MonkeyPatch):
+    def test_parse_error_returns_none_and_does_not_update_prev(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
         state = ToolCallState("call-1", "think")
         state.append_args('{"thought":"hi"}')
 
@@ -60,7 +62,9 @@ class TestExtractThoughtPiece:
         assert state.extract_thought_piece() is None
         assert state.prev_emitted_thought_chunk == ""
 
-    def test_incremental_diff_emits_only_new_suffix(self, monkeypatch: pytest.MonkeyPatch):
+    def test_incremental_diff_emits_only_new_suffix(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
         """
         Monotonic growth contract:
           - thought grows: "" -> "hel" -> "hello" -> "hello world"
