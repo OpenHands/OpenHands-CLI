@@ -1509,7 +1509,6 @@ dependencies = [
     { name = "streamingjson" },
     { name = "textual" },
     { name = "textual-autocomplete" },
-    { name = "textual-dev" },
     { name = "textual-serve" },
     { name = "typer" },
 ]
@@ -1528,6 +1527,7 @@ dev = [
     { name = "pytest-forked" },
     { name = "pytest-xdist" },
     { name = "ruff" },
+    { name = "textual-dev" },
 ]
 
 [package.metadata]
@@ -1542,7 +1542,6 @@ requires-dist = [
     { name = "streamingjson", specifier = ">=0.0.2" },
     { name = "textual", specifier = ">=0.79.0" },
     { name = "textual-autocomplete", specifier = ">=4.0.6" },
-    { name = "textual-dev", specifier = ">=1.8.0" },
     { name = "textual-serve", specifier = ">=1.1.3" },
     { name = "typer", specifier = ">=0.17.4" },
 ]
@@ -1561,6 +1560,7 @@ dev = [
     { name = "pytest-forked", specifier = ">=1.6.0" },
     { name = "pytest-xdist", specifier = ">=3.6.1" },
     { name = "ruff", specifier = ">=0.12.10" },
+    { name = "textual-dev", specifier = ">=1.8.0" },
 ]
 
 [[package]]
