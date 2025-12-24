@@ -125,17 +125,6 @@ class SharedEventHandler:
             raw_output=event.model_dump(),
         )
 
-    async def handle_agent_error(
-        self, ctx: _ACPContext, event: AgentErrorEvent
-    ) -> None:
-        await self.send_tool_progress(
-            ctx,
-            tool_call_id=event.tool_call_id,
-            status="failed",
-            text=_event_visualize_to_plain(event),
-            raw_output=event.model_dump(),
-        )
-
     async def handle_observation(
         self, ctx: _ACPContext, event: ObservationEvent
     ) -> None:

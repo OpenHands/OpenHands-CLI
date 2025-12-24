@@ -14,7 +14,6 @@ from acp.schema import (
 
 from openhands.sdk import Message, TextContent
 from openhands.sdk.event import (
-    AgentErrorEvent,
     Condensation,
     CondensationRequest,
     ConversationStateUpdateEvent,
@@ -149,32 +148,6 @@ async def test_handle_observation_event(event_subscriber, mock_connection):
     assert update.session_update == "tool_call_update"
     assert update.tool_call_id == "test-call-123"
     assert update.status == "completed"
-
-
-@pytest.mark.asyncio
-async def test_handle_agent_error_event(event_subscriber, mock_connection):
-    """Test handling of AgentErrorEvent."""
-    from rich.text import Text
-
-    # Create AgentErrorEvent
-    event = MagicMock(spec=AgentErrorEvent)
-    event.visualize = Text("Error: Something went wrong")
-    event.tool_call_id = "test-call-123"
-    event.error = "Something went wrong"
-    event.model_dump = MagicMock(return_value={"error": "Something went wrong"})
-
-    # Process the event using the main event handler
-    await event_subscriber(event)
-
-    # Verify session_update was called
-    assert mock_connection.session_update.called
-    call_kwargs = mock_connection.session_update.call_args[1]
-    assert call_kwargs["session_id"] == "test-session"
-    update = call_kwargs["update"]
-    assert isinstance(update, SessionUpdate5)
-    assert update.session_update == "tool_call_update"
-    assert update.status == "failed"
-    assert update.raw_output == {"error": "Something went wrong"}
 
 
 @pytest.mark.asyncio
