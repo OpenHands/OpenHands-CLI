@@ -82,6 +82,20 @@ class TokenBasedEventSubscriber:
         self._streaming_tool_calls: dict[int, ToolCallState] = {}
         self.shared_events_handler = SharedEventHandler()
 
+    def _prune_tool_call_state(self, tool_call_id: str) -> None:
+        """Remove any ToolCallState entries matching the given tool_call_id.
+
+        This prevents memory accumulation over long sessions by cleaning up
+        completed/failed tool call states.
+        """
+        indices_to_remove = [
+            idx
+            for idx, state in self._streaming_tool_calls.items()
+            if state.tool_call_id == tool_call_id
+        ]
+        for idx in indices_to_remove:
+            del self._streaming_tool_calls[idx]
+
     async def unstreamed_event_handler(self, event: Event):
         # Skip ConversationStateUpdateEvent (internal state management)
         if isinstance(event, ConversationStateUpdateEvent):
@@ -95,8 +109,10 @@ class TokenBasedEventSubscriber:
             await self.shared_events_handler.handle_user_reject_or_agent_error(
                 self, event
             )
+            self._prune_tool_call_state(event.tool_call_id)
         elif isinstance(event, ObservationEvent):
             await self.shared_events_handler.handle_observation(self, event)
+            self._prune_tool_call_state(event.tool_call_id)
         elif isinstance(event, SystemPromptEvent):
             await self.shared_events_handler.handle_system_prompt(self, event)
         elif isinstance(event, PauseEvent):

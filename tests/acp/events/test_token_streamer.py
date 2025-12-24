@@ -436,3 +436,65 @@ async def test_terminal_tool_lifecycle_stream_then_action_then_observation():
         "Expected final update to be ToolCallProgress"
     )
     assert last.status == "completed"
+
+    # After observation, the tool call state should be pruned to avoid memory leaks
+    assert 0 not in subscriber._streaming_tool_calls, (
+        "Expected tool call state to be pruned after ObservationEvent"
+    )
+
+
+class TestPruneToolCallState:
+    def test_prune_removes_matching_tool_call_id(
+        self, token_subscriber, mock_connection, event_loop
+    ):
+        """Verify that _prune_tool_call_state removes entries by tool_call_id."""
+        # Add some tool call states
+        tc1 = _tool_call(
+            index=0, tool_call_id="call-1", name="terminal", arguments='{"command":"a"}'
+        )
+        tc2 = _tool_call(
+            index=1, tool_call_id="call-2", name="terminal", arguments='{"command":"b"}'
+        )
+        tc3 = _tool_call(
+            index=2, tool_call_id="call-3", name="terminal", arguments='{"command":"c"}'
+        )
+
+        with patch.object(event_loop, "is_running", return_value=False):
+            token_subscriber.on_token(_chunk(tool_calls=[tc1, tc2, tc3]))
+
+        assert len(token_subscriber._streaming_tool_calls) == 3
+        assert 0 in token_subscriber._streaming_tool_calls
+        assert 1 in token_subscriber._streaming_tool_calls
+        assert 2 in token_subscriber._streaming_tool_calls
+
+        # Prune call-2
+        token_subscriber._prune_tool_call_state("call-2")
+
+        assert len(token_subscriber._streaming_tool_calls) == 2
+        assert 0 in token_subscriber._streaming_tool_calls
+        assert 1 not in token_subscriber._streaming_tool_calls
+        assert 2 in token_subscriber._streaming_tool_calls
+
+    def test_prune_with_nonexistent_id_is_noop(self, token_subscriber, event_loop):
+        """Pruning a non-existent tool_call_id should be a safe no-op."""
+        tc = _tool_call(
+            index=0, tool_call_id="call-1", name="terminal", arguments='{"command":"a"}'
+        )
+
+        with patch.object(event_loop, "is_running", return_value=False):
+            token_subscriber.on_token(_chunk(tool_calls=[tc]))
+
+        assert len(token_subscriber._streaming_tool_calls) == 1
+
+        # Prune a non-existent id
+        token_subscriber._prune_tool_call_state("does-not-exist")
+
+        # Should still have the original entry
+        assert len(token_subscriber._streaming_tool_calls) == 1
+        assert 0 in token_subscriber._streaming_tool_calls
+
+    def test_prune_on_empty_dict_is_noop(self, token_subscriber):
+        """Pruning on an empty dict should be a safe no-op."""
+        assert len(token_subscriber._streaming_tool_calls) == 0
+        token_subscriber._prune_tool_call_state("any-id")
+        assert len(token_subscriber._streaming_tool_calls) == 0
