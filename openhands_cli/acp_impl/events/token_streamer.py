@@ -46,6 +46,7 @@ from openhands_cli.acp_impl.events.shared_event_handler import (
 from openhands_cli.acp_impl.events.tool_state import ToolCallState
 from openhands_cli.acp_impl.events.utils import (
     format_content_blocks,
+    get_metadata,
     get_tool_kind,
 )
 
@@ -160,7 +161,11 @@ class TokenBasedEventSubscriber:
         """Schedule a session_update for an ACP update, thread-safe."""
 
         async def _send() -> None:
-            await self.conn.session_update(session_id=self.session_id, update=update)
+            await self.conn.session_update(
+                session_id=self.session_id,
+                update=update,
+                field_meta=get_metadata(self.conversation),
+            )
 
         if self.loop.is_running():
             asyncio.run_coroutine_threadsafe(_send(), self.loop)
