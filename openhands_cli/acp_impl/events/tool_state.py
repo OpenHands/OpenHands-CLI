@@ -2,48 +2,7 @@ import json
 
 import streamingjson
 
-
-def _title_from_streaming_args(tool_name: str, lexer: streamingjson.Lexer) -> str:
-    """
-    Streaming equivalent of _handle_action_event's title logic.
-
-    _handle_action_event titles:
-      - file_editor: "Reading {path}" if command == "view" else "Editing {path}"
-      - terminal: "{command}"
-      - task_tracker: "Plan updated"
-      - everything else: tool_name
-    """
-    if tool_name == "task_tracker":
-        return "Plan updated"
-
-    # Best-effort parse of the (possibly incomplete) JSON args
-    try:
-        args = json.loads(lexer.complete_json())
-    except Exception:
-        return ""
-
-    if not isinstance(args, dict):
-        return tool_name
-
-    if tool_name == "file_editor":
-        path = args.get("path")
-        command = args.get("command")
-        if isinstance(path, str) and path:
-            if command == "view":
-                return f"Reading {path}"
-            return f"Editing {path}"
-        return tool_name
-
-    if tool_name == "terminal":
-        command = args.get("command")
-        # Match _handle_action_event which sets title to event.action.command
-        # (for terminal this is usually the shell command string)
-        if isinstance(command, str) and command:
-            return command
-        return tool_name
-
-    # browser/browser_use/etc: _handle_action_event keeps title == tool_name
-    return tool_name
+from openhands_cli.acp_impl.events.utils import get_tool_title
 
 
 class ToolCallState:
@@ -67,32 +26,37 @@ class ToolCallState:
         self.args += args_part
         self.lexer.append_string(args_part)
 
-    def extract_thought_piece(self, arguments: str) -> str | None:
+    def extract_thought_piece(self) -> str | None:
         """
         Incrementally emit new text from the Think tool's `thought` argument by
         reparsing the best-effort JSON args and diffing against the previously
         emitted prefix.
         """
 
-        if not self.is_think or not arguments:
+        if not self.is_think:
+            print("here")
             return None
 
         try:
             args = json.loads(self.lexer.complete_json())
-        except Exception:
+        except Exception as e:
+            print("2", e)
             return None
 
         thought = args.get("thought", "")
+        prev = self.prev_emitted_thought_chunk
         if not thought:
             return None
 
+        prev = self.prev_emitted_thought_chunk
+        delta = thought[len(prev) :]
         self.prev_emitted_thought_chunk = thought
-        return thought[len(self.prev_emitted_thought_chunk) :]
+        return delta or None
 
     @property
     def title(self) -> str:
         """Get the current title with key argument if available."""
-        return _title_from_streaming_args(self.tool_name, self.lexer)
+        return get_tool_title(tool_name=self.tool_name, partial_args=self.lexer)
 
     def __repr__(self) -> str:
         return (

@@ -206,7 +206,7 @@ class TokenBasedEventSubscriber:
 
         state.append_args(arguments_chunk)
 
-        thought_piece = state.extract_thought_piece(arguments_chunk)
+        thought_piece = state.extract_thought_piece()
         if thought_piece:
             self._schedule_update(update_agent_thought_text(thought_piece))
             return
