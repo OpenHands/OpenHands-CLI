@@ -27,4 +27,4 @@ def test_agent_context_includes_os_info() -> None:
         assert loaded_agent.agent_context is not None
 
         suffix = loaded_agent.agent_context.system_message_suffix or ""
-        assert "User operating system:" in suffix
+        assert "User operating system: TestOS" in suffix
