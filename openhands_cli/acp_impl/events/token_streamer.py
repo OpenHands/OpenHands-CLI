@@ -14,7 +14,6 @@ import asyncio
 
 from acp import (
     Client,
-    RequestError,
     start_tool_call,
     update_agent_message_text,
     update_agent_thought_text,
@@ -135,10 +134,7 @@ class TokenBasedEventSubscriber:
                     self._schedule_update(update_agent_message_text(content))
 
         except Exception as e:
-            # NOTE: this surfaces as an ACP internal error (matches your ask)
-            raise RequestError.internal_error(
-                {"reason": "Error during token streaming", "details": str(e)}
-            )
+            logger.warning("Error during token streaming: %s", e, exc_info=True)
 
     # -----------------------
     # internals

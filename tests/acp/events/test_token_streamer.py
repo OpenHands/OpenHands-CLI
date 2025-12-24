@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from acp import RequestError
 from acp.schema import (
     AgentMessageChunk,
     AgentThoughtChunk,
@@ -265,8 +264,13 @@ class TestToolCallStreaming:
         assert first_state is not second_state
 
 
-class TestErrorWrapping:
-    def test_on_token_wraps_exceptions_as_internal_error(self, token_subscriber):
+class TestErrorHandling:
+    def test_on_token_logs_and_continues_on_error(self, token_subscriber, caplog):
+        """Token callbacks should be best-effort and non-throwing.
+
+        Errors are logged but don't raise, so one malformed chunk won't
+        kill the stream.
+        """
         chunk = _chunk(content=None, reasoning=None, tool_calls=[MagicMock()])
 
         with patch.object(
@@ -274,12 +278,12 @@ class TestErrorWrapping:
             "_handle_tool_call_streaming",
             side_effect=RuntimeError("boom"),
         ):
-            with pytest.raises(RequestError) as exc:
-                token_subscriber.on_token(chunk)
+            # Should NOT raise - errors are caught and logged
+            token_subscriber.on_token(chunk)
 
-        # RequestError.internal_error(...) should be raised
-        # -32603 JSON-RPC error code
-        assert exc.value.code == -32603
+        # Verify error was logged
+        assert any("boom" in record.message for record in caplog.records)
+        assert any(record.levelname == "WARNING" for record in caplog.records)
 
 
 class TestScheduleUpdate:
