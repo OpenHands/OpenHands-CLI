@@ -378,15 +378,21 @@ class TestErrorHandling:
         Errors are logged but don't raise, so one malformed chunk won't
         kill the stream.
         """
+        import logging
+
         chunk = _chunk(content=None, reasoning=None, tool_calls=[MagicMock()])
 
-        with patch.object(
-            token_subscriber,
-            "_handle_tool_call_streaming",
-            side_effect=RuntimeError("boom"),
+        # Ensure caplog captures WARNING level logs from the token_streamer module
+        with caplog.at_level(
+            logging.WARNING, logger="openhands_cli.acp_impl.events.token_streamer"
         ):
-            # Should NOT raise - errors are caught and logged
-            token_subscriber.on_token(chunk)
+            with patch.object(
+                token_subscriber,
+                "_handle_tool_call_streaming",
+                side_effect=RuntimeError("boom"),
+            ):
+                # Should NOT raise - errors are caught and logged
+                token_subscriber.on_token(chunk)
 
         # Verify error was logged
         assert any("boom" in record.message for record in caplog.records)
@@ -505,8 +511,6 @@ async def test_terminal_tool_lifecycle_stream_then_action_then_observation():
         observation=obs,
         action_id=action_id,  # REQUIRED linkage
     )
-
-    await subscriber.unstreamed_event_handler(obs_event)
 
     await subscriber.unstreamed_event_handler(obs_event)
 
