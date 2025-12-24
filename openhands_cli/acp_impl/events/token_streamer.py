@@ -173,7 +173,6 @@ class TokenBasedEventSubscriber:
             if tool_call_id and name:
                 state = ToolCallState(tool_call_id, name)
                 self._streaming_tool_calls[index] = state
-                self._last_tool_call_state = state
 
         elif tool_call_id and name:
             # Update existing state if we get new id/name (shouldn't happen often)
@@ -182,7 +181,6 @@ class TokenBasedEventSubscriber:
                 # New tool call at same index - replace state
                 state = ToolCallState(tool_call_id, name)
                 self._streaming_tool_calls[index] = state
-                self._last_tool_call_state = state
 
         state = self._streaming_tool_calls.get(index)
         if not state:

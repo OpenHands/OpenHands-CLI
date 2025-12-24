@@ -34,17 +34,14 @@ class ToolCallState:
         """
 
         if not self.is_think:
-            print("here")
             return None
 
         try:
             args = json.loads(self.lexer.complete_json())
-        except Exception as e:
-            print("2", e)
+        except Exception:
             return None
 
         thought = args.get("thought", "")
-        prev = self.prev_emitted_thought_chunk
         if not thought:
             return None
 
@@ -65,7 +62,7 @@ class ToolCallState:
             f"  tool={self.tool_name!r},\n"
             f"  title={self.title!r},\n"
             f"  is_think={self.is_think},\n"
-            f". is_started={self.started},\n"
+            f"  is_started={self.started},\n"
             f"  args={self.args!r}\n"
             f")"
         )
