@@ -309,12 +309,17 @@ class TestScheduleUpdate:
 async def test_terminal_tool_lifecycle_stream_then_action_then_observation():
     """
     Lifecycle:
-      1) on_token streams partial TerminalAction -> emits ToolCallStart(in_progress) then ToolCallProgress(in_progress)
-      2) unstreamed ActionEvent arrives (same tool_call_id) -> may emit another ToolCallStart(in_progress)
-      3) unstreamed ObservationEvent arrives (same tool_call_id) -> emits ToolCallProgress(completed)
+      1) on_token streams partial TerminalAction -> emits
+         ToolCallStart(in_progress) then ToolCallProgress(in_progress)
+      2) unstreamed ActionEvent arrives (same tool_call_id) -> may emit
+         another ToolCallStart(in_progress)
+      3) unstreamed ObservationEvent arrives (same tool_call_id) -> emits
+         ToolCallProgress(completed)
 
-    We assert that, for the same tool_call_id, the observed ACP updates progress:
-      tool_call (in_progress) -> tool_call_update (in_progress) -> tool_call_update (completed)
+    We assert that, for the same tool_call_id, the observed ACP updates
+    progress:
+      tool_call (in_progress) -> tool_call_update (in_progress) ->
+      tool_call_update (completed)
     """
     conn = AsyncMock()
     loop = asyncio.get_running_loop()
@@ -358,8 +363,9 @@ async def test_terminal_tool_lifecycle_stream_then_action_then_observation():
         origin="completion",
     )
 
-    # NOTE: depending on your ActionEvent schema, you may need additional required fields.
-    # These are common in OpenHands events; adjust if your constructor differs.
+    # NOTE: depending on your ActionEvent schema, you may need additional
+    # required fields. These are common in OpenHands events; adjust if your
+    # constructor differs.
     action_event = ActionEvent(
         id="evt-action-1",
         timestamp=datetime.now(UTC).isoformat(),

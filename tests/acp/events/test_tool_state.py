@@ -112,7 +112,8 @@ class TestExtractThoughtPiece:
         assert state.extract_thought_piece() == "hello"
         assert state.prev_emitted_thought_chunk == "hello"
 
-        # args can still "grow" by appending irrelevant tokens; thought stays same => no delta
+        # args can still "grow" by appending irrelevant tokens; thought
+        # stays same => no delta
         state.append_args("   ")
         assert state.extract_thought_piece() is None
         assert state.prev_emitted_thought_chunk == "hello"
