@@ -1,6 +1,6 @@
 import json
 
-import streamingjson
+from streamingjson import Lexer
 
 from openhands_cli.acp_impl.events.utils import get_tool_title
 
@@ -8,7 +8,7 @@ from openhands_cli.acp_impl.events.utils import get_tool_title
 class ToolCallState:
     """Manages the state of a single streaming tool call.
 
-    Uses streamingjson.Lexer to incrementally parse JSON arguments
+    Uses Lexer to incrementally parse JSON arguments
     and extract key arguments for dynamic titles.
     """
 
@@ -17,7 +17,7 @@ class ToolCallState:
         self.tool_name = tool_name
         self.is_think = tool_name == "think"
         self.args = ""
-        self.lexer = streamingjson.Lexer()
+        self.lexer = Lexer()
         self.prev_emitted_thought_chunk = ""
         self.started = False
 

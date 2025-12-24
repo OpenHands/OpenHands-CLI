@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-import streamingjson
+from streamingjson import Lexer
 
 from openhands.tools.file_editor.definition import FileEditorAction
 from openhands.tools.task_tracker import TaskTrackerAction
@@ -15,8 +15,8 @@ from openhands_cli.acp_impl.events.utils import (
 )
 
 
-def _lexer(s: str) -> streamingjson.Lexer:
-    lex = streamingjson.Lexer()
+def _lexer(s: str) -> Lexer:
+    lex = Lexer()
     lex.append_string(s)
     return lex
 
