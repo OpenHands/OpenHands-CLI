@@ -219,8 +219,24 @@ class TokenBasedEventSubscriber:
         if not state:
             return
 
-        # Start non-think tool calls once
-        if not state.started and not state.is_think:
+        # Append args first (before checking if we should start)
+        if arguments_chunk:
+            state.append_args(arguments_chunk)
+
+        # Delay all tool call processing until we have a valid skeleton.
+        # This prevents flickering from noisy models that emit a tool name
+        # then hesitate or abandon the call.
+        if not state.has_valid_skeleton:
+            return
+
+        # Handle think tool: extract thought and emit
+        if state.is_think:
+            thought_piece = state.extract_thought_piece()
+            if thought_piece:
+                self._schedule_update(update_agent_thought_text(thought_piece))
+            return
+
+        if not state.started:
             state.started = True
             tool_call_start = start_tool_call(
                 tool_call_id=state.tool_call_id,
@@ -231,18 +247,8 @@ class TokenBasedEventSubscriber:
             )
             self._schedule_update(tool_call_start)
 
-        # Stream args
-        if not arguments_chunk:
-            return
-
-        state.append_args(arguments_chunk)
-
-        thought_piece = state.extract_thought_piece()
-        if thought_piece:
-            self._schedule_update(update_agent_thought_text(thought_piece))
-            return
-
-        if state.started:
+        # Emit progress updates after start
+        if state.started and arguments_chunk:
             self._schedule_update(
                 update_tool_call(
                     tool_call_id=state.tool_call_id,

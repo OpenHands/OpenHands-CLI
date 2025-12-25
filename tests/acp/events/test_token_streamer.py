@@ -231,14 +231,14 @@ class TestToolCallStreaming:
     def test_subsequent_tool_call_chunk_accumulates_args_and_updates_progress(
         self, token_subscriber, mock_connection, event_loop
     ):
-        # chunk1 starts tool call + partial args
+        # chunk1 has partial args (no valid command yet)
         tc1 = _tool_call(
             index=0,
             tool_call_id="call-123",
             name="terminal",
             arguments='{"comm',
         )
-        # chunk2 continues args (id/name omitted in later streaming chunks)
+        # chunk2 continues args and completes command (id/name omitted in later chunks)
         tc2 = _tool_call(
             index=0,
             tool_call_id=None,
@@ -248,22 +248,24 @@ class TestToolCallStreaming:
 
         with patch.object(event_loop, "is_running", return_value=False):
             token_subscriber.on_token(_chunk(tool_calls=[tc1]))
+            # First chunk doesn't emit anything (no valid skeleton yet)
+            assert mock_connection.session_update.call_count == 0
+
             token_subscriber.on_token(_chunk(tool_calls=[tc2]))
 
         state = token_subscriber._streaming_tool_calls[0]
         assert state.args == '{"command":"ls"}'
 
-        # Expect:
-        # - chunk1 emits start + progress
-        # - chunk2 emits progress
-        # => total 3 updates
-        assert mock_connection.session_update.call_count == 3
-        assert (
-            mock_connection.session_update.call_args_list[-1]
-            .kwargs["update"]
-            .session_update
-            == "tool_call_update"
-        )
+        # With delayed start behavior:
+        # - chunk1: no emit (incomplete skeleton, command not present)
+        # - chunk2: emits start + progress (skeleton becomes valid)
+        # => total 2 updates
+        assert mock_connection.session_update.call_count == 2
+        update1 = mock_connection.session_update.call_args_list[0].kwargs["update"]
+        update2 = mock_connection.session_update.call_args_list[1].kwargs["update"]
+        assert isinstance(update1, ToolCallStart)
+        assert isinstance(update2, ToolCallProgress)
+        assert update2.session_update == "tool_call_update"
 
     def test_think_tool_does_not_start_tool_call_and_emits_thought_when_available(
         self, token_subscriber, mock_connection, event_loop
@@ -369,6 +371,90 @@ class TestToolCallStreaming:
         assert first_state.tool_call_id == "call-1"
         assert second_state.tool_call_id == "call-2"
         assert first_state is not second_state
+
+    def test_tool_call_delays_start_until_arg_has_content(
+        self, token_subscriber, mock_connection, event_loop
+    ):
+        """
+        Tool call should NOT emit ToolCallStart until args contain at least
+        one key with non-null, non-empty content. Prevents flickering.
+        """
+        # First chunk: partial key (lexer completes to null value)
+        tc1 = _tool_call(
+            index=0,
+            tool_call_id="call-123",
+            name="terminal",
+            arguments='{"comm',  # becomes {"comm":null}
+        )
+        # Second chunk: key complete, value starting but empty
+        tc2 = _tool_call(
+            index=0,
+            tool_call_id=None,
+            name=None,
+            arguments='and":"',  # becomes {"command":""}
+        )
+        # Third chunk: now has actual content
+        tc3 = _tool_call(
+            index=0,
+            tool_call_id=None,
+            name=None,
+            arguments='ls"}',  # becomes {"command":"ls"}
+        )
+
+        with patch.object(event_loop, "is_running", return_value=False):
+            token_subscriber.on_token(_chunk(tool_calls=[tc1]))
+            state = token_subscriber._streaming_tool_calls[0]
+            assert state.started is False
+            assert mock_connection.session_update.call_count == 0
+
+            token_subscriber.on_token(_chunk(tool_calls=[tc2]))
+            assert state.started is False
+            assert mock_connection.session_update.call_count == 0
+
+            token_subscriber.on_token(_chunk(tool_calls=[tc3]))
+            assert state.started is True
+            assert mock_connection.session_update.call_count == 2  # start + progress
+
+        update1 = mock_connection.session_update.call_args_list[0].kwargs["update"]
+        assert isinstance(update1, ToolCallStart)
+
+    def test_tool_call_starts_when_first_char_of_value_arrives(
+        self, token_subscriber, mock_connection, event_loop
+    ):
+        """Tool call starts as soon as any arg has content (even 1 char)."""
+        tc = _tool_call(
+            index=0,
+            tool_call_id="call-456",
+            name="file_editor",
+            arguments='{"path":"/"}',  # single char value is enough
+        )
+
+        with patch.object(event_loop, "is_running", return_value=False):
+            token_subscriber.on_token(_chunk(tool_calls=[tc]))
+
+        state = token_subscriber._streaming_tool_calls[0]
+        assert state.started is True
+        assert mock_connection.session_update.call_count == 2
+
+    def test_tool_call_without_args_chunk_does_not_start(
+        self, token_subscriber, mock_connection, event_loop
+    ):
+        """
+        A tool call chunk with only name/id but no arguments should not start.
+        """
+        tc = _tool_call(
+            index=0,
+            tool_call_id="call-no-args",
+            name="terminal",
+            arguments=None,  # no args
+        )
+
+        with patch.object(event_loop, "is_running", return_value=False):
+            token_subscriber.on_token(_chunk(tool_calls=[tc]))
+
+        state = token_subscriber._streaming_tool_calls[0]
+        assert state.started is False
+        assert mock_connection.session_update.call_count == 0
 
 
 class TestErrorHandling:
