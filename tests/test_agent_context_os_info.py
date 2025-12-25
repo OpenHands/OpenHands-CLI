@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-from openhands.sdk import Agent, LLM
-
+from openhands.sdk import LLM, Agent
 from openhands_cli.stores import AgentStore
 
 
