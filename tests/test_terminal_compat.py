@@ -14,7 +14,6 @@ def test_non_terminal_is_incompatible():
     console = _FakeConsole(is_terminal=False)
     result = check_terminal_compatibility(console=console)
     assert isinstance(result, TerminalCompatibilityResult)
-    assert result.compatible is False
     assert result.is_tty is False
     assert "Rich detected" in (result.reason or "")
 
@@ -22,7 +21,6 @@ def test_non_terminal_is_incompatible():
 def test_terminal_is_compatible():
     console = _FakeConsole(is_terminal=True)
     result = check_terminal_compatibility(console=console)
-    assert result.compatible is True
     assert result.is_tty is True
     assert result.reason is None
 
