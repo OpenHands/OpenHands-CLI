@@ -117,18 +117,17 @@ def run_cli_entry(
 
     console = Console()
     compat_result = check_terminal_compatibility(console=console)
-    if not compat_result.compatible:
+    if not compat_result.is_tty:
         message = (
             "OpenHands CLI terminal UI may not work correctly in this environment: "
             f"{compat_result.reason}"
         )
-        if compat_result.is_tty:
-            console.print(message, style="yellow")
-        else:
-            print(message)
+        print(message)
 
         if strict_mode_enabled():
-            sys.exit(2)
+            print(
+                "OPENHANDS_CLI_STRICT_TERMINAL is enabled, but continuing anyway."
+            )
 
     display_welcome(conversation_id, confirmation_policy, bool(resume_conversation_id))
 
