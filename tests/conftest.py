@@ -1,4 +1,6 @@
+import os
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -6,6 +8,73 @@ from pydantic import SecretStr
 
 from openhands.sdk import LLM
 from openhands_cli.utils import get_default_cli_agent
+
+
+# Fixture: real_agent_config - Configuration for real LLM testing
+@pytest.fixture
+def real_agent_config() -> dict[str, Any] | None:
+    """Load real agent configuration from environment variables.
+
+    This fixture provides configuration for integration tests that need
+    to interact with a real LLM. It reads from environment variables:
+    - LLM_API_KEY: The API key for authentication
+    - LLM_BASE_URL: (optional) The base URL for the LLM service
+    - LLM_MODEL: (optional) The model name to use
+
+    Returns:
+        dict with api_key, base_url, and model if LLM_API_KEY is set,
+        None otherwise (allowing tests to skip gracefully)
+    """
+    api_key = os.environ.get("LLM_API_KEY")
+    if not api_key:
+        return None
+
+    return {
+        "api_key": api_key,
+        "base_url": os.environ.get(
+            "LLM_BASE_URL", "https://llm-proxy.eval.all-hands.dev"
+        ),
+        "model": os.environ.get("LLM_MODEL", "litellm_proxy/claude-haiku-4-5-20251001"),
+    }
+
+
+@pytest.fixture
+def setup_real_agent_settings(tmp_path_factory, real_agent_config):
+    """Set up real agent settings for integration testing.
+
+    This fixture creates a valid agent_settings.json in a temporary directory
+    using real LLM credentials from environment variables.
+
+    If LLM_API_KEY is not set, the fixture returns None, allowing tests
+    to skip gracefully.
+
+    Returns:
+        Path to the temporary persistence directory, or None if not configured
+    """
+    if real_agent_config is None:
+        return None
+
+    temp_persistence_dir = tmp_path_factory.mktemp("openhands_real_test")
+    conversations_dir = temp_persistence_dir / "conversations"
+    conversations_dir.mkdir(exist_ok=True)
+
+    # Create real LLM configuration
+    llm = LLM(
+        model=real_agent_config["model"],
+        api_key=SecretStr(real_agent_config["api_key"]),
+        base_url=real_agent_config["base_url"],
+        usage_id="test-agent",
+    )
+
+    # Get default agent configuration
+    agent = get_default_cli_agent(llm=llm)
+
+    # Save agent configuration to temporary directory
+    agent_settings_path = temp_persistence_dir / "agent_settings.json"
+    agent_settings_json = agent.model_dump_json(context={"expose_secrets": True})
+    agent_settings_path.write_text(agent_settings_json)
+
+    return temp_persistence_dir
 
 
 # Fixture: mock_verified_models - Simplified model data

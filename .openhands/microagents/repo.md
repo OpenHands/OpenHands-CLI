@@ -39,3 +39,173 @@ If the user says something along the lines of "update the sha" or "update the ag
 5. Open a pull request with the changes
 
 If the build fails, still open the pull request and explain what error you're seeing, and the steps you plan to take to fix it; don't fix it yet though.
+
+## Snapshot Testing with pytest-textual-snapshot
+
+The CLI uses [pytest-textual-snapshot](https://github.com/Textualize/pytest-textual-snapshot) for visual regression testing of Textual UI components. Snapshots are SVG screenshots that capture the exact visual state of the application.
+
+### Running Snapshot Tests
+
+```bash
+# Run all snapshot tests
+uv run pytest tests/snapshots/ -v
+
+# Update snapshots when intentional UI changes are made
+uv run pytest tests/snapshots/ --snapshot-update
+```
+
+### Snapshot Test Location
+
+- **Test files**: `tests/snapshots/test_app_snapshots.py`
+- **Generated snapshots**: `tests/snapshots/__snapshots__/test_app_snapshots/*.svg`
+
+### Writing Snapshot Tests
+
+Snapshot tests must be **synchronous** (not async). The `snap_compare` fixture handles async internally:
+
+```python
+from textual.app import App, ComposeResult
+from textual.widgets import Static, Footer
+
+def test_my_widget(snap_compare):
+    """Snapshot test for my widget."""
+    
+    class MyTestApp(App):
+        def compose(self) -> ComposeResult:
+            yield Static("Content")
+            yield Footer()
+    
+    assert snap_compare(MyTestApp(), terminal_size=(80, 24))
+```
+
+#### Using `run_before` for Setup
+
+To interact with the app before taking a screenshot:
+
+```python
+def test_with_interaction(snap_compare):
+    class MyApp(App):
+        def compose(self) -> ComposeResult:
+            yield InputField(id="input")
+    
+    async def setup(pilot):
+        input_field = pilot.app.query_one(InputField)
+        input_field.input_widget.value = "Hello!"
+        await pilot.pause()
+    
+    assert snap_compare(MyApp(), terminal_size=(80, 24), run_before=setup)
+```
+
+#### Using `press` for Key Simulation
+
+```python
+def test_with_focus(snap_compare):
+    assert snap_compare(
+        MyApp(),
+        terminal_size=(80, 24),
+        press=["tab", "tab"],  # Press tab twice to move focus
+    )
+```
+
+### Viewing Snapshots Visually
+
+To view the generated SVG snapshots in a browser:
+
+1. **Start a local HTTP server** in the snapshots directory:
+   ```bash
+   cd tests/snapshots/__snapshots__/test_app_snapshots
+   python -m http.server 12000
+   ```
+
+2. **Open in browser** using the work host URL:
+   ```
+   https://work-1-eidmcsndvfctphkv.prod-runtime.all-hands.dev/<snapshot-name>.svg
+   ```
+   
+   Example snapshot names:
+   - `TestExitModalSnapshots.test_exit_modal_initial_state.svg`
+   - `TestOpenHandsAppSnapshots.test_openhands_app_splash_screen.svg`
+   - `TestInputFieldSnapshots.test_input_field_with_text.svg`
+
+3. **Stop the server** when done:
+   ```bash
+   pkill -f "python -m http.server 12000"
+   ```
+
+### Current Snapshot Tests
+
+| Test Class | Test Name | Description |
+|------------|-----------|-------------|
+| `TestExitModalSnapshots` | `test_exit_modal_initial_state` | Exit confirmation modal initial view |
+| `TestExitModalSnapshots` | `test_exit_modal_with_focus_on_yes` | Exit modal with focus on Yes button |
+| `TestInputFieldSnapshots` | `test_input_field_single_line_mode` | Input field in default state |
+| `TestInputFieldSnapshots` | `test_input_field_with_text` | Input field with typed text |
+| `TestSimpleWidgetSnapshots` | `test_simple_button_grid` | Button grid layout |
+| `TestOpenHandsAppSnapshots` | `test_openhands_app_splash_screen` | Main app splash screen (mocked) |
+| `TestConfirmationModalSnapshots` | `test_confirmation_settings_modal` | Confirmation settings modal |
+
+### Best Practices
+
+1. **Mock external dependencies** - Use `unittest.mock.patch` to ensure deterministic snapshots
+2. **Use fixed terminal sizes** - Always specify `terminal_size=(width, height)` for consistent results
+3. **Commit snapshots to git** - SVG files are test artifacts and should be version controlled
+4. **Review snapshot diffs carefully** - When tests fail, examine the visual diff to determine if the change is intentional
+
+## Integration Testing with Real LLM
+
+The CLI includes integration tests that can communicate with a real LLM service. These tests are marked with `@pytest.mark.integration` and require credentials to run.
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `LLM_API_KEY` | Yes | - | API key for authentication |
+| `LLM_BASE_URL` | No | `https://llm-proxy.eval.all-hands.dev` | LLM service base URL |
+| `LLM_MODEL` | No | `litellm_proxy/claude-haiku-4-5-20251001` | Model name |
+
+### Running Integration Tests
+
+```bash
+# Run integration tests with real LLM
+LLM_API_KEY=$LLM_API_KEY uv run pytest tests/integration/ -v
+
+# Run only non-integration tests (skip real LLM tests)
+uv run pytest -m "not integration"
+```
+
+### Test Fixtures
+
+The `conftest.py` provides fixtures for integration testing:
+
+- `real_agent_config` - Returns LLM config dict or None if `LLM_API_KEY` not set
+- `setup_real_agent_settings` - Creates temp agent_settings.json with real credentials
+
+### Example Integration Test
+
+```python
+@pytest.mark.integration
+def test_conversation_with_real_llm(real_agent_config, tmp_path):
+    if real_agent_config is None:
+        pytest.skip("LLM_API_KEY not set")
+    
+    from openhands.sdk import LLM, Agent, Conversation, Workspace
+    from openhands.sdk.security.confirmation_policy import NeverConfirm
+    
+    llm = LLM(
+        model=real_agent_config["model"],
+        api_key=SecretStr(real_agent_config["api_key"]),
+        base_url=real_agent_config["base_url"],
+    )
+    
+    agent = Agent(llm=llm, tools=[], mcp_config={})
+    conversation = Conversation(
+        agent=agent,
+        workspace=Workspace(working_dir=str(tmp_path)),
+    )
+    conversation.set_confirmation_policy(NeverConfirm())
+    conversation.send_message("hi")
+    conversation.run()
+    
+    # Assert on events
+    assert len(conversation.state.events) > 0
+```
