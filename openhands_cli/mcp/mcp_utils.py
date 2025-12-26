@@ -140,6 +140,7 @@ def add_server(
     headers: list[str] | None = None,
     env_vars: list[str] | None = None,
     auth: str | None = None,
+    enabled: bool = True,
 ) -> None:
     """Add a new MCP server configuration.
 
@@ -151,6 +152,7 @@ def add_server(
         headers: HTTP headers for http/sse transports
         env_vars: Environment variables for stdio transport
         auth: Authentication method (e.g., "oauth")
+        enabled: Whether the server is enabled (defaults to True)
 
     Raises:
         MCPConfigurationError: If configuration is invalid or server already exists
@@ -178,6 +180,10 @@ def add_server(
         )
     else:
         raise MCPConfigurationError(f"Invalid transport type: {transport}")
+
+    # Add the enabled field to the server
+    # These models have extra='allow', so we can set additional fields
+    setattr(server, "enabled", enabled)
 
     # Add the server to the configuration
     config.add_server(name, server)
@@ -242,6 +248,78 @@ def get_server(name: str) -> StdioMCPServer | RemoteMCPServer:
     return servers[name]
 
 
+def enable_server(name: str) -> None:
+    """Enable an MCP server configuration.
+
+    Args:
+        name: Name of the MCP server to enable
+
+    Raises:
+        MCPConfigurationError: If server doesn't exist
+    """
+    config = load_mcp_config()
+
+    # Check if server exists
+    if name not in config.mcpServers:
+        raise MCPConfigurationError(f"MCP server '{name}' not found")
+
+    # Get the server and update the enabled field
+    server = config.mcpServers[name]
+    server_dict = server.model_dump()
+    server_dict["enabled"] = True
+
+    # Recreate the server with the updated enabled field
+    if isinstance(server, StdioMCPServer):
+        updated_server = StdioMCPServer(**server_dict)
+    elif isinstance(server, RemoteMCPServer):
+        updated_server = RemoteMCPServer(**server_dict)
+    else:
+        raise MCPConfigurationError(f"Unknown server type for '{name}'")
+
+    # Update the config
+    config.mcpServers[name] = updated_server
+    save_mcp_config(config)
+
+    # Validate the saved configuration by loading it
+    load_mcp_config()
+
+
+def disable_server(name: str) -> None:
+    """Disable an MCP server configuration.
+
+    Args:
+        name: Name of the MCP server to disable
+
+    Raises:
+        MCPConfigurationError: If server doesn't exist
+    """
+    config = load_mcp_config()
+
+    # Check if server exists
+    if name not in config.mcpServers:
+        raise MCPConfigurationError(f"MCP server '{name}' not found")
+
+    # Get the server and update the enabled field
+    server = config.mcpServers[name]
+    server_dict = server.model_dump()
+    server_dict["enabled"] = False
+
+    # Recreate the server with the updated enabled field
+    if isinstance(server, StdioMCPServer):
+        updated_server = StdioMCPServer(**server_dict)
+    elif isinstance(server, RemoteMCPServer):
+        updated_server = RemoteMCPServer(**server_dict)
+    else:
+        raise MCPConfigurationError(f"Unknown server type for '{name}'")
+
+    # Update the config
+    config.mcpServers[name] = updated_server
+    save_mcp_config(config)
+
+    # Validate the saved configuration by loading it
+    load_mcp_config()
+
+
 def server_exists(name: str) -> bool:
     """Check if an MCP server configuration exists.
 
@@ -256,6 +334,42 @@ def server_exists(name: str) -> bool:
         return name in config.mcpServers
     except (MCPConfigurationError, ValidationError):
         return False
+
+
+def is_server_enabled(name: str) -> bool:
+    """Check if an MCP server is enabled.
+
+    Args:
+        name: Name of the MCP server
+
+    Returns:
+        True if server exists and is enabled, False otherwise
+    """
+    try:
+        server = get_server(name)
+        server_dict = server.model_dump()
+        # Default to True if enabled field is not present
+        return server_dict.get("enabled", True)
+    except (MCPConfigurationError, ValidationError):
+        return False
+
+
+def list_enabled_servers() -> dict[str, StdioMCPServer | RemoteMCPServer]:
+    """List only enabled MCP servers.
+
+    Returns:
+        Dictionary of enabled server objects keyed by name
+    """
+    config = load_mcp_config()
+    enabled_servers = {}
+
+    for name, server in config.mcpServers.items():
+        server_dict = server.model_dump()
+        # Default to True if enabled field is not present (backwards compatibility)
+        if server_dict.get("enabled", True):
+            enabled_servers[name] = server
+
+    return enabled_servers
 
 
 def get_config_status() -> dict[str, Any]:

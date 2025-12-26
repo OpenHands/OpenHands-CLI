@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from textual.app import App, ComposeResult
+from textual.css.query import NoMatches
 from textual.widgets import Button, Static
 
 from openhands.sdk import LLM, Agent
@@ -220,6 +221,20 @@ async def test_mode_toggle_shows_correct_section(app):
 
 
 @pytest.mark.asyncio
+async def test_cli_settings_tab_not_shown_during_initial_setup(fake_agent_store):
+    """CLI Settings tab should NOT be rendered during initial setup."""
+    with patch.object(SettingsScreen, "is_initial_setup_required", return_value=True):
+        app = SettingsTestApp()
+
+    async with app.run_test():
+        screen = app.settings_screen
+        assert screen.is_initial_setup is True
+
+        with pytest.raises(NoMatches):
+            screen.query_one("#cli_settings_tab")
+
+
+@pytest.mark.asyncio
 async def test_basic_mode_dependency_chain(app):
     """Provider -> model -> API key -> memory enabled chain in basic mode."""
     app_obj, _ = app
@@ -297,7 +312,7 @@ async def test_save_button_success_flow(app, fake_agent_store: InMemoryAgentStor
     screen._show_message = Mock()
     screen.dismiss = Mock()
     on_saved = Mock()
-    screen.on_settings_saved = on_saved
+    screen.on_settings_saved = [on_saved]  # Should be a list of callbacks
 
     save_button = screen.query_one("#save_button", Button)
 

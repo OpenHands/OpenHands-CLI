@@ -336,3 +336,114 @@ def test_stdio_edge_cases_and_error_handling(cli_args, expected):
     assert args.target == expected["target"]
     assert args.transport == "stdio"
     assert args.args == expected["args"]
+
+
+def test_mcp_enable_subcommand():
+    """Test that enable subcommand parses correctly."""
+    from openhands_cli.argparsers.main_parser import create_main_parser
+
+    parser = create_main_parser()
+    args = parser.parse_args(["mcp", "enable", "test_server"])
+
+    assert args.command == "mcp"
+    assert args.mcp_command == "enable"
+    assert args.name == "test_server"
+
+
+def test_mcp_disable_subcommand():
+    """Test that disable subcommand parses correctly."""
+    from openhands_cli.argparsers.main_parser import create_main_parser
+
+    parser = create_main_parser()
+    args = parser.parse_args(["mcp", "disable", "test_server"])
+
+    assert args.command == "mcp"
+    assert args.mcp_command == "disable"
+    assert args.name == "test_server"
+
+
+@pytest.mark.parametrize(
+    "cli_args,expected_enabled",
+    [
+        (
+            [
+                "mcp",
+                "add",
+                "--transport",
+                "http",
+                "test_server",
+                "https://api.example.com",
+            ],
+            True,  # Default is enabled
+        ),
+        (
+            [
+                "mcp",
+                "add",
+                "--transport",
+                "http",
+                "--enabled",
+                "test_server",
+                "https://api.example.com",
+            ],
+            True,
+        ),
+        (
+            [
+                "mcp",
+                "add",
+                "--transport",
+                "http",
+                "--disabled",
+                "test_server",
+                "https://api.example.com",
+            ],
+            False,
+        ),
+    ],
+)
+def test_mcp_add_enabled_disabled_flags(cli_args, expected_enabled):
+    """Test that --enabled and --disabled flags on add command work correctly."""
+    from openhands_cli.argparsers.main_parser import create_main_parser
+
+    parser = create_main_parser()
+    args = parser.parse_args(cli_args)
+
+    assert args.command == "mcp"
+    assert args.mcp_command == "add"
+    assert args.name == "test_server"
+    assert args.enabled == expected_enabled
+
+
+def test_enable_subcommand_missing_name_shows_error():
+    """Test that missing name for enable command shows proper error."""
+    main_parser = argparse.ArgumentParser()
+    subparsers = main_parser.add_subparsers(dest="command")
+    add_mcp_parser(subparsers)
+
+    stderr_capture = io.StringIO()
+
+    with redirect_stderr(stderr_capture):
+        with pytest.raises(SystemExit) as exc_info:
+            main_parser.parse_args(["mcp", "enable"])
+
+    assert exc_info.value.code == 2
+    output = stderr_capture.getvalue()
+    assert "Error: the following arguments are required: name" in output
+
+
+def test_disable_subcommand_missing_name_shows_error():
+    """Test that missing name for disable command shows proper error."""
+    main_parser = argparse.ArgumentParser()
+    subparsers = main_parser.add_subparsers(dest="command")
+    add_mcp_parser(subparsers)
+
+    stderr_capture = io.StringIO()
+
+    with redirect_stderr(stderr_capture):
+        with pytest.raises(SystemExit) as exc_info:
+            main_parser.parse_args(["mcp", "disable"])
+
+    assert exc_info.value.code == 2
+    output = stderr_capture.getvalue()
+    assert "Error: the following arguments are required: name" in output

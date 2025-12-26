@@ -1,5 +1,6 @@
 """Utility functions for LLM configuration in OpenHands CLI."""
 
+import json
 import os
 from argparse import Namespace
 from pathlib import Path
@@ -9,6 +10,8 @@ from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 
 from openhands.sdk import LLM, ImageContent, TextContent
+from openhands.sdk.event import SystemPromptEvent
+from openhands.sdk.event.base import Event
 from openhands.tools.preset import get_default_agent
 
 
@@ -146,3 +149,13 @@ def extract_text_from_message_content(
 
     # Use SDK utility to extract text - content_to_str handles the conversion
     return message_content[0].text
+
+
+def json_callback(event: Event) -> None:
+    if isinstance(event, SystemPromptEvent):
+        return
+
+    data = event.model_dump()
+    pretty_json = json.dumps(data, indent=2, sort_keys=True)
+    print("--JSON Event--")
+    print(pretty_json)

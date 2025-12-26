@@ -55,7 +55,7 @@ class MCPSidePanel(VerticalScroll):
         # agent = cls._load_agent_safe()
         agent = None
         try:
-            from openhands_cli.tui.settings.store import AgentStore
+            from openhands_cli.stores import AgentStore
 
             agent_store = AgentStore()
             agent = agent_store.load()
@@ -83,7 +83,7 @@ class MCPSidePanel(VerticalScroll):
             content_parts = [
                 f"[{OPENHANDS_THEME.error}]Failed to load MCP configurations."
                 f"[/{OPENHANDS_THEME.error}]",
-                f"[{OPENHANDS_THEME.error}]Agent settings file is corrupted!"
+                f"[{OPENHANDS_THEME.error}]Settings file is corrupted!"
                 f"[/{OPENHANDS_THEME.error}]",
             ]
             content_widget.update("\n".join(content_parts))
