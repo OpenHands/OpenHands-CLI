@@ -425,8 +425,8 @@ class TestToolCallStreaming:
         tc = _tool_call(
             index=0,
             tool_call_id="call-456",
-            name="file_editor",
-            arguments='{"path":"/"}',  # single char value is enough
+            name="terminal",
+            arguments='{"command":"l"}',  # single char value is enough
         )
 
         with patch.object(event_loop, "is_running", return_value=False):
@@ -435,6 +435,46 @@ class TestToolCallStreaming:
         state = token_subscriber._streaming_tool_calls[0]
         assert state.started is True
         assert mock_connection.session_update.call_count == 2
+
+    def test_file_editor_waits_for_command_before_starting(
+        self, token_subscriber, mock_connection, event_loop
+    ):
+        """file_editor defers start until 'command' arg to avoid kind churn."""
+        # Chunk 1: path only, no command yet
+        tc1 = _tool_call(
+            index=0,
+            tool_call_id="call-file-1",
+            name="file_editor",
+            arguments='{"path":"/test.py"',
+        )
+        # Chunk 2: command arrives
+        tc2 = _tool_call(
+            index=0,
+            tool_call_id=None,
+            name=None,
+            arguments=',"command":"view"}',
+        )
+
+        with patch.object(event_loop, "is_running", return_value=False):
+            token_subscriber.on_token(_chunk(tool_calls=[tc1]))
+            # Should NOT have started yet - waiting for command
+            assert mock_connection.session_update.call_count == 0
+            state = token_subscriber._streaming_tool_calls[0]
+            assert state.started is False
+
+            token_subscriber.on_token(_chunk(tool_calls=[tc2]))
+            # Now it should start with correct kind
+            assert state.started is True
+
+        # Check the kind is correct (read for view command)
+        updates = [
+            call.kwargs["update"]
+            for call in mock_connection.session_update.call_args_list
+        ]
+        tool_updates = [u for u in updates if hasattr(u, "kind")]
+        assert len(tool_updates) >= 1
+        # All updates should have kind='read' since command='view'
+        assert all(u.kind == "read" for u in tool_updates)
 
     def test_tool_call_without_args_chunk_does_not_start(
         self, token_subscriber, mock_connection, event_loop

@@ -48,7 +48,6 @@ from openhands_cli.acp_impl.events.tool_state import ToolCallState
 from openhands_cli.acp_impl.events.utils import (
     format_content_blocks,
     get_metadata,
-    get_tool_kind,
 )
 
 
@@ -241,7 +240,7 @@ class TokenBasedEventSubscriber:
             tool_call_start = start_tool_call(
                 tool_call_id=state.tool_call_id,
                 title=state.title,
-                kind=get_tool_kind(tool_name=state.tool_name, partial_args=state.lexer),
+                kind=state.kind,
                 status="in_progress",
                 content=format_content_blocks(state.args),
             )
@@ -253,9 +252,7 @@ class TokenBasedEventSubscriber:
                 update_tool_call(
                     tool_call_id=state.tool_call_id,
                     title=state.title,
-                    kind=get_tool_kind(
-                        tool_name=state.tool_name, partial_args=state.lexer
-                    ),
+                    kind=state.kind,
                     status="in_progress",
                     content=format_content_blocks(state.args),
                 ),

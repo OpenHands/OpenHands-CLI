@@ -1,9 +1,12 @@
-"""Tests for event utility functions in utils.py."""
+"""Tests for event utility functions in utils.py.
+
+Note: Streaming partial_args handling for kind/title has been moved to
+ToolCallState. See test_tool_state.py for those tests.
+"""
 
 from __future__ import annotations
 
 import pytest
-from streamingjson import Lexer
 
 from openhands.tools.file_editor.definition import FileEditorAction
 from openhands.tools.task_tracker import TaskTrackerAction
@@ -13,12 +16,6 @@ from openhands_cli.acp_impl.events.utils import (
     get_tool_kind,
     get_tool_title,
 )
-
-
-def _lexer(s: str) -> Lexer:
-    lex = Lexer()
-    lex.append_string(s)
-    return lex
 
 
 class TestGetToolKind:
@@ -32,7 +29,7 @@ class TestGetToolKind:
             ("terminal", "execute"),
             ("unknown_tool", "other"),
             ("custom_tool", "other"),
-            ("file_editor", "other"),  # falls back to mapping default if no args/action
+            ("file_editor", "other"),  # falls back to mapping default if no action
         ],
     )
     def test_tool_kind_by_name_only(self, tool_name: str, expected: str):
@@ -51,24 +48,6 @@ class TestGetToolKind:
     def test_file_editor_kind_from_action(self, command: str, expected: str):
         action = FileEditorAction(command=command, path="/test.py")  # type: ignore[arg-type]
         assert get_tool_kind("file_editor", action=action) == expected
-
-    @pytest.mark.parametrize(
-        "partial_json,expected",
-        [
-            # "view" should be detectable even if the JSON is truncated
-            ('{"command":"view","path":"/te', "read"),
-            # non-view / unknown command should default to edit
-            ('{"command":"str_rep', "edit"),
-            # totally borked => parse error => default edit
-            ('{"comma', "edit"),
-        ],
-    )
-    def test_file_editor_kind_from_streaming_partial_args(
-        self, partial_json: str, expected: str
-    ):
-        assert (
-            get_tool_kind("file_editor", partial_args=_lexer(partial_json)) == expected
-        )
 
 
 class TestGetToolTitle:
@@ -100,49 +79,8 @@ class TestGetToolTitle:
         )
         assert get_tool_title(tool_name, action=action) == expected
 
-    @pytest.mark.parametrize(
-        "tool_name,partial_json,expected",
-        [
-            # file_editor, truncated but still enough to parse and extract fields
-            ("file_editor", '{"command":"view","path":"/test.py"', "Reading /test.py"),
-            (
-                "file_editor",
-                '{"command":"str_replace","path":"/test.py"',
-                "Editing /test.py",
-            ),
-            # terminal, truncated but parseable enough
-            ("terminal", '{"command":"ls -la"', "ls -la"),
-            # file_editor missing/empty path => falls through to tool_name
-            ("file_editor", '{"command":"view"', "file_editor"),
-            ("file_editor", '{"command":"view","path":""', "file_editor"),
-            # parses but not a dict => returns tool_name
-            (
-                "file_editor",
-                "[",
-                "file_editor",
-            ),  # Lexer may complete to [] depending on impl
-            ("terminal", "[]", "terminal"),  # guaranteed non-dict parse
-        ],
-    )
-    def test_title_from_streaming_partial_args(
-        self, tool_name: str, partial_json: str, expected: str
-    ):
-        assert get_tool_title(tool_name, partial_args=_lexer(partial_json)) == expected
-
-    @pytest.mark.parametrize(
-        "tool_name,partial_json",
-        [
-            ("terminal", '{""command"'),  # parse error => ""
-            ("file_editor", "{'}'"),  # parse error => ""
-        ],
-    )
-    def test_title_streaming_parse_error_returns_empty(
-        self, tool_name: str, partial_json: str
-    ):
-        assert get_tool_title(tool_name, partial_args=_lexer(partial_json)) == ""
-
     @pytest.mark.parametrize("tool_name", ["unknown_tool", "terminal", "file_editor"])
-    def test_title_no_partial_args_and_no_action_returns_empty(self, tool_name: str):
+    def test_title_no_action_returns_empty(self, tool_name: str):
         assert get_tool_title(tool_name) == ""
 
 

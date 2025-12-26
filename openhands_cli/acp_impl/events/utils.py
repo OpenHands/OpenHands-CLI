@@ -1,5 +1,3 @@
-import json
-
 from acp import text_block, tool_content
 from acp.schema import (
     ContentToolCallContent,
@@ -8,7 +6,6 @@ from acp.schema import (
     ToolCallLocation,
     ToolKind,
 )
-from streamingjson import Lexer
 
 from openhands.sdk import Action, BaseConversation
 from openhands.tools.file_editor.definition import (
@@ -161,90 +158,42 @@ def extract_action_locations(action: Action) -> list[ToolCallLocation] | None:
     return locations if locations else None
 
 
-def get_tool_kind(
-    tool_name: str,
-    *,
-    partial_args: Lexer | None = None,
-    action: Action | None = None,
-) -> ToolKind:
+def get_tool_kind(tool_name: str, *, action: Action | None = None) -> ToolKind:
+    """Get tool kind from tool name and optional complete action.
+
+    For streaming tool calls, use ToolCallState.kind instead.
+    """
     if tool_name == "think":
         return "think"
 
     if tool_name.startswith("browser"):
-        # Covers browser*, browser_use*, etc.
         return "fetch"
 
-    # Handle complete action
     if isinstance(action, FileEditorAction):
-        # FileEditorAction commands literals
         if action.command == "view":
             return "read"
-
         return "edit"
-
-    # Handle incomplete tool call being streamed
-    if tool_name == "file_editor" and partial_args is not None:
-        try:
-            args = json.loads(partial_args.complete_json())
-            if isinstance(args, dict) and args.get("command") == "view":
-                return "read"
-            return "edit"
-        except Exception:
-            # If args are incomplete, default to edit (safe + consistent)
-            return "edit"
 
     return TOOL_KIND_MAPPING.get(tool_name, "other")
 
 
-def get_tool_title(
-    tool_name: str,
-    *,
-    partial_args: Lexer | None = None,
-    action: Action | None = None,
-) -> str:
+def get_tool_title(tool_name: str, *, action: Action | None = None) -> str:
+    """Get tool title from tool name and optional complete action.
+
+    For streaming tool calls, use ToolCallState.title instead.
+    """
     if tool_name == "task_tracker":
         return "Plan updated"
 
-    # Extract title from well formed action
-    action_based_title = None
     if isinstance(action, FileEditorAction):
         if action.command == "view":
-            action_based_title = f"Reading {action.path}"
-        else:
-            action_based_title = f"Editing {action.path}"
-    elif isinstance(action, TerminalAction):
-        action_based_title = f"{action.command}"
-    elif isinstance(action, TaskTrackerAction):
-        action_based_title = "Plan updated"
+            return f"Reading {action.path}"
+        return f"Editing {action.path}"
 
-    if action_based_title:
-        return action_based_title
+    if isinstance(action, TerminalAction):
+        return f"{action.command}"
 
-    # Extract title from incomplete tool call being streamed
-    if not partial_args:
-        return ""
+    if isinstance(action, TaskTrackerAction):
+        return "Plan updated"
 
-    try:
-        args = json.loads(partial_args.complete_json())
-    except Exception:
-        return ""
-
-    if not isinstance(args, dict):
-        return tool_name
-
-    if tool_name == "file_editor":
-        path = args.get("path")
-        command = args.get("command")
-        if isinstance(path, str) and path:
-            if command == "view":
-                return f"Reading {path}"
-            return f"Editing {path}"
-
-    if tool_name == "terminal":
-        command = args.get("command")
-        # Match _handle_action_event which sets title to event.action.command
-        # (for terminal this is usually the shell command string)
-        if isinstance(command, str) and command:
-            return command
-
-    return tool_name
+    return ""
