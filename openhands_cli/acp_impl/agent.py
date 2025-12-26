@@ -46,7 +46,8 @@ from openhands_cli.acp_impl.confirmation import (
     ConfirmationMode,
     get_available_modes,
 )
-from openhands_cli.acp_impl.event import EventSubscriber
+from openhands_cli.acp_impl.events.event import EventSubscriber
+from openhands_cli.acp_impl.events.token_streamer import TokenBasedEventSubscriber
 from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
 from openhands_cli.acp_impl.slash_commands import (
     VALID_CONFIRMATION_MODE,
@@ -242,12 +243,21 @@ class OpenHandsACPAgent(ACPAgent):
             RequestError: If MCP configuration is invalid
         """
         # Load agent specs (same as setup_conversation)
+        streaming_enabled = False
         try:
             agent = load_agent_specs(
                 conversation_id=session_id,
                 mcp_servers=mcp_servers,
                 skills=[RESOURCE_SKILL],
             )
+            streaming_enabled = not agent.llm.uses_responses_api()
+
+            if streaming_enabled:
+                # Enable streaming for llm
+                agent = agent.model_copy(
+                    update={"llm": agent.llm.model_copy(update={"stream": True})}
+                )
+
         except MCPConfigurationError as e:
             logger.error(f"Invalid MCP configuration: {e}")
             raise RequestError.invalid_params(
@@ -279,17 +289,26 @@ class OpenHandsACPAgent(ACPAgent):
 
         workspace = Workspace(working_dir=str(working_path))
 
-        # Create event subscriber for streaming updates (ACP-specific)
-        subscriber = EventSubscriber(session_id, self._conn)
-
         # Get the current event loop for the callback
         loop = asyncio.get_event_loop()
 
+        # Create event subscriber for streaming updates (ACP-specific)
+        # Pass streaming_enabled=True to indicate token streaming is active
+        subscriber = EventSubscriber(session_id, self._conn)
+        token_subscriber = TokenBasedEventSubscriber(
+            session_id=session_id, conn=self._conn, loop=loop
+        )
+
         def sync_callback(event: Event) -> None:
             """Synchronous wrapper that schedules async event handling."""
-            asyncio.run_coroutine_threadsafe(subscriber(event), loop)
+            if streaming_enabled:
+                asyncio.run_coroutine_threadsafe(
+                    token_subscriber.unstreamed_event_handler(event), loop
+                )
+            else:
+                asyncio.run_coroutine_threadsafe(subscriber(event), loop)
 
-        # Create conversation with persistence support
+        # Create conversation with persistence support and token streaming
         # The SDK automatically loads from disk if conversation_id exists
         conversation = Conversation(
             agent=agent,
@@ -297,11 +316,15 @@ class OpenHandsACPAgent(ACPAgent):
             persistence_dir=CONVERSATIONS_DIR,
             conversation_id=UUID(session_id),
             callbacks=[sync_callback],
+            token_callbacks=[token_subscriber.on_token]
+            if streaming_enabled
+            else None,  # Enable token streaming for completions api
             visualizer=None,  # No visualizer needed for ACP
         )
 
         # Set conversation reference in subscriber for metrics access
         subscriber.conversation = conversation
+        token_subscriber.conversation = conversation
 
         # # Set up security analyzer (same as setup_conversation with confirmation mode)
         # conversation.set_security_analyzer(LLMSecurityAnalyzer())
@@ -478,7 +501,7 @@ class OpenHandsACPAgent(ACPAgent):
             try:
                 await run_task
             finally:
-                # Clean up task tracking
+                # Clean up task tracking and streaming state
                 self._running_tasks.pop(session_id, None)
 
             # Return the final response

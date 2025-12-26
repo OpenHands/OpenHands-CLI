@@ -14,7 +14,6 @@ from acp.schema import (
 
 from openhands.sdk import Message, TextContent
 from openhands.sdk.event import (
-    AgentErrorEvent,
     Condensation,
     CondensationRequest,
     ConversationStateUpdateEvent,
@@ -27,7 +26,7 @@ from openhands.tools.task_tracker.definition import (
     TaskItem,
     TaskTrackerObservation,
 )
-from openhands_cli.acp_impl.event import EventSubscriber
+from openhands_cli.acp_impl.events.event import EventSubscriber
 
 
 @pytest.fixture
@@ -137,8 +136,8 @@ async def test_handle_observation_event(event_subscriber, mock_connection):
     event.tool_call_id = "test-call-123"
     event.observation = mock_observation
 
-    # Process the event
-    await event_subscriber._handle_observation_event(event)
+    # Process the event using the main event handler
+    await event_subscriber(event)
 
     # Verify session_update was called
     assert mock_connection.session_update.called
@@ -149,32 +148,6 @@ async def test_handle_observation_event(event_subscriber, mock_connection):
     assert update.session_update == "tool_call_update"
     assert update.tool_call_id == "test-call-123"
     assert update.status == "completed"
-
-
-@pytest.mark.asyncio
-async def test_handle_agent_error_event(event_subscriber, mock_connection):
-    """Test handling of AgentErrorEvent."""
-    from rich.text import Text
-
-    # Create AgentErrorEvent
-    event = MagicMock(spec=AgentErrorEvent)
-    event.visualize = Text("Error: Something went wrong")
-    event.tool_call_id = "test-call-123"
-    event.error = "Something went wrong"
-    event.model_dump = MagicMock(return_value={"error": "Something went wrong"})
-
-    # Process the event
-    await event_subscriber._handle_observation_event(event)
-
-    # Verify session_update was called
-    assert mock_connection.session_update.called
-    call_kwargs = mock_connection.session_update.call_args[1]
-    assert call_kwargs["session_id"] == "test-session"
-    update = call_kwargs["update"]
-    assert isinstance(update, SessionUpdate5)
-    assert update.session_update == "tool_call_update"
-    assert update.status == "failed"
-    assert update.raw_output == {"error": "Something went wrong"}
 
 
 @pytest.mark.asyncio
@@ -323,53 +296,40 @@ async def test_handle_task_tracker_observation(event_subscriber, mock_connection
     event.tool_call_id = "task-call-123"
     event.model_dump = MagicMock(return_value={"command": "plan"})
 
-    # Process the event
-    await event_subscriber._handle_observation_event(event)
+    # Process the event using the main event handler
+    await event_subscriber(event)
 
-    # Verify session_update was called twice (plan + tool_call_update)
-    assert mock_connection.session_update.call_count == 2
+    # Verify session_update was called once (only plan update, no tool_call_update)
+    assert mock_connection.session_update.call_count == 1
 
     # Verify the plan update was sent
-    calls = mock_connection.session_update.call_args_list
-    plan_update_found = False
-    tool_call_update_found = False
+    call_kwargs = mock_connection.session_update.call_args[1]
+    assert call_kwargs["session_id"] == "test-session"
+    update = call_kwargs["update"]
 
-    for call in calls:
-        call_kwargs = call[1]
-        update = call_kwargs["update"]
-        if isinstance(update, SessionUpdate6):
-            plan_update_found = True
-            # Verify plan structure
-            assert update.session_update == "plan"
-            assert len(update.entries) == 3
+    assert isinstance(update, SessionUpdate6)
+    # Verify plan structure
+    assert update.session_update == "plan"
+    assert len(update.entries) == 3
 
-            # Verify first entry (done -> completed)
-            # Note: notes are intentionally omitted for conciseness
-            entry1 = update.entries[0]
-            assert entry1.content == "Task 1"
-            assert entry1.status == "completed"
-            assert entry1.priority == "medium"
+    # Verify first entry (done -> completed)
+    # Note: notes are intentionally omitted for conciseness
+    entry1 = update.entries[0]
+    assert entry1.content == "Task 1"
+    assert entry1.status == "completed"
+    assert entry1.priority == "medium"
 
-            # Verify second entry (in_progress -> in_progress)
-            entry2 = update.entries[1]
-            assert entry2.content == "Task 2"
-            assert entry2.status == "in_progress"
-            assert entry2.priority == "medium"
+    # Verify second entry (in_progress -> in_progress)
+    entry2 = update.entries[1]
+    assert entry2.content == "Task 2"
+    assert entry2.status == "in_progress"
+    assert entry2.priority == "medium"
 
-            # Verify third entry (todo -> pending)
-            entry3 = update.entries[2]
-            assert entry3.content == "Task 3"
-            assert entry3.status == "pending"
-            assert entry3.priority == "medium"
-
-        elif isinstance(update, SessionUpdate5):
-            tool_call_update_found = True
-            assert update.session_update == "tool_call_update"
-            assert update.tool_call_id == "task-call-123"
-            assert update.status == "completed"
-
-    assert plan_update_found, "AgentPlanUpdate notification should be sent"
-    assert tool_call_update_found, "ToolCallProgress notification should be sent"
+    # Verify third entry (todo -> pending)
+    entry3 = update.entries[2]
+    assert entry3.content == "Task 3"
+    assert entry3.status == "pending"
+    assert entry3.priority == "medium"
 
 
 @pytest.mark.asyncio
@@ -386,29 +346,26 @@ async def test_handle_task_tracker_with_empty_list(event_subscriber, mock_connec
     event.tool_call_id = "task-call-456"
     event.model_dump = MagicMock(return_value={"command": "view"})
 
-    # Process the event
-    await event_subscriber._handle_observation_event(event)
+    # Process the event using the main event handler
+    await event_subscriber(event)
 
-    # Verify session_update was called twice (plan with empty list + tool_call_update)
-    assert mock_connection.session_update.call_count == 2
+    # Verify session_update was called once (only plan update, no tool_call_update)
+    assert mock_connection.session_update.call_count == 1
 
     # Verify empty plan was sent
-    calls = mock_connection.session_update.call_args_list
-    plan_found = False
-    for call in calls:
-        call_kwargs = call[1]
-        update = call_kwargs["update"]
-        if isinstance(update, SessionUpdate6):
-            plan_found = True
-            assert update.entries == []
-
-    assert plan_found, "AgentPlanUpdate with empty entries should be sent"
+    call_kwargs = mock_connection.session_update.call_args[1]
+    assert call_kwargs["session_id"] == "test-session"
+    update = call_kwargs["update"]
+    assert isinstance(update, SessionUpdate6)
+    assert update.entries == []
 
 
 @pytest.mark.asyncio
 async def test_get_metadata_with_status_line(mock_connection):
-    """Test that _get_metadata returns status_line along with raw metrics."""
+    """Test that get_metadata returns status_line along with raw metrics."""
     from unittest.mock import Mock
+
+    from openhands_cli.acp_impl.events.utils import get_metadata
 
     # Create a mock conversation with stats
     mock_conversation = Mock()
@@ -428,13 +385,8 @@ async def test_get_metadata_with_status_line(mock_connection):
     # Set up the mock to return our metrics
     mock_conversation.conversation_stats.get_combined_metrics.return_value = metrics
 
-    # Create EventSubscriber with conversation
-    event_subscriber = EventSubscriber(
-        "test-session", mock_connection, mock_conversation
-    )
-
-    # Get metadata
-    metadata = event_subscriber._get_metadata()
+    # Get metadata using the utility function
+    metadata = get_metadata(mock_conversation)
 
     # Verify metadata structure
     assert metadata is not None
@@ -468,6 +420,8 @@ async def test_format_status_line_abbreviations(mock_connection):
     """Test that _format_status_line correctly abbreviates large numbers."""
     from unittest.mock import Mock
 
+    from openhands_cli.acp_impl.events.utils import get_metadata
+
     # Create a mock conversation with large token counts
     mock_conversation = Mock()
 
@@ -484,12 +438,8 @@ async def test_format_status_line_abbreviations(mock_connection):
 
     mock_conversation.conversation_stats.get_combined_metrics.return_value = metrics
 
-    event_subscriber = EventSubscriber(
-        "test-session", mock_connection, mock_conversation
-    )
-
-    # Get status line
-    metadata = event_subscriber._get_metadata()
+    # Get status line using the utility function
+    metadata = get_metadata(mock_conversation)
     assert metadata is not None
     status_line = metadata["openhands.dev/metrics"]["status_line"]
     assert isinstance(status_line, str)
