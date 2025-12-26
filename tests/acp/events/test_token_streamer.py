@@ -43,7 +43,7 @@ def token_subscriber(mock_connection, event_loop):
     )
 
 
-def _chunk(*, content=None, reasoning=None, tool_calls=None):
+def _chunk(*, content=None, reasoning=None, tool_calls=None, choice_index=0):
     """Build a minimal LLMStreamChunk-like object."""
     chunk = MagicMock()
     delta = MagicMock()
@@ -52,7 +52,29 @@ def _chunk(*, content=None, reasoning=None, tool_calls=None):
     delta.tool_calls = tool_calls
     choice = MagicMock()
     choice.delta = delta
+    choice.index = choice_index
     chunk.choices = [choice]
+    return chunk
+
+
+def _multi_choice_chunk(choices_data):
+    """Build a chunk with multiple choices.
+
+    Args:
+        choices_data: list of dicts with keys: index, content, reasoning, tool_calls
+    """
+    chunk = MagicMock()
+    choices = []
+    for data in choices_data:
+        delta = MagicMock()
+        delta.content = data.get("content")
+        delta.reasoning_content = data.get("reasoning")
+        delta.tool_calls = data.get("tool_calls")
+        choice = MagicMock()
+        choice.delta = delta
+        choice.index = data.get("index", 0)
+        choices.append(choice)
+    chunk.choices = choices
     return chunk
 
 
@@ -189,6 +211,84 @@ class TestOnTokenContentAndReasoning:
         update2 = mock_connection.session_update.call_args_list[1][1]["update"]
         text2 = update2.content.text
         assert text2.startswith(REASONING_HEADER)
+
+
+class TestMultiChoiceHandling:
+    """Tests for multi-choice handling to prevent content interleaving."""
+
+    def test_content_from_choice_index_nonzero_is_ignored(
+        self, token_subscriber, mock_connection, event_loop
+    ):
+        """Content from choice.index > 0 should be ignored to prevent interleaving."""
+        chunk = _chunk(content="Should be ignored", choice_index=1)
+
+        with patch.object(event_loop, "is_running", return_value=False):
+            token_subscriber.on_token(chunk)
+
+        assert not mock_connection.session_update.called
+
+    def test_reasoning_from_choice_index_nonzero_is_ignored(
+        self, token_subscriber, mock_connection, event_loop
+    ):
+        """Reasoning from choice.index > 0 should be ignored to prevent interleaving."""
+        chunk = _chunk(reasoning="Should be ignored", choice_index=1)
+
+        with patch.object(event_loop, "is_running", return_value=False):
+            token_subscriber.on_token(chunk)
+
+        assert not mock_connection.session_update.called
+
+    def test_only_choice_zero_content_emitted_in_multi_choice(
+        self, token_subscriber, mock_connection, event_loop
+    ):
+        """When multiple choices exist, only choice 0 content is emitted."""
+        chunk = _multi_choice_chunk(
+            [
+                {"index": 0, "content": "Choice zero content"},
+                {"index": 1, "content": "Choice one content - ignored"},
+                {"index": 2, "content": "Choice two content - ignored"},
+            ]
+        )
+
+        with patch.object(event_loop, "is_running", return_value=False):
+            token_subscriber.on_token(chunk)
+
+        # Only one update from choice 0
+        assert mock_connection.session_update.call_count == 1
+        update = mock_connection.session_update.call_args[1]["update"]
+        assert isinstance(update, AgentMessageChunk)
+        assert update.content.text == "Choice zero content"
+
+    def test_tool_calls_processed_from_all_choices(
+        self, token_subscriber, mock_connection, event_loop
+    ):
+        """Tool calls from all choices are processed, grouped by tool_call.index."""
+        tc0 = _tool_call(
+            index=0,
+            tool_call_id="call-0",
+            name="terminal",
+            arguments='{"command":"ls"}',
+        )
+        tc1 = _tool_call(
+            index=1,
+            tool_call_id="call-1",
+            name="terminal",
+            arguments='{"command":"pwd"}',
+        )
+        # Tool call from choice index 1 (different from tool_call.index)
+        chunk = _multi_choice_chunk(
+            [
+                {"index": 0, "tool_calls": [tc0]},
+                {"index": 1, "tool_calls": [tc1]},
+            ]
+        )
+
+        with patch.object(event_loop, "is_running", return_value=False):
+            token_subscriber.on_token(chunk)
+
+        # Both tool calls should be tracked (by their tool_call.index, not choice.index)
+        assert 0 in token_subscriber._streaming_tool_calls
+        assert 1 in token_subscriber._streaming_tool_calls
 
 
 class TestToolCallStreaming:

@@ -144,13 +144,24 @@ class TokenBasedEventSubscriber:
                 if not delta:
                     continue
 
-                # Tool calls (stream only: think args and dynamic titles/progress)
+                choice_index = getattr(choice, "index", 0) or 0
+
+                # Tool calls are already grouped by tool_call.index internally,
+                # so we process them from all choices.
                 tool_calls = getattr(delta, "tool_calls", None)
                 if tool_calls:
                     for tool_call in tool_calls:
                         self._handle_tool_call_streaming(tool_call)
 
-                # Reasoning + content streaming
+                # Only process content/reasoning from choice.index == 0.
+                # We maintain single-stream state (_reasoning_header_emitted) that
+                # cannot track per-choice headers. If a provider emits multiple
+                # choices (n > 1) or out-of-order indices, processing all would
+                # interleave content. Standard streaming uses n=1, so choice > 0
+                # is rare; we ignore it to avoid corruption.
+                if choice_index != 0:
+                    continue
+
                 reasoning = getattr(delta, "reasoning_content", None)
                 content = getattr(delta, "content", None)
 
