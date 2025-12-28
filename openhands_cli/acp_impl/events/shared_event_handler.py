@@ -163,12 +163,8 @@ class SharedEventHandler:
 
     async def handle_action_event(self, ctx: _ACPContext, event: ActionEvent):
         content = None
-        tool_kind = get_tool_kind(
-            tool_name=event.tool_name, action=getattr(event, "action", None)
-        )
-        title = get_tool_title(
-            tool_name=event.tool_name, action=getattr(event, "action", None)
-        )
+        tool_kind = get_tool_kind(tool_name=event.tool_name, action=event.action)
+        title = get_tool_title(tool_name=event.tool_name, action=event.action)
         if event.action:
             action_viz = _event_visualize_to_plain(event)
             content = format_content_blocks(action_viz)
