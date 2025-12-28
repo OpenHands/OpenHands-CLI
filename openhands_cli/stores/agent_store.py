@@ -62,9 +62,12 @@ class AgentStore:
                 }
             updated_llm = agent.llm.model_copy(update=llm_update)
 
-            condenser_updates = {}
+            # Always create a fresh condenser with current defaults if condensation
+            # is enabled. This ensures users get the latest condenser settings
+            # (e.g., max_size, keep_first) without needing to reconfigure.
+            condenser = None
             if agent.condenser and isinstance(agent.condenser, LLMSummarizingCondenser):
-                condenser_llm_update = {}
+                condenser_llm_update: dict[str, Any] = {}
                 if should_set_litellm_extra_body(agent.condenser.llm.model):
                     condenser_llm_update["litellm_extra_body"] = {
                         "metadata": get_llm_metadata(
@@ -73,9 +76,10 @@ class AgentStore:
                             session_id=session_id,
                         )
                     }
-                condenser_updates["llm"] = agent.condenser.llm.model_copy(
+                condenser_llm = agent.condenser.llm.model_copy(
                     update=condenser_llm_update
                 )
+                condenser = LLMSummarizingCondenser(llm=condenser_llm)
 
             # Update tools and context
             agent = agent.model_copy(
@@ -86,9 +90,7 @@ class AgentStore:
                     if enabled_servers
                     else {},
                     "agent_context": agent_context,
-                    "condenser": agent.condenser.model_copy(update=condenser_updates)
-                    if agent.condenser
-                    else None,
+                    "condenser": condenser,
                 }
             )
 
