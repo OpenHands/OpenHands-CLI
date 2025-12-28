@@ -130,8 +130,8 @@ pythonVersion = "3.12"
 useLibraryCodeForTypes = true
 typeCheckingMode = "standard"
 
-# USE EXACT COMMIT FROM AGENT-SDK (PR #1368 - Add condense method to conversation class)
+# USE EXACT COMMIT FROM AGENT-SDK (PR #1523 - Fix condensation for 0 events)
 
-# [tool.uv.sources]
-# openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "5ee81068fd16bb84d9a611e9af44825478155e15" }
-# openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "5ee81068fd16bb84d9a611e9af44825478155e15" }
+[tool.uv.sources]
+openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "d6233c9e6c174533de912d4bcda2edb83f4d1e27" }
+openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "d6233c9e6c174533de912d4bcda2edb83f4d1e27" }
