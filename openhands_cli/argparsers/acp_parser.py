@@ -1,6 +1,6 @@
 import argparse
 
-from openhands_cli.argparsers.util import add_confirmation_mode_args
+from openhands_cli.argparsers.util import add_confirmation_mode_args, add_resume_args
 
 
 def add_acp_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
@@ -14,19 +14,7 @@ def add_acp_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentP
     )
 
     # Resume arguments (same as main parser)
-    acp_parser.add_argument(
-        "--resume",
-        type=str,
-        nargs="?",
-        const="",
-        help="Conversation ID to resume. If no ID provided, shows list of recent "
-        "conversations",
-    )
-    acp_parser.add_argument(
-        "--last",
-        action="store_true",
-        help="Resume the most recent conversation (use with --resume)",
-    )
+    add_resume_args(acp_parser)
 
     # ACP confirmation mode options (mutually exclusive)
     acp_confirmation_group = acp_parser.add_mutually_exclusive_group()
