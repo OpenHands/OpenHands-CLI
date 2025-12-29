@@ -720,3 +720,148 @@ async def test_set_session_mode_updates_existing_conversation(acp_agent, tmp_pat
         calls = mock_conversation.set_confirmation_policy.call_args_list
         last_policy = calls[-1][0][0]
         assert isinstance(last_policy, NeverConfirm)
+
+
+@pytest.mark.asyncio
+async def test_new_session_with_resume_conversation_id(mock_connection, tmp_path):
+    """Test that new_session uses resume_conversation_id when provided."""
+    resume_id = "12345678-1234-1234-1234-123456789abc"
+    agent = OpenHandsACPAgent(mock_connection, "always-ask", resume_id)
+
+    with (
+        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
+        patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+    ):
+        mock_agent = MagicMock()
+        mock_agent.llm.model = "test-model"
+        mock_load.return_value = mock_agent
+
+        mock_conversation = MagicMock()
+        mock_conv.return_value = mock_conversation
+
+        # First new_session should use the resume_conversation_id
+        response = await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+
+        # Verify the session ID is the resume_conversation_id
+        assert response.session_id == resume_id
+
+        # Verify the resume_conversation_id is cleared after first use
+        assert agent._resume_conversation_id is None
+
+
+@pytest.mark.asyncio
+async def test_new_session_resume_id_only_used_once(mock_connection, tmp_path):
+    """Test that resume_conversation_id is only used for the first new_session call."""
+    resume_id = "12345678-1234-1234-1234-123456789abc"
+    agent = OpenHandsACPAgent(mock_connection, "always-ask", resume_id)
+
+    with (
+        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
+        patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+    ):
+        mock_agent = MagicMock()
+        mock_agent.llm.model = "test-model"
+        mock_load.return_value = mock_agent
+
+        mock_conversation = MagicMock()
+        mock_conv.return_value = mock_conversation
+
+        # First new_session should use the resume_conversation_id
+        response1 = await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+        assert response1.session_id == resume_id
+
+        # Second new_session should generate a new UUID
+        response2 = await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+        assert response2.session_id != resume_id
+
+        # Verify it's a valid UUID
+        UUID(response2.session_id)
+
+
+@pytest.mark.asyncio
+async def test_new_session_replays_historic_events_on_resume(mock_connection, tmp_path):
+    """Test that new_session replays historic events when resuming a conversation."""
+    resume_id = "12345678-1234-1234-1234-123456789abc"
+    agent = OpenHandsACPAgent(mock_connection, "always-ask", resume_id)
+
+    with (
+        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
+        patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+        patch("openhands_cli.acp_impl.agent.EventSubscriber") as mock_subscriber_class,
+    ):
+        mock_agent = MagicMock()
+        mock_agent.llm.model = "test-model"
+        mock_load.return_value = mock_agent
+
+        # Create mock events
+        from openhands.sdk import Message, TextContent
+        from openhands.sdk.event.llm_convertible.message import MessageEvent
+
+        mock_event1 = MessageEvent(
+            source="user",
+            llm_message=Message(role="user", content=[TextContent(text="Hello")]),
+        )
+        mock_event2 = MessageEvent(
+            source="agent",
+            llm_message=Message(
+                role="assistant", content=[TextContent(text="Hi there!")]
+            ),
+        )
+
+        # Mock conversation with historic events
+        mock_conversation = MagicMock()
+        mock_conversation.state.events = [mock_event1, mock_event2]
+        mock_conv.return_value = mock_conversation
+
+        # Mock EventSubscriber
+        mock_subscriber = AsyncMock()
+        mock_subscriber_class.return_value = mock_subscriber
+
+        # Call new_session with resume
+        response = await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+
+        # Verify the session ID is the resume_conversation_id
+        assert response.session_id == resume_id
+
+        # Verify EventSubscriber was created for replaying events
+        mock_subscriber_class.assert_called_with(resume_id, mock_connection)
+
+        # Verify all historic events were replayed
+        assert mock_subscriber.call_count == 2
+        mock_subscriber.assert_any_call(mock_event1)
+        mock_subscriber.assert_any_call(mock_event2)
+
+
+@pytest.mark.asyncio
+async def test_new_session_no_replay_for_new_conversation(mock_connection, tmp_path):
+    """Test that new_session does NOT replay events for new conversations."""
+    # No resume_conversation_id provided
+    agent = OpenHandsACPAgent(mock_connection, "always-ask")
+
+    with (
+        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
+        patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+        patch("openhands_cli.acp_impl.agent.EventSubscriber") as mock_subscriber_class,
+    ):
+        mock_agent = MagicMock()
+        mock_agent.llm.model = "test-model"
+        mock_load.return_value = mock_agent
+
+        # Mock conversation with no events (new conversation)
+        mock_conversation = MagicMock()
+        mock_conversation.state.events = []
+        mock_conv.return_value = mock_conversation
+
+        # Mock EventSubscriber
+        mock_subscriber = AsyncMock()
+        mock_subscriber_class.return_value = mock_subscriber
+
+        # Call new_session without resume
+        response = await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+
+        # Verify a new UUID was generated (not the resume ID)
+        UUID(response.session_id)  # Should be a valid UUID
+
+        # Verify EventSubscriber was NOT called for replaying events
+        # (it may be created for _send_available_commands, but not called with events)
+        mock_subscriber.assert_not_called()

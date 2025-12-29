@@ -19,3 +19,39 @@ def test_main_help_includes_key_subcommands_and_flags() -> None:
 
     # Version flag should also be advertised
     assert "--version" in help_text or "-v" in help_text
+
+
+def test_acp_subcommand_supports_resume_flags() -> None:
+    """ACP subcommand should support --resume and --last flags.
+
+    This tests the fix for issue #260 where 'openhands acp --resume --last'
+    was failing because the ACP parser didn't recognize these arguments.
+    """
+    parser = create_main_parser()
+
+    # Test parsing 'acp --resume --last'
+    args = parser.parse_args(["acp", "--resume", "--last"])
+    assert args.command == "acp"
+    assert args.resume == ""  # --resume without value gives empty string
+    assert args.last is True
+
+    # Test parsing 'acp --resume <conversation_id>'
+    args = parser.parse_args(
+        ["acp", "--resume", "12345678-1234-1234-1234-123456789abc"]
+    )
+    assert args.command == "acp"
+    assert args.resume == "12345678-1234-1234-1234-123456789abc"
+    assert args.last is False
+
+    # Test parsing 'acp' without resume flags
+    args = parser.parse_args(["acp"])
+    assert args.command == "acp"
+    assert args.resume is None
+    assert args.last is False
+
+    # Test parsing 'acp --llm-approve --resume --last'
+    args = parser.parse_args(["acp", "--llm-approve", "--resume", "--last"])
+    assert args.command == "acp"
+    assert args.llm_approve is True
+    assert args.resume == ""
+    assert args.last is True
