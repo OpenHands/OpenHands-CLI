@@ -1,6 +1,7 @@
 # openhands_cli/settings/store.py
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from prompt_toolkit import HTML, print_formatted_text
@@ -27,16 +28,59 @@ from openhands_cli.utils import (
 )
 
 
+# Current version of the agent settings format
+AGENT_SETTINGS_VERSION = "v1"
+
+
+def _serialize_agent_minimal(agent: Agent) -> str:
+    """Serialize agent with minimal data, preserving only user-configured values.
+
+    Uses exclude_defaults=True to omit SDK default values, ensuring users
+    automatically get updated defaults when the SDK changes. Discriminator
+    fields (like 'kind') are preserved for polymorphic deserialization.
+
+    The output includes a _version field to track the settings format version.
+    """
+    dump = agent.model_dump(exclude_defaults=True, context={"expose_secrets": True})
+
+    # Preserve discriminator fields for polymorphic types
+    if agent.condenser is not None:
+        if "condenser" not in dump:
+            dump["condenser"] = {}
+        dump["condenser"]["kind"] = agent.condenser.kind
+
+    # Add version field
+    dump["_version"] = AGENT_SETTINGS_VERSION
+
+    return json.dumps(dump)
+
+
 class AgentStore:
     """Single source of truth for persisting/retrieving AgentSpec."""
 
     def __init__(self) -> None:
         self.file_store = LocalFileStore(root=PERSISTENCE_DIR)
 
+    def _get_settings_version(self, data: dict[str, Any]) -> str:
+        """Get the version of the settings format.
+
+        Returns 'v0' for legacy settings (no version field), otherwise returns
+        the value of the _version field.
+        """
+        return data.get("_version", "v0")
+
     def load(self, session_id: str | None = None) -> Agent | None:
         try:
             str_spec = self.file_store.read(AGENT_SETTINGS_PATH)
-            agent = Agent.model_validate_json(str_spec)
+
+            # Parse JSON to check version and prepare for migration
+            raw_data = json.loads(str_spec)
+            settings_version = self._get_settings_version(raw_data)
+
+            # Remove _version field before validating as Agent model
+            raw_data.pop("_version", None)
+
+            agent = Agent.model_validate(raw_data)
 
             # Update tools with most recent working directory
             updated_tools = get_default_tools(enable_browser=False)
@@ -62,7 +106,7 @@ class AgentStore:
             enabled_servers = list_enabled_servers()
 
             # Update LLM metadata with current information
-            llm_update = {}
+            llm_update: dict[str, Any] = {}
             if should_set_litellm_extra_body(agent.llm.model):
                 llm_update["litellm_extra_body"] = {
                     "metadata": get_llm_metadata(
@@ -73,9 +117,12 @@ class AgentStore:
                 }
             updated_llm = agent.llm.model_copy(update=llm_update)
 
-            condenser_updates = {}
+            # Always create a fresh condenser with current SDK defaults if condensation
+            # is enabled. This ensures users get the latest condenser settings
+            # (e.g., max_size, keep_first) without needing to reconfigure.
+            condenser = None
             if agent.condenser and isinstance(agent.condenser, LLMSummarizingCondenser):
-                condenser_llm_update = {}
+                condenser_llm_update: dict[str, Any] = {}
                 if should_set_litellm_extra_body(agent.condenser.llm.model):
                     condenser_llm_update["litellm_extra_body"] = {
                         "metadata": get_llm_metadata(
@@ -84,9 +131,10 @@ class AgentStore:
                             session_id=session_id,
                         )
                     }
-                condenser_updates["llm"] = agent.condenser.llm.model_copy(
+                condenser_llm = agent.condenser.llm.model_copy(
                     update=condenser_llm_update
                 )
+                condenser = LLMSummarizingCondenser(llm=condenser_llm)
 
             # Update tools and context
             agent = agent.model_copy(
@@ -97,11 +145,13 @@ class AgentStore:
                     if enabled_servers
                     else {},
                     "agent_context": agent_context,
-                    "condenser": agent.condenser.model_copy(update=condenser_updates)
-                    if agent.condenser
-                    else None,
+                    "condenser": condenser,
                 }
             )
+
+            # If loading from v0 format, re-save in v1 format for future loads
+            if settings_version == "v0":
+                self.save(agent)
 
             return agent
         except FileNotFoundError:
@@ -113,7 +163,7 @@ class AgentStore:
             return None
 
     def save(self, agent: Agent) -> None:
-        serialized_spec = agent.model_dump_json(context={"expose_secrets": True})
+        serialized_spec = _serialize_agent_minimal(agent)
         self.file_store.write(AGENT_SETTINGS_PATH, serialized_spec)
 
     def create_and_save_from_settings(
