@@ -97,6 +97,7 @@ class OpenHandsACPAgent(ACPAgent):
         conn: Client,
         initial_confirmation_mode: ConfirmationMode,
         resume_conversation_id: str | None = None,
+        streaming_enabled: bool = False,
     ):
         """Initialize the OpenHands ACP agent.
 
@@ -105,6 +106,7 @@ class OpenHandsACPAgent(ACPAgent):
             initial_confirmation_mode: Default confirmation mode for new sessions
             resume_conversation_id: Optional conversation ID to resume when a new
                 session is created (used with --resume flag)
+            streaming_enabled: Whether to enable token streaming for LLM outputs
         """
         self._conn = conn
         # Cache of active conversations to preserve state (pause, confirmation, etc.)
@@ -116,9 +118,11 @@ class OpenHandsACPAgent(ACPAgent):
         self._initial_confirmation_mode: ConfirmationMode = initial_confirmation_mode
         # Conversation ID to resume (from --resume flag)
         self._resume_conversation_id: str | None = resume_conversation_id
+        # Whether token streaming is enabled (from --streaming flag)
+        self._streaming_enabled: bool = streaming_enabled
         logger.info(
-            f"OpenHands ACP Agent initialized with "
-            f"confirmation mode: {initial_confirmation_mode}"
+            f"OpenHands ACP Agent initialized with confirmation mode: "
+            f"{initial_confirmation_mode}, streaming: {streaming_enabled}"
         )
         if resume_conversation_id:
             logger.info(f"Will resume conversation: {resume_conversation_id}")
@@ -254,14 +258,18 @@ class OpenHandsACPAgent(ACPAgent):
             RequestError: If MCP configuration is invalid
         """
         # Load agent specs (same as setup_conversation)
-        streaming_enabled = False
         try:
             agent = load_agent_specs(
                 conversation_id=session_id,
                 mcp_servers=mcp_servers,
                 skills=[RESOURCE_SKILL],
             )
-            streaming_enabled = not agent.llm.uses_responses_api()
+            # Streaming is enabled only if:
+            # 1. The --streaming flag was passed (self._streaming_enabled)
+            # 2. The LLM doesn't use responses API (which doesn't support streaming)
+            streaming_enabled = (
+                self._streaming_enabled and not agent.llm.uses_responses_api()
+            )
 
             if streaming_enabled:
                 # Enable streaming for llm
@@ -329,7 +337,7 @@ class OpenHandsACPAgent(ACPAgent):
             callbacks=[sync_callback],
             token_callbacks=[token_subscriber.on_token]
             if streaming_enabled
-            else None,  # Enable token streaming for completions api
+            else None,  # Enable token streaming only when --streaming flag is used
             visualizer=None,  # No visualizer needed for ACP
         )
 
@@ -756,6 +764,7 @@ class OpenHandsACPAgent(ACPAgent):
 async def run_acp_server(
     initial_confirmation_mode: ConfirmationMode = "always-ask",
     resume_conversation_id: str | None = None,
+    streaming_enabled: bool = False,
 ) -> None:
     """Run the OpenHands ACP server.
 
@@ -763,10 +772,11 @@ async def run_acp_server(
         initial_confirmation_mode: Default confirmation mode for new sessions
         resume_conversation_id: Optional conversation ID to resume when a new
             session is created
+        streaming_enabled: Whether to enable token streaming for LLM outputs
     """
     logger.info(
         f"Starting OpenHands ACP server with confirmation mode: "
-        f"{initial_confirmation_mode}..."
+        f"{initial_confirmation_mode}, streaming: {streaming_enabled}..."
     )
     if resume_conversation_id:
         logger.info(f"Will resume conversation: {resume_conversation_id}")
@@ -775,7 +785,7 @@ async def run_acp_server(
 
     def create_agent(conn: Client) -> OpenHandsACPAgent:
         return OpenHandsACPAgent(
-            conn, initial_confirmation_mode, resume_conversation_id
+            conn, initial_confirmation_mode, resume_conversation_id, streaming_enabled
         )
 
     AgentSideConnection(create_agent, writer, reader)

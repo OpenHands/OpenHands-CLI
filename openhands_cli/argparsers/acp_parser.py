@@ -20,4 +20,12 @@ def add_acp_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentP
     acp_confirmation_group = acp_parser.add_mutually_exclusive_group()
     add_confirmation_mode_args(acp_confirmation_group)
 
+    # Streaming mode flag
+    acp_parser.add_argument(
+        "--streaming",
+        action="store_true",
+        default=False,
+        help="Enable streaming mode for LLM outputs (token-by-token streaming)",
+    )
+
     return acp_parser
