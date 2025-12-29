@@ -20,7 +20,11 @@ from openhands_cli.locations import (
     WORK_DIR,
 )
 from openhands_cli.mcp.mcp_utils import list_enabled_servers
-from openhands_cli.utils import get_llm_metadata, should_set_litellm_extra_body
+from openhands_cli.utils import (
+    get_llm_metadata,
+    get_os_description,
+    should_set_litellm_extra_body,
+)
 
 
 class AgentStore:
@@ -40,9 +44,16 @@ class AgentStore:
             # Load skills from user directories and project-specific directories
             skills = load_project_skills(WORK_DIR)
 
+            system_suffix = "\n".join(
+                [
+                    f"Your current working directory is: {WORK_DIR}",
+                    f"User operating system: {get_os_description()}",
+                ]
+            )
+
             agent_context = AgentContext(
                 skills=skills,
-                system_message_suffix=f"You current working directory is: {WORK_DIR}",
+                system_message_suffix=system_suffix,
                 load_user_skills=True,
                 load_public_skills=True,
             )
