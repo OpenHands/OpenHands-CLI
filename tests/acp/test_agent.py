@@ -720,3 +720,59 @@ async def test_set_session_mode_updates_existing_conversation(acp_agent, tmp_pat
         calls = mock_conversation.set_confirmation_policy.call_args_list
         last_policy = calls[-1][0][0]
         assert isinstance(last_policy, NeverConfirm)
+
+
+@pytest.mark.asyncio
+async def test_new_session_with_resume_conversation_id(mock_connection, tmp_path):
+    """Test that new_session uses resume_conversation_id when provided."""
+    resume_id = "12345678-1234-1234-1234-123456789abc"
+    agent = OpenHandsACPAgent(mock_connection, "always-ask", resume_id)
+
+    with (
+        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
+        patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+    ):
+        mock_agent = MagicMock()
+        mock_agent.llm.model = "test-model"
+        mock_load.return_value = mock_agent
+
+        mock_conversation = MagicMock()
+        mock_conv.return_value = mock_conversation
+
+        # First new_session should use the resume_conversation_id
+        response = await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+
+        # Verify the session ID is the resume_conversation_id
+        assert response.session_id == resume_id
+
+        # Verify the resume_conversation_id is cleared after first use
+        assert agent._resume_conversation_id is None
+
+
+@pytest.mark.asyncio
+async def test_new_session_resume_id_only_used_once(mock_connection, tmp_path):
+    """Test that resume_conversation_id is only used for the first new_session call."""
+    resume_id = "12345678-1234-1234-1234-123456789abc"
+    agent = OpenHandsACPAgent(mock_connection, "always-ask", resume_id)
+
+    with (
+        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
+        patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+    ):
+        mock_agent = MagicMock()
+        mock_agent.llm.model = "test-model"
+        mock_load.return_value = mock_agent
+
+        mock_conversation = MagicMock()
+        mock_conv.return_value = mock_conversation
+
+        # First new_session should use the resume_conversation_id
+        response1 = await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+        assert response1.session_id == resume_id
+
+        # Second new_session should generate a new UUID
+        response2 = await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+        assert response2.session_id != resume_id
+
+        # Verify it's a valid UUID
+        UUID(response2.session_id)

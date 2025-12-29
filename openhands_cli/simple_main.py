@@ -124,7 +124,18 @@ def main() -> None:
             elif args.llm_approve:
                 confirmation_mode = "llm-approve"
 
-            asyncio.run(run_acp_server(initial_confirmation_mode=confirmation_mode))
+            # Handle resume logic for ACP (same as main command)
+            resume_id = handle_resume_logic(args)
+            if resume_id is None and (args.last or args.resume == ""):
+                # Either showed conversation list or had an error
+                return
+
+            asyncio.run(
+                run_acp_server(
+                    initial_confirmation_mode=confirmation_mode,
+                    resume_conversation_id=resume_id,
+                )
+            )
 
         elif args.command == "login":
             from openhands_cli.auth.login_command import run_login_command
