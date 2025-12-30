@@ -35,32 +35,31 @@ You can add HTTP/SSE servers with authentication or stdio-based local servers.
 Examples:
 
   # Add an HTTP server with Bearer token authentication
-  openhands mcp add my-api https://api.example.com/mcp \\
-    --transport http \\
-    --header "Authorization: Bearer your-token-here"
+  openhands mcp add my-api --transport http \\
+    --header "Authorization: Bearer your-token-here" \\
+    https://api.example.com/mcp
 
   # Add an HTTP server with API key authentication
-  openhands mcp add weather-api https://weather.api.com \\
-    --transport http \\
-    --header "X-API-Key: your-api-key"
+  openhands mcp add weather-api --transport http \\
+    --header "X-API-Key: your-api-key" \\
+    https://weather.api.com
 
   # Add an HTTP server with multiple headers
-  openhands mcp add secure-api https://api.example.com \\
-    --transport http \\
+  openhands mcp add secure-api --transport http \\
     --header "Authorization: Bearer token123" \\
-    --header "X-Client-ID: client456"
+    --header "X-Client-ID: client456" \\
+    https://api.example.com
 
   # Add a local stdio server with environment variables
-  openhands mcp add local-server python \\
-    --transport stdio \\
+  openhands mcp add local-server --transport stdio \\
     --env "API_KEY=secret123" \\
     --env "DATABASE_URL=postgresql://..." \\
-    -- -m my_mcp_server --config config.json
+    python -- -m my_mcp_server --config config.json
 
   # Add an OAuth-based server (like Notion MCP)
-  openhands mcp add notion-server https://mcp.notion.com/mcp \\
-    --transport http \\
-    --auth oauth
+  openhands mcp add notion-server --transport http \\
+    --auth oauth \\
+    https://mcp.notion.com/mcp
 
   # List all configured servers
   openhands mcp list
@@ -70,6 +69,12 @@ Examples:
 
   # Remove a server
   openhands mcp remove my-api
+
+  # Enable a server
+  openhands mcp enable my-api
+
+  # Disable a server
+  openhands mcp disable my-api
 """
     mcp_parser = subparsers.add_parser(
         "mcp",
@@ -91,32 +96,31 @@ Add a new MCP server configuration.
 Examples:
 
   # Add an HTTP server with Bearer token authentication
-  openhands mcp add my-api https://api.example.com/mcp \\
-    --transport http \\
-    --header "Authorization: Bearer your-token-here"
+  openhands mcp add my-api --transport http \\
+    --header "Authorization: Bearer your-token-here" \\
+    https://api.example.com/mcp
 
   # Add an HTTP server with API key authentication
-  openhands mcp add weather-api https://weather.api.com \\
-    --transport http \\
-    --header "X-API-Key: your-api-key"
+  openhands mcp add weather-api --transport http \\
+    --header "X-API-Key: your-api-key" \\
+    https://weather.api.com
 
   # Add an HTTP server with multiple headers
-  openhands mcp add secure-api https://api.example.com \\
-    --transport http \\
+  openhands mcp add secure-api --transport http \\
     --header "Authorization: Bearer token123" \\
-    --header "X-Client-ID: client456"
+    --header "X-Client-ID: client456" \\
+    https://api.example.com
 
   # Add a local stdio server with environment variables
-  openhands mcp add local-server python \\
-    --transport stdio \\
+  openhands mcp add local-server --transport stdio \\
     --env "API_KEY=secret123" \\
     --env "DATABASE_URL=postgresql://..." \\
-    -- -m my_mcp_server --config config.json
+    python -- -m my_mcp_server --config config.json
 
   # Add an OAuth-based server (like Notion MCP)
-  openhands mcp add notion-server https://mcp.notion.com/mcp \\
-    --transport http \\
-    --auth oauth
+  openhands mcp add notion-server --transport http \\
+    --auth oauth \\
+    https://mcp.notion.com/mcp
 """
     add_parser = mcp_subparsers.add_parser(
         "add",
@@ -124,20 +128,12 @@ Examples:
         description=add_description,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    # Optional arguments first
     add_parser.add_argument(
         "--transport",
         choices=["http", "sse", "stdio"],
         required=True,
         help="Transport type for the MCP server",
-    )
-    add_parser.add_argument("name", help="Name of the MCP server")
-    add_parser.add_argument(
-        "target", help="URL for http/sse transports or command for stdio transport"
-    )
-    add_parser.add_argument(
-        "args",
-        nargs="*",
-        help="Additional arguments for stdio transport (after --)",
     )
     add_parser.add_argument(
         "--header",
@@ -153,6 +149,29 @@ Examples:
         "--auth",
         choices=["oauth"],
         help="Authentication method for the MCP server",
+    )
+    add_parser.add_argument(
+        "--enabled",
+        action="store_true",
+        default=True,
+        help="Enable the server immediately after adding (default: True)",
+    )
+    add_parser.add_argument(
+        "--disabled",
+        dest="enabled",
+        action="store_false",
+        help="Add the server in disabled state",
+    )
+
+    # Positional arguments after optional arguments
+    add_parser.add_argument("name", help="Name of the MCP server")
+    add_parser.add_argument(
+        "target", help="URL for http/sse transports or command for stdio transport"
+    )
+    add_parser.add_argument(
+        "args",
+        nargs=argparse.REMAINDER,
+        help="Additional arguments for stdio transport (after --)",
     )
 
     # MCP list command
@@ -204,5 +223,39 @@ Examples:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     remove_parser.add_argument("name", help="Name of the MCP server to remove")
+
+    # MCP enable command
+    enable_description = """
+Enable an MCP server configuration.
+
+Examples:
+
+  # Enable a server
+  openhands mcp enable my-api
+"""
+    enable_parser = mcp_subparsers.add_parser(
+        "enable",
+        help="Enable an MCP server",
+        description=enable_description,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    enable_parser.add_argument("name", help="Name of the MCP server to enable")
+
+    # MCP disable command
+    disable_description = """
+Disable an MCP server configuration.
+
+Examples:
+
+  # Disable a server
+  openhands mcp disable my-api
+"""
+    disable_parser = mcp_subparsers.add_parser(
+        "disable",
+        help="Disable an MCP server",
+        description=disable_description,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    disable_parser.add_argument("name", help="Name of the MCP server to disable")
 
     return mcp_parser

@@ -1,6 +1,8 @@
 """Utility functions for LLM configuration in OpenHands CLI."""
 
+import json
 import os
+import platform
 from argparse import Namespace
 from pathlib import Path
 from typing import Any
@@ -9,7 +11,29 @@ from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 
 from openhands.sdk import LLM, ImageContent, TextContent
+from openhands.sdk.event import SystemPromptEvent
+from openhands.sdk.event.base import Event
 from openhands.tools.preset import get_default_agent
+
+
+def get_os_description() -> str:
+    system = platform.system() or "Unknown"
+
+    if system == "Darwin":
+        ver = platform.mac_ver()[0] or platform.release()
+        return f"macOS {ver}".strip()
+
+    if system == "Windows":
+        release, version, *_ = platform.win32_ver()
+        if release and version:
+            return f"Windows {release} ({version})"
+        return "Windows"
+
+    if system == "Linux":
+        kernel = platform.release()
+        return f"Linux (kernel {kernel})" if kernel else "Linux"
+
+    return platform.platform() or system
 
 
 def should_set_litellm_extra_body(model_name: str) -> bool:
@@ -146,3 +170,13 @@ def extract_text_from_message_content(
 
     # Use SDK utility to extract text - content_to_str handles the conversion
     return message_content[0].text
+
+
+def json_callback(event: Event) -> None:
+    if isinstance(event, SystemPromptEvent):
+        return
+
+    data = event.model_dump()
+    pretty_json = json.dumps(data, indent=2, sort_keys=True)
+    print("--JSON Event--")
+    print(pretty_json)

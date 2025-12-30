@@ -7,7 +7,7 @@ import pytest
 
 from openhands.tools.file_editor.definition import FileEditorAction
 from openhands_cli.acp_impl.agent import OpenHandsACPAgent
-from openhands_cli.acp_impl.event import extract_action_locations
+from openhands_cli.acp_impl.events.utils import extract_action_locations
 
 
 @pytest.fixture

@@ -1,0 +1,135 @@
+---
+# Workflow that updates the install-openhands-website repository when a release is published
+name: Update Install Website Version
+
+# Trigger when a release is published (not draft) or manually
+on:
+    release:
+        types: [published]
+    workflow_dispatch:
+        inputs:
+            version:
+                description: Version number to update (e.g., 1.6.0)
+                required: true
+                type: string
+
+# Note: This workflow requires ALLHANDS_BOT_GITHUB_PAT secret to have access to the All-Hands-AI/install-openhands-website repository
+# Create a Personal Access Token (PAT) with repo permissions and store it as ALLHANDS_BOT_GITHUB_PAT in repository secrets
+permissions:
+    contents: read
+
+jobs:
+    update-install-website:
+        name: Update install-openhands-website version
+        runs-on: ubuntu-latest
+        if: ${{ github.event_name == 'workflow_dispatch' || !github.event.release.draft }}
+
+        steps:
+            - name: Checkout current repository
+              uses: actions/checkout@v4
+
+            - name: Extract version from release tag or manual input
+              id: extract_version
+              run: |
+                  # Extract version from tag (remove 'v' prefix if present) or use manual input
+                  if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+                    VERSION="${{ inputs.version }}"
+                    echo "Using manual input version: $VERSION"
+                  else
+                    VERSION="${{ github.event.release.tag_name }}"
+                    VERSION="${VERSION#v}"
+                    echo "Extracted version from release tag: $VERSION"
+                  fi
+                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+            - name: Clone install-openhands-website repository
+              run: |
+                  # Use ALLHANDS_BOT_GITHUB_PAT to clone the repository
+                  git clone https://${{ secrets.ALLHANDS_BOT_GITHUB_PAT }}@github.com/All-Hands-AI/install-openhands-website.git website-repo
+                  cd website-repo
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+            - name: Create branch and update version
+              run: |
+                  cd website-repo
+                  BRANCH_NAME="update-version-${{ steps.extract_version.outputs.version }}"
+                  git checkout -b "$BRANCH_NAME"
+
+                  # Update the VERSION line in install.sh
+                  sed -i 's/^VERSION=".*"$/VERSION="${{ steps.extract_version.outputs.version }}"/' public/install.sh
+
+                  # Verify the change was made
+                  echo "Updated VERSION line:"
+                  grep "VERSION=" public/install.sh
+
+                  # Check if there are changes to commit
+                  if git diff --quiet; then
+                    echo "No changes detected. Version might already be up to date."
+                    echo "has_changes=false" >> $GITHUB_ENV
+                  else
+                    echo "Changes detected. Proceeding with commit and PR."
+                    echo "has_changes=true" >> $GITHUB_ENV
+                    git add public/install.sh
+                    git commit -m "Update OpenHands CLI version to ${{ steps.extract_version.outputs.version }}" \
+                               -m "This update corresponds to the release of OpenHands CLI v${{ steps.extract_version.outputs.version }}." \
+                               -m "Automated update triggered by release workflow."
+                    git push origin "$BRANCH_NAME"
+                  fi
+
+            - name: Check for existing PR
+              if: env.has_changes == 'true'
+              run: |
+                  # Check if a PR already exists for this version
+                  EXISTING_PR=$(curl -s \
+                    -H "Authorization: token ${{ secrets.ALLHANDS_BOT_GITHUB_PAT }}" \
+                    -H "Accept: application/vnd.github.v3+json" \
+                    "https://api.github.com/repos/All-Hands-AI/install-openhands-website/pulls?state=open&head=update-version-${{ steps.extract_version.outputs.version }}" \
+                    | jq -r '.[0].html_url // "null"')
+
+                  if [ "$EXISTING_PR" != "null" ]; then
+                    echo "PR already exists for version ${{ steps.extract_version.outputs.version }}: $EXISTING_PR"
+                    echo "pr_exists=true" >> $GITHUB_ENV
+                    echo "existing_pr_url=$EXISTING_PR" >> $GITHUB_ENV
+                  else
+                    echo "No existing PR found for version ${{ steps.extract_version.outputs.version }}"
+                    echo "pr_exists=false" >> $GITHUB_ENV
+                  fi
+
+            - name: Create Pull Request
+              if: env.has_changes == 'true' && env.pr_exists == 'false'
+              run: |
+                  cd website-repo
+                  BRANCH_NAME="update-version-${{ steps.extract_version.outputs.version }}"
+
+                  # Create PR using GitHub API
+                  curl -X POST \
+                    -H "Authorization: token ${{ secrets.ALLHANDS_BOT_GITHUB_PAT }}" \
+                    -H "Accept: application/vnd.github.v3+json" \
+                    https://api.github.com/repos/All-Hands-AI/install-openhands-website/pulls \
+                    -d '{
+                      "title": "Update OpenHands CLI version to ${{ steps.extract_version.outputs.version }}",
+                      "head": "'"$BRANCH_NAME"'",
+                      "base": "main",
+                      "body": "This PR updates the OpenHands CLI version in the install script to v${{ steps.extract_version.outputs.version }}.\n\n**Changes:**\n- Updated `VERSION` in `public/install.sh` from the previous version to `${{ steps.extract_version.outputs.version }}`\n\n**Context:**\n'"$(if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "This update was manually triggered via workflow dispatch."; else echo "This update was automatically triggered by the release of [OpenHands CLI v${{ steps.extract_version.outputs.version }}](${{ github.event.release.html_url }}) in the [OpenHands-CLI repository](https://github.com/OpenHands/OpenHands-CLI)."; fi)"'\n\n**Testing:**\nAfter merging, users will be able to install the latest version using:\n```bash\ncurl -fsSL https://install.openhands.dev/install.sh | sh\n```",
+                      "draft": false
+                    }' | jq -r '.html_url' > pr_url.txt
+
+                  if [ -s pr_url.txt ] && [ "$(cat pr_url.txt)" != "null" ]; then
+                    echo "✅ Pull request created successfully: $(cat pr_url.txt)"
+                  else
+                    echo "❌ Failed to create pull request"
+                    exit 1
+                  fi
+
+            - name: Summary
+              run: |-
+                  if [ "${{ env.has_changes }}" = "true" ]; then
+                    if [ "${{ env.pr_exists }}" = "true" ]; then
+                      echo "ℹ️ PR already exists for version ${{ steps.extract_version.outputs.version }}: ${{ env.existing_pr_url }}"
+                    else
+                      echo "✅ Successfully created PR to update install-openhands-website to version ${{ steps.extract_version.outputs.version }}"
+                    fi
+                  else
+                    echo "ℹ️ No changes needed - version ${{ steps.extract_version.outputs.version }} is already up to date in install-openhands-website"
+                  fi

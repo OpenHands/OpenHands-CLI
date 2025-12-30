@@ -31,7 +31,6 @@ from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.refactor.content.splash import get_splash_content
 from openhands_cli.refactor.core.commands import is_valid_command, show_help
 from openhands_cli.refactor.core.conversation_runner import ConversationRunner
-from openhands_cli.refactor.core.theme import OPENHANDS_THEME
 from openhands_cli.refactor.modals import SettingsScreen
 from openhands_cli.refactor.modals.confirmation_modal import ConfirmationSettingsModal
 from openhands_cli.refactor.modals.exit_modal import ExitConfirmationModal
@@ -46,7 +45,9 @@ from openhands_cli.refactor.widgets.status_line import (
     InfoStatusLine,
     WorkingStatusLine,
 )
+from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.user_actions.types import UserConfirmation
+from openhands_cli.utils import json_callback
 
 
 class OpenHandsApp(App):
@@ -74,6 +75,7 @@ class OpenHandsApp(App):
         queued_inputs: list[str] | None = None,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
         headless_mode: bool = False,
+        json_mode: bool = False,
         **kwargs,
     ):
         """Initialize the app with custom OpenHands theme.
@@ -85,6 +87,8 @@ class OpenHandsApp(App):
             queued_inputs: Optional list of input strings to queue at the start.
             initial_confirmation_policy: Initial confirmation policy to use.
                                        If None, defaults to AlwaysConfirm.
+            headless_mode: If True, run in headless mode.
+            json_mode: If True, enable JSON output mode.
         """
         super().__init__(**kwargs)
 
@@ -96,6 +100,9 @@ class OpenHandsApp(App):
 
         # Store headless mode setting for auto-exit behavior
         self.headless_mode = headless_mode
+
+        # Store JSON mode setting
+        self.json_mode = json_mode
 
         # Store resume conversation ID
         self.conversation_id = (
@@ -112,6 +119,11 @@ class OpenHandsApp(App):
 
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
+        self._reload_visualizer = (
+            lambda: self.conversation_runner.visualizer.reload_configuration()
+            if self.conversation_runner
+            else None
+        )
 
         # Confirmation panel tracking
         self.confirmation_panel: ConfirmationSidePanel | None = None
@@ -161,9 +173,7 @@ class OpenHandsApp(App):
         yield SystemCommand(
             "MCP", "View MCP configurations", lambda: MCPSidePanel.toggle(self)
         )
-        yield SystemCommand(
-            "AGENT SETTINGS", "Configure agent settings", self.action_open_settings
-        )
+        yield SystemCommand("SETTINGS", "Configure settings", self.action_open_settings)
 
     def on_mount(self) -> None:
         """Called when app starts."""
@@ -180,9 +190,12 @@ class OpenHandsApp(App):
 
                 console = Console()
                 console.print(
-                    "[red]Headless mode requires existing settings.[/red]\n"
-                    "[bold]Please run:[/bold] [green]openhands --exp[/green] "
-                    "to configure your settings before using [cyan]--headless[/cyan]."
+                    f"[{OPENHANDS_THEME.error}]Headless mode requires existing "
+                    f"settings.[/{OPENHANDS_THEME.error}]\n"
+                    f"[bold]Please run:[/bold] [{OPENHANDS_THEME.success}]openhands "
+                    f"--exp[/{OPENHANDS_THEME.success}] to configure your settings "
+                    f"before using [{OPENHANDS_THEME.accent}]--headless"
+                    f"[/{OPENHANDS_THEME.accent}]."
                 )
                 self.exit()
                 return
@@ -197,7 +210,10 @@ class OpenHandsApp(App):
     def _show_initial_settings(self) -> None:
         """Show settings screen for first-time users."""
         settings_screen = SettingsScreen(
-            on_settings_saved=self._initialize_main_ui,
+            on_settings_saved=[
+                self._initialize_main_ui,
+                self._reload_visualizer,
+            ],
             on_first_time_settings_cancelled=self._handle_initial_setup_cancelled,
         )
         self.push_screen(settings_screen)
@@ -265,7 +281,9 @@ class OpenHandsApp(App):
             return
 
         # Open the settings screen for existing users
-        settings_screen = SettingsScreen()
+        settings_screen = SettingsScreen(
+            on_settings_saved=[self._reload_visualizer],
+        )
         self.push_screen(settings_screen)
 
     def _initialize_main_ui(self) -> None:
@@ -313,6 +331,11 @@ class OpenHandsApp(App):
             self.main_display, self, skip_user_messages=True
         )
 
+        # Create JSON callback if in JSON mode
+        event_callback = None
+        if self.json_mode:
+            event_callback = json_callback
+
         return ConversationRunner(
             self.conversation_id,
             self.conversation_running_signal.publish,
@@ -322,6 +345,7 @@ class OpenHandsApp(App):
             ),
             visualizer,
             self.initial_confirmation_policy,
+            event_callback,
         )
 
     def _process_queued_inputs(self) -> None:
@@ -406,7 +430,8 @@ class OpenHandsApp(App):
         except RuntimeError:
             # In test environment, just show a placeholder message
             placeholder_widget = Static(
-                "[green]Message would be processed by conversation runner[/green]",
+                f"[{OPENHANDS_THEME.success}]Message would be processed by "
+                f"conversation runner[/{OPENHANDS_THEME.success}]",
                 classes="status-message",
             )
             self.main_display.mount(placeholder_widget)
@@ -561,6 +586,7 @@ def main(
     llm_approve: bool = False,
     exit_without_confirmation: bool = False,
     headless: bool = False,
+    json_mode: bool = False,
 ):
     """Run the textual app.
 
@@ -571,6 +597,7 @@ def main(
         llm_approve: If True, use LLM-based security analyzer (ConfirmRisky policy).
         exit_without_confirmation: If True, exit without showing confirmation dialog.
         headless: If True, run in headless mode (no UI output, auto-approve actions).
+        json_mode: If True, enable JSON output mode (implies headless).
     """
     # Determine initial confirmation policy from CLI arguments
     # If headless mode is enabled, always use NeverConfirm (auto-approve all actions)
@@ -588,6 +615,7 @@ def main(
         queued_inputs=queued_inputs,
         initial_confirmation_policy=initial_confirmation_policy,
         headless_mode=headless,
+        json_mode=json_mode,
     )
     app.run(headless=headless)
 

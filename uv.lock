@@ -67,6 +67,19 @@ wheels = [
 ]
 
 [[package]]
+name = "aiohttp-jinja2"
+version = "1.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "jinja2" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e6/39/da5a94dd89b1af7241fb7fc99ae4e73505b5f898b540b6aba6dc7afe600e/aiohttp-jinja2-1.6.tar.gz", hash = "sha256:a3a7ff5264e5bca52e8ae547bbfd0761b72495230d438d05b6c0915be619b0e2", size = 53057, upload-time = "2023-11-18T15:30:52.559Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/eb/90/65238d4246307195411b87a07d03539049819b022c01bcc773826f600138/aiohttp_jinja2-1.6-py3-none-any.whl", hash = "sha256:0df405ee6ad1b58e5a068a105407dc7dcc1704544c559f1938babde954f945c7", size = 11736, upload-time = "2023-11-18T15:30:50.743Z" },
+]
+
+[[package]]
 name = "aiosignal"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1114,7 +1127,7 @@ wheels = [
 
 [[package]]
 name = "litellm"
-version = "1.80.7"
+version = "1.80.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -1131,14 +1144,14 @@ dependencies = [
     { name = "tiktoken" },
     { name = "tokenizers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a5/3f/af532014449c3931ae6cad2d97d267dd43d0de006060a8cbf0962e004024/litellm-1.80.7.tar.gz", hash = "sha256:3977a8d195aef842d01c18bf9e22984829363c6a4b54daf9a43c9dd9f190b42c", size = 12023127, upload-time = "2025-11-27T23:03:52.474Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/55/47/be6cd7b356418ca8bef3b843507940ce77b76ef2dfe515f2b4ba9b461ff0/litellm-1.80.11.tar.gz", hash = "sha256:c9fc63e7acb6360363238fe291bcff1488c59ff66020416d8376c0ee56414a19", size = 13189510, upload-time = "2025-12-22T12:47:29.181Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/54/e0/2e60a0c09235fd7b55297390c557923f3c35a9cf001914222c26a7857d2b/litellm-1.80.7-py3-none-any.whl", hash = "sha256:f7d993f78c1e0e4e1202b2a925cc6540b55b6e5fb055dd342d88b145ab3102ed", size = 10848321, upload-time = "2025-11-27T23:03:50.002Z" },
+    { url = "https://files.pythonhosted.org/packages/97/0b/9e637344f24f3fe0e8039cd2337389fe05e0d31f518bc3e0a5cdbe45784a/litellm-1.80.11-py3-none-any.whl", hash = "sha256:406283d66ead77dc7ff0e0b2559c80e9e497d8e7c2257efb1cb9210a20d09d54", size = 11456346, upload-time = "2025-12-22T12:47:26.469Z" },
 ]
 
 [[package]]
 name = "lmnr"
-version = "0.7.21"
+version = "0.7.25"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "grpcio" },
@@ -1158,9 +1171,9 @@ dependencies = [
     { name = "tenacity" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9b/00/030cc891cde0b768af6ac76fa303ac824d2c8a608c5dd5326587165f0b78/lmnr-0.7.21.tar.gz", hash = "sha256:7e6653bff214201bc81fa2a51ba1d5bc9a45cf56ac4fa864bc80a9ff03e27a03", size = 198922, upload-time = "2025-11-06T19:25:01.038Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/10/bd/a65219ca6f09199e35a14a55acb503e3ac896db15018d342076bd24401e1/lmnr-0.7.25.tar.gz", hash = "sha256:a3a0ba9a305243bbe97f2fcb8afc7d39d201dc11107b4633c257b64b838b2979", size = 203876, upload-time = "2025-12-18T17:31:24.507Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/97/d4/9bd80d763aaf3ccec1ffb08bfa1f76e616a02856a7ee7cbbac3ee180f5bb/lmnr-0.7.21-py3-none-any.whl", hash = "sha256:5db260c5ed2145aca460563acc810a71a48d9c08663ecb23a318613d221705c7", size = 253726, upload-time = "2025-11-06T19:24:59.312Z" },
+    { url = "https://files.pythonhosted.org/packages/45/35/1f22e3fea98416d58dddbdbc63e18ddcfb2b8f850b8ec065652a90d99666/lmnr-0.7.25-py3-none-any.whl", hash = "sha256:c0539d5f8c8e59a2d5d0ab04e498a82351d51fde8cf04ef8b312424e0be537ac", size = 266040, upload-time = "2025-12-18T17:31:22.986Z" },
 ]
 
 [[package]]
@@ -1308,6 +1321,23 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ea/5d/38b681d3fce7a266dd9ab73c66959406d565b3e85f21d5e66e1181d93721/more_itertools-10.8.0.tar.gz", hash = "sha256:f638ddf8a1a0d134181275fb5d58b086ead7c6a72429ad725c67503f13ba30bd", size = 137431, upload-time = "2025-09-02T15:23:11.018Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a4/8e/469e5a4a2f5855992e425f3cb33804cc07bf18d48f2db061aec61ce50270/more_itertools-10.8.0-py3-none-any.whl", hash = "sha256:52d4362373dcf7c52546bc4af9a86ee7c4579df9a8dc268be0a2f949d376cc9b", size = 69667, upload-time = "2025-09-02T15:23:09.635Z" },
+]
+
+[[package]]
+name = "msgpack"
+version = "1.1.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4d/f2/bfb55a6236ed8725a96b0aa3acbd0ec17588e6a2c3b62a93eb513ed8783f/msgpack-1.1.2.tar.gz", hash = "sha256:3b60763c1373dd60f398488069bcdc703cd08a711477b5d480eecc9f9626f47e", size = 173581, upload-time = "2025-10-08T09:15:56.596Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ad/bd/8b0d01c756203fbab65d265859749860682ccd2a59594609aeec3a144efa/msgpack-1.1.2-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:70a0dff9d1f8da25179ffcf880e10cf1aad55fdb63cd59c9a49a1b82290062aa", size = 81939, upload-time = "2025-10-08T09:15:01.472Z" },
+    { url = "https://files.pythonhosted.org/packages/34/68/ba4f155f793a74c1483d4bdef136e1023f7bcba557f0db4ef3db3c665cf1/msgpack-1.1.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:446abdd8b94b55c800ac34b102dffd2f6aa0ce643c55dfc017ad89347db3dbdb", size = 85064, upload-time = "2025-10-08T09:15:03.764Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/60/a064b0345fc36c4c3d2c743c82d9100c40388d77f0b48b2f04d6041dbec1/msgpack-1.1.2-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:c63eea553c69ab05b6747901b97d620bb2a690633c77f23feb0c6a947a8a7b8f", size = 417131, upload-time = "2025-10-08T09:15:05.136Z" },
+    { url = "https://files.pythonhosted.org/packages/65/92/a5100f7185a800a5d29f8d14041f61475b9de465ffcc0f3b9fba606e4505/msgpack-1.1.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:372839311ccf6bdaf39b00b61288e0557916c3729529b301c52c2d88842add42", size = 427556, upload-time = "2025-10-08T09:15:06.837Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/87/ffe21d1bf7d9991354ad93949286f643b2bb6ddbeab66373922b44c3b8cc/msgpack-1.1.2-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:2929af52106ca73fcb28576218476ffbb531a036c2adbcf54a3664de124303e9", size = 404920, upload-time = "2025-10-08T09:15:08.179Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/41/8543ed2b8604f7c0d89ce066f42007faac1eaa7d79a81555f206a5cdb889/msgpack-1.1.2-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:be52a8fc79e45b0364210eef5234a7cf8d330836d0a64dfbb878efa903d84620", size = 415013, upload-time = "2025-10-08T09:15:09.83Z" },
+    { url = "https://files.pythonhosted.org/packages/41/0d/2ddfaa8b7e1cee6c490d46cb0a39742b19e2481600a7a0e96537e9c22f43/msgpack-1.1.2-cp312-cp312-win32.whl", hash = "sha256:1fff3d825d7859ac888b0fbda39a42d59193543920eda9d9bea44d958a878029", size = 65096, upload-time = "2025-10-08T09:15:11.11Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/ec/d431eb7941fb55a31dd6ca3404d41fbb52d99172df2e7707754488390910/msgpack-1.1.2-cp312-cp312-win_amd64.whl", hash = "sha256:1de460f0403172cff81169a30b9a92b260cb809c4cb7e2fc79ae8d0510c78b6b", size = 72708, upload-time = "2025-10-08T09:15:12.554Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/31/5b1a1f70eb0e87d1678e9624908f86317787b536060641d6798e3cf70ace/msgpack-1.1.2-cp312-cp312-win_arm64.whl", hash = "sha256:be5980f3ee0e6bd44f3a9e9dea01054f175b50c3e6cdb692bc9424c0bbb8bf69", size = 64119, upload-time = "2025-10-08T09:15:13.589Z" },
 ]
 
 [[package]]
@@ -1466,17 +1496,20 @@ wheels = [
 
 [[package]]
 name = "openhands"
-version = "1.5.0"
+version = "1.7.0"
 source = { editable = "." }
 dependencies = [
     { name = "agent-client-protocol" },
+    { name = "httpx" },
     { name = "openhands-sdk" },
     { name = "openhands-tools" },
     { name = "prompt-toolkit" },
     { name = "pydantic" },
     { name = "pyperclip" },
+    { name = "streamingjson" },
     { name = "textual" },
     { name = "textual-autocomplete" },
+    { name = "textual-serve" },
     { name = "typer" },
 ]
 
@@ -1494,18 +1527,22 @@ dev = [
     { name = "pytest-forked" },
     { name = "pytest-xdist" },
     { name = "ruff" },
+    { name = "textual-dev" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "agent-client-protocol", specifier = ">=0.7.0,<0.8.0" },
-    { name = "openhands-sdk", specifier = "==1.5.2" },
-    { name = "openhands-tools", specifier = "==1.5.2" },
+    { name = "httpx", specifier = ">=0.25.0" },
+    { name = "openhands-sdk", specifier = "==1.7.2" },
+    { name = "openhands-tools", specifier = "==1.7.2" },
     { name = "prompt-toolkit", specifier = ">=3" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyperclip", specifier = ">=1.9.0" },
+    { name = "streamingjson", specifier = ">=0.0.2" },
     { name = "textual", specifier = ">=0.79.0" },
     { name = "textual-autocomplete", specifier = ">=4.0.6" },
+    { name = "textual-serve", specifier = ">=1.1.3" },
     { name = "typer", specifier = ">=0.17.4" },
 ]
 
@@ -1523,11 +1560,12 @@ dev = [
     { name = "pytest-forked", specifier = ">=1.6.0" },
     { name = "pytest-xdist", specifier = ">=3.6.1" },
     { name = "ruff", specifier = ">=0.12.10" },
+    { name = "textual-dev", specifier = ">=1.8.0" },
 ]
 
 [[package]]
 name = "openhands-sdk"
-version = "1.5.2"
+version = "1.7.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "deprecation" },
@@ -1541,14 +1579,14 @@ dependencies = [
     { name = "tenacity" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bd/d7/58fa284e8a289496a56f51374523486b24545ae2e1fd6a8f701de7dabe1c/openhands_sdk-1.5.2.tar.gz", hash = "sha256:798aa8f8ccd84b15deb418c4301d00f33da288bc1a8d41efa5cc47c10aaf3fd6", size = 187345, upload-time = "2025-12-11T15:14:33.409Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/99/fc/647babbe04b76c994254f1be416f998506f1bdc8fcc95ba0974d5b2f153e/openhands_sdk-1.7.2.tar.gz", hash = "sha256:0f6d34f857f8f7749d70741376f2a06eee944673f4df862df2e35d680e4b0321", size = 210020, upload-time = "2025-12-29T17:46:59.169Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8a/a0/116bc455e8fe96e4470be4519407032c334ff1aacfcc260151b7b47fe5ab/openhands_sdk-1.5.2-py3-none-any.whl", hash = "sha256:593430e9c8729e345fce3fca7e9a9a7ef084a08222d6ba42113e6ba5f6e9f15d", size = 247271, upload-time = "2025-12-11T15:14:29.244Z" },
+    { url = "https://files.pythonhosted.org/packages/68/b6/d81d2cdbc00ddf1cb053aefcb601a83283346111183507a15c1a629cd690/openhands_sdk-1.7.2-py3-none-any.whl", hash = "sha256:0f013d2a5100e6e562ef6f6932353da3c94c9eae46a1712daab95199a3d9d18a", size = 275662, upload-time = "2025-12-29T17:46:53.915Z" },
 ]
 
 [[package]]
 name = "openhands-tools"
-version = "1.5.2"
+version = "1.7.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bashlex" },
@@ -1561,9 +1599,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "tom-swe" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a4/55/348d5885f7b904d13f6d1b1b774924f01ecec75beb1261321f933b90da50/openhands_tools-1.5.2.tar.gz", hash = "sha256:4644a24144fbdf630fb0edc303526b4add61b3fbe7a7434da73f231312c34846", size = 80520, upload-time = "2025-12-11T15:14:31.141Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/74/6f/8d2d0566dd87122adc7e51609832a7b4ee9ea514b935c71fad7d21414c11/openhands_tools-1.7.2.tar.gz", hash = "sha256:173b9a89c2e88fda24f1ac8e9bbe9a1e37810fcfbf15f5ff81fefcecd820194b", size = 91174, upload-time = "2025-12-29T17:46:55.766Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f7/80/f83fa35c452468005e43fe62c7a582a87e0a5a528692ae995e446041ab12/openhands_tools-1.5.2-py3-none-any.whl", hash = "sha256:33e9c2af65aaa7b6b9a10b42d2fb11137e6b35e7ac02a4b9269ef37b5c79cc01", size = 106497, upload-time = "2025-12-11T15:14:28.119Z" },
+    { url = "https://files.pythonhosted.org/packages/6f/f9/97b6b22251d446ae63220548abaec3a34a46a1a04e75f97179c373b1c355/openhands_tools-1.7.2-py3-none-any.whl", hash = "sha256:4f763632b0506842606f821f01433b40a994b2331e453ee13c99cb3cf6cb0e11", size = 126434, upload-time = "2025-12-29T17:46:52.467Z" },
 ]
 
 [[package]]
@@ -4890,6 +4928,15 @@ wheels = [
 ]
 
 [[package]]
+name = "streamingjson"
+version = "0.0.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b8/bf/733575d718ba8c667ce7b6505d9b64077777ac5cef0877854f5cee4fba2b/streamingjson-0.0.5.tar.gz", hash = "sha256:93b0287ce4ad4089308fbe5745b8bfd63b39e445a6f3891474ea8491284a23e3", size = 15544, upload-time = "2024-09-20T01:56:23.221Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/47/60/3b1680ea91cc95a2088164ae67f91960b93ec568027ccb4b47784b7f5efa/streamingjson-0.0.5-py3-none-any.whl", hash = "sha256:c7baece0ff7ebce0a2a6baa0c1394dfdfe24a4a62f9635d4a17c2b548ff5eb76", size = 10183, upload-time = "2024-09-20T01:56:42.658Z" },
+]
+
+[[package]]
 name = "tenacity"
 version = "9.1.2"
 source = { registry = "https://pypi.org/simple" }
@@ -4926,6 +4973,39 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/1e/3a/80411bc7b94969eb116ad1b18db90f8dce8a1de441278c4a81fee55a27ca/textual_autocomplete-4.0.6.tar.gz", hash = "sha256:2ba2f0d767be4480ecacb3e4b130cf07340e033c3500fc424fed9125d27a4586", size = 97967, upload-time = "2025-09-24T21:19:20.213Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9f/66/ebe744d79c87f25a42d2654dddbd09462edd595f2ded715245a51a546461/textual_autocomplete-4.0.6-py3-none-any.whl", hash = "sha256:bff69c19386e2cbb4a007503b058dc37671d480a4fa2ddb3959c15ceb4aff9b5", size = 16499, upload-time = "2025-09-24T21:19:18.489Z" },
+]
+
+[[package]]
+name = "textual-dev"
+version = "1.8.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "click" },
+    { name = "msgpack" },
+    { name = "textual" },
+    { name = "textual-serve" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/38/fd/fd5ad9527b536c306a5a860a33a45e13983a59804b48b91ea52b42ba030a/textual_dev-1.8.0.tar.gz", hash = "sha256:7e56867b0341405a95e938cac0647e6d2763d38d0df08710469ad6b6a8db76df", size = 25026, upload-time = "2025-10-11T09:47:01.824Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/45/c6/1dc08ceee6d0bdf219c500cb2fbd605b681b63507c4ff27a6477f12f8245/textual_dev-1.8.0-py3-none-any.whl", hash = "sha256:227b6d24a485fbbc77e302aa21f4fdf3083beb57eb45cd95bae082c81cbeddeb", size = 27541, upload-time = "2025-10-11T09:47:00.531Z" },
+]
+
+[[package]]
+name = "textual-serve"
+version = "1.1.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "aiohttp-jinja2" },
+    { name = "jinja2" },
+    { name = "rich" },
+    { name = "textual" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c2/7e/62fecc552853ec6a178cb1faa2d6f73b34d5512924770e7b08b58ff14148/textual_serve-1.1.3.tar.gz", hash = "sha256:f8f636ae2f5fd651b79d965473c3e9383d3521cdf896f9bc289709185da3f683", size = 448340, upload-time = "2025-11-01T16:22:36.723Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b5/fe/108e7773349d500cf363328c3d0b7123e03feda51e310a3a5b136ac8ca71/textual_serve-1.1.3-py3-none-any.whl", hash = "sha256:207a472bc6604e725b1adab4ab8bf12f4c4dc25b04eea31e4d04731d8bf30f18", size = 447339, upload-time = "2025-11-01T16:22:35.209Z" },
 ]
 
 [[package]]

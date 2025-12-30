@@ -8,12 +8,17 @@ from rich.console import Console
 from rich.text import Text
 from textual.notifications import SeverityLevel
 
-from openhands.sdk import BaseConversation, Message, TextContent
+from openhands.sdk import (
+    BaseConversation,
+    ConversationExecutionStatus,
+    Message,
+    TextContent,
+)
 from openhands.sdk.conversation.exceptions import ConversationRunError
 from openhands.sdk.conversation.state import (
-    ConversationExecutionStatus,
     ConversationState,
 )
+from openhands.sdk.event.base import Event
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmationPolicyBase,
@@ -36,6 +41,7 @@ class ConversationRunner:
         notification_callback: Callable[[str, str, SeverityLevel], None],
         visualizer: ConversationVisualizer,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
+        event_callback: Callable[[Event], None] | None = None,
     ):
         """Initialize the conversation runner.
 
@@ -48,11 +54,12 @@ class ConversationRunner:
                                         If None, defaults to AlwaysConfirm.
         """
         starting_confirmation_policy = initial_confirmation_policy or AlwaysConfirm()
-
+        self.visualizer = visualizer
         self.conversation: BaseConversation = setup_conversation(
             conversation_id,
             confirmation_policy=starting_confirmation_policy,
             visualizer=visualizer,
+            event_callback=event_callback,
         )
 
         self._running = False

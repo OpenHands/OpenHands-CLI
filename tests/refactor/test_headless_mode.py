@@ -53,8 +53,8 @@ class TestHeadlessArgumentParsing:
 class TestSimpleMainHeadlessValidation:
     """High-level validation behavior of simple_main."""
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
-    def test_headless_without_task_or_file_exits_with_error(self, mock_run_cli_entry):
+    @patch("openhands_cli.refactor.textual_app.main")
+    def test_headless_without_task_or_file_exits_with_error(self, mock_textual_main):
         test_args = ["openhands", "--headless"]
 
         with patch.object(sys, "argv", test_args):
@@ -62,26 +62,32 @@ class TestSimpleMainHeadlessValidation:
                 with pytest.raises(SystemExit) as exc:
                     simple_main()
         assert exc.value.code == 2
-        mock_run_cli_entry.assert_not_called()
+        mock_textual_main.assert_not_called()
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
-    def test_headless_with_task_calls_run_cli_entry_with_never_confirm_and_queued_input(
-        self, mock_run_cli_entry
+    @patch("openhands_cli.refactor.textual_app.main")
+    def test_headless_with_task_calls_textual_main_with_queued_input(
+        self, mock_textual_main
     ):
+        # Mock textual_main to return a UUID
+        mock_textual_main.return_value = uuid.uuid4()
+
         test_args = ["openhands", "--headless", "--task", "test task"]
 
         with patch.object(sys, "argv", test_args):
             simple_main()
 
-        mock_run_cli_entry.assert_called_once()
-        kwargs = mock_run_cli_entry.call_args.kwargs
+        mock_textual_main.assert_called_once()
+        kwargs = mock_textual_main.call_args.kwargs
 
-        # Headless should always auto-approve (NeverConfirm) and queue the task
-        assert isinstance(kwargs["confirmation_policy"], NeverConfirm)
+        # Headless should queue the task and set headless=True
         assert kwargs["queued_inputs"] == ["test task"]
+        assert kwargs["headless"] is True
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
-    def test_headless_with_file_calls_run_cli_entry(self, mock_run_cli_entry):
+    @patch("openhands_cli.refactor.textual_app.main")
+    def test_headless_with_file_calls_textual_main(self, mock_textual_main):
+        # Mock textual_main to return a UUID
+        mock_textual_main.return_value = uuid.uuid4()
+
         # minimal coverage that file-only headless works
         with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write("test content")
@@ -92,19 +98,26 @@ class TestSimpleMainHeadlessValidation:
             with patch.object(sys, "argv", test_args):
                 simple_main()
 
-            mock_run_cli_entry.assert_called_once()
+            mock_textual_main.assert_called_once()
         finally:
             os.unlink(temp_file)
 
-    @patch("openhands_cli.agent_chat.run_cli_entry")
-    def test_headless_auto_sets_exit_without_confirmation(self, mock_run_cli_entry):
+    @patch("openhands_cli.refactor.textual_app.main")
+    def test_headless_auto_sets_exit_without_confirmation(self, mock_textual_main):
         """Regression guard that headless implies exit_without_confirmation."""
+        # Mock textual_main to return a UUID
+        mock_textual_main.return_value = uuid.uuid4()
+
         test_args = ["openhands", "--headless", "--task", "test task"]
 
         with patch.object(sys, "argv", test_args):
             simple_main()
 
-        mock_run_cli_entry.assert_called_once()
+        mock_textual_main.assert_called_once()
+        kwargs = mock_textual_main.call_args.kwargs
+
+        # Headless should auto-set exit_without_confirmation
+        assert kwargs["exit_without_confirmation"] is True
 
     def test_headless_help_text_mentions_requirements(self):
         """Ensure CLI help describes the task/file requirement."""
@@ -379,3 +392,60 @@ class TestHeadlessInitialSetupGuard:
                 for arg in call.args
             )
             assert printed_any_exp_hint
+
+
+# ---------------------------------------------------------------------------
+# JSON Mode Tests (Minimal High-Impact Coverage)
+# ---------------------------------------------------------------------------
+
+
+class TestJsonArgumentValidation:
+    """Minimal tests for JSON argument validation."""
+
+    def test_json_requires_headless_mode(self):
+        """Test that JSON flag requires headless mode."""
+        # JSON without headless should not enable JSON mode
+        with patch("openhands_cli.refactor.textual_app.main") as mock_textual:
+            # Mock sys.argv for argument parsing
+            with patch("sys.argv", ["openhands", "--json", "--task", "test task"]):
+                simple_main()
+
+            # Verify textual_main was called with json_mode=False
+            mock_textual.assert_called_once()
+            args, kwargs = mock_textual.call_args
+            assert kwargs.get("json_mode", False) is False
+
+    def test_json_and_headless_enables_json_mode(self):
+        """Test that JSON + headless enables JSON mode."""
+        with patch("openhands_cli.refactor.textual_app.main") as mock_textual:
+            # Mock sys.argv for argument parsing
+            with patch(
+                "sys.argv", ["openhands", "--headless", "--json", "--task", "test task"]
+            ):
+                simple_main()
+
+            # Verify textual_main was called with json_mode=True
+            mock_textual.assert_called_once()
+            args, kwargs = mock_textual.call_args
+            assert kwargs.get("json_mode", False) is True
+
+
+class TestJsonModeIntegration:
+    """Minimal tests for JSON mode integration."""
+
+    def test_json_callback_function_exists_and_callable(self):
+        """Test that json_callback function exists and is callable."""
+        from openhands_cli.utils import json_callback
+
+        # Verify the function exists and is callable
+        assert callable(json_callback)
+
+        # Test that it can be used as an event callback (basic compatibility)
+        from openhands.sdk.event import Event
+
+        mock_event = Mock(spec=Event)
+        mock_event.model_dump.return_value = {"test": "data"}
+
+        # Should not raise an exception
+        with patch("builtins.print"):
+            json_callback(mock_event)

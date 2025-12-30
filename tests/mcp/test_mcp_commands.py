@@ -11,6 +11,8 @@ from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
 from openhands_cli.mcp.mcp_commands import (
     handle_mcp_add,
     handle_mcp_command,
+    handle_mcp_disable,
+    handle_mcp_enable,
     handle_mcp_get,
     handle_mcp_list,
     handle_mcp_remove,
@@ -45,7 +47,7 @@ class TestMCPCommands:
             )
 
             with patch("openhands_cli.mcp.mcp_commands.add_server") as mock_add_server:
-                with patch("openhands_cli.mcp.mcp_commands.print_formatted_text"):
+                with patch("openhands_cli.mcp.mcp_commands.console.print"):
                     handle_mcp_add(args)
 
                     mock_add_server.assert_called_once_with(
@@ -56,6 +58,7 @@ class TestMCPCommands:
                         headers=["Authorization: Bearer token"],
                         env_vars=None,
                         auth=None,
+                        enabled=True,
                     )
 
     def test_handle_mcp_add_stdio_success(self):
@@ -71,7 +74,7 @@ class TestMCPCommands:
         )
 
         with patch("openhands_cli.mcp.mcp_commands.add_server") as mock_add_server:
-            with patch("openhands_cli.mcp.mcp_commands.print_formatted_text"):
+            with patch("openhands_cli.mcp.mcp_commands.console.print"):
                 handle_mcp_add(args)
 
                 mock_add_server.assert_called_once_with(
@@ -82,6 +85,7 @@ class TestMCPCommands:
                     headers=None,
                     env_vars=["API_KEY=secret"],
                     auth=None,
+                    enabled=True,
                 )
 
     def test_handle_mcp_add_oauth_success(self):
@@ -98,7 +102,7 @@ class TestMCPCommands:
             )
 
             with patch("openhands_cli.mcp.mcp_commands.add_server") as mock_add_server:
-                with patch("openhands_cli.mcp.mcp_commands.print_formatted_text"):
+                with patch("openhands_cli.mcp.mcp_commands.console.print"):
                     handle_mcp_add(args)
 
                     mock_add_server.assert_called_once_with(
@@ -109,6 +113,7 @@ class TestMCPCommands:
                         headers=None,
                         env_vars=None,
                         auth="oauth",
+                        enabled=True,
                     )
 
     def test_handle_mcp_add_error(self):
@@ -128,9 +133,7 @@ class TestMCPCommands:
 
             mock_add_server.side_effect = MCPConfigurationError("Test error")
 
-            with patch(
-                "openhands_cli.mcp.mcp_commands.print_formatted_text"
-            ) as mock_print:
+            with patch("openhands_cli.mcp.mcp_commands.console.print") as mock_print:
                 with pytest.raises(SystemExit):
                     handle_mcp_add(args)
 
@@ -146,7 +149,7 @@ class TestMCPCommands:
         with patch(
             "openhands_cli.mcp.mcp_commands.remove_server"
         ) as mock_remove_server:
-            with patch("openhands_cli.mcp.mcp_commands.print_formatted_text"):
+            with patch("openhands_cli.mcp.mcp_commands.console.print"):
                 handle_mcp_remove(args)
 
                 mock_remove_server.assert_called_once_with("test_server")
@@ -162,7 +165,7 @@ class TestMCPCommands:
 
             mock_remove_server.side_effect = MCPConfigurationError("Server not found")
 
-            with patch("openhands_cli.mcp.mcp_commands.print_formatted_text"):
+            with patch("openhands_cli.mcp.mcp_commands.console.print"):
                 with pytest.raises(SystemExit):
                     handle_mcp_remove(args)
 
@@ -173,9 +176,7 @@ class TestMCPCommands:
         with patch("openhands_cli.mcp.mcp_commands.list_servers") as mock_list_servers:
             mock_list_servers.return_value = {}
 
-            with patch(
-                "openhands_cli.mcp.mcp_commands.print_formatted_text"
-            ) as mock_print:
+            with patch("openhands_cli.mcp.mcp_commands.console.print") as mock_print:
                 handle_mcp_list(args)
 
                 # Should print "no servers" message
@@ -205,9 +206,7 @@ class TestMCPCommands:
         with patch("openhands_cli.mcp.mcp_commands.list_servers") as mock_list_servers:
             mock_list_servers.return_value = test_servers
 
-            with patch(
-                "openhands_cli.mcp.mcp_commands.print_formatted_text"
-            ) as mock_print:
+            with patch("openhands_cli.mcp.mcp_commands.console.print") as mock_print:
                 handle_mcp_list(args)
 
                 # Should print server details
@@ -231,9 +230,7 @@ class TestMCPCommands:
         with patch("openhands_cli.mcp.mcp_commands.get_server") as mock_get_server:
             mock_get_server.return_value = test_server
 
-            with patch(
-                "openhands_cli.mcp.mcp_commands.print_formatted_text"
-            ) as mock_print:
+            with patch("openhands_cli.mcp.mcp_commands.console.print") as mock_print:
                 handle_mcp_get(args)
 
                 mock_get_server.assert_called_once_with("test_server")
@@ -251,7 +248,7 @@ class TestMCPCommands:
 
             mock_get_server.side_effect = MCPConfigurationError("Server not found")
 
-            with patch("openhands_cli.mcp.mcp_commands.print_formatted_text"):
+            with patch("openhands_cli.mcp.mcp_commands.console.print"):
                 with pytest.raises(SystemExit):
                     handle_mcp_get(args)
 
@@ -283,6 +280,93 @@ class TestMCPCommands:
             result = mask_sensitive_value(key, value)
             assert result == value
 
+    def test_handle_mcp_enable_success(self):
+        """Test successful server enabling."""
+        args = argparse.Namespace(name="test_server")
+
+        with patch("openhands_cli.mcp.mcp_commands.enable_server") as mock_enable:
+            with patch("openhands_cli.mcp.mcp_commands.console.print"):
+                handle_mcp_enable(args)
+
+                mock_enable.assert_called_once_with("test_server")
+
+    def test_handle_mcp_enable_error(self):
+        """Test enabling non-existent server."""
+        args = argparse.Namespace(name="nonexistent")
+
+        with patch("openhands_cli.mcp.mcp_commands.enable_server") as mock_enable:
+            from openhands_cli.mcp.mcp_utils import MCPConfigurationError
+
+            mock_enable.side_effect = MCPConfigurationError("Server not found")
+
+            with patch("openhands_cli.mcp.mcp_commands.console.print"):
+                with pytest.raises(SystemExit):
+                    handle_mcp_enable(args)
+
+    def test_handle_mcp_disable_success(self):
+        """Test successful server disabling."""
+        args = argparse.Namespace(name="test_server")
+
+        with patch("openhands_cli.mcp.mcp_commands.disable_server") as mock_disable:
+            with patch("openhands_cli.mcp.mcp_commands.console.print"):
+                handle_mcp_disable(args)
+
+                mock_disable.assert_called_once_with("test_server")
+
+    def test_handle_mcp_disable_error(self):
+        """Test disabling non-existent server."""
+        args = argparse.Namespace(name="nonexistent")
+
+        with patch("openhands_cli.mcp.mcp_commands.disable_server") as mock_disable:
+            from openhands_cli.mcp.mcp_utils import MCPConfigurationError
+
+            mock_disable.side_effect = MCPConfigurationError("Server not found")
+
+            with patch("openhands_cli.mcp.mcp_commands.console.print"):
+                with pytest.raises(SystemExit):
+                    handle_mcp_disable(args)
+
+    def test_handle_mcp_list_with_enabled_disabled_status(self):
+        """Test listing servers shows enabled/disabled status."""
+        args = argparse.Namespace()
+
+        # Create test servers with enabled field
+        test_servers = {
+            "enabled_server": RemoteMCPServer(
+                transport="http",
+                url="https://api.example.com",
+            ),
+            "disabled_server": StdioMCPServer(
+                transport="stdio",
+                command="python",
+                args=["-m", "server"],
+            ),
+        }
+
+        with patch("openhands_cli.mcp.mcp_commands.list_servers") as mock_list_servers:
+            mock_list_servers.return_value = test_servers
+
+            with patch(
+                "openhands_cli.mcp.mcp_commands.is_server_enabled"
+            ) as mock_is_enabled:
+                # Mock is_server_enabled to return True for enabled_server,
+                # False for disabled_server
+                mock_is_enabled.side_effect = lambda name: name == "enabled_server"
+
+                with patch(
+                    "openhands_cli.mcp.mcp_commands.console.print"
+                ) as mock_print:
+                    handle_mcp_list(args)
+
+                    # Should call is_server_enabled for each server
+                    assert mock_is_enabled.call_count == 2
+
+                    # Check that output contains status indicators
+                    call_args_list = [str(call) for call in mock_print.call_args_list]
+                    content = " ".join(call_args_list)
+                    assert "enabled_server" in content
+                    assert "disabled_server" in content
+
     def test_handle_mcp_command_routing(self):
         """Test that handle_mcp_command routes to correct handlers."""
         test_cases = [
@@ -290,6 +374,8 @@ class TestMCPCommands:
             ("remove", "handle_mcp_remove"),
             ("list", "handle_mcp_list"),
             ("get", "handle_mcp_get"),
+            ("enable", "handle_mcp_enable"),
+            ("disable", "handle_mcp_disable"),
         ]
 
         for command, handler_name in test_cases:
@@ -305,7 +391,7 @@ class TestMCPCommands:
         """Test handling unknown MCP command."""
         args = argparse.Namespace(mcp_command="unknown")
 
-        with patch("openhands_cli.mcp.mcp_commands.print_formatted_text") as mock_print:
+        with patch("openhands_cli.mcp.mcp_commands.console.print") as mock_print:
             with pytest.raises(SystemExit):
                 handle_mcp_command(args)
 
@@ -340,7 +426,7 @@ class TestMCPCommandsIntegration:
                 side_effect=remove_server,
             ),
         ):
-            with patch("openhands_cli.mcp.mcp_commands.print_formatted_text"):
+            with patch("openhands_cli.mcp.mcp_commands.console.print"):
                 # Add server
                 add_args = argparse.Namespace(
                     name="test_server",

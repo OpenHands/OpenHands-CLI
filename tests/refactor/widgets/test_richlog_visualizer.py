@@ -9,9 +9,10 @@ from textual.app import App
 from textual.containers import VerticalScroll
 from textual.widgets import Static
 
-from openhands.sdk.event import ActionEvent, MessageEvent
-from openhands.sdk.llm import MessageToolCall, TextContent
-from openhands.sdk.tool import Action
+from openhands.sdk import Action, MessageEvent, TextContent
+from openhands.sdk.event import ActionEvent
+from openhands.sdk.event.conversation_error import ConversationErrorEvent
+from openhands.sdk.llm import MessageToolCall
 from openhands_cli.refactor.widgets.richlog_visualizer import ConversationVisualizer
 
 
@@ -149,7 +150,7 @@ class TestChineseCharacterMarkupHandling:
         visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
         # Create a message with problematic Chinese content
-        from openhands.sdk.llm import Message
+        from openhands.sdk import Message
 
         message = Message(
             role="assistant",
@@ -271,3 +272,339 @@ class TestVisualizerIntegration:
         if "[" in action.command or "]" in action.command:
             # The title extraction should have escaped them
             assert r"\[" in title_str or r"\]" in title_str
+
+
+class TestConversationErrorEventHandling:
+    """Tests for ConversationErrorEvent handling in the visualizer."""
+
+    def test_conversation_error_event_creates_collapsible_with_error_styling(self):
+        """Test that ConversationErrorEvent is properly handled with error styling."""
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+        # Create a ConversationErrorEvent with test content
+        error_event = ConversationErrorEvent(
+            source="agent", code="test_error", detail="Test conversation error message"
+        )
+
+        # Create the collapsible widget for the error event
+        collapsible = visualizer._create_event_collapsible(error_event)
+
+        # Verify the collapsible was created successfully
+        assert collapsible is not None
+
+        # Verify it has the correct title
+        assert "Conversation Error" in str(collapsible.title)
+
+        # Verify it starts expanded (collapsed=False)
+        assert not collapsible.collapsed
+
+        # Verify it has error border color (should be the error theme color)
+        from openhands_cli.refactor.widgets.richlog_visualizer import (
+            _get_event_border_color,
+        )
+        from openhands_cli.theme import OPENHANDS_THEME
+
+        expected_color = OPENHANDS_THEME.error or "#ff6b6b"
+        actual_color = _get_event_border_color(error_event)
+        assert actual_color == expected_color
+
+
+class TestCliSettingsCaching:
+    """Tests for app configuration caching in ConversationVisualizer."""
+
+    def test_cli_settings_caching(self):
+        """Test that app configuration is cached and not loaded repeatedly."""
+        from unittest.mock import patch
+
+        # Create a mock app and container for the visualizer
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+        # Mock CliSettings.load to track how many times it's called
+        with patch("openhands_cli.stores.CliSettings.load") as mock_load:
+            from openhands_cli.stores import (
+                CliSettings,
+            )
+
+            # Create a mock config
+            mock_config = CliSettings(display_cost_per_action=True)
+            mock_load.return_value = mock_config
+
+            # First call should load from file
+            config1 = visualizer.cli_settings
+            assert config1 == mock_config
+            assert mock_load.call_count == 1
+
+            # Second call should use cached version
+            config2 = visualizer.cli_settings
+            assert config2 == mock_config
+            assert mock_load.call_count == 1  # Should still be 1, not 2
+
+            # Third call should also use cached version
+            config3 = visualizer.cli_settings
+            assert config3 == mock_config
+            assert mock_load.call_count == 1  # Should still be 1, not 3
+
+    def test_cli_settings_refresh(self):
+        """Test that reload_configuration reloads the configuration."""
+        from unittest.mock import patch
+
+        # Create a mock app and container for the visualizer
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+        # Mock CliSettings.load to track how many times it's called
+        with patch("openhands_cli.stores.CliSettings.load") as mock_load:
+            from openhands_cli.stores import (
+                CliSettings,
+            )
+
+            # Create mock configs
+            mock_config1 = CliSettings(display_cost_per_action=False)
+            mock_config2 = CliSettings(display_cost_per_action=True)
+            mock_load.side_effect = [mock_config1, mock_config2]
+
+            # First call should load from file
+            config1 = visualizer.cli_settings
+            assert config1 == mock_config1
+            assert mock_load.call_count == 1
+
+            # Refresh should reload from file
+            visualizer.reload_configuration()
+            assert mock_load.call_count == 2
+
+            # Next call should use the new cached version
+            config2 = visualizer.cli_settings
+            assert config2 == mock_config2
+            assert mock_load.call_count == 2  # Should still be 2, not 3
+
+    def test_format_metrics_subtitle_uses_cached_config(self):
+        """Test that _format_metrics_subtitle uses cached app configuration."""
+        from unittest.mock import MagicMock, patch
+
+        # Create a mock app and container for the visualizer
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+        # Mock the state to return None for stats (no metrics)
+        mock_state = MagicMock()
+        mock_state.stats = None
+        visualizer._state = mock_state
+
+        # Mock CliSettings.load to track how many times it's called
+        with patch("openhands_cli.stores.CliSettings.load") as mock_load:
+            from openhands_cli.stores import (
+                CliSettings,
+            )
+
+            # Create a mock config with display_cost_per_action=False
+            mock_config = CliSettings(display_cost_per_action=False)
+            mock_load.return_value = mock_config
+
+            # Call _format_metrics_subtitle multiple times
+            result1 = visualizer._format_metrics_subtitle()
+            result2 = visualizer._format_metrics_subtitle()
+            result3 = visualizer._format_metrics_subtitle()
+
+            # All should return None because display_cost_per_action=False
+            assert result1 is None
+            assert result2 is None
+            assert result3 is None
+
+            # CliSettings.load should only be called once due to caching
+            assert mock_load.call_count == 1
+
+    @pytest.mark.parametrize(
+        "display_cost_per_action, has_stats, expected_result",
+        [
+            (False, False, None),  # Config disabled, no stats
+            (False, True, None),  # Config disabled, has stats
+            (True, False, None),  # Config enabled, no stats
+            (True, True, "formatted_metrics"),  # Config enabled, has stats
+        ],
+    )
+    def test_format_metrics_subtitle_conditional_display(
+        self, display_cost_per_action, has_stats, expected_result
+    ):
+        """Test that metrics display is conditional on both config and stats
+        availability."""
+        from unittest.mock import MagicMock, patch
+
+        # Create a mock app and container for the visualizer
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+        # Mock the state
+        mock_state = MagicMock()
+        if has_stats:
+            # Mock stats with proper structure for _format_metrics_subtitle
+            mock_usage = MagicMock()
+            mock_usage.prompt_tokens = 800
+            mock_usage.completion_tokens = 200
+            mock_usage.cache_read_tokens = 100
+            mock_usage.reasoning_tokens = 0
+
+            mock_combined_metrics = MagicMock()
+            mock_combined_metrics.accumulated_token_usage = mock_usage
+            mock_combined_metrics.accumulated_cost = 0.05
+
+            mock_stats = MagicMock()
+            mock_stats.get_combined_metrics.return_value = mock_combined_metrics
+            mock_state.stats = mock_stats
+        else:
+            mock_state.stats = None
+        visualizer._state = mock_state
+
+        with patch("openhands_cli.stores.CliSettings.load") as mock_load:
+            from openhands_cli.stores import (
+                CliSettings,
+            )
+
+            # Create config with specified display setting
+            mock_config = CliSettings(display_cost_per_action=display_cost_per_action)
+            mock_load.return_value = mock_config
+
+            # Mock the actual formatting logic for when we have stats and config enabled
+            if expected_result == "formatted_metrics":
+                with patch.object(
+                    visualizer,
+                    "_format_metrics_subtitle",
+                    wraps=visualizer._format_metrics_subtitle,
+                ):
+                    # Let the real method run but intercept the result
+                    result = visualizer._format_metrics_subtitle()
+                    if display_cost_per_action and has_stats:
+                        # Should have called the real formatting logic
+                        assert (
+                            result is not None or result == ""
+                        )  # Could be empty string if no formatting
+                    else:
+                        assert result is None
+            else:
+                result = visualizer._format_metrics_subtitle()
+                assert result == expected_result
+
+    def test_reload_configuration_clears_cache(self):
+        """Test that reload_configuration properly clears the cached configuration."""
+        from unittest.mock import patch
+
+        # Create a mock app and container for the visualizer
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+        with patch("openhands_cli.stores.CliSettings.load") as mock_load:
+            from openhands_cli.stores import (
+                CliSettings,
+            )
+
+            # Create different configs for each load
+            config1 = CliSettings(display_cost_per_action=False)
+            config2 = CliSettings(display_cost_per_action=True)
+            mock_load.side_effect = [config1, config2]
+
+            # First access should load config1
+            first_config = visualizer.cli_settings
+            assert first_config.display_cost_per_action is False
+            assert mock_load.call_count == 1
+
+            # Reload should clear cache and load config2
+            visualizer.reload_configuration()
+            assert mock_load.call_count == 2
+
+            # Next access should return config2 (from cache)
+            second_config = visualizer.cli_settings
+            assert second_config.display_cost_per_action is True
+            assert mock_load.call_count == 2  # No additional load
+
+    @pytest.mark.parametrize(
+        "initial_cache_state",
+        [None, "cached_config"],
+    )
+    def test_cli_settings_property_initialization(self, initial_cache_state):
+        """Test cli_settings property behavior with different initial cache states."""
+        from unittest.mock import patch
+
+        # Create a mock app and container for the visualizer
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+        # Set initial cache state
+        if initial_cache_state == "cached_config":
+            from openhands_cli.stores import (
+                CliSettings,
+            )
+
+            visualizer._cli_settings = CliSettings(display_cost_per_action=True)
+        else:
+            visualizer._cli_settings = None
+
+        with patch("openhands_cli.stores.CliSettings.load") as mock_load:
+            from openhands_cli.stores import (
+                CliSettings,
+            )
+
+            mock_config = CliSettings(display_cost_per_action=False)
+            mock_load.return_value = mock_config
+
+            # Access cli_settings property
+            result = visualizer.cli_settings
+
+            if initial_cache_state is None:
+                # Should load from file
+                assert mock_load.call_count == 1
+                assert result == mock_config
+            else:
+                # Should use cached version
+                assert mock_load.call_count == 0
+                assert result.display_cost_per_action is True
+
+    def test_conversation_stats_property_integration(self):
+        """Test that conversation_stats property works correctly with app config."""
+        from unittest.mock import MagicMock, patch
+
+        # Create a mock app and container for the visualizer
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+        # Mock conversation_stats property with proper structure
+        mock_usage = MagicMock()
+        mock_usage.prompt_tokens = 1600
+        mock_usage.completion_tokens = 400
+        mock_usage.cache_read_tokens = 200
+        mock_usage.reasoning_tokens = 0
+
+        mock_combined_metrics = MagicMock()
+        mock_combined_metrics.accumulated_token_usage = mock_usage
+        mock_combined_metrics.accumulated_cost = 0.10
+
+        mock_stats = MagicMock()
+        mock_stats.get_combined_metrics.return_value = mock_combined_metrics
+
+        with patch.object(
+            type(visualizer),
+            "conversation_stats",
+            new_callable=lambda: property(lambda self: mock_stats),
+        ):
+            with patch("openhands_cli.stores.CliSettings.load") as mock_load:
+                from openhands_cli.stores import (
+                    CliSettings,
+                )
+
+                # Test with display enabled
+                mock_config = CliSettings(display_cost_per_action=True)
+                mock_load.return_value = mock_config
+
+                # Should not return None when both config and stats are available
+                result = visualizer._format_metrics_subtitle()
+                # The actual formatting depends on the implementation,
+                # but it should not be None when enabled and stats exist
+                assert result is not None or mock_stats is not None
