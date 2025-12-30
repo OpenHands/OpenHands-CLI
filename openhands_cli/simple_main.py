@@ -178,7 +178,6 @@ def main() -> None:
                     "To override Rich's detection, you can set TTY_INTERACTIVE=1 "
                     "(and optionally TTY_COMPATIBLE=1)."
                 )
-                
             # Handle resume logic (including --last and conversation list)
             resume_id = handle_resume_logic(args)
             if resume_id is None and (args.last or args.resume == ""):
