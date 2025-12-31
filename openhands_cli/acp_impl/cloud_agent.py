@@ -187,57 +187,38 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
 
         # Create OpenHands Cloud workspace
         logger.info(f"Creating OpenHands Cloud workspace for session {session_id}")
-        workspace = OpenHandsCloudWorkspace(
+        with OpenHandsCloudWorkspace(
             cloud_api_url=self._cloud_api_url,
             cloud_api_key=self._cloud_api_key,
             keep_alive=False,  # Clean up sandbox when done
-        )
+        ) as workspace:
 
-        # Track workspace for cleanup
-        self._active_workspaces[session_id] = workspace
+            # Track workspace for cleanup
+            self._active_workspaces[session_id] = workspace
 
-        # Get the current event loop for the callback
-        loop = asyncio.get_event_loop()
+            # Get the current event loop for the callback
+            loop = asyncio.get_event_loop()
 
-        # Create event subscriber for streaming updates
-        subscriber = EventSubscriber(session_id, self._conn)
-        token_subscriber = TokenBasedEventSubscriber(
-            session_id=session_id, conn=self._conn, loop=loop
-        )
+            # Create event subscriber for streaming updates
+            subscriber = EventSubscriber(session_id, self._conn)
 
-        def sync_callback(event: Event) -> None:
-            """Synchronous wrapper that schedules async event handling."""
-            if streaming_enabled:
-                asyncio.run_coroutine_threadsafe(
-                    token_subscriber.unstreamed_event_handler(event), loop
-                )
-            else:
+
+            def sync_callback(event: Event) -> None:
+                """Synchronous wrapper that schedules async event handling."""
                 asyncio.run_coroutine_threadsafe(subscriber(event), loop)
 
-        # Create RemoteConversation with cloud workspace
-        # Note: RemoteConversation doesn't support persistence_dir
-        conversation = Conversation(
-            agent=agent,
-            workspace=workspace,
-            conversation_id=UUID(session_id),
-            callbacks=[sync_callback],
-            token_callbacks=[token_subscriber.on_token]
-            if streaming_enabled
-            else None,
-            visualizer=None,
-        )
-
-        # Verify it's a RemoteConversation
-        if not isinstance(conversation, RemoteConversation):
-            raise RuntimeError(
-                f"Expected RemoteConversation but got {type(conversation).__name__}"
+            # Create RemoteConversation with cloud workspace
+            # Note: RemoteConversation doesn't support persistence_dir
+            conversation = Conversation(
+                agent=agent,
+                workspace=workspace,
+                conversation_id=UUID(session_id),
+                callbacks=[sync_callback],
+                visualizer=None,
             )
 
-        # Set conversation reference in subscriber for metrics access
-        subscriber.conversation = conversation
-        token_subscriber.conversation = conversation
-
-        return conversation
+            subscriber.conversation = conversation
+            return conversation
 
     async def new_session(
         self,
