@@ -232,8 +232,8 @@ class NonClickableCollapsible(Widget):
                 # pyperclip failed - will try OSC 52 fallback
                 pass
 
-            # Fallback: Use Textual's copy_to_clipboard (OSC 52 escape sequence)
-            # This works in terminals that support OSC 52 even when pyperclip fails
+            # Also try OSC 52 - we do both because pyperclip and OSC 52 can target
+            # different clipboards (e.g., remote terminals, tmux, SSH sessions)
             try:
                 self.app.copy_to_clipboard(self._content_string)
             except Exception:
