@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+import pyperclip
 import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Button, Static
@@ -183,8 +184,8 @@ async def test_copy_button_click_triggers_copy() -> None:
 
 
 @pytest.mark.asyncio
-async def test_copy_failure_on_linux_shows_xclip_hint() -> None:
-    """When copy fails on Linux, the error message includes xclip install hint."""
+async def test_copy_on_linux_without_pyperclip_shows_xclip_hint() -> None:
+    """When pyperclip fails on Linux, message includes xclip install hint."""
 
     collapsible = NonClickableCollapsible(
         "content to copy", title="Title", collapsed=True, border_color="red"
@@ -192,13 +193,14 @@ async def test_copy_failure_on_linux_shows_xclip_hint() -> None:
 
     app = CollapsibleTestApp(collapsible)
 
-    # Patch pyperclip.copy to raise an exception (simulating missing xclip)
-    # Patch copy_to_clipboard to also raise an exception (OSC 52 fallback fails)
+    # Patch pyperclip.copy to raise PyperclipException (simulating missing xclip)
     # Patch _is_linux to return True
     with (
         patch(
             "openhands_cli.refactor.widgets.non_clickable_collapsible.pyperclip.copy",
-            side_effect=Exception("No clipboard mechanism available"),
+            side_effect=pyperclip.PyperclipException(
+                "No clipboard mechanism available"
+            ),
         ),
         patch(
             "openhands_cli.refactor.widgets.non_clickable_collapsible._is_linux",
@@ -208,26 +210,26 @@ async def test_copy_failure_on_linux_shows_xclip_hint() -> None:
         async with app.run_test() as _pilot:
             # Replace notify with a MagicMock so we can assert on it
             app.notify = MagicMock()
-            # Also mock copy_to_clipboard to fail
-            app.copy_to_clipboard = MagicMock(
-                side_effect=Exception("OSC 52 not supported")
-            )
+            # Mock copy_to_clipboard (OSC 52 doesn't raise, just sends escape sequences)
+            app.copy_to_clipboard = MagicMock()
 
             event = NonClickableCollapsibleTitle.CopyRequested()
             collapsible._on_non_clickable_collapsible_title_copy_requested(event)
 
-            # app.notify should be called with error message containing xclip hint
+            # copy_to_clipboard should still be called (OSC 52 fallback)
+            app.copy_to_clipboard.assert_called_once_with("content to copy")
+
+            # app.notify should be called with hint about xclip
             app.notify.assert_called_once()
             args, kwargs = app.notify.call_args
-            assert "Failed to copy to clipboard" in args[0]
+            assert "Copy attempted" in args[0]
             assert "sudo apt install xclip" in args[0]
-            assert kwargs.get("title") == "Copy Error"
-            assert kwargs.get("severity") == "error"
+            assert kwargs.get("title") == "Copy"
 
 
 @pytest.mark.asyncio
-async def test_copy_failure_on_non_linux_no_xclip_hint() -> None:
-    """When copy fails on non-Linux, the error message does not include xclip hint."""
+async def test_copy_on_non_linux_without_pyperclip_shows_success() -> None:
+    """When pyperclip fails on non-Linux, shows success (OSC 52 likely works)."""
 
     collapsible = NonClickableCollapsible(
         "content to copy", title="Title", collapsed=True, border_color="red"
@@ -235,12 +237,14 @@ async def test_copy_failure_on_non_linux_no_xclip_hint() -> None:
 
     app = CollapsibleTestApp(collapsible)
 
-    # Patch pyperclip.copy to raise an exception
+    # Patch pyperclip.copy to raise PyperclipException
     # Patch _is_linux to return False (e.g., macOS or Windows)
     with (
         patch(
             "openhands_cli.refactor.widgets.non_clickable_collapsible.pyperclip.copy",
-            side_effect=Exception("No clipboard mechanism available"),
+            side_effect=pyperclip.PyperclipException(
+                "No clipboard mechanism available"
+            ),
         ),
         patch(
             "openhands_cli.refactor.widgets.non_clickable_collapsible._is_linux",
@@ -250,18 +254,18 @@ async def test_copy_failure_on_non_linux_no_xclip_hint() -> None:
         async with app.run_test() as _pilot:
             # Replace notify with a MagicMock so we can assert on it
             app.notify = MagicMock()
-            # Also mock copy_to_clipboard to fail
-            app.copy_to_clipboard = MagicMock(
-                side_effect=Exception("OSC 52 not supported")
-            )
+            # Mock copy_to_clipboard (OSC 52 doesn't raise, just sends escape sequences)
+            app.copy_to_clipboard = MagicMock()
 
             event = NonClickableCollapsibleTitle.CopyRequested()
             collapsible._on_non_clickable_collapsible_title_copy_requested(event)
 
-            # app.notify should be called with error message WITHOUT xclip hint
+            # copy_to_clipboard should still be called (OSC 52 fallback)
+            app.copy_to_clipboard.assert_called_once_with("content to copy")
+
+            # app.notify should show success (no xclip hint on non-Linux)
             app.notify.assert_called_once()
             args, kwargs = app.notify.call_args
-            assert "Failed to copy to clipboard" in args[0]
+            assert "Content copied to clipboard" in args[0]
             assert "xclip" not in args[0]
-            assert kwargs.get("title") == "Copy Error"
-            assert kwargs.get("severity") == "error"
+            assert kwargs.get("title") == "Copy Success"

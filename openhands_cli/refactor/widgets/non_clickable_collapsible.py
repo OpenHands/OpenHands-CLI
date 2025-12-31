@@ -222,44 +222,44 @@ class NonClickableCollapsible(Widget):
         This ensures clipboard works across different terminal environments.
         """
         event.stop()
-        if self._content_string:
-            pyperclip_success = False
-            # Primary: Try pyperclip for direct OS clipboard access
-            try:
-                pyperclip.copy(self._content_string)
-                pyperclip_success = True
-            except Exception:
-                # pyperclip failed - will try OSC 52 fallback
-                pass
 
-            # Also try OSC 52 - we do both because pyperclip and OSC 52 can target
-            # different clipboards (e.g., remote terminals, tmux, SSH sessions)
-            try:
-                self.app.copy_to_clipboard(self._content_string)
-            except Exception:
-                # OSC 52 fallback also failed
-                if not pyperclip_success:
-                    error_msg = "Failed to copy to clipboard"
-                    # On Linux, provide helpful hint about installing xclip
-                    if _is_linux():
-                        error_msg += ". Try: sudo apt install xclip"
-                    self.app.notify(
-                        error_msg,
-                        title="Copy Error",
-                        severity="error",
-                        timeout=5,
-                    )
-                    return
-
-            self.app.notify(
-                "Content copied to clipboard!", title="Copy Success", timeout=2
-            )
-        else:
+        if not self._content_string:
             self.app.notify(
                 "No content to copy",
                 title="Copy Warning",
                 severity="warning",
                 timeout=2,
+            )
+            return
+
+        pyperclip_success = False
+        # Primary: Try pyperclip for direct OS clipboard access
+        try:
+            pyperclip.copy(self._content_string)
+            pyperclip_success = True
+        except pyperclip.PyperclipException:
+            # pyperclip failed - will try OSC 52 fallback
+            pass
+
+        # Also try OSC 52 - this doesn't raise errors, it just sends escape
+        # sequences. We do both because pyperclip and OSC 52 can target
+        # different clipboards (e.g., remote terminals, tmux, SSH sessions)
+        self.app.copy_to_clipboard(self._content_string)
+
+        if pyperclip_success:
+            self.app.notify(
+                "Content copied to clipboard!", title="Copy Success", timeout=2
+            )
+        elif _is_linux():
+            # On Linux without pyperclip working, OSC 52 may or may not work
+            self.app.notify(
+                "Copy attempted. If it didn't work, try: sudo apt install xclip",
+                title="Copy",
+                timeout=4,
+            )
+        else:
+            self.app.notify(
+                "Content copied to clipboard!", title="Copy Success", timeout=2
             )
 
     def _watch_collapsed(self, collapsed: bool) -> None:
