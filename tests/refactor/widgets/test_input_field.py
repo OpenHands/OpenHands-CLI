@@ -29,6 +29,12 @@ def field_with_mocks(input_field: InputField) -> Generator[InputField, None, Non
     input_field.input_widget.focus = input_focus_mock
     input_field.textarea_widget.focus = textarea_focus_mock
 
+    # Mock the document property for textarea_widget (needed for move_cursor)
+    mock_document = MagicMock()
+    mock_document.end = (0, 0)  # Mock end location
+    input_field.textarea_widget.document = mock_document
+    input_field.textarea_widget.move_cursor = MagicMock()
+
     # Create mock for the signal and its publish method
     signal_mock = MagicMock()
     publish_mock = MagicMock()
@@ -144,13 +150,9 @@ class TestInputField:
         field_with_mocks.input_widget.text = content
         field_with_mocks.input_widget.clear = Mock()
 
-        # Create mock key event for "enter"
-        event = Mock()
-        event.key = "enter"
-        event.prevent_default = Mock()
-        event.stop = Mock()
-
-        field_with_mocks.on_key(event)
+        # Simulate EnterPressed event (Enter key is now handled via message)
+        enter_event = AutoGrowTextArea.EnterPressed()
+        field_with_mocks.on_enter_pressed(enter_event)
 
         if should_submit:
             field_with_mocks.post_message.assert_called_once()
