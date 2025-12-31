@@ -459,3 +459,91 @@ class TestInputFieldPasteIntegration:
 
             # Still single-line, nothing changed
             assert not input_field.is_multiline_mode
+
+
+class TestInputFieldAutoToggle:
+    """Tests for automatic toggle to multiline when text exceeds visible width."""
+
+    @pytest.mark.asyncio
+    async def test_auto_toggle_when_text_exceeds_width(self) -> None:
+        """Should auto-toggle to multiline when text exceeds visible width."""
+        app = InputFieldTestApp()
+        async with app.run_test() as pilot:
+            input_field = app.query_one(InputField)
+
+            # Mock the screen.query_one method to avoid the #input_area dependency
+            mock_input_area = Mock()
+            mock_input_area.styles = Mock()
+            input_field.screen.query_one = Mock(return_value=mock_input_area)
+
+            # Verify we start in single-line mode
+            assert not input_field.is_multiline_mode
+
+            # Focus the input widget
+            input_field.input_widget.focus()
+            await pilot.pause()
+
+            # Get current width and create text that exceeds it
+            # The available width is size.width - 4, so we need text longer than that
+            current_width = input_field.input_widget.size.width
+            if current_width > 4:
+                long_text = "x" * (current_width - 3)  # Exactly at the threshold
+                input_field.input_widget.value = long_text
+                await pilot.pause()
+
+                # Should have auto-toggled to multiline mode
+                assert input_field.is_multiline_mode
+                assert not input_field.input_widget.display
+                assert input_field.textarea_widget.display
+
+    @pytest.mark.asyncio
+    async def test_no_auto_toggle_for_short_text(self) -> None:
+        """Should not auto-toggle for text shorter than visible width."""
+        app = InputFieldTestApp()
+        async with app.run_test() as pilot:
+            input_field = app.query_one(InputField)
+
+            # Verify we start in single-line mode
+            assert not input_field.is_multiline_mode
+
+            # Focus the input widget
+            input_field.input_widget.focus()
+            await pilot.pause()
+
+            # Short text that fits in the input
+            short_text = "Hello"
+            input_field.input_widget.value = short_text
+            await pilot.pause()
+
+            # Should remain in single-line mode
+            assert not input_field.is_multiline_mode
+            assert input_field.input_widget.display
+            assert not input_field.textarea_widget.display
+
+    @pytest.mark.asyncio
+    async def test_no_auto_toggle_when_already_multiline(self) -> None:
+        """Should not re-toggle when already in multiline mode."""
+        app = InputFieldTestApp()
+        async with app.run_test() as pilot:
+            input_field = app.query_one(InputField)
+
+            # Mock the screen.query_one method
+            mock_input_area = Mock()
+            mock_input_area.styles = Mock()
+            input_field.screen.query_one = Mock(return_value=mock_input_area)
+
+            # Switch to multiline mode first
+            input_field.action_toggle_input_mode()
+            await pilot.pause()
+            assert input_field.is_multiline_mode
+
+            # Now even if we set long text in the input_widget (hidden),
+            # it shouldn't affect the mode
+            current_width = input_field.input_widget.size.width
+            if current_width > 4:
+                long_text = "x" * (current_width + 10)
+                input_field.input_widget.value = long_text
+                await pilot.pause()
+
+                # Still in multiline mode (no double toggle)
+                assert input_field.is_multiline_mode

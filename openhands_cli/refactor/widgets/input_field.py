@@ -22,6 +22,11 @@ class PasteAwareInput(Input):
             super().__init__()
             self.text = text
 
+    class TextTooLong(Message):
+        """Message sent when text exceeds the visible input width."""
+
+        pass
+
     @on(Paste)
     def _on_paste(self, event: Paste) -> None:
         """Handle paste events and detect multi-line content."""
@@ -31,6 +36,25 @@ class PasteAwareInput(Input):
             event.prevent_default()
             event.stop()
         # For single-line content, let the default paste behavior handle it
+
+    def _watch_value(self, value: str) -> None:
+        """Watch for value changes and detect when text is too long."""
+        super()._watch_value(value)
+        self._check_text_overflow()
+
+    def _check_text_overflow(self) -> None:
+        """Check if text exceeds visible width and notify parent if so."""
+        if not self.size.width:
+            return
+
+        # Calculate available width (subtract border/padding - 2 chars each side)
+        available_width = self.size.width - 4
+        if available_width <= 0:
+            return
+
+        # If text length exceeds available width, notify parent
+        if len(self.value) >= available_width:
+            self.post_message(self.TextTooLong())
 
 
 class InputField(Container):
@@ -197,4 +221,14 @@ class InputField(Container):
             self.input_widget.value = new_text
 
             # Then switch to multi-line mode (this will convert the text properly)
+            self.action_toggle_input_mode()
+
+    @on(PasteAwareInput.TextTooLong)
+    def on_paste_aware_input_text_too_long(
+        self,
+        event: PasteAwareInput.TextTooLong,  # noqa: ARG002
+    ) -> None:
+        """Handle when text exceeds the visible input width."""
+        # Only auto-switch to multiline when in single-line mode
+        if not self.is_multiline_mode:
             self.action_toggle_input_mode()
