@@ -36,7 +36,7 @@ from openhands_cli.refactor.modals.confirmation_modal import ConfirmationSetting
 from openhands_cli.refactor.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.refactor.panels.confirmation_panel import ConfirmationSidePanel
 from openhands_cli.refactor.panels.mcp_side_panel import MCPSidePanel
-from openhands_cli.refactor.widgets.input_field import InputField
+from openhands_cli.refactor.widgets import InputField
 from openhands_cli.refactor.widgets.non_clickable_collapsible import (
     NonClickableCollapsible,
 )

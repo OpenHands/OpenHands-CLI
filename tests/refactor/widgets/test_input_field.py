@@ -8,7 +8,10 @@ from textual.app import App
 from textual.events import Paste
 from textual.widgets import TextArea
 
-from openhands_cli.refactor.widgets.input_field import AutoGrowTextArea, InputField
+from openhands_cli.refactor.widgets.user_input.input_field import (
+    AutoGrowTextArea,
+    InputField,
+)
 
 
 @pytest.fixture
