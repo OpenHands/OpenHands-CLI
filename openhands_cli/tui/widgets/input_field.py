@@ -8,8 +8,8 @@ from textual.message import Message
 from textual.signal import Signal
 from textual.widgets import Input, TextArea
 
-from openhands_cli.refactor.core.commands import COMMANDS
-from openhands_cli.refactor.widgets.autocomplete import EnhancedAutoComplete
+from openhands_cli.tui.core.commands import COMMANDS
+from openhands_cli.tui.widgets.autocomplete import EnhancedAutoComplete
 
 
 class PasteAwareInput(Input):

@@ -8,7 +8,7 @@ from textual.app import App
 from textual.events import Paste
 from textual.widgets import TextArea
 
-from openhands_cli.refactor.widgets.input_field import InputField, PasteAwareInput
+from openhands_cli.tui.widgets.input_field import InputField, PasteAwareInput
 
 
 @pytest.fixture

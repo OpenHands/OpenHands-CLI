@@ -22,14 +22,14 @@ from textual.widgets import (
 )
 from textual.widgets._select import NoSelection
 
-from openhands_cli.refactor.modals.settings.choices import (
+from openhands_cli.tui.modals.settings.choices import (
     get_model_options,
 )
-from openhands_cli.refactor.modals.settings.components import (
+from openhands_cli.tui.modals.settings.components import (
     CliSettingsTab,
     SettingsTab,
 )
-from openhands_cli.refactor.modals.settings.utils import SettingsFormData, save_settings
+from openhands_cli.tui.modals.settings.utils import SettingsFormData, save_settings
 from openhands_cli.stores import AgentStore
 
 

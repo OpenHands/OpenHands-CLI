@@ -186,7 +186,7 @@ def main() -> None:
 
             # Use textual-based UI as default (experimental UI is now the default)
             # The --exp flag is kept for compatibility but does the same thing
-            from openhands_cli.refactor.textual_app import main as textual_main
+            from openhands_cli.tui.textual_app import main as textual_main
 
             queued_inputs = create_seeded_instructions_from_args(args)
             conversation_id = textual_main(

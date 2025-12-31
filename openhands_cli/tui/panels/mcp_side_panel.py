@@ -13,7 +13,7 @@ from openhands.sdk import Agent
 from openhands_cli.locations import MCP_CONFIG_FILE
 from openhands_cli.mcp.mcp_display_utils import normalize_server_object
 from openhands_cli.mcp.mcp_utils import get_config_status
-from openhands_cli.refactor.panels.mcp_panel_style import MCP_PANEL_STYLE
+from openhands_cli.tui.panels.mcp_panel_style import MCP_PANEL_STYLE
 from openhands_cli.theme import OPENHANDS_THEME
 
 

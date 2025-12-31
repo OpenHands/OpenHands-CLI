@@ -2,11 +2,11 @@
 
 import unittest.mock as mock
 
-from openhands_cli.refactor.content.splash import (
+from openhands_cli.theme import OPENHANDS_THEME
+from openhands_cli.tui.content.splash import (
     get_openhands_banner,
     get_splash_content,
 )
-from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.version_check import VersionInfo
 
 

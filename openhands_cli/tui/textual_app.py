@@ -28,20 +28,20 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
-from openhands_cli.refactor.content.splash import get_splash_content
-from openhands_cli.refactor.core.commands import is_valid_command, show_help
-from openhands_cli.refactor.core.conversation_runner import ConversationRunner
-from openhands_cli.refactor.modals import SettingsScreen
-from openhands_cli.refactor.modals.confirmation_modal import ConfirmationSettingsModal
-from openhands_cli.refactor.modals.exit_modal import ExitConfirmationModal
-from openhands_cli.refactor.panels.confirmation_panel import ConfirmationSidePanel
-from openhands_cli.refactor.panels.mcp_side_panel import MCPSidePanel
-from openhands_cli.refactor.widgets.input_field import InputField
-from openhands_cli.refactor.widgets.non_clickable_collapsible import (
+from openhands_cli.tui.content.splash import get_splash_content
+from openhands_cli.tui.core.commands import is_valid_command, show_help
+from openhands_cli.tui.core.conversation_runner import ConversationRunner
+from openhands_cli.tui.modals import SettingsScreen
+from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModal
+from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
+from openhands_cli.tui.panels.confirmation_panel import ConfirmationSidePanel
+from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
+from openhands_cli.tui.widgets.input_field import InputField
+from openhands_cli.tui.widgets.non_clickable_collapsible import (
     NonClickableCollapsible,
 )
-from openhands_cli.refactor.widgets.richlog_visualizer import ConversationVisualizer
-from openhands_cli.refactor.widgets.status_line import (
+from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
+from openhands_cli.tui.widgets.status_line import (
     InfoStatusLine,
     WorkingStatusLine,
 )

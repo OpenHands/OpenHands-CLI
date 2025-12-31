@@ -6,7 +6,7 @@ import pytest
 from textual.widgets import Input
 from textual_autocomplete import TargetState
 
-from openhands_cli.refactor.widgets.autocomplete import EnhancedAutoComplete
+from openhands_cli.tui.widgets.autocomplete import EnhancedAutoComplete
 
 
 class TestEnhancedAutoComplete:

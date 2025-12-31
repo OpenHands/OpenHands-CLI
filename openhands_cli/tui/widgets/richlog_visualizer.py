@@ -19,7 +19,7 @@ from openhands.sdk.event import (
 from openhands.sdk.event.base import Event
 from openhands.sdk.event.condenser import Condensation, CondensationRequest
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
-from openhands_cli.refactor.widgets.non_clickable_collapsible import (
+from openhands_cli.tui.widgets.non_clickable_collapsible import (
     NonClickableCollapsible,
 )
 from openhands_cli.stores import CliSettings
@@ -29,7 +29,7 @@ from openhands_cli.theme import OPENHANDS_THEME
 if TYPE_CHECKING:
     from textual.containers import VerticalScroll
 
-    from openhands_cli.refactor.textual_app import OpenHandsApp
+    from openhands_cli.tui.textual_app import OpenHandsApp
 
 
 def _get_event_border_color(event: Event) -> str:

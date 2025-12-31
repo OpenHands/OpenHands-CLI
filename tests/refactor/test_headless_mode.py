@@ -7,6 +7,7 @@ import uuid
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 import pytest
+from entrypoint import main as simple_main
 from rich.text import Text
 
 from openhands.sdk.security.confirmation_policy import (
@@ -16,9 +17,8 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.argparsers.main_parser import create_main_parser
-from openhands_cli.refactor.modals import SettingsScreen
-from openhands_cli.refactor.textual_app import OpenHandsApp, main as textual_main
-from openhands_cli.simple_main import main as simple_main
+from openhands_cli.tui.modals.settings.settings_screen import SettingsScreen
+from openhands_cli.tui.textual_app import OpenHandsApp, main as textual_main
 
 
 # ---------------------------------------------------------------------------
@@ -274,7 +274,7 @@ class TestConversationSummary:
     def test_conversation_summary_parsing(self):
         """It should count agent messages and return last agent message text."""
         from openhands.sdk.event import MessageEvent
-        from openhands_cli.refactor.core.conversation_runner import ConversationRunner
+        from openhands_cli.tui.core.conversation_runner import ConversationRunner
 
         mock_conversation = Mock()
         mock_conversation.state = Mock()
@@ -321,7 +321,7 @@ class TestConversationSummary:
 
     def test_conversation_summary_empty_state(self):
         """With no conversation / events, we should get a safe default."""
-        from openhands_cli.refactor.core.conversation_runner import ConversationRunner
+        from openhands_cli.tui.core.conversation_runner import ConversationRunner
 
         with patch(
             "openhands_cli.refactor.core.conversation_runner.setup_conversation",

@@ -5,11 +5,11 @@ import uuid
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import entrypoint
 import pytest
+from entrypoint import main
 
-from openhands_cli import simple_main
 from openhands_cli.argparsers.main_parser import create_main_parser
-from openhands_cli.simple_main import main
 
 
 def test_main_parser_accepts_task_and_file_flags():
@@ -45,7 +45,7 @@ class TestMainEntryPoint:
         mock_textual_main.side_effect = KeyboardInterrupt()
 
         # Should complete without raising an exception (graceful exit)
-        simple_main.main()
+        entrypoint.main()
 
         # Should call textual_main with no resume conversation ID and no queued inputs
         mock_textual_main.assert_called_once()
@@ -61,7 +61,7 @@ class TestMainEntryPoint:
 
         # Should raise ImportError (re-raised after handling)
         with pytest.raises(ImportError) as exc_info:
-            simple_main.main()
+            entrypoint.main()
 
         assert str(exc_info.value) == "Missing dependency"
 
@@ -75,7 +75,7 @@ class TestMainEntryPoint:
         mock_textual_main.side_effect = KeyboardInterrupt()
 
         # Should complete without raising an exception (graceful exit)
-        simple_main.main()
+        entrypoint.main()
 
     @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands"])
@@ -85,7 +85,7 @@ class TestMainEntryPoint:
         mock_textual_main.side_effect = EOFError()
 
         # Should complete without raising an exception (graceful exit)
-        simple_main.main()
+        entrypoint.main()
 
     @patch("openhands_cli.refactor.textual_app.main")
     @patch("sys.argv", ["openhands"])
@@ -95,7 +95,7 @@ class TestMainEntryPoint:
 
         # Should raise Exception (re-raised after handling)
         with pytest.raises(Exception) as exc_info:
-            simple_main.main()
+            entrypoint.main()
 
         assert str(exc_info.value) == "Unexpected error"
 
@@ -108,7 +108,7 @@ class TestMainEntryPoint:
         mock_textual_main.side_effect = KeyboardInterrupt()
 
         # Should complete without raising an exception (graceful exit)
-        simple_main.main()
+        entrypoint.main()
 
         # Should call textual_main with the provided resume conversation ID
         mock_textual_main.assert_called_once()
@@ -126,7 +126,7 @@ class TestMainEntryPoint:
         mock_textual_main.side_effect = KeyboardInterrupt()
 
         # Should complete without raising an exception (graceful exit)
-        simple_main.main()
+        entrypoint.main()
 
         # Should call textual_main with always_approve=True
         mock_textual_main.assert_called_once()
@@ -143,7 +143,7 @@ class TestMainEntryPoint:
         mock_textual_main.side_effect = KeyboardInterrupt()
 
         # Should complete without raising an exception (graceful exit)
-        simple_main.main()
+        entrypoint.main()
 
         # Should call textual_main with llm_approve=True
         mock_textual_main.assert_called_once()

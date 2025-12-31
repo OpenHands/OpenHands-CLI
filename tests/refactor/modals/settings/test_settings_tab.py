@@ -4,7 +4,7 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Input, Select
 
-from openhands_cli.refactor.modals.settings.components.settings_tab import SettingsTab
+from openhands_cli.tui.modals.settings.components.settings_tab import SettingsTab
 
 
 class _TestApp(App):

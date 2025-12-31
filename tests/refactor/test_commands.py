@@ -8,13 +8,13 @@ from textual.containers import VerticalScroll
 from textual_autocomplete import DropdownItem
 
 from openhands.sdk.security.confirmation_policy import AlwaysConfirm
-from openhands_cli.refactor.core.commands import COMMANDS, is_valid_command, show_help
-from openhands_cli.refactor.modals import SettingsScreen
-from openhands_cli.refactor.modals.confirmation_modal import (
+from openhands_cli.tui.core.commands import COMMANDS, is_valid_command, show_help
+from openhands_cli.tui.modals import SettingsScreen
+from openhands_cli.tui.modals.confirmation_modal import (
     ConfirmationSettingsModal,
 )
-from openhands_cli.refactor.modals.exit_modal import ExitConfirmationModal
-from openhands_cli.refactor.textual_app import OpenHandsApp
+from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
+from openhands_cli.tui.textual_app import OpenHandsApp
 
 
 class TestCommands:

@@ -30,7 +30,7 @@ dependencies = [
   "streamingjson>=0.0.2",
 ]
 
-scripts = { openhands = "openhands_cli.simple_main:main", "openhands-acp" = "openhands_cli.acp:main" }
+scripts = { openhands = "openhands_cli.entrypoint:main", "openhands-acp" = "openhands_cli.acp:main" }
 
 [dependency-groups]
 # Hatchling wheel target: include the package directory

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import SecretStr
 
-import openhands_cli.refactor.modals.settings.utils as settings_utils
+import openhands_cli.tui.modals.settings.utils as settings_utils
 from openhands.sdk import LLM, Agent, LLMSummarizingCondenser
 
 
