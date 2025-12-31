@@ -545,6 +545,8 @@ class InputField(Container):
             self.input_widget.display = False
             self.textarea_widget.display = True
             self.textarea_widget.text = self.stored_content
+            # Move cursor to end of text
+            self.textarea_widget.move_cursor(self.textarea_widget.document.end)
             self.textarea_widget.focus()
             self.is_multiline_mode = True
             # Expand input area for multi-line mode
