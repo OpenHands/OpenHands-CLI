@@ -109,7 +109,7 @@ def main() -> None:
             launch_gui_server(mount_cwd=args.mount_cwd, gpu=args.gpu)
         elif args.command == "web":
             # Import web server launcher only when needed
-            from openhands_cli.serve import launch_web_server
+            from openhands_cli.tui.serve import launch_web_server
 
             launch_web_server(host=args.host, port=args.port, debug=args.debug)
         elif args.command == "acp":

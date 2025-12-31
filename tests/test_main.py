@@ -336,7 +336,7 @@ def test_main_serve_calls_launch_gui_server(monkeypatch, argv, expected_kwargs):
         ),
     ],
 )
-@patch("openhands_cli.serve.launch_web_server")
+@patch("openhands_cli.tui.serve.launch_web_server")
 def test_main_web_calls_launch_web_server(mock_launch, argv, expected):
     with patch("sys.argv", argv):
         main()

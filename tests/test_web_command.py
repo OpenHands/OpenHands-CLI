@@ -52,7 +52,7 @@ def test_web_parser_variants(argv, expected):
         ),
     ],
 )
-@patch("openhands_cli.serve.launch_web_server")
+@patch("openhands_cli.tui.serve.launch_web_server")
 def test_web_command_calls_launch_web_server(
     mock_launch_web_server, sys_argv, expected_kwargs
 ):
@@ -84,11 +84,11 @@ def test_web_command_help_smoke(capsys):
         ({"host": "localhost", "port": 3000, "debug": True}, "localhost", 3000, True),
     ],
 )
-@patch("openhands_cli.serve.Server")
+@patch("openhands_cli.tui.serve.Server")
 def test_launch_web_server_constructs_and_serves(
     mock_server_class, kwargs, expected_host, expected_port, expected_debug
 ):
-    from openhands_cli.serve import launch_web_server
+    from openhands_cli.tui.serve import launch_web_server
 
     mock_server = MagicMock()
     mock_server_class.return_value = mock_server
@@ -105,7 +105,7 @@ def test_launch_web_server_constructs_and_serves(
 
 @patch("openhands_cli.serve.Server")
 def test_launch_web_server_propagates_exception(mock_server_class):
-    from openhands_cli.serve import launch_web_server
+    from openhands_cli.tui.serve import launch_web_server
 
     mock_server = MagicMock()
     mock_server.serve.side_effect = Exception("Server error")
