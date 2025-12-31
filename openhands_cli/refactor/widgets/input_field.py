@@ -3,17 +3,25 @@ from typing import ClassVar
 from textual import on
 from textual.binding import Binding
 from textual.containers import Container
+from textual.content import Content
 from textual.events import Paste
 from textual.message import Message
 from textual.signal import Signal
-from textual.widgets import Input, TextArea
+from textual.widgets import TextArea
 
 from openhands_cli.refactor.core.commands import COMMANDS
 from openhands_cli.refactor.widgets.autocomplete import EnhancedAutoComplete
 
 
-class PasteAwareInput(Input):
-    """Custom Input widget that can handle paste events and notify parent."""
+class AutoGrowTextArea(TextArea):
+    """A TextArea that auto-grows with content and supports soft wrapping.
+
+    This implementation is based on the toad project's approach:
+    - Uses soft_wrap=True for automatic line wrapping at word boundaries
+    - Uses compact=True to remove default borders
+    - CSS height: auto makes it grow based on content
+    - CSS max-height limits maximum growth
+    """
 
     class PasteDetected(Message):
         """Message sent when multi-line paste is detected."""
@@ -22,55 +30,125 @@ class PasteAwareInput(Input):
             super().__init__()
             self.text = text
 
+    def __init__(
+        self,
+        text: str = "",
+        *,
+        placeholder: str | Content = "",
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
+        disabled: bool = False,
+    ) -> None:
+        super().__init__(
+            text,
+            name=name,
+            id=id,
+            classes=classes,
+            disabled=disabled,
+            soft_wrap=True,  # Enable soft wrapping at word boundaries
+            show_line_numbers=False,
+            highlight_cursor_line=False,
+        )
+        # Enable compact mode (removes borders/padding for cleaner look)
+        self.compact = True
+        self._placeholder = placeholder
+
+    def on_mount(self) -> None:
+        """Configure the text area on mount."""
+        # Set placeholder after mount
+        if self._placeholder:
+            self.placeholder = (
+                Content(self._placeholder)
+                if isinstance(self._placeholder, str)
+                else self._placeholder
+            )
+
     @on(Paste)
-    def _on_paste(self, event: Paste) -> None:
+    async def _on_paste(self, event: Paste) -> None:
         """Handle paste events and detect multi-line content."""
         if "\n" in event.text or "\r" in event.text:
-            # Multi-line content detected - notify parent and prevent default
+            # Multi-line content detected - notify parent
             self.post_message(self.PasteDetected(event.text))
             event.prevent_default()
             event.stop()
         # For single-line content, let the default paste behavior handle it
 
+    @property
+    def value(self) -> str:
+        """Compatibility property to match Input widget API."""
+        return self.text
+
+    @value.setter
+    def value(self, new_value: str) -> None:
+        """Set the text content."""
+        self.text = new_value
+
+    @property
+    def cursor_position(self) -> int:
+        """Get cursor position as character offset (for Input API compatibility)."""
+        row, col = self.cursor_location
+        # Calculate character offset from start
+        offset = 0
+        lines = self.text.split("\n")
+        for i in range(row):
+            offset += len(lines[i]) + 1  # +1 for newline
+        offset += col
+        return offset
+
 
 class InputField(Container):
+    """Input field with two modes: auto-growing single-line and multiline.
+
+    Single-line mode (default):
+    - Uses AutoGrowTextArea with soft wrapping
+    - Auto-grows height as text wraps (up to max-height)
+    - Enter to submit, Shift+Enter/Ctrl+J for newline
+
+    Multiline mode (toggled with Ctrl+L):
+    - Uses larger TextArea for explicit multiline editing
+    - Ctrl+J to submit
+    """
+
     BINDINGS: ClassVar = [
         Binding("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         Binding("ctrl+j", "submit_textarea", "Submit multi-line input"),
     ]
 
     DEFAULT_CSS = """
-    #user_input {
+    InputField {
         width: 100%;
-        height: 3;
-        background: $background;
-        color: $foreground;
-        border: solid $secondary;
-    }
+        height: auto;
+        min-height: 3;
 
-    #user_input:focus {
-        border: solid $primary;
-        background: $background;
-    }
+        #user_input {
+            width: 100%;
+            height: auto;
+            min-height: 3;
+            max-height: 8;
+            background: $background;
+            color: $foreground;
+            border: solid $secondary;
+        }
 
-    #user_textarea {
-        width: 100%;
-        height: 6;
-        background: $background;
-        color: $foreground;
-        border: solid $secondary;
-        display: none;
-    }
+        #user_input:focus {
+            border: solid $primary;
+            background: $background;
+        }
 
-    #user_textarea:focus {
-        border: solid $primary;
-        background: $background;
-    }
+        #user_textarea {
+            width: 100%;
+            height: 6;
+            background: $background;
+            color: $foreground;
+            border: solid $secondary;
+            display: none;
+        }
 
-    /* Style the cursor to use primary color */
-    Input .input--cursor {
-        background: $primary;
-        color: $background;
+        #user_textarea:focus {
+            border: solid $primary;
+            background: $background;
+        }
     }
     """
 
@@ -90,8 +168,8 @@ class InputField(Container):
 
     def compose(self):
         """Create the input widgets."""
-        # Single-line input (initially visible)
-        self.input_widget = PasteAwareInput(
+        # Auto-growing single-line input (initially visible)
+        self.input_widget = AutoGrowTextArea(
             placeholder=self.placeholder,
             id="user_input",
         )
@@ -111,6 +189,17 @@ class InputField(Container):
     def on_mount(self) -> None:
         """Focus the input when mounted."""
         self.input_widget.focus()
+
+    def on_key(self, event) -> None:
+        """Handle key events for submission in single-line mode."""
+        if not self.is_multiline_mode and event.key == "enter":
+            # In single-line mode, Enter submits
+            content = self.input_widget.text.strip()
+            if content:
+                self.input_widget.clear()
+                self.post_message(self.Submitted(content))
+                event.prevent_default()
+                event.stop()
 
     def action_toggle_input_mode(self) -> None:
         """Toggle between single-line Input and multi-line TextArea."""
@@ -153,16 +242,6 @@ class InputField(Container):
                 # Submit the content
                 self.post_message(self.Submitted(content))
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        """Handle single-line input submission."""
-        if not self.is_multiline_mode:
-            content = event.value.strip()
-            if content:
-                # Clear the input
-                self.input_widget.value = ""
-                # Submit the content
-                self.post_message(self.Submitted(content))
-
     def get_current_value(self) -> str:
         """Get the current input value."""
         if self.is_multiline_mode:
@@ -177,10 +256,8 @@ class InputField(Container):
         else:
             self.input_widget.focus()
 
-    @on(PasteAwareInput.PasteDetected)
-    def on_paste_aware_input_paste_detected(
-        self, event: PasteAwareInput.PasteDetected
-    ) -> None:
+    @on(AutoGrowTextArea.PasteDetected)
+    def on_paste_detected(self, event: AutoGrowTextArea.PasteDetected) -> None:
         """Handle multi-line paste detection from the input widget."""
         # Only handle when in single-line mode
         if not self.is_multiline_mode:
