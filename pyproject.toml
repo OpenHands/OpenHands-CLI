@@ -28,6 +28,7 @@ dependencies = [
   "httpx>=0.25.0",
   "textual-serve>=1.1.3",
   "streamingjson>=0.0.2",
+  "openhands-workspace>=1.7.3",
 ]
 
 scripts = { openhands = "openhands_cli.simple_main:main", "openhands-acp" = "openhands_cli.acp:main" }

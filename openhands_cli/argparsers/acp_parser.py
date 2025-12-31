@@ -1,5 +1,5 @@
 import argparse
-
+import os
 from openhands_cli.argparsers.util import add_confirmation_mode_args, add_resume_args
 
 
@@ -26,6 +26,24 @@ def add_acp_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentP
         action="store_true",
         default=False,
         help="Enable streaming mode for LLM outputs (token-by-token streaming)",
+    )
+
+    acp_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        default=False,
+        help=(
+            "Use OpenHands Cloud workspace instead of local workspace. "
+            "Requires authentication via 'openhands login'."
+        ),
+    )
+
+    # Cloud API URL (optional, defaults to production)
+    acp_parser.add_argument(
+        "--cloud-url",
+        type=str,
+        default=os.getenv("OPENHANDS_CLOUD_URL", "https://app.all-hands.dev"),
+        help=f"OpenHands Cloud API URL",
     )
 
     return acp_parser

@@ -131,13 +131,33 @@ def main() -> None:
                 # Either showed conversation list or had an error
                 return
 
-            asyncio.run(
-                run_acp_server(
-                    initial_confirmation_mode=confirmation_mode,
-                    resume_conversation_id=resume_id,
-                    streaming_enabled=args.streaming,
+            # asyncio.run(
+            #     run_acp_server(
+            #         initial_confirmation_mode=confirmation_mode,
+            #         resume_conversation_id=resume_id,
+            #         streaming_enabled=args.streaming,
+            #     )
+            # )
+
+            if args.cloud:
+                from openhands_cli.acp_impl.cloud_runner import run_cloud_acp_server
+
+                asyncio.run(
+                    run_cloud_acp_server(
+                        initial_confirmation_mode=confirmation_mode,
+                        resume_conversation_id=resume_id,
+                        streaming_enabled=args.streaming,
+                        cloud_api_url=args.cloud_url,
+                    )
                 )
-            )
+            else:
+                asyncio.run(
+                    run_acp_server(
+                        initial_confirmation_mode=confirmation_mode,
+                        resume_conversation_id=resume_id,
+                        streaming_enabled=args.streaming,
+                    )
+                )
 
         elif args.command == "login":
             from openhands_cli.auth.login_command import run_login_command
