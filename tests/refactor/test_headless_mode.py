@@ -7,7 +7,6 @@ import uuid
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 import pytest
-from openhands_cli.entrypoint import main as simple_main
 from rich.text import Text
 
 from openhands.sdk.security.confirmation_policy import (
@@ -17,6 +16,7 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.argparsers.main_parser import create_main_parser
+from openhands_cli.entrypoint import main as simple_main
 from openhands_cli.tui.modals.settings.settings_screen import SettingsScreen
 from openhands_cli.tui.textual_app import OpenHandsApp, main as textual_main
 

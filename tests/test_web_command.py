@@ -5,9 +5,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-from openhands_cli.entrypoint import main
 
 from openhands_cli.argparsers.main_parser import create_main_parser
+from openhands_cli.entrypoint import main
 
 
 @pytest.mark.parametrize(

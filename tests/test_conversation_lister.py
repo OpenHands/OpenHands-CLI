@@ -6,9 +6,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from openhands_cli.entrypoint import handle_resume_logic
 
 from openhands_cli.conversations.lister import ConversationLister
+from openhands_cli.entrypoint import handle_resume_logic
 
 
 class TestConversationLister:

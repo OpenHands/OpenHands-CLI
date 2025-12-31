@@ -6,9 +6,9 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from openhands_cli.entrypoint import main
 
 from openhands_cli.argparsers.main_parser import create_main_parser
+from openhands_cli.entrypoint import main
 
 
 def test_main_parser_accepts_task_and_file_flags():
@@ -181,9 +181,7 @@ def test_main_cli_calls_textual_main(
 
     fake_textual_app = SimpleNamespace(main=mock_textual_main)
     # Provide the symbol that main() will import
-    monkeypatch.setitem(
-        sys.modules, "openhands_cli.tui.textual_app", fake_textual_app
-    )
+    monkeypatch.setitem(sys.modules, "openhands_cli.tui.textual_app", fake_textual_app)
 
     # Execute (no SystemExit expected on success)
     main()
@@ -210,9 +208,7 @@ def test_main_cli_task_sets_queued_inputs(monkeypatch):
         return uuid.uuid4()
 
     fake_textual_app = SimpleNamespace(main=mock_textual_main)
-    monkeypatch.setitem(
-        sys.modules, "openhands_cli.tui.textual_app", fake_textual_app
-    )
+    monkeypatch.setitem(sys.modules, "openhands_cli.tui.textual_app", fake_textual_app)
 
     main()
 
@@ -240,9 +236,7 @@ def test_main_cli_file_sets_queued_inputs(monkeypatch, tmp_path):
         return uuid.uuid4()
 
     fake_textual_app = SimpleNamespace(main=mock_textual_main)
-    monkeypatch.setitem(
-        sys.modules, "openhands_cli.tui.textual_app", fake_textual_app
-    )
+    monkeypatch.setitem(sys.modules, "openhands_cli.tui.textual_app", fake_textual_app)
 
     main()
 
@@ -285,9 +279,7 @@ def test_main_cli_file_takes_precedence_over_task(monkeypatch, tmp_path):
         return uuid.uuid4()
 
     fake_textual_app = SimpleNamespace(main=mock_textual_main)
-    monkeypatch.setitem(
-        sys.modules, "openhands_cli.tui.textual_app", fake_textual_app
-    )
+    monkeypatch.setitem(sys.modules, "openhands_cli.tui.textual_app", fake_textual_app)
 
     main()
 
