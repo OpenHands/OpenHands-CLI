@@ -44,6 +44,7 @@ Screen {
     background: $background;
     padding: 1;
     margin-bottom: 1;
+    align: left bottom;
 }
 
 Footer {
