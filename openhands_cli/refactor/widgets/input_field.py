@@ -349,7 +349,7 @@ class InputField(Container):
             max-height: 8;
             background: $background;
             color: $foreground;
-            border: solid $secondary;
+            border: solid $primary;
         }
 
         #user_input:focus {
@@ -363,7 +363,7 @@ class InputField(Container):
             height: 6;
             background: $background;
             color: $foreground;
-            border: solid $secondary;
+            border: solid $primary;
             display: none;
         }
 
