@@ -111,9 +111,10 @@ class TextAreaAutoComplete(Container):
     TextAreaAutoComplete {
         layer: autocomplete;
         width: auto;
+        min-width: 30;
         max-width: 60;
         height: auto;
-        max-height: 10;
+        max-height: 12;
         display: none;
         background: $surface;
         border: solid $primary;
@@ -123,11 +124,12 @@ class TextAreaAutoComplete(Container):
         OptionList {
             width: 100%;
             height: auto;
-            max-height: 8;
+            min-height: 1;
+            max-height: 10;
             border: none;
-            padding: 0;
+            padding: 0 1;
             margin: 0;
-            background: transparent;
+            background: $surface;
         }
     }
     """
@@ -216,23 +218,20 @@ class TextAreaAutoComplete(Container):
         search = stripped.lower()
         candidates = []
         for cmd in self.command_candidates:
-            # cmd is a DropdownItem with main (Content or str) and suffix
+            # cmd is a DropdownItem with main (Content or str)
             cmd_main = cmd.main if hasattr(cmd, "main") else cmd
             # Convert Content object to plain string if needed
             cmd_text = (
                 str(cmd_main.plain) if hasattr(cmd_main, "plain") else str(cmd_main)
             )
-            if cmd_text.lower().startswith(search):
-                suffix = cmd.suffix if hasattr(cmd, "suffix") else ""
-                # Handle suffix which may be Content, string, or empty
-                if suffix and hasattr(suffix, "plain"):
-                    suffix_text = str(suffix.plain)
-                elif suffix:
-                    suffix_text = str(suffix)
-                else:
-                    suffix_text = ""
-                display = f"{cmd_text} {suffix_text}".strip()
-                candidates.append(Option(display, id=cmd_text))
+            # Extract just the command part (before " - " if present)
+            if " - " in cmd_text:
+                cmd_name = cmd_text.split(" - ")[0]
+            else:
+                cmd_name = cmd_text
+            if cmd_name.lower().startswith(search):
+                # Use full text for display, command name as id
+                candidates.append(Option(cmd_text, id=cmd_name))
 
         return candidates
 
@@ -359,8 +358,10 @@ class InputField(Container):
 
         TextAreaAutoComplete {
             layer: autocomplete;
-            dock: bottom;
-            offset-y: -1;
+            offset-x: 1;
+            offset-y: -2;
+            overlay: screen;
+            constrain: inside inflect;
         }
     }
     """
