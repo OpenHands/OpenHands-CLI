@@ -349,11 +349,11 @@ class InputField(Container):
             max-height: 8;
             background: $background;
             color: $foreground;
-            border: solid $primary;
+            border: solid $primary !important;
         }
 
         #user_input:focus {
-            border: solid $primary;
+            border: solid $primary !important;
             background: $background;
         }
 
@@ -363,12 +363,12 @@ class InputField(Container):
             height: 6;
             background: $background;
             color: $foreground;
-            border: solid $primary;
+            border: solid $primary !important;
             display: none;
         }
 
         #user_textarea:focus {
-            border: solid $primary;
+            border: solid $primary !important;
             background: $background;
         }
 
