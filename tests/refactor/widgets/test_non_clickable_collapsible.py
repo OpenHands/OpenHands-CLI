@@ -93,7 +93,7 @@ async def test_content_copies_and_shows_success_notification() -> None:
 
     # Patch pyperclip.copy in the correct module
     with patch(
-        "openhands_cli.refactor.widgets.non_clickable_collapsible.pyperclip.copy"
+        "openhands_cli.tui.widgets.non_clickable_collapsible.pyperclip.copy"
     ) as mock_copy:
         async with app.run_test() as _pilot:
             # Replace notify with a MagicMock so we can assert on it
@@ -132,7 +132,7 @@ async def test_copy_handler_handles_empty_content_with_warning() -> None:
     app = CollapsibleTestApp(collapsible)
 
     with patch(
-        "openhands_cli.refactor.widgets.non_clickable_collapsible.pyperclip.copy"
+        "openhands_cli.tui.widgets.non_clickable_collapsible.pyperclip.copy"
     ) as mock_copy:
         async with app.run_test() as _pilot:
             app.notify = MagicMock()
@@ -163,7 +163,7 @@ async def test_copy_button_click_triggers_copy() -> None:
 
     # Patch pyperclip.copy in the correct module
     with patch(
-        "openhands_cli.refactor.widgets.non_clickable_collapsible.pyperclip.copy"
+        "openhands_cli.tui.widgets.non_clickable_collapsible.pyperclip.copy"
     ) as mock_copy:
         async with app.run_test() as pilot:
             # Replace notify with a MagicMock so we can assert on it
@@ -197,13 +197,13 @@ async def test_copy_on_linux_without_pyperclip_shows_xclip_hint() -> None:
     # Patch _is_linux to return True
     with (
         patch(
-            "openhands_cli.refactor.widgets.non_clickable_collapsible.pyperclip.copy",
+            "openhands_cli.tui.widgets.non_clickable_collapsible.pyperclip.copy",
             side_effect=pyperclip.PyperclipException(
                 "No clipboard mechanism available"
             ),
         ),
         patch(
-            "openhands_cli.refactor.widgets.non_clickable_collapsible._is_linux",
+            "openhands_cli.tui.widgets.non_clickable_collapsible._is_linux",
             return_value=True,
         ),
     ):
@@ -241,13 +241,13 @@ async def test_copy_on_non_linux_without_pyperclip_shows_success() -> None:
     # Patch _is_linux to return False (e.g., macOS or Windows)
     with (
         patch(
-            "openhands_cli.refactor.widgets.non_clickable_collapsible.pyperclip.copy",
+            "openhands_cli.tui.widgets.non_clickable_collapsible.pyperclip.copy",
             side_effect=pyperclip.PyperclipException(
                 "No clipboard mechanism available"
             ),
         ),
         patch(
-            "openhands_cli.refactor.widgets.non_clickable_collapsible._is_linux",
+            "openhands_cli.tui.widgets.non_clickable_collapsible._is_linux",
             return_value=False,
         ),
     ):

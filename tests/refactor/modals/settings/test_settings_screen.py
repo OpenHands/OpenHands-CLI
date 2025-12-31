@@ -63,7 +63,7 @@ def fake_agent_store(monkeypatch) -> InMemoryAgentStore:
     monkeypatch.setattr(ss, "AgentStore", lambda: store)
     # Also patch in the SettingsScreen module itself
     monkeypatch.setattr(
-        "openhands_cli.refactor.modals.settings.settings_screen.AgentStore",
+        "openhands_cli.tui.modals.settings.settings_screen.AgentStore",
         lambda: store,
     )
     return store

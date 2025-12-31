@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-from entrypoint import main
+from openhands_cli.entrypoint import main
 
 from openhands_cli.argparsers.main_parser import create_main_parser
 
@@ -103,7 +103,7 @@ def test_launch_web_server_constructs_and_serves(
     mock_server.serve.assert_called_once_with(debug=expected_debug)
 
 
-@patch("openhands_cli.serve.Server")
+@patch("openhands_cli.tui.serve.Server")
 def test_launch_web_server_propagates_exception(mock_server_class):
     from openhands_cli.tui.serve import launch_web_server
 

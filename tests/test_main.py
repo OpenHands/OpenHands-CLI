@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from entrypoint import main
+from openhands_cli.entrypoint import main
 
 from openhands_cli.argparsers.main_parser import create_main_parser
 
@@ -34,7 +34,7 @@ def test_main_parser_accepts_task_and_file_flags():
 class TestMainEntryPoint:
     """Test the main entry point behavior."""
 
-    @patch("openhands_cli.refactor.textual_app.main")
+    @patch("openhands_cli.tui.textual_app.main")
     @patch("sys.argv", ["openhands"])
     def test_main_starts_textual_ui_directly(
         self, mock_textual_main: MagicMock
@@ -52,7 +52,7 @@ class TestMainEntryPoint:
         assert kwargs["resume_conversation_id"] is None
         assert kwargs["queued_inputs"] is None
 
-    @patch("openhands_cli.refactor.textual_app.main")
+    @patch("openhands_cli.tui.textual_app.main")
     @patch("sys.argv", ["openhands"])
     def test_main_handles_import_error(self, mock_textual_main: MagicMock) -> None:
         """Test that main() handles ImportError gracefully."""
@@ -64,7 +64,7 @@ class TestMainEntryPoint:
 
         assert str(exc_info.value) == "Missing dependency"
 
-    @patch("openhands_cli.refactor.textual_app.main")
+    @patch("openhands_cli.tui.textual_app.main")
     @patch("sys.argv", ["openhands"])
     def test_main_handles_keyboard_interrupt(
         self, mock_textual_main: MagicMock
@@ -76,7 +76,7 @@ class TestMainEntryPoint:
         # Should complete without raising an exception (graceful exit)
         main()
 
-    @patch("openhands_cli.refactor.textual_app.main")
+    @patch("openhands_cli.tui.textual_app.main")
     @patch("sys.argv", ["openhands"])
     def test_main_handles_eof_error(self, mock_textual_main: MagicMock) -> None:
         """Test that main() handles EOFError gracefully."""
@@ -86,7 +86,7 @@ class TestMainEntryPoint:
         # Should complete without raising an exception (graceful exit)
         main()
 
-    @patch("openhands_cli.refactor.textual_app.main")
+    @patch("openhands_cli.tui.textual_app.main")
     @patch("sys.argv", ["openhands"])
     def test_main_handles_general_exception(self, mock_textual_main: MagicMock) -> None:
         """Test that main() handles general exceptions."""
@@ -98,7 +98,7 @@ class TestMainEntryPoint:
 
         assert str(exc_info.value) == "Unexpected error"
 
-    @patch("openhands_cli.refactor.textual_app.main")
+    @patch("openhands_cli.tui.textual_app.main")
     @patch("sys.argv", ["openhands", "--resume", "test-conversation-id"])
     def test_main_with_resume_argument(self, mock_textual_main: MagicMock) -> None:
         """Test that main() passes resume conversation ID when provided."""
@@ -115,7 +115,7 @@ class TestMainEntryPoint:
         assert kwargs["resume_conversation_id"] == "test-conversation-id"
         assert kwargs["queued_inputs"] is None
 
-    @patch("openhands_cli.refactor.textual_app.main")
+    @patch("openhands_cli.tui.textual_app.main")
     @patch("sys.argv", ["openhands", "--always-approve"])
     def test_main_with_always_approve_argument(
         self, mock_textual_main: MagicMock
@@ -134,7 +134,7 @@ class TestMainEntryPoint:
         assert kwargs["always_approve"] is True
         assert kwargs["queued_inputs"] is None
 
-    @patch("openhands_cli.refactor.textual_app.main")
+    @patch("openhands_cli.tui.textual_app.main")
     @patch("sys.argv", ["openhands", "--llm-approve"])
     def test_main_with_llm_approve_argument(self, mock_textual_main: MagicMock) -> None:
         """Test that main() passes llm_approve=True with --llm-approve."""
@@ -182,7 +182,7 @@ def test_main_cli_calls_textual_main(
     fake_textual_app = SimpleNamespace(main=mock_textual_main)
     # Provide the symbol that main() will import
     monkeypatch.setitem(
-        sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app
+        sys.modules, "openhands_cli.tui.textual_app", fake_textual_app
     )
 
     # Execute (no SystemExit expected on success)
@@ -211,7 +211,7 @@ def test_main_cli_task_sets_queued_inputs(monkeypatch):
 
     fake_textual_app = SimpleNamespace(main=mock_textual_main)
     monkeypatch.setitem(
-        sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app
+        sys.modules, "openhands_cli.tui.textual_app", fake_textual_app
     )
 
     main()
@@ -241,7 +241,7 @@ def test_main_cli_file_sets_queued_inputs(monkeypatch, tmp_path):
 
     fake_textual_app = SimpleNamespace(main=mock_textual_main)
     monkeypatch.setitem(
-        sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app
+        sys.modules, "openhands_cli.tui.textual_app", fake_textual_app
     )
 
     main()
@@ -286,7 +286,7 @@ def test_main_cli_file_takes_precedence_over_task(monkeypatch, tmp_path):
 
     fake_textual_app = SimpleNamespace(main=mock_textual_main)
     monkeypatch.setitem(
-        sys.modules, "openhands_cli.refactor.textual_app", fake_textual_app
+        sys.modules, "openhands_cli.tui.textual_app", fake_textual_app
     )
 
     main()

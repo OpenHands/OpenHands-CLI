@@ -138,7 +138,7 @@ class TestEnhancedAutoComplete:
 
         # Patch WORK_DIR in the autocomplete module to our tmp_path
         monkeypatch.setattr(
-            "openhands_cli.refactor.widgets.autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.autocomplete.WORK_DIR",
             str(tmp_path),
         )
 
@@ -164,7 +164,7 @@ class TestEnhancedAutoComplete:
         """Non-existent directories produce no file candidates."""
         # Point WORK_DIR at a real dir, but use a path that does not exist inside it.
         monkeypatch.setattr(
-            "openhands_cli.refactor.widgets.autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.autocomplete.WORK_DIR",
             str(tmp_path),
         )
 

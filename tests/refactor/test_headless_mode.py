@@ -7,7 +7,7 @@ import uuid
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 import pytest
-from entrypoint import main as simple_main
+from openhands_cli.entrypoint import main as simple_main
 from rich.text import Text
 
 from openhands.sdk.security.confirmation_policy import (
@@ -53,7 +53,7 @@ class TestHeadlessArgumentParsing:
 class TestSimpleMainHeadlessValidation:
     """High-level validation behavior of simple_main."""
 
-    @patch("openhands_cli.refactor.textual_app.main")
+    @patch("openhands_cli.tui.textual_app.main")
     def test_headless_without_task_or_file_exits_with_error(self, mock_textual_main):
         test_args = ["openhands", "--headless"]
 
@@ -64,7 +64,7 @@ class TestSimpleMainHeadlessValidation:
         assert exc.value.code == 2
         mock_textual_main.assert_not_called()
 
-    @patch("openhands_cli.refactor.textual_app.main")
+    @patch("openhands_cli.tui.textual_app.main")
     def test_headless_with_task_calls_textual_main_with_queued_input(
         self, mock_textual_main
     ):
@@ -83,7 +83,7 @@ class TestSimpleMainHeadlessValidation:
         assert kwargs["queued_inputs"] == ["test task"]
         assert kwargs["headless"] is True
 
-    @patch("openhands_cli.refactor.textual_app.main")
+    @patch("openhands_cli.tui.textual_app.main")
     def test_headless_with_file_calls_textual_main(self, mock_textual_main):
         # Mock textual_main to return a UUID
         mock_textual_main.return_value = uuid.uuid4()
@@ -102,7 +102,7 @@ class TestSimpleMainHeadlessValidation:
         finally:
             os.unlink(temp_file)
 
-    @patch("openhands_cli.refactor.textual_app.main")
+    @patch("openhands_cli.tui.textual_app.main")
     def test_headless_auto_sets_exit_without_confirmation(self, mock_textual_main):
         """Regression guard that headless implies exit_without_confirmation."""
         # Mock textual_main to return a UUID
@@ -157,7 +157,7 @@ class TestHeadlessConfirmationPolicy:
         expected_type,
         expected_threshold,
     ):
-        with patch("openhands_cli.refactor.textual_app.OpenHandsApp") as mock_app_cls:
+        with patch("openhands_cli.tui.textual_app.OpenHandsApp") as mock_app_cls:
             mock_app = MagicMock()
             mock_app_cls.return_value = mock_app
 
@@ -324,7 +324,7 @@ class TestConversationSummary:
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
 
         with patch(
-            "openhands_cli.refactor.core.conversation_runner.setup_conversation",
+            "openhands_cli.tui.core.conversation_runner.setup_conversation",
             return_value=None,
         ):
             runner = ConversationRunner(
@@ -405,7 +405,7 @@ class TestJsonArgumentValidation:
     def test_json_requires_headless_mode(self):
         """Test that JSON flag requires headless mode."""
         # JSON without headless should not enable JSON mode
-        with patch("openhands_cli.refactor.textual_app.main") as mock_textual:
+        with patch("openhands_cli.tui.textual_app.main") as mock_textual:
             # Mock sys.argv for argument parsing
             with patch("sys.argv", ["openhands", "--json", "--task", "test task"]):
                 simple_main()
@@ -417,7 +417,7 @@ class TestJsonArgumentValidation:
 
     def test_json_and_headless_enables_json_mode(self):
         """Test that JSON + headless enables JSON mode."""
-        with patch("openhands_cli.refactor.textual_app.main") as mock_textual:
+        with patch("openhands_cli.tui.textual_app.main") as mock_textual:
             # Mock sys.argv for argument parsing
             with patch(
                 "sys.argv", ["openhands", "--headless", "--json", "--task", "test task"]
