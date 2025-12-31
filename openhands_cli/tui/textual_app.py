@@ -28,6 +28,7 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
+from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
@@ -45,7 +46,6 @@ from openhands_cli.tui.widgets.status_line import (
     InfoStatusLine,
     WorkingStatusLine,
 )
-from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.user_actions.types import UserConfirmation
 from openhands_cli.utils import json_callback
 

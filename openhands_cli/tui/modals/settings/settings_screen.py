@@ -22,6 +22,7 @@ from textual.widgets import (
 )
 from textual.widgets._select import NoSelection
 
+from openhands_cli.stores import AgentStore
 from openhands_cli.tui.modals.settings.choices import (
     get_model_options,
 )
@@ -30,7 +31,6 @@ from openhands_cli.tui.modals.settings.components import (
     SettingsTab,
 )
 from openhands_cli.tui.modals.settings.utils import SettingsFormData, save_settings
-from openhands_cli.stores import AgentStore
 
 
 class SettingsScreen(ModalScreen):

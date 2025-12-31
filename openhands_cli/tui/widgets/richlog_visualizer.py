@@ -19,11 +19,11 @@ from openhands.sdk.event import (
 from openhands.sdk.event.base import Event
 from openhands.sdk.event.condenser import Condensation, CondensationRequest
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
+from openhands_cli.stores import CliSettings
+from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.widgets.non_clickable_collapsible import (
     NonClickableCollapsible,
 )
-from openhands_cli.stores import CliSettings
-from openhands_cli.theme import OPENHANDS_THEME
 
 
 if TYPE_CHECKING:
