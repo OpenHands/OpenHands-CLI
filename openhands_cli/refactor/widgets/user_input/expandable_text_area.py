@@ -25,8 +25,6 @@ class AutoGrowTextArea(TextArea):
     class EnterPressed(Message):
         """Message sent when Enter is pressed (for submission)."""
 
-        pass
-
     def __init__(
         self,
         text: str = "",
@@ -49,6 +47,9 @@ class AutoGrowTextArea(TextArea):
         )
         self.compact = True
         self._placeholder = placeholder
+        # Cache for cursor position calculation
+        self._cached_line_offsets: list[int] | None = None
+        self._cached_text_for_offsets: str | None = None
 
     def on_mount(self) -> None:
         """Configure the text area on mount."""
@@ -91,14 +92,41 @@ class AutoGrowTextArea(TextArea):
         """Set the text content."""
         self.text = new_value
 
+    def _get_line_offsets(self) -> list[int]:
+        """Get cached line start offsets for efficient cursor position calculation.
+
+        Returns a list where index i contains the character offset where line i starts.
+        This is cached and invalidated when text changes.
+        """
+        current_text = self.text
+        if (
+            self._cached_line_offsets is not None
+            and self._cached_text_for_offsets == current_text
+        ):
+            return self._cached_line_offsets
+
+        # Compute line offsets: offset[i] = character position where line i starts
+        offsets = [0]
+        pos = 0
+        for char in current_text:
+            pos += 1
+            if char == "\n":
+                offsets.append(pos)
+
+        self._cached_line_offsets = offsets
+        self._cached_text_for_offsets = current_text
+        return offsets
+
     @property
     def cursor_position(self) -> int:
-        """Get cursor position as character offset (for Input API compatibility)."""
+        """Get cursor position as character offset (for Input API compatibility).
+
+        Uses cached line offsets for O(1) lookup after initial O(n) computation.
+        Cache is invalidated when text changes.
+        """
         row, col = self.cursor_location
-        # Calculate character offset from start
-        offset = 0
-        lines = self.text.split("\n")
-        for i in range(row):
-            offset += len(lines[i]) + 1  # +1 for newline
-        offset += col
-        return offset
+        line_offsets = self._get_line_offsets()
+        if row < len(line_offsets):
+            return line_offsets[row] + col
+        # Fallback for edge cases
+        return len(self.text)

@@ -1,5 +1,3 @@
-
-from openhands_cli.refactor.widgets.user_input.expandable_text_area import AutoGrowTextArea
 from pathlib import Path
 
 from rich.text import Text
@@ -8,7 +6,9 @@ from textual.widgets import OptionList
 from textual.widgets.option_list import Option
 
 from openhands_cli.locations import WORK_DIR
-from openhands_cli.refactor.core.commands import COMMANDS
+from openhands_cli.refactor.widgets.user_input.expandable_text_area import (
+    AutoGrowTextArea,
+)
 
 
 class TextAreaAutoComplete(Container):

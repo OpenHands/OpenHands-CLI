@@ -1,14 +1,19 @@
 from typing import ClassVar
+
 from textual import on
 from textual.binding import Binding
 from textual.containers import Container
 from textual.message import Message
 from textual.signal import Signal
 from textual.widgets import TextArea
-from openhands_cli.refactor.core.commands import COMMANDS
-from openhands_cli.refactor.widgets.user_input.text_area_with_autocomplete import TextAreaAutoComplete
-from openhands_cli.refactor.widgets.user_input.expandable_text_area import AutoGrowTextArea
 
+from openhands_cli.refactor.core.commands import COMMANDS
+from openhands_cli.refactor.widgets.user_input.expandable_text_area import (
+    AutoGrowTextArea,
+)
+from openhands_cli.refactor.widgets.user_input.text_area_with_autocomplete import (
+    TextAreaAutoComplete,
+)
 
 
 class InputField(Container):
