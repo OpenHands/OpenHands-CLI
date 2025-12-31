@@ -33,6 +33,11 @@ class AutoGrowTextArea(TextArea):
             super().__init__()
             self.text = text
 
+    class EnterPressed(Message):
+        """Message sent when Enter is pressed (for submission)."""
+
+        pass
+
     def __init__(
         self,
         text: str = "",
@@ -66,6 +71,17 @@ class AutoGrowTextArea(TextArea):
                 if isinstance(self._placeholder, str)
                 else self._placeholder
             )
+
+    async def _on_key(self, event) -> None:
+        """Intercept Enter key before TextArea processes it."""
+        if event.key == "enter":
+            # Post message to parent and prevent default newline insertion
+            self.post_message(self.EnterPressed())
+            event.prevent_default()
+            event.stop()
+            return
+        # Let parent class handle other keys
+        await super()._on_key(event)
 
     @on(Paste)
     async def _on_paste(self, event: Paste) -> None:
@@ -415,7 +431,7 @@ class InputField(Container):
             self.autocomplete.update_candidates(self.input_widget.text)
 
     def on_key(self, event) -> None:
-        """Handle key events for submission and autocomplete navigation."""
+        """Handle key events for autocomplete navigation."""
         if self.is_multiline_mode:
             return
 
@@ -445,25 +461,25 @@ class InputField(Container):
                 event.stop()
                 return
 
-        # Handle enter for submission
-        if event.key == "enter":
-            # If autocomplete is visible, select and apply completion
-            if self.autocomplete.is_visible():
-                selected = self.autocomplete.select_highlighted()
-                if selected:
-                    self._apply_completion(selected)
-                    event.prevent_default()
-                    event.stop()
-                    return
+    @on(AutoGrowTextArea.EnterPressed)
+    def on_enter_pressed(self, event: AutoGrowTextArea.EnterPressed) -> None:  # noqa: ARG002
+        """Handle Enter key press from the input widget."""
+        if self.is_multiline_mode:
+            return
 
-            # Otherwise submit the input
-            content = self.input_widget.text.strip()
-            if content:
-                self.input_widget.clear()
-                self.autocomplete.hide_dropdown()
-                self.post_message(self.Submitted(content))
-            event.prevent_default()
-            event.stop()
+        # If autocomplete is visible, select and apply completion
+        if self.autocomplete.is_visible():
+            selected = self.autocomplete.select_highlighted()
+            if selected:
+                self._apply_completion(selected)
+                return
+
+        # Otherwise submit the input
+        content = self.input_widget.text.strip()
+        if content:
+            self.input_widget.clear()
+            self.autocomplete.hide_dropdown()
+            self.post_message(self.Submitted(content))
 
     def _apply_completion(self, value: str) -> None:
         """Apply the selected completion to the input."""
