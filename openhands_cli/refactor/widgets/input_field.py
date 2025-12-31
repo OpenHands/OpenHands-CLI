@@ -216,11 +216,22 @@ class TextAreaAutoComplete(Container):
         search = stripped.lower()
         candidates = []
         for cmd in self.command_candidates:
-            # cmd is a DropdownItem with main and suffix
-            cmd_text = cmd.main if hasattr(cmd, "main") else str(cmd)
+            # cmd is a DropdownItem with main (Content or str) and suffix
+            cmd_main = cmd.main if hasattr(cmd, "main") else cmd
+            # Convert Content object to plain string if needed
+            cmd_text = (
+                str(cmd_main.plain) if hasattr(cmd_main, "plain") else str(cmd_main)
+            )
             if cmd_text.lower().startswith(search):
                 suffix = cmd.suffix if hasattr(cmd, "suffix") else ""
-                display = f"{cmd_text} {suffix}" if suffix else cmd_text
+                # Handle suffix which may be Content, string, or empty
+                if suffix and hasattr(suffix, "plain"):
+                    suffix_text = str(suffix.plain)
+                elif suffix:
+                    suffix_text = str(suffix)
+                else:
+                    suffix_text = ""
+                display = f"{cmd_text} {suffix_text}".strip()
                 candidates.append(Option(display, id=cmd_text))
 
         return candidates
