@@ -89,7 +89,7 @@ def get_session_mode_state(current_mode: ConfirmationMode) -> SessionModeState:
     )
 
 
-class OpenHandsACPAgent(ACPAgent):
+class LocalOpenHandsACPAgent(ACPAgent):
     """OpenHands Agent Client Protocol implementation."""
 
     def __init__(
@@ -783,8 +783,8 @@ async def run_acp_server(
 
     reader, writer = await stdio_streams()
 
-    def create_agent(conn: Client) -> OpenHandsACPAgent:
-        return OpenHandsACPAgent(
+    def create_agent(conn: Client) -> LocalOpenHandsACPAgent:
+        return LocalOpenHandsACPAgent(
             conn, initial_confirmation_mode, resume_conversation_id, streaming_enabled
         )
 

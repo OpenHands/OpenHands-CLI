@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from litellm.types.utils import ModelResponseStream
 
-from openhands_cli.acp_impl.agent import OpenHandsACPAgent
+from openhands_cli.acp_impl.agent.local_agent import LocalOpenHandsACPAgent
 from openhands_cli.acp_impl.events.event import EventSubscriber
 
 
@@ -20,13 +20,13 @@ def mock_connection():
 @pytest.fixture
 def acp_agent(mock_connection):
     """Create an OpenHands ACP agent instance."""
-    return OpenHandsACPAgent(mock_connection, "always-ask")
+    return LocalOpenHandsACPAgent(mock_connection, "always-ask")
 
 
 @pytest.fixture
 def acp_agent_with_streaming(mock_connection):
     """Create an OpenHands ACP agent instance with streaming enabled."""
-    return OpenHandsACPAgent(mock_connection, "always-ask", streaming_enabled=True)
+    return LocalOpenHandsACPAgent(mock_connection, "always-ask", streaming_enabled=True)
 
 
 @pytest.fixture

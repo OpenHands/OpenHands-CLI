@@ -9,7 +9,7 @@ from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     NeverConfirm,
 )
-from openhands_cli.acp_impl.agent import OpenHandsACPAgent
+from openhands_cli.acp_impl.agent.local_agent import LocalOpenHandsACPAgent
 from openhands_cli.acp_impl.confirmation import get_available_modes
 from openhands_cli.acp_impl.slash_commands import (
     get_confirmation_mode_from_conversation,
@@ -91,25 +91,25 @@ class TestAgentModeSwitching:
     @pytest.fixture
     def acp_agent(self, mock_connection):
         """Create an OpenHands ACP agent instance."""
-        return OpenHandsACPAgent(mock_connection, "always-ask")
+        return LocalOpenHandsACPAgent(mock_connection, "always-ask")
 
     @pytest.mark.asyncio
     async def test_agent_initializes_with_default_mode(self, mock_connection):
         """Test that agent initializes with specified mode."""
-        agent = OpenHandsACPAgent(mock_connection, "always-approve")
+        agent = LocalOpenHandsACPAgent(mock_connection, "always-approve")
         assert agent._initial_confirmation_mode == "always-approve"
 
     @pytest.mark.asyncio
     async def test_default_confirmation_mode_is_always_ask(self, mock_connection):
         """Test that the default confirmation mode for ACP is 'always-ask'."""
         # When no mode is specified, agent should default to "always-ask"
-        agent = OpenHandsACPAgent(mock_connection, "always-ask")
+        agent = LocalOpenHandsACPAgent(mock_connection, "always-ask")
         assert agent._initial_confirmation_mode == "always-ask"
 
         # Verify this matches the default parameter in run_acp_server
         import inspect
 
-        from openhands_cli.acp_impl.agent import run_acp_server
+        from acp_impl.agent.local_agent import run_acp_server
 
         sig = inspect.signature(run_acp_server)
         default_mode = sig.parameters["initial_confirmation_mode"].default
@@ -338,7 +338,7 @@ class TestSlashCommandIntegration:
     @pytest.fixture
     def acp_agent(self, mock_connection):
         """Create an OpenHands ACP agent instance."""
-        return OpenHandsACPAgent(mock_connection, "always-ask")
+        return LocalOpenHandsACPAgent(mock_connection, "always-ask")
 
     @pytest.mark.asyncio
     async def test_help_command_returns_available_commands(self, acp_agent, tmp_path):

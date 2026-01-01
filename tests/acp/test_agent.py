@@ -11,7 +11,7 @@ from acp.schema import (
     TextContentBlock,
 )
 
-from openhands_cli.acp_impl.agent import OpenHandsACPAgent
+from openhands_cli.acp_impl.agent.local_agent import LocalOpenHandsACPAgent
 
 
 @pytest.fixture
@@ -24,7 +24,7 @@ def mock_connection():
 @pytest.fixture
 def acp_agent(mock_connection):
     """Create an OpenHands ACP agent instance."""
-    return OpenHandsACPAgent(mock_connection, "always-ask")
+    return LocalOpenHandsACPAgent(mock_connection, "always-ask")
 
 
 @pytest.mark.asyncio
@@ -726,7 +726,7 @@ async def test_set_session_mode_updates_existing_conversation(acp_agent, tmp_pat
 async def test_new_session_with_resume_conversation_id(mock_connection, tmp_path):
     """Test that new_session uses resume_conversation_id when provided."""
     resume_id = "12345678-1234-1234-1234-123456789abc"
-    agent = OpenHandsACPAgent(mock_connection, "always-ask", resume_id)
+    agent = LocalOpenHandsACPAgent(mock_connection, "always-ask", resume_id)
 
     with (
         patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
@@ -753,7 +753,7 @@ async def test_new_session_with_resume_conversation_id(mock_connection, tmp_path
 async def test_new_session_resume_id_only_used_once(mock_connection, tmp_path):
     """Test that resume_conversation_id is only used for the first new_session call."""
     resume_id = "12345678-1234-1234-1234-123456789abc"
-    agent = OpenHandsACPAgent(mock_connection, "always-ask", resume_id)
+    agent = LocalOpenHandsACPAgent(mock_connection, "always-ask", resume_id)
 
     with (
         patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
@@ -782,7 +782,7 @@ async def test_new_session_resume_id_only_used_once(mock_connection, tmp_path):
 async def test_new_session_replays_historic_events_on_resume(mock_connection, tmp_path):
     """Test that new_session replays historic events when resuming a conversation."""
     resume_id = "12345678-1234-1234-1234-123456789abc"
-    agent = OpenHandsACPAgent(mock_connection, "always-ask", resume_id)
+    agent = LocalOpenHandsACPAgent(mock_connection, "always-ask", resume_id)
 
     with (
         patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
@@ -836,7 +836,7 @@ async def test_new_session_replays_historic_events_on_resume(mock_connection, tm
 async def test_new_session_no_replay_for_new_conversation(mock_connection, tmp_path):
     """Test that new_session does NOT replay events for new conversations."""
     # No resume_conversation_id provided
-    agent = OpenHandsACPAgent(mock_connection, "always-ask")
+    agent = LocalOpenHandsACPAgent(mock_connection, "always-ask")
 
     with (
         patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,

@@ -12,7 +12,7 @@ from acp import Client, stdio_streams
 from acp.core import AgentSideConnection
 from rich.console import Console
 
-from openhands_cli.acp_impl.cloud_agent import OpenHandsCloudACPAgent
+from openhands_cli.acp_impl.agent import OpenHandsCloudACPAgent
 from openhands_cli.acp_impl.confirmation import ConfirmationMode
 from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.cloud.conversation import is_token_valid
