@@ -545,7 +545,51 @@ class OpenHandsCloudACPAgent(ACPAgent):
         """Cancel the current operation."""
         logger.info(f"Cancel requested for session: {session_id}")
 
-        pass
+        try:
+            conversation = self._get_or_create_conversation(session_id=session_id)
+            conversation.pause()
+
+            running_task = self._running_tasks.get(session_id)
+            if not running_task or running_task.done():
+                return
+
+            logger.debug(
+                f"Waiting for conversation thread to terminate for session {session_id}"
+            )
+            await self._wait_for_task_completion(running_task, session_id)
+
+        except RequestError:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to cancel session {session_id}: {e}")
+            raise RequestError.internal_error(
+                {"reason": "Failed to cancel session", "details": str(e)}
+            )
+        
+    async def _wait_for_task_completion(
+        self, task: asyncio.Task, session_id: str, timeout: float = 10.0
+    ) -> None:
+        """Wait for a task to complete and handle cancellation if needed."""
+        try:
+            await asyncio.wait_for(task, timeout=timeout)
+        except TimeoutError:
+            logger.warning(
+                f"Conversation thread did not stop within timeout for session "
+                f"{session_id}"
+            )
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+        except Exception as e:
+            logger.error(f"Error while waiting for conversation to stop: {e}")
+            raise RequestError.internal_error(
+                {
+                    "reason": "Error during conversation cancellation",
+                    "details": str(e),
+                }
+            )
 
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         """Extension method (not supported)."""
