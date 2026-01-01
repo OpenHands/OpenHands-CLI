@@ -406,7 +406,11 @@ class OpenHandsCloudACPAgent(ACPAgent):
 
 
             async def send_message() -> None:
-                with workspace:
+                with OpenHandsCloudWorkspace(
+                    cloud_api_url=self._cloud_api_url,
+                    cloud_api_key=self._cloud_api_key,
+                    keep_alive=True,
+                ):
                     conversation.send_message(message)
                     conversation.run()
 
