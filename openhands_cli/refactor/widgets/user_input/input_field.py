@@ -193,16 +193,18 @@ class InputField(Container):
         if self.is_multiline_mode:
             # Switch from TextArea to Input
             # Replace actual newlines with literal "\n" for single-line display
-            self.stored_content = self.textarea_widget.text.replace("\n", "\\n")
+            self.stored_content = self.textarea_widget.text
             self.textarea_widget.display = False
             self.input_widget.display = True
             self.input_widget.text = self.stored_content
+            self.input_widget.move_cursor(self.input_widget.document.end)
             self.input_widget.focus()
             self.is_multiline_mode = False
         else:
+            
             # Switch from Input to TextArea
             # Replace literal "\n" with actual newlines for multi-line display
-            self.stored_content = self.input_widget.text.replace("\\n", "\n")
+            self.stored_content = self.input_widget.text
             self.input_widget.display = False
             self.textarea_widget.display = True
             self.textarea_widget.text = self.stored_content
