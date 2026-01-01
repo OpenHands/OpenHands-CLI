@@ -134,16 +134,7 @@ class TextAreaAutoComplete(Container):
             self.hide_dropdown()
             return item
         return None
-
-    def move_highlight(self, direction: int) -> None:
-        """Move highlight up or down."""
-        if not self.is_visible:
-            return
-
-        if direction > 0:
-            self.option_list.action_cursor_down()
-        else:
-            self.option_list.action_cursor_up()
+    
 
     def process_key(self, key: str) -> bool:
         """Process keyboard navigation for the autocomplete.
@@ -154,10 +145,10 @@ class TextAreaAutoComplete(Container):
             return False
 
         if key == "down":
-            self.move_highlight(1)
+            self.option_list.action_cursor_down()
             return True
         elif key == "up":
-            self.move_highlight(-1)
+            self.option_list.action_cursor_up()
             return True
         elif key == "tab" or key == "enter":
             item = self.select_highlighted()
