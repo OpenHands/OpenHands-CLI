@@ -280,36 +280,36 @@ class OpenHandsCloudACPAgent(ACPAgent):
 
         # Create OpenHands Cloud workspace
         logger.info(f"Creating OpenHands Cloud workspace for session {session_id}")
-        with OpenHandsCloudWorkspace(
+        workspace = OpenHandsCloudWorkspace(
             cloud_api_url=self._cloud_api_url,
             cloud_api_key=self._cloud_api_key,
-            keep_alive=True,
-        ) as workspace:
+            keep_alive=True
+        )
 
-            # Track workspace for cleanup
-            self._active_workspaces[session_id] = workspace
+        # Track workspace for cleanup
+        self._active_workspaces[session_id] = workspace
 
-            # Get the current event loop for the callback
-            loop = asyncio.get_event_loop()
+        # Get the current event loop for the callback
+        loop = asyncio.get_event_loop()
 
-            # Create event subscriber for streaming updates
-            subscriber = EventSubscriber(session_id, self._conn)
+        # Create event subscriber for streaming updates
+        subscriber = EventSubscriber(session_id, self._conn)
 
 
-            def sync_callback(event: Event) -> None:
-                """Synchronous wrapper that schedules async event handling."""
-                asyncio.run_coroutine_threadsafe(subscriber(event), loop)
+        def sync_callback(event: Event) -> None:
+            """Synchronous wrapper that schedules async event handling."""
+            asyncio.run_coroutine_threadsafe(subscriber(event), loop)
 
-            # Create RemoteConversation with cloud workspace
-            # Note: RemoteConversation doesn't support persistence_dir
-            conversation = Conversation(
-                agent=agent,
-                workspace=workspace,
-                callbacks=[sync_callback]
-            )
+        # Create RemoteConversation with cloud workspace
+        # Note: RemoteConversation doesn't support persistence_dir
+        conversation = Conversation(
+            agent=agent,
+            workspace=workspace,
+            callbacks=[sync_callback]
+        )
 
-            subscriber.conversation = conversation
-            return conversation, workspace
+        subscriber.conversation = conversation
+        return conversation, workspace
 
     async def new_session(
         self,
@@ -404,15 +404,8 @@ class OpenHandsCloudACPAgent(ACPAgent):
             message = Message(role="user", content=message_content)
             conversation.send_message(message)
 
-
             async def send_message() -> None:
-                with OpenHandsCloudWorkspace(
-                    cloud_api_url=self._cloud_api_url,
-                    cloud_api_key=self._cloud_api_key,
-                    keep_alive=True,
-                ):
-                    conversation.send_message(message)
-                    conversation.run()
+                conversation.run()
 
             # Run the conversation with confirmation mode
             run_task = asyncio.create_task(
