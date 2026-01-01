@@ -196,13 +196,13 @@ class InputField(Container):
             self.stored_content = self.textarea_widget.text.replace("\n", "\\n")
             self.textarea_widget.display = False
             self.input_widget.display = True
-            self.input_widget.value = self.stored_content
+            self.input_widget.text = self.stored_content
             self.input_widget.focus()
             self.is_multiline_mode = False
         else:
             # Switch from Input to TextArea
             # Replace literal "\n" with actual newlines for multi-line display
-            self.stored_content = self.input_widget.value.replace("\\n", "\n")
+            self.stored_content = self.input_widget.text.replace("\\n", "\n")
             self.input_widget.display = False
             self.textarea_widget.display = True
             self.textarea_widget.text = self.stored_content
@@ -229,7 +229,7 @@ class InputField(Container):
         if self.is_multiline_mode:
             return self.textarea_widget.text
         else:
-            return self.input_widget.value
+            return self.input_widget.text
 
     def focus_input(self) -> None:
         """Focus the appropriate input widget."""
@@ -244,7 +244,7 @@ class InputField(Container):
         # Only handle when in single-line mode
         if not self.is_multiline_mode:
             # Get current text and cursor position before switching modes
-            current_text = self.input_widget.value
+            current_text = self.input_widget.text
             cursor_pos = self.input_widget.cursor_position
 
             # Insert the pasted text at the cursor position
@@ -253,7 +253,7 @@ class InputField(Container):
             )
 
             # Set the combined text in the input widget first
-            self.input_widget.value = new_text
+            self.input_widget.text = new_text
 
             # Then switch to multi-line mode (this will convert the text properly)
             self.action_toggle_input_mode()

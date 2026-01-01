@@ -82,16 +82,6 @@ class AutoGrowTextArea(TextArea):
             event.stop()
         # For single-line content, let the default paste behavior handle it
 
-    @property
-    def value(self) -> str:
-        """Compatibility property to match Input widget API."""
-        return self.text
-
-    @value.setter
-    def value(self, new_value: str) -> None:
-        """Set the text content."""
-        self.text = new_value
-
     def _get_line_offsets(self) -> list[int]:
         """Get cached line start offsets for efficient cursor position calculation.
 

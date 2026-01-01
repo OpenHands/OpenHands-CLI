@@ -116,7 +116,7 @@ class TestInputField:
             field_with_mocks.mutliline_mode_status.publish.assert_called()  # type: ignore
 
             # Mutli-line -> single-line
-            assert field_with_mocks.input_widget.value == expected_singleline_content
+            assert field_with_mocks.input_widget.text == expected_singleline_content
 
             # Single-line -> multi-line
             field_with_mocks.action_toggle_input_mode()
@@ -235,7 +235,7 @@ class TestInputField:
         if is_multiline:
             field_with_mocks.textarea_widget.text = widget_content
         else:
-            field_with_mocks.input_widget.value = widget_content
+            field_with_mocks.input_widget.text = widget_content
 
         assert field_with_mocks.get_current_value() == expected
 
@@ -367,7 +367,7 @@ class TestInputFieldPasteIntegration:
 
             # Start in single-line mode with initial text
             assert not input_field.is_multiline_mode
-            input_field.input_widget.value = initial_text
+            input_field.input_widget.text = initial_text
 
             # Move cursor to position using TextArea's move_cursor method
             # Cursor is positioned at (row, col) - for single line it's (0, col)
