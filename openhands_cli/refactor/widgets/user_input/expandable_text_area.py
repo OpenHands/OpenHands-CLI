@@ -120,3 +120,37 @@ class AutoGrowTextArea(TextArea):
             return line_offsets[row] + col
         # Fallback for edge cases
         return len(self.text)
+
+    @cursor_position.setter
+    def cursor_position(self, offset: int) -> None:
+        """Set cursor position from character offset.
+
+        Converts character offset to (row, col) and moves the cursor.
+        """
+        location = self._offset_to_location(offset)
+        self.move_cursor(location)
+
+    def _offset_to_location(self, offset: int) -> tuple[int, int]:
+        """Convert character offset to (row, col) location.
+
+        Args:
+            offset: Character offset from start of text
+
+        Returns:
+            Tuple of (row, col) for TextArea cursor location
+        """
+        text = self.text
+        offset = max(0, min(offset, len(text)))
+
+        row = 0
+        col = 0
+        for i, char in enumerate(text):
+            if i == offset:
+                break
+            if char == "\n":
+                row += 1
+                col = 0
+            else:
+                col += 1
+
+        return (row, col)
