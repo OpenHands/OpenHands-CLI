@@ -283,7 +283,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
         with OpenHandsCloudWorkspace(
             cloud_api_url=self._cloud_api_url,
             cloud_api_key=self._cloud_api_key,
-            keep_alive=False,  # Clean up sandbox when done
+            keep_alive=True,
         ) as workspace:
 
             # Track workspace for cleanup
@@ -536,7 +536,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
 
     def on_connect(self, conn: Client) -> None:
         pass
-    
+
     async def close_session(self, session_id: str, **_kwargs: Any) -> None:
         """Close a session and clean up resources."""
         logger.info(f"Closing cloud session: {session_id}")
