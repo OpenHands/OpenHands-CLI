@@ -115,7 +115,8 @@ def main() -> None:
         elif args.command == "acp":
             import asyncio
 
-            from openhands_cli.acp_impl.agent import run_acp_server
+            from acp_impl.agent.local_agent import run_acp_server
+
             from openhands_cli.acp_impl.confirmation import ConfirmationMode
 
             # Determine confirmation mode from arguments

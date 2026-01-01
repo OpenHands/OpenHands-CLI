@@ -41,9 +41,7 @@ from openhands.sdk import (
 )
 from openhands.workspace import OpenHandsCloudWorkspace
 from openhands_cli import __version__
-from openhands_cli.acp_impl.agent import (
-    get_session_mode_state,
-)
+from openhands_cli.acp_impl.agent.util import get_session_mode_state
 from openhands_cli.acp_impl.confirmation import (
     ConfirmationMode,
 )

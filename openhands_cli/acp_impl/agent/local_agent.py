@@ -28,7 +28,6 @@ from acp.schema import (
     LoadSessionResponse,
     McpCapabilities,
     PromptCapabilities,
-    SessionModeState,
     SetSessionModelResponse,
     SetSessionModeResponse,
     TextContentBlock,
@@ -42,9 +41,9 @@ from openhands.sdk import (
     Workspace,
 )
 from openhands_cli import __version__
+from openhands_cli.acp_impl.agent.util import get_session_mode_state
 from openhands_cli.acp_impl.confirmation import (
     ConfirmationMode,
-    get_available_modes,
 )
 from openhands_cli.acp_impl.events.event import EventSubscriber
 from openhands_cli.acp_impl.events.token_streamer import TokenBasedEventSubscriber
@@ -72,21 +71,6 @@ from openhands_cli.utils import extract_text_from_message_content
 
 
 logger = logging.getLogger(__name__)
-
-
-def get_session_mode_state(current_mode: ConfirmationMode) -> SessionModeState:
-    """Get the session mode state for a given confirmation mode.
-
-    Args:
-        current_mode: The current confirmation mode
-
-    Returns:
-        SessionModeState with available modes and current mode
-    """
-    return SessionModeState(
-        current_mode_id=current_mode,
-        available_modes=get_available_modes(),
-    )
 
 
 class LocalOpenHandsACPAgent(ACPAgent):
