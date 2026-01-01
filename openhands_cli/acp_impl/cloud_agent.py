@@ -159,19 +159,6 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
                 mcp_servers=mcp_servers,
                 skills=[RESOURCE_SKILL],
             )
-            # Streaming is enabled only if:
-            # 1. The --streaming flag was passed (self._streaming_enabled)
-            # 2. The LLM doesn't use responses API (which doesn't support streaming)
-            streaming_enabled = (
-                self._streaming_enabled and not agent.llm.uses_responses_api()
-            )
-
-            if streaming_enabled:
-                # Enable streaming for llm
-                agent = agent.model_copy(
-                    update={"llm": agent.llm.model_copy(update={"stream": True})}
-                )
-
         except MCPConfigurationError as e:
             logger.error(f"Invalid MCP configuration: {e}")
             raise RequestError.invalid_params(
@@ -212,9 +199,7 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
             conversation = Conversation(
                 agent=agent,
                 workspace=workspace,
-                conversation_id=UUID(session_id),
-                callbacks=[sync_callback],
-                visualizer=None,
+                callbacks=[sync_callback]
             )
 
             subscriber.conversation = conversation
@@ -263,12 +248,12 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
             await self._send_available_commands(session_id)
 
             # Get current confirmation mode for this session
-            current_mode = get_confirmation_mode_from_conversation(conversation)
+            # current_mode = get_confirmation_mode_from_conversation(conversation)
 
             # Build response
             response = NewSessionResponse(
                 session_id=session_id,
-                modes=get_session_mode_state(current_mode),
+                modes=get_session_mode_state("always-approve"),
             )
 
             # If resuming, replay historic events to the client
