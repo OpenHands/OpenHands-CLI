@@ -156,6 +156,9 @@ class OpenHandsApp(App):
                 yield Static(id="splash_instructions", classes="splash-instruction")
                 yield Static(id="splash_update_notice", classes="splash-update-notice")
 
+
+
+
             # Input area - docked to bottom
             with Container(id="input_area"):
                 yield WorkingStatusLine(self)
