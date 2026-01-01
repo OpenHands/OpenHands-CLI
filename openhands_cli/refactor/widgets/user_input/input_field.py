@@ -11,6 +11,10 @@ from openhands_cli.refactor.core.commands import COMMANDS
 from openhands_cli.refactor.widgets.user_input.expandable_text_area import (
     AutoGrowTextArea,
 )
+from openhands_cli.refactor.widgets.user_input.models import (
+    CompletionItem,
+    CompletionType,
+)
 from openhands_cli.refactor.widgets.user_input.text_area_with_autocomplete import (
     TextAreaAutoComplete,
 )
@@ -115,9 +119,7 @@ class InputField(Container):
         yield self.textarea_widget
 
         # Custom autocomplete for TextArea
-        self.autocomplete = TextAreaAutoComplete(
-            self.input_widget, command_candidates=COMMANDS
-        )
+        self.autocomplete = TextAreaAutoComplete(command_candidates=COMMANDS)
         yield self.autocomplete
 
     def on_mount(self) -> None:
@@ -135,31 +137,10 @@ class InputField(Container):
         if self.is_multiline_mode:
             return
 
-        # Handle autocomplete navigation
-        if self.autocomplete.is_visible():
-            if event.key == "down":
-                self.autocomplete.move_highlight(1)
-                event.prevent_default()
-                event.stop()
-                return
-            elif event.key == "up":
-                self.autocomplete.move_highlight(-1)
-                event.prevent_default()
-                event.stop()
-                return
-            elif event.key == "tab":
-                # Tab to select autocomplete option
-                selected = self.autocomplete.select_highlighted()
-                if selected:
-                    self._apply_completion(selected)
-                event.prevent_default()
-                event.stop()
-                return
-            elif event.key == "escape":
-                self.autocomplete.hide_dropdown()
-                event.prevent_default()
-                event.stop()
-                return
+        # Delegate to autocomplete for navigation keys
+        if self.autocomplete.process_key(event.key):
+            event.prevent_default()
+            event.stop()
 
     @on(AutoGrowTextArea.EnterPressed)
     def on_enter_pressed(self, event: AutoGrowTextArea.EnterPressed) -> None:  # noqa: ARG002
@@ -167,11 +148,10 @@ class InputField(Container):
         if self.is_multiline_mode:
             return
 
-        # If autocomplete is visible, select and apply completion
-        if self.autocomplete.is_visible():
-            selected = self.autocomplete.select_highlighted()
-            if selected:
-                self._apply_completion(selected)
+        # If autocomplete is visible, let it handle the enter key
+        if self.autocomplete.is_visible:
+            # handle_key will post CompletionSelected message if successful
+            if self.autocomplete.process_key("enter"):
                 return
 
         # Otherwise submit the input
@@ -181,43 +161,29 @@ class InputField(Container):
             self.autocomplete.hide_dropdown()
             self.post_message(self.Submitted(content))
 
-    def _apply_completion(self, value: str) -> None:
+    @on(TextAreaAutoComplete.CompletionSelected)
+    def on_completion_selected(
+        self, event: TextAreaAutoComplete.CompletionSelected
+    ) -> None:
+        """Handle completion selection from autocomplete."""
+        self._apply_completion(event.item)
+
+    def _apply_completion(self, item: CompletionItem) -> None:
         """Apply the selected completion to the input."""
         current_text = self.input_widget.text
+        completion_value = item.completion_value
 
-        if current_text.lstrip().startswith("/"):
-            # Command completion - extract just the command
-            if " - " in value:
-                command_only = value.split(" - ")[0].strip()
-            else:
-                # Remove any prefix like emoji
-                command_only = value.strip()
-                if " " in command_only:
-                    # Take just the command part (e.g., "/help" from "📁 /help")
-                    parts = command_only.split()
-                    for part in parts:
-                        if part.startswith("/"):
-                            command_only = part
-                            break
-
-            self.input_widget.text = command_only + " "
-            # Move cursor to end
-            self.input_widget.move_cursor((0, len(self.input_widget.text)))
-        elif "@" in current_text:
+        if item.completion_type == CompletionType.COMMAND:
+            # Command completion - replace entire input with command
+            self.input_widget.text = completion_value + " "
+        elif item.completion_type == CompletionType.FILE:
             # File completion - replace from last @ to end
             at_index = current_text.rfind("@")
-            prefix = current_text[:at_index]
-            # Extract the path from value (remove emoji prefix if present)
-            path_value = value.strip()
-            if " " in path_value:
-                parts = path_value.split()
-                for part in parts:
-                    if part.startswith("@"):
-                        path_value = part
-                        break
+            prefix = current_text[:at_index] if at_index >= 0 else ""
+            self.input_widget.text = prefix + completion_value + " "
 
-            self.input_widget.text = prefix + path_value + " "
-            self.input_widget.move_cursor((0, len(self.input_widget.text)))
+        # Move cursor to end
+        self.input_widget.move_cursor((0, len(self.input_widget.text)))
 
     def action_toggle_input_mode(self) -> None:
         """Toggle between single-line Input and multi-line TextArea."""

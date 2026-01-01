@@ -46,7 +46,7 @@ def field_with_mocks(input_field: InputField) -> Generator[InputField, None, Non
 
     # Create mock for autocomplete
     autocomplete_mock = MagicMock()
-    autocomplete_mock.is_visible.return_value = False
+    type(autocomplete_mock).is_visible = PropertyMock(return_value=False)
     autocomplete_mock.hide_dropdown = MagicMock()
     input_field.autocomplete = autocomplete_mock
 
@@ -146,7 +146,9 @@ class TestInputField:
 
         # Setup the mock autocomplete
         field_with_mocks.autocomplete = MagicMock()
-        field_with_mocks.autocomplete.is_visible.return_value = False
+        type(field_with_mocks.autocomplete).is_visible = PropertyMock(
+            return_value=False
+        )
         field_with_mocks.autocomplete.hide_dropdown = Mock()
 
         # Set up input widget mock
