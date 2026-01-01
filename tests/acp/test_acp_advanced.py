@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 
 from openhands.tools.file_editor.definition import FileEditorAction
-from openhands_cli.acp_impl.agent.local_agent import LocalOpenHandsACPAgent
+from openhands_cli.acp_impl.agent import LocalOpenHandsACPAgent
 from openhands_cli.acp_impl.events.utils import extract_action_locations
 
 

@@ -32,6 +32,7 @@ from acp.schema import (
     SetSessionModeResponse,
     TextContentBlock,
 )
+from rich.console import Console
 
 from openhands.sdk import (
     Conversation,
@@ -57,9 +58,12 @@ from openhands_cli.acp_impl.utils import (
     convert_acp_mcp_servers_to_agent_format,
     convert_acp_prompt_to_message_content,
 )
+from openhands_cli.auth.token_storage import TokenStorage
+from openhands_cli.cloud.conversation import is_token_valid
 from openhands_cli.locations import MCP_CONFIG_FILE
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
+from openhands_cli.theme import OPENHANDS_THEME
 
 
 logger = logging.getLogger(__name__)
@@ -564,3 +568,112 @@ class OpenHandsCloudACPAgent(ACPAgent):
         """Clean up all active workspaces on agent destruction."""
         for session_id in list(self._active_workspaces.keys()):
             self._cleanup_session(session_id)
+
+
+console = Console()
+
+
+class CloudAuthenticationError(Exception):
+    """Exception raised for cloud authentication errors."""
+
+
+def _print_login_instructions(msg: str) -> None:
+    """Print login instructions to the user."""
+    console.print(f"[{OPENHANDS_THEME.error}]{msg}[/{OPENHANDS_THEME.error}]")
+    console.print(
+        f"[{OPENHANDS_THEME.secondary}]"
+        "Please run the following command to authenticate:"
+        f"[/{OPENHANDS_THEME.secondary}]"
+    )
+    console.print(
+        f"[{OPENHANDS_THEME.accent}]  openhands login[/{OPENHANDS_THEME.accent}]"
+    )
+
+
+def _logout_and_instruct(server_url: str) -> None:
+    """Log out and instruct the user to re-authenticate."""
+    from openhands_cli.auth.logout_command import logout_command
+
+    console.print(
+        f"[{OPENHANDS_THEME.warning}]Your connection with OpenHands Cloud has expired."
+        f"[/{OPENHANDS_THEME.warning}]"
+    )
+    console.print(
+        f"[{OPENHANDS_THEME.accent}]Logging you out...[/{OPENHANDS_THEME.accent}]"
+    )
+    logout_command(server_url)
+    console.print(
+        f"[{OPENHANDS_THEME.secondary}]"
+        "Please re-run the following command to reconnect and retry:"
+        f"[/{OPENHANDS_THEME.secondary}]"
+    )
+    console.print(
+        f"[{OPENHANDS_THEME.accent}]  openhands login[/{OPENHANDS_THEME.accent}]"
+    )
+
+
+def require_api_key() -> str:
+    """Return stored API key or raise with a helpful message.
+
+    Returns:
+        The stored API key
+
+    Raises:
+        CloudAuthenticationError: If the user is not authenticated
+    """
+    store = TokenStorage()
+
+    if not store.has_api_key():
+        _print_login_instructions("Error: You are not logged in to OpenHands Cloud.")
+        raise CloudAuthenticationError("User not authenticated")
+
+    api_key = store.get_api_key()
+    if not api_key:
+        _print_login_instructions("Error: Invalid API key stored.")
+        raise CloudAuthenticationError("Invalid API key")
+
+    return api_key
+
+
+async def validate_cloud_credentials(
+    cloud_api_url: str,
+) -> str:
+    """Validate cloud credentials before starting the ACP server.
+
+    Args:
+        cloud_api_url: The OpenHands Cloud API URL
+
+    Returns:
+        The validated API key
+
+    Raises:
+        CloudAuthenticationError: If authentication fails
+    """
+    # Get the API key from storage
+    api_key = require_api_key()
+
+    # Validate the token with the cloud API
+    console.print(
+        f"[{OPENHANDS_THEME.secondary}]Validating OpenHands Cloud credentials..."
+        f"[/{OPENHANDS_THEME.secondary}]",
+    )
+
+    try:
+        if not await is_token_valid(cloud_api_url, api_key):
+            _logout_and_instruct(cloud_api_url)
+            raise CloudAuthenticationError("Authentication expired - user logged out")
+    except CloudAuthenticationError:
+        raise
+    except Exception as e:
+        console.print(
+            f"[{OPENHANDS_THEME.error}]Failed to validate credentials: {e}"
+            f"[/{OPENHANDS_THEME.error}]",
+        )
+        raise CloudAuthenticationError(f"Failed to validate credentials: {e}") from e
+
+    console.print(
+        f"[{OPENHANDS_THEME.success}]✓ OpenHands Cloud credentials validated"
+        f"[/{OPENHANDS_THEME.success}]",
+    )
+
+    return api_key

@@ -14,9 +14,7 @@ from acp import (
     NewSessionResponse,
     PromptResponse,
     RequestError,
-    stdio_streams,
 )
-from acp.core import AgentSideConnection
 from acp.helpers import update_current_mode
 from acp.schema import (
     AgentCapabilities,
@@ -743,36 +741,3 @@ class LocalOpenHandsACPAgent(ACPAgent):
     async def ext_notification(self, method: str, params: dict[str, Any]) -> None:
         """Extension notification (no-op for now)."""
         logger.info(f"Extension notification '{method}' received with params: {params}")
-
-
-async def run_acp_server(
-    initial_confirmation_mode: ConfirmationMode = "always-ask",
-    resume_conversation_id: str | None = None,
-    streaming_enabled: bool = False,
-) -> None:
-    """Run the OpenHands ACP server.
-
-    Args:
-        initial_confirmation_mode: Default confirmation mode for new sessions
-        resume_conversation_id: Optional conversation ID to resume when a new
-            session is created
-        streaming_enabled: Whether to enable token streaming for LLM outputs
-    """
-    logger.info(
-        f"Starting OpenHands ACP server with confirmation mode: "
-        f"{initial_confirmation_mode}, streaming: {streaming_enabled}..."
-    )
-    if resume_conversation_id:
-        logger.info(f"Will resume conversation: {resume_conversation_id}")
-
-    reader, writer = await stdio_streams()
-
-    def create_agent(conn: Client) -> LocalOpenHandsACPAgent:
-        return LocalOpenHandsACPAgent(
-            conn, initial_confirmation_mode, resume_conversation_id, streaming_enabled
-        )
-
-    AgentSideConnection(create_agent, writer, reader)
-
-    # Keep the server running
-    await asyncio.Event().wait()

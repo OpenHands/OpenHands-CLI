@@ -11,7 +11,7 @@ from acp.schema import (
     TextContentBlock,
 )
 
-from openhands_cli.acp_impl.agent.local_agent import LocalOpenHandsACPAgent
+from openhands_cli.acp_impl.agent import LocalOpenHandsACPAgent
 
 
 @pytest.fixture

@@ -9,7 +9,7 @@ from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     NeverConfirm,
 )
-from openhands_cli.acp_impl.agent.local_agent import LocalOpenHandsACPAgent
+from openhands_cli.acp_impl.agent import LocalOpenHandsACPAgent
 from openhands_cli.acp_impl.confirmation import get_available_modes
 from openhands_cli.acp_impl.slash_commands import (
     get_confirmation_mode_from_conversation,
@@ -109,7 +109,7 @@ class TestAgentModeSwitching:
         # Verify this matches the default parameter in run_acp_server
         import inspect
 
-        from acp_impl.agent.local_agent import run_acp_server
+        from openhands_cli.acp_impl.agent import run_acp_server
 
         sig = inspect.signature(run_acp_server)
         default_mode = sig.parameters["initial_confirmation_mode"].default
