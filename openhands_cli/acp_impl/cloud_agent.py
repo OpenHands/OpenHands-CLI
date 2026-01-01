@@ -101,7 +101,7 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
         session_id: str,
         working_dir: str | None = None,
         mcp_servers: dict[str, dict[str, Any]] | None = None,
-    ) -> RemoteConversation:
+    ) -> tuple[RemoteConversation, OpenHandsCloudWorkspace]:
         """Get an active conversation from cache or create it with cloud workspace.
 
         Args:
@@ -115,24 +115,25 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
         # Check if we already have this conversation active
         if session_id in self._active_sessions:
             logger.debug(f"Using cached cloud conversation for session {session_id}")
-            return self._active_sessions[session_id]
+            return self._active_sessions[session_id], self._active_workspaces[session_id]
 
         # Create new conversation with cloud workspace
         logger.debug(f"Creating new cloud conversation for session {session_id}")
-        conversation = self._setup_cloud_conversation(
+        conversation, workspace = self._setup_cloud_conversation(
             session_id=session_id,
             mcp_servers=mcp_servers,
         )
         # Cache the conversation
         self._active_sessions[session_id] = conversation
+        self._active_workspaces[session_id] = workspace
 
-        return conversation
+        return conversation, workspace
 
     def _setup_cloud_conversation(
         self,
         session_id: str,
         mcp_servers: dict[str, dict[str, Any]] | None = None,
-    ) -> RemoteConversation:
+    ) -> tuple[RemoteConversation, OpenHandsCloudWorkspace]:
         """Set up a conversation with OpenHands Cloud workspace.
 
         Args:
@@ -203,7 +204,7 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
                 conversation, self._initial_confirmation_mode, session_id
             )
 
-            return conversation
+            return conversation, workspace
 
     async def new_session(
         self,
@@ -292,7 +293,7 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
         """Handle a prompt request with cloud workspace."""
         try:
             # Get or create conversation (preserves state like pause/confirmation)
-            conversation = self._get_or_create_conversation(session_id=session_id)
+            conversation, workspace = self._get_or_create_conversation(session_id=session_id)
 
             # Convert ACP prompt format to OpenHands message content
             message_content = convert_acp_prompt_to_message_content(prompt)
@@ -332,13 +333,15 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
             message = Message(role="user", content=message_content)
             conversation.send_message(message)
 
+
+            async def send_message() -> None:
+                with workspace:
+                    conversation.send_message(message)
+                    conversation.run()
+
             # Run the conversation with confirmation mode
             run_task = asyncio.create_task(
-                run_conversation_with_confirmation(
-                    conversation=conversation,
-                    conn=self._conn,
-                    session_id=session_id,
-                )
+                send_message()
             )
 
             self._running_tasks[session_id] = run_task
