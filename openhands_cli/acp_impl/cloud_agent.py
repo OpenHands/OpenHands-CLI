@@ -7,16 +7,8 @@ for sandbox environments instead of local workspace.
 import asyncio
 import logging
 import uuid
-from typing import Any, cast
+from typing import Any
 from uuid import UUID
-
-from acp import Client, NewSessionResponse, PromptResponse, RequestError
-from acp.schema import (
-    AgentMessageChunk,
-    LoadSessionResponse,
-    TextContentBlock,
-)
-from openhands_cli import __version__
 
 from acp import (
     Agent as ACPAgent,
@@ -26,6 +18,19 @@ from acp import (
     PromptResponse,
     RequestError,
 )
+from acp.schema import (
+    AgentCapabilities,
+    AgentMessageChunk,
+    AuthenticateResponse,
+    Implementation,
+    ListSessionsResponse,
+    LoadSessionResponse,
+    McpCapabilities,
+    PromptCapabilities,
+    SetSessionModelResponse,
+    SetSessionModeResponse,
+    TextContentBlock,
+)
 
 from openhands.sdk import (
     Conversation,
@@ -33,46 +38,20 @@ from openhands.sdk import (
     Message,
     RemoteConversation,
 )
-from acp.schema import (
-    AgentCapabilities,
-    AgentMessageChunk,
-    AuthenticateResponse,
-    AvailableCommandsUpdate,
-    Implementation,
-    ListSessionsResponse,
-    LoadSessionResponse,
-    McpCapabilities,
-    PromptCapabilities,
-    SessionModeState,
-    SetSessionModelResponse,
-    SetSessionModeResponse,
-    TextContentBlock,
-)
 from openhands.workspace import OpenHandsCloudWorkspace
+from openhands_cli import __version__
 from openhands_cli.acp_impl.agent import (
-    OpenHandsACPAgent,
     get_session_mode_state,
 )
-from openhands_cli.acp_impl.confirmation import ConfirmationMode
 from openhands_cli.acp_impl.events.event import EventSubscriber
-from openhands_cli.acp_impl.events.token_streamer import TokenBasedEventSubscriber
-from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
-from openhands_cli.acp_impl.slash_commands import (
-    apply_confirmation_mode_to_conversation,
-    create_help_text,
-    get_confirmation_mode_from_conversation,
-    get_unknown_command_text,
-    parse_slash_command,
-)
 from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
     convert_acp_mcp_servers_to_agent_format,
     convert_acp_prompt_to_message_content,
 )
-from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE
+from openhands_cli.locations import MCP_CONFIG_FILE
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
-from openhands_cli.utils import extract_text_from_message_content
 
 
 logger = logging.getLogger(__name__)
@@ -159,7 +138,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
                 version=__version__,
             ),
         )
-    
+
     async def set_session_mode(
         self,
         mode_id: str,
@@ -180,7 +159,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
         """
 
         return SetSessionModeResponse()
-    
+
     async def list_sessions(
         self,
         cursor: str | None = None,  # noqa: ARG002
@@ -190,7 +169,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
         """List available sessions (no-op for now)."""
         logger.info("List sessions requested")
         return ListSessionsResponse(sessions=[])
-    
+
     async def set_session_model(
         self,
         model_id: str,  # noqa: ARG002
@@ -200,14 +179,14 @@ class OpenHandsCloudACPAgent(ACPAgent):
         """Set session model (no-op for now)."""
         logger.info(f"Set session model requested: {session_id}")
         return SetSessionModelResponse()
-    
+
     async def authenticate(
         self, method_id: str, **_kwargs: Any
     ) -> AuthenticateResponse | None:
         """Authenticate the client (no-op for now)."""
         logger.info(f"Authentication requested with method: {method_id}")
         return AuthenticateResponse()
-    
+
     def _get_or_create_conversation(
         self,
         session_id: str,
@@ -226,7 +205,9 @@ class OpenHandsCloudACPAgent(ACPAgent):
         # Check if we already have this conversation active
         if session_id in self._active_sessions:
             logger.debug(f"Using cached cloud conversation for session {session_id}")
-            return self._active_sessions[session_id], self._active_workspaces[session_id]
+            return self._active_sessions[session_id], self._active_workspaces[
+                session_id
+            ]
 
         # Create new conversation with cloud workspace
         logger.debug(f"Creating new cloud conversation for session {session_id}")
@@ -283,7 +264,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
         workspace = OpenHandsCloudWorkspace(
             cloud_api_url=self._cloud_api_url,
             cloud_api_key=self._cloud_api_key,
-            keep_alive=True
+            keep_alive=True,
         )
 
         # Track workspace for cleanup
@@ -295,7 +276,6 @@ class OpenHandsCloudACPAgent(ACPAgent):
         # Create event subscriber for streaming updates
         subscriber = EventSubscriber(session_id, self._conn)
 
-
         def sync_callback(event: Event) -> None:
             """Synchronous wrapper that schedules async event handling."""
             asyncio.run_coroutine_threadsafe(subscriber(event), loop)
@@ -303,9 +283,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
         # Create RemoteConversation with cloud workspace
         # Note: RemoteConversation doesn't support persistence_dir
         conversation = Conversation(
-            agent=agent,
-            workspace=workspace,
-            callbacks=[sync_callback]
+            agent=agent, workspace=workspace, callbacks=[sync_callback]
         )
 
         subscriber.conversation = conversation
@@ -392,7 +370,9 @@ class OpenHandsCloudACPAgent(ACPAgent):
         """Handle a prompt request with cloud workspace."""
         try:
             # Get or create conversation (preserves state like pause/confirmation)
-            conversation, workspace = self._get_or_create_conversation(session_id=session_id)
+            conversation, workspace = self._get_or_create_conversation(
+                session_id=session_id
+            )
 
             # Convert ACP prompt format to OpenHands message content
             message_content = convert_acp_prompt_to_message_content(prompt)
@@ -408,9 +388,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
                 conversation.run()
 
             # Run the conversation with confirmation mode
-            run_task = asyncio.create_task(
-                send_message()
-            )
+            run_task = asyncio.create_task(send_message())
 
             self._running_tasks[session_id] = run_task
             try:
@@ -472,7 +450,9 @@ class OpenHandsCloudACPAgent(ACPAgent):
                     for event in conversation.state.events:
                         await subscriber(event)
 
-                return LoadSessionResponse(modes=get_session_mode_state("always-approve"))
+                return LoadSessionResponse(
+                    modes=get_session_mode_state("always-approve")
+                )
 
             # Session not found - cloud mode doesn't support loading from disk
             raise RequestError.invalid_params(

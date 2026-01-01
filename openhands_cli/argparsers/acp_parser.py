@@ -1,5 +1,6 @@
 import argparse
 import os
+
 from openhands_cli.argparsers.util import add_confirmation_mode_args, add_resume_args
 
 
@@ -43,7 +44,7 @@ def add_acp_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentP
         "--cloud-url",
         type=str,
         default=os.getenv("OPENHANDS_CLOUD_URL", "https://app.all-hands.dev"),
-        help=f"OpenHands Cloud API URL",
+        help="OpenHands Cloud API URL",
     )
 
     return acp_parser
