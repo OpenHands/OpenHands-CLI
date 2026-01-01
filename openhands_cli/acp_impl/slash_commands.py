@@ -4,7 +4,7 @@ import logging
 
 from acp.schema import AvailableCommand, AvailableCommandInput, UnstructuredCommandInput
 
-from openhands.sdk import LocalConversation
+from openhands.sdk import LocalConversation, RemoteConversation
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmRisky,
@@ -160,7 +160,7 @@ def validate_confirmation_mode(mode_str: str) -> ConfirmationMode | None:
 
 
 def apply_confirmation_mode_to_conversation(
-    conversation: LocalConversation,
+    conversation: LocalConversation | RemoteConversation,
     mode: ConfirmationMode,
     session_id: str,
 ) -> None:

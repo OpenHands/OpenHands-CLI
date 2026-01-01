@@ -7,7 +7,7 @@ for sandbox environments instead of local workspace.
 import asyncio
 import logging
 import uuid
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from acp import (
@@ -18,6 +18,7 @@ from acp import (
     PromptResponse,
     RequestError,
 )
+from acp.helpers import update_current_mode
 from acp.schema import (
     AgentCapabilities,
     AgentMessageChunk,
@@ -43,7 +44,15 @@ from openhands_cli import __version__
 from openhands_cli.acp_impl.agent import (
     get_session_mode_state,
 )
+from openhands_cli.acp_impl.confirmation import (
+    ConfirmationMode,
+)
 from openhands_cli.acp_impl.events.event import EventSubscriber
+from openhands_cli.acp_impl.slash_commands import (
+    VALID_CONFIRMATION_MODE,
+    apply_confirmation_mode_to_conversation,
+    validate_confirmation_mode,
+)
 from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
     convert_acp_mcp_servers_to_agent_format,
@@ -158,7 +167,45 @@ class OpenHandsCloudACPAgent(ACPAgent):
             RequestError: If mode_id is invalid
         """
 
+        logger.info(f"Set session mode requested: {session_id} -> {mode_id}")
+
+        mode = validate_confirmation_mode(mode_id)
+        if mode is None:
+            raise RequestError.invalid_params(
+                {
+                    "reason": f"Invalid mode ID: {mode_id}",
+                    "validModes": sorted(VALID_CONFIRMATION_MODE),
+                }
+            )
+
+        confirmation_mode: ConfirmationMode = cast(ConfirmationMode, mode_id)
+        await self._set_confirmation_mode(session_id, confirmation_mode)
+
+        await self._conn.session_update(
+            session_id=session_id,
+            update=update_current_mode(current_mode_id=mode_id),
+        )
+
         return SetSessionModeResponse()
+
+    async def _set_confirmation_mode(
+        self, session_id: str, mode: ConfirmationMode
+    ) -> None:
+        """Set confirmation mode for a session.
+
+        Args:
+            session_id: The session ID
+            mode: Confirmation mode (always-ask|always-approve|llm-approve)
+        """
+        if session_id in self._active_sessions:
+            conversation = self._active_sessions[session_id]
+            apply_confirmation_mode_to_conversation(conversation, mode, session_id)
+            logger.debug(f"Confirmation mode for session {session_id}: {mode}")
+        else:
+            logger.warning(
+                f"Cannot set confirmation mode for session {session_id}: "
+                "session not found"
+            )
 
     async def list_sessions(
         self,
