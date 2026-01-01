@@ -42,6 +42,7 @@ from openhands.sdk import (
 )
 from openhands.workspace import OpenHandsCloudWorkspace
 from openhands_cli import __version__
+from openhands_cli.acp_impl.agent.shared_agent_handler import SharedACPAgentHandler
 from openhands_cli.acp_impl.agent.util import get_session_mode_state
 from openhands_cli.acp_impl.confirmation import (
     ConfirmationMode,
@@ -94,6 +95,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
             streaming_enabled: Whether to enable token streaming for LLM outputs
         """
         self._conn = conn
+        self.shared_agent_handler = SharedACPAgentHandler(conn)
         # Track running tasks for each session to ensure proper cleanup on cancel
         self._running_tasks: dict[str, asyncio.Task] = {}
         # Conversation ID to resume (from --resume flag)
@@ -121,6 +123,8 @@ class OpenHandsCloudACPAgent(ACPAgent):
     ) -> InitializeResponse:
         """Initialize the ACP protocol."""
         logger.info(f"Initializing ACP with protocol version: {protocol_version}")
+
+        # TODO: verify api key access here first
 
         # Check if agent is configured
         try:
@@ -235,6 +239,9 @@ class OpenHandsCloudACPAgent(ACPAgent):
     ) -> AuthenticateResponse | None:
         """Authenticate the client (no-op for now)."""
         logger.info(f"Authentication requested with method: {method_id}")
+
+        # TODO: may require authentication here
+
         return AuthenticateResponse()
 
     def _get_or_create_conversation(
@@ -373,6 +380,8 @@ class OpenHandsCloudACPAgent(ACPAgent):
                 session_id=session_id,
                 mcp_servers=mcp_servers_dict,
             )
+
+            await self.shared_agent_handler.send_available_commands(session_id)
 
             logger.info(f"Created new cloud session {session_id}")
 
@@ -565,7 +574,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
             raise RequestError.internal_error(
                 {"reason": "Failed to cancel session", "details": str(e)}
             )
-        
+
     async def _wait_for_task_completion(
         self, task: asyncio.Task, session_id: str, timeout: float = 10.0
     ) -> None:

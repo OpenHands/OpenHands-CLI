@@ -20,7 +20,6 @@ from acp.schema import (
     AgentCapabilities,
     AgentMessageChunk,
     AuthenticateResponse,
-    AvailableCommandsUpdate,
     Implementation,
     ListSessionsResponse,
     LoadSessionResponse,
@@ -39,6 +38,7 @@ from openhands.sdk import (
     Workspace,
 )
 from openhands_cli import __version__
+from openhands_cli.acp_impl.agent.shared_agent_handler import SharedACPAgentHandler
 from openhands_cli.acp_impl.agent.util import get_session_mode_state
 from openhands_cli.acp_impl.confirmation import (
     ConfirmationMode,
@@ -50,7 +50,6 @@ from openhands_cli.acp_impl.slash_commands import (
     VALID_CONFIRMATION_MODE,
     apply_confirmation_mode_to_conversation,
     create_help_text,
-    get_available_slash_commands,
     get_confirmation_mode_from_conversation,
     get_unknown_command_text,
     handle_confirm_argument,
@@ -91,6 +90,8 @@ class LocalOpenHandsACPAgent(ACPAgent):
             streaming_enabled: Whether to enable token streaming for LLM outputs
         """
         self._conn = conn
+
+        self.shared_agent_handler = SharedACPAgentHandler(conn)
         # Cache of active conversations to preserve state (pause, confirmation, etc.)
         # across multiple operations on the same session
         self._active_sessions: dict[str, LocalConversation] = {}
@@ -151,20 +152,6 @@ class LocalOpenHandsACPAgent(ACPAgent):
                 f"Cannot set confirmation mode for session {session_id}: "
                 "session not found"
             )
-
-    async def _send_available_commands(self, session_id: str) -> None:
-        """Send available slash commands to the client.
-
-        Args:
-            session_id: The session ID
-        """
-        await self._conn.session_update(
-            session_id=session_id,
-            update=AvailableCommandsUpdate(
-                session_update="available_commands_update",
-                available_commands=get_available_slash_commands(),
-            ),
-        )
 
     def on_connect(self, conn: Client) -> None:
         pass
@@ -424,7 +411,7 @@ class LocalOpenHandsACPAgent(ACPAgent):
             logger.info(f"Created new session {session_id}")
 
             # Send available slash commands to client
-            await self._send_available_commands(session_id)
+            await self.shared_agent_handler.send_available_commands(session_id)
 
             # Get current confirmation mode for this session
             current_mode = get_confirmation_mode_from_conversation(conversation)
@@ -657,7 +644,7 @@ class LocalOpenHandsACPAgent(ACPAgent):
             logger.info(f"Successfully loaded session {session_id}")
 
             # Send available slash commands to client
-            await self._send_available_commands(session_id)
+            await self.shared_agent_handler.send_available_commands(session_id)
 
             # Get current confirmation mode for this session
             current_mode = get_confirmation_mode_from_conversation(conversation)
