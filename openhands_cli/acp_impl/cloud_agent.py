@@ -16,12 +16,37 @@ from acp.schema import (
     LoadSessionResponse,
     TextContentBlock,
 )
+from openhands_cli import __version__
+
+from acp import (
+    Agent as ACPAgent,
+    Client,
+    InitializeResponse,
+    NewSessionResponse,
+    PromptResponse,
+    RequestError,
+)
 
 from openhands.sdk import (
     Conversation,
     Event,
     Message,
     RemoteConversation,
+)
+from acp.schema import (
+    AgentCapabilities,
+    AgentMessageChunk,
+    AuthenticateResponse,
+    AvailableCommandsUpdate,
+    Implementation,
+    ListSessionsResponse,
+    LoadSessionResponse,
+    McpCapabilities,
+    PromptCapabilities,
+    SessionModeState,
+    SetSessionModelResponse,
+    SetSessionModeResponse,
+    TextContentBlock,
 )
 from openhands.workspace import OpenHandsCloudWorkspace
 from openhands_cli.acp_impl.agent import (
@@ -53,7 +78,7 @@ from openhands_cli.utils import extract_text_from_message_content
 logger = logging.getLogger(__name__)
 
 
-class OpenHandsCloudACPAgent(OpenHandsACPAgent):
+class OpenHandsCloudACPAgent(ACPAgent):
     """OpenHands Cloud ACP Agent that uses OpenHands Cloud for sandbox environments.
 
     This agent connects to OpenHands Cloud (app.all-hands.dev) to provision
@@ -63,11 +88,9 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
     def __init__(
         self,
         conn: Client,
-        initial_confirmation_mode: ConfirmationMode,
         cloud_api_key: str,
         cloud_api_url: str = "https://app.all-hands.dev",
         resume_conversation_id: str | None = None,
-        streaming_enabled: bool = False,
     ):
         """Initialize the OpenHands Cloud ACP agent.
 
@@ -79,27 +102,115 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
             resume_conversation_id: Optional conversation ID to resume
             streaming_enabled: Whether to enable token streaming for LLM outputs
         """
-        super().__init__(
-            conn=conn,
-            initial_confirmation_mode=initial_confirmation_mode,
-            resume_conversation_id=resume_conversation_id,
-            streaming_enabled=streaming_enabled,
-        )
+        self._conn = conn
+        # Track running tasks for each session to ensure proper cleanup on cancel
+        self._running_tasks: dict[str, asyncio.Task] = {}
+        # Conversation ID to resume (from --resume flag)
+        self._resume_conversation_id: str | None = resume_conversation_id
+        if resume_conversation_id:
+            logger.info(f"Will resume conversation: {resume_conversation_id}")
+
         self._cloud_api_key = cloud_api_key
         self._cloud_api_url = cloud_api_url
+
         # Track active cloud workspaces for cleanup
+        self._active_sessions: dict[str, RemoteConversation] = {}
         self._active_workspaces: dict[str, OpenHandsCloudWorkspace] = {}
-        # Override active sessions to use RemoteConversation
-        self._active_sessions: dict[str, RemoteConversation] = {}  # type: ignore[assignment]
 
         logger.info(
             f"OpenHands Cloud ACP Agent initialized with cloud URL: {cloud_api_url}"
         )
 
+    async def initialize(
+        self,
+        protocol_version: int,
+        client_capabilities: Any | None = None,  # noqa: ARG002
+        client_info: Any | None = None,  # noqa: ARG002
+        **_kwargs: Any,
+    ) -> InitializeResponse:
+        """Initialize the ACP protocol."""
+        logger.info(f"Initializing ACP with protocol version: {protocol_version}")
+
+        # Check if agent is configured
+        try:
+            load_agent_specs()
+            auth_methods = []
+            logger.info("Agent configured, no authentication required")
+        except MissingAgentSpec:
+            # Agent not configured - this shouldn't happen in production
+            # but we'll return empty auth methods for now
+            auth_methods = []
+            logger.warning("Agent not configured - users should run 'openhands' first")
+
+        return InitializeResponse(
+            protocol_version=protocol_version,
+            auth_methods=auth_methods,
+            agent_capabilities=AgentCapabilities(
+                load_session=True,
+                mcp_capabilities=McpCapabilities(http=True, sse=True),
+                prompt_capabilities=PromptCapabilities(
+                    audio=False,
+                    embedded_context=True,
+                    image=True,
+                ),
+            ),
+            agent_info=Implementation(
+                name="OpenHands CLI ACP Agent",
+                version=__version__,
+            ),
+        )
+    
+    async def set_session_mode(
+        self,
+        mode_id: str,
+        session_id: str,
+        **_kwargs: Any,
+    ) -> SetSessionModeResponse | None:
+        """Set session mode by updating confirmation mode.
+
+        Args:
+            mode_id: The mode ID to switch to (ask, auto, analyze)
+            session_id: The session ID to update
+
+        Returns:
+            SetSessionModeResponse if successful
+
+        Raises:
+            RequestError: If mode_id is invalid
+        """
+
+        return SetSessionModeResponse()
+    
+    async def list_sessions(
+        self,
+        cursor: str | None = None,  # noqa: ARG002
+        cwd: str | None = None,  # noqa: ARG002
+        **_kwargs: Any,
+    ) -> ListSessionsResponse:
+        """List available sessions (no-op for now)."""
+        logger.info("List sessions requested")
+        return ListSessionsResponse(sessions=[])
+    
+    async def set_session_model(
+        self,
+        model_id: str,  # noqa: ARG002
+        session_id: str,
+        **_kwargs: Any,
+    ) -> SetSessionModelResponse | None:
+        """Set session model (no-op for now)."""
+        logger.info(f"Set session model requested: {session_id}")
+        return SetSessionModelResponse()
+    
+    async def authenticate(
+        self, method_id: str, **_kwargs: Any
+    ) -> AuthenticateResponse | None:
+        """Authenticate the client (no-op for now)."""
+        logger.info(f"Authentication requested with method: {method_id}")
+        return AuthenticateResponse()
+    
     def _get_or_create_conversation(
         self,
         session_id: str,
-        working_dir: str | None = None,
         mcp_servers: dict[str, dict[str, Any]] | None = None,
     ) -> tuple[RemoteConversation, OpenHandsCloudWorkspace]:
         """Get an active conversation from cache or create it with cloud workspace.
@@ -198,12 +309,6 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
             )
 
             subscriber.conversation = conversation
-            
-            # Initialize confirmation mode to the configured default
-            apply_confirmation_mode_to_conversation(
-                conversation, self._initial_confirmation_mode, session_id
-            )
-
             return conversation, workspace
 
     async def new_session(
@@ -238,18 +343,12 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
             logger.info(f"Creating cloud session {session_id}")
 
             # Create conversation with cloud workspace
-            conversation = self._get_or_create_conversation(
+            conversation, _ = self._get_or_create_conversation(
                 session_id=session_id,
                 mcp_servers=mcp_servers_dict,
             )
 
             logger.info(f"Created new cloud session {session_id}")
-
-            # Send available slash commands to client
-            await self._send_available_commands(session_id)
-
-            # Get current confirmation mode for this session
-            # current_mode = get_confirmation_mode_from_conversation(conversation)
 
             # Build response
             response = NewSessionResponse(
@@ -299,34 +398,6 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
             message_content = convert_acp_prompt_to_message_content(prompt)
 
             if not message_content:
-                return PromptResponse(stop_reason="end_turn")
-
-            # Check if this is a slash command
-            text = extract_text_from_message_content(
-                message_content, has_exactly_one=True
-            )
-            slash_cmd = parse_slash_command(text) if text else None
-            if slash_cmd:
-                command, argument = slash_cmd
-                logger.info(f"Executing slash command: /{command} {argument}")
-
-                # Execute the slash command
-                if command == "help":
-                    response_text = create_help_text()
-                elif command == "confirm":
-                    response_text = await self._cmd_confirm(session_id, argument)
-                else:
-                    response_text = get_unknown_command_text(command)
-
-                # Send response to client
-                await self._conn.session_update(
-                    session_id=session_id,
-                    update=AgentMessageChunk(
-                        session_update="agent_message_chunk",
-                        content=TextContentBlock(type="text", text=response_text),
-                    ),
-                )
-
                 return PromptResponse(stop_reason="end_turn")
 
             # Send the message
@@ -404,9 +475,7 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
                     for event in conversation.state.events:
                         await subscriber(event)
 
-                await self._send_available_commands(session_id)
-                current_mode = get_confirmation_mode_from_conversation(conversation)
-                return LoadSessionResponse(modes=get_session_mode_state(current_mode))
+                return LoadSessionResponse(modes=get_session_mode_state("always-approve"))
 
             # Session not found - cloud mode doesn't support loading from disk
             raise RequestError.invalid_params(
@@ -450,6 +519,24 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
             except Exception as e:
                 logger.warning(f"Error closing conversation for {session_id}: {e}")
 
+    async def cancel(self, session_id: str, **_kwargs: Any) -> None:
+        """Cancel the current operation."""
+        logger.info(f"Cancel requested for session: {session_id}")
+
+        pass
+
+    async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+        """Extension method (not supported)."""
+        logger.info(f"Extension method '{method}' requested with params: {params}")
+        return {"error": "ext_method not supported"}
+
+    async def ext_notification(self, method: str, params: dict[str, Any]) -> None:
+        """Extension notification (no-op for now)."""
+        logger.info(f"Extension notification '{method}' received with params: {params}")
+
+    def on_connect(self, conn: Client) -> None:
+        pass
+    
     async def close_session(self, session_id: str, **_kwargs: Any) -> None:
         """Close a session and clean up resources."""
         logger.info(f"Closing cloud session: {session_id}")

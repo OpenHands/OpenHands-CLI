@@ -171,11 +171,8 @@ async def run_cloud_acp_server(
     def create_agent(conn: Client) -> OpenHandsCloudACPAgent:
         return OpenHandsCloudACPAgent(
             conn=conn,
-            initial_confirmation_mode=initial_confirmation_mode,
             cloud_api_key=api_key,
             cloud_api_url=cloud_api_url,
-            resume_conversation_id=resume_conversation_id,
-            streaming_enabled=streaming_enabled,
         )
 
     AgentSideConnection(create_agent, writer, reader)
