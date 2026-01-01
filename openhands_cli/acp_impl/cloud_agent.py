@@ -123,12 +123,6 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
             session_id=session_id,
             mcp_servers=mcp_servers,
         )
-
-        # Initialize confirmation mode to the configured default
-        apply_confirmation_mode_to_conversation(
-            conversation, self._initial_confirmation_mode, session_id
-        )
-
         # Cache the conversation
         self._active_sessions[session_id] = conversation
 
@@ -203,6 +197,12 @@ class OpenHandsCloudACPAgent(OpenHandsACPAgent):
             )
 
             subscriber.conversation = conversation
+            
+            # Initialize confirmation mode to the configured default
+            apply_confirmation_mode_to_conversation(
+                conversation, self._initial_confirmation_mode, session_id
+            )
+
             return conversation
 
     async def new_session(
