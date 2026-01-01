@@ -14,21 +14,17 @@ from acp import (
     NewSessionResponse,
     PromptResponse,
     RequestError,
-    stdio_streams,
 )
-from acp.core import AgentSideConnection
 from acp.helpers import update_current_mode
 from acp.schema import (
     AgentCapabilities,
     AgentMessageChunk,
     AuthenticateResponse,
-    AvailableCommandsUpdate,
     Implementation,
     ListSessionsResponse,
     LoadSessionResponse,
     McpCapabilities,
     PromptCapabilities,
-    SessionModeState,
     SetSessionModelResponse,
     SetSessionModeResponse,
     TextContentBlock,
@@ -42,9 +38,10 @@ from openhands.sdk import (
     Workspace,
 )
 from openhands_cli import __version__
+from openhands_cli.acp_impl.agent.shared_agent_handler import SharedACPAgentHandler
+from openhands_cli.acp_impl.agent.util import get_session_mode_state
 from openhands_cli.acp_impl.confirmation import (
     ConfirmationMode,
-    get_available_modes,
 )
 from openhands_cli.acp_impl.events.event import EventSubscriber
 from openhands_cli.acp_impl.events.token_streamer import TokenBasedEventSubscriber
@@ -53,7 +50,6 @@ from openhands_cli.acp_impl.slash_commands import (
     VALID_CONFIRMATION_MODE,
     apply_confirmation_mode_to_conversation,
     create_help_text,
-    get_available_slash_commands,
     get_confirmation_mode_from_conversation,
     get_unknown_command_text,
     handle_confirm_argument,
@@ -74,22 +70,7 @@ from openhands_cli.utils import extract_text_from_message_content
 logger = logging.getLogger(__name__)
 
 
-def get_session_mode_state(current_mode: ConfirmationMode) -> SessionModeState:
-    """Get the session mode state for a given confirmation mode.
-
-    Args:
-        current_mode: The current confirmation mode
-
-    Returns:
-        SessionModeState with available modes and current mode
-    """
-    return SessionModeState(
-        current_mode_id=current_mode,
-        available_modes=get_available_modes(),
-    )
-
-
-class OpenHandsACPAgent(ACPAgent):
+class LocalOpenHandsACPAgent(ACPAgent):
     """OpenHands Agent Client Protocol implementation."""
 
     def __init__(
@@ -109,6 +90,8 @@ class OpenHandsACPAgent(ACPAgent):
             streaming_enabled: Whether to enable token streaming for LLM outputs
         """
         self._conn = conn
+
+        self.shared_agent_handler = SharedACPAgentHandler(conn)
         # Cache of active conversations to preserve state (pause, confirmation, etc.)
         # across multiple operations on the same session
         self._active_sessions: dict[str, LocalConversation] = {}
@@ -169,20 +152,6 @@ class OpenHandsACPAgent(ACPAgent):
                 f"Cannot set confirmation mode for session {session_id}: "
                 "session not found"
             )
-
-    async def _send_available_commands(self, session_id: str) -> None:
-        """Send available slash commands to the client.
-
-        Args:
-            session_id: The session ID
-        """
-        await self._conn.session_update(
-            session_id=session_id,
-            update=AvailableCommandsUpdate(
-                session_update="available_commands_update",
-                available_commands=get_available_slash_commands(),
-            ),
-        )
 
     def on_connect(self, conn: Client) -> None:
         pass
@@ -442,7 +411,7 @@ class OpenHandsACPAgent(ACPAgent):
             logger.info(f"Created new session {session_id}")
 
             # Send available slash commands to client
-            await self._send_available_commands(session_id)
+            await self.shared_agent_handler.send_available_commands(session_id)
 
             # Get current confirmation mode for this session
             current_mode = get_confirmation_mode_from_conversation(conversation)
@@ -675,7 +644,7 @@ class OpenHandsACPAgent(ACPAgent):
             logger.info(f"Successfully loaded session {session_id}")
 
             # Send available slash commands to client
-            await self._send_available_commands(session_id)
+            await self.shared_agent_handler.send_available_commands(session_id)
 
             # Get current confirmation mode for this session
             current_mode = get_confirmation_mode_from_conversation(conversation)
@@ -759,36 +728,3 @@ class OpenHandsACPAgent(ACPAgent):
     async def ext_notification(self, method: str, params: dict[str, Any]) -> None:
         """Extension notification (no-op for now)."""
         logger.info(f"Extension notification '{method}' received with params: {params}")
-
-
-async def run_acp_server(
-    initial_confirmation_mode: ConfirmationMode = "always-ask",
-    resume_conversation_id: str | None = None,
-    streaming_enabled: bool = False,
-) -> None:
-    """Run the OpenHands ACP server.
-
-    Args:
-        initial_confirmation_mode: Default confirmation mode for new sessions
-        resume_conversation_id: Optional conversation ID to resume when a new
-            session is created
-        streaming_enabled: Whether to enable token streaming for LLM outputs
-    """
-    logger.info(
-        f"Starting OpenHands ACP server with confirmation mode: "
-        f"{initial_confirmation_mode}, streaming: {streaming_enabled}..."
-    )
-    if resume_conversation_id:
-        logger.info(f"Will resume conversation: {resume_conversation_id}")
-
-    reader, writer = await stdio_streams()
-
-    def create_agent(conn: Client) -> OpenHandsACPAgent:
-        return OpenHandsACPAgent(
-            conn, initial_confirmation_mode, resume_conversation_id, streaming_enabled
-        )
-
-    AgentSideConnection(create_agent, writer, reader)
-
-    # Keep the server running
-    await asyncio.Event().wait()
