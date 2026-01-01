@@ -190,7 +190,7 @@ def apply_confirmation_mode_to_conversation(
 
 
 def get_confirmation_mode_from_conversation(
-    conversation: LocalConversation,
+    conversation: LocalConversation | RemoteConversation,
 ) -> ConfirmationMode:
     """Get current confirmation mode from a conversation's policy.
 

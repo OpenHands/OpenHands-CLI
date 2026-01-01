@@ -51,6 +51,7 @@ from openhands_cli.acp_impl.events.event import EventSubscriber
 from openhands_cli.acp_impl.slash_commands import (
     VALID_CONFIRMATION_MODE,
     apply_confirmation_mode_to_conversation,
+    get_confirmation_mode_from_conversation,
     validate_confirmation_mode,
 )
 from openhands_cli.acp_impl.utils import (
@@ -238,7 +239,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
         self,
         session_id: str,
         mcp_servers: dict[str, dict[str, Any]] | None = None,
-    ) -> tuple[RemoteConversation, OpenHandsCloudWorkspace]:
+    ) -> RemoteConversation:
         """Get an active conversation from cache or create it with cloud workspace.
 
         Args:
@@ -252,9 +253,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
         # Check if we already have this conversation active
         if session_id in self._active_sessions:
             logger.debug(f"Using cached cloud conversation for session {session_id}")
-            return self._active_sessions[session_id], self._active_workspaces[
-                session_id
-            ]
+            return self._active_sessions[session_id]
 
         # Create new conversation with cloud workspace
         logger.debug(f"Creating new cloud conversation for session {session_id}")
@@ -266,7 +265,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
         self._active_sessions[session_id] = conversation
         self._active_workspaces[session_id] = workspace
 
-        return conversation, workspace
+        return conversation
 
     def _setup_cloud_conversation(
         self,
@@ -338,7 +337,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
 
     async def new_session(
         self,
-        cwd: str,
+        cwd: str,  # noqa: ARG002
         mcp_servers: list[Any],
         **_kwargs: Any,
     ) -> NewSessionResponse:
@@ -368,7 +367,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
             logger.info(f"Creating cloud session {session_id}")
 
             # Create conversation with cloud workspace
-            conversation, _ = self._get_or_create_conversation(
+            conversation = self._get_or_create_conversation(
                 session_id=session_id,
                 mcp_servers=mcp_servers_dict,
             )
@@ -417,9 +416,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
         """Handle a prompt request with cloud workspace."""
         try:
             # Get or create conversation (preserves state like pause/confirmation)
-            conversation, workspace = self._get_or_create_conversation(
-                session_id=session_id
-            )
+            conversation = self._get_or_create_conversation(session_id=session_id)
 
             # Convert ACP prompt format to OpenHands message content
             message_content = convert_acp_prompt_to_message_content(prompt)
@@ -462,8 +459,8 @@ class OpenHandsCloudACPAgent(ACPAgent):
 
     async def load_session(
         self,
-        cwd: str,
-        mcp_servers: list[Any],
+        cwd: str,  # noqa: ARG002
+        mcp_servers: list[Any],  # noqa: ARG002
         session_id: str,
         **_kwargs: Any,
     ) -> LoadSessionResponse | None:
@@ -497,9 +494,8 @@ class OpenHandsCloudACPAgent(ACPAgent):
                     for event in conversation.state.events:
                         await subscriber(event)
 
-                return LoadSessionResponse(
-                    modes=get_session_mode_state("always-approve")
-                )
+                current_mode = get_confirmation_mode_from_conversation(conversation)
+                return LoadSessionResponse(modes=get_session_mode_state(current_mode))
 
             # Session not found - cloud mode doesn't support loading from disk
             raise RequestError.invalid_params(
