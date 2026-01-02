@@ -132,7 +132,7 @@ async def test_load_current_settings_basic_mode(
     screen.current_agent = fake_agent_store.load()
 
     with patch.object(ss, "get_model_options") as mock_get_options:
-        # Model options don't include provider prefix (matches real get_model_options behavior)
+        # Model options don't include provider prefix
         mock_get_options.return_value = [
             ("gpt-4o-mini", "gpt-4o-mini"),
             ("gpt-4o", "gpt-4o"),

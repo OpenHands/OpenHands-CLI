@@ -174,7 +174,7 @@ class SettingsScreen(ModalScreen):
 
                 # Update model options and select current model
                 self._update_model_options(provider)
-                # Use model (without provider prefix) since dropdown options don't include prefix
+                # Use model without provider prefix (dropdown options don't have it)
                 self.model_select.value = model
 
         # API Key (show masked version)
