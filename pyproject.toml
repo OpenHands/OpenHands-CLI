@@ -44,6 +44,7 @@ dev = [
   "pytest-cov>=5.0.0",
   "pytest-forked>=1.6.0",
   "pytest-xdist>=3.6.1",
+  "pytest-textual-snapshot>=1.1.0",
   "ruff>=0.12.10",
   "pycodestyle>=2.12.0",
   "pyright[nodejs]>=1.1.405",
@@ -106,6 +107,9 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
 asyncio_mode = "auto"
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
 
 [tool.coverage.run]
 relative_files = true
