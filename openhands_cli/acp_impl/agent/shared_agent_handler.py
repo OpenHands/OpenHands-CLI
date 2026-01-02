@@ -255,7 +255,9 @@ class SharedACPAgentHandler:
             NewSessionResponse with session ID and modes
         """
         # Determine session type name from agent type
-        session_type_name = "cloud session" if ctx.agent_type == "remote" else "session"
+        session_type_name = (
+            "cloud session" if ctx.agent_type == "remote" else "local session"
+        )
 
         # Convert ACP MCP servers to Agent format
         mcp_servers_dict = None
