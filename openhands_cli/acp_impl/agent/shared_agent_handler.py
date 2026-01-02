@@ -20,6 +20,7 @@ from acp.schema import (
 )
 
 from openhands.sdk import BaseConversation, LocalConversation, RemoteConversation
+from acp_impl.agent.util import AgentType
 from openhands_cli import __version__
 from openhands_cli.acp_impl.confirmation import ConfirmationMode
 from openhands_cli.acp_impl.slash_commands import (
@@ -46,6 +47,7 @@ class _ACPAgentContext(Protocol):
 
     _conn: Client
     _running_tasks: dict[str, asyncio.Task]
+    agent_type: AgentType
 
     @property
     def active_session(self) -> Mapping[str, BaseConversation]:
