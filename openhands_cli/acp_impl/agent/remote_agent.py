@@ -39,6 +39,7 @@ from openhands.workspace import OpenHandsCloudWorkspace
 from openhands_cli.acp_impl.agent.shared_agent_handler import SharedACPAgentHandler
 from openhands_cli.acp_impl.agent.util import get_session_mode_state
 from openhands_cli.acp_impl.events.event import EventSubscriber
+from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
 from openhands_cli.acp_impl.slash_commands import (
     get_confirmation_mode_from_conversation,
 )
@@ -355,12 +356,30 @@ class OpenHandsCloudACPAgent(ACPAgent):
             # Run the conversation with confirmation mode
             run_task = asyncio.create_task(send_message())
 
+            # Send the message with potentially multiple content types
+            # (text + images)
+            message = Message(role="user", content=message_content)
+            conversation.send_message(message)
+
+            # Run the conversation with confirmation mode via runner function
+            # The runner handles the confirmation flow for all modes
+            # Track the running task so cancel() can wait for proper cleanup
+            run_task = asyncio.create_task(
+                run_conversation_with_confirmation(
+                    conversation=conversation,
+                    conn=self._conn,
+                    session_id=session_id,
+                )
+            )
+
             self._running_tasks[session_id] = run_task
             try:
                 await run_task
             finally:
+                # Clean up task tracking and streaming state
                 self._running_tasks.pop(session_id, None)
 
+            # Return the final response
             return PromptResponse(stop_reason="end_turn")
 
         except RequestError:
