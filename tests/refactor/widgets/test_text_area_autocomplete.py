@@ -4,11 +4,11 @@ from unittest import mock
 
 import pytest
 
-from openhands_cli.refactor.widgets.user_input.models import (
+from openhands_cli.tui.widgets.user_input.models import (
     CompletionItem,
     CompletionType,
 )
-from openhands_cli.refactor.widgets.user_input.text_area_with_autocomplete import (
+from openhands_cli.tui.widgets.user_input.text_area_with_autocomplete import (
     TextAreaAutoComplete,
     detect_completion_type,
 )

@@ -7,15 +7,15 @@ from textual.message import Message
 from textual.signal import Signal
 from textual.widgets import TextArea
 
-from openhands_cli.refactor.core.commands import COMMANDS
-from openhands_cli.refactor.widgets.user_input.expandable_text_area import (
+from openhands_cli.tui.core.commands import COMMANDS
+from openhands_cli.tui.widgets.user_input.expandable_text_area import (
     AutoGrowTextArea,
 )
-from openhands_cli.refactor.widgets.user_input.models import (
+from openhands_cli.tui.widgets.user_input.models import (
     CompletionItem,
     CompletionType,
 )
-from openhands_cli.refactor.widgets.user_input.text_area_with_autocomplete import (
+from openhands_cli.tui.widgets.user_input.text_area_with_autocomplete import (
     TextAreaAutoComplete,
 )
 

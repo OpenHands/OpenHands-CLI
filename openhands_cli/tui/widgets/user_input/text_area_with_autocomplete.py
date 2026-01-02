@@ -6,7 +6,7 @@ from textual.widgets import OptionList
 from textual.widgets.option_list import Option
 
 from openhands_cli.locations import WORK_DIR
-from openhands_cli.refactor.widgets.user_input.models import (
+from openhands_cli.tui.widgets.user_input.models import (
     CompletionItem,
     CompletionType,
 )
