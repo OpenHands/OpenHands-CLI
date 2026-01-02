@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Mapping
+import uuid
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
-from acp import Client, InitializeResponse, RequestError
+from acp import Client, InitializeResponse, NewSessionResponse, RequestError
 from acp.helpers import update_current_mode
 from acp.schema import (
     AgentCapabilities,
@@ -20,13 +21,15 @@ from acp.schema import (
 )
 
 from openhands.sdk import BaseConversation, LocalConversation, RemoteConversation
-from acp_impl.agent.util import AgentType
 from openhands_cli import __version__
+from openhands_cli.acp_impl.agent.util import AgentType, get_session_mode_state
 from openhands_cli.acp_impl.confirmation import ConfirmationMode
+from openhands_cli.acp_impl.events.event import EventSubscriber
 from openhands_cli.acp_impl.slash_commands import (
     VALID_CONFIRMATION_MODE,
     apply_confirmation_mode_to_conversation,
     get_available_slash_commands,
+    get_confirmation_mode_from_conversation,
     validate_confirmation_mode,
 )
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
@@ -47,6 +50,7 @@ class _ACPAgentContext(Protocol):
 
     _conn: Client
     _running_tasks: dict[str, asyncio.Task]
+    _resume_conversation_id: str | None
     agent_type: AgentType
 
     @property
@@ -216,6 +220,99 @@ class SharedACPAgentHandler:
         )
 
         return SetSessionModeResponse()
+
+    async def new_session(
+        self,
+        ctx: _ACPAgentContext,
+        mcp_servers_dict: dict[str, dict[str, Any]] | None,
+        get_or_create_conversation: Callable[..., BaseConversation],
+        session_type_name: str = "session",
+        cleanup_on_failure: Callable[[str], None] | None = None,
+    ) -> NewSessionResponse:
+        """Create a new conversation session.
+
+        This shared method handles the common logic for creating sessions in both
+        local and cloud agents.
+
+        Args:
+            ctx: The ACP agent context
+            mcp_servers_dict: Converted MCP servers configuration
+            get_or_create_conversation: Callable to create/get conversation
+            session_type_name: Name for logging (e.g., "session" or "cloud session")
+            cleanup_on_failure: Optional cleanup callable on failure
+
+        Returns:
+            NewSessionResponse with session ID and modes
+        """
+        # Use resume_conversation_id if provided (from --resume flag)
+        # Only use it once, then clear it
+        is_resuming = False
+        if ctx._resume_conversation_id:
+            session_id = ctx._resume_conversation_id
+            ctx._resume_conversation_id = None
+            is_resuming = True
+            logger.info(f"Resuming conversation: {session_id}")
+        else:
+            session_id = str(uuid.uuid4())
+
+        try:
+            # Create conversation and cache it for future operations
+            conversation = get_or_create_conversation(
+                session_id=session_id,
+                mcp_servers=mcp_servers_dict,
+            )
+
+            logger.info(f"Created new {session_type_name} {session_id}")
+
+            # Send available slash commands to client
+            await self.send_available_commands(session_id)
+
+            # Get current confirmation mode for this session
+            current_mode = get_confirmation_mode_from_conversation(conversation)
+
+            # Build response first (before streaming events)
+            response = NewSessionResponse(
+                session_id=session_id,
+                modes=get_session_mode_state(current_mode),
+            )
+
+            # If resuming, replay historic events to the client
+            # This ensures the ACP client sees the full conversation history
+            if is_resuming and conversation.state.events:
+                logger.info(
+                    f"Replaying {len(conversation.state.events)} historic events "
+                    f"for resumed session {session_id}"
+                )
+                subscriber = EventSubscriber(session_id, ctx._conn)
+                for event in conversation.state.events:
+                    await subscriber(event)
+
+            return response
+
+        except MissingAgentSpec as e:
+            logger.error(f"Agent not configured: {e}")
+            raise RequestError.internal_error(
+                {
+                    "reason": "Agent not configured",
+                    "details": "Please run 'openhands' to configure the agent first.",
+                }
+            )
+        except RequestError:
+            # Re-raise RequestError as-is
+            raise
+        except Exception as e:
+            logger.error(
+                f"Failed to create new {session_type_name}: {e}", exc_info=True
+            )
+            # Clean up on failure if cleanup callback provided
+            if cleanup_on_failure:
+                cleanup_on_failure(session_id)
+            raise RequestError.internal_error(
+                {
+                    "reason": f"Failed to create new {session_type_name}",
+                    "details": str(e),
+                }
+            )
 
     async def wait_for_task_completion(
         self, task: asyncio.Task, session_id: str, timeout: float = 10.0

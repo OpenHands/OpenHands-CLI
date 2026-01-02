@@ -6,7 +6,6 @@ for sandbox environments instead of local workspace.
 
 import asyncio
 import logging
-import uuid
 from typing import Any
 from uuid import UUID
 
@@ -56,7 +55,7 @@ from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.cloud.conversation import is_token_valid
 from openhands_cli.locations import MCP_CONFIG_FILE
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
-from openhands_cli.setup import MissingAgentSpec, load_agent_specs
+from openhands_cli.setup import load_agent_specs
 from openhands_cli.theme import OPENHANDS_THEME
 
 
@@ -279,73 +278,21 @@ class OpenHandsCloudACPAgent(ACPAgent):
 
         Overrides the base implementation to handle cloud workspace creation.
         """
-        # Use resume_conversation_id if provided (from --resume flag)
-        # Only use it once, then clear it
-        is_resuming = False
-        if self._resume_conversation_id:
-            session_id = self._resume_conversation_id
-            self._resume_conversation_id = None
-            is_resuming = True
-            logger.info(f"Resuming conversation: {session_id}")
-        else:
-            session_id = str(uuid.uuid4())
+        # Convert ACP MCP servers to Agent format
+        mcp_servers_dict = None
+        if mcp_servers:
+            mcp_servers_dict = convert_acp_mcp_servers_to_agent_format(mcp_servers)
 
-        try:
-            # Convert ACP MCP servers to Agent format
-            mcp_servers_dict = None
-            if mcp_servers:
-                mcp_servers_dict = convert_acp_mcp_servers_to_agent_format(mcp_servers)
+        # Note: working_dir is ignored for cloud workspace as it's managed
+        # by the cloud environment
 
-            # Note: working_dir is ignored for cloud workspace as it's managed
-            # by the cloud environment
-            logger.info(f"Creating cloud session {session_id}")
-
-            # Create conversation with cloud workspace
-            conversation = self._get_or_create_conversation(
-                session_id=session_id,
-                mcp_servers=mcp_servers_dict,
-            )
-
-            await self._shared_handler.send_available_commands(session_id)
-
-            logger.info(f"Created new cloud session {session_id}")
-
-            current_mode = get_confirmation_mode_from_conversation(conversation)
-            # Build response
-            response = NewSessionResponse(
-                session_id=session_id,
-                modes=get_session_mode_state(current_mode),
-            )
-
-            # If resuming, replay historic events to the client
-            if is_resuming and conversation.state.events:
-                logger.info(
-                    f"Replaying {len(conversation.state.events)} historic events "
-                    f"for resumed session {session_id}"
-                )
-                subscriber = EventSubscriber(session_id, self._conn)
-                for event in conversation.state.events:
-                    await subscriber(event)
-
-            return response
-
-        except MissingAgentSpec as e:
-            logger.error(f"Agent not configured: {e}")
-            raise RequestError.internal_error(
-                {
-                    "reason": "Agent not configured",
-                    "details": "Please run 'openhands' to configure the agent first.",
-                }
-            )
-        except RequestError:
-            raise
-        except Exception as e:
-            logger.error(f"Failed to create new cloud session: {e}", exc_info=True)
-            # Clean up workspace on failure
-            self._cleanup_session(session_id)
-            raise RequestError.internal_error(
-                {"reason": "Failed to create new cloud session", "details": str(e)}
-            )
+        return await self._shared_handler.new_session(
+            ctx=self,
+            mcp_servers_dict=mcp_servers_dict,
+            get_or_create_conversation=self._get_or_create_conversation,
+            session_type_name="cloud session",
+            cleanup_on_failure=self._cleanup_session,
+        )
 
     async def prompt(
         self, prompt: list[Any], session_id: str, **_kwargs: Any

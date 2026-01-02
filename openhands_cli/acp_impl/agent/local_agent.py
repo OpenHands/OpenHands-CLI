@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import uuid
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -55,7 +54,7 @@ from openhands_cli.acp_impl.utils import (
 )
 from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
-from openhands_cli.setup import MissingAgentSpec, load_agent_specs
+from openhands_cli.setup import load_agent_specs
 from openhands_cli.utils import extract_text_from_message_content
 
 
@@ -330,78 +329,31 @@ class LocalOpenHandsACPAgent(ACPAgent):
         call will use the specified conversation ID instead of generating a new one.
         When resuming, historic events are replayed to the client.
         """
-        # Use resume_conversation_id if provided (from --resume flag)
-        # Only use it once, then clear it
-        is_resuming = False
-        if self._resume_conversation_id:
-            session_id = self._resume_conversation_id
-            self._resume_conversation_id = None
-            is_resuming = True
-            logger.info(f"Resuming conversation: {session_id}")
-        else:
-            session_id = str(uuid.uuid4())
+        # Convert ACP MCP servers to Agent format
+        mcp_servers_dict = None
+        if mcp_servers:
+            mcp_servers_dict = convert_acp_mcp_servers_to_agent_format(mcp_servers)
 
-        try:
-            # Convert ACP MCP servers to Agent format
-            mcp_servers_dict = None
-            if mcp_servers:
-                mcp_servers_dict = convert_acp_mcp_servers_to_agent_format(mcp_servers)
+        # Validate working directory
+        working_dir = cwd or str(Path.cwd())
+        logger.info(f"Using working directory: {working_dir}")
 
-            # Validate working directory
-            working_dir = cwd or str(Path.cwd())
-            logger.info(f"Using working directory: {working_dir}")
-
-            # Create conversation and cache it for future operations
-            # This reuses the same pattern as openhands --resume
-            conversation = self._get_or_create_conversation(
+        # Create a wrapper that includes working_dir for local conversations
+        def get_or_create_with_working_dir(
+            session_id: str, mcp_servers: dict[str, dict[str, Any]] | None = None
+        ) -> LocalConversation:
+            return self._get_or_create_conversation(
                 session_id=session_id,
                 working_dir=working_dir,
-                mcp_servers=mcp_servers_dict,
+                mcp_servers=mcp_servers,
             )
 
-            logger.info(f"Created new session {session_id}")
-
-            # Send available slash commands to client
-            await self._shared_handler.send_available_commands(session_id)
-
-            # Get current confirmation mode for this session
-            current_mode = get_confirmation_mode_from_conversation(conversation)
-
-            # Build response first (before streaming events)
-            response = NewSessionResponse(
-                session_id=session_id,
-                modes=get_session_mode_state(current_mode),
-            )
-
-            # If resuming, replay historic events to the client
-            # This ensures the ACP client sees the full conversation history
-            if is_resuming and conversation.state.events:
-                logger.info(
-                    f"Replaying {len(conversation.state.events)} historic events "
-                    f"for resumed session {session_id}"
-                )
-                subscriber = EventSubscriber(session_id, self._conn)
-                for event in conversation.state.events:
-                    await subscriber(event)
-
-            return response
-
-        except MissingAgentSpec as e:
-            logger.error(f"Agent not configured: {e}")
-            raise RequestError.internal_error(
-                {
-                    "reason": "Agent not configured",
-                    "details": "Please run 'openhands' to configure the agent first.",
-                }
-            )
-        except RequestError:
-            # Re-raise RequestError as-is
-            raise
-        except Exception as e:
-            logger.error(f"Failed to create new session: {e}", exc_info=True)
-            raise RequestError.internal_error(
-                {"reason": "Failed to create new session", "details": str(e)}
-            )
+        return await self._shared_handler.new_session(
+            ctx=self,
+            mcp_servers_dict=mcp_servers_dict,
+            get_or_create_conversation=get_or_create_with_working_dir,
+            session_type_name="session",
+        )
 
     async def prompt(
         self, prompt: list[Any], session_id: str, **_kwargs: Any
