@@ -62,6 +62,7 @@ async def run_acp_server(
         def create_agent(conn: Client) -> OpenHandsCloudACPAgent:
             return OpenHandsCloudACPAgent(
                 conn=conn,
+                initial_confirmation_mode=initial_confirmation_mode,
                 cloud_api_key=api_key,
                 cloud_api_url=cloud_api_url,
             )

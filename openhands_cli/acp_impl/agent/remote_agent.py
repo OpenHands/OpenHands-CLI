@@ -38,9 +38,13 @@ from openhands.sdk import (
 from openhands.workspace import OpenHandsCloudWorkspace
 from openhands_cli.acp_impl.agent.shared_agent_handler import SharedACPAgentHandler
 from openhands_cli.acp_impl.agent.util import get_session_mode_state
+from openhands_cli.acp_impl.confirmation import (
+    ConfirmationMode,
+)
 from openhands_cli.acp_impl.events.event import EventSubscriber
 from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
 from openhands_cli.acp_impl.slash_commands import (
+    apply_confirmation_mode_to_conversation,
     get_confirmation_mode_from_conversation,
 )
 from openhands_cli.acp_impl.utils import (
@@ -70,6 +74,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
         self,
         conn: Client,
         cloud_api_key: str,
+        initial_confirmation_mode: ConfirmationMode,
         cloud_api_url: str = "https://app.all-hands.dev",
         resume_conversation_id: str | None = None,
     ):
@@ -96,6 +101,8 @@ class OpenHandsCloudACPAgent(ACPAgent):
         # Track active cloud workspaces for cleanup
         self._active_sessions: dict[str, RemoteConversation] = {}
         self._active_workspaces: dict[str, OpenHandsCloudWorkspace] = {}
+
+        self._initial_confirmation_mode: ConfirmationMode = initial_confirmation_mode
 
         logger.info(
             f"OpenHands Cloud ACP Agent initialized with cloud URL: {cloud_api_url}"
@@ -181,6 +188,11 @@ class OpenHandsCloudACPAgent(ACPAgent):
             session_id=session_id,
             mcp_servers=mcp_servers,
         )
+
+        apply_confirmation_mode_to_conversation(
+            conversation, self._initial_confirmation_mode, session_id
+        )
+
         # Cache the conversation
         self._active_sessions[session_id] = conversation
         self._active_workspaces[session_id] = workspace
