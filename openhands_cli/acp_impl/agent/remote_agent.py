@@ -37,7 +37,7 @@ from openhands.sdk import (
 )
 from openhands.workspace import OpenHandsCloudWorkspace
 from openhands_cli.acp_impl.agent.shared_agent_handler import SharedACPAgentHandler
-from openhands_cli.acp_impl.agent.util import get_session_mode_state
+from openhands_cli.acp_impl.agent.util import AgentType, get_session_mode_state
 from openhands_cli.acp_impl.confirmation import (
     ConfirmationMode,
 )
@@ -107,6 +107,8 @@ class OpenHandsCloudACPAgent(ACPAgent):
         logger.info(
             f"OpenHands Cloud ACP Agent initialized with cloud URL: {cloud_api_url}"
         )
+
+        self.agent_type: AgentType = "remote"
 
     @property
     def active_session(self) -> dict[str, RemoteConversation]:
@@ -308,10 +310,11 @@ class OpenHandsCloudACPAgent(ACPAgent):
 
             logger.info(f"Created new cloud session {session_id}")
 
+            current_mode = get_confirmation_mode_from_conversation(conversation)
             # Build response
             response = NewSessionResponse(
                 session_id=session_id,
-                modes=get_session_mode_state("always-approve"),
+                modes=get_session_mode_state(current_mode),
             )
 
             # If resuming, replay historic events to the client

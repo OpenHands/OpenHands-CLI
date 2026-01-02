@@ -33,7 +33,7 @@ from openhands.sdk import (
     Workspace,
 )
 from openhands_cli.acp_impl.agent.shared_agent_handler import SharedACPAgentHandler
-from openhands_cli.acp_impl.agent.util import get_session_mode_state
+from openhands_cli.acp_impl.agent.util import AgentType, get_session_mode_state
 from openhands_cli.acp_impl.confirmation import (
     ConfirmationMode,
 )
@@ -100,6 +100,8 @@ class LocalOpenHandsACPAgent(ACPAgent):
         )
         if resume_conversation_id:
             logger.info(f"Will resume conversation: {resume_conversation_id}")
+
+        self.agent_type: AgentType = "remote"
 
     @property
     def active_session(self) -> dict[str, LocalConversation]:
