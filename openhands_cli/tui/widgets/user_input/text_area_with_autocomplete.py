@@ -134,7 +134,6 @@ class TextAreaAutoComplete(Container):
             self.hide_dropdown()
             return item
         return None
-    
 
     def process_key(self, key: str) -> bool:
         """Process keyboard navigation for the autocomplete.
