@@ -262,10 +262,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
         # Create RemoteConversation with cloud workspace
         # Note: RemoteConversation doesn't support persistence_dir
         conversation = Conversation(
-            agent=agent,
-            workspace=workspace,
-            callbacks=[sync_callback],
-            conversation_id=UUID(session_id),
+            agent=agent, workspace=workspace, callbacks=[sync_callback]
         )
 
         subscriber.conversation = conversation
