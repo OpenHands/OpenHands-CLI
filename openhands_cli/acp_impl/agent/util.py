@@ -8,7 +8,6 @@ from acp.schema import (
     SessionModeState,
 )
 
-from openhands_cli.acp_impl.agent import LocalOpenHandsACPAgent
 from openhands_cli.acp_impl.agent.remote_agent import (
     OpenHandsCloudACPAgent,
     validate_cloud_credentials,
@@ -62,6 +61,7 @@ async def run_acp_server(
     reader, writer = await stdio_streams()
 
     if not cloud:
+        from openhands_cli.acp_impl.agent.local_agent import LocalOpenHandsACPAgent
 
         def create_local_agent(conn: Client) -> LocalOpenHandsACPAgent:
             return LocalOpenHandsACPAgent(
