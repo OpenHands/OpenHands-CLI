@@ -174,7 +174,8 @@ class SettingsScreen(ModalScreen):
 
                 # Update model options and select current model
                 self._update_model_options(provider)
-                self.model_select.value = llm.model
+                # Use model (without provider prefix) since dropdown options don't include prefix
+                self.model_select.value = model
 
         # API Key (show masked version)
         if llm.api_key:

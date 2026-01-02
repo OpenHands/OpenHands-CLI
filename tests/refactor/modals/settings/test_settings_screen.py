@@ -132,9 +132,10 @@ async def test_load_current_settings_basic_mode(
     screen.current_agent = fake_agent_store.load()
 
     with patch.object(ss, "get_model_options") as mock_get_options:
+        # Model options don't include provider prefix (matches real get_model_options behavior)
         mock_get_options.return_value = [
-            ("GPT-4o Mini", "openai/gpt-4o-mini"),
-            ("GPT-4o", "openai/gpt-4o"),
+            ("gpt-4o-mini", "gpt-4o-mini"),
+            ("gpt-4o", "gpt-4o"),
         ]
         screen._load_current_settings()
 
@@ -147,7 +148,8 @@ async def test_load_current_settings_basic_mode(
     assert screen.is_advanced_mode is False
     assert mode_select.value == "basic"
     assert provider_select.value == "openai"
-    assert model_select.value == "openai/gpt-4o-mini"
+    # Model select value should be model_id without provider prefix
+    assert model_select.value == "gpt-4o-mini"
 
     placeholder = api_key_input.placeholder
     assert placeholder.startswith("Current: tes")
