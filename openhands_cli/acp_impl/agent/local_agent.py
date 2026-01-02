@@ -4,7 +4,7 @@ import asyncio
 import logging
 import uuid
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from uuid import UUID
 
 from acp import (
@@ -15,16 +15,11 @@ from acp import (
     PromptResponse,
     RequestError,
 )
-from acp.helpers import update_current_mode
 from acp.schema import (
-    AgentCapabilities,
     AgentMessageChunk,
     AuthenticateResponse,
-    Implementation,
     ListSessionsResponse,
     LoadSessionResponse,
-    McpCapabilities,
-    PromptCapabilities,
     SetSessionModelResponse,
     SetSessionModeResponse,
     TextContentBlock,
@@ -37,7 +32,6 @@ from openhands.sdk import (
     Message,
     Workspace,
 )
-from openhands_cli import __version__
 from openhands_cli.acp_impl.agent.shared_agent_handler import SharedACPAgentHandler
 from openhands_cli.acp_impl.agent.util import get_session_mode_state
 from openhands_cli.acp_impl.confirmation import (
@@ -47,14 +41,12 @@ from openhands_cli.acp_impl.events.event import EventSubscriber
 from openhands_cli.acp_impl.events.token_streamer import TokenBasedEventSubscriber
 from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
 from openhands_cli.acp_impl.slash_commands import (
-    VALID_CONFIRMATION_MODE,
     apply_confirmation_mode_to_conversation,
     create_help_text,
     get_confirmation_mode_from_conversation,
     get_unknown_command_text,
     handle_confirm_argument,
     parse_slash_command,
-    validate_confirmation_mode,
 )
 from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
@@ -90,8 +82,7 @@ class LocalOpenHandsACPAgent(ACPAgent):
             streaming_enabled: Whether to enable token streaming for LLM outputs
         """
         self._conn = conn
-
-        self.shared_agent_handler = SharedACPAgentHandler(conn)
+        self._shared_handler = SharedACPAgentHandler(conn)
         # Cache of active conversations to preserve state (pause, confirmation, etc.)
         # across multiple operations on the same session
         self._active_sessions: dict[str, LocalConversation] = {}
@@ -109,6 +100,11 @@ class LocalOpenHandsACPAgent(ACPAgent):
         )
         if resume_conversation_id:
             logger.info(f"Will resume conversation: {resume_conversation_id}")
+
+    @property
+    def active_session(self) -> dict[str, LocalConversation]:
+        """Return the active sessions mapping."""
+        return self._active_sessions
 
     async def _cmd_confirm(self, session_id: str, argument: str) -> str:
         """Handle /confirm command.
@@ -130,28 +126,9 @@ class LocalOpenHandsACPAgent(ACPAgent):
 
         response_text, new_mode = handle_confirm_argument(current_mode, argument)
         if new_mode is not None:
-            await self._set_confirmation_mode(session_id, new_mode)
+            await self._shared_handler.set_confirmation_mode(self, session_id, new_mode)
 
         return response_text
-
-    async def _set_confirmation_mode(
-        self, session_id: str, mode: ConfirmationMode
-    ) -> None:
-        """Set confirmation mode for a session.
-
-        Args:
-            session_id: The session ID
-            mode: Confirmation mode (always-ask|always-approve|llm-approve)
-        """
-        if session_id in self._active_sessions:
-            conversation = self._active_sessions[session_id]
-            apply_confirmation_mode_to_conversation(conversation, mode, session_id)
-            logger.debug(f"Confirmation mode for session {session_id}: {mode}")
-        else:
-            logger.warning(
-                f"Cannot set confirmation mode for session {session_id}: "
-                "session not found"
-            )
 
     def on_connect(self, conn: Client) -> None:
         pass
@@ -324,48 +301,20 @@ class LocalOpenHandsACPAgent(ACPAgent):
     async def initialize(
         self,
         protocol_version: int,
-        client_capabilities: Any | None = None,  # noqa: ARG002
-        client_info: Any | None = None,  # noqa: ARG002
+        client_capabilities: Any | None = None,
+        client_info: Any | None = None,
         **_kwargs: Any,
     ) -> InitializeResponse:
         """Initialize the ACP protocol."""
-        logger.info(f"Initializing ACP with protocol version: {protocol_version}")
-
-        # Check if agent is configured
-        try:
-            load_agent_specs()
-            auth_methods = []
-            logger.info("Agent configured, no authentication required")
-        except MissingAgentSpec:
-            # Agent not configured - this shouldn't happen in production
-            # but we'll return empty auth methods for now
-            auth_methods = []
-            logger.warning("Agent not configured - users should run 'openhands' first")
-
-        return InitializeResponse(
-            protocol_version=protocol_version,
-            auth_methods=auth_methods,
-            agent_capabilities=AgentCapabilities(
-                load_session=True,
-                mcp_capabilities=McpCapabilities(http=True, sse=True),
-                prompt_capabilities=PromptCapabilities(
-                    audio=False,
-                    embedded_context=True,
-                    image=True,
-                ),
-            ),
-            agent_info=Implementation(
-                name="OpenHands CLI ACP Agent",
-                version=__version__,
-            ),
+        return await self._shared_handler.initialize(
+            protocol_version, client_capabilities, client_info, **_kwargs
         )
 
     async def authenticate(
         self, method_id: str, **_kwargs: Any
     ) -> AuthenticateResponse | None:
         """Authenticate the client (no-op for now)."""
-        logger.info(f"Authentication requested with method: {method_id}")
-        return AuthenticateResponse()
+        return await self._shared_handler.authenticate(method_id, **_kwargs)
 
     async def new_session(
         self,
@@ -411,7 +360,7 @@ class LocalOpenHandsACPAgent(ACPAgent):
             logger.info(f"Created new session {session_id}")
 
             # Send available slash commands to client
-            await self.shared_agent_handler.send_available_commands(session_id)
+            await self._shared_handler.send_available_commands(session_id)
 
             # Get current confirmation mode for this session
             current_mode = get_confirmation_mode_from_conversation(conversation)
@@ -538,55 +487,11 @@ class LocalOpenHandsACPAgent(ACPAgent):
                 {"reason": "Failed to process prompt", "details": str(e)}
             )
 
-    async def _wait_for_task_completion(
-        self, task: asyncio.Task, session_id: str, timeout: float = 10.0
-    ) -> None:
-        """Wait for a task to complete and handle cancellation if needed."""
-        try:
-            await asyncio.wait_for(task, timeout=timeout)
-        except TimeoutError:
-            logger.warning(
-                f"Conversation thread did not stop within timeout for session "
-                f"{session_id}"
-            )
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-        except Exception as e:
-            logger.error(f"Error while waiting for conversation to stop: {e}")
-            raise RequestError.internal_error(
-                {
-                    "reason": "Error during conversation cancellation",
-                    "details": str(e),
-                }
-            )
-
     async def cancel(self, session_id: str, **_kwargs: Any) -> None:
         """Cancel the current operation."""
-        logger.info(f"Cancel requested for session: {session_id}")
-
-        try:
-            conversation = self._get_or_create_conversation(session_id=session_id)
-            conversation.pause()
-
-            running_task = self._running_tasks.get(session_id)
-            if not running_task or running_task.done():
-                return
-
-            logger.debug(
-                f"Waiting for conversation thread to terminate for session {session_id}"
-            )
-            await self._wait_for_task_completion(running_task, session_id)
-
-        except RequestError:
-            raise
-        except Exception as e:
-            logger.error(f"Failed to cancel session {session_id}: {e}")
-            raise RequestError.internal_error(
-                {"reason": "Failed to cancel session", "details": str(e)}
-            )
+        await self._shared_handler.cancel(
+            self, session_id, self._get_or_create_conversation, **_kwargs
+        )
 
     async def load_session(
         self,
@@ -644,7 +549,7 @@ class LocalOpenHandsACPAgent(ACPAgent):
             logger.info(f"Successfully loaded session {session_id}")
 
             # Send available slash commands to client
-            await self.shared_agent_handler.send_available_commands(session_id)
+            await self._shared_handler.send_available_commands(session_id)
 
             # Get current confirmation mode for this session
             current_mode = get_confirmation_mode_from_conversation(conversation)
@@ -663,13 +568,12 @@ class LocalOpenHandsACPAgent(ACPAgent):
 
     async def list_sessions(
         self,
-        cursor: str | None = None,  # noqa: ARG002
-        cwd: str | None = None,  # noqa: ARG002
+        cursor: str | None = None,
+        cwd: str | None = None,
         **_kwargs: Any,
     ) -> ListSessionsResponse:
         """List available sessions (no-op for now)."""
-        logger.info("List sessions requested")
-        return ListSessionsResponse(sessions=[])
+        return await self._shared_handler.list_sessions(cursor, cwd, **_kwargs)
 
     async def set_session_mode(
         self,
@@ -677,54 +581,26 @@ class LocalOpenHandsACPAgent(ACPAgent):
         session_id: str,
         **_kwargs: Any,
     ) -> SetSessionModeResponse | None:
-        """Set session mode by updating confirmation mode.
-
-        Args:
-            mode_id: The mode ID to switch to (ask, auto, analyze)
-            session_id: The session ID to update
-
-        Returns:
-            SetSessionModeResponse if successful
-
-        Raises:
-            RequestError: If mode_id is invalid
-        """
-        logger.info(f"Set session mode requested: {session_id} -> {mode_id}")
-
-        mode = validate_confirmation_mode(mode_id)
-        if mode is None:
-            raise RequestError.invalid_params(
-                {
-                    "reason": f"Invalid mode ID: {mode_id}",
-                    "validModes": sorted(VALID_CONFIRMATION_MODE),
-                }
-            )
-
-        confirmation_mode: ConfirmationMode = cast(ConfirmationMode, mode_id)
-        await self._set_confirmation_mode(session_id, confirmation_mode)
-
-        await self._conn.session_update(
-            session_id=session_id,
-            update=update_current_mode(current_mode_id=mode_id),
+        """Set session mode by updating confirmation mode."""
+        return await self._shared_handler.set_session_mode(
+            self, mode_id, session_id, **_kwargs
         )
-
-        return SetSessionModeResponse()
 
     async def set_session_model(
         self,
-        model_id: str,  # noqa: ARG002
+        model_id: str,
         session_id: str,
         **_kwargs: Any,
     ) -> SetSessionModelResponse | None:
         """Set session model (no-op for now)."""
-        logger.info(f"Set session model requested: {session_id}")
-        return SetSessionModelResponse()
+        return await self._shared_handler.set_session_model(
+            model_id, session_id, **_kwargs
+        )
 
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         """Extension method (not supported)."""
-        logger.info(f"Extension method '{method}' requested with params: {params}")
-        return {"error": "ext_method not supported"}
+        return await self._shared_handler.ext_method(method, params)
 
     async def ext_notification(self, method: str, params: dict[str, Any]) -> None:
         """Extension notification (no-op for now)."""
-        logger.info(f"Extension notification '{method}' received with params: {params}")
+        await self._shared_handler.ext_notification(method, params)

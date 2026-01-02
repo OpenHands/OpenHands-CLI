@@ -4,7 +4,7 @@ import logging
 
 from acp.schema import AvailableCommand, AvailableCommandInput, UnstructuredCommandInput
 
-from openhands.sdk import LocalConversation, RemoteConversation
+from openhands.sdk import BaseConversation, LocalConversation, RemoteConversation
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmRisky,
@@ -190,7 +190,7 @@ def apply_confirmation_mode_to_conversation(
 
 
 def get_confirmation_mode_from_conversation(
-    conversation: LocalConversation | RemoteConversation,
+    conversation: BaseConversation,
 ) -> ConfirmationMode:
     """Get current confirmation mode from a conversation's policy.
 

@@ -4,19 +4,16 @@ import sys
 
 from acp import Client, stdio_streams
 from acp.core import AgentSideConnection
-from acp.schema import (
-    SessionModeState,
-)
 
 from openhands_cli.acp_impl.agent.remote_agent import (
     OpenHandsCloudACPAgent,
     validate_cloud_credentials,
 )
-from openhands_cli.acp_impl.confirmation import (
-    ConfirmationMode
-)
+from openhands_cli.acp_impl.confirmation import ConfirmationMode
+
 
 logger = logging.getLogger(__name__)
+
 
 async def run_acp_server(
     initial_confirmation_mode: ConfirmationMode = "always-ask",
