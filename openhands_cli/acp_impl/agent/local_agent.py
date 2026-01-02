@@ -49,7 +49,6 @@ from openhands_cli.acp_impl.slash_commands import (
 )
 from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
-    convert_acp_mcp_servers_to_agent_format,
     convert_acp_prompt_to_message_content,
 )
 from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
@@ -317,6 +316,11 @@ class LocalOpenHandsACPAgent(ACPAgent):
         """Authenticate the client (no-op for now)."""
         return await self._shared_handler.authenticate(method_id, **_kwargs)
 
+    def _cleanup_session(self, session_id: str) -> None:
+        """Clean up resources for a session (no-op for local agent)."""
+        # Local agent doesn't need special cleanup
+        pass
+
     async def new_session(
         self,
         cwd: str,
@@ -329,30 +333,14 @@ class LocalOpenHandsACPAgent(ACPAgent):
         call will use the specified conversation ID instead of generating a new one.
         When resuming, historic events are replayed to the client.
         """
-        # Convert ACP MCP servers to Agent format
-        mcp_servers_dict = None
-        if mcp_servers:
-            mcp_servers_dict = convert_acp_mcp_servers_to_agent_format(mcp_servers)
-
         # Validate working directory
         working_dir = cwd or str(Path.cwd())
         logger.info(f"Using working directory: {working_dir}")
 
-        # Create a wrapper that includes working_dir for local conversations
-        def get_or_create_with_working_dir(
-            session_id: str, mcp_servers: dict[str, dict[str, Any]] | None = None
-        ) -> LocalConversation:
-            return self._get_or_create_conversation(
-                session_id=session_id,
-                working_dir=working_dir,
-                mcp_servers=mcp_servers,
-            )
-
         return await self._shared_handler.new_session(
             ctx=self,
-            mcp_servers_dict=mcp_servers_dict,
-            get_or_create_conversation=get_or_create_with_working_dir,
-            session_type_name="session",
+            mcp_servers=mcp_servers,
+            working_dir=working_dir,
         )
 
     async def prompt(

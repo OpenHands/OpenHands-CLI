@@ -48,7 +48,6 @@ from openhands_cli.acp_impl.slash_commands import (
 )
 from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
-    convert_acp_mcp_servers_to_agent_format,
     convert_acp_prompt_to_message_content,
 )
 from openhands_cli.auth.token_storage import TokenStorage
@@ -166,6 +165,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
     def _get_or_create_conversation(
         self,
         session_id: str,
+        working_dir: str | None = None,  # noqa: ARG002
         mcp_servers: dict[str, dict[str, Any]] | None = None,
     ) -> RemoteConversation:
         """Get an active conversation from cache or create it with cloud workspace.
@@ -277,21 +277,12 @@ class OpenHandsCloudACPAgent(ACPAgent):
         """Create a new conversation session with cloud workspace.
 
         Overrides the base implementation to handle cloud workspace creation.
+        Note: working_dir is ignored for cloud workspace as it's managed
+        by the cloud environment.
         """
-        # Convert ACP MCP servers to Agent format
-        mcp_servers_dict = None
-        if mcp_servers:
-            mcp_servers_dict = convert_acp_mcp_servers_to_agent_format(mcp_servers)
-
-        # Note: working_dir is ignored for cloud workspace as it's managed
-        # by the cloud environment
-
         return await self._shared_handler.new_session(
             ctx=self,
-            mcp_servers_dict=mcp_servers_dict,
-            get_or_create_conversation=self._get_or_create_conversation,
-            session_type_name="cloud session",
-            cleanup_on_failure=self._cleanup_session,
+            mcp_servers=mcp_servers,
         )
 
     async def prompt(

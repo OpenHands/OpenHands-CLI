@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from acp import Client, InitializeResponse, NewSessionResponse, RequestError
@@ -32,6 +32,7 @@ from openhands_cli.acp_impl.slash_commands import (
     get_confirmation_mode_from_conversation,
     validate_confirmation_mode,
 )
+from openhands_cli.acp_impl.utils import convert_acp_mcp_servers_to_agent_format
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
 
 
@@ -56,6 +57,19 @@ class _ACPAgentContext(Protocol):
     @property
     def active_session(self) -> Mapping[str, BaseConversation]:
         """Return the active sessions mapping."""
+        ...
+
+    def _get_or_create_conversation(
+        self,
+        session_id: str,
+        working_dir: str | None = None,
+        mcp_servers: dict[str, dict[str, Any]] | None = None,
+    ) -> BaseConversation:
+        """Get or create a conversation for the given session ID."""
+        ...
+
+    def _cleanup_session(self, session_id: str) -> None:
+        """Clean up resources for a session (optional, may be no-op)."""
         ...
 
 
@@ -224,10 +238,8 @@ class SharedACPAgentHandler:
     async def new_session(
         self,
         ctx: _ACPAgentContext,
-        mcp_servers_dict: dict[str, dict[str, Any]] | None,
-        get_or_create_conversation: Callable[..., BaseConversation],
-        session_type_name: str = "session",
-        cleanup_on_failure: Callable[[str], None] | None = None,
+        mcp_servers: list[Any],
+        working_dir: str | None = None,
     ) -> NewSessionResponse:
         """Create a new conversation session.
 
@@ -236,14 +248,20 @@ class SharedACPAgentHandler:
 
         Args:
             ctx: The ACP agent context
-            mcp_servers_dict: Converted MCP servers configuration
-            get_or_create_conversation: Callable to create/get conversation
-            session_type_name: Name for logging (e.g., "session" or "cloud session")
-            cleanup_on_failure: Optional cleanup callable on failure
+            mcp_servers: ACP MCP servers configuration (will be converted)
+            working_dir: Working directory for local sessions (ignored for cloud)
 
         Returns:
             NewSessionResponse with session ID and modes
         """
+        # Determine session type name from agent type
+        session_type_name = "cloud session" if ctx.agent_type == "remote" else "session"
+
+        # Convert ACP MCP servers to Agent format
+        mcp_servers_dict = None
+        if mcp_servers:
+            mcp_servers_dict = convert_acp_mcp_servers_to_agent_format(mcp_servers)
+
         # Use resume_conversation_id if provided (from --resume flag)
         # Only use it once, then clear it
         is_resuming = False
@@ -257,8 +275,9 @@ class SharedACPAgentHandler:
 
         try:
             # Create conversation and cache it for future operations
-            conversation = get_or_create_conversation(
+            conversation = ctx._get_or_create_conversation(
                 session_id=session_id,
+                working_dir=working_dir,
                 mcp_servers=mcp_servers_dict,
             )
 
@@ -304,9 +323,8 @@ class SharedACPAgentHandler:
             logger.error(
                 f"Failed to create new {session_type_name}: {e}", exc_info=True
             )
-            # Clean up on failure if cleanup callback provided
-            if cleanup_on_failure:
-                cleanup_on_failure(session_id)
+            # Clean up on failure
+            ctx._cleanup_session(session_id)
             raise RequestError.internal_error(
                 {
                     "reason": f"Failed to create new {session_type_name}",
