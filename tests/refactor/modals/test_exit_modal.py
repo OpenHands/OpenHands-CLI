@@ -4,7 +4,7 @@ from unittest import mock
 
 from textual.widgets import Button
 
-from openhands_cli.refactor.modals.exit_modal import ExitConfirmationModal
+from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 
 
 class TestExitConfirmationModal:

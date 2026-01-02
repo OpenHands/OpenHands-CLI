@@ -13,7 +13,7 @@ from openhands.sdk import Action, MessageEvent, TextContent
 from openhands.sdk.event import ActionEvent
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.llm import MessageToolCall
-from openhands_cli.refactor.widgets.richlog_visualizer import ConversationVisualizer
+from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
 
 if TYPE_CHECKING:
@@ -301,10 +301,10 @@ class TestConversationErrorEventHandling:
         assert not collapsible.collapsed
 
         # Verify it has error border color (should be the error theme color)
-        from openhands_cli.refactor.widgets.richlog_visualizer import (
+        from openhands_cli.theme import OPENHANDS_THEME
+        from openhands_cli.tui.widgets.richlog_visualizer import (
             _get_event_border_color,
         )
-        from openhands_cli.theme import OPENHANDS_THEME
 
         expected_color = OPENHANDS_THEME.error or "#ff6b6b"
         actual_color = _get_event_border_color(error_event)

@@ -3,10 +3,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import openhands_cli.refactor.widgets.status_line as status_line_module
+import openhands_cli.tui.widgets.status_line as status_line_module
 
 # Adjust the import path to wherever this file actually lives
-from openhands_cli.refactor.widgets.status_line import (
+from openhands_cli.tui.widgets.status_line import (
     InfoStatusLine,
     WorkingStatusLine,
 )

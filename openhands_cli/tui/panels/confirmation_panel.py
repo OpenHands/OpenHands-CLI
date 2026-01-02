@@ -8,7 +8,7 @@ from textual.containers import Container, Vertical, VerticalScroll
 from textual.widgets import ListItem, ListView, Static
 
 from openhands.sdk.event import ActionEvent
-from openhands_cli.refactor.panels.confirmation_panel_style import (
+from openhands_cli.tui.panels.confirmation_panel_style import (
     CONFIRMATION_SIDE_PANEL_STYLLE,
 )
 from openhands_cli.user_actions.types import UserConfirmation

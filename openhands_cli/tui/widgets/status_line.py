@@ -11,7 +11,7 @@ from openhands_cli.locations import WORK_DIR
 
 
 if TYPE_CHECKING:
-    from openhands_cli.refactor.textual_app import OpenHandsApp
+    from openhands_cli.tui.textual_app import OpenHandsApp
 
 
 class WorkingStatusLine(Static):

@@ -22,15 +22,15 @@ from textual.widgets import (
 )
 from textual.widgets._select import NoSelection
 
-from openhands_cli.refactor.modals.settings.choices import (
+from openhands_cli.stores import AgentStore
+from openhands_cli.tui.modals.settings.choices import (
     get_model_options,
 )
-from openhands_cli.refactor.modals.settings.components import (
+from openhands_cli.tui.modals.settings.components import (
     CliSettingsTab,
     SettingsTab,
 )
-from openhands_cli.refactor.modals.settings.utils import SettingsFormData, save_settings
-from openhands_cli.stores import AgentStore
+from openhands_cli.tui.modals.settings.utils import SettingsFormData, save_settings
 
 
 class SettingsScreen(ModalScreen):
@@ -174,7 +174,8 @@ class SettingsScreen(ModalScreen):
 
                 # Update model options and select current model
                 self._update_model_options(provider)
-                self.model_select.value = llm.model
+                # Use model without provider prefix (dropdown options don't have it)
+                self.model_select.value = model
 
         # API Key (show masked version)
         if llm.api_key:

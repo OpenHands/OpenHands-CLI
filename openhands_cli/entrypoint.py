@@ -109,7 +109,7 @@ def main() -> None:
             launch_gui_server(mount_cwd=args.mount_cwd, gpu=args.gpu)
         elif args.command == "web":
             # Import web server launcher only when needed
-            from openhands_cli.serve import launch_web_server
+            from openhands_cli.tui.serve import launch_web_server
 
             launch_web_server(host=args.host, port=args.port, debug=args.debug)
         elif args.command == "acp":
@@ -186,7 +186,7 @@ def main() -> None:
 
             # Use textual-based UI as default (experimental UI is now the default)
             # The --exp flag is kept for compatibility but does the same thing
-            from openhands_cli.refactor.textual_app import main as textual_main
+            from openhands_cli.tui.textual_app import main as textual_main
 
             queued_inputs = create_seeded_instructions_from_args(args)
             conversation_id = textual_main(

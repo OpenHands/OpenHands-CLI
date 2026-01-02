@@ -4,7 +4,7 @@ from textual.app import ComposeResult
 from textual.containers import Container, VerticalScroll
 from textual.widgets import Input, Label, Select, Static
 
-from openhands_cli.refactor.modals.settings.choices import (
+from openhands_cli.tui.modals.settings.choices import (
     provider_options,
 )
 

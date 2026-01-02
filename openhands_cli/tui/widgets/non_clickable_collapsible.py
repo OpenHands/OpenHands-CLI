@@ -4,6 +4,7 @@ This module provides a Collapsible widget that cannot be toggled by clicking,
 only through programmatic control (like Ctrl+E). It also has a dimmer gray background.
 """
 
+import platform
 from typing import Any, ClassVar
 
 import pyperclip
@@ -15,6 +16,11 @@ from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Button, Static
+
+
+def _is_linux() -> bool:
+    """Check if the current platform is Linux."""
+    return platform.system() == "Linux"
 
 
 class NonClickableCollapsibleTitle(Container, can_focus=False):
@@ -91,6 +97,12 @@ class NonClickableCollapsibleTitle(Container, can_focus=False):
 
     class CopyRequested(Message):
         """Request to copy content."""
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button press - post CopyRequested when copy button is clicked."""
+        if event.button.id == "copy-btn":
+            event.stop()
+            self.post_message(self.CopyRequested())
 
     def compose(self) -> ComposeResult:
         """Compose the title with copy button."""
@@ -201,27 +213,53 @@ class NonClickableCollapsible(Widget):
     def _on_non_clickable_collapsible_title_copy_requested(
         self, event: NonClickableCollapsibleTitle.CopyRequested
     ) -> None:
-        """Handle copy request from the title."""
+        """Handle copy request from the title.
+
+        Uses a two-layer approach for clipboard access:
+        1. Primary: pyperclip for direct OS clipboard access
+        2. Fallback: Textual's copy_to_clipboard (OSC 52 escape sequence)
+
+        This ensures clipboard works across different terminal environments.
+        """
         event.stop()
-        if self._content_string:
-            try:
-                pyperclip.copy(self._content_string)
-                self.app.notify(
-                    "Content copied to clipboard!", title="Copy Success", timeout=2
-                )
-            except Exception as e:
-                self.app.notify(
-                    f"Failed to copy: {str(e)}",
-                    title="Copy Error",
-                    severity="error",
-                    timeout=3,
-                )
-        else:
+
+        if not self._content_string:
             self.app.notify(
                 "No content to copy",
                 title="Copy Warning",
                 severity="warning",
                 timeout=2,
+            )
+            return
+
+        pyperclip_success = False
+        # Primary: Try pyperclip for direct OS clipboard access
+        try:
+            pyperclip.copy(self._content_string)
+            pyperclip_success = True
+        except pyperclip.PyperclipException:
+            # pyperclip failed - will try OSC 52 fallback
+            pass
+
+        # Also try OSC 52 - this doesn't raise errors, it just sends escape
+        # sequences. We do both because pyperclip and OSC 52 can target
+        # different clipboards (e.g., remote terminals, tmux, SSH sessions)
+        self.app.copy_to_clipboard(self._content_string)
+
+        if pyperclip_success:
+            self.app.notify(
+                "Content copied to clipboard!", title="Copy Success", timeout=2
+            )
+        elif _is_linux():
+            # On Linux without pyperclip working, OSC 52 may or may not work
+            self.app.notify(
+                "Copy attempted. If it didn't work, try: sudo apt install xclip",
+                title="Copy",
+                timeout=4,
+            )
+        else:
+            self.app.notify(
+                "Content copied to clipboard!", title="Copy Success", timeout=2
             )
 
     def _watch_collapsed(self, collapsed: bool) -> None:

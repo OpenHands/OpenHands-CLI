@@ -15,8 +15,8 @@ from textual.css.query import NoMatches
 from textual.widgets import Button, Static
 
 from openhands.sdk import LLM, Agent
-from openhands_cli.refactor.modals.settings import settings_screen as ss
-from openhands_cli.refactor.modals.settings.settings_screen import SettingsScreen
+from openhands_cli.tui.modals.settings import settings_screen as ss
+from openhands_cli.tui.modals.settings.settings_screen import SettingsScreen
 
 
 #
@@ -63,7 +63,7 @@ def fake_agent_store(monkeypatch) -> InMemoryAgentStore:
     monkeypatch.setattr(ss, "AgentStore", lambda: store)
     # Also patch in the SettingsScreen module itself
     monkeypatch.setattr(
-        "openhands_cli.refactor.modals.settings.settings_screen.AgentStore",
+        "openhands_cli.tui.modals.settings.settings_screen.AgentStore",
         lambda: store,
     )
     return store
@@ -132,9 +132,10 @@ async def test_load_current_settings_basic_mode(
     screen.current_agent = fake_agent_store.load()
 
     with patch.object(ss, "get_model_options") as mock_get_options:
+        # Model options don't include provider prefix
         mock_get_options.return_value = [
-            ("GPT-4o Mini", "openai/gpt-4o-mini"),
-            ("GPT-4o", "openai/gpt-4o"),
+            ("gpt-4o-mini", "gpt-4o-mini"),
+            ("gpt-4o", "gpt-4o"),
         ]
         screen._load_current_settings()
 
@@ -147,7 +148,8 @@ async def test_load_current_settings_basic_mode(
     assert screen.is_advanced_mode is False
     assert mode_select.value == "basic"
     assert provider_select.value == "openai"
-    assert model_select.value == "openai/gpt-4o-mini"
+    # Model select value should be model_id without provider prefix
+    assert model_select.value == "gpt-4o-mini"
 
     placeholder = api_key_input.placeholder
     assert placeholder.startswith("Current: tes")

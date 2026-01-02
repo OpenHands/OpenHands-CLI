@@ -2,11 +2,11 @@
 
 import unittest.mock as mock
 
-from openhands_cli.refactor.content.splash import (
+from openhands_cli.theme import OPENHANDS_THEME
+from openhands_cli.tui.content.splash import (
     get_openhands_banner,
     get_splash_content,
 )
-from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.version_check import VersionInfo
 
 
@@ -38,7 +38,7 @@ class TestGetSplashContent:
     def test_splash_content_with_conversation_id(self):
         """Test splash content generation with conversation ID."""
         with mock.patch(
-            "openhands_cli.refactor.content.splash.check_for_updates"
+            "openhands_cli.tui.content.splash.check_for_updates"
         ) as mock_check:
             mock_check.return_value = VersionInfo(
                 current_version="1.0.0",
@@ -75,7 +75,7 @@ class TestGetSplashContent:
     def test_splash_content_structure(self):
         """Test the structure of splash content."""
         with mock.patch(
-            "openhands_cli.refactor.content.splash.check_for_updates"
+            "openhands_cli.tui.content.splash.check_for_updates"
         ) as mock_check:
             mock_check.return_value = VersionInfo(
                 current_version="1.0.0",
@@ -112,7 +112,7 @@ class TestGetSplashContent:
     def test_splash_content_includes_banner(self):
         """Test that splash content includes the OpenHands banner."""
         with mock.patch(
-            "openhands_cli.refactor.content.splash.check_for_updates"
+            "openhands_cli.tui.content.splash.check_for_updates"
         ) as mock_check:
             mock_check.return_value = VersionInfo(
                 current_version="1.0.0",
@@ -131,7 +131,7 @@ class TestGetSplashContent:
     def test_splash_content_with_colors(self):
         """Test that splash content includes color markup."""
         with mock.patch(
-            "openhands_cli.refactor.content.splash.check_for_updates"
+            "openhands_cli.tui.content.splash.check_for_updates"
         ) as mock_check:
             mock_check.return_value = VersionInfo(
                 current_version="1.0.0",
