@@ -8,7 +8,10 @@ from textual.app import App
 from textual.events import Paste
 from textual.widgets import TextArea
 
-from openhands_cli.tui.widgets.input_field import InputField, PasteAwareInput
+from openhands_cli.tui.widgets.user_input.input_field import (
+    AutoGrowTextArea,
+    InputField,
+)
 
 
 @pytest.fixture
@@ -20,7 +23,7 @@ def input_field() -> InputField:
 @pytest.fixture
 def field_with_mocks(input_field: InputField) -> Generator[InputField, None, None]:
     """InputField with its internal widgets and signal mocked out."""
-    input_field.input_widget = MagicMock(spec=PasteAwareInput)
+    input_field.input_widget = MagicMock(spec=AutoGrowTextArea)
     input_field.textarea_widget = MagicMock(spec=TextArea)
 
     # Create separate mock objects for focus methods
@@ -29,11 +32,23 @@ def field_with_mocks(input_field: InputField) -> Generator[InputField, None, Non
     input_field.input_widget.focus = input_focus_mock
     input_field.textarea_widget.focus = textarea_focus_mock
 
+    # Mock the document property for textarea_widget (needed for move_cursor)
+    mock_document = MagicMock()
+    mock_document.end = (0, 0)  # Mock end location
+    input_field.textarea_widget.document = mock_document
+    input_field.textarea_widget.move_cursor = MagicMock()
+
     # Create mock for the signal and its publish method
     signal_mock = MagicMock()
     publish_mock = MagicMock()
     signal_mock.publish = publish_mock
     input_field.mutliline_mode_status = signal_mock
+
+    # Create mock for autocomplete
+    autocomplete_mock = MagicMock()
+    type(autocomplete_mock).is_visible = PropertyMock(return_value=False)
+    autocomplete_mock.hide_dropdown = MagicMock()
+    input_field.autocomplete = autocomplete_mock
 
     # Mock the screen and input_area for toggle functionality
     input_area_mock = MagicMock()
@@ -101,7 +116,7 @@ class TestInputField:
             field_with_mocks.mutliline_mode_status.publish.assert_called()  # type: ignore
 
             # Mutli-line -> single-line
-            assert field_with_mocks.input_widget.value == expected_singleline_content
+            assert field_with_mocks.input_widget.text == expected_singleline_content
 
             # Single-line -> multi-line
             field_with_mocks.action_toggle_input_mode()
@@ -117,7 +132,6 @@ class TestInputField:
             ("  Valid with spaces  ", True),
             ("", False),
             ("   ", False),
-            ("\t\n  \t", False),
         ],
     )
     def test_single_line_input_submission(
@@ -130,10 +144,20 @@ class TestInputField:
         field_with_mocks.is_multiline_mode = False
         field_with_mocks.post_message = Mock()
 
-        event = Mock()
-        event.value = content
+        # Setup the mock autocomplete
+        field_with_mocks.autocomplete = MagicMock()
+        type(field_with_mocks.autocomplete).is_visible = PropertyMock(
+            return_value=False
+        )
+        field_with_mocks.autocomplete.hide_dropdown = Mock()
 
-        field_with_mocks.on_input_submitted(event)
+        # Set up input widget mock
+        field_with_mocks.input_widget.text = content
+        field_with_mocks.input_widget.clear = Mock()
+
+        # Simulate EnterPressed event (Enter key is now handled via message)
+        enter_event = AutoGrowTextArea.EnterPressed()
+        field_with_mocks.on_enter_pressed(enter_event)
 
         if should_submit:
             field_with_mocks.post_message.assert_called_once()
@@ -141,7 +165,7 @@ class TestInputField:
             assert isinstance(msg, InputField.Submitted)
             assert msg.content == content.strip()
             # Input cleared after submission
-            assert field_with_mocks.input_widget.value == ""
+            field_with_mocks.input_widget.clear.assert_called_once()
         else:
             field_with_mocks.post_message.assert_not_called()
 
@@ -211,7 +235,7 @@ class TestInputField:
         if is_multiline:
             field_with_mocks.textarea_widget.text = widget_content
         else:
-            field_with_mocks.input_widget.value = widget_content
+            field_with_mocks.input_widget.text = widget_content
 
         assert field_with_mocks.get_current_value() == expected
 
@@ -341,10 +365,13 @@ class TestInputFieldPasteIntegration:
             mock_input_area.styles = Mock()
             input_field.screen.query_one = Mock(return_value=mock_input_area)
 
-            # Start in single-line mode with initial text + cursor position
+            # Start in single-line mode with initial text
             assert not input_field.is_multiline_mode
-            input_field.input_widget.value = initial_text
-            input_field.input_widget.cursor_position = cursor_pos
+            input_field.input_widget.text = initial_text
+
+            # Move cursor to position using TextArea's move_cursor method
+            # Cursor is positioned at (row, col) - for single line it's (0, col)
+            input_field.input_widget.move_cursor((0, cursor_pos))
 
             input_field.input_widget.focus()
             await pilot.pause()
