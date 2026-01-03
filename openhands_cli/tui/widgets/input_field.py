@@ -37,6 +37,7 @@ class InputField(Container):
     BINDINGS: ClassVar = [
         Binding("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         Binding("ctrl+j", "submit_textarea", "Submit multi-line input"),
+        Binding("ctrl+a", "select_all", "Select all"),
     ]
 
     DEFAULT_CSS = """
@@ -152,6 +153,14 @@ class InputField(Container):
                 self.action_toggle_input_mode()
                 # Submit the content
                 self.post_message(self.Submitted(content))
+
+    def action_select_all(self) -> None:
+        """Select all content in the active input widget."""
+        if self.is_multiline_mode:
+            self.textarea_widget.select_all()
+        else:
+            self.input_widget.action_end()
+            self.input_widget.select_all()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle single-line input submission."""
