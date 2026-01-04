@@ -362,7 +362,9 @@ class OpenHandsApp(App):
         user_input = self.pending_inputs.pop(0)
 
         # Add the user message to the main display as a Static widget
-        user_message_widget = Static(f"> {user_input}", classes="user-message")
+        user_message_widget = Static(
+            f"> {user_input}", classes="user-message", markup=False
+        )
         self.main_display.mount(user_message_widget)
         self.main_display.scroll_end(animate=False)
 
@@ -376,7 +378,9 @@ class OpenHandsApp(App):
             return
 
         # Add the user message to the main display as a Static widget
-        user_message_widget = Static(f"> {content}", classes="user-message")
+        user_message_widget = Static(
+            f"> {content}", classes="user-message", markup=False
+        )
         await self.main_display.mount(user_message_widget)
         self.main_display.scroll_end(animate=False)
         # Force immediate refresh to show the message without delay
