@@ -161,6 +161,36 @@ class TestCommands:
         """Command validation is strict and argument-sensitive."""
         assert is_valid_command(cmd) is expected
 
+    def test_all_commands_included_in_help(self):
+        """Test that all commands from COMMANDS list are included in help text.
+
+        This ensures that when new commands are added to COMMANDS, they are also
+        added to the help text displayed by show_help().
+        """
+        from openhands_cli.tui.core.commands import get_valid_commands
+
+        mock_main_display = mock.MagicMock(spec=VerticalScroll)
+        show_help(mock_main_display)
+
+        # Get the help text that was mounted
+        mock_main_display.mount.assert_called_once()
+        help_widget = mock_main_display.mount.call_args[0][0]
+        help_text = help_widget.content
+
+        # Get all valid commands from COMMANDS list
+        valid_commands = get_valid_commands()
+
+        # Verify each command is present in the help text
+        missing_commands = []
+        for command in valid_commands:
+            if command not in help_text:
+                missing_commands.append(command)
+
+        assert not missing_commands, (
+            f"The following commands are defined in COMMANDS but missing from "
+            f"help text: {missing_commands}"
+        )
+
 
 class TestOpenHandsAppCommands:
     """Integration-style tests for command handling in OpenHandsApp."""
