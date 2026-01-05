@@ -23,7 +23,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 4
+        assert len(COMMANDS) == 5
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -38,6 +38,7 @@ class TestCommands:
             ("/help", "Display available commands"),
             ("/confirm", "Configure confirmation settings"),
             ("/condense", "Condense conversation history"),
+            ("/feedback", "Send anonymous feedback about CLI"),
             ("/exit", "Exit the application"),
         ],
     )
@@ -73,10 +74,12 @@ class TestCommands:
             "/help",
             "/confirm",
             "/condense",
+            "/feedback",
             "/exit",
             "Display available commands",
             "Configure confirmation settings",
             "Condense conversation history",
+            "Send anonymous feedback about CLI",
             "Exit the application",
             "Tips:",
             "Type / and press Tab",
@@ -144,6 +147,7 @@ class TestCommands:
             ("/help", True),
             ("/confirm", True),
             ("/condense", True),
+            ("/feedback", True),
             ("/exit", True),
             ("/help extra", False),
             ("/exit now", False),
@@ -355,3 +359,40 @@ class TestOpenHandsAppCommands:
                 message="No conversation available to condense",
                 severity="error",
             )
+
+    @pytest.mark.asyncio
+    async def test_feedback_command_opens_browser(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/feedback` should open the feedback form URL in the browser."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            # Mock webbrowser.open to verify it's called with correct URL
+            with mock.patch("webbrowser.open") as mock_browser:
+                # Mock notify to verify notification is shown
+                notify_mock = mock.MagicMock()
+                oh_app.notify = notify_mock
+
+                oh_app._handle_command("/feedback")
+
+                # Verify browser was opened with correct URL
+                mock_browser.assert_called_once_with(
+                    "https://forms.gle/chHc5VdS3wty5DwW6"
+                )
+
+                # Verify notification was shown
+                notify_mock.assert_called_once_with(
+                    title="Feedback",
+                    message="Opening feedback form in your browser...",
+                    severity="information",
+                )

@@ -16,6 +16,7 @@ COMMANDS = [
     DropdownItem(main="/help - Display available commands"),
     DropdownItem(main="/confirm - Configure confirmation settings"),
     DropdownItem(main="/condense - Condense conversation history"),
+    DropdownItem(main="/feedback - Send anonymous feedback about CLI"),
     DropdownItem(main="/exit - Exit the application"),
 ]
 
@@ -66,6 +67,7 @@ def show_help(main_display: VerticalScroll) -> None:
   [{secondary}]/help[/{secondary}] - Display available commands
   [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
   [{secondary}]/condense[/{secondary}] - Condense conversation history
+  [{secondary}]/feedback[/{secondary}] - Send anonymous feedback about CLI
   [{secondary}]/exit[/{secondary}] - Exit the application
 
 [dim]Tips:[/dim]

@@ -402,6 +402,8 @@ class OpenHandsApp(App):
             self._handle_confirm_command()
         elif command == "/condense":
             self._handle_condense_command()
+        elif command == "/feedback":
+            self._handle_feedback_command()
         elif command == "/exit":
             self._handle_exit()
         else:
@@ -517,6 +519,18 @@ class OpenHandsApp(App):
         # Use the async condensation method from conversation runner
         # This will handle all error cases and notifications
         asyncio.create_task(self.conversation_runner.condense_async())
+
+    def _handle_feedback_command(self) -> None:
+        """Handle the /feedback command to open feedback form in browser."""
+        import webbrowser
+
+        feedback_url = "https://forms.gle/chHc5VdS3wty5DwW6"
+        webbrowser.open(feedback_url)
+        self.notify(
+            title="Feedback",
+            message="Opening feedback form in your browser...",
+            severity="information",
+        )
 
     def _handle_confirmation_request(
         self, pending_actions: list[ActionEvent]
