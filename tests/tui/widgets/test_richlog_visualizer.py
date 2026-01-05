@@ -297,7 +297,8 @@ class TestConversationErrorEventHandling:
         # Verify it has the correct title
         assert "Conversation Error" in str(collapsible.title)
 
-        # Verify it starts expanded (collapsed=False)
+        # Verify it starts expanded by default (collapsed=False when
+        # default_cells_expanded=True)
         assert not collapsible.collapsed
 
         # Verify it has error border color (should be the error theme color)
@@ -309,6 +310,63 @@ class TestConversationErrorEventHandling:
         expected_color = OPENHANDS_THEME.error or "#ff6b6b"
         actual_color = _get_event_border_color(error_event)
         assert actual_color == expected_color
+
+
+class TestDefaultCellsExpandedSetting:
+    """Tests for the default_cells_expanded setting in ConversationVisualizer."""
+
+    @pytest.mark.parametrize("default_expanded", [True, False])
+    def test_collapsible_respects_default_cells_expanded_setting(
+        self, default_expanded: bool
+    ):
+        """Test that collapsible widgets respect the default_cells_expanded setting."""
+        from unittest.mock import patch
+
+        from openhands_cli.stores import CliSettings
+
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+        # Mock CLI settings with specific default_cells_expanded value
+        mock_config = CliSettings(default_cells_expanded=default_expanded)
+        with patch.object(CliSettings, "load", return_value=mock_config):
+            # Force reload to pick up the mocked config
+            visualizer.reload_configuration()
+
+            # Create a test error event
+            error_event = ConversationErrorEvent(
+                source="agent", code="test_error", detail="Test message"
+            )
+
+            collapsible = visualizer._create_event_collapsible(error_event)
+            assert collapsible is not None
+
+            # collapsed should be the opposite of default_cells_expanded
+            expected_collapsed = not default_expanded
+            assert collapsible.collapsed is expected_collapsed
+
+    def test_default_collapsed_property(self):
+        """Test the _default_collapsed property returns correct value."""
+        from unittest.mock import patch
+
+        from openhands_cli.stores import CliSettings
+
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+        # Test with default_cells_expanded=True (default)
+        mock_config_expanded = CliSettings(default_cells_expanded=True)
+        with patch.object(CliSettings, "load", return_value=mock_config_expanded):
+            visualizer.reload_configuration()
+            assert visualizer._default_collapsed is False
+
+        # Test with default_cells_expanded=False
+        mock_config_collapsed = CliSettings(default_cells_expanded=False)
+        with patch.object(CliSettings, "load", return_value=mock_config_collapsed):
+            visualizer.reload_configuration()
+            assert visualizer._default_collapsed is True
 
 
 class TestCliSettingsCaching:

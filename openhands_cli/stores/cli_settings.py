@@ -11,6 +11,7 @@ class CliSettings(BaseModel):
     """Model for CLI-level settings."""
 
     display_cost_per_action: bool = False
+    default_cells_expanded: bool = True
 
     @classmethod
     def get_config_path(cls) -> Path:

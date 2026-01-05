@@ -56,7 +56,7 @@ class OpenHandsApp(App):
     # Key bindings
     BINDINGS: ClassVar = [
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
-        ("ctrl+o", "expand_all", "Expand the cells"),
+        ("ctrl+o", "toggle_cells", "Toggle Cells"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
@@ -445,8 +445,8 @@ class OpenHandsApp(App):
         """Action to handle Ctrl+Q key binding."""
         self._handle_exit()
 
-    def action_expand_all(self) -> None:
-        """Action to handle Ctrl+E key binding - toggle expand/collapse all
+    def action_toggle_cells(self) -> None:
+        """Action to handle Ctrl+O key binding - toggle expand/collapse all
         collapsible widgets."""
         collapsibles = self.main_display.query(NonClickableCollapsible)
 

@@ -232,6 +232,14 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Final fallback
         return fallback_title
 
+    @property
+    def _default_collapsed(self) -> bool:
+        """Get the default collapsed state for new cells based on settings.
+
+        Returns True if cells should start collapsed, False if expanded.
+        """
+        return not self.cli_settings.default_cells_expanded
+
     def _create_event_collapsible(self, event: Event) -> NonClickableCollapsible | None:
         """Create a Collapsible widget for the event with appropriate styling."""
         # Use the event's visualize property for content
@@ -239,6 +247,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         if not content.plain.strip():
             return None
+
+        # Get default collapsed state from settings
+        collapsed = self._default_collapsed
 
         # Don't emit system prompt in CLI
         if isinstance(event, SystemPromptEvent):
@@ -264,7 +275,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 content_string,
                 title=title,
-                collapsed=False,  # Start expanded by default
+                collapsed=collapsed,
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, ObservationEvent):
@@ -272,7 +283,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 self._escape_rich_markup(str(content)),
                 title=title,
-                collapsed=False,  # Start expanded for observations
+                collapsed=collapsed,
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, UserRejectObservation):
@@ -280,7 +291,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 self._escape_rich_markup(str(content)),
                 title=title,
-                collapsed=False,  # Start expanded by default
+                collapsed=collapsed,
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, MessageEvent):
@@ -306,7 +317,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 content_string,
                 title=title,
-                collapsed=False,  # Start expanded by default
+                collapsed=collapsed,
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, AgentErrorEvent):
@@ -319,7 +330,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 content_string,
                 title=title,
-                collapsed=False,  # Start expanded by default
+                collapsed=collapsed,
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, ConversationErrorEvent):
@@ -332,7 +343,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 content_string,
                 title=title,
-                collapsed=False,  # Start expanded by default
+                collapsed=collapsed,
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, PauseEvent):
@@ -340,7 +351,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 self._escape_rich_markup(str(content)),
                 title=title,
-                collapsed=False,  # Start expanded for pauses
+                collapsed=collapsed,
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, Condensation):
@@ -353,7 +364,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 content_string,
                 title=title,
-                collapsed=False,  # Start expanded for condensations
+                collapsed=collapsed,
                 border_color=_get_event_border_color(event),
             )
         else:
@@ -367,7 +378,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return NonClickableCollapsible(
                 content_string,
                 title=title,
-                collapsed=False,  # Start expanded for unknown events
+                collapsed=collapsed,
                 border_color=_get_event_border_color(event),
             )
 

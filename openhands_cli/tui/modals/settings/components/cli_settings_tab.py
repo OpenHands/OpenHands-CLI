@@ -41,8 +41,33 @@ class CliSettingsTab(Container):
                     classes="form_help switch_help",
                 )
 
+            # Default Cells Expanded Setting
+            with Container(classes="form_group"):
+                with Horizontal(classes="switch_container"):
+                    yield Label(
+                        "Default Cells Expanded:",
+                        classes="form_label switch_label",
+                    )
+                    yield Switch(
+                        value=self.cli_settings.default_cells_expanded,
+                        id="default_cells_expanded_switch",
+                        classes="form_switch",
+                    )
+                yield Static(
+                    "When enabled, new action/observation cells will be expanded "
+                    "by default. When disabled, cells will be collapsed showing "
+                    "only the title. Use Ctrl+O to toggle all cells at any time.",
+                    classes="form_help switch_help",
+                )
+
     def get_cli_settings(self) -> CliSettings:
         """Get the current CLI settings from the form."""
         display_cost_switch = self.query_one("#display_cost_switch", Switch)
+        default_cells_expanded_switch = self.query_one(
+            "#default_cells_expanded_switch", Switch
+        )
 
-        return CliSettings(display_cost_per_action=display_cost_switch.value)
+        return CliSettings(
+            display_cost_per_action=display_cost_switch.value,
+            default_cells_expanded=default_cells_expanded_switch.value,
+        )
