@@ -51,7 +51,6 @@ from openhands_cli.acp_impl.utils import (
     convert_acp_prompt_to_message_content,
 )
 from openhands_cli.auth.token_storage import TokenStorage
-from openhands_cli.cloud.conversation import is_token_valid
 from openhands_cli.locations import MCP_CONFIG_FILE
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import load_agent_specs
@@ -71,7 +70,6 @@ class OpenHandsCloudACPAgent(ACPAgent):
     def __init__(
         self,
         conn: Client,
-        cloud_api_key: str,
         initial_confirmation_mode: ConfirmationMode,
         cloud_api_url: str = "https://app.all-hands.dev",
         resume_conversation_id: str | None = None,
@@ -93,7 +91,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
         if resume_conversation_id:
             logger.info(f"Will resume conversation: {resume_conversation_id}")
 
-        self._cloud_api_key = cloud_api_key
+        self._cloud_api_key = None
         self._cloud_api_url = cloud_api_url
 
         # Track active cloud workspaces for cleanup
@@ -306,6 +304,12 @@ class OpenHandsCloudACPAgent(ACPAgent):
 
         # Create OpenHands Cloud workspace
         logger.info(f"Creating OpenHands Cloud workspace for session {session_id}")
+
+        if not self._cloud_api_key:
+            raise RequestError.auth_required(
+                {"reason": "Authentication required to create a cloud session"}
+            )
+
         workspace = OpenHandsCloudWorkspace(
             cloud_api_url=self._cloud_api_url,
             cloud_api_key=self._cloud_api_key,
@@ -588,70 +592,3 @@ def _logout_and_instruct(server_url: str) -> None:
     console.print(
         f"[{OPENHANDS_THEME.accent}]  openhands login[/{OPENHANDS_THEME.accent}]"
     )
-
-
-def require_api_key() -> str:
-    """Return stored API key or raise with a helpful message.
-
-    Returns:
-        The stored API key
-
-    Raises:
-        CloudAuthenticationError: If the user is not authenticated
-    """
-    store = TokenStorage()
-
-    if not store.has_api_key():
-        _print_login_instructions("Error: You are not logged in to OpenHands Cloud.")
-        raise CloudAuthenticationError("User not authenticated")
-
-    api_key = store.get_api_key()
-    if not api_key:
-        _print_login_instructions("Error: Invalid API key stored.")
-        raise CloudAuthenticationError("Invalid API key")
-
-    return api_key
-
-
-async def validate_cloud_credentials(
-    cloud_api_url: str,
-) -> str:
-    """Validate cloud credentials before starting the ACP server.
-
-    Args:
-        cloud_api_url: The OpenHands Cloud API URL
-
-    Returns:
-        The validated API key
-
-    Raises:
-        CloudAuthenticationError: If authentication fails
-    """
-    # Get the API key from storage
-    api_key = require_api_key()
-
-    # Validate the token with the cloud API
-    console.print(
-        f"[{OPENHANDS_THEME.secondary}]Validating OpenHands Cloud credentials..."
-        f"[/{OPENHANDS_THEME.secondary}]",
-    )
-
-    try:
-        if not await is_token_valid(cloud_api_url, api_key):
-            _logout_and_instruct(cloud_api_url)
-            raise CloudAuthenticationError("Authentication expired - user logged out")
-    except CloudAuthenticationError:
-        raise
-    except Exception as e:
-        console.print(
-            f"[{OPENHANDS_THEME.error}]Failed to validate credentials: {e}"
-            f"[/{OPENHANDS_THEME.error}]",
-        )
-        raise CloudAuthenticationError(f"Failed to validate credentials: {e}") from e
-
-    console.print(
-        f"[{OPENHANDS_THEME.success}]✓ OpenHands Cloud credentials validated"
-        f"[/{OPENHANDS_THEME.success}]",
-    )
-
-    return api_key

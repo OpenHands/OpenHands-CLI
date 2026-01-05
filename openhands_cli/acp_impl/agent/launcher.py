@@ -1,13 +1,11 @@
 import asyncio
 import logging
-import sys
 
 from acp import Client, stdio_streams
 from acp.core import AgentSideConnection
 
 from openhands_cli.acp_impl.agent.remote_agent import (
     OpenHandsCloudACPAgent,
-    validate_cloud_credentials,
 )
 from openhands_cli.acp_impl.confirmation import ConfirmationMode
 
@@ -53,17 +51,11 @@ async def run_acp_server(
         AgentSideConnection(create_local_agent, writer, reader)
 
     else:
-        try:
-            api_key = await validate_cloud_credentials(cloud_api_url)
-        except Exception:
-            # Error messages already printed
-            sys.exit(1)
 
         def create_agent(conn: Client) -> OpenHandsCloudACPAgent:
             return OpenHandsCloudACPAgent(
                 conn=conn,
                 initial_confirmation_mode=initial_confirmation_mode,
-                cloud_api_key=api_key,
                 cloud_api_url=cloud_api_url,
             )
 
