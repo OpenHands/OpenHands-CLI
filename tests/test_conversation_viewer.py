@@ -5,8 +5,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from openhands_cli.conversations.viewer import ConversationViewer, view_conversation
 
 

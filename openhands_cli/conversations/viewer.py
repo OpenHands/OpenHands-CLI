@@ -10,9 +10,14 @@ from rich.console import Console
 
 from openhands.sdk.conversation.visualizer import DefaultConversationVisualizer
 from openhands.sdk.event.base import Event
+from openhands.tools.preset.default import register_default_tools
 from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.theme import OPENHANDS_THEME
 
+
+# Register default tools to ensure all Action subclasses are available
+# for proper deserialization of events
+register_default_tools()
 
 console = Console()
 
