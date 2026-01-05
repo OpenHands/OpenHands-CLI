@@ -371,7 +371,7 @@ class TestConfirmationPanelIntegration:
             # Verify the side panel is a VerticalScroll (scrollable)
             side_panel = pilot.app.query_one(ConfirmationSidePanel)
             assert side_panel is not None
-            assert isinstance(side_panel, VerticalScroll)
+            assert side_panel.is_scrollable
 
             # Verify the actions container exists
             actions_container = pilot.app.query_one(".actions-container")
