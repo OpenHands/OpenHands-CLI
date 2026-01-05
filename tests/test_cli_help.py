@@ -2,7 +2,7 @@ from openhands_cli.argparsers.main_parser import create_main_parser
 
 
 def test_main_help_includes_key_subcommands_and_flags() -> None:
-    """Help text should mention serve, acp, and confirmation flags.
+    """Help text should mention serve, acp, view, and confirmation flags.
 
     This guards against accidental regressions in the CLI help/epilog.
     """
@@ -12,6 +12,7 @@ def test_main_help_includes_key_subcommands_and_flags() -> None:
     # Subcommands
     assert "serve" in help_text
     assert "acp" in help_text
+    assert "view" in help_text
 
     # Confirmation flags
     assert "--always-approve" in help_text
@@ -55,3 +56,29 @@ def test_acp_subcommand_supports_resume_flags() -> None:
     assert args.llm_approve is True
     assert args.resume == ""
     assert args.last is True
+
+
+def test_view_subcommand_parses_correctly() -> None:
+    """View subcommand should parse conversation_id and --limit correctly.
+
+    This tests the view command for viewing conversation trajectories.
+    """
+    parser = create_main_parser()
+
+    # Test parsing 'view <conversation_id>'
+    args = parser.parse_args(["view", "test-conversation-id"])
+    assert args.command == "view"
+    assert args.conversation_id == "test-conversation-id"
+    assert args.limit == 20  # default value
+
+    # Test parsing 'view <conversation_id> --limit 10'
+    args = parser.parse_args(["view", "test-conversation-id", "--limit", "10"])
+    assert args.command == "view"
+    assert args.conversation_id == "test-conversation-id"
+    assert args.limit == 10
+
+    # Test parsing 'view <conversation_id> -l 5'
+    args = parser.parse_args(["view", "test-conversation-id", "-l", "5"])
+    assert args.command == "view"
+    assert args.conversation_id == "test-conversation-id"
+    assert args.limit == 5
