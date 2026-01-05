@@ -1,4 +1,4 @@
-CONFIRMATION_SIDE_PANEL_STYLLE = """
+CONFIRMATION_SIDE_PANEL_STYLE = """
 ConfirmationSidePanel {
     split: right;
     width: 33%;
@@ -7,12 +7,24 @@ ConfirmationSidePanel {
     background: $surface;
     padding: 1;
     margin-left: 1;
+    scrollbar-size-vertical: 1;
+}
+
+ConfirmationPanel {
+    height: auto;
+    width: 100%;
+}
+
+.confirmation-content {
+    height: auto;
+    width: 100%;
 }
 
 .confirmation-header {
     color: $primary;
     text-style: bold;
     margin-bottom: 1;
+    height: auto;
 }
 
 .actions-container {
