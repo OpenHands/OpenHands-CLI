@@ -159,8 +159,74 @@ class OpenHandsCloudACPAgent(ACPAgent):
     async def authenticate(
         self, method_id: str, **_kwargs: Any
     ) -> AuthenticateResponse | None:
-        """Authenticate the client (no-op for now)."""
-        return await self._shared_handler.authenticate(method_id, **_kwargs)
+        """Authenticate the client using OAuth2 device flow.
+
+        This method performs the OAuth2 device flow to authenticate the user
+        with OpenHands Cloud. It opens a browser for the user to authorize,
+        then stores the resulting API key for future requests.
+
+        Args:
+            method_id: Authentication method ID (should be "oauth")
+
+        Returns:
+            AuthenticateResponse on success
+
+        Raises:
+            RequestError: If authentication fails
+        """
+        logger.info(f"Authentication requested with method: {method_id}")
+
+        if method_id != "oauth":
+            raise RequestError.invalid_params(
+                {"reason": f"Unsupported authentication method: {method_id}"}
+            )
+
+        from openhands_cli.auth.api_client import (
+            ApiClientError,
+            fetch_user_data_after_oauth,
+        )
+        from openhands_cli.auth.device_flow import (
+            DeviceFlowError,
+            authenticate_with_device_flow,
+        )
+
+        try:
+            # Perform OAuth2 device flow authentication
+            tokens = await authenticate_with_device_flow(self._cloud_api_url)
+
+            api_key = tokens.get("access_token")
+            if not api_key:
+                raise RequestError.internal_error(
+                    {"reason": "No access token received from OAuth flow"}
+                )
+
+            # Store the API key
+            store = TokenStorage()
+            store.store_api_key(api_key)
+
+            # Update the agent's API key
+            self._cloud_api_key = api_key
+
+            # Fetch user data and configure the agent
+            try:
+                await fetch_user_data_after_oauth(self._cloud_api_url, api_key)
+            except ApiClientError as e:
+                # Log - auth succeeded even if data fetch failed
+                logger.warning(f"Failed to fetch user data after OAuth: {e}")
+
+            logger.info("OAuth authentication completed successfully")
+            return AuthenticateResponse()
+
+        except DeviceFlowError as e:
+            logger.error(f"OAuth authentication failed: {e}")
+            raise RequestError.internal_error(
+                {"reason": f"Authentication failed: {e}"}
+            ) from e
+        except Exception as e:
+            logger.error(f"Unexpected error during authentication: {e}", exc_info=True)
+            raise RequestError.internal_error(
+                {"reason": f"Authentication error: {e}"}
+            ) from e
 
     def _get_or_create_conversation(
         self,
@@ -271,6 +337,15 @@ class OpenHandsCloudACPAgent(ACPAgent):
         subscriber.conversation = conversation
         return conversation, workspace
 
+    def _is_authenticated(self) -> bool:
+        """Check if the user is authenticated with OpenHands Cloud.
+
+        Returns:
+            True if the user has a valid API key stored, False otherwise.
+        """
+        store = TokenStorage()
+        return store.has_api_key() and bool(store.get_api_key())
+
     async def new_session(
         self,
         cwd: str,  # noqa: ARG002
@@ -282,7 +357,17 @@ class OpenHandsCloudACPAgent(ACPAgent):
         Overrides the base implementation to handle cloud workspace creation.
         Note: working_dir is ignored for cloud workspace as it's managed
         by the cloud environment.
+
+        Raises:
+            RequestError.auth_required: If the user is not authenticated
         """
+        # Check if user is authenticated before creating a session
+        if not self._is_authenticated():
+            logger.info("User not authenticated, requiring authentication")
+            raise RequestError.auth_required(
+                {"reason": "Authentication required to create a cloud session"}
+            )
+
         return await self._shared_handler.new_session(
             ctx=self,
             mcp_servers=mcp_servers,

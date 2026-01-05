@@ -11,6 +11,7 @@ from acp.helpers import update_current_mode
 from acp.schema import (
     AgentCapabilities,
     AuthenticateResponse,
+    AuthMethod,
     AvailableCommandsUpdate,
     Implementation,
     ListSessionsResponse,
@@ -18,7 +19,6 @@ from acp.schema import (
     PromptCapabilities,
     SetSessionModelResponse,
     SetSessionModeResponse,
-    AuthMethod
 )
 
 from openhands.sdk import BaseConversation, LocalConversation, RemoteConversation
@@ -107,7 +107,11 @@ class SharedACPAgentHandler:
         # Check if agent is configured
         try:
             load_agent_specs()
-            auth_methods = [AuthMethod(description="OAuth with OpenHands Cloud", id="oauth", name="OAuth")]
+            auth_methods = [
+                AuthMethod(
+                    description="OAuth with OpenHands Cloud", id="oauth", name="OAuth"
+                )
+            ]
             logger.info("Agent configured, no authentication required")
         except MissingAgentSpec:
             # Agent not configured - this shouldn't happen in production
