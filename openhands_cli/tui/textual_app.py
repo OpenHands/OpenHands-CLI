@@ -51,6 +51,16 @@ from openhands_cli.user_actions.types import UserConfirmation
 from openhands_cli.utils import json_callback
 
 
+# Optional dependency for autocomplete functionality
+try:
+    from textual_autocomplete import AutoComplete
+
+    _HAS_AUTOCOMPLETE = True
+except ImportError:
+    AutoComplete = None  # type: ignore[misc, assignment]
+    _HAS_AUTOCOMPLETE = False
+
+
 class OpenHandsApp(App):
     """A minimal textual app for OpenHands CLI with scrollable main display."""
 
@@ -526,21 +536,10 @@ class OpenHandsApp(App):
         This prevents Tab key interception when user wants to select an
         autocomplete suggestion.
         """
-        from textual.css.query import NoMatches
-
-        try:
-            from textual_autocomplete import AutoComplete
-        except ImportError:
-            # textual_autocomplete not installed
+        if not _HAS_AUTOCOMPLETE:
             return False
-
-        try:
-            autocomplete = self.query_one(AutoComplete)
-            # Check if the dropdown is mounted and visible
-            return bool(autocomplete.display)
-        except NoMatches:
-            # No autocomplete widget found
-            return False
+        autocompletes = self.query(AutoComplete)
+        return any(ac.display for ac in autocompletes)
 
     def action_pause_conversation(self) -> None:
         """Action to handle Esc key binding - pause the running conversation."""
