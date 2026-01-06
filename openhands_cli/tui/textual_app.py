@@ -490,13 +490,20 @@ class OpenHandsApp(App):
         This prevents Tab key interception when user wants to select an
         autocomplete suggestion.
         """
+        from textual.css.query import NoMatches
+
         try:
             from textual_autocomplete import AutoComplete
+        except ImportError:
+            # textual_autocomplete not installed
+            return False
 
+        try:
             autocomplete = self.query_one(AutoComplete)
             # Check if the dropdown is mounted and visible
             return bool(autocomplete.display)
-        except Exception:
+        except NoMatches:
+            # No autocomplete widget found
             return False
 
     def action_pause_conversation(self) -> None:
