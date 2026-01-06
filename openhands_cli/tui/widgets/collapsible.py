@@ -14,6 +14,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
 from textual.containers import Container, Horizontal
 from textual.content import Content, ContentText
+from textual.dom import DOMNode
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
@@ -142,13 +143,13 @@ class CollapsibleTitle(Container, can_focus=True):
         Args:
             direction: -1 for previous (up), 1 for next (down)
         """
-        # Get the parent Collapsible
-        parent_collapsible = self.parent
-        if not isinstance(parent_collapsible, Collapsible):
+        # Find the parent Collapsible using ancestor query (robust to nesting changes)
+        parent_collapsible = self._find_parent_collapsible()
+        if parent_collapsible is None:
             return
 
-        # Get the container that holds all collapsibles (usually main_display)
-        container = parent_collapsible.parent
+        # Find the container holding collapsibles using ancestor query
+        container = self._find_collapsible_container(parent_collapsible)
         if container is None:
             return
 
@@ -176,6 +177,42 @@ class CollapsibleTitle(Container, can_focus=True):
         target_title.focus()
         # Scroll the target into view
         target_collapsible.scroll_visible()
+
+    def _find_parent_collapsible(self) -> "Collapsible | None":
+        """Find the parent Collapsible widget using ancestor traversal.
+
+        Returns:
+            The parent Collapsible or None if not found.
+        """
+        # Walk up the DOM tree to find the Collapsible ancestor
+        node = self.parent
+        while node is not None:
+            if isinstance(node, Collapsible):
+                return node
+            node = node.parent
+        return None
+
+    def _find_collapsible_container(self, collapsible: "Collapsible") -> DOMNode | None:
+        """Find the container that holds multiple Collapsible widgets.
+
+        Walks up from the collapsible to find a container with multiple
+        Collapsible children (typically the main_display).
+
+        Args:
+            collapsible: The current Collapsible widget.
+
+        Returns:
+            The container DOMNode or None if not found.
+        """
+        node = collapsible.parent
+        while node is not None:
+            # Check if this container has multiple Collapsible children
+            collapsible_count = len(list(node.query(Collapsible)))
+            if collapsible_count > 1:
+                return node
+            node = node.parent
+        # Fallback to immediate parent if no container with multiple found
+        return collapsible.parent
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press - post CopyRequested when copy button is clicked."""
@@ -289,9 +326,7 @@ class Collapsible(Widget):
         self._watch_collapsed(collapsed)
         self.styles.border_left = ("thick", border_color)
 
-    def _on_collapsible_title_toggle(
-        self, event: CollapsibleTitle.Toggle
-    ) -> None:
+    def _on_collapsible_title_toggle(self, event: CollapsibleTitle.Toggle) -> None:
         """Handle toggle request from title click or keyboard."""
         event.stop()
         self.collapsed = not self.collapsed

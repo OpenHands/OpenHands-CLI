@@ -92,9 +92,7 @@ async def test_content_copies_and_shows_success_notification() -> None:
     app = CollapsibleTestApp(collapsible)
 
     # Patch pyperclip.copy in the correct module
-    with patch(
-        "openhands_cli.tui.widgets.collapsible.pyperclip.copy"
-    ) as mock_copy:
+    with patch("openhands_cli.tui.widgets.collapsible.pyperclip.copy") as mock_copy:
         async with app.run_test() as _pilot:
             # Replace notify with a MagicMock so we can assert on it
             app.notify = MagicMock()
@@ -131,9 +129,7 @@ async def test_copy_handler_handles_empty_content_with_warning() -> None:
 
     app = CollapsibleTestApp(collapsible)
 
-    with patch(
-        "openhands_cli.tui.widgets.collapsible.pyperclip.copy"
-    ) as mock_copy:
+    with patch("openhands_cli.tui.widgets.collapsible.pyperclip.copy") as mock_copy:
         async with app.run_test() as _pilot:
             app.notify = MagicMock()
 
@@ -162,9 +158,7 @@ async def test_copy_button_click_triggers_copy() -> None:
     app = CollapsibleTestApp(collapsible)
 
     # Patch pyperclip.copy in the correct module
-    with patch(
-        "openhands_cli.tui.widgets.collapsible.pyperclip.copy"
-    ) as mock_copy:
+    with patch("openhands_cli.tui.widgets.collapsible.pyperclip.copy") as mock_copy:
         async with app.run_test() as pilot:
             # Replace notify with a MagicMock so we can assert on it
             app.notify = MagicMock()
