@@ -51,6 +51,7 @@ from openhands_cli.acp_impl.utils import (
     convert_acp_prompt_to_message_content,
 )
 from openhands_cli.auth.token_storage import TokenStorage
+from openhands_cli.cloud.conversation import is_token_valid
 from openhands_cli.locations import MCP_CONFIG_FILE
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import load_agent_specs
@@ -91,7 +92,8 @@ class OpenHandsCloudACPAgent(ACPAgent):
         if resume_conversation_id:
             logger.info(f"Will resume conversation: {resume_conversation_id}")
 
-        self._cloud_api_key = None
+        self.store = TokenStorage()
+        self._cloud_api_key = self.store.get_api_key()
         self._cloud_api_url = cloud_api_url
 
         # Track active cloud workspaces for cleanup
@@ -341,14 +343,19 @@ class OpenHandsCloudACPAgent(ACPAgent):
         subscriber.conversation = conversation
         return conversation, workspace
 
-    def _is_authenticated(self) -> bool:
+    async def _is_authenticated(self) -> bool:
         """Check if the user is authenticated with OpenHands Cloud.
 
         Returns:
             True if the user has a valid API key stored, False otherwise.
         """
-        store = TokenStorage()
-        return store.has_api_key() and bool(store.get_api_key())
+
+        if not self._cloud_api_key:
+            return False
+
+        return await is_token_valid(
+            server_url=self._cloud_api_url, api_key=self._cloud_api_key
+        )
 
     async def new_session(
         self,
@@ -366,7 +373,8 @@ class OpenHandsCloudACPAgent(ACPAgent):
             RequestError.auth_required: If the user is not authenticated
         """
         # Check if user is authenticated before creating a session
-        if not self._is_authenticated():
+        is_authenticated = self._is_authenticated()
+        if not is_authenticated:
             logger.info("User not authenticated, requiring authentication")
             raise RequestError.auth_required(
                 {"reason": "Authentication required to create a cloud session"}
