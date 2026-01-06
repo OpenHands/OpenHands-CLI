@@ -1,4 +1,4 @@
-"""Tests for confirmation panel functionality."""
+"""Tests for inline confirmation panel functionality."""
 
 from __future__ import annotations
 
@@ -6,40 +6,16 @@ from unittest import mock
 
 import pytest
 from textual.app import App
-from textual.containers import Container, Vertical
+from textual.containers import Horizontal
 from textual.widgets import ListView, Static
 
-from openhands_cli.tui.panels.confirmation_panel import (
-    ConfirmationPanel,
-    ConfirmationSidePanel,
-)
+from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
 from openhands_cli.user_actions.types import UserConfirmation
-
-
-class MockActionObject:
-    """Mock action object with visualize attribute."""
-
-    def __init__(self, text: str):
-        self.visualize = text
-
-
-class MockActionEvent:
-    """Minimal ActionEvent interface used by ConfirmationPanel."""
-
-    def __init__(self, tool_name: str = "unknown", action_text: str = ""):
-        self.tool_name = tool_name
-        self.action = MockActionObject(action_text) if action_text else None
 
 
 @pytest.fixture
 def callback() -> mock.MagicMock:
     return mock.MagicMock()
-
-
-def make_actions(
-    n: int = 1, tool_name: str = "test_tool", content: str = "test action"
-):
-    return [MockActionEvent(tool_name, content) for _ in range(n)]
 
 
 def make_test_app(widget):
@@ -54,19 +30,17 @@ def make_test_app(widget):
 @pytest.mark.parametrize(
     "query, expected_type",
     [
-        (".confirmation-header", Static),
-        (".actions-container", Container),
-        (".confirmation-content", Vertical),
-        (".confirmation-instructions", Static),
+        (".inline-confirmation-header", Static),
+        (".inline-confirmation-content", Horizontal),
     ],
 )
-async def test_confirmation_panel_structure_contains_expected_nodes(
+async def test_inline_confirmation_panel_structure_contains_expected_nodes(
     callback: mock.MagicMock,
     query: str,
     expected_type: type,
 ):
-    panel = ConfirmationPanel(
-        pending_actions=make_actions(),  # type: ignore[arg-type]
+    panel = InlineConfirmationPanel(
+        num_actions=1,
         confirmation_callback=callback,
     )
     app = make_test_app(panel)
@@ -78,15 +52,17 @@ async def test_confirmation_panel_structure_contains_expected_nodes(
 
 
 @pytest.mark.asyncio
-async def test_confirmation_panel_has_listview(callback: mock.MagicMock):
-    panel = ConfirmationPanel(
-        pending_actions=make_actions(),  # type: ignore[arg-type]
+async def test_inline_confirmation_panel_has_listview(callback: mock.MagicMock):
+    panel = InlineConfirmationPanel(
+        num_actions=1,
         confirmation_callback=callback,
     )
     app = make_test_app(panel)
 
     async with app.run_test() as pilot:
-        assert pilot.app.query_one("#confirmation-listview", ListView) is not None
+        assert (
+            pilot.app.query_one("#inline-confirmation-listview", ListView) is not None
+        )
 
 
 @pytest.mark.parametrize(
@@ -103,8 +79,8 @@ def test_listview_selection_triggers_expected_callback(
     item_id: str,
     expected_confirmation: UserConfirmation,
 ):
-    panel = ConfirmationPanel(
-        pending_actions=make_actions(),  # type: ignore[arg-type]
+    panel = InlineConfirmationPanel(
+        num_actions=1,
         confirmation_callback=callback,
     )
 
@@ -119,70 +95,47 @@ def test_listview_selection_triggers_expected_callback(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("num_actions", [1, 3])
-async def test_panel_renders_action_items(callback: mock.MagicMock, num_actions: int):
-    long_content = "x" * 1000
-    actions = [
-        MockActionEvent(tool_name, long_content)
-        for tool_name in (
-            ["file_editor"]
-            if num_actions == 1
-            else ["file_editor", "execute_bash", "str_replace_editor"]
-        )
-    ][:num_actions]
-
-    panel = ConfirmationPanel(
-        pending_actions=actions,  # type: ignore[arg-type]
+@pytest.mark.parametrize("num_actions", [1, 3, 5])
+async def test_inline_panel_displays_correct_action_count(
+    callback: mock.MagicMock, num_actions: int
+):
+    panel = InlineConfirmationPanel(
+        num_actions=num_actions,
         confirmation_callback=callback,
     )
     app = make_test_app(panel)
 
     async with app.run_test() as pilot:
-        action_items = pilot.app.query(".action-item")
-        assert len(action_items) == num_actions
+        # Verify the panel was created with the correct num_actions
+        inline_panel = pilot.app.query_one(InlineConfirmationPanel)
+        assert inline_panel.num_actions == num_actions
 
 
 @pytest.mark.asyncio
-async def test_side_panel_renders_inner_panel_and_listview(callback: mock.MagicMock):
-    side_panel = ConfirmationSidePanel(
-        pending_actions=make_actions(),  # type: ignore[arg-type]
+async def test_inline_panel_renders_and_listview_exists(callback: mock.MagicMock):
+    panel = InlineConfirmationPanel(
+        num_actions=2,
         confirmation_callback=callback,
     )
-    app = make_test_app(side_panel)
+    app = make_test_app(panel)
 
     async with app.run_test() as pilot:
-        assert pilot.app.query_one(ConfirmationSidePanel) is not None
-        assert pilot.app.query_one(ConfirmationPanel) is not None
-        assert pilot.app.query_one("#confirmation-listview", ListView) is not None
-
-
-@pytest.mark.asyncio
-async def test_side_panel_is_scrollable_with_long_content(callback: mock.MagicMock):
-    long_content = "z" * 5000
-    side_panel = ConfirmationSidePanel(
-        pending_actions=[MockActionEvent("file_editor", long_content)],  # type: ignore[arg-type]
-        confirmation_callback=callback,
-    )
-    app = make_test_app(side_panel)
-
-    async with app.run_test() as pilot:
-        sp = pilot.app.query_one(ConfirmationSidePanel)
-        assert sp.is_scrollable
-
-        assert pilot.app.query_one(".actions-container") is not None
-        assert pilot.app.query_one("#confirmation-listview", ListView) is not None
+        assert pilot.app.query_one(InlineConfirmationPanel) is not None
+        assert (
+            pilot.app.query_one("#inline-confirmation-listview", ListView) is not None
+        )
 
 
 @pytest.mark.asyncio
 async def test_listview_is_focusable(callback: mock.MagicMock):
-    side_panel = ConfirmationSidePanel(
-        pending_actions=make_actions(),  # type: ignore[arg-type]
+    panel = InlineConfirmationPanel(
+        num_actions=1,
         confirmation_callback=callback,
     )
-    app = make_test_app(side_panel)
+    app = make_test_app(panel)
 
     async with app.run_test() as pilot:
-        listview = pilot.app.query_one("#confirmation-listview", ListView)
+        listview = pilot.app.query_one("#inline-confirmation-listview", ListView)
         assert listview.can_focus
 
 
@@ -190,15 +143,30 @@ async def test_listview_is_focusable(callback: mock.MagicMock):
 async def test_keyboard_enter_selects_first_item_and_calls_callback(
     callback: mock.MagicMock,
 ):
-    side_panel = ConfirmationSidePanel(
-        pending_actions=make_actions(),  # type: ignore[arg-type]
+    panel = InlineConfirmationPanel(
+        num_actions=1,
         confirmation_callback=callback,
     )
-    app = make_test_app(side_panel)
+    app = make_test_app(panel)
 
     async with app.run_test() as pilot:
-        listview = pilot.app.query_one("#confirmation-listview", ListView)
+        listview = pilot.app.query_one("#inline-confirmation-listview", ListView)
         listview.focus()
         await pilot.press("enter")
 
         callback.assert_called_once_with(UserConfirmation.ACCEPT)
+
+
+@pytest.mark.asyncio
+async def test_inline_panel_has_four_options(callback: mock.MagicMock):
+    """Test that the inline panel has all four confirmation options."""
+    panel = InlineConfirmationPanel(
+        num_actions=1,
+        confirmation_callback=callback,
+    )
+    app = make_test_app(panel)
+
+    async with app.run_test() as pilot:
+        listview = pilot.app.query_one("#inline-confirmation-listview", ListView)
+        # The ListView should have 4 items: accept, reject, always, risky
+        assert len(listview.children) == 4

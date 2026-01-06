@@ -1,73 +1,50 @@
-CONFIRMATION_SIDE_PANEL_STYLE = """
-ConfirmationSidePanel {
-    split: right;
-    width: 33%;
-    height: 100%;
-    border-left: vkey $foreground 30%;
+INLINE_CONFIRMATION_PANEL_STYLE = """
+InlineConfirmationPanel {
+    width: 100%;
+    height: auto;
     background: $surface;
     padding: 1;
-    margin-left: 1;
-    scrollbar-size-vertical: 1;
+    margin: 1 0;
+    border: solid $primary;
 }
 
-ConfirmationPanel {
-    height: auto;
+.inline-confirmation-content {
     width: 100%;
-}
-
-.confirmation-content {
     height: auto;
-    width: 100%;
+    align: center middle;
 }
 
-.confirmation-header {
+.inline-confirmation-header {
     color: $primary;
     text-style: bold;
-    margin-bottom: 1;
     height: auto;
+    width: auto;
+    padding-right: 1;
 }
 
-.actions-container {
+.inline-confirmation-options {
     height: auto;
-    margin-bottom: 1;
-}
-
-.action-item {
-    color: $foreground;
-    margin-bottom: 1;
-    padding: 0 1;
+    width: 1fr;
     background: $background;
     border: solid $secondary;
 }
 
-.confirmation-instructions {
-    color: $secondary;
-    text-style: italic;
-    margin-bottom: 1;
-    text-align: center;
-}
-
-.confirmation-options {
-    height: auto;
-    border: solid $secondary;
-    background: $background;
-}
-
-.confirmation-options > ListItem {
-    padding: 1 2;
+.inline-confirmation-options > ListItem {
+    padding: 0 2;
     margin: 0;
+    height: auto;
 }
 
-.confirmation-options > ListItem:hover {
-    background: $background;
+.inline-confirmation-options > ListItem:hover {
+    background: $surface;
 }
 
-.confirmation-options > ListItem.-highlighted {
+.inline-confirmation-options > ListItem.-highlighted {
     background: $primary;
     color: $foreground;
 }
 
-.confirmation-options Static {
-    width: 100%;
+.inline-confirmation-options Static {
+    width: auto;
 }
 """
