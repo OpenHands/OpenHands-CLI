@@ -1,13 +1,15 @@
-"""Custom non-clickable Collapsible widget for OpenHands CLI.
+"""Collapsible widget for OpenHands CLI.
 
-This module provides a Collapsible widget that cannot be toggled by clicking,
-only through programmatic control (like Ctrl+E). It also has a dimmer gray background.
+This module provides a Collapsible widget that can be toggled by clicking on the
+title or pressing Enter when focused. It also supports programmatic control via
+Ctrl+O to toggle all cells at once.
 """
 
 import platform
 from typing import Any, ClassVar
 
 import pyperclip
+from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
 from textual.containers import Container, Horizontal
@@ -23,8 +25,11 @@ def _is_linux() -> bool:
     return platform.system() == "Linux"
 
 
-class NonClickableCollapsibleTitle(Container, can_focus=False):
-    """Title and symbol for the NonClickableCollapsible that ignores click events."""
+class NonClickableCollapsibleTitle(Container, can_focus=True):
+    """Title and symbol for the Collapsible widget.
+
+    Supports click-to-toggle and keyboard navigation (Enter to toggle).
+    """
 
     ALLOW_SELECT = False
     DEFAULT_CSS = """
@@ -34,6 +39,17 @@ class NonClickableCollapsibleTitle(Container, can_focus=False):
         padding: 0 1;
         text-style: $block-cursor-blurred-text-style;
         color: $block-cursor-blurred-foreground;
+
+        &:hover {
+            background: $block-hover-background;
+            color: $foreground;
+        }
+
+        &:focus {
+            text-style: $block-cursor-text-style;
+            background: $block-cursor-background;
+            color: $block-cursor-foreground;
+        }
     }
 
     NonClickableCollapsibleTitle Horizontal {
@@ -97,6 +113,18 @@ class NonClickableCollapsibleTitle(Container, can_focus=False):
 
     class CopyRequested(Message):
         """Request to copy content."""
+
+    class Toggle(Message):
+        """Request to toggle the collapsible state."""
+
+    async def _on_click(self, event: events.Click) -> None:
+        """Toggle collapsible when title area is clicked."""
+        event.stop()
+        self.post_message(self.Toggle())
+
+    def action_toggle_collapsible(self) -> None:
+        """Toggle the collapsible when Enter is pressed."""
+        self.post_message(self.Toggle())
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press - post CopyRequested when copy button is clicked."""
@@ -209,6 +237,13 @@ class NonClickableCollapsible(Widget):
         self.collapsed = collapsed
         self._watch_collapsed(collapsed)
         self.styles.border_left = ("thick", border_color)
+
+    def _on_non_clickable_collapsible_title_toggle(
+        self, event: NonClickableCollapsibleTitle.Toggle
+    ) -> None:
+        """Handle toggle request from title click or keyboard."""
+        event.stop()
+        self.collapsed = not self.collapsed
 
     def _on_non_clickable_collapsible_title_copy_requested(
         self, event: NonClickableCollapsibleTitle.CopyRequested

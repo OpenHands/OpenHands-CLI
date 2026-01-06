@@ -13,12 +13,12 @@ import uuid
 from collections.abc import Iterable
 from typing import ClassVar
 
-from textual import getters, on
+from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.screen import Screen
 from textual.signal import Signal
-from textual.widgets import Footer, Static
+from textual.widgets import Footer, Input, Static, TextArea
 
 from openhands.sdk.event import ActionEvent
 from openhands.sdk.security.confirmation_policy import (
@@ -455,6 +455,16 @@ class OpenHandsApp(App):
 
         for collapsible in collapsibles:
             collapsible.collapsed = any_expanded
+
+    def on_key(self, event: events.Key) -> None:
+        """Auto-focus input when user starts typing.
+
+        This allows users to click on collapsible cells to expand/collapse them
+        without losing their typing context - as soon as they start typing,
+        focus automatically returns to the input field.
+        """
+        if event.is_printable and not isinstance(self.focused, (Input, TextArea)):
+            self.input_field.focus_input()
 
     def action_pause_conversation(self) -> None:
         """Action to handle Esc key binding - pause the running conversation."""

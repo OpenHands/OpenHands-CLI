@@ -279,27 +279,39 @@ class TestConversationErrorEventHandling:
 
     def test_conversation_error_event_creates_collapsible_with_error_styling(self):
         """Test that ConversationErrorEvent is properly handled with error styling."""
+        from unittest.mock import patch
+
+        from openhands_cli.stores import CliSettings
+
         app = App()
         container = VerticalScroll()
         visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
-        # Create a ConversationErrorEvent with test content
-        error_event = ConversationErrorEvent(
-            source="agent", code="test_error", detail="Test conversation error message"
-        )
+        # Mock CLI settings to ensure default_cells_expanded=True for this test
+        mock_settings = CliSettings(default_cells_expanded=True)
+        with patch.object(
+            CliSettings, "load", return_value=mock_settings
+        ):
+            # Clear cached settings to ensure our mock is used
+            visualizer._cli_settings = None
 
-        # Create the collapsible widget for the error event
-        collapsible = visualizer._create_event_collapsible(error_event)
+            # Create a ConversationErrorEvent with test content
+            error_event = ConversationErrorEvent(
+                source="agent", code="test_error", detail="Test conversation error message"
+            )
 
-        # Verify the collapsible was created successfully
-        assert collapsible is not None
+            # Create the collapsible widget for the error event
+            collapsible = visualizer._create_event_collapsible(error_event)
 
-        # Verify it has the correct title
-        assert "Conversation Error" in str(collapsible.title)
+            # Verify the collapsible was created successfully
+            assert collapsible is not None
 
-        # Verify it starts expanded by default (collapsed=False when
-        # default_cells_expanded=True)
-        assert not collapsible.collapsed
+            # Verify it has the correct title
+            assert "Conversation Error" in str(collapsible.title)
+
+            # Verify it starts expanded by default (collapsed=False when
+            # default_cells_expanded=True)
+            assert not collapsible.collapsed
 
         # Verify it has error border color (should be the error theme color)
         from openhands_cli.theme import OPENHANDS_THEME
