@@ -39,6 +39,7 @@ from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
+    CollapsibleNavigationMixin,
     CollapsibleTitle,
 )
 from openhands_cli.tui.widgets.input_field import InputField
@@ -61,7 +62,7 @@ except ImportError:
     _HAS_AUTOCOMPLETE = False
 
 
-class OpenHandsApp(App):
+class OpenHandsApp(CollapsibleNavigationMixin, App):
     """A minimal textual app for OpenHands CLI with scrollable main display."""
 
     # Key bindings
@@ -469,39 +470,6 @@ class OpenHandsApp(App):
 
         for collapsible in collapsibles:
             collapsible.collapsed = any_expanded
-
-    def on_collapsible_title_navigate(self, event: CollapsibleTitle.Navigate) -> None:
-        """Handle navigation between collapsible cells.
-
-        The Navigate message includes the source collapsible, so we can
-        directly find its index without searching through all cells.
-        """
-        event.stop()
-
-        # Get all collapsibles as a list for index-based navigation
-        collapsibles = list(self.main_display.query(Collapsible))
-        if not collapsibles:
-            return
-
-        # Use the collapsible reference from the event directly
-        try:
-            current_index = collapsibles.index(event.collapsible)
-        except ValueError:
-            # Collapsible not in list (shouldn't happen, but be safe)
-            return
-
-        # Calculate target index
-        target_index = current_index + event.direction
-
-        # Check bounds
-        if target_index < 0 or target_index >= len(collapsibles):
-            return
-
-        # Focus the target collapsible's title
-        target = collapsibles[target_index]
-        target_title = target.query_one(CollapsibleTitle)
-        target_title.focus()
-        target.scroll_visible()
 
     def on_key(self, event: events.Key) -> None:
         """Handle keyboard navigation.

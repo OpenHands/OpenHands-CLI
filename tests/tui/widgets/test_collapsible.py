@@ -8,6 +8,7 @@ from textual.widgets import Button, Static
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
+    CollapsibleNavigationMixin,
     CollapsibleTitle,
 )
 
@@ -265,8 +266,12 @@ async def test_copy_on_non_linux_without_pyperclip_shows_success() -> None:
             assert kwargs.get("title") == "Copy Success"
 
 
-class MultiCollapsibleTestApp(App):
-    """App with multiple collapsibles for testing navigation."""
+class MultiCollapsibleTestApp(CollapsibleNavigationMixin, App):
+    """App with multiple collapsibles for testing navigation.
+
+    Uses CollapsibleNavigationMixin to share the same navigation logic
+    as the main OpenHandsApp, ensuring tests verify the real behavior.
+    """
 
     def __init__(self) -> None:
         super().__init__()
@@ -286,35 +291,6 @@ class MultiCollapsibleTestApp(App):
             yield Collapsible(
                 "Content 3", title="Cell 3", collapsed=True, border_color="green"
             )
-
-    def on_collapsible_title_navigate(self, event: CollapsibleTitle.Navigate) -> None:
-        """Handle navigation between collapsible cells."""
-        event.stop()
-
-        # Get all collapsibles as a list for index-based navigation
-        main_display = self.query_one("#main_display")
-        collapsibles = list(main_display.query(Collapsible))
-        if not collapsibles:
-            return
-
-        # Use the collapsible reference from the event directly
-        try:
-            current_index = collapsibles.index(event.collapsible)
-        except ValueError:
-            return
-
-        # Calculate target index
-        target_index = current_index + event.direction
-
-        # Check bounds
-        if target_index < 0 or target_index >= len(collapsibles):
-            return
-
-        # Focus the target collapsible's title
-        target = collapsibles[target_index]
-        target_title = target.query_one(CollapsibleTitle)
-        target_title.focus()
-        target.scroll_visible()
 
 
 @pytest.mark.asyncio

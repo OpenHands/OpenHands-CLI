@@ -360,3 +360,50 @@ class Collapsible(Widget):
         yield self._title
         with CollapsibleContents():
             yield self._content_widget
+
+
+class CollapsibleNavigationMixin:
+    """Mixin providing navigation handler for apps with Collapsible widgets.
+
+    Apps that contain Collapsible widgets can use this mixin to handle
+    arrow key navigation between cells. The app must have a container
+    with id="main_display" containing the Collapsible widgets.
+
+    Usage:
+        class MyApp(CollapsibleNavigationMixin, App):
+            ...
+    """
+
+    def on_collapsible_title_navigate(self, event: CollapsibleTitle.Navigate) -> None:
+        """Handle navigation between collapsible cells.
+
+        The Navigate message includes the source collapsible, so we can
+        directly find its index without searching through all cells.
+        """
+        event.stop()
+
+        # Get all collapsibles as a list for index-based navigation
+        main_display = self.query_one("#main_display")  # type: ignore[attr-defined]
+        collapsibles = list(main_display.query(Collapsible))
+        if not collapsibles:
+            return
+
+        # Use the collapsible reference from the event directly
+        try:
+            current_index = collapsibles.index(event.collapsible)
+        except ValueError:
+            # Collapsible not in list (shouldn't happen, but be safe)
+            return
+
+        # Calculate target index
+        target_index = current_index + event.direction
+
+        # Check bounds
+        if target_index < 0 or target_index >= len(collapsibles):
+            return
+
+        # Focus the target collapsible's title
+        target = collapsibles[target_index]
+        target_title = target.query_one(CollapsibleTitle)
+        target_title.focus()
+        target.scroll_visible()
