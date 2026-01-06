@@ -248,9 +248,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         if not content.plain.strip():
             return None
 
-        # Get default collapsed state from settings
-        collapsed = self._default_collapsed
-
         # Don't emit system prompt in CLI
         if isinstance(event, SystemPromptEvent):
             return None
@@ -275,7 +272,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return Collapsible(
                 content_string,
                 title=title,
-                collapsed=collapsed,
+                collapsed=self._default_collapsed,
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, ObservationEvent):
@@ -283,7 +280,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return Collapsible(
                 self._escape_rich_markup(str(content)),
                 title=title,
-                collapsed=collapsed,
+                collapsed=self._default_collapsed,
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, UserRejectObservation):
@@ -291,7 +288,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return Collapsible(
                 self._escape_rich_markup(str(content)),
                 title=title,
-                collapsed=collapsed,
+                collapsed=self._default_collapsed,
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, MessageEvent):
@@ -317,7 +314,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return Collapsible(
                 content_string,
                 title=title,
-                collapsed=collapsed,
+                collapsed=self._default_collapsed,
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, AgentErrorEvent):
@@ -330,7 +327,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return Collapsible(
                 content_string,
                 title=title,
-                collapsed=collapsed,
+                collapsed=self._default_collapsed,
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, ConversationErrorEvent):
@@ -343,7 +340,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return Collapsible(
                 content_string,
                 title=title,
-                collapsed=collapsed,
+                collapsed=self._default_collapsed,
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, PauseEvent):
@@ -351,7 +348,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return Collapsible(
                 self._escape_rich_markup(str(content)),
                 title=title,
-                collapsed=collapsed,
+                collapsed=self._default_collapsed,
                 border_color=_get_event_border_color(event),
             )
         elif isinstance(event, Condensation):
@@ -364,7 +361,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return Collapsible(
                 content_string,
                 title=title,
-                collapsed=collapsed,
+                collapsed=self._default_collapsed,
                 border_color=_get_event_border_color(event),
             )
         else:
@@ -378,7 +375,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return Collapsible(
                 content_string,
                 title=title,
-                collapsed=collapsed,
+                collapsed=self._default_collapsed,
                 border_color=_get_event_border_color(event),
             )
 
