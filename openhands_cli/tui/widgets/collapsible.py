@@ -153,30 +153,49 @@ class CollapsibleTitle(Container, can_focus=True):
         if container is None:
             return
 
-        # Query all Collapsible widgets in the container
-        collapsibles = list(container.query(Collapsible))
-        if not collapsibles:
-            return
-
-        # Find current position
-        try:
-            current_index = collapsibles.index(parent_collapsible)
-        except ValueError:
-            return
-
-        # Calculate target index
-        target_index = current_index + direction
-
-        # Check bounds
-        if target_index < 0 or target_index >= len(collapsibles):
+        # Find the target collapsible in a single pass (O(n) but no list allocation)
+        target = self._find_sibling_collapsible(
+            container, parent_collapsible, direction
+        )
+        if target is None:
             return
 
         # Focus the title of the target collapsible
-        target_collapsible = collapsibles[target_index]
-        target_title = target_collapsible.query_one(CollapsibleTitle)
+        target_title = target.query_one(CollapsibleTitle)
         target_title.focus()
         # Scroll the target into view
-        target_collapsible.scroll_visible()
+        target.scroll_visible()
+
+    def _find_sibling_collapsible(
+        self, container: DOMNode, current: "Collapsible", direction: int
+    ) -> "Collapsible | None":
+        """Find the next or previous sibling Collapsible in a single iteration.
+
+        This avoids creating a full list and calling .index(), reducing allocations.
+
+        Args:
+            container: The container holding Collapsible widgets.
+            current: The current Collapsible widget.
+            direction: -1 for previous, 1 for next.
+
+        Returns:
+            The target Collapsible or None if at boundary.
+        """
+        prev_collapsible: Collapsible | None = None
+
+        for collapsible in container.query(Collapsible):
+            if collapsible is current:
+                if direction == -1:
+                    # Want previous - return what we saw before
+                    return prev_collapsible
+                # Want next - continue to get the next one
+            elif prev_collapsible is current and direction == 1:
+                # We just passed current, this is the next one
+                return collapsible
+            prev_collapsible = collapsible
+
+        # Reached end without finding target (at boundary)
+        return None
 
     def _find_parent_collapsible(self) -> "Collapsible | None":
         """Find the parent Collapsible widget using ancestor traversal.
