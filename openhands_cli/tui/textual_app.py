@@ -463,24 +463,41 @@ class OpenHandsApp(App):
         - Auto-focus input when user starts typing (allows clicking cells without
           losing typing context)
         - When Tab is pressed from input area, focus the most recent (last) cell
-          instead of the first one
+          instead of the first one (unless autocomplete is showing)
         """
         # Handle Tab from input area - focus most recent cell
+        # Only do this if autocomplete dropdown is not visible (Tab is used for selection)
         if event.key == "tab" and isinstance(self.focused, Input | TextArea):
-            collapsibles = list(self.main_display.query(Collapsible))
-            if collapsibles:
-                # Focus the last (most recent) collapsible's title
-                last_collapsible = collapsibles[-1]
-                last_title = last_collapsible.query_one(CollapsibleTitle)
-                last_title.focus()
-                last_collapsible.scroll_visible()
-                event.stop()
-                event.prevent_default()
-                return
+            if not self._is_autocomplete_showing():
+                collapsibles = list(self.main_display.query(Collapsible))
+                if collapsibles:
+                    # Focus the last (most recent) collapsible's title
+                    last_collapsible = collapsibles[-1]
+                    last_title = last_collapsible.query_one(CollapsibleTitle)
+                    last_title.focus()
+                    last_collapsible.scroll_visible()
+                    event.stop()
+                    event.prevent_default()
+                    return
 
         # Auto-focus input when user types printable characters
         if event.is_printable and not isinstance(self.focused, Input | TextArea):
             self.input_field.focus_input()
+
+    def _is_autocomplete_showing(self) -> bool:
+        """Check if the autocomplete dropdown is currently visible.
+
+        This prevents Tab key interception when user wants to select an
+        autocomplete suggestion.
+        """
+        try:
+            from textual_autocomplete import AutoComplete
+
+            autocomplete = self.query_one(AutoComplete)
+            # Check if the dropdown is mounted and has visible items
+            return autocomplete.display and len(autocomplete._items) > 0
+        except Exception:
+            return False
 
     def action_pause_conversation(self) -> None:
         """Action to handle Esc key binding - pause the running conversation."""
