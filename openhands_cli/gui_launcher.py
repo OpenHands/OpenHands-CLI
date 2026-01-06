@@ -1,6 +1,7 @@
 """GUI launcher for OpenHands CLI."""
 
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -10,6 +11,38 @@ from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 
 from openhands_cli.locations import PERSISTENCE_DIR
+
+
+def _is_wsl2() -> bool:
+    """Check if running in WSL2 environment."""
+    try:
+        release = platform.release()
+        return "microsoft" in release.lower() or release.endswith("microsoft-standard-WSL2")
+    except Exception:
+        return False
+
+
+def _wsl_to_windows_path(wsl_path: str) -> str:
+    """Convert WSL2 path to Windows path for Docker Desktop.
+
+    Docker Desktop on Windows with WSL2 backend expects Windows-style paths
+    (e.g., D:/folder) for volume mounts, not WSL2 paths (e.g., /mnt/d/folder).
+
+    Args:
+        wsl_path: A path that may be in WSL2 format (e.g., /mnt/d/ai-data/workspace)
+
+    Returns:
+        Windows-style path (e.g., D:/ai-data/workspace) if input is a WSL2 mount path,
+        otherwise returns the original path unchanged.
+    """
+    # Only convert paths that start with /mnt/ followed by a single drive letter
+    if wsl_path.startswith("/mnt/") and len(wsl_path) > 5:
+        parts = wsl_path[5:].split("/", 1)
+        if len(parts) >= 1 and len(parts[0]) == 1 and parts[0].isalpha():
+            drive_letter = parts[0].upper()
+            rest = parts[1] if len(parts) > 1 else ""
+            return f"{drive_letter}:/{rest}"
+    return wsl_path
 
 
 def _format_docker_command_for_logging(cmd: list[str]) -> str:
@@ -167,12 +200,32 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
 
     # Add current working directory mount if requested
     if mount_cwd:
-        cwd = Path.cwd()
+        cwd = str(Path.cwd())
+
+        # Convert WSL2 paths to Windows paths for Docker Desktop compatibility
+        # Docker Desktop on Windows with WSL2 backend expects Windows-style paths
+        if _is_wsl2():
+            mount_path = _wsl_to_windows_path(cwd)
+            if mount_path != cwd:
+                print_formatted_text(
+                    HTML(
+                        f"<grey>WSL2 detected: Converting path for Docker Desktop</grey>"
+                    )
+                )
+                print_formatted_text(
+                    HTML(f"<grey>  WSL2 path: {cwd}</grey>")
+                )
+                print_formatted_text(
+                    HTML(f"<grey>  Docker path: {mount_path}</grey>")
+                )
+        else:
+            mount_path = cwd
+
         # Following the documentation at https://docs.all-hands.dev/usage/runtimes/docker#connecting-to-your-filesystem
         docker_cmd.extend(
             [
                 "-e",
-                f"SANDBOX_VOLUMES={cwd}:/workspace:rw",
+                f"SANDBOX_VOLUMES={mount_path}:/workspace:rw",
             ]
         )
 

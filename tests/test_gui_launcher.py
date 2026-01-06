@@ -9,10 +9,72 @@ import pytest
 
 from openhands_cli.gui_launcher import (
     _format_docker_command_for_logging,
+    _is_wsl2,
+    _wsl_to_windows_path,
     check_docker_requirements,
     get_openhands_version,
     launch_gui_server,
 )
+
+
+class TestWSL2Detection:
+    """Test WSL2 detection and path conversion functions."""
+
+    @pytest.mark.parametrize(
+        "platform_release,expected",
+        [
+            ("5.15.153.1-microsoft-standard-WSL2", True),
+            ("5.10.16.3-microsoft-standard-WSL2", True),
+            ("5.4.72-microsoft-standard-WSL2", True),
+            ("4.4.0-19041-Microsoft", True),  # WSL1 but still has microsoft
+            ("5.15.0-generic", False),  # Regular Linux
+            ("6.8.0-1026-gke", False),  # GKE
+            ("Darwin Kernel Version 21.6.0", False),  # macOS
+        ],
+    )
+    def test_is_wsl2(self, platform_release, expected):
+        """Test WSL2 detection based on platform release string."""
+        with patch("platform.release", return_value=platform_release):
+            result = _is_wsl2()
+            assert result is expected
+
+    def test_is_wsl2_exception_handling(self):
+        """Test that _is_wsl2 returns False on exception."""
+        with patch("platform.release", side_effect=Exception("Test error")):
+            result = _is_wsl2()
+            assert result is False
+
+
+class TestWSLToWindowsPath:
+    """Test WSL2 to Windows path conversion."""
+
+    @pytest.mark.parametrize(
+        "wsl_path,expected",
+        [
+            # Standard WSL2 mount paths
+            ("/mnt/c/Users/test", "C:/Users/test"),
+            ("/mnt/d/ai-data/workspace", "D:/ai-data/workspace"),
+            ("/mnt/e/projects/myproject", "E:/projects/myproject"),
+            # Drive root
+            ("/mnt/c", "C:/"),
+            ("/mnt/d", "D:/"),
+            # Paths that should NOT be converted
+            ("/home/user/project", "/home/user/project"),  # Native Linux path
+            ("/workspace", "/workspace"),  # Container path
+            ("/mnt/wsl/docker-desktop", "/mnt/wsl/docker-desktop"),  # WSL internal
+            ("/mnt/", "/mnt/"),  # Just /mnt/
+            ("/mnt/ab/test", "/mnt/ab/test"),  # Two-letter "drive"
+            ("", ""),  # Empty string
+            ("/", "/"),  # Root
+            # Edge cases
+            ("/mnt/c/", "C:/"),  # Trailing slash
+            ("/mnt/C/Users/Test", "C:/Users/Test"),  # Uppercase drive letter
+        ],
+    )
+    def test_wsl_to_windows_path(self, wsl_path, expected):
+        """Test WSL2 to Windows path conversion."""
+        result = _wsl_to_windows_path(wsl_path)
+        assert result == expected
 
 
 class TestFormatDockerCommand:
@@ -216,3 +278,91 @@ class TestLaunchGuiServer:
                 assert "--gpus" in run_cmd
                 assert "all" in run_cmd
                 assert "SANDBOX_ENABLE_GPU=true" in " ".join(run_cmd)
+
+    @patch("openhands_cli.gui_launcher.check_docker_requirements")
+    @patch("openhands_cli.gui_launcher.ensure_config_dir_exists")
+    @patch("openhands_cli.gui_launcher.get_openhands_version")
+    @patch("openhands_cli.gui_launcher._is_wsl2")
+    @patch("subprocess.run")
+    @patch("subprocess.check_output")
+    @patch("pathlib.Path.cwd")
+    @patch("openhands_cli.gui_launcher.print_formatted_text")
+    def test_launch_gui_server_wsl2_path_conversion(
+        self,
+        mock_print,
+        mock_cwd,
+        mock_check_output,
+        mock_run,
+        mock_is_wsl2,
+        mock_version,
+        mock_config_dir,
+        mock_check_docker,
+    ):
+        """Test that WSL2 paths are converted to Windows paths for Docker Desktop."""
+        # Setup mocks
+        mock_check_docker.return_value = True
+        mock_config_dir.return_value = Path("/home/user/.openhands")
+        mock_version.return_value = "latest"
+        mock_check_output.return_value = "1000\n"
+        mock_cwd.return_value = Path("/mnt/d/ai-data/workspace")
+        mock_is_wsl2.return_value = True
+
+        # Configure subprocess.run to succeed
+        mock_run.return_value = MagicMock(returncode=0)
+
+        # Run the function
+        launch_gui_server(mount_cwd=True, gpu=False)
+
+        # Verify subprocess.run was called correctly
+        assert mock_run.call_count == 2  # Pull and run commands
+
+        # Check run command has converted path
+        run_call = mock_run.call_args_list[1]
+        run_cmd = run_call[0][0]
+
+        # The WSL2 path /mnt/d/ai-data/workspace should be converted to D:/ai-data/workspace
+        assert "SANDBOX_VOLUMES=D:/ai-data/workspace:/workspace:rw" in " ".join(run_cmd)
+
+    @patch("openhands_cli.gui_launcher.check_docker_requirements")
+    @patch("openhands_cli.gui_launcher.ensure_config_dir_exists")
+    @patch("openhands_cli.gui_launcher.get_openhands_version")
+    @patch("openhands_cli.gui_launcher._is_wsl2")
+    @patch("subprocess.run")
+    @patch("subprocess.check_output")
+    @patch("pathlib.Path.cwd")
+    @patch("openhands_cli.gui_launcher.print_formatted_text")
+    def test_launch_gui_server_non_wsl2_no_path_conversion(
+        self,
+        mock_print,
+        mock_cwd,
+        mock_check_output,
+        mock_run,
+        mock_is_wsl2,
+        mock_version,
+        mock_config_dir,
+        mock_check_docker,
+    ):
+        """Test that paths are NOT converted when not running on WSL2."""
+        # Setup mocks
+        mock_check_docker.return_value = True
+        mock_config_dir.return_value = Path("/home/user/.openhands")
+        mock_version.return_value = "latest"
+        mock_check_output.return_value = "1000\n"
+        mock_cwd.return_value = Path("/mnt/d/ai-data/workspace")
+        mock_is_wsl2.return_value = False  # Not WSL2
+
+        # Configure subprocess.run to succeed
+        mock_run.return_value = MagicMock(returncode=0)
+
+        # Run the function
+        launch_gui_server(mount_cwd=True, gpu=False)
+
+        # Verify subprocess.run was called correctly
+        assert mock_run.call_count == 2  # Pull and run commands
+
+        # Check run command has original path (not converted)
+        run_call = mock_run.call_args_list[1]
+        run_cmd = run_call[0][0]
+
+        # The path should NOT be converted when not on WSL2
+        assert "SANDBOX_VOLUMES=/mnt/d/ai-data/workspace:/workspace:rw" in " ".join(run_cmd)
