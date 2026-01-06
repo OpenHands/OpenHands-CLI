@@ -25,7 +25,7 @@ def _is_linux() -> bool:
     return platform.system() == "Linux"
 
 
-class NonClickableCollapsibleTitle(Container, can_focus=True):
+class CollapsibleTitle(Container, can_focus=True):
     """Title and symbol for the Collapsible widget.
 
     Supports click-to-toggle and keyboard navigation (Enter to toggle).
@@ -33,7 +33,7 @@ class NonClickableCollapsibleTitle(Container, can_focus=True):
 
     ALLOW_SELECT = False
     DEFAULT_CSS = """
-    NonClickableCollapsibleTitle {
+    CollapsibleTitle {
         width: 100%;
         height: auto;
         padding: 0 1;
@@ -52,17 +52,17 @@ class NonClickableCollapsibleTitle(Container, can_focus=True):
         }
     }
 
-    NonClickableCollapsibleTitle Horizontal {
+    CollapsibleTitle Horizontal {
         width: 100%;
         height: auto;
     }
 
-    NonClickableCollapsibleTitle .title-text {
+    CollapsibleTitle .title-text {
         width: 1fr;
         height: auto;
     }
 
-    NonClickableCollapsibleTitle .copy-button {
+    CollapsibleTitle .copy-button {
         width: auto;
         height: 1;
         min-width: 4;
@@ -73,13 +73,13 @@ class NonClickableCollapsibleTitle(Container, can_focus=True):
         text-style: none;
     }
 
-    NonClickableCollapsibleTitle .copy-button:hover {
+    CollapsibleTitle .copy-button:hover {
         background: $surface-lighten-1;
         color: $text;
         text-style: bold;
     }
 
-    NonClickableCollapsibleTitle .copy-button:focus {
+    CollapsibleTitle .copy-button:focus {
         background: $surface-lighten-2;
         color: $text;
         text-style: bold;
@@ -142,9 +142,9 @@ class NonClickableCollapsibleTitle(Container, can_focus=True):
         Args:
             direction: -1 for previous (up), 1 for next (down)
         """
-        # Get the parent NonClickableCollapsible
+        # Get the parent Collapsible
         parent_collapsible = self.parent
-        if not isinstance(parent_collapsible, NonClickableCollapsible):
+        if not isinstance(parent_collapsible, Collapsible):
             return
 
         # Get the container that holds all collapsibles (usually main_display)
@@ -152,8 +152,8 @@ class NonClickableCollapsibleTitle(Container, can_focus=True):
         if container is None:
             return
 
-        # Query all NonClickableCollapsible widgets in the container
-        collapsibles = list(container.query(NonClickableCollapsible))
+        # Query all Collapsible widgets in the container
+        collapsibles = list(container.query(Collapsible))
         if not collapsibles:
             return
 
@@ -172,7 +172,7 @@ class NonClickableCollapsibleTitle(Container, can_focus=True):
 
         # Focus the title of the target collapsible
         target_collapsible = collapsibles[target_index]
-        target_title = target_collapsible.query_one(NonClickableCollapsibleTitle)
+        target_title = target_collapsible.query_one(CollapsibleTitle)
         target_title.focus()
         # Scroll the target into view
         target_collapsible.scroll_visible()
@@ -211,9 +211,9 @@ class NonClickableCollapsibleTitle(Container, can_focus=True):
         self._update_label()
 
 
-class NonClickableCollapsibleContents(Container):
+class CollapsibleContents(Container):
     DEFAULT_CSS = """
-    NonClickableCollapsibleContents {
+    CollapsibleContents {
         width: 100%;
         height: auto;
         padding: 1 0 0 3;
@@ -221,7 +221,7 @@ class NonClickableCollapsibleContents(Container):
     """
 
 
-class NonClickableCollapsible(Widget):
+class Collapsible(Widget):
     """A collapsible container that cannot be toggled by clicking."""
 
     ALLOW_MAXIMIZE = True
@@ -229,7 +229,7 @@ class NonClickableCollapsible(Widget):
     title = reactive("Toggle")
 
     DEFAULT_CSS = """
-    NonClickableCollapsible {
+    Collapsible {
         width: 1fr;
         height: auto;
         background: $background;
@@ -240,7 +240,7 @@ class NonClickableCollapsible(Widget):
             background-tint: $foreground 3%;
         }
 
-        &.-collapsed > NonClickableCollapsibleContents {
+        &.-collapsed > CollapsibleContents {
             display: none;
         }
     }
@@ -260,7 +260,7 @@ class NonClickableCollapsible(Widget):
         classes: str | None = None,
         disabled: bool = False,
     ) -> None:
-        """Initialize a NonClickableCollapsible widget.
+        """Initialize a Collapsible widget.
 
         Args:
             content: Content that will be collapsed/expanded (converted to string).
@@ -275,7 +275,7 @@ class NonClickableCollapsible(Widget):
             disabled: Whether the collapsible is disabled or not.
         """
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
-        self._title = NonClickableCollapsibleTitle(
+        self._title = CollapsibleTitle(
             label=title,
             collapsed_symbol=collapsed_symbol,
             expanded_symbol=expanded_symbol,
@@ -289,15 +289,15 @@ class NonClickableCollapsible(Widget):
         self._watch_collapsed(collapsed)
         self.styles.border_left = ("thick", border_color)
 
-    def _on_non_clickable_collapsible_title_toggle(
-        self, event: NonClickableCollapsibleTitle.Toggle
+    def _on_collapsible_title_toggle(
+        self, event: CollapsibleTitle.Toggle
     ) -> None:
         """Handle toggle request from title click or keyboard."""
         event.stop()
         self.collapsed = not self.collapsed
 
-    def _on_non_clickable_collapsible_title_copy_requested(
-        self, event: NonClickableCollapsibleTitle.CopyRequested
+    def _on_collapsible_title_copy_requested(
+        self, event: CollapsibleTitle.CopyRequested
     ) -> None:
         """Handle copy request from the title.
 
@@ -357,5 +357,5 @@ class NonClickableCollapsible(Widget):
 
     def compose(self) -> ComposeResult:
         yield self._title
-        with NonClickableCollapsibleContents():
+        with CollapsibleContents():
             yield self._content_widget

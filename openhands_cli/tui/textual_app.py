@@ -37,11 +37,11 @@ from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModa
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import ConfirmationSidePanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
-from openhands_cli.tui.widgets.input_field import InputField
-from openhands_cli.tui.widgets.non_clickable_collapsible import (
-    NonClickableCollapsible,
-    NonClickableCollapsibleTitle,
+from openhands_cli.tui.widgets.collapsible import (
+    Collapsible,
+    CollapsibleTitle,
 )
+from openhands_cli.tui.widgets.input_field import InputField
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.tui.widgets.status_line import (
     InfoStatusLine,
@@ -449,7 +449,7 @@ class OpenHandsApp(App):
     def action_toggle_cells(self) -> None:
         """Action to handle Ctrl+O key binding - toggle expand/collapse all
         collapsible widgets."""
-        collapsibles = self.main_display.query(NonClickableCollapsible)
+        collapsibles = self.main_display.query(Collapsible)
 
         # Check if any are expanded - if so, collapse all; otherwise expand all
         any_expanded = any(not collapsible.collapsed for collapsible in collapsibles)
@@ -467,11 +467,11 @@ class OpenHandsApp(App):
         """
         # Handle Tab from input area - focus most recent cell
         if event.key == "tab" and isinstance(self.focused, Input | TextArea):
-            collapsibles = list(self.main_display.query(NonClickableCollapsible))
+            collapsibles = list(self.main_display.query(Collapsible))
             if collapsibles:
                 # Focus the last (most recent) collapsible's title
                 last_collapsible = collapsibles[-1]
-                last_title = last_collapsible.query_one(NonClickableCollapsibleTitle)
+                last_title = last_collapsible.query_one(CollapsibleTitle)
                 last_title.focus()
                 last_collapsible.scroll_visible()
                 event.stop()

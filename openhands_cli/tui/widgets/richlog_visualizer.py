@@ -21,8 +21,8 @@ from openhands.sdk.event.condenser import Condensation, CondensationRequest
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.widgets.non_clickable_collapsible import (
-    NonClickableCollapsible,
+from openhands_cli.tui.widgets.collapsible import (
+    Collapsible,
 )
 
 
@@ -111,7 +111,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 # We're in a background thread, use call_from_thread
                 self._app.call_from_thread(self._add_widget_to_ui, collapsible_widget)
 
-    def _add_widget_to_ui(self, widget: NonClickableCollapsible) -> None:
+    def _add_widget_to_ui(self, widget: Collapsible) -> None:
         """Add a widget to the UI (must be called from main thread)."""
         self._container.mount(widget)
         # Automatically scroll to the bottom to show the newly added widget
@@ -240,7 +240,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """
         return not self.cli_settings.default_cells_expanded
 
-    def _create_event_collapsible(self, event: Event) -> NonClickableCollapsible | None:
+    def _create_event_collapsible(self, event: Event) -> Collapsible | None:
         """Create a Collapsible widget for the event with appropriate styling."""
         # Use the event's visualize property for content
         content = event.visualize
@@ -272,7 +272,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return NonClickableCollapsible(
+            return Collapsible(
                 content_string,
                 title=title,
                 collapsed=collapsed,
@@ -280,7 +280,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             )
         elif isinstance(event, ObservationEvent):
             title = self._extract_meaningful_title(event, "Observation")
-            return NonClickableCollapsible(
+            return Collapsible(
                 self._escape_rich_markup(str(content)),
                 title=title,
                 collapsed=collapsed,
@@ -288,7 +288,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             )
         elif isinstance(event, UserRejectObservation):
             title = self._extract_meaningful_title(event, "User Rejected Action")
-            return NonClickableCollapsible(
+            return Collapsible(
                 self._escape_rich_markup(str(content)),
                 title=title,
                 collapsed=collapsed,
@@ -314,7 +314,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics and event.llm_message.role == "assistant":
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return NonClickableCollapsible(
+            return Collapsible(
                 content_string,
                 title=title,
                 collapsed=collapsed,
@@ -327,7 +327,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return NonClickableCollapsible(
+            return Collapsible(
                 content_string,
                 title=title,
                 collapsed=collapsed,
@@ -340,7 +340,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return NonClickableCollapsible(
+            return Collapsible(
                 content_string,
                 title=title,
                 collapsed=collapsed,
@@ -348,7 +348,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             )
         elif isinstance(event, PauseEvent):
             title = self._extract_meaningful_title(event, "User Paused")
-            return NonClickableCollapsible(
+            return Collapsible(
                 self._escape_rich_markup(str(content)),
                 title=title,
                 collapsed=collapsed,
@@ -361,7 +361,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return NonClickableCollapsible(
+            return Collapsible(
                 content_string,
                 title=title,
                 collapsed=collapsed,
@@ -375,7 +375,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             content_string = (
                 f"{self._escape_rich_markup(str(content))}\n\nSource: {event.source}"
             )
-            return NonClickableCollapsible(
+            return Collapsible(
                 content_string,
                 title=title,
                 collapsed=collapsed,
