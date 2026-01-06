@@ -9,13 +9,17 @@ from textual.widgets import ListItem, ListView, Static
 
 from openhands.sdk.event import ActionEvent
 from openhands_cli.tui.panels.confirmation_panel_style import (
-    CONFIRMATION_SIDE_PANEL_STYLLE,
+    CONFIRMATION_SIDE_PANEL_STYLE,
 )
 from openhands_cli.user_actions.types import UserConfirmation
 
 
 class ConfirmationPanel(Container):
-    """A side panel that displays pending actions and confirmation options."""
+    """A side panel that displays pending actions and confirmation options.
+
+    All content is placed in a vertical layout that can be scrolled
+    when the content exceeds the available space.
+    """
 
     def __init__(
         self,
@@ -35,7 +39,7 @@ class ConfirmationPanel(Container):
 
     def compose(self) -> ComposeResult:
         """Create the confirmation panel layout."""
-        with Vertical():
+        with Vertical(classes="confirmation-content"):
             # Header
             yield Static(
                 f"🔍 Agent created {len(self.pending_actions)} action(s) and is "
@@ -94,12 +98,13 @@ class ConfirmationPanel(Container):
 
 
 class ConfirmationSidePanel(VerticalScroll):
-    """A container that shows the confirmation panel on the right side.
+    """A scrollable container that shows the confirmation panel on the right side.
 
-    Uses a dashed border for visual separation.
+    The entire panel content is scrollable, allowing users to scroll down
+    to see the confirmation buttons when the action content is too long.
     """
 
-    DEFAULT_CSS = CONFIRMATION_SIDE_PANEL_STYLLE
+    DEFAULT_CSS = CONFIRMATION_SIDE_PANEL_STYLE
 
     def __init__(
         self,
