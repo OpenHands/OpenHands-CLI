@@ -87,7 +87,9 @@ class NonClickableCollapsibleTitle(Container, can_focus=True):
     """
 
     BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("enter", "toggle_collapsible", "Toggle collapsible", show=False)
+        Binding("enter", "toggle_collapsible", "Toggle collapsible", show=False),
+        Binding("up", "focus_previous_cell", "Previous cell", show=False),
+        Binding("down", "focus_next_cell", "Next cell", show=False),
     ]
 
     collapsed = reactive(True)
@@ -125,6 +127,55 @@ class NonClickableCollapsibleTitle(Container, can_focus=True):
     def action_toggle_collapsible(self) -> None:
         """Toggle the collapsible when Enter is pressed."""
         self.post_message(self.Toggle())
+
+    def action_focus_previous_cell(self) -> None:
+        """Focus the previous collapsible cell (up arrow)."""
+        self._navigate_to_sibling_cell(direction=-1)
+
+    def action_focus_next_cell(self) -> None:
+        """Focus the next collapsible cell (down arrow)."""
+        self._navigate_to_sibling_cell(direction=1)
+
+    def _navigate_to_sibling_cell(self, direction: int) -> None:
+        """Navigate to a sibling collapsible cell.
+
+        Args:
+            direction: -1 for previous (up), 1 for next (down)
+        """
+        # Get the parent NonClickableCollapsible
+        parent_collapsible = self.parent
+        if parent_collapsible is None:
+            return
+
+        # Get the container that holds all collapsibles (usually main_display)
+        container = parent_collapsible.parent
+        if container is None:
+            return
+
+        # Query all NonClickableCollapsible widgets in the container
+        collapsibles = list(container.query(NonClickableCollapsible))
+        if not collapsibles:
+            return
+
+        # Find current position
+        try:
+            current_index = collapsibles.index(parent_collapsible)
+        except ValueError:
+            return
+
+        # Calculate target index
+        target_index = current_index + direction
+
+        # Check bounds
+        if target_index < 0 or target_index >= len(collapsibles):
+            return
+
+        # Focus the title of the target collapsible
+        target_collapsible = collapsibles[target_index]
+        target_title = target_collapsible.query_one(NonClickableCollapsibleTitle)
+        target_title.focus()
+        # Scroll the target into view
+        target_collapsible.scroll_visible()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press - post CopyRequested when copy button is clicked."""

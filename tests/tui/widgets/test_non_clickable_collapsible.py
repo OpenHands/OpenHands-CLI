@@ -269,3 +269,120 @@ async def test_copy_on_non_linux_without_pyperclip_shows_success() -> None:
             assert "Content copied to clipboard" in args[0]
             assert "xclip" not in args[0]
             assert kwargs.get("title") == "Copy Success"
+
+
+class MultiCollapsibleTestApp(App):
+    """App with multiple collapsibles for testing navigation."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.register_theme(OPENHANDS_THEME)
+        self.theme = "openhands"
+
+    def compose(self) -> ComposeResult:
+        from textual.containers import VerticalScroll
+
+        with VerticalScroll(id="main_display"):
+            yield NonClickableCollapsible(
+                "Content 1", title="Cell 1", collapsed=True, border_color="red"
+            )
+            yield NonClickableCollapsible(
+                "Content 2", title="Cell 2", collapsed=True, border_color="blue"
+            )
+            yield NonClickableCollapsible(
+                "Content 3", title="Cell 3", collapsed=True, border_color="green"
+            )
+
+
+@pytest.mark.asyncio
+async def test_arrow_key_navigation_down() -> None:
+    """Down arrow navigates to the next cell."""
+    app = MultiCollapsibleTestApp()
+
+    async with app.run_test() as pilot:
+        # Get all collapsibles
+        collapsibles = list(app.query(NonClickableCollapsible))
+        assert len(collapsibles) == 3
+
+        # Focus the first cell's title
+        first_title = collapsibles[0].query_one(NonClickableCollapsibleTitle)
+        first_title.focus()
+        await pilot.pause()
+        assert app.focused == first_title
+
+        # Press down arrow - should focus second cell
+        await pilot.press("down")
+        second_title = collapsibles[1].query_one(NonClickableCollapsibleTitle)
+        assert app.focused == second_title
+
+
+@pytest.mark.asyncio
+async def test_arrow_key_navigation_up() -> None:
+    """Up arrow navigates to the previous cell."""
+    app = MultiCollapsibleTestApp()
+
+    async with app.run_test() as pilot:
+        # Get all collapsibles
+        collapsibles = list(app.query(NonClickableCollapsible))
+
+        # Focus the second cell's title
+        second_title = collapsibles[1].query_one(NonClickableCollapsibleTitle)
+        second_title.focus()
+        await pilot.pause()
+        assert app.focused == second_title
+
+        # Press up arrow - should focus first cell
+        await pilot.press("up")
+        first_title = collapsibles[0].query_one(NonClickableCollapsibleTitle)
+        assert app.focused == first_title
+
+
+@pytest.mark.asyncio
+async def test_arrow_navigation_at_boundaries() -> None:
+    """Arrow keys at boundaries don't crash or change focus."""
+    app = MultiCollapsibleTestApp()
+
+    async with app.run_test() as pilot:
+        collapsibles = list(app.query(NonClickableCollapsible))
+
+        # Focus the first cell and press up - should stay on first
+        first_title = collapsibles[0].query_one(NonClickableCollapsibleTitle)
+        first_title.focus()
+        await pilot.pause()
+        await pilot.press("up")
+        assert app.focused == first_title
+
+        # Focus the last cell and press down - should stay on last
+        last_title = collapsibles[2].query_one(NonClickableCollapsibleTitle)
+        last_title.focus()
+        await pilot.pause()
+        await pilot.press("down")
+        assert app.focused == last_title
+
+
+@pytest.mark.asyncio
+async def test_enter_still_toggles_collapsible() -> None:
+    """Enter key still toggles the collapsible state."""
+    app = MultiCollapsibleTestApp()
+
+    async with app.run_test() as pilot:
+        collapsibles = list(app.query(NonClickableCollapsible))
+        first_collapsible = collapsibles[0]
+
+        # Focus the first cell's title
+        first_title = first_collapsible.query_one(NonClickableCollapsibleTitle)
+        first_title.focus()
+        await pilot.pause()
+
+        # Initially collapsed
+        assert first_collapsible.collapsed is True
+
+        # Press enter - should toggle to expanded
+        await pilot.press("enter")
+        await pilot.pause()
+        assert first_collapsible.collapsed is False
+
+        # Press enter again - should toggle back to collapsed
+        await pilot.press("enter")
+        await pilot.pause()
+        assert first_collapsible.collapsed is True

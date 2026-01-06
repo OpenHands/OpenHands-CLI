@@ -40,6 +40,7 @@ from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.widgets.input_field import InputField
 from openhands_cli.tui.widgets.non_clickable_collapsible import (
     NonClickableCollapsible,
+    NonClickableCollapsibleTitle,
 )
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.tui.widgets.status_line import (
@@ -457,12 +458,27 @@ class OpenHandsApp(App):
             collapsible.collapsed = any_expanded
 
     def on_key(self, event: events.Key) -> None:
-        """Auto-focus input when user starts typing.
+        """Handle keyboard navigation.
 
-        This allows users to click on collapsible cells to expand/collapse them
-        without losing their typing context - as soon as they start typing,
-        focus automatically returns to the input field.
+        - Auto-focus input when user starts typing (allows clicking cells without
+          losing typing context)
+        - When Tab is pressed from input area, focus the most recent (last) cell
+          instead of the first one
         """
+        # Handle Tab from input area - focus most recent cell
+        if event.key == "tab" and isinstance(self.focused, Input | TextArea):
+            collapsibles = list(self.main_display.query(NonClickableCollapsible))
+            if collapsibles:
+                # Focus the last (most recent) collapsible's title
+                last_collapsible = collapsibles[-1]
+                last_title = last_collapsible.query_one(NonClickableCollapsibleTitle)
+                last_title.focus()
+                last_collapsible.scroll_visible()
+                event.stop()
+                event.prevent_default()
+                return
+
+        # Auto-focus input when user types printable characters
         if event.is_printable and not isinstance(self.focused, Input | TextArea):
             self.input_field.focus_input()
 
