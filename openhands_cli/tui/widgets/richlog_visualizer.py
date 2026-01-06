@@ -240,6 +240,26 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """
         return not self.cli_settings.default_cells_expanded
 
+    def _make_collapsible(
+        self, content: str, title: str, event: Event
+    ) -> Collapsible:
+        """Create a Collapsible widget with standard settings.
+
+        Args:
+            content: The content string to display in the collapsible.
+            title: The title for the collapsible header.
+            event: The event used to determine border color.
+
+        Returns:
+            A configured Collapsible widget.
+        """
+        return Collapsible(
+            content,
+            title=title,
+            collapsed=self._default_collapsed,
+            border_color=_get_event_border_color(event),
+        )
+
     def _create_event_collapsible(self, event: Event) -> Collapsible | None:
         """Create a Collapsible widget for the event with appropriate styling."""
         # Use the event's visualize property for content
@@ -269,27 +289,16 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return Collapsible(
-                content_string,
-                title=title,
-                collapsed=self._default_collapsed,
-                border_color=_get_event_border_color(event),
-            )
+            return self._make_collapsible(content_string, title, event)
         elif isinstance(event, ObservationEvent):
             title = self._extract_meaningful_title(event, "Observation")
-            return Collapsible(
-                self._escape_rich_markup(str(content)),
-                title=title,
-                collapsed=self._default_collapsed,
-                border_color=_get_event_border_color(event),
+            return self._make_collapsible(
+                self._escape_rich_markup(str(content)), title, event
             )
         elif isinstance(event, UserRejectObservation):
             title = self._extract_meaningful_title(event, "User Rejected Action")
-            return Collapsible(
-                self._escape_rich_markup(str(content)),
-                title=title,
-                collapsed=self._default_collapsed,
-                border_color=_get_event_border_color(event),
+            return self._make_collapsible(
+                self._escape_rich_markup(str(content)), title, event
             )
         elif isinstance(event, MessageEvent):
             if (
@@ -311,12 +320,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics and event.llm_message.role == "assistant":
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return Collapsible(
-                content_string,
-                title=title,
-                collapsed=self._default_collapsed,
-                border_color=_get_event_border_color(event),
-            )
+            return self._make_collapsible(content_string, title, event)
         elif isinstance(event, AgentErrorEvent):
             title = self._extract_meaningful_title(event, "Agent Error")
             content_string = self._escape_rich_markup(str(content))
@@ -324,12 +328,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return Collapsible(
-                content_string,
-                title=title,
-                collapsed=self._default_collapsed,
-                border_color=_get_event_border_color(event),
-            )
+            return self._make_collapsible(content_string, title, event)
         elif isinstance(event, ConversationErrorEvent):
             title = self._extract_meaningful_title(event, "Conversation Error")
             content_string = self._escape_rich_markup(str(content))
@@ -337,19 +336,11 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return Collapsible(
-                content_string,
-                title=title,
-                collapsed=self._default_collapsed,
-                border_color=_get_event_border_color(event),
-            )
+            return self._make_collapsible(content_string, title, event)
         elif isinstance(event, PauseEvent):
             title = self._extract_meaningful_title(event, "User Paused")
-            return Collapsible(
-                self._escape_rich_markup(str(content)),
-                title=title,
-                collapsed=self._default_collapsed,
-                border_color=_get_event_border_color(event),
+            return self._make_collapsible(
+                self._escape_rich_markup(str(content)), title, event
             )
         elif isinstance(event, Condensation):
             title = self._extract_meaningful_title(event, "Condensation")
@@ -358,12 +349,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return Collapsible(
-                content_string,
-                title=title,
-                collapsed=self._default_collapsed,
-                border_color=_get_event_border_color(event),
-            )
+            return self._make_collapsible(content_string, title, event)
         else:
             # Fallback for unknown event types
             title = self._extract_meaningful_title(
@@ -372,12 +358,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             content_string = (
                 f"{self._escape_rich_markup(str(content))}\n\nSource: {event.source}"
             )
-            return Collapsible(
-                content_string,
-                title=title,
-                collapsed=self._default_collapsed,
-                border_color=_get_event_border_color(event),
-            )
+            return self._make_collapsible(content_string, title, event)
 
     def _format_metrics_subtitle(self) -> str | None:
         """Format LLM metrics as a visually appealing subtitle string."""
