@@ -14,7 +14,6 @@ from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
 from textual.containers import Container, Horizontal
 from textual.content import Content, ContentText
-from textual.dom import DOMNode
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
@@ -30,6 +29,8 @@ class CollapsibleTitle(Container, can_focus=True):
     """Title and symbol for the Collapsible widget.
 
     Supports click-to-toggle and keyboard navigation (Enter to toggle).
+    Emits Navigate messages for arrow key navigation, which should be
+    handled by the parent App that owns the list of collapsibles.
     """
 
     ALLOW_SELECT = False
@@ -89,8 +90,8 @@ class CollapsibleTitle(Container, can_focus=True):
 
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("enter", "toggle_collapsible", "Toggle collapsible", show=False),
-        Binding("up", "focus_previous_cell", "Previous cell", show=False),
-        Binding("down", "focus_next_cell", "Next cell", show=False),
+        Binding("up", "navigate_previous", "Previous cell", show=False),
+        Binding("down", "navigate_next", "Next cell", show=False),
     ]
 
     collapsed = reactive(True)
@@ -120,6 +121,22 @@ class CollapsibleTitle(Container, can_focus=True):
     class Toggle(Message):
         """Request to toggle the collapsible state."""
 
+    class Navigate(Message):
+        """Request to navigate to a sibling cell.
+
+        This message bubbles up to the App, which owns the list of collapsibles
+        and can efficiently handle navigation without O(n²) DOM traversal.
+        """
+
+        def __init__(self, direction: int) -> None:
+            """Initialize Navigate message.
+
+            Args:
+                direction: -1 for previous (up), 1 for next (down)
+            """
+            super().__init__()
+            self.direction = direction
+
     async def _on_click(self, event: events.Click) -> None:
         """Toggle collapsible when title area is clicked."""
         event.stop()
@@ -129,109 +146,13 @@ class CollapsibleTitle(Container, can_focus=True):
         """Toggle the collapsible when Enter is pressed."""
         self.post_message(self.Toggle())
 
-    def action_focus_previous_cell(self) -> None:
-        """Focus the previous collapsible cell (up arrow)."""
-        self._navigate_to_sibling_cell(direction=-1)
+    def action_navigate_previous(self) -> None:
+        """Request navigation to previous cell (up arrow)."""
+        self.post_message(self.Navigate(direction=-1))
 
-    def action_focus_next_cell(self) -> None:
-        """Focus the next collapsible cell (down arrow)."""
-        self._navigate_to_sibling_cell(direction=1)
-
-    def _navigate_to_sibling_cell(self, direction: int) -> None:
-        """Navigate to a sibling collapsible cell.
-
-        Args:
-            direction: -1 for previous (up), 1 for next (down)
-        """
-        # Find the parent Collapsible using ancestor query (robust to nesting changes)
-        parent_collapsible = self._find_parent_collapsible()
-        if parent_collapsible is None:
-            return
-
-        # Find the container holding collapsibles using ancestor query
-        container = self._find_collapsible_container(parent_collapsible)
-        if container is None:
-            return
-
-        # Find the target collapsible in a single pass (O(n) but no list allocation)
-        target = self._find_sibling_collapsible(
-            container, parent_collapsible, direction
-        )
-        if target is None:
-            return
-
-        # Focus the title of the target collapsible
-        target_title = target.query_one(CollapsibleTitle)
-        target_title.focus()
-        # Scroll the target into view
-        target.scroll_visible()
-
-    def _find_sibling_collapsible(
-        self, container: DOMNode, current: "Collapsible", direction: int
-    ) -> "Collapsible | None":
-        """Find the next or previous sibling Collapsible in a single iteration.
-
-        This avoids creating a full list and calling .index(), reducing allocations.
-
-        Args:
-            container: The container holding Collapsible widgets.
-            current: The current Collapsible widget.
-            direction: -1 for previous, 1 for next.
-
-        Returns:
-            The target Collapsible or None if at boundary.
-        """
-        prev_collapsible: Collapsible | None = None
-
-        for collapsible in container.query(Collapsible):
-            if collapsible is current:
-                if direction == -1:
-                    # Want previous - return what we saw before
-                    return prev_collapsible
-                # Want next - continue to get the next one
-            elif prev_collapsible is current and direction == 1:
-                # We just passed current, this is the next one
-                return collapsible
-            prev_collapsible = collapsible
-
-        # Reached end without finding target (at boundary)
-        return None
-
-    def _find_parent_collapsible(self) -> "Collapsible | None":
-        """Find the parent Collapsible widget using ancestor traversal.
-
-        Returns:
-            The parent Collapsible or None if not found.
-        """
-        # Walk up the DOM tree to find the Collapsible ancestor
-        node = self.parent
-        while node is not None:
-            if isinstance(node, Collapsible):
-                return node
-            node = node.parent
-        return None
-
-    def _find_collapsible_container(self, collapsible: "Collapsible") -> DOMNode | None:
-        """Find the container that holds multiple Collapsible widgets.
-
-        Walks up from the collapsible to find a container with multiple
-        Collapsible children (typically the main_display).
-
-        Args:
-            collapsible: The current Collapsible widget.
-
-        Returns:
-            The container DOMNode or None if not found.
-        """
-        node = collapsible.parent
-        while node is not None:
-            # Check if this container has multiple Collapsible children
-            collapsible_count = len(list(node.query(Collapsible)))
-            if collapsible_count > 1:
-                return node
-            node = node.parent
-        # Fallback to immediate parent if no container with multiple found
-        return collapsible.parent
+    def action_navigate_next(self) -> None:
+        """Request navigation to next cell (down arrow)."""
+        self.post_message(self.Navigate(direction=1))
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press - post CopyRequested when copy button is clicked."""

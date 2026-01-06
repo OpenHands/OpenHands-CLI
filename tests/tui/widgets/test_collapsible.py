@@ -287,6 +287,44 @@ class MultiCollapsibleTestApp(App):
                 "Content 3", title="Cell 3", collapsed=True, border_color="green"
             )
 
+    def on_collapsible_title_navigate(
+        self, event: CollapsibleTitle.Navigate
+    ) -> None:
+        """Handle navigation between collapsible cells."""
+        event.stop()
+
+        # Get all collapsibles as a list for index-based navigation
+        main_display = self.query_one("#main_display")
+        collapsibles = list(main_display.query(Collapsible))
+        if not collapsibles:
+            return
+
+        # Find which collapsible contains the focused title
+        focused = self.focused
+        current_collapsible = None
+        for collapsible in collapsibles:
+            title = collapsible.query_one(CollapsibleTitle)
+            if title is focused:
+                current_collapsible = collapsible
+                break
+
+        if current_collapsible is None:
+            return
+
+        # Calculate target index
+        current_index = collapsibles.index(current_collapsible)
+        target_index = current_index + event.direction
+
+        # Check bounds
+        if target_index < 0 or target_index >= len(collapsibles):
+            return
+
+        # Focus the target collapsible's title
+        target = collapsibles[target_index]
+        target_title = target.query_one(CollapsibleTitle)
+        target_title.focus()
+        target.scroll_visible()
+
 
 @pytest.mark.asyncio
 async def test_arrow_key_navigation_down() -> None:

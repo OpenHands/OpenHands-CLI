@@ -457,6 +457,52 @@ class OpenHandsApp(App):
         for collapsible in collapsibles:
             collapsible.collapsed = any_expanded
 
+    def on_collapsible_title_navigate(
+        self, event: CollapsibleTitle.Navigate
+    ) -> None:
+        """Handle navigation between collapsible cells.
+
+        The App owns the list of collapsibles and can navigate efficiently
+        using simple index arithmetic rather than O(n²) DOM traversal.
+        """
+        from textual.css.query import NoMatches
+
+        event.stop()
+
+        # Get all collapsibles as a list for index-based navigation
+        collapsibles = list(self.main_display.query(Collapsible))
+        if not collapsibles:
+            return
+
+        # Find which collapsible contains the focused title
+        focused = self.focused
+        current_collapsible = None
+        for collapsible in collapsibles:
+            try:
+                title = collapsible.query_one(CollapsibleTitle)
+                if title is focused:
+                    current_collapsible = collapsible
+                    break
+            except NoMatches:
+                continue
+
+        if current_collapsible is None:
+            return
+
+        # Calculate target index
+        current_index = collapsibles.index(current_collapsible)
+        target_index = current_index + event.direction
+
+        # Check bounds
+        if target_index < 0 or target_index >= len(collapsibles):
+            return
+
+        # Focus the target collapsible's title
+        target = collapsibles[target_index]
+        target_title = target.query_one(CollapsibleTitle)
+        target_title.focus()
+        target.scroll_visible()
+
     def on_key(self, event: events.Key) -> None:
         """Handle keyboard navigation.
 
