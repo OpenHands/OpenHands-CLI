@@ -181,9 +181,6 @@ class OpenHandsCloudACPAgent(ACPAgent):
                 {"reason": f"Unsupported authentication method: {method_id}"}
             )
 
-        from openhands_cli.auth.api_client import (
-            ApiClientError,
-        )
         from openhands_cli.auth.device_flow import (
             DeviceFlowError,
             authenticate_with_device_flow,

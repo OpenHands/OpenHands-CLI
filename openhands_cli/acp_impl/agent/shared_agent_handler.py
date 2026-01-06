@@ -109,7 +109,9 @@ class SharedACPAgentHandler:
             load_agent_specs()
             auth_methods = [
                 AuthMethod(
-                    description="OAuth with OpenHands Cloud", id="oauth", name="OAuth"
+                    description="OAuth with OpenHands Cloud",
+                    id="oauth",
+                    name="OAuth with OpenHands Cloud",
                 )
             ]
             logger.info("Agent configured, no authentication required")
