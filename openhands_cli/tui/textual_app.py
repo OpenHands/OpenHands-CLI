@@ -35,7 +35,7 @@ from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModal
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
-from openhands_cli.tui.panels.confirmation_panel import ConfirmationSidePanel
+from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
@@ -127,7 +127,7 @@ class OpenHandsApp(App):
         )
 
         # Confirmation panel tracking
-        self.confirmation_panel: ConfirmationSidePanel | None = None
+        self.confirmation_panel: InlineConfirmationPanel | None = None
 
         # MCP panel tracking
         self.mcp_panel: MCPSidePanel | None = None
@@ -564,7 +564,12 @@ class OpenHandsApp(App):
     def _handle_confirmation_request(
         self, pending_actions: list[ActionEvent]
     ) -> UserConfirmation:
-        """Handle confirmation request by showing the side panel.
+        """Handle confirmation request by showing an inline panel in the main display.
+
+        The inline confirmation panel is mounted in the main_display area,
+        underneath the latest action event collapsible. Since the action details
+        are already visible in the collapsible above, this panel only shows
+        the confirmation options.
 
         Args:
             pending_actions: List of pending actions that need confirmation
@@ -580,7 +585,7 @@ class OpenHandsApp(App):
         decision_future: Future[UserConfirmation] = Future()
 
         def show_confirmation_panel():
-            """Show the confirmation panel in the UI thread."""
+            """Show the inline confirmation panel in the UI thread."""
             try:
                 # Remove any existing confirmation panel
                 if self.confirmation_panel:
@@ -597,11 +602,14 @@ class OpenHandsApp(App):
                     if not decision_future.done():
                         decision_future.set_result(decision)
 
-                # Create and mount the confirmation panel
-                self.confirmation_panel = ConfirmationSidePanel(
-                    pending_actions, on_confirmation_decision
+                # Create and mount the inline confirmation panel in main_display
+                # This places it underneath the latest action event collapsible
+                self.confirmation_panel = InlineConfirmationPanel(
+                    len(pending_actions), on_confirmation_decision
                 )
-                self.content_area.mount(self.confirmation_panel)
+                self.main_display.mount(self.confirmation_panel)
+                # Scroll to show the confirmation panel
+                self.main_display.scroll_end(animate=False)
 
             except Exception:
                 # If there's an error, default to DEFER
