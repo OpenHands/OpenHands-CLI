@@ -199,7 +199,14 @@ class CollapsibleContents(Container):
 
 
 class Collapsible(Widget):
-    """A collapsible container that cannot be toggled by clicking."""
+    """A collapsible container with click and keyboard toggle support.
+
+    Can be toggled by:
+    - Clicking the title bar
+    - Pressing Enter when the title is focused
+    - Arrow keys to navigate between cells (handled by parent App)
+    - Ctrl+O to toggle all cells at once (handled by parent App)
+    """
 
     ALLOW_MAXIMIZE = True
     collapsed = reactive(True, init=False)
