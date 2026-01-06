@@ -2,46 +2,43 @@ INLINE_CONFIRMATION_PANEL_STYLE = """
 InlineConfirmationPanel {
     width: 100%;
     height: auto;
-    background: $surface;
-    padding: 1;
+    background: $background;
+    padding: 0 1;
     margin: 1 0;
-    border: solid $primary;
 }
 
 .inline-confirmation-content {
     width: 100%;
     height: auto;
-    align: center middle;
 }
 
 .inline-confirmation-header {
     color: $primary;
     text-style: bold;
     height: auto;
-    width: auto;
-    padding-right: 1;
+    width: 100%;
+    margin-bottom: 1;
 }
 
 .inline-confirmation-options {
     height: auto;
-    width: 1fr;
-    background: $background;
-    border: solid $secondary;
+    width: 100%;
+    background: transparent;
 }
 
 .inline-confirmation-options > ListItem {
-    padding: 0 2;
+    padding: 0;
     margin: 0;
     height: auto;
+    background: transparent;
 }
 
 .inline-confirmation-options > ListItem:hover {
-    background: $surface;
+    background: transparent;
 }
 
 .inline-confirmation-options > ListItem.-highlighted {
-    background: $primary;
-    color: $foreground;
+    background: transparent;
 }
 
 .inline-confirmation-options Static {

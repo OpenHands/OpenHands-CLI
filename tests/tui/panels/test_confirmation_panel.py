@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 from textual.app import App
-from textual.containers import Horizontal
+from textual.containers import Vertical
 from textual.widgets import ListView, Static
 
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
@@ -31,7 +31,7 @@ def make_test_app(widget):
     "query, expected_type",
     [
         (".inline-confirmation-header", Static),
-        (".inline-confirmation-content", Horizontal),
+        (".inline-confirmation-content", Vertical),
     ],
 )
 async def test_inline_confirmation_panel_structure_contains_expected_nodes(
