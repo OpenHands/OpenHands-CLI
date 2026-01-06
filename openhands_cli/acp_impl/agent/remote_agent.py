@@ -183,7 +183,6 @@ class OpenHandsCloudACPAgent(ACPAgent):
 
         from openhands_cli.auth.api_client import (
             ApiClientError,
-            fetch_user_data_after_oauth,
         )
         from openhands_cli.auth.device_flow import (
             DeviceFlowError,
@@ -206,14 +205,6 @@ class OpenHandsCloudACPAgent(ACPAgent):
 
             # Update the agent's API key
             self._cloud_api_key = api_key
-
-            # Fetch user data and configure the agent
-            try:
-                await fetch_user_data_after_oauth(self._cloud_api_url, api_key)
-            except ApiClientError as e:
-                # Log - auth succeeded even if data fetch failed
-                logger.warning(f"Failed to fetch user data after OAuth: {e}")
-
             logger.info("OAuth authentication completed successfully")
             return AuthenticateResponse()
 
