@@ -6,7 +6,7 @@ Ctrl+O to toggle all cells at once.
 """
 
 import platform
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol
 
 import pyperclip
 from textual import events
@@ -18,6 +18,10 @@ from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Button, Static
+
+
+if TYPE_CHECKING:
+    from textual.dom import DOMNode
 
 
 def _is_linux() -> bool:
@@ -362,6 +366,12 @@ class Collapsible(Widget):
             yield self._content_widget
 
 
+class _HasQueryOne(Protocol):
+    """Protocol for classes that support query_one method (e.g., Textual App)."""
+
+    def query_one(self, selector: str) -> "DOMNode": ...
+
+
 class CollapsibleNavigationMixin:
     """Mixin providing navigation handler for apps with Collapsible widgets.
 
@@ -374,7 +384,9 @@ class CollapsibleNavigationMixin:
             ...
     """
 
-    def on_collapsible_title_navigate(self, event: CollapsibleTitle.Navigate) -> None:
+    def on_collapsible_title_navigate(
+        self: _HasQueryOne, event: CollapsibleTitle.Navigate
+    ) -> None:
         """Handle navigation between collapsible cells.
 
         The Navigate message includes the source collapsible, so we can
@@ -383,8 +395,8 @@ class CollapsibleNavigationMixin:
         event.stop()
 
         # Get all collapsibles as a list for index-based navigation
-        main_display = self.query_one("#main_display")  # type: ignore[attr-defined]
-        collapsibles = list(main_display.query(Collapsible))
+        main_display = self.query_one("#main_display")
+        collapsibles = list(main_display.query(Collapsible))  # type: ignore[union-attr]
         if not collapsibles:
             return
 

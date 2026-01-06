@@ -19,6 +19,7 @@ from textual.containers import Container, Horizontal, VerticalScroll
 from textual.screen import Screen
 from textual.signal import Signal
 from textual.widgets import Footer, Input, Static, TextArea
+from textual_autocomplete import AutoComplete
 
 from openhands.sdk.event import ActionEvent
 from openhands.sdk.security.confirmation_policy import (
@@ -50,16 +51,6 @@ from openhands_cli.tui.widgets.status_line import (
 )
 from openhands_cli.user_actions.types import UserConfirmation
 from openhands_cli.utils import json_callback
-
-
-# Optional dependency for autocomplete functionality
-try:
-    from textual_autocomplete import AutoComplete
-
-    _HAS_AUTOCOMPLETE = True
-except ImportError:
-    AutoComplete = None  # type: ignore[misc, assignment]
-    _HAS_AUTOCOMPLETE = False
 
 
 class OpenHandsApp(CollapsibleNavigationMixin, App):
@@ -504,8 +495,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         This prevents Tab key interception when user wants to select an
         autocomplete suggestion.
         """
-        if not _HAS_AUTOCOMPLETE:
-            return False
         autocompletes = self.query(AutoComplete)
         return any(ac.display for ac in autocompletes)
 
