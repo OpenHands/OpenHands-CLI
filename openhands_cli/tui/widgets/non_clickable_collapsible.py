@@ -144,7 +144,7 @@ class NonClickableCollapsibleTitle(Container, can_focus=True):
         """
         # Get the parent NonClickableCollapsible
         parent_collapsible = self.parent
-        if parent_collapsible is None:
+        if not isinstance(parent_collapsible, NonClickableCollapsible):
             return
 
         # Get the container that holds all collapsibles (usually main_display)
