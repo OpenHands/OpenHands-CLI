@@ -125,17 +125,23 @@ class CollapsibleTitle(Container, can_focus=True):
         """Request to navigate to a sibling cell.
 
         This message bubbles up to the App, which owns the list of collapsibles
-        and can efficiently handle navigation without O(n²) DOM traversal.
+        and can efficiently handle navigation using direct index lookup.
+
+        The message includes the source collapsible reference, eliminating the
+        need for the App to search through all collapsibles to find which one
+        is currently focused.
         """
 
-        def __init__(self, direction: int) -> None:
+        def __init__(self, direction: int, collapsible: "Collapsible") -> None:
             """Initialize Navigate message.
 
             Args:
                 direction: -1 for previous (up), 1 for next (down)
+                collapsible: The source Collapsible widget requesting navigation
             """
             super().__init__()
             self.direction = direction
+            self.collapsible = collapsible
 
     async def _on_click(self, event: events.Click) -> None:
         """Toggle collapsible when title area is clicked."""
@@ -146,13 +152,26 @@ class CollapsibleTitle(Container, can_focus=True):
         """Toggle the collapsible when Enter is pressed."""
         self.post_message(self.Toggle())
 
+    def _find_parent_collapsible(self) -> "Collapsible | None":
+        """Find the parent Collapsible widget by walking up the DOM tree."""
+        node = self.parent
+        while node is not None:
+            if isinstance(node, Collapsible):
+                return node
+            node = node.parent
+        return None
+
     def action_navigate_previous(self) -> None:
         """Request navigation to previous cell (up arrow)."""
-        self.post_message(self.Navigate(direction=-1))
+        parent = self._find_parent_collapsible()
+        if parent is not None:
+            self.post_message(self.Navigate(direction=-1, collapsible=parent))
 
     def action_navigate_next(self) -> None:
         """Request navigation to next cell (down arrow)."""
-        self.post_message(self.Navigate(direction=1))
+        parent = self._find_parent_collapsible()
+        if parent is not None:
+            self.post_message(self.Navigate(direction=1, collapsible=parent))
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press - post CopyRequested when copy button is clicked."""

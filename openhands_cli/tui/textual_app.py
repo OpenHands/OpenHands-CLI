@@ -460,16 +460,12 @@ class OpenHandsApp(App):
         for collapsible in collapsibles:
             collapsible.collapsed = any_expanded
 
-    def on_collapsible_title_navigate(
-        self, event: CollapsibleTitle.Navigate
-    ) -> None:
+    def on_collapsible_title_navigate(self, event: CollapsibleTitle.Navigate) -> None:
         """Handle navigation between collapsible cells.
 
-        The App owns the list of collapsibles and can navigate efficiently
-        using simple index arithmetic rather than O(n²) DOM traversal.
+        The Navigate message includes the source collapsible, so we can
+        directly find its index without searching through all cells.
         """
-        from textual.css.query import NoMatches
-
         event.stop()
 
         # Get all collapsibles as a list for index-based navigation
@@ -477,23 +473,14 @@ class OpenHandsApp(App):
         if not collapsibles:
             return
 
-        # Find which collapsible contains the focused title
-        focused = self.focused
-        current_collapsible = None
-        for collapsible in collapsibles:
-            try:
-                title = collapsible.query_one(CollapsibleTitle)
-                if title is focused:
-                    current_collapsible = collapsible
-                    break
-            except NoMatches:
-                continue
-
-        if current_collapsible is None:
+        # Use the collapsible reference from the event directly
+        try:
+            current_index = collapsibles.index(event.collapsible)
+        except ValueError:
+            # Collapsible not in list (shouldn't happen, but be safe)
             return
 
         # Calculate target index
-        current_index = collapsibles.index(current_collapsible)
         target_index = current_index + event.direction
 
         # Check bounds

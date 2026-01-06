@@ -287,9 +287,7 @@ class MultiCollapsibleTestApp(App):
                 "Content 3", title="Cell 3", collapsed=True, border_color="green"
             )
 
-    def on_collapsible_title_navigate(
-        self, event: CollapsibleTitle.Navigate
-    ) -> None:
+    def on_collapsible_title_navigate(self, event: CollapsibleTitle.Navigate) -> None:
         """Handle navigation between collapsible cells."""
         event.stop()
 
@@ -299,20 +297,13 @@ class MultiCollapsibleTestApp(App):
         if not collapsibles:
             return
 
-        # Find which collapsible contains the focused title
-        focused = self.focused
-        current_collapsible = None
-        for collapsible in collapsibles:
-            title = collapsible.query_one(CollapsibleTitle)
-            if title is focused:
-                current_collapsible = collapsible
-                break
-
-        if current_collapsible is None:
+        # Use the collapsible reference from the event directly
+        try:
+            current_index = collapsibles.index(event.collapsible)
+        except ValueError:
             return
 
         # Calculate target index
-        current_index = collapsibles.index(current_collapsible)
         target_index = current_index + event.direction
 
         # Check bounds

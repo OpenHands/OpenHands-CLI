@@ -240,9 +240,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """
         return not self.cli_settings.default_cells_expanded
 
-    def _make_collapsible(
-        self, content: str, title: str, event: Event
-    ) -> Collapsible:
+    def _make_collapsible(self, content: str, title: str, event: Event) -> Collapsible:
         """Create a Collapsible widget with standard settings.
 
         Args:
