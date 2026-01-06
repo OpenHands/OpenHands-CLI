@@ -447,11 +447,14 @@ class OpenHandsApp(App):
         self._handle_exit()
 
     def action_toggle_cells(self) -> None:
-        """Action to handle Ctrl+O key binding - toggle expand/collapse all
-        collapsible widgets."""
+        """Action to handle Ctrl+O key binding.
+
+        Collapses all cells if any are expanded, otherwise expands all cells.
+        This provides a quick way to minimize or maximize all content at once.
+        """
         collapsibles = self.main_display.query(Collapsible)
 
-        # Check if any are expanded - if so, collapse all; otherwise expand all
+        # If any cell is expanded, collapse all; otherwise expand all
         any_expanded = any(not collapsible.collapsed for collapsible in collapsibles)
 
         for collapsible in collapsibles:
