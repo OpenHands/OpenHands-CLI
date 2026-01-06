@@ -463,7 +463,7 @@ class OpenHandsApp(App):
         without losing their typing context - as soon as they start typing,
         focus automatically returns to the input field.
         """
-        if event.is_printable and not isinstance(self.focused, (Input, TextArea)):
+        if event.is_printable and not isinstance(self.focused, Input | TextArea):
             self.input_field.focus_input()
 
     def action_pause_conversation(self) -> None:

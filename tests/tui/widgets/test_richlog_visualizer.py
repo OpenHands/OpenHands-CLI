@@ -289,15 +289,15 @@ class TestConversationErrorEventHandling:
 
         # Mock CLI settings to ensure default_cells_expanded=True for this test
         mock_settings = CliSettings(default_cells_expanded=True)
-        with patch.object(
-            CliSettings, "load", return_value=mock_settings
-        ):
+        with patch.object(CliSettings, "load", return_value=mock_settings):
             # Clear cached settings to ensure our mock is used
             visualizer._cli_settings = None
 
             # Create a ConversationErrorEvent with test content
             error_event = ConversationErrorEvent(
-                source="agent", code="test_error", detail="Test conversation error message"
+                source="agent",
+                code="test_error",
+                detail="Test conversation error message",
             )
 
             # Create the collapsible widget for the error event
