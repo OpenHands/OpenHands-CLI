@@ -466,7 +466,7 @@ class OpenHandsApp(App):
           instead of the first one (unless autocomplete is showing)
         """
         # Handle Tab from input area - focus most recent cell
-        # Only do this if autocomplete dropdown is not visible (Tab is used for selection)
+        # Skip if autocomplete dropdown is visible (Tab is used for selection)
         if event.key == "tab" and isinstance(self.focused, Input | TextArea):
             if not self._is_autocomplete_showing():
                 collapsibles = list(self.main_display.query(Collapsible))
@@ -494,8 +494,8 @@ class OpenHandsApp(App):
             from textual_autocomplete import AutoComplete
 
             autocomplete = self.query_one(AutoComplete)
-            # Check if the dropdown is mounted and has visible items
-            return autocomplete.display and len(autocomplete._items) > 0
+            # Check if the dropdown is mounted and visible
+            return bool(autocomplete.display)
         except Exception:
             return False
 

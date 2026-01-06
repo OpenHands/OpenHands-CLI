@@ -38,11 +38,21 @@ def visualizer():
 @pytest.fixture
 def mock_cli_settings():
     """Provide a context manager for mocking CliSettings.load with default settings."""
+    from contextlib import contextmanager
 
-    def _mock_settings(**kwargs):
-        """Create mock context with specified settings."""
+    @contextmanager
+    def _mock_settings(visualizer=None, **kwargs):
+        """Create mock context with specified settings.
+
+        Args:
+            visualizer: Optional visualizer to clear cached settings for
+            **kwargs: Settings to pass to CliSettings constructor
+        """
         settings = CliSettings(**kwargs)
-        return patch.object(CliSettings, "load", return_value=settings)
+        with patch.object(CliSettings, "load", return_value=settings):
+            if visualizer is not None:
+                visualizer._cli_settings = None
+            yield settings
 
     return _mock_settings
 
@@ -268,16 +278,13 @@ class TestConversationErrorEventHandling:
         self, visualizer, mock_cli_settings
     ):
         """Test that ConversationErrorEvent is properly handled with error styling."""
-        with mock_cli_settings(default_cells_expanded=True):
-            # Clear cached settings to ensure our mock is used
-            visualizer._cli_settings = None
+        error_event = ConversationErrorEvent(
+            source="agent",
+            code="test_error",
+            detail="Test conversation error message",
+        )
 
-            error_event = ConversationErrorEvent(
-                source="agent",
-                code="test_error",
-                detail="Test conversation error message",
-            )
-
+        with mock_cli_settings(visualizer=visualizer, default_cells_expanded=True):
             collapsible = visualizer._create_event_collapsible(error_event)
 
             assert collapsible is not None
@@ -304,13 +311,13 @@ class TestDefaultCellsExpandedSetting:
         self, visualizer, mock_cli_settings, default_expanded: bool
     ):
         """Test that collapsible widgets respect the default_cells_expanded setting."""
-        with mock_cli_settings(default_cells_expanded=default_expanded):
-            visualizer.reload_configuration()
+        error_event = ConversationErrorEvent(
+            source="agent", code="test_error", detail="Test message"
+        )
 
-            error_event = ConversationErrorEvent(
-                source="agent", code="test_error", detail="Test message"
-            )
-
+        with mock_cli_settings(
+            visualizer=visualizer, default_cells_expanded=default_expanded
+        ):
             collapsible = visualizer._create_event_collapsible(error_event)
             assert collapsible is not None
 
@@ -321,13 +328,11 @@ class TestDefaultCellsExpandedSetting:
     def test_default_collapsed_property(self, visualizer, mock_cli_settings):
         """Test the _default_collapsed property returns correct value."""
         # Test with default_cells_expanded=True (default)
-        with mock_cli_settings(default_cells_expanded=True):
-            visualizer.reload_configuration()
+        with mock_cli_settings(visualizer=visualizer, default_cells_expanded=True):
             assert visualizer._default_collapsed is False
 
         # Test with default_cells_expanded=False
-        with mock_cli_settings(default_cells_expanded=False):
-            visualizer.reload_configuration()
+        with mock_cli_settings(visualizer=visualizer, default_cells_expanded=False):
             assert visualizer._default_collapsed is True
 
 
