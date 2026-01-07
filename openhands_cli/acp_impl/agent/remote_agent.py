@@ -324,6 +324,10 @@ class OpenHandsCloudACPAgent(ACPAgent):
             )
             sandbox_id = self._verify_and_get_sandbox_id(session_id)
 
+            raise RequestError.internal_error(
+            {"reason": "sandbox id", "details": str(sandbox_id)}
+        )
+
         # Create new conversation with cloud workspace
         logger.debug(f"Creating new cloud conversation for session {session_id}")
         conversation, workspace = self._setup_cloud_conversation(
