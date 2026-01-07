@@ -425,10 +425,6 @@ class OpenHandsCloudACPAgent(ACPAgent):
             conversation_id=UUID(session_id),
         )
 
-        raise RequestError.internal_error(
-            {"reason": "check session id", "details": str(conversation.id)}
-        )
-
         subscriber.conversation = conversation
         return conversation, workspace
 
