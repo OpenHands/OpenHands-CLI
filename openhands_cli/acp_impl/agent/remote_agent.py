@@ -317,6 +317,9 @@ class OpenHandsCloudACPAgent(ACPAgent):
 
         # Check if we're resuming a conversation
         sandbox_id: str | None = None
+        raise RequestError.internal_error(
+            {"reason": "check resume id", "details": str(self._resume_conversation_id)}
+        )
         if self._resume_conversation_id:
             logger.info(
                 f"Resuming conversation {session_id}, "
@@ -325,8 +328,8 @@ class OpenHandsCloudACPAgent(ACPAgent):
             sandbox_id = self._verify_and_get_sandbox_id(session_id)
 
             raise RequestError.internal_error(
-            {"reason": "sandbox id", "details": str(sandbox_id)}
-        )
+                {"reason": "sandbox id", "details": str(sandbox_id)}
+            )
 
         # Create new conversation with cloud workspace
         logger.debug(f"Creating new cloud conversation for session {session_id}")
