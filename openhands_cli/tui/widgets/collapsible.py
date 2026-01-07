@@ -261,7 +261,7 @@ class Collapsible(Widget):
         collapsed: bool = True,
         collapsed_symbol: str = "▶",
         expanded_symbol: str = "▼",
-        border_color: str = "$secondary",
+        border_color: str | None = "$secondary",
         name: str | None = None,
         id: str | None = None,
         classes: str | None = None,
@@ -275,7 +275,7 @@ class Collapsible(Widget):
             collapsed: Default status of the contents.
             collapsed_symbol: Collapsed symbol before the title.
             expanded_symbol: Expanded symbol before the title.
-            border_color: CSS color for the left border.
+            border_color: CSS color for the left border. None to disable border.
             name: The name of the collapsible.
             id: The ID of the collapsible in the DOM.
             classes: The CSS classes of the collapsible.
@@ -294,7 +294,8 @@ class Collapsible(Widget):
         self._content_widget = Static(content)
         self.collapsed = collapsed
         self._watch_collapsed(collapsed)
-        self.styles.border_left = ("thick", border_color)
+        if border_color is not None:
+            self.styles.border_left = ("thick", border_color)
 
     def update_title(self, new_title: str) -> None:
         """Update the title of the collapsible.

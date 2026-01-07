@@ -6,6 +6,8 @@ This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 import threading
 from typing import TYPE_CHECKING
 
+from textual.widgets import Static
+
 from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
 from openhands.sdk.event import (
     ActionEvent,
@@ -31,9 +33,13 @@ TOOL_ICON = "🔧"
 SUCCESS_ICON = "✓"
 ERROR_ICON = "✗"
 
+# Tool names that should be displayed as plain text (not collapsible)
+PLAIN_TEXT_TOOLS = {"finish", "think"}
+
 
 if TYPE_CHECKING:
     from textual.containers import VerticalScroll
+    from textual.widget import Widget
 
     from openhands_cli.tui.textual_app import OpenHandsApp
 
@@ -107,7 +113,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._cli_settings = CliSettings.load()
 
     def on_event(self, event: Event) -> None:
-        """Main event handler that creates Collapsible widgets for events."""
+        """Main event handler that creates widgets for events."""
         # Handle observation events by updating existing action collapsibles
         if isinstance(
             event, ObservationEvent | UserRejectObservation | AgentErrorEvent
@@ -115,18 +121,18 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if self._handle_observation_event(event):
                 return  # Successfully paired with action, no new widget needed
 
-        collapsible_widget = self._create_event_collapsible(event)
-        if collapsible_widget:
+        widget = self._create_event_widget(event)
+        if widget:
             # Check if we're in the main thread or a background thread
             current_thread_id = threading.get_ident()
             if current_thread_id == self._main_thread_id:
                 # We're in the main thread, update UI directly
-                self._add_widget_to_ui(collapsible_widget)
+                self._add_widget_to_ui(widget)
             else:
                 # We're in a background thread, use call_from_thread
-                self._app.call_from_thread(self._add_widget_to_ui, collapsible_widget)
+                self._app.call_from_thread(self._add_widget_to_ui, widget)
 
-    def _add_widget_to_ui(self, widget: Collapsible) -> None:
+    def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
         self._container.mount(widget)
         # Automatically scroll to the bottom to show the newly added widget
@@ -389,16 +395,16 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self,
         content: str,
         title: str,
-        event: Event,
         collapsed: bool | None = None,
+        border_color: str | None = None,
     ) -> Collapsible:
         """Create a Collapsible widget with standard settings.
 
         Args:
             content: The content string to display in the collapsible.
             title: The title for the collapsible header.
-            event: The event used to determine border color.
             collapsed: Override the default collapsed state. If None, uses default.
+            border_color: Override border color. None means no border.
 
         Returns:
             A configured Collapsible widget.
@@ -409,8 +415,41 @@ class ConversationVisualizer(ConversationVisualizerBase):
             content,
             title=title,
             collapsed=collapsed,
-            border_color=_get_event_border_color(event),
+            border_color=border_color,
         )
+
+    def _create_event_widget(self, event: Event) -> "Widget | None":
+        """Create a widget for the event - either plain text or collapsible."""
+        content = event.visualize
+
+        if not content.plain.strip():
+            return None
+
+        # Don't emit system prompt in CLI
+        if isinstance(event, SystemPromptEvent):
+            return None
+        # Don't emit condensation request events (internal events)
+        elif isinstance(event, CondensationRequest):
+            return None
+
+        # Check if this is a plain text event (finish, think, or message)
+        if isinstance(event, ActionEvent):
+            if event.tool_name in PLAIN_TEXT_TOOLS:
+                # Display as plain text without collapsible
+                return Static(str(content))
+
+        if isinstance(event, MessageEvent):
+            if (
+                self._skip_user_messages
+                and event.llm_message
+                and event.llm_message.role == "user"
+            ):
+                return None
+            # Display messages as plain text
+            return Static(str(content))
+
+        # For other events, use collapsible
+        return self._create_event_collapsible(event)
 
     def _create_event_collapsible(self, event: Event) -> Collapsible | None:
         """Create a Collapsible widget for the event with appropriate styling."""
@@ -437,9 +476,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 content_string = f"{content_string}\n\n{metrics}"
 
             # Action events default to collapsed since we have summary in title
-            collapsible = self._make_collapsible(
-                content_string, title, event, collapsed=True
-            )
+            collapsible = self._make_collapsible(content_string, title, collapsed=True)
 
             # Store for pairing with observation
             self._pending_actions[event.tool_call_id] = (event, collapsible)
@@ -449,32 +486,11 @@ class ConversationVisualizer(ConversationVisualizerBase):
             # If we get here, the observation wasn't paired with an action
             # (shouldn't happen normally, but handle gracefully)
             title = self._extract_meaningful_title(event, "Observation")
-            return self._make_collapsible(str(content), title, event)
+            return self._make_collapsible(str(content), title)
         elif isinstance(event, UserRejectObservation):
             # If we get here, the rejection wasn't paired with an action
             title = self._extract_meaningful_title(event, "User Rejected Action")
-            return self._make_collapsible(str(content), title, event)
-        elif isinstance(event, MessageEvent):
-            if (
-                self._skip_user_messages
-                and event.llm_message
-                and event.llm_message.role == "user"
-            ):
-                return None
-            assert event.llm_message is not None
-
-            if event.llm_message.role == "user":
-                title = self._extract_meaningful_title(event, "User Message")
-            else:
-                title = self._extract_meaningful_title(event, "Agent Message")
-
-            # Create content string with metrics if available
-            content_string = self._escape_rich_markup(str(content))
-            metrics = self._format_metrics_subtitle()
-            if metrics and event.llm_message.role == "assistant":
-                content_string = f"{content_string}\n\n{metrics}"
-
-            return self._make_collapsible(content_string, title, event)
+            return self._make_collapsible(str(content), title)
         elif isinstance(event, AgentErrorEvent):
             title = self._extract_meaningful_title(event, "Agent Error")
             content_string = self._escape_rich_markup(str(content))
@@ -482,7 +498,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return self._make_collapsible(content_string, title, event)
+            return self._make_collapsible(content_string, title)
         elif isinstance(event, ConversationErrorEvent):
             title = self._extract_meaningful_title(event, "Conversation Error")
             content_string = self._escape_rich_markup(str(content))
@@ -490,12 +506,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return self._make_collapsible(content_string, title, event)
+            return self._make_collapsible(content_string, title)
         elif isinstance(event, PauseEvent):
             title = self._extract_meaningful_title(event, "User Paused")
-            return self._make_collapsible(
-                self._escape_rich_markup(str(content)), title, event
-            )
+            return self._make_collapsible(self._escape_rich_markup(str(content)), title)
         elif isinstance(event, Condensation):
             title = self._extract_meaningful_title(event, "Condensation")
             content_string = self._escape_rich_markup(str(content))
@@ -503,7 +517,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return self._make_collapsible(content_string, title, event)
+            return self._make_collapsible(content_string, title)
         else:
             # Fallback for unknown event types
             title = self._extract_meaningful_title(
@@ -512,7 +526,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             content_string = (
                 f"{self._escape_rich_markup(str(content))}\n\nSource: {event.source}"
             )
-            return self._make_collapsible(content_string, title, event)
+            return self._make_collapsible(content_string, title)
 
     def _format_metrics_subtitle(self) -> str | None:
         """Format LLM metrics as a visually appealing subtitle string."""
