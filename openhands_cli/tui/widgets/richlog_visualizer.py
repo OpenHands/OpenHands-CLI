@@ -33,9 +33,6 @@ TOOL_ICON = "🔧"
 SUCCESS_ICON = "✓"
 ERROR_ICON = "✗"
 
-# Tool names that should be displayed as plain text (not collapsible)
-PLAIN_TEXT_TOOLS = {"finish", "think"}
-
 
 if TYPE_CHECKING:
     from textual.containers import VerticalScroll
@@ -114,22 +111,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
-        import logging
-
-        logging.debug(f"on_event: {event.__class__.__name__}")
-
         # Handle observation events by updating existing action collapsibles
         if isinstance(
             event, ObservationEvent | UserRejectObservation | AgentErrorEvent
         ):
-            logging.debug(
-                f"Observation event: tool_call_id={event.tool_call_id}, "
-                f"pending_actions={list(self._pending_actions.keys())}"
-            )
             if self._handle_observation_event(event):
-                logging.debug("Observation matched with action")
                 return  # Successfully paired with action, no new widget needed
-            logging.debug("Observation NOT matched with action")
 
         widget = self._create_event_widget(event)
         if widget:
@@ -152,12 +139,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self, collapsible: Collapsible, new_title: str, new_content: str
     ) -> None:
         """Update an existing widget in the UI (must be called from main thread)."""
-        import logging
-
-        logging.debug(
-            f"Updating collapsible: is_mounted={collapsible.is_mounted}, "
-            f"new_title={new_title[:50]}..."
-        )
         collapsible.update_title(new_title)
         collapsible.update_content(new_content)
         self._container.scroll_end(animate=False)
@@ -411,16 +392,16 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self,
         content: str,
         title: str,
+        event: Event,
         collapsed: bool | None = None,
-        border_color: str | None = None,
     ) -> Collapsible:
         """Create a Collapsible widget with standard settings.
 
         Args:
             content: The content string to display in the collapsible.
             title: The title for the collapsible header.
+            event: The event used to determine border color.
             collapsed: Override the default collapsed state. If None, uses default.
-            border_color: Override border color. None means no border.
 
         Returns:
             A configured Collapsible widget.
@@ -431,7 +412,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             content,
             title=title,
             collapsed=collapsed,
-            border_color=border_color,
+            border_color=_get_event_border_color(event),
         )
 
     def _create_event_widget(self, event: Event) -> "Widget | None":
@@ -450,8 +431,18 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         # Check if this is a plain text event (finish, think, or message)
         if isinstance(event, ActionEvent):
-            if event.tool_name in PLAIN_TEXT_TOOLS:
-                # Display as plain text without collapsible
+            if event.tool_name == "finish":
+                # For finish action, only show the message
+                action = event.action
+                if action and hasattr(action, "message"):
+                    message = getattr(action, "message", None)
+                    if message:
+                        return Static(str(message))
+                return Static(str(content))
+            elif event.tool_name == "think":
+                # For think action, show the action's visualize (not the full event)
+                if event.action:
+                    return Static(event.action.visualize)
                 return Static(str(content))
 
         if isinstance(event, MessageEvent):
@@ -492,12 +483,11 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 content_string = f"{content_string}\n\n{metrics}"
 
             # Action events default to collapsed since we have summary in title
-            collapsible = self._make_collapsible(content_string, title, collapsed=True)
+            collapsible = self._make_collapsible(
+                content_string, title, event, collapsed=True
+            )
 
             # Store for pairing with observation
-            import logging
-
-            logging.debug(f"Storing action with tool_call_id={event.tool_call_id}")
             self._pending_actions[event.tool_call_id] = (event, collapsible)
 
             return collapsible
@@ -505,11 +495,11 @@ class ConversationVisualizer(ConversationVisualizerBase):
             # If we get here, the observation wasn't paired with an action
             # (shouldn't happen normally, but handle gracefully)
             title = self._extract_meaningful_title(event, "Observation")
-            return self._make_collapsible(str(content), title)
+            return self._make_collapsible(str(content), title, event)
         elif isinstance(event, UserRejectObservation):
             # If we get here, the rejection wasn't paired with an action
             title = self._extract_meaningful_title(event, "User Rejected Action")
-            return self._make_collapsible(str(content), title)
+            return self._make_collapsible(str(content), title, event)
         elif isinstance(event, AgentErrorEvent):
             title = self._extract_meaningful_title(event, "Agent Error")
             content_string = self._escape_rich_markup(str(content))
@@ -517,7 +507,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return self._make_collapsible(content_string, title)
+            return self._make_collapsible(content_string, title, event)
         elif isinstance(event, ConversationErrorEvent):
             title = self._extract_meaningful_title(event, "Conversation Error")
             content_string = self._escape_rich_markup(str(content))
@@ -525,10 +515,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return self._make_collapsible(content_string, title)
+            return self._make_collapsible(content_string, title, event)
         elif isinstance(event, PauseEvent):
             title = self._extract_meaningful_title(event, "User Paused")
-            return self._make_collapsible(self._escape_rich_markup(str(content)), title)
+            return self._make_collapsible(
+                self._escape_rich_markup(str(content)), title, event
+            )
         elif isinstance(event, Condensation):
             title = self._extract_meaningful_title(event, "Condensation")
             content_string = self._escape_rich_markup(str(content))
@@ -536,7 +528,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return self._make_collapsible(content_string, title)
+            return self._make_collapsible(content_string, title, event)
         else:
             # Fallback for unknown event types
             title = self._extract_meaningful_title(
@@ -545,7 +537,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             content_string = (
                 f"{self._escape_rich_markup(str(content))}\n\nSource: {event.source}"
             )
-            return self._make_collapsible(content_string, title)
+            return self._make_collapsible(content_string, title, event)
 
     def _format_metrics_subtitle(self) -> str | None:
         """Format LLM metrics as a visually appealing subtitle string."""
