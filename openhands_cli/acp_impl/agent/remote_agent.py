@@ -247,7 +247,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
                 {"reason": "Authentication required to verify conversation"}
             )
 
-        url = f"{self._cloud_api_url}/api/conversations/{conversation_id}"
+        url = f"{self._cloud_api_url}/api/v1/app-conversations?ids={conversation_id}"
         headers = {"Authorization": f"Bearer {self._cloud_api_key}"}
 
         logger.info(f"Verifying conversation {conversation_id} exists...")
