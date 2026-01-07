@@ -57,6 +57,7 @@ async def run_acp_server(
                 conn=conn,
                 initial_confirmation_mode=initial_confirmation_mode,
                 cloud_api_url=cloud_api_url,
+                resume_conversation_id=resume_conversation_id
             )
 
         AgentSideConnection(create_agent, writer, reader)
