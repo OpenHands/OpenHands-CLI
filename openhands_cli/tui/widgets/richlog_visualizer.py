@@ -26,6 +26,12 @@ from openhands_cli.tui.widgets.collapsible import (
 )
 
 
+# Icons for different tool types
+TOOL_ICON = "🔧"
+SUCCESS_ICON = "✓"
+ERROR_ICON = "✗"
+
+
 if TYPE_CHECKING:
     from textual.containers import VerticalScroll
 
@@ -88,6 +94,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._main_thread_id = threading.get_ident()
         # Cache CLI settings to avoid repeated file system reads
         self._cli_settings: CliSettings | None = None
+        # Track pending actions by tool_call_id for action-observation pairing
+        self._pending_actions: dict[str, tuple[ActionEvent, Collapsible]] = {}
 
     @property
     def cli_settings(self) -> CliSettings:
@@ -100,6 +108,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates Collapsible widgets for events."""
+        # Handle observation events by updating existing action collapsibles
+        if isinstance(
+            event, ObservationEvent | UserRejectObservation | AgentErrorEvent
+        ):
+            if self._handle_observation_event(event):
+                return  # Successfully paired with action, no new widget needed
+
         collapsible_widget = self._create_event_collapsible(event)
         if collapsible_widget:
             # Check if we're in the main thread or a background thread
@@ -116,6 +131,101 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._container.mount(widget)
         # Automatically scroll to the bottom to show the newly added widget
         self._container.scroll_end(animate=False)
+
+    def _update_widget_in_ui(
+        self, collapsible: Collapsible, new_title: str, new_content: str
+    ) -> None:
+        """Update an existing widget in the UI (must be called from main thread)."""
+        collapsible.update_title(new_title)
+        collapsible.update_content(new_content)
+        self._container.scroll_end(animate=False)
+
+    def _handle_observation_event(
+        self, event: ObservationEvent | UserRejectObservation | AgentErrorEvent
+    ) -> bool:
+        """Handle observation event by updating the corresponding action collapsible.
+
+        Returns True if the observation was paired with an action, False otherwise.
+        """
+        tool_call_id = event.tool_call_id
+        if tool_call_id not in self._pending_actions:
+            return False
+
+        action_event, collapsible = self._pending_actions.pop(tool_call_id)
+
+        # Determine success/error status
+        is_error = isinstance(event, UserRejectObservation | AgentErrorEvent)
+        status_icon = ERROR_ICON if is_error else SUCCESS_ICON
+
+        # Build the new title with status icon
+        new_title = self._build_action_title(action_event)
+        new_title = f"{new_title} {status_icon}"
+
+        # Build the new content (observation result only)
+        new_content = self._build_observation_content(event)
+
+        # Update the collapsible
+        current_thread_id = threading.get_ident()
+        if current_thread_id == self._main_thread_id:
+            self._update_widget_in_ui(collapsible, new_title, new_content)
+        else:
+            self._app.call_from_thread(
+                self._update_widget_in_ui, collapsible, new_title, new_content
+            )
+
+        return True
+
+    def _build_action_title(self, event: ActionEvent) -> str:
+        """Build a title for an action event.
+
+        Format: "🔧 {summary}: $ {command}" for terminal
+                "🔧 {summary}: {path}" for file operations
+        """
+        parts = [TOOL_ICON]
+
+        # Get the summary or fallback
+        summary = ""
+        if event.summary:
+            summary = str(event.summary).strip().replace("\n", " ")
+
+        # Get the command/path details
+        command_detail = ""
+        if event.action is not None:
+            action = event.action
+            # Use getattr to avoid pyright errors on dynamic attribute access
+            command = getattr(action, "command", None)
+            path = getattr(action, "path", None)
+            if command:
+                # Terminal command - show with $ prefix
+                cmd = str(command).strip().replace("\n", " ")
+                command_detail = f"$ {cmd}"
+            elif path:
+                # File operation - show path
+                command_detail = str(path)
+
+        # Build the title
+        if summary and command_detail:
+            # Combine summary and command
+            title = f"{summary}: {command_detail}"
+        elif summary:
+            title = summary
+        elif command_detail:
+            title = command_detail
+        else:
+            title = event.tool_name
+
+        # Escape and truncate
+        title = self._escape_rich_markup(title)
+
+        parts.append(title)
+        return " ".join(parts)
+
+    def _build_observation_content(
+        self, event: ObservationEvent | UserRejectObservation | AgentErrorEvent
+    ) -> str:
+        """Build content string from an observation event."""
+        content = event.visualize
+        return self._escape_rich_markup(str(content))
 
     def _escape_rich_markup(self, text: str) -> str:
         """Escape Rich markup characters in text to prevent markup errors.
@@ -280,13 +390,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         elif isinstance(event, CondensationRequest):
             return None
         elif isinstance(event, ActionEvent):
-            # Check if action is None (non-executable)
-            if event.action is None:
-                title = self._extract_meaningful_title(
-                    event, "Agent Action (Not Executed)"
-                )
-            else:
-                title = self._extract_meaningful_title(event, "Agent Action")
+            # Build title using new format: "🔧 {summary}: $ {command}"
+            title = self._build_action_title(event)
 
             # Create content string with metrics subtitle if available
             content_string = self._escape_rich_markup(str(content))
@@ -294,13 +399,21 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
-            return self._make_collapsible(content_string, title, event)
+            collapsible = self._make_collapsible(content_string, title, event)
+
+            # Store for pairing with observation
+            self._pending_actions[event.tool_call_id] = (event, collapsible)
+
+            return collapsible
         elif isinstance(event, ObservationEvent):
+            # If we get here, the observation wasn't paired with an action
+            # (shouldn't happen normally, but handle gracefully)
             title = self._extract_meaningful_title(event, "Observation")
             return self._make_collapsible(
                 self._escape_rich_markup(str(content)), title, event
             )
         elif isinstance(event, UserRejectObservation):
+            # If we get here, the rejection wasn't paired with an action
             title = self._extract_meaningful_title(event, "User Rejected Action")
             return self._make_collapsible(
                 self._escape_rich_markup(str(content)), title, event

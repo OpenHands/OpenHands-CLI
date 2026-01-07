@@ -296,6 +296,25 @@ class Collapsible(Widget):
         self._watch_collapsed(collapsed)
         self.styles.border_left = ("thick", border_color)
 
+    def update_title(self, new_title: str) -> None:
+        """Update the title of the collapsible.
+
+        Args:
+            new_title: The new title text to display.
+        """
+        self.title = new_title
+        self._title.label = Content.from_text(new_title)
+        self._title._update_label()
+
+    def update_content(self, new_content: Any) -> None:
+        """Update the content of the collapsible.
+
+        Args:
+            new_content: The new content to display (can be string or Rich renderable).
+        """
+        self._content_string = str(new_content)
+        self._content_widget.update(new_content)
+
     def _on_collapsible_title_toggle(self, event: CollapsibleTitle.Toggle) -> None:
         """Handle toggle request from title click or keyboard."""
         event.stop()
