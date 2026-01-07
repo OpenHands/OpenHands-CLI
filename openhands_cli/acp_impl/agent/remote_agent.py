@@ -279,7 +279,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
                 {"reason": f"Error verifying conversation: {e}"}
             )
 
-        sandbox_id = data.get("sandbox_id")
+        sandbox_id = data[0].get("sandbox_id") if isinstance(data, list) and len(data) > 0 else None
         if not sandbox_id:
             raise RequestError.invalid_params(
                 {
