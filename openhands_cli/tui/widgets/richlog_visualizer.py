@@ -21,6 +21,8 @@ from openhands.sdk.event import (
 from openhands.sdk.event.base import Event
 from openhands.sdk.event.condenser import Condensation, CondensationRequest
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
+from openhands.sdk.tool.builtins.finish import FinishAction
+from openhands.sdk.tool.builtins.think import ThinkAction
 from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.widgets.collapsible import (
@@ -431,19 +433,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         # Check if this is a plain text event (finish, think, or message)
         if isinstance(event, ActionEvent):
-            if event.tool_name == "finish":
+            action = event.action
+            if isinstance(action, FinishAction):
                 # For finish action, only show the message
-                action = event.action
-                if action and hasattr(action, "message"):
-                    message = getattr(action, "message", None)
-                    if message:
-                        return Static(str(message))
-                return Static(str(content))
-            elif event.tool_name == "think":
+                return Static(action.message)
+            elif isinstance(action, ThinkAction):
                 # For think action, show the action's visualize (not the full event)
-                if event.action:
-                    return Static(event.action.visualize)
-                return Static(str(content))
+                return Static(action.visualize)
 
         if isinstance(event, MessageEvent):
             if (
