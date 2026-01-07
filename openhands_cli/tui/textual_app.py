@@ -500,6 +500,77 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         autocompletes = self.query(AutoComplete)
         return any(ac.display for ac in autocompletes)
 
+    def on_mouse_up(self, _event: events.MouseUp) -> None:
+        """Handle mouse up events for auto-copy on text selection.
+
+        When the user finishes selecting text by releasing the mouse button,
+        this method checks if there's selected text and copies it to clipboard.
+        """
+        # Get selected text from the screen
+        selected_text = self.screen.get_selected_text()
+        if not selected_text:
+            return
+
+        # Copy to clipboard and get result
+        pyperclip_success = self._copy_to_clipboard(selected_text)
+
+        # Show appropriate notification based on copy result
+        if pyperclip_success:
+            self.notify(
+                "Selection copied to clipboard",
+                title="Auto-copy",
+                timeout=2,
+            )
+        elif self._is_linux():
+            # On Linux without pyperclip working, OSC 52 may or may not work
+            self.notify(
+                "Selection copied. May require `sudo apt install xclip`",
+                title="Auto-copy",
+                timeout=4,
+            )
+        else:
+            self.notify(
+                "Selection copied to clipboard",
+                title="Auto-copy",
+                timeout=2,
+            )
+
+    def _is_linux(self) -> bool:
+        """Check if the current platform is Linux."""
+        import platform
+
+        return platform.system() == "Linux"
+
+    def _copy_to_clipboard(self, text: str) -> bool:
+        """Copy text to clipboard using pyperclip with OSC 52 fallback.
+
+        Uses a two-layer approach for clipboard access:
+        1. Primary: pyperclip for direct OS clipboard access
+        2. Fallback: Textual's copy_to_clipboard (OSC 52 escape sequence)
+
+        This ensures clipboard works across different terminal environments.
+
+        Returns:
+            True if pyperclip succeeded, False otherwise.
+        """
+        import pyperclip
+
+        pyperclip_success = False
+        # Primary: Try pyperclip for direct OS clipboard access
+        try:
+            pyperclip.copy(text)
+            pyperclip_success = True
+        except pyperclip.PyperclipException:
+            # pyperclip failed - will try OSC 52 fallback
+            pass
+
+        # Also try OSC 52 - this doesn't raise errors, it just sends escape
+        # sequences. We do both because pyperclip and OSC 52 can target
+        # different clipboards (e.g., remote terminals, tmux, SSH sessions)
+        self.copy_to_clipboard(text)
+
+        return pyperclip_success
+
     def action_pause_conversation(self) -> None:
         """Action to handle Esc key binding - pause the running conversation."""
         # Run the pause operation asynchronously to avoid blocking the UI

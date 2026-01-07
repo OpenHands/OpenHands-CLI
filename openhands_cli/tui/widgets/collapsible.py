@@ -5,28 +5,21 @@ title or pressing Enter when focused. It also supports programmatic control via
 Ctrl+O to toggle all cells at once.
 """
 
-import platform
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol
 
-import pyperclip
 from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
-from textual.containers import Container, Horizontal
+from textual.containers import Container
 from textual.content import Content, ContentText
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual.widgets import Button, Static
+from textual.widgets import Static
 
 
 if TYPE_CHECKING:
     from textual.dom import DOMNode
-
-
-def _is_linux() -> bool:
-    """Check if the current platform is Linux."""
-    return platform.system() == "Linux"
 
 
 class CollapsibleTitle(Container, can_focus=True):
@@ -58,37 +51,9 @@ class CollapsibleTitle(Container, can_focus=True):
         }
     }
 
-    CollapsibleTitle Horizontal {
-        width: 100%;
-        height: auto;
-    }
-
     CollapsibleTitle .title-text {
         width: 1fr;
         height: auto;
-    }
-
-    CollapsibleTitle .copy-button {
-        width: auto;
-        height: 1;
-        min-width: 4;
-        margin-left: 1;
-        background: transparent;
-        border: none;
-        color: $text-muted;
-        text-style: none;
-    }
-
-    CollapsibleTitle .copy-button:hover {
-        background: $surface-lighten-1;
-        color: $text;
-        text-style: bold;
-    }
-
-    CollapsibleTitle .copy-button:focus {
-        background: $surface-lighten-2;
-        color: $text;
-        text-style: bold;
     }
     """
 
@@ -118,9 +83,6 @@ class CollapsibleTitle(Container, can_focus=True):
         # Set reactive properties after _title_static is initialized
         self.label = Content.from_text(label)
         self.collapsed = collapsed
-
-    class CopyRequested(Message):
-        """Request to copy content."""
 
     class Toggle(Message):
         """Request to toggle the collapsible state."""
@@ -177,18 +139,10 @@ class CollapsibleTitle(Container, can_focus=True):
         if parent is not None:
             self.post_message(self.Navigate(direction=1, collapsible=parent))
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button press - post CopyRequested when copy button is clicked."""
-        if event.button.id == "copy-btn":
-            event.stop()
-            self.post_message(self.CopyRequested())
-
     def compose(self) -> ComposeResult:
-        """Compose the title with copy button."""
+        """Compose the title."""
         self._title_static = Static(classes="title-text")
-        with Horizontal():
-            yield self._title_static
-            yield Button("📋", id="copy-btn", classes="copy-button")
+        yield self._title_static
 
     def on_mount(self) -> None:
         """Initialize the title display."""
@@ -289,7 +243,6 @@ class Collapsible(Widget):
             collapsed=collapsed,
         )
         self.title = title
-        self._content_string = str(content)  # String version for copying
         # Pass the original content to Static (can be Rich renderable)
         self._content_widget = Static(content)
         self.collapsed = collapsed
@@ -300,58 +253,6 @@ class Collapsible(Widget):
         """Handle toggle request from title click or keyboard."""
         event.stop()
         self.collapsed = not self.collapsed
-
-    def _on_collapsible_title_copy_requested(
-        self, event: CollapsibleTitle.CopyRequested
-    ) -> None:
-        """Handle copy request from the title.
-
-        Uses a two-layer approach for clipboard access:
-        1. Primary: pyperclip for direct OS clipboard access
-        2. Fallback: Textual's copy_to_clipboard (OSC 52 escape sequence)
-
-        This ensures clipboard works across different terminal environments.
-        """
-        event.stop()
-
-        if not self._content_string:
-            self.app.notify(
-                "No content to copy",
-                title="Copy Warning",
-                severity="warning",
-                timeout=2,
-            )
-            return
-
-        pyperclip_success = False
-        # Primary: Try pyperclip for direct OS clipboard access
-        try:
-            pyperclip.copy(self._content_string)
-            pyperclip_success = True
-        except pyperclip.PyperclipException:
-            # pyperclip failed - will try OSC 52 fallback
-            pass
-
-        # Also try OSC 52 - this doesn't raise errors, it just sends escape
-        # sequences. We do both because pyperclip and OSC 52 can target
-        # different clipboards (e.g., remote terminals, tmux, SSH sessions)
-        self.app.copy_to_clipboard(self._content_string)
-
-        if pyperclip_success:
-            self.app.notify(
-                "Content copied to clipboard!", title="Copy Success", timeout=2
-            )
-        elif _is_linux():
-            # On Linux without pyperclip working, OSC 52 may or may not work
-            self.app.notify(
-                "Copy attempted. If it didn't work, try: sudo apt install xclip",
-                title="Copy",
-                timeout=4,
-            )
-        else:
-            self.app.notify(
-                "Content copied to clipboard!", title="Copy Success", timeout=2
-            )
 
     def _watch_collapsed(self, collapsed: bool) -> None:
         """Update collapsed state when reactive is changed."""
