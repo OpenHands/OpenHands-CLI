@@ -416,6 +416,10 @@ class OpenHandsCloudACPAgent(ACPAgent):
             """Synchronous wrapper that schedules async event handling."""
             asyncio.run_coroutine_threadsafe(subscriber(event), loop)
 
+        raise RequestError.internal_error(
+            {"reason": "check session id", "details": str(session_id)}
+        )
+    
         # Create RemoteConversation with cloud workspace
         # Note: RemoteConversation doesn't support persistence_dir
         conversation = Conversation(
