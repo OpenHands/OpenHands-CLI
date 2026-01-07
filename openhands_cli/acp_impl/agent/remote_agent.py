@@ -26,7 +26,6 @@ from acp.schema import (
     SetSessionModeResponse,
     TextContentBlock,
 )
-from rich.console import Console
 
 from openhands.sdk import (
     Conversation,
@@ -55,7 +54,6 @@ from openhands_cli.cloud.conversation import is_token_valid
 from openhands_cli.locations import MCP_CONFIG_FILE
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import load_agent_specs
-from openhands_cli.theme import OPENHANDS_THEME
 
 
 logger = logging.getLogger(__name__)
@@ -279,7 +277,11 @@ class OpenHandsCloudACPAgent(ACPAgent):
                 {"reason": f"Error verifying conversation: {e}"}
             )
 
-        sandbox_id = data[0].get("sandbox_id") if isinstance(data, list) and len(data) > 0 else None
+        sandbox_id = (
+            data[0].get("sandbox_id")
+            if isinstance(data, list) and len(data) > 0
+            else None
+        )
         if not sandbox_id:
             raise RequestError.invalid_params(
                 {
@@ -643,45 +645,3 @@ class OpenHandsCloudACPAgent(ACPAgent):
         """Clean up all active workspaces on agent destruction."""
         for session_id in list(self._active_workspaces.keys()):
             self._cleanup_session(session_id)
-
-
-console = Console()
-
-
-class CloudAuthenticationError(Exception):
-    """Exception raised for cloud authentication errors."""
-
-
-def _print_login_instructions(msg: str) -> None:
-    """Print login instructions to the user."""
-    console.print(f"[{OPENHANDS_THEME.error}]{msg}[/{OPENHANDS_THEME.error}]")
-    console.print(
-        f"[{OPENHANDS_THEME.secondary}]"
-        "Please run the following command to authenticate:"
-        f"[/{OPENHANDS_THEME.secondary}]"
-    )
-    console.print(
-        f"[{OPENHANDS_THEME.accent}]  openhands login[/{OPENHANDS_THEME.accent}]"
-    )
-
-
-def _logout_and_instruct(server_url: str) -> None:
-    """Log out and instruct the user to re-authenticate."""
-    from openhands_cli.auth.logout_command import logout_command
-
-    console.print(
-        f"[{OPENHANDS_THEME.warning}]Your connection with OpenHands Cloud has expired."
-        f"[/{OPENHANDS_THEME.warning}]"
-    )
-    console.print(
-        f"[{OPENHANDS_THEME.accent}]Logging you out...[/{OPENHANDS_THEME.accent}]"
-    )
-    logout_command(server_url)
-    console.print(
-        f"[{OPENHANDS_THEME.secondary}]"
-        "Please re-run the following command to reconnect and retry:"
-        f"[/{OPENHANDS_THEME.secondary}]"
-    )
-    console.print(
-        f"[{OPENHANDS_THEME.accent}]  openhands login[/{OPENHANDS_THEME.accent}]"
-    )
