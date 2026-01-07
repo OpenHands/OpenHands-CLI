@@ -32,8 +32,9 @@
         font-family: arial;
     }
 
-    .terminal-r1 { fill: #ffffff }
-.terminal-r2 { fill: #c5c8c6 }
+    .terminal-r1 { fill: #c5c8c6 }
+.terminal-r2 { fill: #fee165 }
+.terminal-r3 { fill: #ffffff }
     </style>
 
     <defs>
@@ -83,19 +84,19 @@
             </g>
         
     <g transform="translate(9, 41)" clip-path="url(#terminal-clip-terminal)">
-    <rect fill="#222222" x="0" y="1.5" width="195.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="195.2" y="1.5" width="780.8" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="25.9" width="24.4" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="24.4" y="25.9" width="341.6" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="366" y="25.9" width="610" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="50.3" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="74.7" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="99.1" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="123.5" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="147.9" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="172.3" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="196.7" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="221.1" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="245.5" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="269.9" width="976" height="24.65" shape-rendering="crispEdges"/>
+    <rect fill="#222222" x="0" y="1.5" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="25.9" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="50.3" width="24.4" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="24.4" y="50.3" width="195.2" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="219.6" y="50.3" width="756.4" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="74.7" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="99.1" width="48.8" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="48.8" y="99.1" width="341.6" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="390.4" y="99.1" width="585.6" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="123.5" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="147.9" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="172.3" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="196.7" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="221.1" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="245.5" width="976" height="24.65" shape-rendering="crispEdges"/><rect fill="#222222" x="0" y="269.9" width="976" height="24.65" shape-rendering="crispEdges"/>
     <g class="terminal-matrix">
-    <text class="terminal-r1" x="0" y="20" textLength="195.2" clip-path="url(#terminal-line-0)">&gt;&#160;hi&#160;how&#160;are&#160;you</text><text class="terminal-r2" x="976" y="20" textLength="12.2" clip-path="url(#terminal-line-0)">
-</text><text class="terminal-r1" x="24.4" y="44.4" textLength="341.6" clip-path="url(#terminal-line-1)">Task&#160;completed&#160;successfully!</text><text class="terminal-r2" x="976" y="44.4" textLength="12.2" clip-path="url(#terminal-line-1)">
-</text><text class="terminal-r2" x="976" y="68.8" textLength="12.2" clip-path="url(#terminal-line-2)">
-</text><text class="terminal-r2" x="976" y="93.2" textLength="12.2" clip-path="url(#terminal-line-3)">
-</text><text class="terminal-r2" x="976" y="117.6" textLength="12.2" clip-path="url(#terminal-line-4)">
-</text><text class="terminal-r2" x="976" y="142" textLength="12.2" clip-path="url(#terminal-line-5)">
-</text><text class="terminal-r2" x="976" y="166.4" textLength="12.2" clip-path="url(#terminal-line-6)">
-</text><text class="terminal-r2" x="976" y="190.8" textLength="12.2" clip-path="url(#terminal-line-7)">
-</text><text class="terminal-r2" x="976" y="215.2" textLength="12.2" clip-path="url(#terminal-line-8)">
-</text><text class="terminal-r2" x="976" y="239.6" textLength="12.2" clip-path="url(#terminal-line-9)">
-</text><text class="terminal-r2" x="976" y="264" textLength="12.2" clip-path="url(#terminal-line-10)">
+    <text class="terminal-r1" x="976" y="20" textLength="12.2" clip-path="url(#terminal-line-0)">
+</text><text class="terminal-r1" x="976" y="44.4" textLength="12.2" clip-path="url(#terminal-line-1)">
+</text><text class="terminal-r2" x="24.4" y="68.8" textLength="195.2" clip-path="url(#terminal-line-2)">&gt;&#160;hi&#160;how&#160;are&#160;you</text><text class="terminal-r1" x="976" y="68.8" textLength="12.2" clip-path="url(#terminal-line-2)">
+</text><text class="terminal-r1" x="976" y="93.2" textLength="12.2" clip-path="url(#terminal-line-3)">
+</text><text class="terminal-r3" x="48.8" y="117.6" textLength="341.6" clip-path="url(#terminal-line-4)">Task&#160;completed&#160;successfully!</text><text class="terminal-r1" x="976" y="117.6" textLength="12.2" clip-path="url(#terminal-line-4)">
+</text><text class="terminal-r1" x="976" y="142" textLength="12.2" clip-path="url(#terminal-line-5)">
+</text><text class="terminal-r1" x="976" y="166.4" textLength="12.2" clip-path="url(#terminal-line-6)">
+</text><text class="terminal-r1" x="976" y="190.8" textLength="12.2" clip-path="url(#terminal-line-7)">
+</text><text class="terminal-r1" x="976" y="215.2" textLength="12.2" clip-path="url(#terminal-line-8)">
+</text><text class="terminal-r1" x="976" y="239.6" textLength="12.2" clip-path="url(#terminal-line-9)">
+</text><text class="terminal-r1" x="976" y="264" textLength="12.2" clip-path="url(#terminal-line-10)">
 </text>
     </g>
     </g>

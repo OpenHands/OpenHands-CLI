@@ -23,15 +23,29 @@ if TYPE_CHECKING:
 
 
 class VisualizerTestApp(App):
-    """Test app for visualizer snapshots."""
+    """Test app for visualizer snapshots.
+
+    Uses the same CSS styling as the real OpenHands CLI app to ensure
+    accurate visual testing.
+    """
 
     CSS = """
     Screen {
         layout: vertical;
+        background: $background;
     }
     #main_display {
         height: 100%;
         width: 100%;
+        margin: 1 1 0 1;
+        background: $background;
+    }
+    .user-message {
+        padding: 0 1;
+        margin-top: 1;
+        margin-bottom: 1;
+        background: $background;
+        color: $primary;
     }
     """
 
@@ -43,7 +57,7 @@ class VisualizerTestApp(App):
 
     def compose(self) -> ComposeResult:
         with VerticalScroll(id="main_display"):
-            # User message for comparison
+            # User message with same styling as real CLI
             yield Static("> hi how are you", classes="user-message")
 
     def on_mount(self) -> None:

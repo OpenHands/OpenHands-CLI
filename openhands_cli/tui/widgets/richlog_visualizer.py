@@ -436,13 +436,15 @@ class ConversationVisualizer(ConversationVisualizerBase):
             action = event.action
             if isinstance(action, FinishAction):
                 # For finish action, only show the message with padding to align
+                # User message has "padding: 0 1" and starts with "> ", so text
+                # starts at position 3 (1 padding + 2 for "> ")
                 widget = Static(action.message)
-                widget.styles.padding = (0, 0, 0, 2)  # top, right, bottom, left
+                widget.styles.padding = (0, 0, 0, 3)  # top, right, bottom, left
                 return widget
             elif isinstance(action, ThinkAction):
                 # For think action, show the action's visualize with padding
                 widget = Static(action.visualize)
-                widget.styles.padding = (0, 0, 0, 2)
+                widget.styles.padding = (0, 0, 0, 3)
                 return widget
 
         if isinstance(event, MessageEvent):
