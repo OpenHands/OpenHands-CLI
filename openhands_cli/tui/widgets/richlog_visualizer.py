@@ -114,12 +114,22 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
+        import logging
+
+        logging.debug(f"on_event: {event.__class__.__name__}")
+
         # Handle observation events by updating existing action collapsibles
         if isinstance(
             event, ObservationEvent | UserRejectObservation | AgentErrorEvent
         ):
+            logging.debug(
+                f"Observation event: tool_call_id={event.tool_call_id}, "
+                f"pending_actions={list(self._pending_actions.keys())}"
+            )
             if self._handle_observation_event(event):
+                logging.debug("Observation matched with action")
                 return  # Successfully paired with action, no new widget needed
+            logging.debug("Observation NOT matched with action")
 
         widget = self._create_event_widget(event)
         if widget:
@@ -479,6 +489,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
             collapsible = self._make_collapsible(content_string, title, collapsed=True)
 
             # Store for pairing with observation
+            import logging
+
+            logging.debug(f"Storing action with tool_call_id={event.tool_call_id}")
             self._pending_actions[event.tool_call_id] = (event, collapsible)
 
             return collapsible
