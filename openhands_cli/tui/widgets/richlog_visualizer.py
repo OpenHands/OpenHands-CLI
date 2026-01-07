@@ -19,6 +19,7 @@ from openhands.sdk.event import (
 from openhands.sdk.event.base import Event
 from openhands.sdk.event.condenser import Condensation, CondensationRequest
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
+from openhands.tools.task_tracker.definition import TaskTrackerObservation
 from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.widgets.collapsible import (
@@ -100,6 +101,17 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates Collapsible widgets for events."""
+        # Check for TaskTrackerObservation to update the plan panel
+        if isinstance(event, ObservationEvent) and isinstance(
+            event.observation, TaskTrackerObservation
+        ):
+            task_list = event.observation.task_list
+            current_thread_id = threading.get_ident()
+            if current_thread_id == self._main_thread_id:
+                self._app.update_plan(task_list)
+            else:
+                self._app.call_from_thread(self._app.update_plan, task_list)
+
         collapsible_widget = self._create_event_collapsible(event)
         if collapsible_widget:
             # Check if we're in the main thread or a background thread

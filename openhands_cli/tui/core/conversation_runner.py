@@ -1,9 +1,12 @@
 """Conversation runner with confirmation mode support for the refactored UI."""
 
 import asyncio
+import json
 import uuid
 from collections.abc import Callable
+from pathlib import Path
 
+from pydantic import ValidationError
 from rich.console import Console
 from rich.text import Text
 from textual.notifications import SeverityLevel
@@ -25,6 +28,7 @@ from openhands.sdk.security.confirmation_policy import (
     ConfirmRisky,
     NeverConfirm,
 )
+from openhands.tools.task_tracker.definition import TaskItem
 from openhands_cli.setup import setup_conversation
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.user_actions.types import UserConfirmation
@@ -78,6 +82,32 @@ class ConversationRunner:
     def is_confirmation_mode_active(self) -> bool:
         """Check if confirmation mode is currently active."""
         return self._confirmation_mode_active
+
+    def get_existing_plan(self) -> list[TaskItem] | None:
+        """Get the existing plan from the persisted TASKS.json file.
+
+        The TaskTrackerExecutor saves tasks to TASKS.json in the conversation's
+        persistence directory. This method reads from that file directly.
+
+        Returns:
+            List of TaskItem objects if a plan exists, None otherwise
+        """
+        if not self.conversation or not self.conversation.state:
+            return None
+
+        persistence_dir = self.conversation.state.persistence_dir
+        if not persistence_dir:
+            return None
+
+        tasks_file = Path(persistence_dir) / "TASKS.json"
+        if not tasks_file.exists():
+            return None
+
+        try:
+            with open(tasks_file, encoding="utf-8") as f:
+                return [TaskItem.model_validate(d) for d in json.load(f)]
+        except (OSError, json.JSONDecodeError, TypeError, ValidationError):
+            return None
 
     def get_confirmation_policy(self) -> ConfirmationPolicyBase:
         """Get the current confirmation policy."""
