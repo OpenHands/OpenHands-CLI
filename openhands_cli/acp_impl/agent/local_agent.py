@@ -321,28 +321,6 @@ class LocalOpenHandsACPAgent(ACPAgent):
         # Local agent doesn't need special cleanup
         pass
 
-    def _get_resume_events(self, conversation_id: str) -> list[Event] | None:
-        """Get events for resuming a conversation from local storage.
-
-        For local conversations, this returns conversation.state.events.
-
-        Args:
-            conversation_id: The conversation ID to get events for
-
-        Returns:
-            List of events or None if not resuming or no events available
-        """
-        if not self._resume_conversation_id:
-            return None
-
-        # Get the conversation from cache
-        if conversation_id in self._active_sessions:
-            conversation = self._active_sessions[conversation_id]
-            if conversation.state.events:
-                return list(conversation.state.events)
-
-        return None
-
     async def new_session(
         self,
         cwd: str,

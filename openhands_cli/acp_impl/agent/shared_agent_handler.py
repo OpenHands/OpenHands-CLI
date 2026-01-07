@@ -73,17 +73,6 @@ class _ACPAgentContext(Protocol):
         """Clean up resources for a session (optional, may be no-op)."""
         ...
 
-    def _get_resume_events(self, conversation_id: str) -> list | None:
-        """Get events for resuming a conversation.
-
-        For local conversations, this returns conversation.state.events.
-        For cloud conversations, this fetches events from the cloud API.
-
-        Returns:
-            List of events or None if not resuming or no events available.
-        """
-        ...
-
 
 class SharedACPAgentHandler:
     """Shared ACP agent behavior used by both local and cloud agents."""
@@ -314,17 +303,14 @@ class SharedACPAgentHandler:
 
             # If resuming, replay historic events to the client
             # This ensures the ACP client sees the full conversation history
-            if is_resuming:
-                # Get events for resuming - this handles both local and cloud
-                resume_events = ctx._get_resume_events(session_id)
-                if resume_events:
-                    logger.info(
-                        f"Replaying {len(resume_events)} historic events "
-                        f"for resumed session {session_id}"
-                    )
-                    subscriber = EventSubscriber(session_id, ctx._conn)
-                    for event in resume_events:
-                        await subscriber(event)
+            if is_resuming and conversation.state.events:
+                logger.info(
+                    f"Replaying {len(conversation.state.events)} historic events "
+                    f"for resumed session {session_id}"
+                )
+                subscriber = EventSubscriber(session_id, ctx._conn)
+                for event in conversation.state.events:
+                    await subscriber(event)
 
             return response
 

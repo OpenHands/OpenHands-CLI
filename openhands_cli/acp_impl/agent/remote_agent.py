@@ -294,79 +294,6 @@ class OpenHandsCloudACPAgent(ACPAgent):
         logger.info(f"Found sandbox_id {sandbox_id} for conversation {conversation_id}")
         return sandbox_id
 
-    def _fetch_events_from_cloud(self, conversation_id: str) -> list[Event]:
-        """Fetch events for a conversation from the cloud API.
-
-        Args:
-            conversation_id: The conversation ID to fetch events for
-
-        Returns:
-            List of events for the conversation
-
-        Raises:
-            RequestError: If fetching events fails
-        """
-        import httpx
-
-        if not self._cloud_api_key:
-            raise RequestError.auth_required(
-                {"reason": "Authentication required to fetch events"}
-            )
-
-        url = f"{self._cloud_api_url}/api/conversations/{conversation_id}/events"
-        headers = {"Authorization": f"Bearer {self._cloud_api_key}"}
-
-        logger.info(f"Fetching events for conversation {conversation_id}...")
-
-        try:
-            with httpx.Client(timeout=60.0) as client:
-                response = client.get(url, headers=headers)
-                response.raise_for_status()
-                data = response.json()
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 404:
-                logger.warning(
-                    f"No events found for conversation {conversation_id}, "
-                    "returning empty list"
-                )
-                return []
-            logger.error(f"Failed to fetch events: {e}")
-            raise RequestError.internal_error(
-                {"reason": f"Failed to fetch events: {e}"}
-            )
-        except Exception as e:
-            logger.error(f"Error fetching events: {e}", exc_info=True)
-            raise RequestError.internal_error({"reason": f"Error fetching events: {e}"})
-
-        # Convert raw event dicts to Event objects using Pydantic validation
-        events: list[Event] = []
-        for event_dict in data:
-            try:
-                event = Event.model_validate(event_dict)
-                events.append(event)
-            except Exception as e:
-                logger.warning(f"Failed to parse event: {e}")
-                continue
-
-        logger.info(f"Fetched {len(events)} events for conversation {conversation_id}")
-        return events
-
-    def _get_resume_events(self, conversation_id: str) -> list[Event] | None:  # noqa: ARG002
-        """Get events for resuming a conversation from the cloud API.
-
-        Args:
-            conversation_id: The conversation ID to get events for (unused for cloud,
-                we use self._resume_conversation_id instead)
-
-        Returns:
-            List of events or None if not resuming
-        """
-        if not self._resume_conversation_id:
-            return None
-
-        # Fetch events from the cloud API
-        return self._fetch_events_from_cloud(self._resume_conversation_id)
-
     def _get_or_create_conversation(
         self,
         session_id: str,
@@ -490,14 +417,12 @@ class OpenHandsCloudACPAgent(ACPAgent):
             asyncio.run_coroutine_threadsafe(subscriber(event), loop)
 
         # Create RemoteConversation with cloud workspace
-        # Note: We don't pass conversation_id here because for cloud workspaces,
-        # the SDK would try to load events from the runtime URL, but events are
-        # stored on the cloud API. The sandbox_id already connects us to the
-        # existing sandbox for resume scenarios.
+        # Note: RemoteConversation doesn't support persistence_dir
         conversation = Conversation(
             agent=agent,
             workspace=workspace,
             callbacks=[sync_callback],
+            conversation_id=UUID(session_id),
         )
 
         subscriber.conversation = conversation
@@ -533,7 +458,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
             RequestError.auth_required: If the user is not authenticated
         """
         # Check if user is authenticated before creating a session
-        is_authenticated = await self._is_authenticated()
+        is_authenticated = self._is_authenticated()
         if not is_authenticated:
             logger.info("User not authenticated, requiring authentication")
             raise RequestError.auth_required(
