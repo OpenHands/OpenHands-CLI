@@ -415,10 +415,6 @@ class OpenHandsCloudACPAgent(ACPAgent):
         def sync_callback(event: Event) -> None:
             """Synchronous wrapper that schedules async event handling."""
             asyncio.run_coroutine_threadsafe(subscriber(event), loop)
-
-        raise RequestError.internal_error(
-            {"reason": "check session id", "details": str(session_id)}
-        )
     
         # Create RemoteConversation with cloud workspace
         # Note: RemoteConversation doesn't support persistence_dir
@@ -427,6 +423,10 @@ class OpenHandsCloudACPAgent(ACPAgent):
             workspace=workspace,
             callbacks=[sync_callback],
             conversation_id=UUID(session_id),
+        )
+
+        raise RequestError.internal_error(
+            {"reason": "check session id", "details": str(conversation.id)}
         )
 
         subscriber.conversation = conversation
