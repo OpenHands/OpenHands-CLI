@@ -285,9 +285,30 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Open the settings screen for existing users
         settings_screen = SettingsScreen(
-            on_settings_saved=[self._reload_visualizer],
+            on_settings_saved=[
+                self._reload_visualizer,
+                self._notify_restart_required,
+            ],
         )
         self.push_screen(settings_screen)
+
+    def _notify_restart_required(self) -> None:
+        """Notify user that CLI restart is required for agent settings changes.
+
+        Only shows notification if a conversation runner has been instantiated,
+        meaning a conversation has already started with the previous settings.
+
+        Note: This callback is only registered for `action_open_settings` (existing
+        users), not for `_show_initial_settings` (first-time setup). Additionally,
+        during first-time setup, conversation_runner is always None, so even if
+        this method were called, no notification would be shown.
+        """
+        if self.conversation_runner:
+            self.notify(
+                "Settings saved. Please restart the CLI for changes to take effect.",
+                severity="information",
+                timeout=10.0,
+            )
 
     def _initialize_main_ui(self) -> None:
         """Initialize the main UI components."""
