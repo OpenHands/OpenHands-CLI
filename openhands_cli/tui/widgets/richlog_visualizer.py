@@ -152,6 +152,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self, collapsible: Collapsible, new_title: str, new_content: str
     ) -> None:
         """Update an existing widget in the UI (must be called from main thread)."""
+        import logging
+
+        logging.debug(
+            f"Updating collapsible: is_mounted={collapsible.is_mounted}, "
+            f"new_title={new_title[:50]}..."
+        )
         collapsible.update_title(new_title)
         collapsible.update_content(new_content)
         self._container.scroll_end(animate=False)
