@@ -1608,9 +1608,9 @@ dev = [
 requires-dist = [
     { name = "agent-client-protocol", specifier = ">=0.7.0,<0.8.0" },
     { name = "httpx", specifier = ">=0.25.0" },
-    { name = "openhands-sdk", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=0c3dd1208e286e64f9cf58a84872b60729454d91" },
-    { name = "openhands-tools", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=0c3dd1208e286e64f9cf58a84872b60729454d91" },
-    { name = "openhands-workspace", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-workspace&rev=0c3dd1208e286e64f9cf58a84872b60729454d91" },
+    { name = "openhands-sdk", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=db83a25aacc91046e63fbb7ddb38222aa1e821f4" },
+    { name = "openhands-tools", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=db83a25aacc91046e63fbb7ddb38222aa1e821f4" },
+    { name = "openhands-workspace", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-workspace&rev=db83a25aacc91046e63fbb7ddb38222aa1e821f4" },
     { name = "prompt-toolkit", specifier = ">=3" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyperclip", specifier = ">=1.9.0" },
@@ -1641,7 +1641,7 @@ dev = [
 [[package]]
 name = "openhands-agent-server"
 version = "1.7.4"
-source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-agent-server&rev=0c3dd1208e286e64f9cf58a84872b60729454d91#0c3dd1208e286e64f9cf58a84872b60729454d91" }
+source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-agent-server&rev=db83a25aacc91046e63fbb7ddb38222aa1e821f4#db83a25aacc91046e63fbb7ddb38222aa1e821f4" }
 dependencies = [
     { name = "aiosqlite" },
     { name = "alembic" },
@@ -1658,7 +1658,7 @@ dependencies = [
 [[package]]
 name = "openhands-sdk"
 version = "1.7.4"
-source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=0c3dd1208e286e64f9cf58a84872b60729454d91#0c3dd1208e286e64f9cf58a84872b60729454d91" }
+source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=db83a25aacc91046e63fbb7ddb38222aa1e821f4#db83a25aacc91046e63fbb7ddb38222aa1e821f4" }
 dependencies = [
     { name = "deprecation" },
     { name = "fastmcp" },
@@ -1675,7 +1675,7 @@ dependencies = [
 [[package]]
 name = "openhands-tools"
 version = "1.7.4"
-source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=0c3dd1208e286e64f9cf58a84872b60729454d91#0c3dd1208e286e64f9cf58a84872b60729454d91" }
+source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=db83a25aacc91046e63fbb7ddb38222aa1e821f4#db83a25aacc91046e63fbb7ddb38222aa1e821f4" }
 dependencies = [
     { name = "bashlex" },
     { name = "binaryornot" },
@@ -1691,7 +1691,7 @@ dependencies = [
 [[package]]
 name = "openhands-workspace"
 version = "1.7.4"
-source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-workspace&rev=0c3dd1208e286e64f9cf58a84872b60729454d91#0c3dd1208e286e64f9cf58a84872b60729454d91" }
+source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-workspace&rev=db83a25aacc91046e63fbb7ddb38222aa1e821f4#db83a25aacc91046e63fbb7ddb38222aa1e821f4" }
 dependencies = [
     { name = "openhands-agent-server" },
     { name = "openhands-sdk" },
