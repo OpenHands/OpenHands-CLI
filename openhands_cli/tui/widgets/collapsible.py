@@ -241,7 +241,6 @@ class Collapsible(Widget):
         height: auto;
         background: $background;
         padding-bottom: 1;
-        padding-left: 1;
 
         &:focus-within {
             background-tint: $foreground 3%;
@@ -295,7 +294,8 @@ class Collapsible(Widget):
         self.collapsed = collapsed
         self._watch_collapsed(collapsed)
         if border_color is not None:
-            self.styles.border_left = ("thick", border_color)
+            # Use "tall" for a thin vertical line, with gray color
+            self.styles.border_left = ("tall", "gray")
 
     def update_title(self, new_title: str) -> None:
         """Update the title of the collapsible.
