@@ -178,8 +178,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def _build_action_title(self, event: ActionEvent) -> str:
         """Build a title for an action event.
 
-        Format: "🔧 {summary}: $ {command}" for terminal
-                "🔧 {summary}: {path}" for file operations
+        Format: "🔧 [bold]{summary}[/bold]: $ {command}" for terminal
+                "🔧 [bold]Editing[/bold] {path}" for file edit operations
+                "🔧 [bold]Reading[/bold] {path}" for file view operations
         """
         parts = [TOOL_ICON]
 
@@ -188,34 +189,57 @@ class ConversationVisualizer(ConversationVisualizerBase):
         if event.summary:
             summary = str(event.summary).strip().replace("\n", " ")
 
-        # Get the command/path details
+        # Get the command/path details and operation type
         command_detail = ""
+        file_operation = ""  # "Editing" or "Reading"
         if event.action is not None:
             action = event.action
             # Use getattr to avoid pyright errors on dynamic attribute access
             command = getattr(action, "command", None)
             path = getattr(action, "path", None)
-            if command:
+
+            if command and not path:
                 # Terminal command - show with $ prefix
                 cmd = str(command).strip().replace("\n", " ")
                 command_detail = f"$ {cmd}"
             elif path:
-                # File operation - show path
+                # File operation - determine if editing or reading
+                # Check the command type for str_replace_editor actions
+                action_cmd = getattr(action, "command", None)
+                if action_cmd in ("view",):
+                    file_operation = "Reading"
+                elif action_cmd in ("create", "str_replace", "insert", "undo_edit"):
+                    file_operation = "Editing"
+                else:
+                    # Default based on tool name
+                    if "editor" in event.tool_name.lower():
+                        file_operation = "Editing"
+                    else:
+                        file_operation = "Reading"
                 command_detail = str(path)
 
-        # Build the title
+        # Build the title with bold summary
         if summary and command_detail:
-            # Combine summary and command
-            title = f"{summary}: {command_detail}"
+            # Escape special characters in summary and command_detail
+            summary_escaped = self._escape_rich_markup(summary)
+            detail_escaped = self._escape_rich_markup(command_detail)
+            if file_operation:
+                # File operation: "🔧 [bold]Editing[/bold] /path/to/file"
+                title = f"[bold]{file_operation}[/bold] {detail_escaped}"
+            else:
+                # Terminal: "🔧 [bold]{summary}[/bold]: $ command"
+                title = f"[bold]{summary_escaped}[/bold]: {detail_escaped}"
         elif summary:
-            title = summary
+            summary_escaped = self._escape_rich_markup(summary)
+            title = f"[bold]{summary_escaped}[/bold]"
         elif command_detail:
-            title = command_detail
+            detail_escaped = self._escape_rich_markup(command_detail)
+            if file_operation:
+                title = f"[bold]{file_operation}[/bold] {detail_escaped}"
+            else:
+                title = detail_escaped
         else:
             title = event.tool_name
-
-        # Escape and truncate
-        title = self._escape_rich_markup(title)
 
         parts.append(title)
         return " ".join(parts)
@@ -223,9 +247,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def _build_observation_content(
         self, event: ObservationEvent | UserRejectObservation | AgentErrorEvent
     ) -> str:
-        """Build content string from an observation event."""
-        content = event.visualize
-        return self._escape_rich_markup(str(content))
+        """Build content string from an observation event.
+
+        Returns the Rich-formatted content to preserve colors and styling.
+        """
+        # Return the visualize content directly (Rich Text object)
+        # The Collapsible widget can handle Rich renderables
+        return str(event.visualize)
 
     def _escape_rich_markup(self, text: str) -> str:
         """Escape Rich markup characters in text to prevent markup errors.
@@ -357,21 +385,30 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """
         return not self.cli_settings.default_cells_expanded
 
-    def _make_collapsible(self, content: str, title: str, event: Event) -> Collapsible:
+    def _make_collapsible(
+        self,
+        content: str,
+        title: str,
+        event: Event,
+        collapsed: bool | None = None,
+    ) -> Collapsible:
         """Create a Collapsible widget with standard settings.
 
         Args:
             content: The content string to display in the collapsible.
             title: The title for the collapsible header.
             event: The event used to determine border color.
+            collapsed: Override the default collapsed state. If None, uses default.
 
         Returns:
             A configured Collapsible widget.
         """
+        if collapsed is None:
+            collapsed = self._default_collapsed
         return Collapsible(
             content,
             title=title,
-            collapsed=self._default_collapsed,
+            collapsed=collapsed,
             border_color=_get_event_border_color(event),
         )
 
@@ -393,13 +430,16 @@ class ConversationVisualizer(ConversationVisualizerBase):
             # Build title using new format: "🔧 {summary}: $ {command}"
             title = self._build_action_title(event)
 
-            # Create content string with metrics subtitle if available
-            content_string = self._escape_rich_markup(str(content))
+            # Keep rich formatting for content (don't escape)
+            content_string = str(content)
             metrics = self._format_metrics_subtitle()
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
-            collapsible = self._make_collapsible(content_string, title, event)
+            # Action events default to collapsed since we have summary in title
+            collapsible = self._make_collapsible(
+                content_string, title, event, collapsed=True
+            )
 
             # Store for pairing with observation
             self._pending_actions[event.tool_call_id] = (event, collapsible)
@@ -409,15 +449,11 @@ class ConversationVisualizer(ConversationVisualizerBase):
             # If we get here, the observation wasn't paired with an action
             # (shouldn't happen normally, but handle gracefully)
             title = self._extract_meaningful_title(event, "Observation")
-            return self._make_collapsible(
-                self._escape_rich_markup(str(content)), title, event
-            )
+            return self._make_collapsible(str(content), title, event)
         elif isinstance(event, UserRejectObservation):
             # If we get here, the rejection wasn't paired with an action
             title = self._extract_meaningful_title(event, "User Rejected Action")
-            return self._make_collapsible(
-                self._escape_rich_markup(str(content)), title, event
-            )
+            return self._make_collapsible(str(content), title, event)
         elif isinstance(event, MessageEvent):
             if (
                 self._skip_user_messages
