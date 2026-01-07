@@ -319,10 +319,10 @@ class OpenHandsCloudACPAgent(ACPAgent):
         sandbox_id: str | None = None
         if self._resume_conversation_id:
             logger.info(
-                f"Resuming conversation {self._resume_conversation_id}, "
+                f"Resuming conversation {session_id}, "
                 "verifying and getting sandbox_id..."
             )
-            sandbox_id = self._verify_and_get_sandbox_id(self._resume_conversation_id)
+            sandbox_id = self._verify_and_get_sandbox_id(session_id)
 
         # Create new conversation with cloud workspace
         logger.debug(f"Creating new cloud conversation for session {session_id}")
