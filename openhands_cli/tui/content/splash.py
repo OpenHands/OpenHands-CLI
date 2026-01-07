@@ -59,8 +59,8 @@ def get_splash_content(conversation_id: str, *, theme: Theme) -> dict:
             "1. Ask questions, edit files, or run commands.",
             "2. Use @ to look up a file in the folder structure",
             (
-                "3. Type /help for help or / to immediately scroll through "
-                "available commands"
+                "3. Type /help for help, /feedback to leave anonymous feedback, "
+                "or / to scroll through available commands"
             ),
         ],
         "update_notice": None,
