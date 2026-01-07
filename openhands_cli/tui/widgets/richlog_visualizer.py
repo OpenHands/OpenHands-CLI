@@ -130,6 +130,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def _extract_meaningful_title(self, event, fallback_title: str) -> str:
         """Extract a meaningful title from an event, with fallback to truncated
         content."""
+        # For ActionEvents, prefer the LLM-generated summary if available
+        if hasattr(event, "summary") and event.summary:
+            summary = str(event.summary).strip().replace("\n", " ")
+            if len(summary) > 70:
+                summary = summary[:67] + "..."
+            return self._escape_rich_markup(summary)
+
         # Try to extract meaningful information from the event
         if hasattr(event, "action") and event.action is not None:
             # For ActionEvents, try to get action type and details
