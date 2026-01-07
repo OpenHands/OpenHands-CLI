@@ -135,7 +135,7 @@ typeCheckingMode = "standard"
 
 # USE EXACT COMMIT FROM AGENT-SDK (PR #1368 - Add condense method to conversation class)
 
-# [tool.uv.sources]
-# openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "d5e58a33216ba3ee089a43c688cfd72e5baaab57" }
-# openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "d5e58a33216ba3ee089a43c688cfd72e5baaab57" }
-# openhands-workspace = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-workspace", rev = "d5e58a33216ba3ee089a43c688cfd72e5baaab57" }
+[tool.uv.sources]
+openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "0c3dd1208e286e64f9cf58a84872b60729454d91" }
+openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "0c3dd1208e286e64f9cf58a84872b60729454d91" }
+openhands-workspace = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-workspace", rev = "0c3dd1208e286e64f9cf58a84872b60729454d91" }

@@ -274,7 +274,6 @@ class SharedACPAgentHandler:
         is_resuming = False
         if ctx._resume_conversation_id:
             session_id = ctx._resume_conversation_id
-            ctx._resume_conversation_id = None
             is_resuming = True
             logger.info(f"Resuming conversation: {session_id}")
         else:

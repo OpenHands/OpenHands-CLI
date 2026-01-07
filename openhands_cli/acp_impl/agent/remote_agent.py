@@ -228,6 +228,72 @@ class OpenHandsCloudACPAgent(ACPAgent):
                 {"reason": f"Authentication error: {e}"}
             ) from e
 
+    def _verify_and_get_sandbox_id(self, conversation_id: str) -> str:
+        """Verify a conversation exists and get its sandbox_id.
+
+        Args:
+            conversation_id: The conversation ID to verify
+
+        Returns:
+            The sandbox_id associated with the conversation
+
+        Raises:
+            RequestError: If the conversation doesn't exist or has no sandbox_id
+        """
+        import httpx
+
+        if not self._cloud_api_key:
+            raise RequestError.auth_required(
+                {"reason": "Authentication required to verify conversation"}
+            )
+
+        url = f"{self._cloud_api_url}/api/conversations/{conversation_id}"
+        headers = {"Authorization": f"Bearer {self._cloud_api_key}"}
+
+        logger.info(f"Verifying conversation {conversation_id} exists...")
+
+        try:
+            with httpx.Client(timeout=30.0) as client:
+                response = client.get(url, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise RequestError.invalid_params(
+                    {
+                        "reason": "Conversation not found",
+                        "conversation_id": conversation_id,
+                        "help": (
+                            "The conversation may have been deleted "
+                            "or the ID is incorrect."
+                        ),
+                    }
+                )
+            logger.error(f"Failed to verify conversation: {e}")
+            raise RequestError.internal_error(
+                {"reason": f"Failed to verify conversation: {e}"}
+            )
+        except Exception as e:
+            logger.error(f"Error verifying conversation: {e}", exc_info=True)
+            raise RequestError.internal_error(
+                {"reason": f"Error verifying conversation: {e}"}
+            )
+
+        sandbox_id = data.get("sandbox_id")
+        if not sandbox_id:
+            raise RequestError.invalid_params(
+                {
+                    "reason": "Conversation has no associated sandbox",
+                    "conversation_id": conversation_id,
+                    "help": (
+                        "The conversation may not have been started with a sandbox."
+                    ),
+                }
+            )
+
+        logger.info(f"Found sandbox_id {sandbox_id} for conversation {conversation_id}")
+        return sandbox_id
+
     def _get_or_create_conversation(
         self,
         session_id: str,
@@ -249,11 +315,21 @@ class OpenHandsCloudACPAgent(ACPAgent):
             logger.debug(f"Using cached cloud conversation for session {session_id}")
             return self._active_sessions[session_id]
 
+        # Check if we're resuming a conversation
+        sandbox_id: str | None = None
+        if self._resume_conversation_id:
+            logger.info(
+                f"Resuming conversation {self._resume_conversation_id}, "
+                "verifying and getting sandbox_id..."
+            )
+            sandbox_id = self._verify_and_get_sandbox_id(self._resume_conversation_id)
+
         # Create new conversation with cloud workspace
         logger.debug(f"Creating new cloud conversation for session {session_id}")
         conversation, workspace = self._setup_cloud_conversation(
             session_id=session_id,
             mcp_servers=mcp_servers,
+            sandbox_id=sandbox_id,
         )
 
         apply_confirmation_mode_to_conversation(
@@ -270,12 +346,14 @@ class OpenHandsCloudACPAgent(ACPAgent):
         self,
         session_id: str,
         mcp_servers: dict[str, dict[str, Any]] | None = None,
+        sandbox_id: str | None = None,
     ) -> tuple[RemoteConversation, OpenHandsCloudWorkspace]:
         """Set up a conversation with OpenHands Cloud workspace.
 
         Args:
             session_id: Session/conversation ID (UUID string)
             mcp_servers: Optional MCP servers configuration
+            sandbox_id: Optional sandbox ID to resume an existing sandbox
 
         Returns:
             Configured RemoteConversation with cloud workspace
@@ -305,7 +383,13 @@ class OpenHandsCloudACPAgent(ACPAgent):
             )
 
         # Create OpenHands Cloud workspace
-        logger.info(f"Creating OpenHands Cloud workspace for session {session_id}")
+        if sandbox_id:
+            logger.info(
+                f"Resuming OpenHands Cloud workspace with sandbox_id {sandbox_id} "
+                f"for session {session_id}"
+            )
+        else:
+            logger.info(f"Creating OpenHands Cloud workspace for session {session_id}")
 
         if not self._cloud_api_key:
             raise RequestError.auth_required(
@@ -316,6 +400,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
             cloud_api_url=self._cloud_api_url,
             cloud_api_key=self._cloud_api_key,
             keep_alive=True,
+            sandbox_id=sandbox_id,
         )
 
         # Track workspace for cleanup
