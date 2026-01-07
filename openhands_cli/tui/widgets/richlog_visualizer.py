@@ -435,11 +435,15 @@ class ConversationVisualizer(ConversationVisualizerBase):
         if isinstance(event, ActionEvent):
             action = event.action
             if isinstance(action, FinishAction):
-                # For finish action, only show the message
-                return Static(action.message)
+                # For finish action, only show the message with padding to align
+                widget = Static(action.message)
+                widget.styles.padding = (0, 0, 0, 2)  # top, right, bottom, left
+                return widget
             elif isinstance(action, ThinkAction):
-                # For think action, show the action's visualize (not the full event)
-                return Static(action.visualize)
+                # For think action, show the action's visualize with padding
+                widget = Static(action.visualize)
+                widget.styles.padding = (0, 0, 0, 2)
+                return widget
 
         if isinstance(event, MessageEvent):
             if (
