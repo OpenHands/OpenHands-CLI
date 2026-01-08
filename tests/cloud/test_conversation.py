@@ -56,19 +56,17 @@ def test_require_api_key(has_api_key, stored_key, expect_exc, exc_msg):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "side_effect,expected,expect_exc,exc_msg",
+    "side_effect,expected",
     [
-        (None, True, False, None),
-        ("UnauthenticatedError", False, False, None),
-        (
-            Exception("Network error"),
-            None,
-            True,
-            "Failed to validate token: Network error",
-        ),
+        # Success case - returns True
+        (None, True),
+        # UnauthenticatedError - returns False (token invalid)
+        ("UnauthenticatedError", False),
+        # Other exceptions - returns False (logs error, doesn't raise)
+        (Exception("Network error"), False),
     ],
 )
-async def test_is_token_valid(side_effect, expected, expect_exc, exc_msg):
+async def test_is_token_valid(side_effect, expected):
     from unittest.mock import AsyncMock
 
     from openhands_cli.auth.api_client import UnauthenticatedError
@@ -89,11 +87,7 @@ async def test_is_token_valid(side_effect, expected, expect_exc, exc_msg):
 
         mock_client_cls.return_value = client
 
-        if expect_exc:
-            with pytest.raises(CloudConversationError, match=exc_msg):
-                await is_token_valid("https://example.com", "token")
-        else:
-            assert await is_token_valid("https://example.com", "token") is expected
+        assert await is_token_valid("https://example.com", "token") is expected
 
         client.get_user_info.assert_called_once()
 
