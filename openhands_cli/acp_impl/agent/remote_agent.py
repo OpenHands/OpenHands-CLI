@@ -22,6 +22,7 @@ from acp.schema import (
     AuthenticateResponse,
     ListSessionsResponse,
     LoadSessionResponse,
+    SessionInfo,
     SetSessionModelResponse,
     SetSessionModeResponse,
     TextContentBlock,
@@ -141,12 +142,44 @@ class OpenHandsCloudACPAgent(ACPAgent):
 
     async def list_sessions(
         self,
-        cursor: str | None = None,
-        cwd: str | None = None,
+        cursor: str | None = None,  # noqa: ARG002
+        cwd: str | None = None,  # noqa: ARG002
         **_kwargs: Any,
     ) -> ListSessionsResponse:
-        """List available sessions (no-op for now)."""
-        return await self._shared_handler.list_sessions(cursor, cwd, **_kwargs)
+        """List available cloud sessions (V1 conversations only)."""
+        logger.info("List sessions requested for cloud agent")
+
+        if not self._cloud_api_key:
+            logger.warning("No API key available, returning empty session list")
+            return ListSessionsResponse(sessions=[])
+
+        try:
+            client = OpenHandsApiClient(self._cloud_api_url, self._cloud_api_key)
+            conversations = await client.list_conversations()
+
+            # Filter to only V1 conversations and convert to SessionInfo
+            sessions: list[SessionInfo] = []
+            for conv in conversations:
+                if conv.get("conversation_version") != "V1":
+                    continue
+
+                session_info = SessionInfo(
+                    session_id=conv.get("conversation_id", ""),
+                    cwd="/",  # Cloud sessions don't have a local cwd
+                    title=conv.get("title"),
+                    updated_at=conv.get("last_updated_at"),
+                )
+                sessions.append(session_info)
+
+            logger.info(f"Found {len(sessions)} V1 cloud sessions")
+            return ListSessionsResponse(sessions=sessions)
+
+        except UnauthenticatedError:
+            logger.warning("Authentication failed, returning empty session list")
+            return ListSessionsResponse(sessions=[])
+        except ApiClientError as e:
+            logger.error(f"Failed to list sessions: {e}")
+            return ListSessionsResponse(sessions=[])
 
     async def set_session_model(
         self,

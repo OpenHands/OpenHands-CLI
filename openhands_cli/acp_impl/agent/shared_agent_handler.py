@@ -15,7 +15,6 @@ from acp.schema import (
     AuthMethod,
     AvailableCommandsUpdate,
     Implementation,
-    ListSessionsResponse,
     McpCapabilities,
     PromptCapabilities,
     SetSessionModelResponse,
@@ -137,16 +136,6 @@ class SharedACPAgentHandler:
         """Authenticate the client (no-op for now)."""
         logger.info(f"Authentication requested with method: {method_id}")
         return AuthenticateResponse()
-
-    async def list_sessions(
-        self,
-        cursor: str | None = None,  # noqa: ARG002
-        cwd: str | None = None,  # noqa: ARG002
-        **_kwargs: Any,
-    ) -> ListSessionsResponse:
-        """List available sessions (no-op for now)."""
-        logger.info("List sessions requested")
-        return ListSessionsResponse(sessions=[])
 
     async def set_session_model(
         self,

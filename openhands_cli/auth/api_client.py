@@ -103,6 +103,30 @@ class OpenHandsApiClient(BaseHttpClient):
             return data[0]
         return None
 
+    async def list_conversations(self) -> list[dict[str, Any]]:
+        """List all conversations from the cloud.
+
+        Returns:
+            List of conversation dictionaries
+
+        Raises:
+            UnauthenticatedError: If the user is not authenticated (401 response)
+            ApiClientError: For other API errors
+        """
+        path = "/api/conversations"
+        try:
+            response = await self.get(path, headers=self._headers)
+        except AuthHttpError as e:
+            if "HTTP 401" in str(e):
+                raise UnauthenticatedError(
+                    f"Authentication failed for {path!r}: {e}"
+                ) from e
+            raise ApiClientError(f"Request to {path!r} failed: {e}") from e
+
+        data: dict[str, Any] = response.json()
+        results: list[dict[str, Any]] = data.get("results", [])
+        return results
+
 
 def _print_settings_summary(settings: dict[str, Any]) -> None:
     _p(
