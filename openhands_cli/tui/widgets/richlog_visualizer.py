@@ -34,6 +34,7 @@ from openhands_cli.tui.widgets.collapsible import (
 TOOL_ICON = "🔧"
 SUCCESS_ICON = "✓"
 ERROR_ICON = "✗"
+AGENT_MESSAGE_LEFT_PADDING = 1
 
 
 if TYPE_CHECKING:
@@ -438,13 +439,18 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 # For finish action, only show the message with padding to align
                 # User message has "padding: 0 1" and starts with "> ", so text
                 # starts at position 3 (1 padding + 2 for "> ")
-                widget = Static(action.message)
-                widget.styles.padding = (0, 0, 0, 3)  # top, right, bottom, left
+                widget = Static(self._escape_rich_markup(str(action.message)))
+                widget.styles.padding = (
+                    0,
+                    0,
+                    0,
+                    AGENT_MESSAGE_LEFT_PADDING,
+                )  # top, right, bottom, left
                 return widget
             elif isinstance(action, ThinkAction):
                 # For think action, show the action's visualize with padding
-                widget = Static(action.visualize)
-                widget.styles.padding = (0, 0, 0, 3)
+                widget = Static(self._escape_rich_markup(str(action.visualize)))
+                widget.styles.padding = (0, 0, 0, AGENT_MESSAGE_LEFT_PADDING)
                 return widget
 
         if isinstance(event, MessageEvent):
@@ -455,7 +461,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
             ):
                 return None
             # Display messages as plain text
-            return Static(str(content))
+            widget = Static(self._escape_rich_markup(str(content)))
+            widget.styles.padding = (
+                0,
+                0,
+                0,
+                AGENT_MESSAGE_LEFT_PADDING,
+            )  # top, right, bottom, left
 
         # For other events, use collapsible
         return self._create_event_collapsible(event)
@@ -477,17 +489,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
         elif isinstance(event, ActionEvent):
             # Build title using new format: "🔧 {summary}: $ {command}"
             title = self._build_action_title(event)
-
-            # Keep rich formatting for content (don't escape)
-            content_string = str(content)
+            content_string = self._escape_rich_markup(str(content))
             metrics = self._format_metrics_subtitle()
             if metrics:
                 content_string = f"{content_string}\n\n{metrics}"
 
             # Action events default to collapsed since we have summary in title
-            collapsible = self._make_collapsible(
-                content_string, title, event, collapsed=True
-            )
+            collapsible = self._make_collapsible(content_string, title, event)
 
             # Store for pairing with observation
             self._pending_actions[event.tool_call_id] = (event, collapsible)
@@ -497,11 +505,14 @@ class ConversationVisualizer(ConversationVisualizerBase):
             # If we get here, the observation wasn't paired with an action
             # (shouldn't happen normally, but handle gracefully)
             title = self._extract_meaningful_title(event, "Observation")
-            return self._make_collapsible(str(content), title, event)
+            return self._make_collapsible(
+                self._escape_rich_markup(str(content)), title, event
+            )
         elif isinstance(event, UserRejectObservation):
-            # If we get here, the rejection wasn't paired with an action
             title = self._extract_meaningful_title(event, "User Rejected Action")
-            return self._make_collapsible(str(content), title, event)
+            return self._make_collapsible(
+                self._escape_rich_markup(str(content)), title, event
+            )
         elif isinstance(event, AgentErrorEvent):
             title = self._extract_meaningful_title(event, "Agent Error")
             content_string = self._escape_rich_markup(str(content))
