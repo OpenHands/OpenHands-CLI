@@ -30,6 +30,7 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.risk import SecurityRisk
 from openhands.tools.task_tracker.definition import TaskItem
+from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
@@ -351,6 +352,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             update_notice_widget.display = True
         else:
             update_notice_widget.display = False
+
+        # Show plan panel on startup if enabled in settings
+        cli_settings = CliSettings.load()
+        if cli_settings.show_plan_panel_on_startup:
+            self.plan_panel = PlanSidePanel.get_or_create(self)
 
         # Process any queued inputs
         self._process_queued_inputs()

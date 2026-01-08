@@ -74,14 +74,29 @@ class CliSettingsTab(Container):
                 value=self.cli_settings.default_cells_expanded,
             )
 
+            yield SettingsSwitch(
+                label="Show Plan Panel on Startup",
+                description=(
+                    "When enabled, the plan panel will be shown on the right side "
+                    "when the CLI starts. The panel displays the agent's task plan "
+                    "and progress. You can toggle it anytime via the command palette."
+                ),
+                switch_id="show_plan_panel_on_startup_switch",
+                value=self.cli_settings.show_plan_panel_on_startup,
+            )
+
     def get_cli_settings(self) -> CliSettings:
         """Get the current CLI settings from the form."""
         display_cost_switch = self.query_one("#display_cost_switch", Switch)
         default_cells_expanded_switch = self.query_one(
             "#default_cells_expanded_switch", Switch
         )
+        show_plan_panel_on_startup_switch = self.query_one(
+            "#show_plan_panel_on_startup_switch", Switch
+        )
 
         return CliSettings(
             display_cost_per_action=display_cost_switch.value,
             default_cells_expanded=default_cells_expanded_switch.value,
+            show_plan_panel_on_startup=show_plan_panel_on_startup_switch.value,
         )
