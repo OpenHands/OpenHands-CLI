@@ -138,7 +138,7 @@ class LocalOpenHandsACPAgent(ACPAgent):
         session_id: str,
         working_dir: str | None = None,
         mcp_servers: dict[str, dict[str, Any]] | None = None,
-        is_resuming: bool = False
+        is_resuming: bool = False,  # noqa: ARG002
     ) -> LocalConversation:
         """Get an active conversation from cache or create/load it.
 
@@ -339,10 +339,7 @@ class LocalOpenHandsACPAgent(ACPAgent):
         logger.info(f"Using working directory: {working_dir}")
 
         return await self._shared_handler.new_session(
-            ctx=self,
-            mcp_servers=mcp_servers,
-            working_dir=working_dir,
-            get_or_create_conversation=self._get_or_create_conversation,
+            ctx=self, mcp_servers=mcp_servers, working_dir=working_dir
         )
 
     async def prompt(
@@ -433,9 +430,7 @@ class LocalOpenHandsACPAgent(ACPAgent):
 
     async def cancel(self, session_id: str, **_kwargs: Any) -> None:
         """Cancel the current operation."""
-        await self._shared_handler.cancel(
-            self, session_id, **_kwargs
-        )
+        await self._shared_handler.cancel(self, session_id, **_kwargs)
 
     async def load_session(
         self,

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
 import logging
 import uuid
 from collections.abc import Mapping
@@ -70,9 +69,8 @@ class _ACPAgentContext(Protocol):
         session_id: str,
         working_dir: str | None = None,
         mcp_servers: dict[str, dict[str, Any]] | None = None,
-        is_resuming: bool = False
-    ) -> LocalConversation | RemoteConversation:
-        ...
+        is_resuming: bool = False,
+    ) -> LocalConversation | RemoteConversation: ...
 
 
 class SharedACPAgentHandler:
@@ -248,7 +246,6 @@ class SharedACPAgentHandler:
         ctx: _ACPAgentContext,
         mcp_servers: list[Any],
         working_dir: str | None = None,
-        get_or_create_conversation: Any = None,
     ) -> NewSessionResponse:
         """Create a new conversation session.
 
@@ -274,10 +271,11 @@ class SharedACPAgentHandler:
             mcp_servers_dict = convert_acp_mcp_servers_to_agent_format(mcp_servers)
 
         # Use resume_conversation_id if provided (from --resume flag)
-        # Only use it once, then clear it
+        # Only use it once, then clear for creating subsequent new sessions
         is_resuming = False
         if ctx._resume_conversation_id:
             session_id = ctx._resume_conversation_id
+            ctx._resume_conversation_id = None
             is_resuming = True
             logger.info(f"Resuming conversation: {session_id}")
         else:
@@ -290,7 +288,7 @@ class SharedACPAgentHandler:
                 session_id=session_id,
                 working_dir=working_dir,
                 mcp_servers=mcp_servers_dict,
-                is_resuming=is_resuming
+                is_resuming=is_resuming,
             )
 
             logger.info(f"Created new {session_type_name} {session_id}")
