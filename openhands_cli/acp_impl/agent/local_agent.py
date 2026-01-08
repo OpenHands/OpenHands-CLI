@@ -133,11 +133,12 @@ class LocalOpenHandsACPAgent(ACPAgent):
     def on_connect(self, conn: Client) -> None:
         pass
 
-    def _get_or_create_conversation(
+    async def _get_or_create_conversation(
         self,
         session_id: str,
         working_dir: str | None = None,
         mcp_servers: dict[str, dict[str, Any]] | None = None,
+        is_resuming: bool = False
     ) -> LocalConversation:
         """Get an active conversation from cache or create/load it.
 
@@ -350,7 +351,7 @@ class LocalOpenHandsACPAgent(ACPAgent):
         """Handle a prompt request."""
         try:
             # Get or create conversation (preserves state like pause/confirmation)
-            conversation = self._get_or_create_conversation(session_id=session_id)
+            conversation = await self._get_or_create_conversation(session_id=session_id)
 
             # Convert ACP prompt format to OpenHands message content
             message_content = convert_acp_prompt_to_message_content(prompt)
@@ -433,7 +434,7 @@ class LocalOpenHandsACPAgent(ACPAgent):
     async def cancel(self, session_id: str, **_kwargs: Any) -> None:
         """Cancel the current operation."""
         await self._shared_handler.cancel(
-            self, session_id, self._get_or_create_conversation, **_kwargs
+            self, session_id, **_kwargs
         )
 
     async def load_session(
@@ -468,7 +469,7 @@ class LocalOpenHandsACPAgent(ACPAgent):
             # Get or create conversation (loads from disk if not in cache)
             # The SDK's Conversation class automatically loads from disk if the
             # conversation_id exists in persistence_dir
-            conversation = self._get_or_create_conversation(session_id=session_id)
+            conversation = await self._get_or_create_conversation(session_id=session_id)
 
             # Check if there's actually any history to load
             if not conversation.state.events:

@@ -65,6 +65,15 @@ class _ACPAgentContext(Protocol):
         """Clean up resources for a session (optional, may be no-op)."""
         ...
 
+    async def _get_or_create_conversation(
+        self,
+        session_id: str,
+        working_dir: str | None = None,
+        mcp_servers: dict[str, dict[str, Any]] | None = None,
+        is_resuming: bool = False
+    ) -> LocalConversation | RemoteConversation:
+        ...
+
 
 class SharedACPAgentHandler:
     """Shared ACP agent behavior used by both local and cloud agents."""
@@ -277,15 +286,12 @@ class SharedACPAgentHandler:
         try:
             # Create conversation and cache it for future operations
             # Support both sync and async get_or_create_conversation callables
-            result = get_or_create_conversation(
+            conversation = await ctx._get_or_create_conversation(
                 session_id=session_id,
                 working_dir=working_dir,
                 mcp_servers=mcp_servers_dict,
+                is_resuming=is_resuming
             )
-            if inspect.iscoroutine(result):
-                conversation = await result
-            else:
-                conversation = result
 
             logger.info(f"Created new {session_type_name} {session_id}")
 
@@ -367,7 +373,6 @@ class SharedACPAgentHandler:
         self,
         ctx: _ACPAgentContext,
         session_id: str,
-        get_or_create_conversation: Any,
         **_kwargs: Any,
     ) -> None:
         """Cancel the current operation.
@@ -382,11 +387,7 @@ class SharedACPAgentHandler:
 
         try:
             # Support both sync and async get_or_create_conversation callables
-            result = get_or_create_conversation(session_id=session_id)
-            if inspect.iscoroutine(result):
-                conversation = await result
-            else:
-                conversation = result
+            conversation = await ctx._get_or_create_conversation(session_id=session_id)
             conversation.pause()
 
             running_task = ctx._running_tasks.get(session_id)
