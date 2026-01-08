@@ -462,6 +462,9 @@ class OpenHandsCloudACPAgent(ACPAgent):
         is_authenticated = await self._is_authenticated()
         if not is_authenticated:
             logger.info("User not authenticated, requiring authentication")
+
+            # Clients recognize this error type and display login options
+            # Selecting the login option will trigger the authenticate method
             raise RequestError.auth_required(
                 {"reason": "Authentication required to create a cloud session"}
             )

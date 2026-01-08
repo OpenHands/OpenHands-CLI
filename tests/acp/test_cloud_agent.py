@@ -120,7 +120,10 @@ class TestVerifyAndGetSandboxId:
             "openhands_cli.acp_impl.agent.remote_agent.OpenHandsApiClient"
         ) as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.get_conversation_info.return_value = {"id": "test", "sandbox_id": None}
+            mock_client.get_conversation_info.return_value = {
+                "id": "test",
+                "sandbox_id": None,
+            }
             mock_client_class.return_value = mock_client
 
             with pytest.raises(RequestError) as exc_info:
@@ -141,7 +144,9 @@ class TestVerifyAndGetSandboxId:
             }
             mock_client_class.return_value = mock_client
 
-            sandbox_id = await cloud_agent._verify_and_get_sandbox_id("test-conversation-id")
+            sandbox_id = await cloud_agent._verify_and_get_sandbox_id(
+                "test-conversation-id"
+            )
 
             assert sandbox_id == "sandbox-123"
 
@@ -165,9 +170,7 @@ class TestGetOrCreateConversation:
         """Test _get_or_create_conversation creates new conversation when not cached."""
         session_id = str(uuid4())
 
-        with patch.object(
-            cloud_agent, "_setup_cloud_conversation"
-        ) as mock_setup:
+        with patch.object(cloud_agent, "_setup_cloud_conversation") as mock_setup:
             mock_conversation = MagicMock()
             mock_workspace = MagicMock()
             mock_setup.return_value = (mock_conversation, mock_workspace)
@@ -189,18 +192,14 @@ class TestGetOrCreateConversation:
             patch.object(
                 cloud_agent, "_verify_and_get_sandbox_id", new_callable=AsyncMock
             ) as mock_verify,
-            patch.object(
-                cloud_agent, "_setup_cloud_conversation"
-            ) as mock_setup,
+            patch.object(cloud_agent, "_setup_cloud_conversation") as mock_setup,
         ):
             mock_verify.return_value = "sandbox-123"
             mock_conversation = MagicMock()
             mock_workspace = MagicMock()
             mock_setup.return_value = (mock_conversation, mock_workspace)
 
-            await cloud_agent._get_or_create_conversation(
-                session_id, is_resuming=True
-            )
+            await cloud_agent._get_or_create_conversation(session_id, is_resuming=True)
 
             mock_verify.assert_called_once_with(session_id)
             mock_setup.assert_called_once()
