@@ -18,12 +18,17 @@ def mock_connection():
 @pytest.fixture
 def cloud_agent(mock_connection):
     """Create an OpenHands Cloud ACP agent instance."""
-    return OpenHandsCloudACPAgent(
-        conn=mock_connection,
-        cloud_api_key="test-api-key",
-        initial_confirmation_mode="always-ask",
-        cloud_api_url="https://app.all-hands.dev",
-    )
+    with patch(
+        "openhands_cli.acp_impl.agent.remote_agent.TokenStorage"
+    ) as mock_storage_class:
+        mock_storage = MagicMock()
+        mock_storage.get_api_key.return_value = "test-api-key"
+        mock_storage_class.return_value = mock_storage
+        return OpenHandsCloudACPAgent(
+            conn=mock_connection,
+            initial_confirmation_mode="always-ask",
+            cloud_api_url="https://app.all-hands.dev",
+        )
 
 
 @pytest.mark.asyncio
@@ -51,18 +56,14 @@ async def test_new_session_succeeds_when_authenticated(cloud_agent):
     """Test that new_session proceeds when user is authenticated."""
     with (
         patch(
-            "openhands_cli.acp_impl.agent.remote_agent.TokenStorage"
-        ) as mock_storage_class,
+            "openhands_cli.acp_impl.agent.remote_agent.is_token_valid",
+            new_callable=AsyncMock,
+            return_value=True,
+        ),
         patch.object(
             cloud_agent._shared_handler, "new_session", new_callable=AsyncMock
         ) as mock_new_session,
     ):
-        # Mock TokenStorage to indicate API key is stored
-        mock_storage = MagicMock()
-        mock_storage.has_api_key.return_value = True
-        mock_storage.get_api_key.return_value = "valid-api-key"
-        mock_storage_class.return_value = mock_storage
-
         # Mock the shared handler's new_session
         mock_response = MagicMock()
         mock_new_session.return_value = mock_response
@@ -192,38 +193,37 @@ async def test_authenticate_continues_on_user_data_fetch_error(cloud_agent):
 async def test_is_authenticated_returns_false_when_no_key():
     """Test _is_authenticated returns False when no API key is stored."""
     mock_conn = AsyncMock()
-    agent = OpenHandsCloudACPAgent(
-        conn=mock_conn,
-        cloud_api_key="",
-        initial_confirmation_mode="always-ask",
-    )
-
     with patch(
         "openhands_cli.acp_impl.agent.remote_agent.TokenStorage"
     ) as mock_storage_class:
         mock_storage = MagicMock()
-        mock_storage.has_api_key.return_value = False
+        mock_storage.get_api_key.return_value = None
         mock_storage_class.return_value = mock_storage
+        agent = OpenHandsCloudACPAgent(
+            conn=mock_conn,
+            initial_confirmation_mode="always-ask",
+        )
 
-        assert agent._is_authenticated() is False
+        assert await agent._is_authenticated() is False
 
 
 @pytest.mark.asyncio
 async def test_is_authenticated_returns_true_when_key_exists():
     """Test _is_authenticated returns True when API key is stored."""
     mock_conn = AsyncMock()
-    agent = OpenHandsCloudACPAgent(
-        conn=mock_conn,
-        cloud_api_key="test-key",
-        initial_confirmation_mode="always-ask",
-    )
-
     with patch(
         "openhands_cli.acp_impl.agent.remote_agent.TokenStorage"
     ) as mock_storage_class:
         mock_storage = MagicMock()
-        mock_storage.has_api_key.return_value = True
         mock_storage.get_api_key.return_value = "valid-key"
         mock_storage_class.return_value = mock_storage
+        agent = OpenHandsCloudACPAgent(
+            conn=mock_conn,
+            initial_confirmation_mode="always-ask",
+        )
 
-        assert agent._is_authenticated() is True
+        with patch(
+            "openhands_cli.acp_impl.agent.remote_agent.is_token_valid",
+            return_value=True,
+        ):
+            assert await agent._is_authenticated() is True

@@ -49,6 +49,11 @@ from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
     convert_acp_prompt_to_message_content,
 )
+from openhands_cli.auth.api_client import (
+    ApiClientError,
+    OpenHandsApiClient,
+    UnauthenticatedError,
+)
 from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.cloud.conversation import is_token_valid
 from openhands_cli.locations import MCP_CONFIG_FILE
@@ -226,7 +231,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
                 {"reason": f"Authentication error: {e}"}
             ) from e
 
-    def _verify_and_get_sandbox_id(self, conversation_id: str) -> str:
+    async def _verify_and_get_sandbox_id(self, conversation_id: str) -> str:
         """Verify a conversation exists and get its sandbox_id.
 
         Args:
@@ -238,25 +243,22 @@ class OpenHandsCloudACPAgent(ACPAgent):
         Raises:
             RequestError: If the conversation doesn't exist or has no sandbox_id
         """
-        import httpx
-
         if not self._cloud_api_key:
             raise RequestError.auth_required(
                 {"reason": "Authentication required to verify conversation"}
             )
 
-        url = f"{self._cloud_api_url}/api/v1/app-conversations?ids={conversation_id}"
-        headers = {"Authorization": f"Bearer {self._cloud_api_key}"}
-
         logger.info(f"Verifying conversation {conversation_id} exists...")
 
         try:
-            with httpx.Client(timeout=30.0) as client:
-                response = client.get(url, headers=headers)
-                response.raise_for_status()
-                data = response.json()
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 404:
+            client = OpenHandsApiClient(self._cloud_api_url, self._cloud_api_key)
+            conversation_info = await client.get_conversation_info(conversation_id)
+        except UnauthenticatedError:
+            raise RequestError.auth_required(
+                {"reason": "Authentication required to verify conversation"}
+            )
+        except ApiClientError as e:
+            if "HTTP 404" in str(e):
                 raise RequestError.invalid_params(
                     {
                         "reason": "Conversation not found",
@@ -277,11 +279,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
                 {"reason": f"Error verifying conversation: {e}"}
             )
 
-        sandbox_id = (
-            data[0].get("sandbox_id")
-            if isinstance(data, list) and len(data) > 0
-            else None
-        )
+        sandbox_id = conversation_info.get("sandbox_id") if conversation_info else None
         if not sandbox_id:
             raise RequestError.invalid_params(
                 {
@@ -296,7 +294,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
         logger.info(f"Found sandbox_id {sandbox_id} for conversation {conversation_id}")
         return sandbox_id
 
-    def _get_or_create_conversation(
+    async def _get_or_create_conversation(
         self,
         session_id: str,
         working_dir: str | None = None,  # noqa: ARG002
@@ -324,7 +322,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
                 f"Resuming conversation {session_id}, "
                 "verifying and getting sandbox_id..."
             )
-            sandbox_id = self._verify_and_get_sandbox_id(session_id)
+            sandbox_id = await self._verify_and_get_sandbox_id(session_id)
 
         # Create new conversation with cloud workspace
         logger.debug(f"Creating new cloud conversation for session {session_id}")
@@ -460,7 +458,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
             RequestError.auth_required: If the user is not authenticated
         """
         # Check if user is authenticated before creating a session
-        is_authenticated = self._is_authenticated()
+        is_authenticated = await self._is_authenticated()
         if not is_authenticated:
             logger.info("User not authenticated, requiring authentication")
             raise RequestError.auth_required(
@@ -470,6 +468,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
         return await self._shared_handler.new_session(
             ctx=self,
             mcp_servers=mcp_servers,
+            get_or_create_conversation=self._get_or_create_conversation,
         )
 
     async def prompt(
@@ -478,7 +477,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
         """Handle a prompt request with cloud workspace."""
         try:
             # Get or create conversation (preserves state like pause/confirmation)
-            conversation = self._get_or_create_conversation(session_id=session_id)
+            conversation = await self._get_or_create_conversation(session_id=session_id)
 
             # Convert ACP prompt format to OpenHands message content
             message_content = convert_acp_prompt_to_message_content(prompt)

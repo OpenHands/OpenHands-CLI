@@ -341,6 +341,7 @@ class LocalOpenHandsACPAgent(ACPAgent):
             ctx=self,
             mcp_servers=mcp_servers,
             working_dir=working_dir,
+            get_or_create_conversation=self._get_or_create_conversation,
         )
 
     async def prompt(

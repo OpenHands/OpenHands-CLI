@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import uuid
 from collections.abc import Mapping
@@ -58,15 +59,6 @@ class _ACPAgentContext(Protocol):
     @property
     def active_session(self) -> Mapping[str, BaseConversation]:
         """Return the active sessions mapping."""
-        ...
-
-    def _get_or_create_conversation(
-        self,
-        session_id: str,
-        working_dir: str | None = None,
-        mcp_servers: dict[str, dict[str, Any]] | None = None,
-    ) -> BaseConversation:
-        """Get or create a conversation for the given session ID."""
         ...
 
     def _cleanup_session(self, session_id: str) -> None:
@@ -247,6 +239,7 @@ class SharedACPAgentHandler:
         ctx: _ACPAgentContext,
         mcp_servers: list[Any],
         working_dir: str | None = None,
+        get_or_create_conversation: Any = None,
     ) -> NewSessionResponse:
         """Create a new conversation session.
 
@@ -257,6 +250,8 @@ class SharedACPAgentHandler:
             ctx: The ACP agent context
             mcp_servers: ACP MCP servers configuration (will be converted)
             working_dir: Working directory for local sessions (ignored for cloud)
+            get_or_create_conversation: Callable to get or create conversation
+                (can be sync or async)
 
         Returns:
             NewSessionResponse with session ID and modes
@@ -281,11 +276,16 @@ class SharedACPAgentHandler:
 
         try:
             # Create conversation and cache it for future operations
-            conversation = ctx._get_or_create_conversation(
+            # Support both sync and async get_or_create_conversation callables
+            result = get_or_create_conversation(
                 session_id=session_id,
                 working_dir=working_dir,
                 mcp_servers=mcp_servers_dict,
             )
+            if inspect.iscoroutine(result):
+                conversation = await result
+            else:
+                conversation = result
 
             logger.info(f"Created new {session_type_name} {session_id}")
 
@@ -376,11 +376,17 @@ class SharedACPAgentHandler:
             ctx: The ACP agent context
             session_id: The session ID to cancel
             get_or_create_conversation: Callable to get or create conversation
+                (can be sync or async)
         """
         logger.info(f"Cancel requested for session: {session_id}")
 
         try:
-            conversation = get_or_create_conversation(session_id=session_id)
+            # Support both sync and async get_or_create_conversation callables
+            result = get_or_create_conversation(session_id=session_id)
+            if inspect.iscoroutine(result):
+                conversation = await result
+            else:
+                conversation = result
             conversation.pause()
 
             running_task = ctx._running_tasks.get(session_id)
