@@ -511,13 +511,12 @@ class LocalOpenHandsACPAgent(ACPAgent):
 
     async def list_sessions(
         self,
-        cursor: str | None = None,  # noqa: ARG002
-        cwd: str | None = None,  # noqa: ARG002
+        cursor: str | None = None,
+        cwd: str | None = None,
         **_kwargs: Any,
     ) -> ListSessionsResponse:
-        """List available sessions (returns empty list for local agent)."""
-        logger.info("List sessions requested (local agent returns empty list)")
-        return ListSessionsResponse(sessions=[])
+        """List available sessions (no-op for now)."""
+        return await self._shared_handler.list_sessions(cursor, cwd, **_kwargs)
 
     async def set_session_mode(
         self,
