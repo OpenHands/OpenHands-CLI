@@ -1,0 +1,451 @@
+"""Tests for headless mode and conversation summary behavior."""
+
+import os
+import sys
+import tempfile
+import uuid
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
+
+import pytest
+from rich.text import Text
+
+from openhands.sdk.security.confirmation_policy import (
+    AlwaysConfirm,
+    ConfirmRisky,
+    NeverConfirm,
+)
+from openhands.sdk.security.risk import SecurityRisk
+from openhands_cli.argparsers.main_parser import create_main_parser
+from openhands_cli.entrypoint import main as simple_main
+from openhands_cli.tui.modals.settings.settings_screen import SettingsScreen
+from openhands_cli.tui.textual_app import OpenHandsApp, main as textual_main
+
+
+# ---------------------------------------------------------------------------
+# Argument parsing / simple_main validation
+# ---------------------------------------------------------------------------
+
+
+class TestHeadlessArgumentParsing:
+    """Minimal but high-impact coverage for headless arg parsing."""
+
+    def test_headless_flag_parsed_and_default_false(self):
+        parser = create_main_parser()
+
+        # No flag -> False
+        args = parser.parse_args(["--task", "test"])
+        assert hasattr(args, "headless")
+        assert args.headless is False
+
+        # With flag -> True
+        args = parser.parse_args(["--headless", "--task", "test"])
+        assert args.headless is True
+
+    def test_headless_can_be_parsed_without_task_or_file(self):
+        """Parser itself accepts this; validation happens in simple_main."""
+        parser = create_main_parser()
+        args = parser.parse_args(["--headless"])
+        assert args.headless is True
+        assert args.task is None
+        assert args.file is None
+
+
+class TestSimpleMainHeadlessValidation:
+    """High-level validation behavior of simple_main."""
+
+    @patch("openhands_cli.tui.textual_app.main")
+    def test_headless_without_task_or_file_exits_with_error(self, mock_textual_main):
+        test_args = ["openhands", "--headless"]
+
+        with patch.object(sys, "argv", test_args):
+            with patch("sys.stderr"):  # suppress usage output
+                with pytest.raises(SystemExit) as exc:
+                    simple_main()
+        assert exc.value.code == 2
+        mock_textual_main.assert_not_called()
+
+    @patch("openhands_cli.tui.textual_app.main")
+    def test_headless_with_task_calls_textual_main_with_queued_input(
+        self, mock_textual_main
+    ):
+        # Mock textual_main to return a UUID
+        mock_textual_main.return_value = uuid.uuid4()
+
+        test_args = ["openhands", "--headless", "--task", "test task"]
+
+        with patch.object(sys, "argv", test_args):
+            simple_main()
+
+        mock_textual_main.assert_called_once()
+        kwargs = mock_textual_main.call_args.kwargs
+
+        # Headless should queue the task and set headless=True
+        assert kwargs["queued_inputs"] == ["test task"]
+        assert kwargs["headless"] is True
+
+    @patch("openhands_cli.tui.textual_app.main")
+    def test_headless_with_file_calls_textual_main(self, mock_textual_main):
+        # Mock textual_main to return a UUID
+        mock_textual_main.return_value = uuid.uuid4()
+
+        # minimal coverage that file-only headless works
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
+            f.write("test content")
+            temp_file = f.name
+
+        try:
+            test_args = ["openhands", "--headless", "--file", temp_file]
+            with patch.object(sys, "argv", test_args):
+                simple_main()
+
+            mock_textual_main.assert_called_once()
+        finally:
+            os.unlink(temp_file)
+
+    @patch("openhands_cli.tui.textual_app.main")
+    def test_headless_auto_sets_exit_without_confirmation(self, mock_textual_main):
+        """Regression guard that headless implies exit_without_confirmation."""
+        # Mock textual_main to return a UUID
+        mock_textual_main.return_value = uuid.uuid4()
+
+        test_args = ["openhands", "--headless", "--task", "test task"]
+
+        with patch.object(sys, "argv", test_args):
+            simple_main()
+
+        mock_textual_main.assert_called_once()
+        kwargs = mock_textual_main.call_args.kwargs
+
+        # Headless should auto-set exit_without_confirmation
+        assert kwargs["exit_without_confirmation"] is True
+
+    def test_headless_help_text_mentions_requirements(self):
+        """Ensure CLI help describes the task/file requirement."""
+        parser = create_main_parser()
+        help_text = parser.format_help()
+        assert "--headless" in help_text
+        assert "Requires --task or --file" in help_text
+
+
+# ---------------------------------------------------------------------------
+# textual.main → confirmation policy wiring
+# ---------------------------------------------------------------------------
+
+
+class TestHeadlessConfirmationPolicy:
+    """High-impact confirmation policy behavior for textual_main."""
+
+    @pytest.mark.parametrize(
+        "headless,always_approve,llm_approve,expected_type,expected_threshold",
+        [
+            # Headless forces NeverConfirm regardless of flags
+            (True, False, False, NeverConfirm, None),
+            (True, True, True, NeverConfirm, None),
+            # Non-headless + always_approve -> NeverConfirm
+            (False, True, False, NeverConfirm, None),
+            # Non-headless + llm_approve -> ConfirmRisky(HIGH)
+            (False, False, True, ConfirmRisky, SecurityRisk.HIGH),
+            # Default non-headless -> AlwaysConfirm
+            (False, False, False, AlwaysConfirm, None),
+        ],
+    )
+    def test_confirmation_policy_selection(
+        self,
+        headless: bool,
+        always_approve: bool,
+        llm_approve: bool,
+        expected_type,
+        expected_threshold,
+    ):
+        with patch("openhands_cli.tui.textual_app.OpenHandsApp") as mock_app_cls:
+            mock_app = MagicMock()
+            mock_app_cls.return_value = mock_app
+
+            textual_main(
+                headless=headless,
+                always_approve=always_approve,
+                llm_approve=llm_approve,
+                exit_without_confirmation=True,
+            )
+
+            mock_app_cls.assert_called_once()
+            policy = mock_app_cls.call_args.kwargs["initial_confirmation_policy"]
+            assert isinstance(policy, expected_type)
+            if isinstance(policy, ConfirmRisky):
+                assert policy.threshold == expected_threshold
+
+
+# ---------------------------------------------------------------------------
+# OpenHandsApp headless behavior + summary printing
+# ---------------------------------------------------------------------------
+
+
+class TestHeadlessAppBehavior:
+    """Tests focused on headless flag and auto-exit behavior in OpenHandsApp."""
+
+    @pytest.mark.asyncio
+    async def test_conversation_state_change_triggers_summary_and_exit_in_headless(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        """When headless and conversation finishes, we should print summary & exit."""
+        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda: False)
+
+        app = OpenHandsApp(exit_confirmation=False, headless_mode=True)
+
+        app._print_conversation_summary = MagicMock()
+        app.exit = MagicMock()
+
+        app._on_conversation_state_changed(is_running=False)
+
+        app._print_conversation_summary.assert_called_once()
+        app.exit.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_conversation_state_change_no_exit_when_running(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda: False)
+
+        app = OpenHandsApp(exit_confirmation=False)
+        app.headless_mode = True
+        app.exit = MagicMock()
+
+        app._on_conversation_state_changed(is_running=True)
+        app.exit.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_conversation_state_change_no_exit_in_non_headless(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda: False)
+
+        app = OpenHandsApp(exit_confirmation=False)
+        app.exit = MagicMock()
+
+        app._on_conversation_state_changed(is_running=False)
+        app.exit.assert_not_called()
+
+
+class TestPrintConversationSummary:
+    """Focused tests for _print_conversation_summary."""
+
+    def test_print_conversation_summary_no_runner_is_noop(self, monkeypatch):
+        """If no conversation_runner is set, method should be a no-op (no crash)."""
+        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda: False)
+        app = OpenHandsApp(exit_confirmation=False)
+        app.conversation_runner = None
+
+        # Just ensure this doesn't raise
+        app._print_conversation_summary()
+
+    def test_print_conversation_summary_uses_console_and_runner(self, monkeypatch):
+        """Ensure we call get_conversation_summary and rich.Console.print."""
+        from rich.text import Text
+
+        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda: False)
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        mock_runner = MagicMock()
+        mock_runner.get_conversation_summary.return_value = (
+            2,
+            Text("Last agent message"),
+        )
+        app.conversation_runner = mock_runner
+
+        with patch("rich.console.Console") as mock_console_cls:
+            mock_console = MagicMock()
+            mock_console_cls.return_value = mock_console
+
+            app._print_conversation_summary()
+
+            mock_runner.get_conversation_summary.assert_called_once()
+            assert mock_console.print.call_count >= 1
+
+
+# ---------------------------------------------------------------------------
+# ConversationRunner.get_conversation_summary behavior
+# ---------------------------------------------------------------------------
+
+
+class TestConversationSummary:
+    """Tests for ConversationRunner.get_conversation_summary itself."""
+
+    def test_conversation_summary_parsing(self):
+        """It should count agent messages and return last agent message text."""
+        from openhands.sdk.event import MessageEvent
+        from openhands_cli.tui.core.conversation_runner import ConversationRunner
+
+        mock_conversation = Mock()
+        mock_conversation.state = Mock()
+
+        # Mock events
+        user_event = Mock(spec=MessageEvent)
+        user_event.llm_message = Mock()
+        user_event.llm_message.role = "user"
+        user_event.source = "user"
+
+        agent_event = Mock(spec=MessageEvent)
+        agent_event.llm_message = Mock()
+        agent_event.llm_message.role = "assistant"
+        agent_event.source = "agent"
+
+        # visualize returns an object whose __str__ is the message text
+        type(agent_event).visualize = PropertyMock(
+            return_value=Mock(
+                __str__=Mock(return_value="This is a test agent response message.")
+            )
+        )
+
+        mock_conversation.state.events = [
+            user_event,
+            agent_event,
+            user_event,
+            agent_event,
+        ]
+
+        runner = ConversationRunner(
+            conversation_id=uuid.uuid4(),
+            running_state_callback=Mock(),
+            confirmation_callback=Mock(),
+            notification_callback=Mock(),
+            visualizer=Mock(),
+        )
+
+        runner.conversation = mock_conversation
+
+        agent_count, last_agent_message = runner.get_conversation_summary()
+        assert agent_count == 2
+        # We only care about what will be printed, not the concrete type
+        assert str(last_agent_message) == "This is a test agent response message."
+
+    def test_conversation_summary_empty_state(self):
+        """With no conversation / events, we should get a safe default."""
+        from openhands_cli.tui.core.conversation_runner import ConversationRunner
+
+        with patch(
+            "openhands_cli.tui.core.conversation_runner.setup_conversation",
+            return_value=None,
+        ):
+            runner = ConversationRunner(
+                conversation_id=uuid.uuid4(),
+                running_state_callback=Mock(),
+                confirmation_callback=Mock(),
+                notification_callback=Mock(),
+                visualizer=Mock(),
+            )
+
+        agent_count, last_agent_message = runner.get_conversation_summary()
+        assert agent_count == 0
+
+        # Again, expect a rich.Text object with the default message
+        assert isinstance(last_agent_message, Text)
+        assert str(last_agent_message) == "No conversation data available"
+
+
+class TestHeadlessInitialSetupGuard:
+    def test_headless_with_initial_setup_required_exits_and_instructs_user(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """If settings aren't configured, headless mode
+        should exit and print guidance."""
+        # Pretend this is a fresh install / no settings
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: True,
+        )
+
+        app = OpenHandsApp(
+            exit_confirmation=False,
+            headless_mode=True,
+            resume_conversation_id=uuid.uuid4(),
+        )
+
+        # Avoid Textual's "node must be running" restriction in this unit test
+        monkeypatch.setattr(
+            app.conversation_running_signal,
+            "subscribe",
+            MagicMock(),
+        )
+
+        # We don't want to actually exit the process in the test
+        app.exit = MagicMock()
+        # Ensure the interactive path is not taken
+        app._show_initial_settings = MagicMock()
+
+        with patch("rich.console.Console") as mock_console_cls:
+            mock_console = MagicMock()
+            mock_console_cls.return_value = mock_console
+
+            app.on_mount()
+
+            # Should exit immediately
+            app.exit.assert_called_once()
+            # Should NOT try to open the interactive settings screen
+            app._show_initial_settings.assert_not_called()
+
+            # We should have printed a message that mentions `openhands --exp`
+            printed_any_exp_hint = any(
+                "openhands --exp" in str(arg)
+                for call in mock_console.print.call_args_list
+                for arg in call.args
+            )
+            assert printed_any_exp_hint
+
+
+# ---------------------------------------------------------------------------
+# JSON Mode Tests (Minimal High-Impact Coverage)
+# ---------------------------------------------------------------------------
+
+
+class TestJsonArgumentValidation:
+    """Minimal tests for JSON argument validation."""
+
+    def test_json_requires_headless_mode(self):
+        """Test that JSON flag requires headless mode."""
+        # JSON without headless should not enable JSON mode
+        with patch("openhands_cli.tui.textual_app.main") as mock_textual:
+            # Mock sys.argv for argument parsing
+            with patch("sys.argv", ["openhands", "--json", "--task", "test task"]):
+                simple_main()
+
+            # Verify textual_main was called with json_mode=False
+            mock_textual.assert_called_once()
+            args, kwargs = mock_textual.call_args
+            assert kwargs.get("json_mode", False) is False
+
+    def test_json_and_headless_enables_json_mode(self):
+        """Test that JSON + headless enables JSON mode."""
+        with patch("openhands_cli.tui.textual_app.main") as mock_textual:
+            # Mock sys.argv for argument parsing
+            with patch(
+                "sys.argv", ["openhands", "--headless", "--json", "--task", "test task"]
+            ):
+                simple_main()
+
+            # Verify textual_main was called with json_mode=True
+            mock_textual.assert_called_once()
+            args, kwargs = mock_textual.call_args
+            assert kwargs.get("json_mode", False) is True
+
+
+class TestJsonModeIntegration:
+    """Minimal tests for JSON mode integration."""
+
+    def test_json_callback_function_exists_and_callable(self):
+        """Test that json_callback function exists and is callable."""
+        from openhands_cli.utils import json_callback
+
+        # Verify the function exists and is callable
+        assert callable(json_callback)
+
+        # Test that it can be used as an event callback (basic compatibility)
+        from openhands.sdk.event import Event
+
+        mock_event = Mock(spec=Event)
+        mock_event.model_dump.return_value = {"test": "data"}
+
+        # Should not raise an exception
+        with patch("builtins.print"):
+            json_callback(mock_event)

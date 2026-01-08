@@ -19,7 +19,7 @@ jobs:
     update-pr-description:
         name: Update PR Description with uvx Instructions
         runs-on: ubuntu-latest
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork
 
         steps:
             - name: Checkout repository

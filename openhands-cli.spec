@@ -21,7 +21,7 @@ from PyInstaller.utils.hooks import (
 project_root = Path.cwd()
 
 a = Analysis(
-    ['openhands_cli/simple_main.py'],
+    ['openhands_cli/entrypoint.py'],
     pathex=[str(project_root)],
     binaries=[],
     datas=[
@@ -61,6 +61,10 @@ a = Analysis(
         'openhands.tools.terminal',
         'openhands.tools.str_replace_editor',
         'openhands.tools.task_tracker',
+        # Include textual internal modules that might not be auto-detected
+        'textual.widgets._tab_pane',
+        'textual.widgets._select',
+        'textual.widgets._tabbed_content',
     ],
     hookspath=[],
     hooksconfig={},

@@ -1,12 +1,17 @@
 """Tests for utility functions."""
 
+import json
 from argparse import Namespace
+from unittest.mock import patch
 
 from acp.schema import EnvVariable, StdioMcpServer
 
+from openhands.sdk.event import MessageEvent, SystemPromptEvent
+from openhands.sdk.llm import Message, TextContent
 from openhands_cli.acp_impl.utils import convert_acp_mcp_servers_to_agent_format
 from openhands_cli.utils import (
     create_seeded_instructions_from_args,
+    json_callback,
     should_set_litellm_extra_body,
 )
 
@@ -117,3 +122,71 @@ def test_seeded_instructions_file_only(tmp_path):
     assert isinstance(queued, list)
     assert len(queued) == 1
     assert "File path:" in queued[0]
+
+
+class TestJsonCallback:
+    """Minimal tests for json_callback function core behavior."""
+
+    def test_json_callback_filters_system_events_and_outputs_others(self):
+        """Test that SystemPromptEvent is filtered and other events output as JSON."""
+        # Test SystemPromptEvent filtering
+        system_event = SystemPromptEvent(
+            system_prompt=TextContent(text="test prompt"), tools=[], source="agent"
+        )
+
+        with patch("builtins.print") as mock_print:
+            json_callback(system_event)
+            mock_print.assert_not_called()
+
+        # Test non-system event JSON output
+        message_event = MessageEvent(
+            llm_message=Message(
+                role="user", content=[TextContent(text="test message")]
+            ),
+            source="user",
+        )
+
+        with patch("builtins.print") as mock_print:
+            json_callback(message_event)
+
+            # Should have two print calls: header and JSON
+            assert mock_print.call_count == 2
+            mock_print.assert_any_call("--JSON Event--")
+
+            # Verify valid JSON output
+            json_output = mock_print.call_args_list[1][0][0]
+            parsed_json = json.loads(json_output)
+            assert isinstance(parsed_json, dict)
+
+    def test_json_callback_real_message_event_processing(self):
+        """Test json_callback with realistic MessageEvent processing."""
+        event = MessageEvent(
+            llm_message=Message(
+                role="user", content=[TextContent(text="Hello, this is a test message")]
+            ),
+            source="user",
+        )
+
+        with patch("builtins.print") as mock_print:
+            json_callback(event)
+
+            # Verify the output structure
+            assert mock_print.call_count == 2
+            mock_print.assert_any_call("--JSON Event--")
+
+            # Get and validate the JSON output
+            json_output = mock_print.call_args_list[1][0][0]
+            parsed_json = json.loads(json_output)
+
+            # Verify essential fields are present
+            assert "llm_message" in parsed_json
+            assert "source" in parsed_json
+            assert parsed_json["source"] == "user"
+
+            # Check the message content structure
+            llm_message = parsed_json["llm_message"]
+            assert "content" in llm_message
+            content = llm_message["content"]
+            assert isinstance(content, list)
+            assert len(content) > 0
+            assert content[0]["text"] == "Hello, this is a test message"

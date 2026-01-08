@@ -36,17 +36,18 @@ from acp.schema import (
 
 from openhands.sdk import (
     Conversation,
+    Event,
     LocalConversation,
     Message,
     Workspace,
 )
-from openhands.sdk.event import Event
 from openhands_cli import __version__
 from openhands_cli.acp_impl.confirmation import (
     ConfirmationMode,
     get_available_modes,
 )
-from openhands_cli.acp_impl.event import EventSubscriber
+from openhands_cli.acp_impl.events.event import EventSubscriber
+from openhands_cli.acp_impl.events.token_streamer import TokenBasedEventSubscriber
 from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
 from openhands_cli.acp_impl.slash_commands import (
     VALID_CONFIRMATION_MODE,
@@ -91,12 +92,21 @@ def get_session_mode_state(current_mode: ConfirmationMode) -> SessionModeState:
 class OpenHandsACPAgent(ACPAgent):
     """OpenHands Agent Client Protocol implementation."""
 
-    def __init__(self, conn: Client, initial_confirmation_mode: ConfirmationMode):
+    def __init__(
+        self,
+        conn: Client,
+        initial_confirmation_mode: ConfirmationMode,
+        resume_conversation_id: str | None = None,
+        streaming_enabled: bool = False,
+    ):
         """Initialize the OpenHands ACP agent.
 
         Args:
             conn: ACP connection for sending notifications
             initial_confirmation_mode: Default confirmation mode for new sessions
+            resume_conversation_id: Optional conversation ID to resume when a new
+                session is created (used with --resume flag)
+            streaming_enabled: Whether to enable token streaming for LLM outputs
         """
         self._conn = conn
         # Cache of active conversations to preserve state (pause, confirmation, etc.)
@@ -106,10 +116,16 @@ class OpenHandsACPAgent(ACPAgent):
         self._running_tasks: dict[str, asyncio.Task] = {}
         # Default confirmation mode for new sessions
         self._initial_confirmation_mode: ConfirmationMode = initial_confirmation_mode
+        # Conversation ID to resume (from --resume flag)
+        self._resume_conversation_id: str | None = resume_conversation_id
+        # Whether token streaming is enabled (from --streaming flag)
+        self._streaming_enabled: bool = streaming_enabled
         logger.info(
-            f"OpenHands ACP Agent initialized with "
-            f"confirmation mode: {initial_confirmation_mode}"
+            f"OpenHands ACP Agent initialized with confirmation mode: "
+            f"{initial_confirmation_mode}, streaming: {streaming_enabled}"
         )
+        if resume_conversation_id:
+            logger.info(f"Will resume conversation: {resume_conversation_id}")
 
     async def _cmd_confirm(self, session_id: str, argument: str) -> str:
         """Handle /confirm command.
@@ -248,6 +264,19 @@ class OpenHandsACPAgent(ACPAgent):
                 mcp_servers=mcp_servers,
                 skills=[RESOURCE_SKILL],
             )
+            # Streaming is enabled only if:
+            # 1. The --streaming flag was passed (self._streaming_enabled)
+            # 2. The LLM doesn't use responses API (which doesn't support streaming)
+            streaming_enabled = (
+                self._streaming_enabled and not agent.llm.uses_responses_api()
+            )
+
+            if streaming_enabled:
+                # Enable streaming for llm
+                agent = agent.model_copy(
+                    update={"llm": agent.llm.model_copy(update={"stream": True})}
+                )
+
         except MCPConfigurationError as e:
             logger.error(f"Invalid MCP configuration: {e}")
             raise RequestError.invalid_params(
@@ -279,17 +308,26 @@ class OpenHandsACPAgent(ACPAgent):
 
         workspace = Workspace(working_dir=str(working_path))
 
-        # Create event subscriber for streaming updates (ACP-specific)
-        subscriber = EventSubscriber(session_id, self._conn)
-
         # Get the current event loop for the callback
         loop = asyncio.get_event_loop()
 
+        # Create event subscriber for streaming updates (ACP-specific)
+        # Pass streaming_enabled=True to indicate token streaming is active
+        subscriber = EventSubscriber(session_id, self._conn)
+        token_subscriber = TokenBasedEventSubscriber(
+            session_id=session_id, conn=self._conn, loop=loop
+        )
+
         def sync_callback(event: Event) -> None:
             """Synchronous wrapper that schedules async event handling."""
-            asyncio.run_coroutine_threadsafe(subscriber(event), loop)
+            if streaming_enabled:
+                asyncio.run_coroutine_threadsafe(
+                    token_subscriber.unstreamed_event_handler(event), loop
+                )
+            else:
+                asyncio.run_coroutine_threadsafe(subscriber(event), loop)
 
-        # Create conversation with persistence support
+        # Create conversation with persistence support and token streaming
         # The SDK automatically loads from disk if conversation_id exists
         conversation = Conversation(
             agent=agent,
@@ -297,11 +335,15 @@ class OpenHandsACPAgent(ACPAgent):
             persistence_dir=CONVERSATIONS_DIR,
             conversation_id=UUID(session_id),
             callbacks=[sync_callback],
+            token_callbacks=[token_subscriber.on_token]
+            if streaming_enabled
+            else None,  # Enable token streaming only when --streaming flag is used
             visualizer=None,  # No visualizer needed for ACP
         )
 
         # Set conversation reference in subscriber for metrics access
         subscriber.conversation = conversation
+        token_subscriber.conversation = conversation
 
         # # Set up security analyzer (same as setup_conversation with confirmation mode)
         # conversation.set_security_analyzer(LLMSecurityAnalyzer())
@@ -362,8 +404,22 @@ class OpenHandsACPAgent(ACPAgent):
         mcp_servers: list[Any],
         **_kwargs: Any,
     ) -> NewSessionResponse:
-        """Create a new conversation session."""
-        session_id = str(uuid.uuid4())
+        """Create a new conversation session.
+
+        If --resume was used when starting the ACP server, the first new_session
+        call will use the specified conversation ID instead of generating a new one.
+        When resuming, historic events are replayed to the client.
+        """
+        # Use resume_conversation_id if provided (from --resume flag)
+        # Only use it once, then clear it
+        is_resuming = False
+        if self._resume_conversation_id:
+            session_id = self._resume_conversation_id
+            self._resume_conversation_id = None
+            is_resuming = True
+            logger.info(f"Resuming conversation: {session_id}")
+        else:
+            session_id = str(uuid.uuid4())
 
         try:
             # Convert ACP MCP servers to Agent format
@@ -377,7 +433,7 @@ class OpenHandsACPAgent(ACPAgent):
 
             # Create conversation and cache it for future operations
             # This reuses the same pattern as openhands --resume
-            _ = self._get_or_create_conversation(
+            conversation = self._get_or_create_conversation(
                 session_id=session_id,
                 working_dir=working_dir,
                 mcp_servers=mcp_servers_dict,
@@ -389,14 +445,26 @@ class OpenHandsACPAgent(ACPAgent):
             await self._send_available_commands(session_id)
 
             # Get current confirmation mode for this session
-            conversation = self._active_sessions[session_id]
             current_mode = get_confirmation_mode_from_conversation(conversation)
 
-            # Return response with modes
-            return NewSessionResponse(
+            # Build response first (before streaming events)
+            response = NewSessionResponse(
                 session_id=session_id,
                 modes=get_session_mode_state(current_mode),
             )
+
+            # If resuming, replay historic events to the client
+            # This ensures the ACP client sees the full conversation history
+            if is_resuming and conversation.state.events:
+                logger.info(
+                    f"Replaying {len(conversation.state.events)} historic events "
+                    f"for resumed session {session_id}"
+                )
+                subscriber = EventSubscriber(session_id, self._conn)
+                for event in conversation.state.events:
+                    await subscriber(event)
+
+            return response
 
         except MissingAgentSpec as e:
             logger.error(f"Agent not configured: {e}")
@@ -478,7 +546,7 @@ class OpenHandsACPAgent(ACPAgent):
             try:
                 await run_task
             finally:
-                # Clean up task tracking
+                # Clean up task tracking and streaming state
                 self._running_tasks.pop(session_id, None)
 
             # Return the final response
@@ -695,21 +763,30 @@ class OpenHandsACPAgent(ACPAgent):
 
 async def run_acp_server(
     initial_confirmation_mode: ConfirmationMode = "always-ask",
+    resume_conversation_id: str | None = None,
+    streaming_enabled: bool = False,
 ) -> None:
     """Run the OpenHands ACP server.
 
     Args:
         initial_confirmation_mode: Default confirmation mode for new sessions
+        resume_conversation_id: Optional conversation ID to resume when a new
+            session is created
+        streaming_enabled: Whether to enable token streaming for LLM outputs
     """
     logger.info(
         f"Starting OpenHands ACP server with confirmation mode: "
-        f"{initial_confirmation_mode}..."
+        f"{initial_confirmation_mode}, streaming: {streaming_enabled}..."
     )
+    if resume_conversation_id:
+        logger.info(f"Will resume conversation: {resume_conversation_id}")
 
     reader, writer = await stdio_streams()
 
     def create_agent(conn: Client) -> OpenHandsACPAgent:
-        return OpenHandsACPAgent(conn, initial_confirmation_mode)
+        return OpenHandsACPAgent(
+            conn, initial_confirmation_mode, resume_conversation_id, streaming_enabled
+        )
 
     AgentSideConnection(create_agent, writer, reader)
 

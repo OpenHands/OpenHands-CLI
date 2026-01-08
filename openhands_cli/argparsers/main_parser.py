@@ -3,31 +3,14 @@
 import argparse
 
 from openhands_cli import __version__
+from openhands_cli.argparsers.acp_parser import add_acp_parser
+from openhands_cli.argparsers.auth_parser import add_login_parser, add_logout_parser
+from openhands_cli.argparsers.cloud_parser import add_cloud_parser
 from openhands_cli.argparsers.mcp_parser import add_mcp_parser
 from openhands_cli.argparsers.serve_parser import add_serve_parser
-
-
-def add_confirmation_mode_args(
-    parser_or_group: argparse.ArgumentParser | argparse._MutuallyExclusiveGroup,
-) -> None:
-    """Add confirmation mode arguments to a parser or mutually exclusive group.
-
-    Args:
-        parser_or_group: Either an ArgumentParser or a mutually exclusive group
-    """
-    parser_or_group.add_argument(
-        "--always-approve",
-        action="store_true",
-        help="Auto-approve all actions without asking for confirmation",
-    )
-    parser_or_group.add_argument(
-        "--llm-approve",
-        action="store_true",
-        help=(
-            "Enable LLM-based security analyzer "
-            "(only confirm LLM-predicted high-risk actions)"
-        ),
-    )
+from openhands_cli.argparsers.util import add_confirmation_mode_args, add_resume_args
+from openhands_cli.argparsers.view_parser import add_view_parser
+from openhands_cli.argparsers.web_parser import add_web_parser
 
 
 def create_main_parser() -> argparse.ArgumentParser:
@@ -40,23 +23,29 @@ def create_main_parser() -> argparse.ArgumentParser:
         description="OpenHands CLI - Terminal User Interface for OpenHands AI Agent",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-            By default, OpenHands runs in CLI mode (terminal interface)
+            By default, OpenHands runs in textual UI mode (terminal interface)
             with 'always-ask' confirmation mode, where all agent actions
             require user confirmation.
 
             Use 'serve' subcommand to launch the GUI server instead.
 
             Examples:
-                openhands                           # Start CLI mode
-                openhands --exp                     # Start experimental textual UI
-                openhands --exp --headless          # Start textual UI in headless mode
+                openhands                           # Start textual UI mode
+                openhands --exp                     # Start textual UI (same as default)
+                openhands --headless                # Start textual UI in headless mode
+                openhands --headless --json -t "Fix bug"  # Headless with JSON output
                 openhands --resume conversation-id  # Resume conversation
                 openhands --always-approve          # Auto-approve all actions
                 openhands --llm-approve             # LLM-based approval mode
+                openhands cloud -t "Fix bug"        # Create cloud conversation
                 openhands serve                     # Launch GUI server
                 openhands serve --gpu               # Launch with GPU support
+                openhands web                       # Launch CLI as web app
+                openhands web --port 8080           # Launch web app on custom port
                 openhands acp                       # Agent-Client Protocol
-                                                      server (e.g., Zed IDE)
+                                                      server (e.g., Toad CLI, Zed IDE)
+                openhands login                     # Authenticate with OpenHands Cloud
+                openhands logout                    # Log out from OpenHands Cloud
         """,
     )
 
@@ -84,23 +73,11 @@ def create_main_parser() -> argparse.ArgumentParser:
     )
 
     # CLI arguments at top level (default mode)
-    parser.add_argument(
-        "--resume",
-        type=str,
-        nargs="?",
-        const="",
-        help="Conversation ID to resume. If no ID provided, shows list of recent "
-        "conversations",
-    )
-    parser.add_argument(
-        "--last",
-        action="store_true",
-        help="Resume the most recent conversation (use with --resume)",
-    )
+    add_resume_args(parser)
     parser.add_argument(
         "--exp",
         action="store_true",
-        help="Use experimental textual-based UI instead of the default CLI interface",
+        help="Use textual-based UI (now default, flag kept for compatibility)",
     )
     parser.add_argument(
         "--headless",
@@ -108,6 +85,14 @@ def create_main_parser() -> argparse.ArgumentParser:
         help=(
             "Run in headless mode (no UI output, auto-approve actions). "
             "Requires --task or --file."
+        ),
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help=(
+            "Enable JSON output mode for headless operation. "
+            "Streams JSONL event outputs to terminal. Must be used with --headless."
         ),
     )
 
@@ -124,19 +109,26 @@ def create_main_parser() -> argparse.ArgumentParser:
     # Subcommands
     subparsers = parser.add_subparsers(dest="command", help="Additional commands")
 
+    # Add acp subcommands
+    add_acp_parser(subparsers)
+
     # Add serve subcommand
     add_serve_parser(subparsers)
 
-    # Add ACP subcommand
-    acp_parser = subparsers.add_parser(
-        "acp", help="Start OpenHands as an Agent Client Protocol (ACP) agent"
-    )
-
-    # ACP confirmation mode options (mutually exclusive)
-    acp_confirmation_group = acp_parser.add_mutually_exclusive_group()
-    add_confirmation_mode_args(acp_confirmation_group)
+    # Add web subcommand
+    add_web_parser(subparsers)
 
     # Add MCP subcommand
     add_mcp_parser(subparsers)
+
+    # Add cloud subcommand
+    add_cloud_parser(subparsers)
+
+    # Add authentication subcommands
+    add_login_parser(subparsers)
+    add_logout_parser(subparsers)
+
+    # Add view subcommand
+    add_view_parser(subparsers)
 
     return parser

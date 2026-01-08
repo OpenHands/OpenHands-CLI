@@ -5,7 +5,6 @@ from collections.abc import Callable
 
 from .models import TestResult, TestSummary
 from .test_acp import test_acp_executable
-from .test_executable import test_executable
 from .test_experimental_ui import test_experimental_ui
 from .test_version import test_version
 
@@ -18,7 +17,6 @@ def run_all_e2e_tests() -> TestSummary:
     # Define all tests
     tests: list[Callable[[], TestResult]] = [
         test_version,
-        test_executable,
         test_experimental_ui,
         test_acp_executable,
     ]
