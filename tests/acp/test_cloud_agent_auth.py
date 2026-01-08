@@ -6,6 +6,7 @@ import pytest
 from acp import RequestError
 
 from openhands_cli.acp_impl.agent import OpenHandsCloudACPAgent
+from openhands_cli.auth.device_flow import DeviceTokenResponse
 
 
 @pytest.fixture
@@ -103,8 +104,8 @@ async def test_authenticate_with_oauth_success(cloud_agent):
             new_callable=AsyncMock,
         ) as mock_fetch,
     ):
-        # Mock successful OAuth flow
-        mock_auth.return_value = {"access_token": "new-api-key"}
+        # Mock successful OAuth flow with Pydantic model
+        mock_auth.return_value = DeviceTokenResponse(access_token="new-api-key")
 
         # Mock token storage
         mock_storage = MagicMock()
@@ -166,8 +167,8 @@ async def test_authenticate_continues_on_user_data_fetch_error(cloud_agent):
     ):
         from openhands_cli.auth.api_client import ApiClientError
 
-        # Mock successful OAuth flow
-        mock_auth.return_value = {"access_token": "new-api-key"}
+        # Mock successful OAuth flow with Pydantic model
+        mock_auth.return_value = DeviceTokenResponse(access_token="new-api-key")
 
         # Mock token storage
         mock_storage = MagicMock()

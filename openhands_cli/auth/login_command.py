@@ -84,7 +84,7 @@ async def login_command(server_url: str) -> bool:
 
     # No existing token: run device flow
     try:
-        tokens = await authenticate_with_device_flow(server_url)
+        token_response = await authenticate_with_device_flow(server_url)
     except DeviceFlowError as e:
         _p(
             f"[{OPENHANDS_THEME.error}]Authentication failed: "
@@ -92,19 +92,7 @@ async def login_command(server_url: str) -> bool:
         )
         return False
 
-    api_key = tokens.get("access_token")
-
-    if not api_key:
-        _p(
-            f"\n[{OPENHANDS_THEME.warning}]Warning: "
-            f"No access token found in OAuth response.[/{OPENHANDS_THEME.warning}]"
-        )
-        _p(
-            f"[{OPENHANDS_THEME.secondary}]You can still use OpenHands CLI with "
-            f"cloud features.[/{OPENHANDS_THEME.secondary}]"
-        )
-        # Authentication technically succeeded, even if we lack a token
-        return True
+    api_key = token_response.access_token
 
     # Store the API key securely
     token_storage.store_api_key(api_key)

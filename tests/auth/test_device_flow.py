@@ -10,6 +10,8 @@ from openhands_cli.auth.device_flow import (
     DeviceAuthorizationResponse,
     DeviceFlowClient,
     DeviceFlowError,
+    DeviceTokenErrorResponse,
+    DeviceTokenResponse,
     authenticate_with_device_flow,
 )
 
@@ -111,7 +113,9 @@ class TestDeviceFlowClient:
 
             result = await client.poll_for_token("device123", 1)
 
-            assert result == {"access_token": "token123", "token_type": "Bearer"}
+            assert isinstance(result, DeviceTokenResponse)
+            assert result.access_token == "token123"
+            assert result.token_type == "Bearer"
             mock_post.assert_called_once_with(
                 "/oauth/device/token",
                 form_data={"device_code": "device123"},
@@ -143,7 +147,9 @@ class TestDeviceFlowClient:
             with patch("asyncio.sleep") as mock_sleep:
                 result = await client.poll_for_token("device123", 1)
 
-                assert result == {"access_token": "token123", "token_type": "Bearer"}
+                assert isinstance(result, DeviceTokenResponse)
+                assert result.access_token == "token123"
+                assert result.token_type == "Bearer"
                 mock_sleep.assert_called_once_with(1)
 
     @pytest.mark.asyncio
@@ -168,9 +174,41 @@ class TestDeviceFlowClient:
             with patch("asyncio.sleep") as mock_sleep:
                 result = await client.poll_for_token("device123", 5)
 
-                assert result == {"access_token": "token123", "token_type": "Bearer"}
+                assert isinstance(result, DeviceTokenResponse)
+                assert result.access_token == "token123"
+                assert result.token_type == "Bearer"
                 # Should double the interval (5 * 2 = 10)
                 mock_sleep.assert_called_once_with(10)
+
+    @pytest.mark.asyncio
+    async def test_poll_for_token_slow_down_with_server_interval(self):
+        """Test token polling uses server-provided interval on slow_down."""
+        client = DeviceFlowClient("https://api.example.com")
+
+        # Mock slow down response with server-provided interval
+        slow_down_response = httpx.Response(status_code=400)
+        slow_down_response._content = json.dumps(
+            {
+                "error": "slow_down",
+                "error_description": "Polling too frequently",
+                "interval": 15,
+            }
+        ).encode()
+
+        success_response = httpx.Response(status_code=200)
+        success_response._content = json.dumps(
+            {"access_token": "token123", "token_type": "Bearer"}
+        ).encode()
+
+        with patch.object(client, "post") as mock_post:
+            mock_post.side_effect = [slow_down_response, success_response]
+
+            with patch("asyncio.sleep") as mock_sleep:
+                result = await client.poll_for_token("device123", 5)
+
+                assert isinstance(result, DeviceTokenResponse)
+                # Should use server-provided interval (15) instead of doubling
+                mock_sleep.assert_called_once_with(15)
 
     @pytest.mark.asyncio
     async def test_poll_for_token_expired_token(self):
@@ -293,19 +331,18 @@ class TestDeviceFlowClient:
             )
 
             with patch.object(client, "poll_for_token") as mock_poll:
-                mock_poll.return_value = {
-                    "access_token": "token123",
-                    "token_type": "Bearer",
-                }
+                mock_poll.return_value = DeviceTokenResponse(
+                    access_token="token123",
+                    token_type="Bearer",
+                )
 
                 with patch("openhands_cli.auth.device_flow._p") as mock_print:
                     with patch("webbrowser.open") as mock_browser:
                         result = await client.authenticate()
 
-                        assert result == {
-                            "access_token": "token123",
-                            "token_type": "Bearer",
-                        }
+                        assert isinstance(result, DeviceTokenResponse)
+                        assert result.access_token == "token123"
+                        assert result.token_type == "Bearer"
 
                         # Verify print calls for user instructions
                         assert mock_print.call_count >= 5  # Multiple print statements
@@ -332,10 +369,10 @@ class TestDeviceFlowClient:
             )
 
             with patch.object(client, "poll_for_token") as mock_poll:
-                mock_poll.return_value = {
-                    "access_token": "token123",
-                    "token_type": "Bearer",
-                }
+                mock_poll.return_value = DeviceTokenResponse(
+                    access_token="token123",
+                    token_type="Bearer",
+                )
 
                 with patch("openhands_cli.auth.device_flow._p"):
                     with patch("webbrowser.open") as mock_browser:
@@ -343,10 +380,9 @@ class TestDeviceFlowClient:
 
                         result = await client.authenticate()
 
-                        assert result == {
-                            "access_token": "token123",
-                            "token_type": "Bearer",
-                        }
+                        assert isinstance(result, DeviceTokenResponse)
+                        assert result.access_token == "token123"
+                        assert result.token_type == "Bearer"
 
                         # Verify browser open was attempted with
                         # verification_uri_complete
@@ -396,15 +432,63 @@ class TestDeviceFlowClient:
 async def test_authenticate_with_device_flow():
     """Test convenience function for device flow authentication."""
     server_url = "https://api.example.com"
-    expected_tokens = {"access_token": "token123", "token_type": "Bearer"}
+    expected_token_response = DeviceTokenResponse(
+        access_token="token123", token_type="Bearer"
+    )
 
     with patch("openhands_cli.auth.device_flow.DeviceFlowClient") as mock_client_class:
         mock_client = AsyncMock()
         mock_client_class.return_value = mock_client
-        mock_client.authenticate.return_value = expected_tokens
+        mock_client.authenticate.return_value = expected_token_response
 
         result = await authenticate_with_device_flow(server_url)
 
-        assert result == expected_tokens
+        assert isinstance(result, DeviceTokenResponse)
+        assert result.access_token == "token123"
+        assert result.token_type == "Bearer"
         mock_client_class.assert_called_once_with(server_url)
         mock_client.authenticate.assert_called_once()
+
+
+class TestDeviceTokenErrorResponse:
+    """Test cases for DeviceTokenErrorResponse model."""
+
+    def test_minimal_error(self):
+        """Test error response with only required field."""
+        response = DeviceTokenErrorResponse(error="authorization_pending")
+        assert response.error == "authorization_pending"
+        assert response.error_description is None
+        assert response.interval is None
+
+    def test_full_error(self):
+        """Test error response with all fields."""
+        response = DeviceTokenErrorResponse(
+            error="slow_down",
+            error_description="Polling too frequently",
+            interval=10,
+        )
+        assert response.error == "slow_down"
+        assert response.error_description == "Polling too frequently"
+        assert response.interval == 10
+
+
+class TestDeviceTokenResponse:
+    """Test cases for DeviceTokenResponse model."""
+
+    def test_minimal_response(self):
+        """Test token response with only access_token."""
+        response = DeviceTokenResponse(access_token="mytoken")
+        assert response.access_token == "mytoken"
+        assert response.token_type == "Bearer"  # default
+        assert response.expires_in is None
+
+    def test_full_response(self):
+        """Test token response with all fields."""
+        response = DeviceTokenResponse(
+            access_token="mytoken",
+            token_type="Bearer",
+            expires_in=3600,
+        )
+        assert response.access_token == "mytoken"
+        assert response.token_type == "Bearer"
+        assert response.expires_in == 3600

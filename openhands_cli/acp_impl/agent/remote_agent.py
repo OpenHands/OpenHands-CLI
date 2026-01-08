@@ -195,13 +195,9 @@ class OpenHandsCloudACPAgent(ACPAgent):
 
         try:
             # Perform OAuth2 device flow authentication
-            tokens = await authenticate_with_device_flow(self._cloud_api_url)
+            token_response = await authenticate_with_device_flow(self._cloud_api_url)
 
-            api_key = tokens.get("access_token")
-            if not api_key:
-                raise RequestError.internal_error(
-                    {"reason": "No access token received from OAuth flow"}
-                )
+            api_key = token_response.access_token
 
             # Store the API key
             store = TokenStorage()

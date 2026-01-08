@@ -1,10 +1,8 @@
 """OAuth 2.0 Device Flow client implementation for OpenHands CLI."""
 
 import asyncio
-import json
 import time
 import webbrowser
-from typing import Any
 
 from pydantic import BaseModel
 
@@ -28,6 +26,22 @@ class DeviceAuthorizationResponse(BaseModel):
     verification_uri_complete: str
     expires_in: int
     interval: int
+
+
+class DeviceTokenResponse(BaseModel):
+    """Successful token response from the device token endpoint (RFC 8628)."""
+
+    access_token: str  # This will be the user's API key
+    token_type: str = "Bearer"
+    expires_in: int | None = None  # API keys may not have expiration
+
+
+class DeviceTokenErrorResponse(BaseModel):
+    """Error response from the device token endpoint (RFC 8628)."""
+
+    error: str
+    error_description: str | None = None
+    interval: int | None = None  # Required for slow_down error
 
 
 class DeviceFlowClient(BaseHttpClient):
@@ -63,7 +77,7 @@ class DeviceFlowClient(BaseHttpClient):
 
     async def poll_for_token(
         self, device_code: str, interval: int, timeout: float = 600.0
-    ) -> dict[str, Any]:
+    ) -> DeviceTokenResponse:
         """Poll for the API key after user authorization.
 
         Args:
@@ -72,7 +86,7 @@ class DeviceFlowClient(BaseHttpClient):
             timeout: Maximum time to wait for authorization in seconds (default: 10 min)
 
         Returns:
-            Dictionary containing access_token (API key), token_type, etc.
+            DeviceTokenResponse containing access_token (API key), token_type, etc.
 
         Raises:
             DeviceFlowError: If polling fails or user denies access
@@ -91,26 +105,37 @@ class DeviceFlowClient(BaseHttpClient):
                 raise DeviceFlowError(f"Network error during token polling: {e}") from e
 
             if response.status_code == 200:
-                # Success
-                return response.json()
+                # Success - parse and validate the token response
+                try:
+                    return DeviceTokenResponse.model_validate(response.json())
+                except Exception as e:
+                    raise DeviceFlowError(
+                        f"Invalid token response from server: {e}"
+                    ) from e
 
-            # Non-200: try to interpret the error
+            # Non-200: try to interpret the error using Pydantic model
             try:
-                error_data = response.json()
-            except json.JSONDecodeError:
+                error_response = DeviceTokenErrorResponse.model_validate(
+                    response.json()
+                )
+            except Exception:
                 raise DeviceFlowError(
                     f"Unexpected response from server: {response.status_code}"
                 )
 
-            error = error_data.get("error", "unknown_error")
-            description = error_data.get("error_description", "")
+            error = error_response.error
+            description = error_response.error_description or ""
 
             if error == "authorization_pending":
                 # User hasn't finished yet; just sleep and retry
                 pass
             elif error == "slow_down":
                 # Server asks us to poll less frequently
-                interval = min(interval * 2, 30)
+                # Use server-provided interval if available, otherwise double current
+                if error_response.interval is not None:
+                    interval = error_response.interval
+                else:
+                    interval = min(interval * 2, 30)
             elif error == "expired_token":
                 raise DeviceFlowError(
                     "Device code has expired. Please start a new login."
@@ -126,11 +151,11 @@ class DeviceFlowClient(BaseHttpClient):
             "Timeout waiting for user authorization. Please try again."
         )
 
-    async def authenticate(self) -> dict[str, Any]:
+    async def authenticate(self) -> DeviceTokenResponse:
         """Complete OAuth 2.0 Device Flow authentication.
 
         Returns:
-            Dictionary containing access_token (API key), token_type, etc.
+            DeviceTokenResponse containing access_token (API key), token_type, etc.
 
         Raises:
             DeviceFlowError: If authentication fails
@@ -187,27 +212,27 @@ class DeviceFlowClient(BaseHttpClient):
 
         # Step 3: Poll for token using device_code and interval from auth_response
         try:
-            tokens = await self.poll_for_token(
+            token_response = await self.poll_for_token(
                 auth_response.device_code, auth_response.interval
             )
             _p(
                 f"[{OPENHANDS_THEME.success}]✓ Authentication "
                 f"successful![/{OPENHANDS_THEME.success}]"
             )
-            return tokens
+            return token_response
         except DeviceFlowError as e:
             _p(f"[{OPENHANDS_THEME.error}]Error: {e}[/{OPENHANDS_THEME.error}]")
             raise
 
 
-async def authenticate_with_device_flow(server_url: str) -> dict[str, Any]:
+async def authenticate_with_device_flow(server_url: str) -> DeviceTokenResponse:
     """Convenience function to authenticate using device flow.
 
     Args:
         server_url: OpenHands server URL
 
     Returns:
-        Dictionary containing authentication tokens
+        DeviceTokenResponse containing access_token (API key), token_type, etc.
 
     Raises:
         DeviceFlowError: If authentication fails
