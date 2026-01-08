@@ -23,6 +23,8 @@ from openhands.sdk.event.condenser import Condensation, CondensationRequest
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.tool.builtins.finish import FinishAction
 from openhands.sdk.tool.builtins.think import ThinkAction
+from openhands.tools.file_editor.definition import FileEditorAction
+from openhands.tools.terminal.definition import TerminalAction
 from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.widgets.collapsible import (
@@ -198,31 +200,34 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Get the command/path details and operation type
         command_detail = ""
         file_operation = ""  # "Editing" or "Reading"
-        if event.action is not None:
-            action = event.action
-            # Use getattr to avoid pyright errors on dynamic attribute access
-            command = getattr(action, "command", None)
-            path = getattr(action, "path", None)
+        action = event.action
 
-            if command and not path:
-                # Terminal command - show with $ prefix
-                cmd = str(command).strip().replace("\n", " ")
-                command_detail = f"$ {cmd}"
-            elif path:
-                # File operation - determine if editing or reading
-                # Check the command type for str_replace_editor actions
-                action_cmd = getattr(action, "command", None)
-                if action_cmd in ("view",):
+        if isinstance(action, TerminalAction):
+            # Terminal command - show with $ prefix
+            cmd = action.command.strip().replace("\n", " ")
+            command_detail = f"$ {cmd}"
+        elif isinstance(action, FileEditorAction):
+            # File operation - determine if editing or reading based on command
+            if action.command == "view":
+                file_operation = "Reading"
+            else:  # create, str_replace, insert, undo_edit
+                file_operation = "Editing"
+            command_detail = action.path
+        elif action is not None:
+            # Fallback for other action types - check for common attributes
+            if hasattr(action, "command") and hasattr(action, "path"):
+                # Has both command and path - treat as file operation
+                path = getattr(action, "path")
+                cmd = getattr(action, "command")
+                if cmd == "view":
                     file_operation = "Reading"
-                elif action_cmd in ("create", "str_replace", "insert", "undo_edit"):
-                    file_operation = "Editing"
                 else:
-                    # Default based on tool name
-                    if "editor" in event.tool_name.lower():
-                        file_operation = "Editing"
-                    else:
-                        file_operation = "Reading"
-                command_detail = str(path)
+                    file_operation = "Editing"
+                command_detail = str(path) if path else ""
+            elif hasattr(action, "command"):
+                # Has command but no path - treat as terminal-like
+                cmd = str(getattr(action, "command")).strip().replace("\n", " ")
+                command_detail = f"$ {cmd}"
 
         # Build the title with bold summary
         if summary and command_detail:
