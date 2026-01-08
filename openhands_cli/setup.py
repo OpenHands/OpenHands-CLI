@@ -7,6 +7,7 @@ from rich.console import Console
 from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, Workspace
 from openhands.sdk.context import Skill
 from openhands.sdk.event.base import Event
+from openhands.sdk.hooks import HookConfig
 from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
 )
@@ -25,6 +26,30 @@ class MissingAgentSpec(Exception):
     """Raised when agent specification is not found or invalid."""
 
     pass
+
+
+def load_hook_config(working_dir: str | None = None) -> HookConfig | None:
+    """Load hook configuration from the working directory.
+
+    Searches for hooks.json in:
+    1. <working_dir>/.openhands/hooks.json
+    2. ~/.openhands/hooks.json
+
+    Args:
+        working_dir: Working directory to search for hooks.json.
+            Defaults to WORK_DIR if not provided.
+
+    Returns:
+        HookConfig if found, None otherwise.
+    """
+    search_dir = working_dir or str(WORK_DIR)
+    config = HookConfig.load(working_dir=search_dir)
+
+    # Return None if no hooks are configured (empty config)
+    if not config.hooks:
+        return None
+
+    return config
 
 
 def load_agent_specs(
@@ -86,6 +111,7 @@ def setup_conversation(
     confirmation_policy: ConfirmationPolicyBase,
     visualizer: ConversationVisualizer | None = None,
     event_callback: Callable[[Event], None] | None = None,
+    hook_config: HookConfig | None = None,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
@@ -96,6 +122,8 @@ def setup_conversation(
         confirmation_policy: Confirmation policy to use.
         visualizer: Optional visualizer to use. If None, a default will be used
         event_callback: Optional callback function to handle events (e.g., JSON output)
+        hook_config: Optional hook configuration for event-driven automation.
+            If None, hooks will be auto-discovered from .openhands/hooks.json.
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
@@ -104,6 +132,14 @@ def setup_conversation(
     console.print("Initializing agent...", style="white")
 
     agent = load_agent_specs(str(conversation_id))
+
+    # Load hook configuration if not provided
+    # Auto-discover from .openhands/hooks.json in working directory or home
+    if hook_config is None:
+        hook_config = load_hook_config(str(WORK_DIR))
+
+    if hook_config is not None:
+        console.print("✓ Hooks configuration loaded", style="dim")
 
     # Prepare callbacks list
     callbacks = [event_callback] if event_callback else None
@@ -117,6 +153,7 @@ def setup_conversation(
         conversation_id=conversation_id,
         visualizer=visualizer,
         callbacks=callbacks,
+        hook_config=hook_config,
     )
 
     conversation.set_security_analyzer(LLMSecurityAnalyzer())
