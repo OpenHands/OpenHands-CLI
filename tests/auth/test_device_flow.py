@@ -7,6 +7,7 @@ import httpx
 import pytest
 
 from openhands_cli.auth.device_flow import (
+    DeviceAuthorizationResponse,
     DeviceFlowClient,
     DeviceFlowError,
     authenticate_with_device_flow,
@@ -34,6 +35,8 @@ class TestDeviceFlowClient:
                 "device_code": "device123",
                 "user_code": "USER123",
                 "verification_uri": "https://example.com/device",
+                "verification_uri_complete": "https://example.com/device?user_code=USER123",
+                "expires_in": 600,
                 "interval": 5,
             }
         ).encode()
@@ -43,7 +46,16 @@ class TestDeviceFlowClient:
 
             result = await client.start_device_flow()
 
-            assert result == ("device123", "USER123", "https://example.com/device", 5)
+            assert isinstance(result, DeviceAuthorizationResponse)
+            assert result.device_code == "device123"
+            assert result.user_code == "USER123"
+            assert result.verification_uri == "https://example.com/device"
+            assert (
+                result.verification_uri_complete
+                == "https://example.com/device?user_code=USER123"
+            )
+            assert result.expires_in == 600
+            assert result.interval == 5
             mock_post.assert_called_once_with("/oauth/device/authorize", json_data={})
 
     @pytest.mark.asyncio
@@ -70,14 +82,17 @@ class TestDeviceFlowClient:
         mock_response._content = json.dumps(
             {
                 "device_code": "device123",
-                # Missing user_code, verification_uri, interval
+                # Missing user_code, verification_uri, verification_uri_complete,
+                # expires_in, interval
             }
         ).encode()
 
         with patch.object(client, "post") as mock_post:
             mock_post.return_value = mock_response
 
-            with pytest.raises(DeviceFlowError, match="Failed to start device flow"):
+            with pytest.raises(
+                DeviceFlowError, match="Invalid response from device authorization"
+            ):
                 await client.start_device_flow()
 
     @pytest.mark.asyncio
@@ -268,11 +283,13 @@ class TestDeviceFlowClient:
         client = DeviceFlowClient("https://api.example.com")
 
         with patch.object(client, "start_device_flow") as mock_start:
-            mock_start.return_value = (
-                "device123",
-                "USER123",
-                "https://example.com/device",
-                5,
+            mock_start.return_value = DeviceAuthorizationResponse(
+                device_code="device123",
+                user_code="USER123",
+                verification_uri="https://example.com/device",
+                verification_uri_complete="https://example.com/device?user_code=USER123",
+                expires_in=600,
+                interval=5,
             )
 
             with patch.object(client, "poll_for_token") as mock_poll:
@@ -294,7 +311,7 @@ class TestDeviceFlowClient:
                         assert mock_print.call_count >= 5  # Multiple print statements
                         mock_poll.assert_called_once_with("device123", 5)
 
-                        # Verify browser was opened with correct URL
+                        # Verify browser was opened with verification_uri_complete
                         mock_browser.assert_called_once_with(
                             "https://example.com/device?user_code=USER123"
                         )
@@ -305,11 +322,13 @@ class TestDeviceFlowClient:
         client = DeviceFlowClient("https://api.example.com")
 
         with patch.object(client, "start_device_flow") as mock_start:
-            mock_start.return_value = (
-                "device123",
-                "USER123",
-                "https://example.com/device",
-                5,
+            mock_start.return_value = DeviceAuthorizationResponse(
+                device_code="device123",
+                user_code="USER123",
+                verification_uri="https://example.com/device",
+                verification_uri_complete="https://example.com/device?user_code=USER123",
+                expires_in=600,
+                interval=5,
             )
 
             with patch.object(client, "poll_for_token") as mock_poll:
@@ -329,7 +348,8 @@ class TestDeviceFlowClient:
                             "token_type": "Bearer",
                         }
 
-                        # Verify browser open was attempted
+                        # Verify browser open was attempted with
+                        # verification_uri_complete
                         mock_browser.assert_called_once_with(
                             "https://example.com/device?user_code=USER123"
                         )
@@ -355,11 +375,13 @@ class TestDeviceFlowClient:
         client = DeviceFlowClient("https://api.example.com")
 
         with patch.object(client, "start_device_flow") as mock_start:
-            mock_start.return_value = (
-                "device123",
-                "USER123",
-                "https://example.com/device",
-                5,
+            mock_start.return_value = DeviceAuthorizationResponse(
+                device_code="device123",
+                user_code="USER123",
+                verification_uri="https://example.com/device",
+                verification_uri_complete="https://example.com/device?user_code=USER123",
+                expires_in=600,
+                interval=5,
             )
 
             with patch.object(client, "poll_for_token") as mock_poll:

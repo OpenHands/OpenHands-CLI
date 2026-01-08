@@ -111,6 +111,7 @@ class TestVerifyAndGetSandboxId:
             with pytest.raises(RequestError) as exc_info:
                 await cloud_agent._verify_and_get_sandbox_id("test-conversation-id")
 
+            assert exc_info.value.data is not None
             assert "Conversation not found" in exc_info.value.data.get("reason", "")
 
     @pytest.mark.asyncio
@@ -129,6 +130,7 @@ class TestVerifyAndGetSandboxId:
             with pytest.raises(RequestError) as exc_info:
                 await cloud_agent._verify_and_get_sandbox_id("test-conversation-id")
 
+            assert exc_info.value.data is not None
             assert "no associated sandbox" in exc_info.value.data.get("reason", "")
 
     @pytest.mark.asyncio
@@ -224,6 +226,7 @@ class TestLoadSession:
                 cwd="/tmp", mcp_servers=[], session_id=invalid_session_id
             )
 
+        assert exc_info.value.data is not None
         assert "Invalid session ID" in exc_info.value.data.get("reason", "")
 
     @pytest.mark.asyncio
@@ -259,6 +262,7 @@ class TestLoadSession:
                 cwd="/tmp", mcp_servers=[], session_id=session_id
             )
 
+        assert exc_info.value.data is not None
         assert "Session not found" in exc_info.value.data.get("reason", "")
 
 
@@ -301,6 +305,7 @@ class TestPrompt:
                     session_id=session_id,
                 )
 
+            assert exc_info.value.data is not None
             assert "Failed to process prompt" in exc_info.value.data.get("reason", "")
             # Verify error message was sent
             mock_connection.session_update.assert_called()

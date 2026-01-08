@@ -6,6 +6,8 @@ import time
 import webbrowser
 from typing import Any
 
+from pydantic import BaseModel
+
 from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
 from openhands_cli.auth.utils import _p
 from openhands_cli.theme import OPENHANDS_THEME
@@ -15,6 +17,17 @@ class DeviceFlowError(Exception):
     """Base exception for device flow errors."""
 
     pass
+
+
+class DeviceAuthorizationResponse(BaseModel):
+    """Response from the device authorization endpoint (RFC 8628)."""
+
+    device_code: str
+    user_code: str
+    verification_uri: str
+    verification_uri_complete: str
+    expires_in: int
+    interval: int
 
 
 class DeviceFlowClient(BaseHttpClient):
@@ -28,27 +41,25 @@ class DeviceFlowClient(BaseHttpClient):
         """
         super().__init__(server_url)
 
-    async def start_device_flow(self) -> tuple[str, str, str, int]:
+    async def start_device_flow(self) -> DeviceAuthorizationResponse:
         """Start the OAuth 2.0 Device Flow.
 
         Returns:
-            Tuple of (device_code, user_code, verification_uri, interval)
+            DeviceAuthorizationResponse containing device_code, user_code,
+            verification_uri, verification_uri_complete, expires_in, and interval
 
         Raises:
             DeviceFlowError: If the device flow initiation fails
         """
         try:
             response = await self.post("/oauth/device/authorize", json_data={})
-            result = response.json()
-
-            return (
-                result["device_code"],
-                result["user_code"],
-                result["verification_uri"],
-                result["interval"],
-            )
-        except (AuthHttpError, KeyError) as e:
+            return DeviceAuthorizationResponse.model_validate(response.json())
+        except AuthHttpError as e:
             raise DeviceFlowError(f"Failed to start device flow: {e}") from e
+        except Exception as e:
+            raise DeviceFlowError(
+                f"Invalid response from device authorization endpoint: {e}"
+            ) from e
 
     async def poll_for_token(
         self, device_code: str, interval: int, timeout: float = 600.0
@@ -131,18 +142,13 @@ class DeviceFlowClient(BaseHttpClient):
 
         # Step 1: Start device flow
         try:
-            (
-                device_code,
-                user_code,
-                verification_uri,
-                interval,
-            ) = await self.start_device_flow()
+            auth_response = await self.start_device_flow()
         except DeviceFlowError as e:
             _p(f"[{OPENHANDS_THEME.error}]Error: {e}[/{OPENHANDS_THEME.error}]")
             raise
 
-        # Step 2: Construct URL with user_code parameter and open browser
-        verification_url = f"{verification_uri}?user_code={user_code}"
+        # Step 2: Use verification_uri_complete if available, otherwise construct URL
+        verification_url = auth_response.verification_uri_complete
 
         _p(
             f"\n[{OPENHANDS_THEME.warning}]Opening your web browser for "
@@ -179,9 +185,11 @@ class DeviceFlowClient(BaseHttpClient):
             f"[/{OPENHANDS_THEME.accent}]"
         )
 
-        # Step 3: Poll for token
+        # Step 3: Poll for token using device_code and interval from auth_response
         try:
-            tokens = await self.poll_for_token(device_code, interval)
+            tokens = await self.poll_for_token(
+                auth_response.device_code, auth_response.interval
+            )
             _p(
                 f"[{OPENHANDS_THEME.success}]✓ Authentication "
                 f"successful![/{OPENHANDS_THEME.success}]"

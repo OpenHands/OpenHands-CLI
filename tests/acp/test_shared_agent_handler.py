@@ -201,6 +201,7 @@ class TestNewSession:
                 ctx=mock_context, mcp_servers=[], working_dir="/tmp"
             )
 
+        assert exc_info.value.data is not None
         assert "Agent not configured" in exc_info.value.data.get("reason", "")
 
 
@@ -251,6 +252,7 @@ class TestSetSessionMode:
                 ctx=mock_context, mode_id=invalid_mode, session_id=session_id
             )
 
+        assert exc_info.value.data is not None
         assert "Invalid mode ID" in exc_info.value.data.get("reason", "")
 
 
