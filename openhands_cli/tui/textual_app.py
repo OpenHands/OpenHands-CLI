@@ -381,7 +381,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         )
 
         # Load existing plan from persisted conversation if available
-        existing_plan = runner.get_existing_plan()
+        existing_plan = PlanSidePanel.load_tasks_from_path(runner.persistence_dir)
         if existing_plan:
             self.update_plan(existing_plan)
 

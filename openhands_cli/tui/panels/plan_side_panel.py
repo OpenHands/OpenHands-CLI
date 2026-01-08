@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+from pydantic import ValidationError
 from textual.app import App
 from textual.containers import Horizontal, VerticalScroll
 from textual.css.query import NoMatches
@@ -104,6 +107,34 @@ class PlanSidePanel(VerticalScroll):
         """
         self._task_list = task_list
         self.refresh_content()
+
+    @staticmethod
+    def load_tasks_from_path(
+        persistence_dir: str | Path | None,
+    ) -> list[TaskItem] | None:
+        """Load tasks from the TASKS.json file in the given persistence directory.
+
+        The TaskTrackerExecutor saves tasks to TASKS.json in the conversation's
+        persistence directory. This method reads from that file directly.
+
+        Args:
+            persistence_dir: Path to the conversation's persistence directory
+
+        Returns:
+            List of TaskItem objects if a plan exists, None otherwise
+        """
+        if not persistence_dir:
+            return None
+
+        tasks_file = Path(persistence_dir) / "TASKS.json"
+        if not tasks_file.exists():
+            return None
+
+        try:
+            with open(tasks_file, encoding="utf-8") as f:
+                return [TaskItem.model_validate(d) for d in json.load(f)]
+        except (OSError, json.JSONDecodeError, TypeError, ValidationError):
+            return None
 
     def refresh_content(self):
         """Refresh the plan content display."""
