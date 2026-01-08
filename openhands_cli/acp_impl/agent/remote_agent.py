@@ -486,17 +486,6 @@ class OpenHandsCloudACPAgent(ACPAgent):
             message = Message(role="user", content=message_content)
             conversation.send_message(message)
 
-            async def send_message() -> None:
-                conversation.run()
-
-            # Run the conversation with confirmation mode
-            run_task = asyncio.create_task(send_message())
-
-            # Send the message with potentially multiple content types
-            # (text + images)
-            message = Message(role="user", content=message_content)
-            conversation.send_message(message)
-
             # Run the conversation with confirmation mode via runner function
             # The runner handles the confirmation flow for all modes
             # Track the running task so cancel() can wait for proper cleanup

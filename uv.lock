@@ -1569,7 +1569,7 @@ wheels = [
 
 [[package]]
 name = "openhands"
-version = "1.7.0"
+version = "1.8.1"
 source = { editable = "." }
 dependencies = [
     { name = "agent-client-protocol" },
@@ -1599,6 +1599,7 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-forked" },
+    { name = "pytest-textual-snapshot" },
     { name = "pytest-xdist" },
     { name = "ruff" },
     { name = "textual-dev" },
@@ -1633,6 +1634,7 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.21.0" },
     { name = "pytest-cov", specifier = ">=5.0.0" },
     { name = "pytest-forked", specifier = ">=1.6.0" },
+    { name = "pytest-textual-snapshot", specifier = ">=1.1.0" },
     { name = "pytest-xdist", specifier = ">=3.6.1" },
     { name = "ruff", specifier = ">=0.12.10" },
     { name = "textual-dev", specifier = ">=1.8.0" },
@@ -4654,6 +4656,22 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-textual-snapshot"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jinja2" },
+    { name = "pytest" },
+    { name = "rich" },
+    { name = "syrupy" },
+    { name = "textual" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3e/7f/4135f87e12c1c46376971fec5ebfe71f7f8b15ac20f887c90932dedd6e78/pytest_textual_snapshot-1.1.0.tar.gz", hash = "sha256:96d48ab01306852a3b4ae165f008d5fdd7fda777e91e9d2c3ea0f7d7458544eb", size = 11391, upload-time = "2025-01-23T16:12:00.537Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1c/30/c31d800f8d40d663fc84d83548b26aecf613c9c39bd6985c813d623d7b84/pytest_textual_snapshot-1.1.0-py3-none-any.whl", hash = "sha256:fdf7727d2bc444f947554308da1b08df7a45215fe49d0621cbbc24c33e8f7b8d", size = 11451, upload-time = "2025-01-23T16:11:59.389Z" },
+]
+
+[[package]]
 name = "pytest-xdist"
 version = "3.8.0"
 source = { registry = "https://pypi.org/simple" }
@@ -5051,6 +5069,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b8/bf/733575d718ba8c667ce7b6505d9b64077777ac5cef0877854f5cee4fba2b/streamingjson-0.0.5.tar.gz", hash = "sha256:93b0287ce4ad4089308fbe5745b8bfd63b39e445a6f3891474ea8491284a23e3", size = 15544, upload-time = "2024-09-20T01:56:23.221Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/47/60/3b1680ea91cc95a2088164ae67f91960b93ec568027ccb4b47784b7f5efa/streamingjson-0.0.5-py3-none-any.whl", hash = "sha256:c7baece0ff7ebce0a2a6baa0c1394dfdfe24a4a62f9635d4a17c2b548ff5eb76", size = 10183, upload-time = "2024-09-20T01:56:42.658Z" },
+]
+
+[[package]]
+name = "syrupy"
+version = "4.8.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/57/54/07f40c1e9355c0eb6909b83abd8ea2c523a1e05b8257a575bbaa42df28de/syrupy-4.8.0.tar.gz", hash = "sha256:648f0e9303aaa8387c8365d7314784c09a6bab0a407455c6a01d6a4f5c6a8ede", size = 49526, upload-time = "2024-11-23T23:34:36.399Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ed/c7/8cd6b5fa8cc4a5c025d3d36a014dff44436fda8b3003a471253931c77f1b/syrupy-4.8.0-py3-none-any.whl", hash = "sha256:544f4ec6306f4b1c460fdab48fd60b2c7fe54a6c0a8243aeea15f9ad9c638c3f", size = 49530, upload-time = "2024-11-23T23:34:34.697Z" },
 ]
 
 [[package]]
