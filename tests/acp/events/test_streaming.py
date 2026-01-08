@@ -62,10 +62,14 @@ async def test_conversation_setup_enables_streaming(acp_agent_with_streaming, tm
     session_id = str(uuid4())
 
     with (
-        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load_specs,
-        patch("openhands_cli.acp_impl.agent.Conversation") as mock_conversation_class,
         patch(
-            "openhands_cli.acp_impl.agent.EventSubscriber"
+            "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+        ) as mock_load_specs,
+        patch(
+            "openhands_cli.acp_impl.agent.local_agent.Conversation"
+        ) as mock_conversation_class,
+        patch(
+            "openhands_cli.acp_impl.agent.local_agent.EventSubscriber"
         ) as mock_event_subscriber_class,
     ):
         # Mock agent with LLM that doesn't use responses API (supports streaming)
@@ -119,10 +123,14 @@ async def test_conversation_setup_without_streaming_flag(acp_agent, tmp_path):
     session_id = str(uuid4())
 
     with (
-        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load_specs,
-        patch("openhands_cli.acp_impl.agent.Conversation") as mock_conversation_class,
         patch(
-            "openhands_cli.acp_impl.agent.EventSubscriber"
+            "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+        ) as mock_load_specs,
+        patch(
+            "openhands_cli.acp_impl.agent.local_agent.Conversation"
+        ) as mock_conversation_class,
+        patch(
+            "openhands_cli.acp_impl.agent.local_agent.EventSubscriber"
         ) as mock_event_subscriber_class,
     ):
         # Mock agent with LLM that doesn't use responses API (supports streaming)
