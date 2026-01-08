@@ -22,6 +22,7 @@ from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.tools.task_tracker.definition import TaskTrackerObservation
 from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
+from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
 )
@@ -99,18 +100,31 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def reload_configuration(self) -> None:
         self._cli_settings = CliSettings.load()
 
+    def _refresh_plan_panel(self) -> None:
+        """Refresh the plan panel by reloading tasks from disk.
+
+        This method handles thread safety - it can be called from any thread
+        and will ensure the panel refresh happens on the main thread.
+        """
+        try:
+            panel = self._app.query_one(PlanSidePanel)
+        except Exception:
+            # Panel doesn't exist, nothing to refresh
+            return
+
+        current_thread_id = threading.get_ident()
+        if current_thread_id == self._main_thread_id:
+            panel.refresh_from_disk()
+        else:
+            self._app.call_from_thread(panel.refresh_from_disk)
+
     def on_event(self, event: Event) -> None:
         """Main event handler that creates Collapsible widgets for events."""
         # Check for TaskTrackerObservation to update the plan panel
         if isinstance(event, ObservationEvent) and isinstance(
             event.observation, TaskTrackerObservation
         ):
-            task_list = event.observation.task_list
-            current_thread_id = threading.get_ident()
-            if current_thread_id == self._main_thread_id:
-                self._app.update_plan(task_list)
-            else:
-                self._app.call_from_thread(self._app.update_plan, task_list)
+            self._refresh_plan_panel()
 
         collapsible_widget = self._create_event_collapsible(event)
         if collapsible_widget:

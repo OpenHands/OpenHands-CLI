@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 from textual.app import App
@@ -20,10 +19,6 @@ from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.panels.plan_panel_style import PLAN_PANEL_STYLE
 
 
-if TYPE_CHECKING:
-    pass
-
-
 # Status icons for visual representation
 STATUS_ICONS: dict[TaskTrackerStatusType, str] = {
     "todo": "○",
@@ -33,23 +28,49 @@ STATUS_ICONS: dict[TaskTrackerStatusType, str] = {
 
 
 class PlanSidePanel(VerticalScroll):
-    """Side panel widget that displays the agent's task plan."""
+    """Side panel widget that displays the agent's task plan.
+
+    This panel is self-sufficient - it knows its persistence directory and can
+    reload tasks from disk when needed. External callers just need to call
+    refresh_from_disk() to trigger an update.
+    """
 
     DEFAULT_CSS = PLAN_PANEL_STYLE
 
-    def __init__(self, task_list: list[TaskItem] | None = None, **kwargs):
-        """Initialize the Plan side panel.
-
-        Args:
-            task_list: Initial list of tasks to display
-        """
+    def __init__(self, **kwargs):
+        """Initialize the Plan side panel."""
         super().__init__(**kwargs)
-        self._task_list: list[TaskItem] = task_list or []
+        self._task_list: list[TaskItem] = []
+        self._persistence_dir: str | Path | None = None
 
     @property
     def task_list(self) -> list[TaskItem]:
         """Get the current task list."""
         return self._task_list
+
+    @property
+    def persistence_dir(self) -> str | Path | None:
+        """Get the persistence directory path."""
+        return self._persistence_dir
+
+    def set_persistence_dir(self, path: str | Path | None) -> None:
+        """Set the persistence directory and load initial tasks.
+
+        Args:
+            path: Path to the conversation's persistence directory
+        """
+        self._persistence_dir = path
+        self.refresh_from_disk()
+
+    def refresh_from_disk(self) -> None:
+        """Reload tasks from the persistence directory and update display.
+
+        This method reads the TASKS.json file from the persistence directory
+        and updates the panel's content. It's safe to call even if no
+        persistence directory is set or if the file doesn't exist.
+        """
+        self._task_list = self._load_tasks_from_path(self._persistence_dir) or []
+        self._refresh_content()
 
     @classmethod
     def toggle(cls, app: App) -> None:
@@ -97,19 +118,10 @@ class PlanSidePanel(VerticalScroll):
 
     def on_mount(self):
         """Called when the panel is mounted."""
-        self.refresh_content()
-
-    def update_tasks(self, task_list: list[TaskItem]) -> None:
-        """Update the task list and refresh the display.
-
-        Args:
-            task_list: New list of tasks to display
-        """
-        self._task_list = task_list
-        self.refresh_content()
+        self._refresh_content()
 
     @staticmethod
-    def load_tasks_from_path(
+    def _load_tasks_from_path(
         persistence_dir: str | Path | None,
     ) -> list[TaskItem] | None:
         """Load tasks from the TASKS.json file in the given persistence directory.
@@ -136,7 +148,7 @@ class PlanSidePanel(VerticalScroll):
         except (OSError, json.JSONDecodeError, TypeError, ValidationError):
             return None
 
-    def refresh_content(self):
+    def _refresh_content(self):
         """Refresh the plan content display."""
         content_widget = self.query_one("#plan-content", Static)
 

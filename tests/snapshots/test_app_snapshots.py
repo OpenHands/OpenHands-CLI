@@ -96,7 +96,9 @@ class TestPlanSidePanelSnapshots:
             def compose(self) -> ComposeResult:
                 with Horizontal(id="content_area"):
                     yield Static("Main content area", id="main_content")
-                    yield PlanSidePanel(task_list=task_list)
+                    panel = PlanSidePanel()
+                    panel._task_list = task_list
+                    yield panel
                 yield Footer()
 
         assert snap_compare(PlanPanelWithTasksApp(), terminal_size=(100, 30))
@@ -122,7 +124,9 @@ class TestPlanSidePanelSnapshots:
             def compose(self) -> ComposeResult:
                 with Horizontal(id="content_area"):
                     yield Static("Main content area", id="main_content")
-                    yield PlanSidePanel(task_list=task_list)
+                    panel = PlanSidePanel()
+                    panel._task_list = task_list
+                    yield panel
                 yield Footer()
 
         assert snap_compare(PlanPanelAllDoneApp(), terminal_size=(100, 30))

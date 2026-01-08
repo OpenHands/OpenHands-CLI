@@ -29,7 +29,6 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
-from openhands.tools.task_tracker.definition import TaskItem
 from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_splash_content
@@ -386,25 +385,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             event_callback,
         )
 
-        # Load existing plan from persisted conversation if available
-        existing_plan = PlanSidePanel.load_tasks_from_path(runner.persistence_dir)
-        if existing_plan:
-            self.update_plan(existing_plan)
+        # Set persistence directory on plan panel so it can load/refresh tasks
+        if self.plan_panel:
+            self.plan_panel.set_persistence_dir(runner.persistence_dir)
 
         return runner
-
-    def update_plan(self, task_list: list[TaskItem]) -> None:
-        """Update the plan panel with a new task list.
-
-        This method is called when a TaskTrackerObservation event is received.
-        It ensures the plan panel is visible and updates its content.
-
-        Args:
-            task_list: List of TaskItem objects representing the current plan
-        """
-        # Get or create the plan panel
-        self.plan_panel = PlanSidePanel.get_or_create(self)
-        self.plan_panel.update_tasks(task_list)
 
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.
