@@ -184,35 +184,13 @@ class OpenHandsCloudACPAgent(ACPAgent):
                 {"reason": f"Unsupported authentication method: {method_id}"}
             )
 
-        from openhands_cli.auth.api_client import (
-            ApiClientError,
-            fetch_user_data_after_oauth,
-        )
-        from openhands_cli.auth.device_flow import (
-            DeviceFlowError,
-            authenticate_with_device_flow,
-        )
+        from openhands_cli.auth.device_flow import DeviceFlowError
+        from openhands_cli.auth.login_command import login_command
 
         try:
             # Perform OAuth2 device flow authentication
-            token_response = await authenticate_with_device_flow(self._cloud_api_url)
-
-            api_key = token_response.access_token
-
-            # Store the API key
-            store = TokenStorage()
-            store.store_api_key(api_key)
-
-            # Update the agent's API key
-            self._cloud_api_key = api_key
-
-            # Fetch user data and configure the agent
-            try:
-                await fetch_user_data_after_oauth(self._cloud_api_url, api_key)
-            except ApiClientError as e:
-                # Log - auth succeeded even if data fetch failed
-                logger.warning(f"Failed to fetch user data after OAuth: {e}")
-
+            await login_command(self._cloud_api_url, skip_settings_sync=True)
+            self._cloud_api_key = self.store.get_api_key()
             logger.info("OAuth authentication completed successfully")
             return AuthenticateResponse()
 

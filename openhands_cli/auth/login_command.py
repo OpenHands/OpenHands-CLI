@@ -17,6 +17,7 @@ async def _fetch_user_data_with_context(
     server_url: str,
     api_key: str,
     already_logged_in: bool,
+    skip_settings_sync: bool = False,
 ) -> None:
     """Fetch user data and print messages depending on login context."""
 
@@ -30,6 +31,10 @@ async def _fetch_user_data_with_context(
             f"[{OPENHANDS_THEME.secondary}]Pulling latest settings from remote..."
             f"[/{OPENHANDS_THEME.secondary}]"
         )
+
+    # If already logged, skip re-fetching settings
+    if already_logged_in and skip_settings_sync:
+        return
 
     try:
         await fetch_user_data_after_oauth(server_url, api_key)
@@ -55,7 +60,7 @@ async def _fetch_user_data_with_context(
         )
 
 
-async def login_command(server_url: str) -> bool:
+async def login_command(server_url: str, skip_settings_sync: bool = False) -> bool:
     """Execute the login command.
 
     Args:
@@ -79,6 +84,7 @@ async def login_command(server_url: str) -> bool:
             server_url,
             existing_api_key,
             already_logged_in=True,
+            skip_settings_sync=skip_settings_sync,
         )
         return True
 
@@ -111,6 +117,7 @@ async def login_command(server_url: str) -> bool:
         server_url,
         api_key,
         already_logged_in=False,
+        skip_settings_sync=skip_settings_sync,
     )
     return True
 
