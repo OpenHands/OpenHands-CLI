@@ -1,5 +1,6 @@
 """Cloud conversation creation functionality."""
 
+import logging
 from typing import Any
 
 from rich.console import Console
@@ -9,6 +10,8 @@ from openhands_cli.auth.logout_command import logout_command
 from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.theme import OPENHANDS_THEME
 
+
+logger = logging.getLogger(__name__)
 
 console = Console()
 
@@ -74,7 +77,8 @@ async def is_token_valid(server_url: str, api_key: str) -> bool:
     except UnauthenticatedError:
         return False
     except Exception as e:
-        raise CloudConversationError(f"Failed to validate token: {e}") from e
+        logger.exception(f"Failed to validate token: {e}")
+        return False
 
 
 async def create_cloud_conversation(
