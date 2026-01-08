@@ -46,7 +46,7 @@ def load_agent_specs(
         MissingAgentSpec: If agent specification is not found or invalid
     """
     agent_store = AgentStore()
-    agent = agent_store.load(session_id=conversation_id)
+    agent = agent_store.load_or_create_from_env(session_id=conversation_id)
     if not agent:
         raise MissingAgentSpec(
             "Agent specification not found. Please configure your settings."

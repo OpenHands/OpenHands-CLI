@@ -1,6 +1,7 @@
 # openhands_cli/settings/store.py
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from prompt_toolkit import HTML, print_formatted_text
@@ -32,6 +33,36 @@ class AgentStore:
 
     def __init__(self) -> None:
         self.file_store = LocalFileStore(root=PERSISTENCE_DIR)
+
+    def load_or_create_from_env(self, session_id: str | None = None) -> Agent | None:
+        """Load agent from file, or create from environment variables if file missing."""
+        # Try file first
+        existing_agent = self.load(session_id=session_id)
+        if existing_agent is not None:
+            return existing_agent
+        
+        # Check env vars
+        model = os.getenv("OPENHANDS_LLM_MODEL")
+        api_key = os.getenv("OPENHANDS_LLM_API_KEY")
+        base_url = os.getenv("OPENHANDS_LLM_BASE_URL", "https://llm-proxy.app.all-hands.dev/")
+        
+        # Both model and API key required
+        if not model or not api_key:
+            return None
+        
+        try:
+            # Create and save agent from env vars
+            agent = self.create_and_save_from_settings(
+                llm_api_key=api_key,
+                settings={"llm_model": model},
+                base_url=base_url,
+            )
+            return agent
+        except Exception as e:
+            print_formatted_text(
+                HTML(f"\n<red>Failed to create agent from environment variables: {str(e)}</red>")
+            )
+            return None
 
     def load(self, session_id: str | None = None) -> Agent | None:
         try:

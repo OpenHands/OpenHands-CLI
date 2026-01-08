@@ -193,12 +193,28 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
                 console = Console()
                 console.print(
-                    f"[{OPENHANDS_THEME.error}]Headless mode requires existing "
-                    f"settings.[/{OPENHANDS_THEME.error}]\n"
-                    f"[bold]Please run:[/bold] [{OPENHANDS_THEME.success}]openhands "
-                    f"--exp[/{OPENHANDS_THEME.success}] to configure your settings "
-                    f"before using [{OPENHANDS_THEME.accent}]--headless"
-                    f"[/{OPENHANDS_THEME.accent}]."
+                    f"[{OPENHANDS_THEME.error}]Error: Headless mode requires agent "
+                    f"configuration.[/{OPENHANDS_THEME.error}]\n"
+                )
+                console.print(
+                    "[bold]Configure using one of these methods:[/bold]\n"
+                )
+                console.print(
+                    f"[{OPENHANDS_THEME.secondary}]Option 1: Set environment "
+                    f"variables (recommended for CI/CD)[/{OPENHANDS_THEME.secondary}]"
+                )
+                console.print(
+                    "  export OPENHANDS_LLM_MODEL='openai/gpt-4o-mini'\n"
+                    "  export OPENHANDS_LLM_API_KEY='sk-...'\n"
+                    "  export OPENHANDS_LLM_BASE_URL='https://...' (optional)\n"
+                )
+                console.print(
+                    f"[{OPENHANDS_THEME.secondary}]Option 2: Interactive setup"
+                    f"[/{OPENHANDS_THEME.secondary}]"
+                )
+                console.print(
+                    f"  Run: [{OPENHANDS_THEME.success}]openhands --exp[/{OPENHANDS_THEME.success}] "
+                    f"to configure interactively\n"
                 )
                 self.exit()
                 return
