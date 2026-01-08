@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from openhands_cli.conversations.lister import ConversationLister
-from openhands_cli.simple_main import handle_resume_logic
+from openhands_cli.entrypoint import handle_resume_logic
 
 
 class TestConversationLister:
@@ -202,7 +202,7 @@ class TestResumeLogicHandling:
             ({"resume": None, "last": True}, None, True),
         ],
     )
-    @patch("openhands_cli.simple_main.console.print")
+    @patch("openhands_cli.entrypoint.console.print")
     def test_handle_resume_logic_scenarios(
         self, mock_print, args_dict, expected_result, should_show_output
     ):
@@ -253,7 +253,7 @@ class TestResumeLogicHandling:
             mock_lister_cls.return_value = mock_lister
             mock_lister.get_latest_conversation_id.return_value = None
 
-            with patch("openhands_cli.simple_main.console.print") as mock_print:
+            with patch("openhands_cli.entrypoint.console.print") as mock_print:
                 result = handle_resume_logic(args)
 
                 assert result is None

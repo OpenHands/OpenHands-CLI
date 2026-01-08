@@ -21,7 +21,7 @@ from PyInstaller.utils.hooks import (
 project_root = Path.cwd()
 
 a = Analysis(
-    ['openhands_cli/simple_main.py'],
+    ['openhands_cli/entrypoint.py'],
     pathex=[str(project_root)],
     binaries=[],
     datas=[
