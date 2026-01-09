@@ -30,7 +30,7 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.splash import get_splash_content
+from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.modals import SettingsScreen
@@ -708,8 +708,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Update the splash conversation widget with the new conversation ID
         splash_conversation = self.query_one("#splash_conversation", Static)
         splash_conversation.update(
-            f"[{OPENHANDS_THEME.accent}]Initialized conversation[/] "
-            f"{self.conversation_id.hex}"
+            get_conversation_text(self.conversation_id.hex, theme=OPENHANDS_THEME)
         )
 
         # Scroll to top to show the splash screen
