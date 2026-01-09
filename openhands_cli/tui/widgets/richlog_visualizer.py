@@ -36,7 +36,7 @@ from openhands_cli.tui.widgets.collapsible import (
 TOOL_ICON = "🔧"
 SUCCESS_ICON = "✓"
 ERROR_ICON = "✗"
-AGENT_MESSAGE_LEFT_PADDING = 1
+AGENT_MESSAGE_PADDING = (1, 0, 1, 3)  # top, right, bottom, left
 
 
 if TYPE_CHECKING:
@@ -445,17 +445,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 # User message has "padding: 0 1" and starts with "> ", so text
                 # starts at position 3 (1 padding + 2 for "> ")
                 widget = Static(self._escape_rich_markup(str(action.message)))
-                widget.styles.padding = (
-                    0,
-                    0,
-                    0,
-                    AGENT_MESSAGE_LEFT_PADDING,
-                )  # top, right, bottom, left
+                widget.styles.padding = AGENT_MESSAGE_PADDING
                 return widget
             elif isinstance(action, ThinkAction):
                 # For think action, show the action's visualize with padding
                 widget = Static(self._escape_rich_markup(str(action.visualize)))
-                widget.styles.padding = (0, 0, 0, AGENT_MESSAGE_LEFT_PADDING)
+                widget.styles.padding = AGENT_MESSAGE_PADDING
                 return widget
 
         if isinstance(event, MessageEvent):
@@ -467,12 +462,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 return None
             # Display messages as plain text
             widget = Static(self._escape_rich_markup(str(content)))
-            widget.styles.padding = (
-                0,
-                0,
-                0,
-                AGENT_MESSAGE_LEFT_PADDING,
-            )  # top, right, bottom, left
+            widget.styles.padding = AGENT_MESSAGE_PADDING
+            return widget
 
         # For other events, use collapsible
         return self._create_event_collapsible(event)
