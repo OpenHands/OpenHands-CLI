@@ -20,9 +20,39 @@ from PyInstaller.utils.hooks import (
 # Get the project root directory (current working directory when running PyInstaller)
 project_root = Path.cwd()
 
+# Get the site-packages directory for the virtual environment
+# This is needed to find namespace packages like openhands.sdk and openhands.tools
+import site
+site_packages = site.getsitepackages()[0] if site.getsitepackages() else None
+
+# Build pathex list
+pathex_list = [str(project_root)]
+if site_packages:
+    pathex_list.append(site_packages)
+    # Also add the openhands namespace package directory explicitly
+    openhands_path = os.path.join(site_packages, 'openhands')
+    if os.path.exists(openhands_path):
+        pathex_list.append(openhands_path)
+
+# Create a temporary __init__.py for the openhands namespace package
+# This is needed because openhands is a PEP 420 namespace package without __init__.py
+# and PyInstaller doesn't automatically handle namespace packages
+openhands_init_created = False
+if site_packages:
+    openhands_init_path = os.path.join(site_packages, 'openhands', '__init__.py')
+    if not os.path.exists(openhands_init_path):
+        try:
+            with open(openhands_init_path, 'w') as f:
+                f.write('# Namespace package init created by PyInstaller spec\n')
+                f.write('__path__ = __import__("pkgutil").extend_path(__path__, __name__)\n')
+            openhands_init_created = True
+            print(f"Created temporary __init__.py at {openhands_init_path}")
+        except Exception as e:
+            print(f"Warning: Could not create __init__.py for openhands namespace: {e}")
+
 a = Analysis(
     ['openhands_cli/entrypoint.py'],
-    pathex=[str(project_root)],
+    pathex=pathex_list,
     binaries=[],
     datas=[
         # Include any data files that might be needed
@@ -45,8 +75,21 @@ a = Analysis(
         *collect_submodules('openhands_cli'),
         *collect_submodules('prompt_toolkit'),
         # Include OpenHands SDK submodules explicitly to avoid resolution issues
+        # Note: openhands is a namespace package (PEP 420) without __init__.py
+        # We need to explicitly include the submodules
         *collect_submodules('openhands.sdk'),
         *collect_submodules('openhands.tools'),
+        # Explicitly include commonly used SDK modules to ensure they're bundled
+        'openhands.sdk.llm',
+        'openhands.sdk.agent',
+        'openhands.sdk.conversation',
+        'openhands.sdk.event',
+        'openhands.sdk.tool',
+        'openhands.sdk.context',
+        'openhands.sdk.mcp',
+        'openhands.sdk.io',
+        'openhands.sdk.workspace',
+        'openhands.sdk.logger',
         *collect_submodules('tiktoken'),
         *collect_submodules('tiktoken_ext'),
         *collect_submodules('litellm'),
@@ -66,10 +109,9 @@ a = Analysis(
         'textual.widgets._select',
         'textual.widgets._tabbed_content',
     ],
-    hookspath=[],
+    hookspath=[str(project_root / "hooks")],
     hooksconfig={},
-    runtime_hooks=[],
-    # runtime_hooks=[str(project_root / "hooks" / "rthook_profile_imports.py")],
+    runtime_hooks=[str(project_root / "hooks" / "rthook_openhands.py")],
     excludes=[
         # Exclude unnecessary modules to reduce binary size
         'tkinter',
