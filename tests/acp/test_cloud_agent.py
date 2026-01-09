@@ -1,4 +1,8 @@
-"""Tests for OpenHandsCloudACPAgent."""
+"""Tests for OpenHandsCloudACPAgent - cloud-specific behavior.
+
+Common behavior shared with LocalOpenHandsACPAgent is tested in test_agent_common.py.
+This file tests cloud-specific functionality: authentication, workspace management.
+"""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -216,28 +220,14 @@ class TestPrompt:
 
 
 class TestLoadSession:
-    """Tests for the load_session method."""
+    """Cloud-specific load_session tests.
+
+    Common load_session tests are in test_agent_common.py.
+    """
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "invalid_session_id",
-        ["not-a-uuid", "12345", "invalid-session"],
-    )
-    async def test_load_session_rejects_invalid_uuid(
-        self, cloud_agent, invalid_session_id
-    ):
-        """Test load_session rejects invalid UUIDs."""
-        with pytest.raises(RequestError) as exc_info:
-            await cloud_agent.load_session(
-                cwd="/tmp", mcp_servers=[], session_id=invalid_session_id
-            )
-
-        assert exc_info.value.data is not None
-        assert "Invalid session ID" in exc_info.value.data.get("reason", "")
-
-    @pytest.mark.asyncio
-    async def test_load_session_not_found(self, cloud_agent):
-        """Test load_session raises error when session not cached."""
+    async def test_load_session_not_found_returns_helpful_message(self, cloud_agent):
+        """Test load_session raises error with helpful message for cloud mode."""
         session_id = str(uuid4())
 
         with pytest.raises(RequestError) as exc_info:
@@ -247,83 +237,8 @@ class TestLoadSession:
 
         assert exc_info.value.data is not None
         assert "Session not found" in exc_info.value.data.get("reason", "")
-
-    @pytest.mark.asyncio
-    async def test_load_session_replays_historic_events(
-        self, cloud_agent, mock_connection
-    ):
-        """Test that load_session replays historic events to the client."""
-        from openhands.sdk import Message, TextContent
-        from openhands.sdk.event.llm_convertible.message import MessageEvent
-
-        session_id = str(uuid4())
-
-        # Create mock events
-        mock_event1 = MessageEvent(
-            source="user",
-            llm_message=Message(role="user", content=[TextContent(text="Hello")]),
-        )
-        mock_event2 = MessageEvent(
-            source="agent",
-            llm_message=Message(
-                role="assistant", content=[TextContent(text="Hi there!")]
-            ),
-        )
-
-        # Set up cached conversation with events
-        mock_conversation = MagicMock()
-        mock_conversation.state.events = [mock_event1, mock_event2]
-        cloud_agent._active_sessions[session_id] = mock_conversation
-
-        with patch(
-            "openhands_cli.acp_impl.agent.remote_agent.EventSubscriber"
-        ) as mock_subscriber_class:
-            mock_subscriber = AsyncMock()
-            mock_subscriber_class.return_value = mock_subscriber
-
-            response = await cloud_agent.load_session(
-                cwd="/tmp", mcp_servers=[], session_id=session_id
-            )
-
-            # Verify response is returned
-            assert response is not None
-            assert response.modes is not None
-
-            # Verify EventSubscriber was created
-            mock_subscriber_class.assert_called_once_with(session_id, mock_connection)
-
-            # Verify all historic events were replayed
-            assert mock_subscriber.call_count == 2
-            mock_subscriber.assert_any_call(mock_event1)
-            mock_subscriber.assert_any_call(mock_event2)
-
-    @pytest.mark.asyncio
-    async def test_load_session_no_replay_when_no_events(
-        self, cloud_agent, mock_connection
-    ):
-        """Test that load_session doesn't replay events when none exist."""
-        session_id = str(uuid4())
-
-        # Set up cached conversation with no events
-        mock_conversation = MagicMock()
-        mock_conversation.state.events = []
-        cloud_agent._active_sessions[session_id] = mock_conversation
-
-        with patch(
-            "openhands_cli.acp_impl.agent.remote_agent.EventSubscriber"
-        ) as mock_subscriber_class:
-            mock_subscriber = AsyncMock()
-            mock_subscriber_class.return_value = mock_subscriber
-
-            response = await cloud_agent.load_session(
-                cwd="/tmp", mcp_servers=[], session_id=session_id
-            )
-
-            # Verify response is returned
-            assert response is not None
-
-            # Verify EventSubscriber was NOT created (no events to replay)
-            mock_subscriber_class.assert_not_called()
+        # Cloud-specific help message
+        assert "Cloud mode" in exc_info.value.data.get("help", "")
 
 
 class TestCleanupSession:
