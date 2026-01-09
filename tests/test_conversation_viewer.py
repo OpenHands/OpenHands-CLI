@@ -207,6 +207,43 @@ class TestConversationViewer:
                 result = viewer.view("test-conv")
                 assert result is True
 
+    def test_view_with_validation_error_prints_raw_json(self, capsys):
+        """Test that validation errors print the raw JSON content."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch(
+                "openhands_cli.conversations.viewer.CONVERSATIONS_DIR", temp_dir
+            ):
+                conv_dir = Path(temp_dir) / "test-conv"
+                events_dir = conv_dir / "events"
+                events_dir.mkdir(parents=True)
+
+                # Create a JSON file with valid JSON but invalid event schema
+                # (e.g., extra fields that are not permitted)
+                invalid_event = {
+                    "kind": "MessageEvent",
+                    "id": "invalid-event",
+                    "timestamp": "2025-01-01T00:00:00",
+                    "source": "user",
+                    "extra_forbidden_field": "this should cause validation error",
+                    "llm_message": {
+                        "role": "user",
+                        "content": [{"type": "text", "text": "Test message"}],
+                    },
+                }
+                invalid_file = events_dir / "event-00000.json"
+                with open(invalid_file, "w") as f:
+                    json.dump(invalid_event, f)
+
+                viewer = ConversationViewer()
+                result = viewer.view("test-conv")
+                # Should return False since no valid events could be displayed
+                assert result is False
+
+                # Check that the raw JSON was printed
+                captured = capsys.readouterr()
+                assert "Raw JSON:" in captured.out
+                assert "extra_forbidden_field" in captured.out
+
 
 class TestViewConversationFunction:
     """Test cases for the view_conversation helper function."""

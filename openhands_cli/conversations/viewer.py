@@ -120,6 +120,7 @@ class ConversationViewer:
         Returns:
             The parsed Event object, or None if parsing failed.
         """
+        event_data = None
         try:
             with open(event_file, encoding="utf-8") as f:
                 event_data = json.load(f)
@@ -129,6 +130,11 @@ class ConversationViewer:
                 f"Warning: Could not parse event file {event_file.name}: {e}",
                 style=OPENHANDS_THEME.warning,
             )
+            if event_data is not None:
+                console.print(
+                    f"Raw JSON: {json.dumps(event_data, indent=2)}",
+                    style=OPENHANDS_THEME.secondary,
+                )
             return None
 
 
