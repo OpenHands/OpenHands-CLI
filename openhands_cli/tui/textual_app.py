@@ -422,6 +422,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         if command == "/help":
             show_help(self.main_display)
+        elif command == "/new":
+            self._handle_new_command()
         elif command == "/confirm":
             self._handle_confirm_command()
         elif command == "/condense":
@@ -663,6 +665,60 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.notify(
             title="Feedback",
             message="Opening feedback form in your browser...",
+            severity="information",
+        )
+
+    def _handle_new_command(self) -> None:
+        """Handle the /new command to start a new conversation.
+
+        This clears the terminal UI and starts a fresh conversation runner.
+        """
+        # Check if a conversation is currently running
+        if self.conversation_runner and self.conversation_runner.is_running:
+            self.notify(
+                title="New Conversation Error",
+                message="Cannot start a new conversation while one is running. "
+                "Please wait for the current conversation to complete or pause it.",
+                severity="warning",
+            )
+            return
+
+        # Generate a new conversation ID
+        self.conversation_id = uuid.uuid4()
+
+        # Reset the conversation runner
+        self.conversation_runner = None
+
+        # Remove any existing confirmation panel
+        if self.confirmation_panel:
+            self.confirmation_panel.remove()
+            self.confirmation_panel = None
+
+        # Clear all dynamically added widgets from main_display
+        # Keep only the splash widgets (those with IDs starting with "splash_")
+        widgets_to_remove = []
+        for widget in self.main_display.children:
+            widget_id = widget.id or ""
+            if not widget_id.startswith("splash_"):
+                widgets_to_remove.append(widget)
+
+        for widget in widgets_to_remove:
+            widget.remove()
+
+        # Update the splash conversation widget with the new conversation ID
+        splash_conversation = self.query_one("#splash_conversation", Static)
+        splash_conversation.update(
+            f"[{OPENHANDS_THEME.accent}]Initialized conversation[/] "
+            f"{self.conversation_id.hex}"
+        )
+
+        # Scroll to top to show the splash screen
+        self.main_display.scroll_home(animate=False)
+
+        # Notify user
+        self.notify(
+            title="New Conversation",
+            message="Started a new conversation",
             severity="information",
         )
 
