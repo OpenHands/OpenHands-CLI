@@ -455,8 +455,8 @@ class OpenHandsCloudACPAgent(ACPAgent):
             if not workspace:
                 raise Exception("Missing workspace for session")
 
-            # Get or create conversation (preserves state like pause/confirmation)
-            # Resume workspace in the event conversation has been open but workspace closed
+            # Resumes workspace in the event conversation
+            # has been open but workspace closed
             conversation = await self._get_or_create_conversation(
                 session_id=session_id, is_resuming=not workspace.alive
             )
