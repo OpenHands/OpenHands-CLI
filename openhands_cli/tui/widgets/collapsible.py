@@ -243,8 +243,10 @@ class Collapsible(Widget):
             collapsed=collapsed,
         )
         self.title = title
-        # Pass the original content to Static (can be Rich renderable)
-        self._content_widget = Static(content)
+        # Pass the original content to Static with markup=False to prevent
+        # MarkupError when content contains special characters like quotes,
+        # brackets, etc. This follows the same approach as toad's tool_call.py.
+        self._content_widget = Static(content, markup=False)
         self.collapsed = collapsed
         self._watch_collapsed(collapsed)
         if border_color is not None:
