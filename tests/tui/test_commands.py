@@ -504,11 +504,11 @@ class TestOpenHandsAppCommands:
             # Verify conversation ID was NOT changed
             assert oh_app.conversation_id == original_conversation_id
 
-            # Verify warning notification was shown
+            # Verify error notification was shown
             notify_mock.assert_called_once()
             call_args = notify_mock.call_args
             assert call_args[1]["title"] == "New Conversation Error"
-            assert call_args[1]["severity"] == "warning"
+            assert call_args[1]["severity"] == "error"
 
     @pytest.mark.asyncio
     async def test_new_command_clears_dynamically_added_widgets(

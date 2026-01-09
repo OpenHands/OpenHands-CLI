@@ -679,7 +679,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 title="New Conversation Error",
                 message="Cannot start a new conversation while one is running. "
                 "Please wait for the current conversation to complete or pause it.",
-                severity="warning",
+                severity="error",
             )
             return
 
