@@ -136,7 +136,13 @@ class TestNewSession:
         )
 
         assert response.session_id == resume_id
-        assert mock_context._resume_conversation_id is None  # Cleared after use
+
+        response = await shared_handler.new_session(
+            ctx=mock_context, mcp_servers=[], working_dir="/tmp"
+        )
+
+        # Resume ID was cleared, new session ID as assigned next time
+        assert response.session_id != resume_id
 
     @pytest.mark.asyncio
     async def test_new_session_returns_modes(self, shared_handler, mock_context):
