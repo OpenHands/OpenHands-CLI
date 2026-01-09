@@ -286,7 +286,8 @@ class OpenHandsCloudACPAgent(ACPAgent):
             Cached or newly created conversation with cloud workspace
         """
         # Check if we already have this conversation active
-        if session_id in self._active_sessions:
+        # Skip check when resuming
+        if session_id in self._active_sessions and not is_resuming:
             logger.debug(f"Using cached cloud conversation for session {session_id}")
             return self._active_sessions[session_id]
 
