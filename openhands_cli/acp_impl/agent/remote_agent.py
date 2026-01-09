@@ -450,8 +450,15 @@ class OpenHandsCloudACPAgent(ACPAgent):
     ) -> PromptResponse:
         """Handle a prompt request with cloud workspace."""
         try:
+            workspace = self._active_workspaces.get(session_id)
+            if not workspace:
+                raise Exception("Missing workspace for session")
+
             # Get or create conversation (preserves state like pause/confirmation)
-            conversation = await self._get_or_create_conversation(session_id=session_id)
+            # Resume workspace in the event conversation has been open but workspace closed
+            conversation = await self._get_or_create_conversation(
+                session_id=session_id, is_resuming=not workspace.alive
+            )
 
             # Convert ACP prompt format to OpenHands message content
             message_content = convert_acp_prompt_to_message_content(prompt)
