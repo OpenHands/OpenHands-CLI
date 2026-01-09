@@ -61,6 +61,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+o", "toggle_cells", "Toggle Cells"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
+        ("ctrl+t", "open_external_editor", "Open external editor"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
         ("ctrl+c", "request_quit", "Quit the application"),
@@ -607,6 +608,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     def action_submit_textarea(self) -> None:
         """Forward submit textarea action to the input field."""
         self.input_field.action_submit_textarea()
+
+    def action_open_external_editor(self) -> None:
+        """Forward open external editor action to the input field."""
+        self.input_field.action_open_external_editor()
 
     def _handle_confirm_command(self) -> None:
         """Handle the /confirm command to show confirmation settings modal."""

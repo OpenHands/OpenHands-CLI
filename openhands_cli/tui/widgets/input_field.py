@@ -70,7 +70,7 @@ class InputField(Container):
     BINDINGS: ClassVar = [
         Binding("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         Binding("ctrl+j", "submit_textarea", "Submit multi-line input"),
-        Binding("ctrl+x", "open_external_editor", "Open external editor"),
+        Binding("ctrl+t", "open_external_editor", "Open external editor"),
     ]
 
     DEFAULT_CSS = """
