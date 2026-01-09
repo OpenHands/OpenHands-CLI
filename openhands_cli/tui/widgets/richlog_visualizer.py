@@ -32,8 +32,7 @@ from openhands_cli.tui.widgets.collapsible import (
 )
 
 
-# Icons for different tool types
-TOOL_ICON = "🔧"
+# Icons for different event types
 SUCCESS_ICON = "✓"
 ERROR_ICON = "✗"
 AGENT_MESSAGE_PADDING = (1, 0, 1, 1)  # top, right, bottom, left
@@ -186,74 +185,36 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def _build_action_title(self, event: ActionEvent) -> str:
         """Build a title for an action event.
 
-        Format: "🔧 [bold]{summary}[/bold]: $ {command}" for terminal
-                "🔧 [bold]Editing[/bold] {path}" for file edit operations
-                "🔧 [bold]Reading[/bold] {path}" for file view operations
+        Format: "[bold]{summary}[/bold]" for most actions
+                "[bold]{summary}[/bold]: $ {command}" for terminal actions
+                "[bold]{summary}[/bold]: Reading/Editing {path}" for file operations
         """
-        parts = [TOOL_ICON]
-
-        # Get the summary or fallback
-        summary = ""
-        if event.summary:
-            summary = str(event.summary).strip().replace("\n", " ")
-
-        # Get the command/path details and operation type
-        command_detail = ""
-        file_operation = ""  # "Editing" or "Reading"
+        summary = (
+            self._escape_rich_markup(str(event.summary).strip().replace("\n", " "))
+            if event.summary
+            else ""
+        )
         action = event.action
 
-        if isinstance(action, TerminalAction):
-            # Terminal command - show with $ prefix
-            cmd = action.command.strip().replace("\n", " ")
-            command_detail = f"$ {cmd}"
-        elif isinstance(action, FileEditorAction):
-            # File operation - determine if editing or reading based on command
-            if action.command == "view":
-                file_operation = "Reading"
-            else:  # create, str_replace, insert, undo_edit
-                file_operation = "Editing"
-            command_detail = action.path
-        elif action is not None:
-            # Fallback for other action types - check for common attributes
-            if hasattr(action, "command") and hasattr(action, "path"):
-                # Has both command and path - treat as file operation
-                path = getattr(action, "path")
-                cmd = getattr(action, "command")
-                if cmd == "view":
-                    file_operation = "Reading"
-                else:
-                    file_operation = "Editing"
-                command_detail = str(path) if path else ""
-            elif hasattr(action, "command"):
-                # Has command but no path - treat as terminal-like
-                cmd = str(getattr(action, "command")).strip().replace("\n", " ")
-                command_detail = f"$ {cmd}"
+        # Terminal actions: show summary + command
+        if isinstance(action, TerminalAction) and action.command:
+            cmd = self._escape_rich_markup(action.command.strip().replace("\n", " "))
+            if summary:
+                return f"[bold]{summary}[/bold]: $ {cmd}"
+            return f"$ {cmd}"
 
-        # Build the title with bold summary
-        if summary and command_detail:
-            # Escape special characters in summary and command_detail
-            summary_escaped = self._escape_rich_markup(summary)
-            detail_escaped = self._escape_rich_markup(command_detail)
-            if file_operation:
-                # File operation: "🔧 [bold]Editing[/bold] /path/to/file"
-                title = f"[bold]{file_operation}[/bold] {detail_escaped}"
-            else:
-                # Terminal: "🔧 [bold]{summary}[/bold]: $ command"
-                title = f"[bold]{summary_escaped}[/bold]: {detail_escaped}"
-        elif summary:
-            summary_escaped = self._escape_rich_markup(summary)
-            title = f"[bold]{summary_escaped}[/bold]"
-        elif command_detail:
-            detail_escaped = self._escape_rich_markup(command_detail)
-            if file_operation:
-                title = f"[bold]{file_operation}[/bold] {detail_escaped}"
-            else:
-                title = detail_escaped
-        else:
-            title = event.tool_name
+        # File operations: include path with Reading/Editing
+        if isinstance(action, FileEditorAction) and action.path:
+            op = "Reading" if action.command == "view" else "Editing"
+            path = self._escape_rich_markup(action.path)
+            if summary:
+                return f"[bold]{summary}[/bold]: {op} {path}"
+            return f"[bold]{op}[/bold] {path}"
 
-        parts.append(title)
-        return " ".join(parts)
+        # All other actions: just use summary
+        if summary:
+            return f"[bold]{summary}[/bold]"
+        return event.tool_name
 
     def _build_observation_content(
         self, event: ObservationEvent | UserRejectObservation | AgentErrorEvent
