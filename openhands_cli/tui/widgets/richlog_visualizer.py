@@ -36,7 +36,7 @@ from openhands_cli.tui.widgets.collapsible import (
 TOOL_ICON = "🔧"
 SUCCESS_ICON = "✓"
 ERROR_ICON = "✗"
-AGENT_MESSAGE_PADDING = (1, 0, 1, 3)  # top, right, bottom, left
+AGENT_MESSAGE_PADDING = (1, 0, 1, 1)  # top, right, bottom, left
 
 
 if TYPE_CHECKING:
