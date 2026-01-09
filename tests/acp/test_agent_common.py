@@ -40,7 +40,7 @@ def agent(request, mock_connection):
 
 
 class TestLoadSession:
-    """Tests for load_session - ensures both agents handle session loading consistently."""
+    """Tests for load_session - both agents handle session loading consistently."""
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -118,6 +118,7 @@ class TestLoadSession:
             cwd="/tmp", mcp_servers=[], session_id=session_id
         )
 
+        assert response is not None
         assert response.modes is not None
         assert response.modes.current_mode_id == "always-ask"
         assert len(response.modes.available_modes) == 3
@@ -126,7 +127,7 @@ class TestLoadSession:
 
 
 class TestSetSessionMode:
-    """Tests for set_session_mode - ensures both agents handle mode changes consistently."""
+    """Tests for set_session_mode - both agents handle mode changes consistently."""
 
     @pytest.mark.asyncio
     async def test_set_session_mode_invalid(self, agent):
@@ -137,7 +138,10 @@ class TestSetSessionMode:
     @pytest.mark.asyncio
     async def test_set_session_mode_updates_confirmation_policy(self, agent):
         """Test that setting mode updates conversation's confirmation policy."""
-        from openhands.sdk.security.confirmation_policy import AlwaysConfirm, NeverConfirm
+        from openhands.sdk.security.confirmation_policy import (
+            AlwaysConfirm,
+            NeverConfirm,
+        )
 
         session_id = str(uuid4())
         mock_conversation = MagicMock()
