@@ -79,6 +79,17 @@ class ConversationRunner:
         """Check if confirmation mode is currently active."""
         return self._confirmation_mode_active
 
+    @property
+    def persistence_dir(self) -> str | None:
+        """Get the persistence directory for the conversation.
+
+        Returns:
+            Path to the persistence directory, or None if not available
+        """
+        if not self.conversation or not self.conversation.state:
+            return None
+        return self.conversation.state.persistence_dir
+
     def get_confirmation_policy(self) -> ConfirmationPolicyBase:
         """Get the current confirmation policy."""
         return self.conversation.state.confirmation_policy

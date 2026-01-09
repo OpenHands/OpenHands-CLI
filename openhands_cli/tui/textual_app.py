@@ -29,6 +29,7 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
+from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
@@ -38,6 +39,7 @@ from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModa
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
+from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
     CollapsibleNavigationMixin,
@@ -134,6 +136,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # MCP panel tracking
         self.mcp_panel: MCPSidePanel | None = None
 
+        # Plan panel tracking
+        self.plan_panel: PlanSidePanel | None = None
+
         # Register the custom theme
         self.register_theme(OPENHANDS_THEME)
 
@@ -175,6 +180,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         yield from super().get_system_commands(screen)
         yield SystemCommand(
             "MCP", "View MCP configurations", lambda: MCPSidePanel.toggle(self)
+        )
+        yield SystemCommand(
+            "PLAN", "View agent plan", lambda: PlanSidePanel.toggle(self)
         )
         yield SystemCommand("SETTINGS", "Configure settings", self.action_open_settings)
 
@@ -344,6 +352,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         else:
             update_notice_widget.display = False
 
+        # Show plan panel on startup if enabled in settings
+        cli_settings = CliSettings.load()
+        if cli_settings.show_plan_panel_on_startup:
+            self.plan_panel = PlanSidePanel.get_or_create(self)
+
         # Process any queued inputs
         self._process_queued_inputs()
         self.is_ui_initialized = True
@@ -360,7 +373,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if self.json_mode:
             event_callback = json_callback
 
-        return ConversationRunner(
+        runner = ConversationRunner(
             self.conversation_id,
             self.conversation_running_signal.publish,
             self._handle_confirmation_request,
@@ -371,6 +384,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self.initial_confirmation_policy,
             event_callback,
         )
+
+        # Set persistence directory on plan panel so it can load/refresh tasks
+        if self.plan_panel:
+            self.plan_panel.set_persistence_dir(runner.persistence_dir)
+
+        return runner
 
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.
