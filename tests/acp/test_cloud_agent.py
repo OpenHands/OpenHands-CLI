@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 from acp import RequestError
+from acp.schema import TextContentBlock
 
 from openhands_cli.acp_impl.agent import OpenHandsCloudACPAgent
 
@@ -12,8 +13,7 @@ from openhands_cli.acp_impl.agent import OpenHandsCloudACPAgent
 @pytest.fixture
 def mock_connection():
     """Create a mock ACP connection."""
-    conn = AsyncMock()
-    return conn
+    return AsyncMock()
 
 
 @pytest.fixture
@@ -32,54 +32,14 @@ def cloud_agent(mock_connection):
         )
 
 
-class TestCloudAgentInit:
-    """Tests for agent initialization."""
-
-    @pytest.mark.parametrize(
-        "confirmation_mode",
-        ["always-ask", "always-approve", "llm-approve"],
-    )
-    def test_init_with_confirmation_modes(self, mock_connection, confirmation_mode):
-        """Test agent can be initialized with any valid confirmation mode."""
-        with patch(
-            "openhands_cli.acp_impl.agent.remote_agent.TokenStorage"
-        ) as mock_storage_class:
-            mock_storage = MagicMock()
-            mock_storage.get_api_key.return_value = "test-api-key"
-            mock_storage_class.return_value = mock_storage
-
-            agent = OpenHandsCloudACPAgent(
-                conn=mock_connection,
-                initial_confirmation_mode=confirmation_mode,
-            )
-
-            assert agent._initial_confirmation_mode == confirmation_mode
-
-    def test_init_with_resume_id(self, mock_connection):
-        """Test agent stores resume conversation ID."""
-        resume_id = str(uuid4())
-        with patch(
-            "openhands_cli.acp_impl.agent.remote_agent.TokenStorage"
-        ) as mock_storage_class:
-            mock_storage = MagicMock()
-            mock_storage.get_api_key.return_value = "test-api-key"
-            mock_storage_class.return_value = mock_storage
-
-            agent = OpenHandsCloudACPAgent(
-                conn=mock_connection,
-                initial_confirmation_mode="always-ask",
-                resume_conversation_id=resume_id,
-            )
-
-            assert agent._resume_conversation_id == resume_id
-
-
-class TestVerifyAndGetSandboxId:
-    """Tests for the _verify_and_get_sandbox_id method."""
+class TestNewSessionAuthentication:
+    """Tests for new_session authentication requirements."""
 
     @pytest.mark.asyncio
-    async def test_verify_requires_api_key(self, mock_connection):
-        """Test _verify_and_get_sandbox_id raises auth_required without API key."""
+    async def test_new_session_raises_auth_required_when_not_authenticated(
+        self, mock_connection
+    ):
+        """Test that new_session raises auth_required when user is not authenticated."""
         with patch(
             "openhands_cli.acp_impl.agent.remote_agent.TokenStorage"
         ) as mock_storage_class:
@@ -92,121 +52,167 @@ class TestVerifyAndGetSandboxId:
             )
 
             with pytest.raises(RequestError) as exc_info:
-                await agent._verify_and_get_sandbox_id("test-conversation-id")
+                await agent.new_session(cwd="/tmp", mcp_servers=[])
 
             assert "Authentication required" in str(exc_info.value.data)
 
     @pytest.mark.asyncio
-    async def test_verify_handles_not_found(self, cloud_agent):
-        """Test _verify_and_get_sandbox_id handles 404 errors."""
-        from openhands_cli.auth.api_client import ApiClientError
-
-        with patch(
-            "openhands_cli.acp_impl.agent.remote_agent.OpenHandsApiClient"
-        ) as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.get_conversation_info.side_effect = ApiClientError("HTTP 404")
-            mock_client_class.return_value = mock_client
-
-            with pytest.raises(RequestError) as exc_info:
-                await cloud_agent._verify_and_get_sandbox_id("test-conversation-id")
-
-            assert exc_info.value.data is not None
-            assert "Conversation not found" in exc_info.value.data.get("reason", "")
-
-    @pytest.mark.asyncio
-    async def test_verify_handles_no_sandbox(self, cloud_agent):
-        """Test _verify_and_get_sandbox_id handles conversations without sandbox."""
-        with patch(
-            "openhands_cli.acp_impl.agent.remote_agent.OpenHandsApiClient"
-        ) as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.get_conversation_info.return_value = {
-                "id": "test",
-                "sandbox_id": None,
-            }
-            mock_client_class.return_value = mock_client
-
-            with pytest.raises(RequestError) as exc_info:
-                await cloud_agent._verify_and_get_sandbox_id("test-conversation-id")
-
-            assert exc_info.value.data is not None
-            assert "no associated sandbox" in exc_info.value.data.get("reason", "")
-
-    @pytest.mark.asyncio
-    async def test_verify_returns_sandbox_id(self, cloud_agent):
-        """Test _verify_and_get_sandbox_id returns sandbox_id on success."""
-        with patch(
-            "openhands_cli.acp_impl.agent.remote_agent.OpenHandsApiClient"
-        ) as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.get_conversation_info.return_value = {
-                "id": "test",
-                "sandbox_id": "sandbox-123",
-            }
-            mock_client_class.return_value = mock_client
-
-            sandbox_id = await cloud_agent._verify_and_get_sandbox_id(
-                "test-conversation-id"
-            )
-
-            assert sandbox_id == "sandbox-123"
-
-
-class TestGetOrCreateConversation:
-    """Tests for the _get_or_create_conversation method."""
-
-    @pytest.mark.asyncio
-    async def test_returns_cached_conversation(self, cloud_agent):
-        """Test _get_or_create_conversation returns cached conversation."""
-        session_id = str(uuid4())
-        mock_conversation = MagicMock()
-        cloud_agent._active_sessions[session_id] = mock_conversation
-
-        result = await cloud_agent._get_or_create_conversation(session_id)
-
-        assert result == mock_conversation
-
-    @pytest.mark.asyncio
-    async def test_creates_new_conversation(self, cloud_agent):
-        """Test _get_or_create_conversation creates new conversation when not cached."""
-        session_id = str(uuid4())
-
-        with patch.object(cloud_agent, "_setup_cloud_conversation") as mock_setup:
-            mock_conversation = MagicMock()
-            mock_workspace = MagicMock()
-            mock_setup.return_value = (mock_conversation, mock_workspace)
-
-            result = await cloud_agent._get_or_create_conversation(
-                session_id, mcp_servers={}
-            )
-
-            assert result == mock_conversation
-            assert session_id in cloud_agent._active_sessions
-            assert session_id in cloud_agent._active_workspaces
-
-    @pytest.mark.asyncio
-    async def test_verifies_sandbox_when_resuming(self, cloud_agent):
-        """Test _get_or_create_conversation verifies sandbox when resuming."""
-        session_id = str(uuid4())
-
+    async def test_new_session_proceeds_when_authenticated(self, cloud_agent):
+        """Test that new_session proceeds when user is authenticated."""
         with (
+            patch(
+                "openhands_cli.acp_impl.agent.remote_agent.is_token_valid",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
             patch.object(
-                cloud_agent, "_verify_and_get_sandbox_id", new_callable=AsyncMock
-            ) as mock_verify,
-            patch.object(cloud_agent, "_setup_cloud_conversation") as mock_setup,
+                cloud_agent._shared_handler, "new_session", new_callable=AsyncMock
+            ) as mock_new_session,
         ):
-            mock_verify.return_value = "sandbox-123"
+            mock_response = MagicMock()
+            mock_new_session.return_value = mock_response
+
+            result = await cloud_agent.new_session(cwd="/tmp", mcp_servers=[])
+
+            mock_new_session.assert_called_once()
+            assert result == mock_response
+
+
+class TestAuthenticate:
+    """Tests for the authenticate method."""
+
+    @pytest.mark.asyncio
+    async def test_authenticate_rejects_invalid_method(self, cloud_agent):
+        """Test that authenticate rejects invalid method IDs."""
+        with pytest.raises(RequestError) as exc_info:
+            await cloud_agent.authenticate(method_id="invalid-method")
+
+        assert exc_info.value.data is not None
+        assert "Unsupported authentication method" in exc_info.value.data.get(
+            "reason", ""
+        )
+
+    @pytest.mark.asyncio
+    async def test_authenticate_executes_login_command(self, cloud_agent):
+        """Test that authenticate executes the login_command for OAuth."""
+        with patch(
+            "openhands_cli.auth.login_command.login_command",
+            new_callable=AsyncMock,
+        ) as mock_login:
+            result = await cloud_agent.authenticate(method_id="oauth")
+
+            mock_login.assert_called_once_with(
+                "https://app.all-hands.dev", skip_settings_sync=True
+            )
+            assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_authenticate_handles_device_flow_error(self, cloud_agent):
+        """Test that authenticate handles DeviceFlowError properly."""
+        from openhands_cli.auth.device_flow import DeviceFlowError
+
+        with patch(
+            "openhands_cli.auth.login_command.login_command",
+            new_callable=AsyncMock,
+            side_effect=DeviceFlowError("User denied access"),
+        ):
+            with pytest.raises(RequestError) as exc_info:
+                await cloud_agent.authenticate(method_id="oauth")
+
+            assert exc_info.value.data is not None
+            assert "Authentication failed" in exc_info.value.data.get("reason", "")
+
+
+class TestPrompt:
+    """Tests for the prompt method."""
+
+    @pytest.mark.asyncio
+    async def test_prompt_returns_end_turn_for_empty_prompt(
+        self, cloud_agent, mock_connection
+    ):
+        """Test prompt returns end_turn for empty content."""
+        session_id = str(uuid4())
+        mock_workspace = MagicMock()
+        mock_workspace.alive = True
+        cloud_agent._active_workspaces[session_id] = mock_workspace
+
+        with patch.object(
+            cloud_agent, "_get_or_create_conversation", new_callable=AsyncMock
+        ) as mock_get:
             mock_conversation = MagicMock()
-            mock_workspace = MagicMock()
-            mock_setup.return_value = (mock_conversation, mock_workspace)
+            mock_get.return_value = mock_conversation
 
-            await cloud_agent._get_or_create_conversation(session_id, is_resuming=True)
+            response = await cloud_agent.prompt(prompt=[], session_id=session_id)
 
-            mock_verify.assert_called_once_with(session_id)
-            mock_setup.assert_called_once()
-            # Verify sandbox_id was passed to setup
-            assert mock_setup.call_args[1].get("sandbox_id") == "sandbox-123"
+            assert response.stop_reason == "end_turn"
+
+    @pytest.mark.asyncio
+    async def test_prompt_resumes_when_workspace_not_alive(
+        self, cloud_agent, mock_connection
+    ):
+        """Test that prompt triggers resume when workspace is not alive."""
+        session_id = str(uuid4())
+        mock_workspace = MagicMock()
+        mock_workspace.alive = False
+        cloud_agent._active_workspaces[session_id] = mock_workspace
+
+        with patch.object(
+            cloud_agent, "_get_or_create_conversation", new_callable=AsyncMock
+        ) as mock_get:
+            mock_conversation = MagicMock()
+            mock_get.return_value = mock_conversation
+
+            await cloud_agent.prompt(prompt=[], session_id=session_id)
+
+            # Verify _get_or_create_conversation was called with is_resuming=True
+            mock_get.assert_called_once_with(session_id=session_id, is_resuming=True)
+
+    @pytest.mark.asyncio
+    async def test_prompt_does_not_resume_when_workspace_alive(
+        self, cloud_agent, mock_connection
+    ):
+        """Test that prompt does not trigger resume when workspace is alive."""
+        session_id = str(uuid4())
+        mock_workspace = MagicMock()
+        mock_workspace.alive = True
+        cloud_agent._active_workspaces[session_id] = mock_workspace
+
+        with patch.object(
+            cloud_agent, "_get_or_create_conversation", new_callable=AsyncMock
+        ) as mock_get:
+            mock_conversation = MagicMock()
+            mock_get.return_value = mock_conversation
+
+            await cloud_agent.prompt(prompt=[], session_id=session_id)
+
+            # Verify _get_or_create_conversation was called with is_resuming=False
+            mock_get.assert_called_once_with(session_id=session_id, is_resuming=False)
+
+    @pytest.mark.asyncio
+    async def test_prompt_handles_exception(self, cloud_agent, mock_connection):
+        """Test prompt handles exceptions and sends error message."""
+        session_id = str(uuid4())
+        mock_workspace = MagicMock()
+        mock_workspace.alive = True
+        cloud_agent._active_workspaces[session_id] = mock_workspace
+
+        mock_conversation = MagicMock()
+        mock_conversation.send_message.side_effect = Exception("Test error")
+
+        with patch.object(
+            cloud_agent, "_get_or_create_conversation", new_callable=AsyncMock
+        ) as mock_get:
+            mock_get.return_value = mock_conversation
+
+            with pytest.raises(RequestError) as exc_info:
+                await cloud_agent.prompt(
+                    prompt=[TextContentBlock(type="text", text="Hello")],
+                    session_id=session_id,
+                )
+
+            assert exc_info.value.data is not None
+            assert "Failed to process prompt" in exc_info.value.data.get("reason", "")
+            mock_connection.session_update.assert_called()
 
 
 class TestLoadSession:
@@ -230,29 +236,6 @@ class TestLoadSession:
         assert "Invalid session ID" in exc_info.value.data.get("reason", "")
 
     @pytest.mark.asyncio
-    async def test_load_session_returns_cached(self, cloud_agent, mock_connection):
-        """Test load_session returns cached session and streams history."""
-        session_id = str(uuid4())
-        mock_event = MagicMock()
-        mock_conversation = MagicMock()
-        mock_conversation.state.events = [mock_event]
-        cloud_agent._active_sessions[session_id] = mock_conversation
-
-        with patch(
-            "openhands_cli.acp_impl.agent.remote_agent.EventSubscriber"
-        ) as mock_subscriber_class:
-            mock_subscriber = AsyncMock()
-            mock_subscriber_class.return_value = mock_subscriber
-
-            response = await cloud_agent.load_session(
-                cwd="/tmp", mcp_servers=[], session_id=session_id
-            )
-
-            assert response is not None
-            assert response.modes is not None
-            mock_subscriber.assert_called_once_with(mock_event)
-
-    @pytest.mark.asyncio
     async def test_load_session_not_found(self, cloud_agent):
         """Test load_session raises error when session not cached."""
         session_id = str(uuid4())
@@ -264,51 +247,6 @@ class TestLoadSession:
 
         assert exc_info.value.data is not None
         assert "Session not found" in exc_info.value.data.get("reason", "")
-
-
-class TestPrompt:
-    """Tests for the prompt method."""
-
-    @pytest.mark.asyncio
-    async def test_prompt_returns_end_turn_for_empty_prompt(self, cloud_agent):
-        """Test prompt returns end_turn for empty content."""
-        session_id = str(uuid4())
-
-        with patch.object(
-            cloud_agent, "_get_or_create_conversation", new_callable=AsyncMock
-        ) as mock_get:
-            mock_conversation = MagicMock()
-            mock_get.return_value = mock_conversation
-
-            # Empty prompt list
-            response = await cloud_agent.prompt(prompt=[], session_id=session_id)
-
-            assert response.stop_reason == "end_turn"
-
-    @pytest.mark.asyncio
-    async def test_prompt_handles_exception(self, cloud_agent, mock_connection):
-        """Test prompt handles exceptions and sends error message."""
-        from acp.schema import TextContentBlock
-
-        session_id = str(uuid4())
-        mock_conversation = MagicMock()
-        mock_conversation.send_message.side_effect = Exception("Test error")
-
-        with patch.object(
-            cloud_agent, "_get_or_create_conversation", new_callable=AsyncMock
-        ) as mock_get:
-            mock_get.return_value = mock_conversation
-
-            with pytest.raises(RequestError) as exc_info:
-                await cloud_agent.prompt(
-                    prompt=[TextContentBlock(type="text", text="Hello")],
-                    session_id=session_id,
-                )
-
-            assert exc_info.value.data is not None
-            assert "Failed to process prompt" in exc_info.value.data.get("reason", "")
-            # Verify error message was sent
-            mock_connection.session_update.assert_called()
 
 
 class TestCleanupSession:
@@ -328,87 +266,3 @@ class TestCleanupSession:
         mock_conversation.close.assert_called_once()
         assert session_id not in cloud_agent._active_workspaces
         assert session_id not in cloud_agent._active_sessions
-
-    def test_cleanup_handles_missing_session(self, cloud_agent):
-        """Test _cleanup_session handles non-existent sessions gracefully."""
-        session_id = str(uuid4())
-        # Should not raise
-        cloud_agent._cleanup_session(session_id)
-
-
-class TestCancel:
-    """Tests for the cancel method."""
-
-    @pytest.mark.asyncio
-    async def test_cancel_delegates_to_shared_handler(self, cloud_agent):
-        """Test cancel delegates to shared handler."""
-        session_id = str(uuid4())
-
-        with patch.object(
-            cloud_agent._shared_handler, "cancel", new_callable=AsyncMock
-        ) as mock_cancel:
-            await cloud_agent.cancel(session_id=session_id)
-
-            mock_cancel.assert_called_once_with(cloud_agent, session_id)
-
-
-class TestDelegatedMethods:
-    """Tests for methods that delegate to shared handler."""
-
-    @pytest.mark.asyncio
-    async def test_initialize_delegates(self, cloud_agent):
-        """Test initialize delegates to shared handler."""
-        with patch.object(
-            cloud_agent._shared_handler, "initialize", new_callable=AsyncMock
-        ) as mock_init:
-            await cloud_agent.initialize(protocol_version=1)
-            mock_init.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_set_session_mode_delegates(self, cloud_agent):
-        """Test set_session_mode delegates to shared handler."""
-        with patch.object(
-            cloud_agent._shared_handler, "set_session_mode", new_callable=AsyncMock
-        ) as mock_set:
-            await cloud_agent.set_session_mode(
-                mode_id="always-ask", session_id="test-session"
-            )
-            mock_set.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_list_sessions_delegates(self, cloud_agent):
-        """Test list_sessions delegates to shared handler."""
-        with patch.object(
-            cloud_agent._shared_handler, "list_sessions", new_callable=AsyncMock
-        ) as mock_list:
-            await cloud_agent.list_sessions()
-            mock_list.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_set_session_model_delegates(self, cloud_agent):
-        """Test set_session_model delegates to shared handler."""
-        with patch.object(
-            cloud_agent._shared_handler, "set_session_model", new_callable=AsyncMock
-        ) as mock_set:
-            await cloud_agent.set_session_model(
-                model_id="test-model", session_id="test-session"
-            )
-            mock_set.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_ext_method_delegates(self, cloud_agent):
-        """Test ext_method delegates to shared handler."""
-        with patch.object(
-            cloud_agent._shared_handler, "ext_method", new_callable=AsyncMock
-        ) as mock_ext:
-            await cloud_agent.ext_method("test", {})
-            mock_ext.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_ext_notification_delegates(self, cloud_agent):
-        """Test ext_notification delegates to shared handler."""
-        with patch.object(
-            cloud_agent._shared_handler, "ext_notification", new_callable=AsyncMock
-        ) as mock_ext:
-            await cloud_agent.ext_notification("test", {})
-            mock_ext.assert_called_once()

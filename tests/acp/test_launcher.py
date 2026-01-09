@@ -13,9 +13,7 @@ def mock_acp_dependencies():
         patch(
             "openhands_cli.acp_impl.agent.launcher.stdio_streams"
         ) as mock_stdio_streams,
-        patch(
-            "openhands_cli.acp_impl.agent.launcher.AgentSideConnection"
-        ) as mock_conn,
+        patch("openhands_cli.acp_impl.agent.launcher.AgentSideConnection") as mock_conn,
         patch("openhands_cli.acp_impl.agent.launcher.asyncio.Event") as mock_event,
     ):
         mock_stdio_streams.return_value = (AsyncMock(), AsyncMock())
