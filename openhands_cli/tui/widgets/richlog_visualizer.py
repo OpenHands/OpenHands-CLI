@@ -101,8 +101,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._main_thread_id = threading.get_ident()
         # Cache CLI settings to avoid repeated file system reads
         self._cli_settings: CliSettings | None = None
-        # Track pending actions by tool_call_id for action-observation pairing
-        self._pending_actions: dict[str, tuple[ActionEvent, Collapsible]] = {}
+        # Track pending action collapsibles by tool_call_id for pairing with
+        # observations. The ActionEvent is retrieved from conversation state.
+        self._pending_action_widgets: dict[str, Collapsible] = {}
 
     @property
     def cli_settings(self) -> CliSettings:
@@ -147,6 +148,29 @@ class ConversationVisualizer(ConversationVisualizerBase):
         collapsible.update_content(new_content)
         self._container.scroll_end(animate=False)
 
+    def _find_action_event_by_tool_call_id(
+        self, tool_call_id: str
+    ) -> ActionEvent | None:
+        """Find an ActionEvent by tool_call_id from the conversation state.
+
+        Args:
+            tool_call_id: The tool_call_id to search for
+
+        Returns:
+            The matching ActionEvent, or None if not found
+        """
+        if (
+            not self._app.conversation_runner
+            or not self._app.conversation_runner.conversation
+        ):
+            return None
+
+        events = self._app.conversation_runner.conversation.state.events
+        for event in reversed(events):  # Search from most recent
+            if isinstance(event, ActionEvent) and event.tool_call_id == tool_call_id:
+                return event
+        return None
+
     def _handle_observation_event(
         self, event: ObservationEvent | UserRejectObservation | AgentErrorEvent
     ) -> bool:
@@ -155,10 +179,15 @@ class ConversationVisualizer(ConversationVisualizerBase):
         Returns True if the observation was paired with an action, False otherwise.
         """
         tool_call_id = event.tool_call_id
-        if tool_call_id not in self._pending_actions:
+        if tool_call_id not in self._pending_action_widgets:
             return False
 
-        action_event, collapsible = self._pending_actions.pop(tool_call_id)
+        collapsible = self._pending_action_widgets.pop(tool_call_id)
+
+        # Look up the action event from conversation state
+        action_event = self._find_action_event_by_tool_call_id(tool_call_id)
+        if not action_event:
+            return False
 
         # Determine success/error status
         is_error = isinstance(event, UserRejectObservation | AgentErrorEvent)
@@ -454,8 +483,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
             # Action events default to collapsed since we have summary in title
             collapsible = self._make_collapsible(content_string, title, event)
 
-            # Store for pairing with observation
-            self._pending_actions[event.tool_call_id] = (event, collapsible)
+            # Store widget for pairing with observation
+            self._pending_action_widgets[event.tool_call_id] = collapsible
 
             return collapsible
         elif isinstance(event, ObservationEvent):
