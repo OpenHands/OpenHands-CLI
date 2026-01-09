@@ -6,7 +6,7 @@ This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 import threading
 from typing import TYPE_CHECKING
 
-from textual.widgets import Static
+from textual.widgets import Markdown
 
 from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
 from openhands.sdk.event import (
@@ -270,8 +270,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """Escape Rich markup characters in text to prevent markup errors.
 
         This is needed to handle content with special characters (e.g., Chinese text
-        with brackets) that would otherwise cause MarkupError when rendered in Static
-        widgets with markup=True.
+        with brackets) that would otherwise cause MarkupError when rendered in
+        Collapsible widgets with markup=True.
         """
         # Escape square brackets which are used for Rich markup
         return text.replace("[", r"\[").replace("]", r"\]")
@@ -441,15 +441,15 @@ class ConversationVisualizer(ConversationVisualizerBase):
         if isinstance(event, ActionEvent):
             action = event.action
             if isinstance(action, FinishAction):
-                # For finish action, only show the message with padding to align
+                # For finish action, render as markdown with padding to align
                 # User message has "padding: 0 1" and starts with "> ", so text
                 # starts at position 3 (1 padding + 2 for "> ")
-                widget = Static(self._escape_rich_markup(str(action.message)))
+                widget = Markdown(str(action.message))
                 widget.styles.padding = AGENT_MESSAGE_PADDING
                 return widget
             elif isinstance(action, ThinkAction):
-                # For think action, show the action's visualize with padding
-                widget = Static(self._escape_rich_markup(str(action.visualize)))
+                # For think action, render as markdown with padding
+                widget = Markdown(str(action.visualize))
                 widget.styles.padding = AGENT_MESSAGE_PADDING
                 return widget
 
@@ -460,8 +460,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 and event.llm_message.role == "user"
             ):
                 return None
-            # Display messages as plain text
-            widget = Static(self._escape_rich_markup(str(content)))
+            # Display messages as markdown for proper rendering
+            widget = Markdown(str(content))
             widget.styles.padding = AGENT_MESSAGE_PADDING
             return widget
 
