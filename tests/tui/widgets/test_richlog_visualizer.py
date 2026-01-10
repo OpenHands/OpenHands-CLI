@@ -15,7 +15,11 @@ from openhands.sdk.event import ActionEvent
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.llm import MessageToolCall
 from openhands_cli.stores import CliSettings
-from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
+from openhands_cli.tui.widgets.richlog_visualizer import (
+    ELLIPSIS,
+    MAX_LINE_LENGTH,
+    ConversationVisualizer,
+)
 
 
 if TYPE_CHECKING:
@@ -572,12 +576,12 @@ class TestCommandTruncation:
         assert "..." not in title
 
     def test_long_command_truncated(self, visualizer):
-        """Test that commands exceeding 70 chars are truncated with ellipsis."""
+        """Test that commands exceeding MAX_LINE_LENGTH are truncated with ellipsis."""
         from openhands.tools.terminal.definition import TerminalAction
 
-        # Create a command longer than 70 characters
+        # Create a command longer than MAX_LINE_LENGTH characters
         long_cmd = "curl -X POST https://api.example.com/endpoint " + "-d " * 20
-        assert len(long_cmd) > 70
+        assert len(long_cmd) > MAX_LINE_LENGTH
 
         action = TerminalAction(command=long_cmd)
         tool_call = create_tool_call("call_1", "terminal")
@@ -608,7 +612,7 @@ This is line 2
 This is line 3
 And many more lines
 EOF"""
-        assert len(multiline_cmd) > 70
+        assert len(multiline_cmd) > MAX_LINE_LENGTH
 
         action = TerminalAction(command=multiline_cmd)
         tool_call = create_tool_call("call_1", "terminal")
@@ -629,12 +633,12 @@ EOF"""
         assert "\n" not in title
 
     def test_command_exactly_at_limit(self, visualizer):
-        """Test that commands exactly at 70 chars are not truncated."""
+        """Test that commands exactly at MAX_LINE_LENGTH are not truncated."""
         from openhands.tools.terminal.definition import TerminalAction
 
-        # Create a command exactly 70 characters
-        cmd = "a" * 70
-        assert len(cmd) == 70
+        # Create a command exactly MAX_LINE_LENGTH characters
+        cmd = "a" * MAX_LINE_LENGTH
+        assert len(cmd) == MAX_LINE_LENGTH
 
         action = TerminalAction(command=cmd)
         tool_call = create_tool_call("call_1", "terminal")
@@ -654,12 +658,12 @@ EOF"""
         assert cmd in title
 
     def test_command_one_over_limit_truncated(self, visualizer):
-        """Test that commands one char over 70 are truncated."""
+        """Test that commands one char over MAX_LINE_LENGTH are truncated."""
         from openhands.tools.terminal.definition import TerminalAction
 
-        # Create a command 71 characters (one over limit)
-        cmd = "a" * 71
-        assert len(cmd) == 71
+        # Create a command one over the limit
+        cmd = "a" * (MAX_LINE_LENGTH + 1)
+        assert len(cmd) == MAX_LINE_LENGTH + 1
 
         action = TerminalAction(command=cmd)
         tool_call = create_tool_call("call_1", "terminal")
@@ -675,9 +679,10 @@ EOF"""
 
         title = visualizer._build_action_title(action_event)
         # Should be truncated
-        assert "..." in title
-        # The truncated part should be 67 chars of 'a' + '...'
-        assert "a" * 67 + "..." in title
+        assert ELLIPSIS in title
+        # The truncated part should be (MAX_LINE_LENGTH - len(ELLIPSIS)) 'a' chars
+        truncated_length = MAX_LINE_LENGTH - len(ELLIPSIS)
+        assert "a" * truncated_length + ELLIPSIS in title
 
     def test_command_without_summary(self, visualizer):
         """Test truncation works when there's no summary (just $ command)."""
