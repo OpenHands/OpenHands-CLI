@@ -140,6 +140,8 @@ class HistorySidePanel(Container):
     DEFAULT_CSS = HISTORY_PANEL_STYLE
     INITIAL_VISIBLE = 10
     LOAD_MORE_STEP = 10
+    CLOUD_INITIAL_VISIBLE = 10
+    CLOUD_LOAD_MORE_STEP = 10
 
     def __init__(
         self,
@@ -162,6 +164,7 @@ class HistorySidePanel(Container):
         self._cloud_loading: bool = False
         self._cloud_error: str | None = None
         self._visible_count: int = self.INITIAL_VISIBLE
+        self._cloud_visible_count: int = self.CLOUD_INITIAL_VISIBLE
 
     @classmethod
     def toggle(
@@ -207,13 +210,12 @@ class HistorySidePanel(Container):
     def refresh_content(self) -> None:
         """Reload local conversations and render current visible slice."""
         self._local_rows = self._load_local_rows()
-        total_rows = len(self._local_rows) + len(self._cloud_rows)
-        if total_rows == 0:
+        if len(self._local_rows) == 0:
             self._visible_count = self.INITIAL_VISIBLE
         else:
             self._visible_count = min(
                 max(self._visible_count, self.INITIAL_VISIBLE),
-                total_rows,
+                len(self._local_rows),
             )
         self._render_list()
 
@@ -299,34 +301,7 @@ class HistorySidePanel(Container):
         list_container = self.query_one("#history-list", VerticalScroll)
         list_container.remove_children()
 
-        rows: list[HistoryConversationRow] = list(self._local_rows)
-
-        if self._cloud_loading:
-            rows.append(
-                HistoryConversationRow(
-                    select_id="cloud:loading",
-                    display_id="cloud",
-                    created_date=datetime.now(),
-                    first_user_prompt="Loading cloud conversations…",
-                    source=HistoryConversationRow.SOURCE_CLOUD,
-                )
-            )
-        elif self._cloud_error:
-            rows.append(
-                HistoryConversationRow(
-                    select_id="cloud:error",
-                    display_id="cloud",
-                    created_date=datetime.now(),
-                    first_user_prompt=f"Cloud unavailable: {self._cloud_error}",
-                    source=HistoryConversationRow.SOURCE_CLOUD,
-                )
-            )
-        else:
-            rows.extend(self._cloud_rows)
-
-        rows.sort(key=lambda r: r.created_date, reverse=True)
-
-        if not rows:
+        if not self._local_rows and not self._cloud_loading and not self._cloud_rows:
             list_container.mount(
                 Static(
                     f"[{OPENHANDS_THEME.warning}]No conversations yet.\n"
@@ -336,8 +311,6 @@ class HistorySidePanel(Container):
             )
             return
 
-        visible_items = rows[: self._visible_count]
-
         current_id_str = (
             self.current_conversation_id.hex if self.current_conversation_id else None
         )
@@ -345,15 +318,12 @@ class HistorySidePanel(Container):
             self.selected_conversation_id.hex if self.selected_conversation_id else None
         )
 
-        for conv in visible_items:
-            is_current = (
-                conv.source == HistoryConversationRow.SOURCE_LOCAL
-                and conv.select_id == current_id_str
-            )
+        # --- Local section ---
+        local_visible = self._local_rows[: self._visible_count]
+        for conv in local_visible:
+            is_current = conv.select_id == current_id_str
             is_selected = (
-                conv.source == HistoryConversationRow.SOURCE_LOCAL
-                and conv.select_id == selected_id_str
-                and selected_id_str is not None
+                conv.select_id == selected_id_str and selected_id_str is not None
             )
             list_container.mount(
                 HistoryItem(
@@ -364,12 +334,53 @@ class HistorySidePanel(Container):
                 )
             )
 
-        if self._visible_count < len(rows):
-            list_container.mount(MoreConversationsItem(self._load_more))
+        if self._visible_count < len(self._local_rows):
+            list_container.mount(MoreConversationsItem(self._load_more, label="… More"))
+
+        # --- Cloud section (always visible if authenticated/loading/error/has rows) ---
+        store = TokenStorage()
+        has_cloud = store.has_api_key() or self._cloud_loading or bool(self._cloud_rows)
+        if not has_cloud:
+            return
+
+        list_container.mount(Static("[dim]Cloud conversations[/dim]"))
+
+        if self._cloud_loading:
+            list_container.mount(Static("[dim]Loading cloud conversations…[/dim]"))
+            return
+
+        if self._cloud_error:
+            list_container.mount(
+                Static(f"[dim]Cloud unavailable: {self._cloud_error}[/dim]")
+            )
+            return
+
+        cloud_visible = self._cloud_rows[: self._cloud_visible_count]
+        for conv in cloud_visible:
+            list_container.mount(
+                HistoryItem(
+                    conversation=conv,
+                    is_current=False,
+                    is_selected=False,
+                    on_select=self._handle_select,
+                )
+            )
+
+        if self._cloud_visible_count < len(self._cloud_rows):
+            list_container.mount(
+                MoreConversationsItem(self._load_more_cloud, label="… More (cloud)")
+            )
 
     def _load_more(self) -> None:
         """Load the next chunk of conversations."""
         self._visible_count = self._visible_count + self.LOAD_MORE_STEP
+        self._render_list()
+
+    def _load_more_cloud(self) -> None:
+        """Load the next chunk of cloud conversations."""
+        self._cloud_visible_count = (
+            self._cloud_visible_count + self.CLOUD_LOAD_MORE_STEP
+        )
         self._render_list()
 
     def _handle_select(self, conversation_id: str) -> None:
@@ -458,9 +469,9 @@ class HistorySidePanel(Container):
 class MoreConversationsItem(Static):
     """A subtle 'More…' row to load more conversations."""
 
-    def __init__(self, on_click: Callable[[], None], **kwargs):
+    def __init__(self, on_click: Callable[[], None], label: str = "… More", **kwargs):
         super().__init__(
-            "[dim]… More[/dim]",
+            f"[dim]{label}[/dim]",
             markup=True,
             classes="history-more",
             **kwargs,
