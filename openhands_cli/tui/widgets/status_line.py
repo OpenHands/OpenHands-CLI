@@ -8,6 +8,7 @@ from textual.timer import Timer
 from textual.widgets import Static
 
 from openhands_cli.locations import WORK_DIR
+from openhands_cli.utils import abbreviate_number, format_cost
 
 
 if TYPE_CHECKING:
@@ -98,7 +99,7 @@ class WorkingStatusLine(Static):
 
 
 class InfoStatusLine(Static):
-    """Status line showing work directory and input mode (below input)."""
+    """Status line showing work directory, input mode, and conversation metrics."""
 
     DEFAULT_CSS = """
     #info_status_line {
@@ -114,6 +115,13 @@ class InfoStatusLine(Static):
         self.main_app = app
         self.mode_indicator = "[Ctrl+L for multi-line]"
         self.work_dir_display = self._get_work_dir_display()
+        # Conversation metrics
+        self._input_tokens: int = 0
+        self._output_tokens: int = 0
+        self._cache_hit_rate: str = "N/A"
+        self._reasoning_tokens: int = 0
+        self._accumulated_cost: float = 0.0
+        self._metrics_update_timer: Timer | None = None
 
     def on_mount(self) -> None:
         """Initialize the info status line."""
@@ -121,6 +129,52 @@ class InfoStatusLine(Static):
         self.main_app.input_field.mutliline_mode_status.subscribe(
             self, self._on_handle_mutliline_mode
         )
+        self.main_app.conversation_running_signal.subscribe(
+            self, self._on_conversation_state_changed
+        )
+
+    def on_unmount(self) -> None:
+        """Stop timer when widget is removed."""
+        if self._metrics_update_timer:
+            self._metrics_update_timer.stop()
+            self._metrics_update_timer = None
+
+    def _on_conversation_state_changed(self, is_running: bool) -> None:
+        """Update metrics display when conversation state changes."""
+        if is_running:
+            # Start periodic metrics updates while conversation is running
+            if self._metrics_update_timer:
+                self._metrics_update_timer.stop()
+            self._metrics_update_timer = self.set_interval(1.0, self._update_metrics)
+        else:
+            # Stop timer and do final metrics update
+            if self._metrics_update_timer:
+                self._metrics_update_timer.stop()
+                self._metrics_update_timer = None
+            self._update_metrics()
+
+    def _update_metrics(self) -> None:
+        """Update the conversation metrics from conversation stats."""
+        if self.main_app.conversation_runner:
+            visualizer = self.main_app.conversation_runner.visualizer
+            stats = visualizer.conversation_stats
+            if stats:
+                combined_metrics = stats.get_combined_metrics()
+                if combined_metrics:
+                    self._accumulated_cost = combined_metrics.accumulated_cost or 0.0
+                    usage = combined_metrics.accumulated_token_usage
+                    if usage:
+                        self._input_tokens = usage.prompt_tokens or 0
+                        self._output_tokens = usage.completion_tokens or 0
+                        self._reasoning_tokens = usage.reasoning_tokens or 0
+                        # Calculate cache hit rate
+                        prompt = usage.prompt_tokens or 0
+                        cache_read = usage.cache_read_tokens or 0
+                        if prompt > 0:
+                            self._cache_hit_rate = f"{(cache_read / prompt * 100):.2f}%"
+                        else:
+                            self._cache_hit_rate = "N/A"
+        self._update_text()
 
     def _on_handle_mutliline_mode(self, is_multiline_mode: bool) -> None:
         if is_multiline_mode:
@@ -137,7 +191,19 @@ class InfoStatusLine(Static):
             work_dir = work_dir.replace(home, "~", 1)
         return work_dir
 
+    def _format_metrics_display(self) -> str:
+        """Format the conversation metrics for display."""
+        parts = []
+        parts.append(f"↑ input {abbreviate_number(self._input_tokens)}")
+        parts.append(f"cache hit {self._cache_hit_rate}")
+        if self._reasoning_tokens > 0:
+            parts.append(f"reasoning {abbreviate_number(self._reasoning_tokens)}")
+        parts.append(f"↓ output {abbreviate_number(self._output_tokens)}")
+        parts.append(f"$ {format_cost(self._accumulated_cost)}")
+        return " • ".join(parts)
+
     def _update_text(self) -> None:
         """Rebuild the info status text."""
-        status_text = f"{self.mode_indicator} • {self.work_dir_display}"
+        metrics_display = self._format_metrics_display()
+        status_text = f"{self.work_dir_display}    {metrics_display}"
         self.update(status_text)

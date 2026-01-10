@@ -30,6 +30,7 @@ from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
 )
+from openhands_cli.utils import abbreviate_number, format_cost
 
 
 # Icons for different event types
@@ -526,21 +527,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         usage = combined_metrics.accumulated_token_usage
         cost = combined_metrics.accumulated_cost or 0.0
 
-        # helper: 1234 -> "1.2K", 1200000 -> "1.2M"
-        def abbr(n: int | float) -> str:
-            n = int(n or 0)
-            if n >= 1_000_000_000:
-                val, suffix = n / 1_000_000_000, "B"
-            elif n >= 1_000_000:
-                val, suffix = n / 1_000_000, "M"
-            elif n >= 1_000:
-                val, suffix = n / 1_000, "K"
-            else:
-                return str(n)
-            return f"{val:.2f}".rstrip("0").rstrip(".") + suffix
-
-        input_tokens = abbr(usage.prompt_tokens or 0)
-        output_tokens = abbr(usage.completion_tokens or 0)
+        input_tokens = abbreviate_number(usage.prompt_tokens or 0)
+        output_tokens = abbreviate_number(usage.completion_tokens or 0)
 
         # Cache hit rate (prompt + cache)
         prompt = usage.prompt_tokens or 0
@@ -548,30 +536,19 @@ class ConversationVisualizer(ConversationVisualizerBase):
         cache_rate = f"{(cache_read / prompt * 100):.2f}%" if prompt > 0 else "N/A"
         reasoning_tokens = usage.reasoning_tokens or 0
 
-        # Cost
-        cost_str = f"{cost:.4f}" if cost > 0 else "0.00"
-
         # Build with theme color scheme
         parts: list[str] = []
-        parts.append(
-            f"[{OPENHANDS_THEME.accent}]↑ input {input_tokens}"
-            f"[/{OPENHANDS_THEME.accent}]"
-        )
-        parts.append(
-            f"[{OPENHANDS_THEME.primary}]cache hit {cache_rate}"
-            f"[/{OPENHANDS_THEME.primary}]"
-        )
+        accent = OPENHANDS_THEME.accent
+        primary = OPENHANDS_THEME.primary
+        warning = OPENHANDS_THEME.warning
+        success = OPENHANDS_THEME.success
+
+        parts.append(f"[{accent}]↑ input {input_tokens}[/{accent}]")
+        parts.append(f"[{primary}]cache hit {cache_rate}[/{primary}]")
         if reasoning_tokens > 0:
-            parts.append(
-                f"[{OPENHANDS_THEME.warning}] reasoning {abbr(reasoning_tokens)}"
-                f"[/{OPENHANDS_THEME.warning}]"
-            )
-        parts.append(
-            f"[{OPENHANDS_THEME.accent}]↓ output {output_tokens}"
-            f"[/{OPENHANDS_THEME.accent}]"
-        )
-        parts.append(
-            f"[{OPENHANDS_THEME.success}]$ {cost_str}[/{OPENHANDS_THEME.success}]"
-        )
+            reasoning_abbr = abbreviate_number(reasoning_tokens)
+            parts.append(f"[{warning}] reasoning {reasoning_abbr}[/{warning}]")
+        parts.append(f"[{accent}]↓ output {output_tokens}[/{accent}]")
+        parts.append(f"[{success}]$ {format_cost(cost)}[/{success}]")
 
         return "Tokens: " + " • ".join(parts)
