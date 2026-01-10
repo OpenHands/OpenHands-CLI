@@ -81,29 +81,3 @@ class AutoGrowTextArea(TextArea):
             event.prevent_default()
             event.stop()
         # For single-line content, let the default paste behavior handle it
-
-    def _get_line_offsets(self) -> list[int]:
-        """Get cached line start offsets for efficient cursor position calculation.
-
-        Returns a list where index i contains the character offset where line i starts.
-        This is cached and invalidated when text changes.
-        """
-        current_text = self.text
-        if (
-            self._cached_line_offsets is not None
-            and self._cached_text_for_offsets == current_text
-        ):
-            return self._cached_line_offsets
-
-        # Compute line offsets: offset[i] = character position where line i starts
-        offsets = [0]
-        pos = 0
-        for char in current_text:
-            pos += 1
-            if char == "\n":
-                offsets.append(pos)
-
-        self._cached_line_offsets = offsets
-        self._cached_text_for_offsets = current_text
-        return offsets
-

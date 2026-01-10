@@ -245,9 +245,8 @@ class InputField(Container):
         # Only handle when in single-line mode
         if not self.is_multiline_mode:
             # Get current text and cursor position before switching modes
-            current_text = self.input_widget.text
             self.input_widget.insert(
-                event.text, 
+                event.text,
                 self.input_widget.cursor_location,
             )
             # Switch to multi-line mode
