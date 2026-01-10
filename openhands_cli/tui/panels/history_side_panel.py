@@ -11,7 +11,7 @@ from datetime import datetime
 from textual.app import App
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.css.query import NoMatches
-from textual.widgets import Static
+from textual.widgets import Static, TabbedContent, TabPane
 
 from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.cloud.lister import CloudConversationLister
@@ -199,7 +199,11 @@ class HistorySidePanel(Container):
     def compose(self):
         """Compose the history side panel content."""
         yield Static("Conversations", classes="history-header", id="history-header")
-        yield VerticalScroll(id="history-list")
+        with TabbedContent(id="history-tabs"):
+            with TabPane("Local", id="history_tab_local"):
+                yield VerticalScroll(id="history-list-local")
+            with TabPane("Cloud", id="history_tab_cloud"):
+                yield VerticalScroll(id="history-list-cloud")
 
     def on_mount(self):
         """Called when the panel is mounted."""
@@ -297,11 +301,16 @@ class HistorySidePanel(Container):
             self.app.call_from_thread(_apply_error)
 
     def _render_list(self) -> None:
-        """Render the current visible slice of conversations."""
-        list_container = self.query_one("#history-list", VerticalScroll)
+        """Render both tab lists (Local and Cloud)."""
+        self._render_local_list()
+        self._render_cloud_list()
+
+    def _render_local_list(self) -> None:
+        """Render the Local tab conversation list."""
+        list_container = self.query_one("#history-list-local", VerticalScroll)
         list_container.remove_children()
 
-        if not self._local_rows and not self._cloud_loading and not self._cloud_rows:
+        if not self._local_rows:
             list_container.mount(
                 Static(
                     f"[{OPENHANDS_THEME.warning}]No conversations yet.\n"
@@ -318,7 +327,6 @@ class HistorySidePanel(Container):
             self.selected_conversation_id.hex if self.selected_conversation_id else None
         )
 
-        # --- Local section ---
         local_visible = self._local_rows[: self._visible_count]
         for conv in local_visible:
             is_current = conv.select_id == current_id_str
@@ -335,15 +343,21 @@ class HistorySidePanel(Container):
             )
 
         if self._visible_count < len(self._local_rows):
-            list_container.mount(MoreConversationsItem(self._load_more, label="… More"))
+            list_container.mount(
+                MoreConversationsItem(self._load_more_local, label="… More")
+            )
 
-        # --- Cloud section (always visible if authenticated/loading/error/has rows) ---
+    def _render_cloud_list(self) -> None:
+        """Render the Cloud tab conversation list (best-effort)."""
+        list_container = self.query_one("#history-list-cloud", VerticalScroll)
+        list_container.remove_children()
+
         store = TokenStorage()
-        has_cloud = store.has_api_key() or self._cloud_loading or bool(self._cloud_rows)
-        if not has_cloud:
+        if not store.has_api_key() and not self._cloud_loading and not self._cloud_rows:
+            list_container.mount(
+                Static("[dim]Not logged in. Run `openhands login`.[/dim]")
+            )
             return
-
-        list_container.mount(Static("[dim]Cloud conversations[/dim]"))
 
         if self._cloud_loading:
             list_container.mount(Static("[dim]Loading cloud conversations…[/dim]"))
@@ -353,6 +367,10 @@ class HistorySidePanel(Container):
             list_container.mount(
                 Static(f"[dim]Cloud unavailable: {self._cloud_error}[/dim]")
             )
+            return
+
+        if not self._cloud_rows:
+            list_container.mount(Static("[dim]No cloud conversations found.[/dim]"))
             return
 
         cloud_visible = self._cloud_rows[: self._cloud_visible_count]
@@ -368,11 +386,11 @@ class HistorySidePanel(Container):
 
         if self._cloud_visible_count < len(self._cloud_rows):
             list_container.mount(
-                MoreConversationsItem(self._load_more_cloud, label="… More (cloud)")
+                MoreConversationsItem(self._load_more_cloud, label="… More")
             )
 
-    def _load_more(self) -> None:
-        """Load the next chunk of conversations."""
+    def _load_more_local(self) -> None:
+        """Load the next chunk of local conversations."""
         self._visible_count = self._visible_count + self.LOAD_MORE_STEP
         self._render_list()
 
@@ -408,13 +426,8 @@ class HistorySidePanel(Container):
         selected_hex = (
             self.selected_conversation_id.hex if self.selected_conversation_id else None
         )
-        list_container = self.query_one("#history-list", VerticalScroll)
+        list_container = self.query_one("#history-list-local", VerticalScroll)
         for item in list_container.query(HistoryItem):
-            # Only local conversations participate in current/selected highlighting.
-            if item.conversation_id.startswith("cloud:"):
-                item.set_current(False)
-                item.set_selected(False)
-                continue
             item.set_current(item.conversation_id == current_hex)
             item.set_selected(item.conversation_id == selected_hex)
 
@@ -457,7 +470,7 @@ class HistorySidePanel(Container):
                 )
                 break
 
-        list_container = self.query_one("#history-list", VerticalScroll)
+        list_container = self.query_one("#history-list-local", VerticalScroll)
         for item in list_container.query(HistoryItem):
             if item.conversation_id != conv_hex:
                 continue
@@ -487,7 +500,9 @@ class MoreConversationsItem(Static):
 
 def _format_time(dt: datetime) -> str:
     """Format datetime for display."""
-    now = datetime.now()
+    # Be defensive: dt can be timezone-aware (cloud) while now() is naive.
+    # Normalize now to dt's timezone if needed.
+    now = datetime.now(dt.tzinfo) if dt.tzinfo is not None else datetime.now()
     diff = now - dt
 
     if diff.days == 0:
