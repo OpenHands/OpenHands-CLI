@@ -640,3 +640,27 @@ EOF"""
         title = visualizer._build_action_title(action_event)
         assert title.startswith("$ ")
         assert "..." in title
+
+    def test_truncate_from_end_for_paths(self, visualizer):
+        """Test that path truncation keeps the end (filename) and truncates start."""
+        # Create a path that exceeds MAX_LINE_LENGTH (70 chars)
+        long_path = (
+            "/very/long/directory/structure/with/many/nested/folders/extras/file.txt"
+        )
+        assert len(long_path) > MAX_LINE_LENGTH, f"Path length is {len(long_path)}"
+        truncated = visualizer._truncate_for_display(long_path, from_start=False)
+
+        # Should keep the end (filename) and add ellipsis at start
+        assert truncated.startswith(ELLIPSIS)
+        assert truncated.endswith("file.txt")
+        assert len(truncated) == MAX_LINE_LENGTH
+
+    def test_truncate_from_start_default(self, visualizer):
+        """Test default truncation keeps start and adds ellipsis at end."""
+        long_text = "a" * 100
+        truncated = visualizer._truncate_for_display(long_text)
+
+        # Should keep start and add ellipsis at end
+        assert truncated.endswith(ELLIPSIS)
+        assert truncated.startswith("a")
+        assert len(truncated) == MAX_LINE_LENGTH

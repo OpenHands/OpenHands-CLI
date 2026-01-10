@@ -243,11 +243,21 @@ class ConversationVisualizer(ConversationVisualizerBase):
         return text.replace("[", r"\[").replace("]", r"\]")
 
     def _truncate_for_display(
-        self, text: str, max_length: int = MAX_LINE_LENGTH
+        self, text: str, max_length: int = MAX_LINE_LENGTH, *, from_start: bool = True
     ) -> str:
-        """Truncate text with ellipsis if it exceeds max_length."""
+        """Truncate text with ellipsis if it exceeds max_length.
+
+        Args:
+            text: The text to truncate.
+            max_length: Maximum length before truncation.
+            from_start: If True, keep the start and add ellipsis at end.
+                       If False, keep the end and add ellipsis at start (for paths).
+        """
         if len(text) > max_length:
-            return text[: max_length - len(ELLIPSIS)] + ELLIPSIS
+            if from_start:
+                return text[: max_length - len(ELLIPSIS)] + ELLIPSIS
+            else:
+                return ELLIPSIS + text[-(max_length - len(ELLIPSIS)) :]
         return text
 
     def _extract_meaningful_title(self, event, fallback_title: str) -> str:
@@ -269,26 +279,22 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if hasattr(action, "command") and action.command:
                 # For command actions, show the command
                 cmd = str(action.command).strip()
-                if len(cmd) > 50:
-                    cmd = cmd[:47] + "..."
+                cmd = self._truncate_for_display(cmd)
                 return f"{action_type}: {self._escape_rich_markup(cmd)}"
             elif hasattr(action, "path") and action.path:
-                # For file actions, show the path
+                # For file actions, show the path (truncate from start to show filename)
                 path = str(action.path)
-                if len(path) > 50:
-                    path = "..." + path[-47:]  # Show end of path if too long
+                path = self._truncate_for_display(path, from_start=False)
                 return f"{action_type}: {self._escape_rich_markup(path)}"
             elif hasattr(action, "content") and action.content:
                 # For content-based actions, show truncated content
                 content = str(action.content).strip().replace("\n", " ")
-                if len(content) > 50:
-                    content = content[:47] + "..."
+                content = self._truncate_for_display(content)
                 return f"{action_type}: {self._escape_rich_markup(content)}"
             elif hasattr(action, "message") and action.message:
                 # For message actions, show truncated message
                 msg = str(action.message).strip().replace("\n", " ")
-                if len(msg) > 50:
-                    msg = msg[:47] + "..."
+                msg = self._truncate_for_display(msg)
                 return f"{action_type}: {self._escape_rich_markup(msg)}"
             else:
                 return f"{action_type} Action"
@@ -300,8 +306,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
             if hasattr(obs, "content") and obs.content:
                 content = str(obs.content).strip().replace("\n", " ")
-                if len(content) > 50:
-                    content = content[:47] + "..."
+                content = self._truncate_for_display(content)
                 return f"{obs_type}: {self._escape_rich_markup(content)}"
             else:
                 return f"{obs_type} Observation"
