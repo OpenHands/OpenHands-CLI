@@ -13,12 +13,13 @@ import uuid
 from collections.abc import Iterable
 from typing import ClassVar
 
-from textual import getters, on
+from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.screen import Screen
 from textual.signal import Signal
-from textual.widgets import Footer, Static
+from textual.widgets import Footer, Input, Static, TextArea
+from textual_autocomplete import AutoComplete
 
 from openhands.sdk.event import ActionEvent
 from openhands.sdk.security.confirmation_policy import (
@@ -29,18 +30,20 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.splash import get_splash_content
+from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModal
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
-from openhands_cli.tui.panels.confirmation_panel import ConfirmationSidePanel
+from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
-from openhands_cli.tui.widgets import InputField
-from openhands_cli.tui.widgets.non_clickable_collapsible import (
-    NonClickableCollapsible,
+from openhands_cli.tui.widgets.collapsible import (
+    Collapsible,
+    CollapsibleNavigationMixin,
+    CollapsibleTitle,
 )
+from openhands_cli.tui.widgets.input_field import InputField
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.tui.widgets.status_line import (
     InfoStatusLine,
@@ -50,13 +53,13 @@ from openhands_cli.user_actions.types import UserConfirmation
 from openhands_cli.utils import json_callback
 
 
-class OpenHandsApp(App):
+class OpenHandsApp(CollapsibleNavigationMixin, App):
     """A minimal textual app for OpenHands CLI with scrollable main display."""
 
     # Key bindings
     BINDINGS: ClassVar = [
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
-        ("ctrl+o", "expand_all", "Expand the cells"),
+        ("ctrl+o", "toggle_cells", "Toggle Cells"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
@@ -126,7 +129,7 @@ class OpenHandsApp(App):
         )
 
         # Confirmation panel tracking
-        self.confirmation_panel: ConfirmationSidePanel | None = None
+        self.confirmation_panel: InlineConfirmationPanel | None = None
 
         # MCP panel tracking
         self.mcp_panel: MCPSidePanel | None = None
@@ -282,9 +285,30 @@ class OpenHandsApp(App):
 
         # Open the settings screen for existing users
         settings_screen = SettingsScreen(
-            on_settings_saved=[self._reload_visualizer],
+            on_settings_saved=[
+                self._reload_visualizer,
+                self._notify_restart_required,
+            ],
         )
         self.push_screen(settings_screen)
+
+    def _notify_restart_required(self) -> None:
+        """Notify user that CLI restart is required for agent settings changes.
+
+        Only shows notification if a conversation runner has been instantiated,
+        meaning a conversation has already started with the previous settings.
+
+        Note: This callback is only registered for `action_open_settings` (existing
+        users), not for `_show_initial_settings` (first-time setup). Additionally,
+        during first-time setup, conversation_runner is always None, so even if
+        this method were called, no notification would be shown.
+        """
+        if self.conversation_runner:
+            self.notify(
+                "Settings saved. Please restart the CLI for changes to take effect.",
+                severity="information",
+                timeout=10.0,
+            )
 
     def _initialize_main_ui(self) -> None:
         """Initialize the main UI components."""
@@ -362,7 +386,9 @@ class OpenHandsApp(App):
         user_input = self.pending_inputs.pop(0)
 
         # Add the user message to the main display as a Static widget
-        user_message_widget = Static(f"> {user_input}", classes="user-message")
+        user_message_widget = Static(
+            f"> {user_input}", classes="user-message", markup=False
+        )
         self.main_display.mount(user_message_widget)
         self.main_display.scroll_end(animate=False)
 
@@ -376,7 +402,9 @@ class OpenHandsApp(App):
             return
 
         # Add the user message to the main display as a Static widget
-        user_message_widget = Static(f"> {content}", classes="user-message")
+        user_message_widget = Static(
+            f"> {content}", classes="user-message", markup=False
+        )
         await self.main_display.mount(user_message_widget)
         self.main_display.scroll_end(animate=False)
         # Force immediate refresh to show the message without delay
@@ -394,10 +422,14 @@ class OpenHandsApp(App):
 
         if command == "/help":
             show_help(self.main_display)
+        elif command == "/new":
+            self._handle_new_command()
         elif command == "/confirm":
             self._handle_confirm_command()
         elif command == "/condense":
             self._handle_condense_command()
+        elif command == "/feedback":
+            self._handle_feedback_command()
         elif command == "/exit":
             self._handle_exit()
         else:
@@ -441,16 +473,126 @@ class OpenHandsApp(App):
         """Action to handle Ctrl+Q key binding."""
         self._handle_exit()
 
-    def action_expand_all(self) -> None:
-        """Action to handle Ctrl+E key binding - toggle expand/collapse all
-        collapsible widgets."""
-        collapsibles = self.main_display.query(NonClickableCollapsible)
+    def action_toggle_cells(self) -> None:
+        """Action to handle Ctrl+O key binding.
 
-        # Check if any are expanded - if so, collapse all; otherwise expand all
+        Collapses all cells if any are expanded, otherwise expands all cells.
+        This provides a quick way to minimize or maximize all content at once.
+        """
+        collapsibles = self.main_display.query(Collapsible)
+
+        # If any cell is expanded, collapse all; otherwise expand all
         any_expanded = any(not collapsible.collapsed for collapsible in collapsibles)
 
         for collapsible in collapsibles:
             collapsible.collapsed = any_expanded
+
+    def on_key(self, event: events.Key) -> None:
+        """Handle keyboard navigation.
+
+        - Auto-focus input when user starts typing (allows clicking cells without
+          losing typing context)
+        - When Tab is pressed from input area, focus the most recent (last) cell
+          instead of the first one (unless autocomplete is showing)
+        """
+        # Handle Tab from input area - focus most recent cell
+        # Skip if autocomplete dropdown is visible (Tab is used for selection)
+        if event.key == "tab" and isinstance(self.focused, Input | TextArea):
+            if not self._is_autocomplete_showing():
+                collapsibles = list(self.main_display.query(Collapsible))
+                if collapsibles:
+                    # Focus the last (most recent) collapsible's title
+                    last_collapsible = collapsibles[-1]
+                    last_title = last_collapsible.query_one(CollapsibleTitle)
+                    last_title.focus()
+                    last_collapsible.scroll_visible()
+                    event.stop()
+                    event.prevent_default()
+                    return
+
+        # Auto-focus input when user types printable characters
+        if event.is_printable and not isinstance(self.focused, Input | TextArea):
+            self.input_field.focus_input()
+
+    def _is_autocomplete_showing(self) -> bool:
+        """Check if the autocomplete dropdown is currently visible.
+
+        This prevents Tab key interception when user wants to select an
+        autocomplete suggestion.
+        """
+        autocompletes = self.query(AutoComplete)
+        return any(ac.display for ac in autocompletes)
+
+    def on_mouse_up(self, _event: events.MouseUp) -> None:
+        """Handle mouse up events for auto-copy on text selection.
+
+        When the user finishes selecting text by releasing the mouse button,
+        this method checks if there's selected text and copies it to clipboard.
+        """
+        # Get selected text from the screen
+        selected_text = self.screen.get_selected_text()
+        if not selected_text:
+            return
+
+        # Copy to clipboard and get result
+        pyperclip_success = self._copy_to_clipboard(selected_text)
+
+        # Show appropriate notification based on copy result
+        if pyperclip_success:
+            self.notify(
+                "Selection copied to clipboard",
+                title="Auto-copy",
+                timeout=2,
+            )
+        elif self._is_linux():
+            # On Linux without pyperclip working, OSC 52 may or may not work
+            self.notify(
+                "Selection copied. May require `sudo apt install xclip`",
+                title="Auto-copy",
+                timeout=4,
+            )
+        else:
+            self.notify(
+                "Selection copied to clipboard",
+                title="Auto-copy",
+                timeout=2,
+            )
+
+    def _is_linux(self) -> bool:
+        """Check if the current platform is Linux."""
+        import platform
+
+        return platform.system() == "Linux"
+
+    def _copy_to_clipboard(self, text: str) -> bool:
+        """Copy text to clipboard using pyperclip with OSC 52 fallback.
+
+        Uses a two-layer approach for clipboard access:
+        1. Primary: pyperclip for direct OS clipboard access
+        2. Fallback: Textual's copy_to_clipboard (OSC 52 escape sequence)
+
+        This ensures clipboard works across different terminal environments.
+
+        Returns:
+            True if pyperclip succeeded, False otherwise.
+        """
+        import pyperclip
+
+        pyperclip_success = False
+        # Primary: Try pyperclip for direct OS clipboard access
+        try:
+            pyperclip.copy(text)
+            pyperclip_success = True
+        except pyperclip.PyperclipException:
+            # pyperclip failed - will try OSC 52 fallback
+            pass
+
+        # Also try OSC 52 - this doesn't raise errors, it just sends escape
+        # sequences. We do both because pyperclip and OSC 52 can target
+        # different clipboards (e.g., remote terminals, tmux, SSH sessions)
+        self.copy_to_clipboard(text)
+
+        return pyperclip_success
 
     def action_pause_conversation(self) -> None:
         """Action to handle Esc key binding - pause the running conversation."""
@@ -514,10 +656,80 @@ class OpenHandsApp(App):
         # This will handle all error cases and notifications
         asyncio.create_task(self.conversation_runner.condense_async())
 
+    def _handle_feedback_command(self) -> None:
+        """Handle the /feedback command to open feedback form in browser."""
+        import webbrowser
+
+        feedback_url = "https://forms.gle/chHc5VdS3wty5DwW6"
+        webbrowser.open(feedback_url)
+        self.notify(
+            title="Feedback",
+            message="Opening feedback form in your browser...",
+            severity="information",
+        )
+
+    def _handle_new_command(self) -> None:
+        """Handle the /new command to start a new conversation.
+
+        This clears the terminal UI and starts a fresh conversation runner.
+        """
+        # Check if a conversation is currently running
+        if self.conversation_runner and self.conversation_runner.is_running:
+            self.notify(
+                title="New Conversation Error",
+                message="Cannot start a new conversation while one is running. "
+                "Please wait for the current conversation to complete or pause it.",
+                severity="error",
+            )
+            return
+
+        # Generate a new conversation ID
+        self.conversation_id = uuid.uuid4()
+
+        # Reset the conversation runner
+        self.conversation_runner = None
+
+        # Remove any existing confirmation panel
+        if self.confirmation_panel:
+            self.confirmation_panel.remove()
+            self.confirmation_panel = None
+
+        # Clear all dynamically added widgets from main_display
+        # Keep only the splash widgets (those with IDs starting with "splash_")
+        widgets_to_remove = []
+        for widget in self.main_display.children:
+            widget_id = widget.id or ""
+            if not widget_id.startswith("splash_"):
+                widgets_to_remove.append(widget)
+
+        for widget in widgets_to_remove:
+            widget.remove()
+
+        # Update the splash conversation widget with the new conversation ID
+        splash_conversation = self.query_one("#splash_conversation", Static)
+        splash_conversation.update(
+            get_conversation_text(self.conversation_id.hex, theme=OPENHANDS_THEME)
+        )
+
+        # Scroll to top to show the splash screen
+        self.main_display.scroll_home(animate=False)
+
+        # Notify user
+        self.notify(
+            title="New Conversation",
+            message="Started a new conversation",
+            severity="information",
+        )
+
     def _handle_confirmation_request(
         self, pending_actions: list[ActionEvent]
     ) -> UserConfirmation:
-        """Handle confirmation request by showing the side panel.
+        """Handle confirmation request by showing an inline panel in the main display.
+
+        The inline confirmation panel is mounted in the main_display area,
+        underneath the latest action event collapsible. Since the action details
+        are already visible in the collapsible above, this panel only shows
+        the confirmation options.
 
         Args:
             pending_actions: List of pending actions that need confirmation
@@ -533,7 +745,7 @@ class OpenHandsApp(App):
         decision_future: Future[UserConfirmation] = Future()
 
         def show_confirmation_panel():
-            """Show the confirmation panel in the UI thread."""
+            """Show the inline confirmation panel in the UI thread."""
             try:
                 # Remove any existing confirmation panel
                 if self.confirmation_panel:
@@ -550,11 +762,14 @@ class OpenHandsApp(App):
                     if not decision_future.done():
                         decision_future.set_result(decision)
 
-                # Create and mount the confirmation panel
-                self.confirmation_panel = ConfirmationSidePanel(
-                    pending_actions, on_confirmation_decision
+                # Create and mount the inline confirmation panel in main_display
+                # This places it underneath the latest action event collapsible
+                self.confirmation_panel = InlineConfirmationPanel(
+                    len(pending_actions), on_confirmation_decision
                 )
-                self.content_area.mount(self.confirmation_panel)
+                self.main_display.mount(self.confirmation_panel)
+                # Scroll to show the confirmation panel
+                self.main_display.scroll_end(animate=False)
 
             except Exception:
                 # If there's an error, default to DEFER

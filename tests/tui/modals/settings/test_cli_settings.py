@@ -12,11 +12,17 @@ class TestCliSettings:
     def test_defaults(self):
         cfg = CliSettings()
         assert cfg.display_cost_per_action is False
+        assert cfg.default_cells_expanded is True
 
     @pytest.mark.parametrize("value", [True, False])
     def test_model_accepts_bool(self, value: bool):
         cfg = CliSettings(display_cost_per_action=value)
         assert cfg.display_cost_per_action is value
+
+    @pytest.mark.parametrize("value", [True, False])
+    def test_default_cells_expanded_accepts_bool(self, value: bool):
+        cfg = CliSettings(default_cells_expanded=value)
+        assert cfg.default_cells_expanded is value
 
     @pytest.mark.parametrize(
         "env_value, expected",
@@ -101,13 +107,13 @@ class TestCliSettings:
 
     def test_save_writes_expected_json_format(self, tmp_path: Path):
         config_path = tmp_path / "cli_config.json"
-        cfg = CliSettings(display_cost_per_action=True)
+        cfg = CliSettings(display_cost_per_action=True, default_cells_expanded=False)
 
         with patch.object(CliSettings, "get_config_path", return_value=config_path):
             cfg.save()
 
         assert config_path.read_text() == json.dumps(
-            {"display_cost_per_action": True}, indent=2
+            {"display_cost_per_action": True, "default_cells_expanded": False}, indent=2
         )
 
     def test_save_permission_error_propagates(self, tmp_path: Path):

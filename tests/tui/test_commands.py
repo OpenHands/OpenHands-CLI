@@ -23,7 +23,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 4
+        assert len(COMMANDS) == 6
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -36,8 +36,10 @@ class TestCommands:
         "expected_command,expected_description",
         [
             ("/help", "Display available commands"),
+            ("/new", "Start a new conversation"),
             ("/confirm", "Configure confirmation settings"),
             ("/condense", "Condense conversation history"),
+            ("/feedback", "Send anonymous feedback about CLI"),
             ("/exit", "Exit the application"),
         ],
     )
@@ -71,12 +73,16 @@ class TestCommands:
         [
             "OpenHands CLI Help",
             "/help",
+            "/new",
             "/confirm",
             "/condense",
+            "/feedback",
             "/exit",
             "Display available commands",
+            "Start a new conversation",
             "Configure confirmation settings",
             "Condense conversation history",
+            "Send anonymous feedback about CLI",
             "Exit the application",
             "Tips:",
             "Type / and press Tab",
@@ -142,8 +148,10 @@ class TestCommands:
         "cmd,expected",
         [
             ("/help", True),
+            ("/new", True),
             ("/confirm", True),
             ("/condense", True),
+            ("/feedback", True),
             ("/exit", True),
             ("/help extra", False),
             ("/exit now", False),
@@ -156,6 +164,36 @@ class TestCommands:
     def test_is_valid_command(self, cmd, expected):
         """Command validation is strict and argument-sensitive."""
         assert is_valid_command(cmd) is expected
+
+    def test_all_commands_included_in_help(self):
+        """Test that all commands from COMMANDS list are included in help text.
+
+        This ensures that when new commands are added to COMMANDS, they are also
+        added to the help text displayed by show_help().
+        """
+        from openhands_cli.tui.core.commands import get_valid_commands
+
+        mock_main_display = mock.MagicMock(spec=VerticalScroll)
+        show_help(mock_main_display)
+
+        # Get the help text that was mounted
+        mock_main_display.mount.assert_called_once()
+        help_widget = mock_main_display.mount.call_args[0][0]
+        help_text = help_widget.content
+
+        # Get all valid commands from COMMANDS list
+        valid_commands = get_valid_commands()
+
+        # Verify each command is present in the help text
+        missing_commands = []
+        for command in valid_commands:
+            if command not in help_text:
+                missing_commands.append(command)
+
+        assert not missing_commands, (
+            f"The following commands are defined in COMMANDS but missing from "
+            f"help text: {missing_commands}"
+        )
 
 
 class TestOpenHandsAppCommands:
@@ -355,3 +393,191 @@ class TestOpenHandsAppCommands:
                 message="No conversation available to condense",
                 severity="error",
             )
+
+    @pytest.mark.asyncio
+    async def test_feedback_command_opens_browser(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/feedback` should open the feedback form URL in the browser."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            # Mock webbrowser.open to verify it's called with correct URL
+            with mock.patch("webbrowser.open") as mock_browser:
+                # Mock notify to verify notification is shown
+                notify_mock = mock.MagicMock()
+                oh_app.notify = notify_mock
+
+                oh_app._handle_command("/feedback")
+
+                # Verify browser was opened with correct URL
+                mock_browser.assert_called_once_with(
+                    "https://forms.gle/chHc5VdS3wty5DwW6"
+                )
+
+                # Verify notification was shown
+                notify_mock.assert_called_once_with(
+                    title="Feedback",
+                    message="Opening feedback form in your browser...",
+                    severity="information",
+                )
+
+    @pytest.mark.asyncio
+    async def test_new_command_starts_new_conversation(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/new` should start a new conversation with a new ID."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            # Store the original conversation ID
+            original_conversation_id = oh_app.conversation_id
+
+            # Mock notify to verify notification is shown
+            notify_mock = mock.MagicMock()
+            oh_app.notify = notify_mock
+
+            oh_app._handle_command("/new")
+
+            # Verify a new conversation ID was generated
+            assert oh_app.conversation_id != original_conversation_id
+
+            # Verify conversation runner was reset
+            assert oh_app.conversation_runner is None
+
+            # Verify notification was shown
+            notify_mock.assert_called_once_with(
+                title="New Conversation",
+                message="Started a new conversation",
+                severity="information",
+            )
+
+    @pytest.mark.asyncio
+    async def test_new_command_blocked_when_conversation_running(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/new` should show warning when a conversation is running."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            # Create a mock conversation runner that is running
+            dummy_runner = mock.MagicMock()
+            dummy_runner.is_running = True
+            oh_app.conversation_runner = dummy_runner
+
+            # Store the original conversation ID
+            original_conversation_id = oh_app.conversation_id
+
+            # Mock notify to verify warning is shown
+            notify_mock = mock.MagicMock()
+            oh_app.notify = notify_mock
+
+            oh_app._handle_command("/new")
+
+            # Verify conversation ID was NOT changed
+            assert oh_app.conversation_id == original_conversation_id
+
+            # Verify error notification was shown
+            notify_mock.assert_called_once()
+            call_args = notify_mock.call_args
+            assert call_args[1]["title"] == "New Conversation Error"
+            assert call_args[1]["severity"] == "error"
+
+    @pytest.mark.asyncio
+    async def test_new_command_clears_dynamically_added_widgets(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/new` should clear dynamically added widgets but keep splash widgets."""
+        from textual.widgets import Static
+
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            # Add a dynamic widget to main_display (simulating conversation content)
+            dynamic_widget = Static("Test message", classes="user-message")
+            oh_app.main_display.mount(dynamic_widget)
+            await pilot.pause()
+
+            # Verify the widget was added
+            assert dynamic_widget in oh_app.main_display.children
+
+            # Mock notify
+            notify_mock = mock.MagicMock()
+            oh_app.notify = notify_mock
+
+            oh_app._handle_command("/new")
+            await pilot.pause()
+
+            # Verify dynamic widget was removed
+            assert dynamic_widget not in oh_app.main_display.children
+
+            # Verify splash widgets still exist
+            splash_banner = oh_app.query_one("#splash_banner", Static)
+            assert splash_banner is not None
+
+    @pytest.mark.asyncio
+    async def test_new_command_updates_splash_conversation_id(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/new` should update the splash conversation widget with new ID."""
+        from textual.widgets import Static
+
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            # Mock notify
+            notify_mock = mock.MagicMock()
+            oh_app.notify = notify_mock
+
+            oh_app._handle_command("/new")
+            await pilot.pause()
+
+            # Verify splash conversation widget contains the new conversation ID
+            splash_conversation = oh_app.query_one("#splash_conversation", Static)
+            # The content should contain the new conversation ID hex
+            assert oh_app.conversation_id.hex in str(splash_conversation.content)

@@ -167,6 +167,13 @@ def main() -> None:
 
             handle_cloud_command(args)
 
+        elif args.command == "view":
+            from openhands_cli.conversations.viewer import view_conversation
+
+            success = view_conversation(args.conversation_id, args.limit)
+            if not success:
+                sys.exit(1)
+
         else:
             compat_result = check_terminal_compatibility(console=console)
             if not compat_result.is_tty:

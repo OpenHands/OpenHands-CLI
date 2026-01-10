@@ -1,6 +1,7 @@
 """Tests for ConversationVisualizer and Chinese character markup handling."""
 
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 from rich.errors import MarkupError
@@ -13,11 +14,58 @@ from openhands.sdk import Action, MessageEvent, TextContent
 from openhands.sdk.event import ActionEvent
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.llm import MessageToolCall
+from openhands_cli.stores import CliSettings
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
 
 if TYPE_CHECKING:
     pass
+
+
+# ============================================================================
+# Fixtures
+# ============================================================================
+
+
+@pytest.fixture
+def visualizer():
+    """Create a ConversationVisualizer with mock app and container."""
+    app = App()
+    container = VerticalScroll()
+    return ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+
+@pytest.fixture
+def mock_cli_settings():
+    """Provide a context manager for mocking CliSettings.load with default settings."""
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _mock_settings(visualizer=None, **kwargs):
+        """Create mock context with specified settings.
+
+        Args:
+            visualizer: Optional visualizer to clear cached settings for
+            **kwargs: Settings to pass to CliSettings constructor
+        """
+        settings = CliSettings(**kwargs)
+        with patch.object(CliSettings, "load", return_value=settings):
+            if visualizer is not None:
+                visualizer._cli_settings = None
+            yield settings
+
+    return _mock_settings
+
+
+@pytest.fixture
+def mock_cli_settings_with_cost(mock_cli_settings):
+    """Provide mock CliSettings with display_cost_per_action=True."""
+    return mock_cli_settings(display_cost_per_action=True)
+
+
+# ============================================================================
+# Helper Classes and Functions
+# ============================================================================
 
 
 class RichLogMockAction(Action):
@@ -41,14 +89,8 @@ def create_tool_call(
 class TestChineseCharacterMarkupHandling:
     """Tests for handling Chinese characters with special markup symbols."""
 
-    def test_escape_rich_markup_escapes_brackets(self):
+    def test_escape_rich_markup_escapes_brackets(self, visualizer):
         """Test that _escape_rich_markup properly escapes square brackets."""
-        # Create a mock app and container for the visualizer
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
-
-        # Test escaping with various bracket patterns
         test_cases = [
             ("[test]", r"\[test\]"),
             ("处于历史40%分位]", r"处于历史40%分位\]"),
@@ -66,13 +108,8 @@ class TestChineseCharacterMarkupHandling:
                 f"got '{result}'"
             )
 
-    def test_safe_content_string_escapes_problematic_content(self):
+    def test_safe_content_string_escapes_problematic_content(self, visualizer):
         """Test that _escape_rich_markup escapes MarkupError content."""
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
-
-        # Example content that caused the original error
         problematic_content = "+0.3%,月变化+0.8%,处于历史40%分位]"
         safe_content = visualizer._escape_rich_markup(str(problematic_content))
 
@@ -87,46 +124,28 @@ class TestChineseCharacterMarkupHandling:
 
         This test demonstrates the problem that can occur with unescaped brackets.
         """
-
-        # Content with close tag but no open tag - this WILL cause an error
         problematic_content = "[/close_without_open]"
 
-        # Without escaping, this raises a MarkupError when parsed as markup
         with pytest.raises(MarkupError) as exc_info:
             Text.from_markup(problematic_content)
 
         assert "closing tag" in str(exc_info.value).lower()
 
-    def test_escaped_chinese_content_renders_successfully(self):
+    def test_escaped_chinese_content_renders_successfully(self, visualizer):
         """Verify escaped Chinese chars and brackets render correctly.
 
         This test demonstrates that the fix resolves the issue.
         """
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
-
-        # Content with Chinese characters and special markup characters
         problematic_content = "+0.3%,月变化+0.8%,处于历史40%分位]"
-
-        # Use the _escape_rich_markup method (the fix)
         safe_content = visualizer._escape_rich_markup(str(problematic_content))
 
         # This should NOT raise an error
         widget = Static(safe_content, markup=True)
-        # Force rendering to verify it works
         rendered = widget.render()
-
-        # Verify the content is present in the rendered output
         assert rendered is not None
 
-    def test_visualizer_handles_chinese_action_event(self):
+    def test_visualizer_handles_chinese_action_event(self, visualizer):
         """Test that visualizer can handle ActionEvent with Chinese content."""
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
-
-        # Create an action with Chinese content
         action = RichLogMockAction(command="分析数据: [结果+0.3%]")
         tool_call = create_tool_call("call_1", "test")
 
@@ -139,17 +158,11 @@ class TestChineseCharacterMarkupHandling:
             llm_response_id="response_1",
         )
 
-        # This should not raise an error
         collapsible = visualizer._create_event_collapsible(action_event)
         assert collapsible is not None
 
-    def test_visualizer_handles_chinese_message_event(self):
+    def test_visualizer_handles_chinese_message_event(self, visualizer):
         """Test that visualizer can handle MessageEvent with Chinese content."""
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
-
-        # Create a message with problematic Chinese content
         from openhands.sdk import Message
 
         message = Message(
@@ -163,32 +176,21 @@ class TestChineseCharacterMarkupHandling:
 
         message_event = MessageEvent(llm_message=message, source="agent")
 
-        # This should not raise an error
         collapsible = visualizer._create_event_collapsible(message_event)
         assert collapsible is not None
 
     @pytest.mark.parametrize(
         "test_content",
         [
-            # Chinese with brackets
             "测试[内容]",
-            # Chinese with percentage and brackets
             "+0.3%,月变化+0.8%,处于历史40%分位]",
-            # Multiple bracket pairs
             "[开始]处理数据[结束]",
-            # Complex markup-like patterns
             "[cyan]彩色文字[/cyan]",
-            # Mixed English and Chinese
             "Processing [处理中] 100%",
         ],
     )
-    def test_various_chinese_patterns_are_escaped(self, test_content):
+    def test_various_chinese_patterns_are_escaped(self, visualizer, test_content):
         """Test that various patterns of Chinese text with special chars are handled."""
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
-
-        # Use the _escape_rich_markup method
         safe_content = visualizer._escape_rich_markup(str(test_content))
 
         # Verify brackets are escaped
@@ -240,22 +242,22 @@ class TestVisualizerWithoutEscaping:
 class TestVisualizerIntegration:
     """Integration tests for the visualizer with Chinese content."""
 
-    def test_end_to_end_chinese_content_visualization(self):
-        """End-to-end test: create event with Chinese content and visualize it."""
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+    def test_end_to_end_chinese_content_visualization(self, visualizer):
+        """End-to-end test: create event with Chinese content and visualize it.
 
-        # Create realistic event with problematic content
-        action = RichLogMockAction(
+        Uses TerminalAction since the title includes the command for terminal actions.
+        """
+        from openhands.tools.terminal.definition import TerminalAction
+
+        action = TerminalAction(
             command="分析结果: 增长率+0.3%,月变化+0.8%,处于历史40%分位]"
         )
-        tool_call = create_tool_call("call_test", "analyze")
+        tool_call = create_tool_call("call_test", "terminal")
 
         event = ActionEvent(
             thought=[TextContent(text="执行分析")],
             action=action,
-            tool_name="analyze",
+            tool_name="terminal",
             tool_call_id="call_test",
             tool_call=tool_call,
             llm_response_id="resp_test",
@@ -268,39 +270,33 @@ class TestVisualizerIntegration:
 
         # The title should contain escaped content
         title_str = str(collapsible.title)
-        # If brackets were in the original, they should be escaped in the output
-        if "[" in action.command or "]" in action.command:
-            # The title extraction should have escaped them
-            assert r"\[" in title_str or r"\]" in title_str
+        # For terminal actions, the command is included in the title
+        # Brackets in the command should be escaped
+        assert r"\]" in title_str, f"Expected escaped bracket in title: {title_str}"
 
 
 class TestConversationErrorEventHandling:
     """Tests for ConversationErrorEvent handling in the visualizer."""
 
-    def test_conversation_error_event_creates_collapsible_with_error_styling(self):
+    def test_conversation_error_event_creates_collapsible_with_error_styling(
+        self, visualizer, mock_cli_settings
+    ):
         """Test that ConversationErrorEvent is properly handled with error styling."""
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
-
-        # Create a ConversationErrorEvent with test content
         error_event = ConversationErrorEvent(
-            source="agent", code="test_error", detail="Test conversation error message"
+            source="agent",
+            code="test_error",
+            detail="Test conversation error message",
         )
 
-        # Create the collapsible widget for the error event
-        collapsible = visualizer._create_event_collapsible(error_event)
+        with mock_cli_settings(visualizer=visualizer, default_cells_expanded=True):
+            collapsible = visualizer._create_event_collapsible(error_event)
 
-        # Verify the collapsible was created successfully
-        assert collapsible is not None
+            assert collapsible is not None
+            assert "Conversation Error" in str(collapsible.title)
+            # collapsed=False when default_cells_expanded=True
+            assert not collapsible.collapsed
 
-        # Verify it has the correct title
-        assert "Conversation Error" in str(collapsible.title)
-
-        # Verify it starts expanded (collapsed=False)
-        assert not collapsible.collapsed
-
-        # Verify it has error border color (should be the error theme color)
+        # Verify error border color
         from openhands_cli.theme import OPENHANDS_THEME
         from openhands_cli.tui.widgets.richlog_visualizer import (
             _get_event_border_color,
@@ -311,25 +307,45 @@ class TestConversationErrorEventHandling:
         assert actual_color == expected_color
 
 
+class TestDefaultCellsExpandedSetting:
+    """Tests for the default_cells_expanded setting in ConversationVisualizer."""
+
+    @pytest.mark.parametrize("default_expanded", [True, False])
+    def test_collapsible_respects_default_cells_expanded_setting(
+        self, visualizer, mock_cli_settings, default_expanded: bool
+    ):
+        """Test that collapsible widgets respect the default_cells_expanded setting."""
+        error_event = ConversationErrorEvent(
+            source="agent", code="test_error", detail="Test message"
+        )
+
+        with mock_cli_settings(
+            visualizer=visualizer, default_cells_expanded=default_expanded
+        ):
+            collapsible = visualizer._create_event_collapsible(error_event)
+            assert collapsible is not None
+
+            # collapsed should be the opposite of default_cells_expanded
+            expected_collapsed = not default_expanded
+            assert collapsible.collapsed is expected_collapsed
+
+    def test_default_collapsed_property(self, visualizer, mock_cli_settings):
+        """Test the _default_collapsed property returns correct value."""
+        # Test with default_cells_expanded=True (default)
+        with mock_cli_settings(visualizer=visualizer, default_cells_expanded=True):
+            assert visualizer._default_collapsed is False
+
+        # Test with default_cells_expanded=False
+        with mock_cli_settings(visualizer=visualizer, default_cells_expanded=False):
+            assert visualizer._default_collapsed is True
+
+
 class TestCliSettingsCaching:
     """Tests for app configuration caching in ConversationVisualizer."""
 
-    def test_cli_settings_caching(self):
+    def test_cli_settings_caching(self, visualizer):
         """Test that app configuration is cached and not loaded repeatedly."""
-        from unittest.mock import patch
-
-        # Create a mock app and container for the visualizer
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
-
-        # Mock CliSettings.load to track how many times it's called
         with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-            from openhands_cli.stores import (
-                CliSettings,
-            )
-
-            # Create a mock config
             mock_config = CliSettings(display_cost_per_action=True)
             mock_load.return_value = mock_config
 
@@ -348,22 +364,9 @@ class TestCliSettingsCaching:
             assert config3 == mock_config
             assert mock_load.call_count == 1  # Should still be 1, not 3
 
-    def test_cli_settings_refresh(self):
+    def test_cli_settings_refresh(self, visualizer):
         """Test that reload_configuration reloads the configuration."""
-        from unittest.mock import patch
-
-        # Create a mock app and container for the visualizer
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
-
-        # Mock CliSettings.load to track how many times it's called
         with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-            from openhands_cli.stores import (
-                CliSettings,
-            )
-
-            # Create mock configs
             mock_config1 = CliSettings(display_cost_per_action=False)
             mock_config2 = CliSettings(display_cost_per_action=True)
             mock_load.side_effect = [mock_config1, mock_config2]
@@ -382,27 +385,16 @@ class TestCliSettingsCaching:
             assert config2 == mock_config2
             assert mock_load.call_count == 2  # Should still be 2, not 3
 
-    def test_format_metrics_subtitle_uses_cached_config(self):
+    def test_format_metrics_subtitle_uses_cached_config(self, visualizer):
         """Test that _format_metrics_subtitle uses cached app configuration."""
-        from unittest.mock import MagicMock, patch
-
-        # Create a mock app and container for the visualizer
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+        from unittest.mock import MagicMock
 
         # Mock the state to return None for stats (no metrics)
         mock_state = MagicMock()
         mock_state.stats = None
         visualizer._state = mock_state
 
-        # Mock CliSettings.load to track how many times it's called
         with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-            from openhands_cli.stores import (
-                CliSettings,
-            )
-
-            # Create a mock config with display_cost_per_action=False
             mock_config = CliSettings(display_cost_per_action=False)
             mock_load.return_value = mock_config
 
@@ -429,21 +421,15 @@ class TestCliSettingsCaching:
         ],
     )
     def test_format_metrics_subtitle_conditional_display(
-        self, display_cost_per_action, has_stats, expected_result
+        self, visualizer, display_cost_per_action, has_stats, expected_result
     ):
         """Test that metrics display is conditional on both config and stats
         availability."""
-        from unittest.mock import MagicMock, patch
-
-        # Create a mock app and container for the visualizer
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+        from unittest.mock import MagicMock
 
         # Mock the state
         mock_state = MagicMock()
         if has_stats:
-            # Mock stats with proper structure for _format_metrics_subtitle
             mock_usage = MagicMock()
             mock_usage.prompt_tokens = 800
             mock_usage.completion_tokens = 200
@@ -462,49 +448,27 @@ class TestCliSettingsCaching:
         visualizer._state = mock_state
 
         with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-            from openhands_cli.stores import (
-                CliSettings,
-            )
-
-            # Create config with specified display setting
             mock_config = CliSettings(display_cost_per_action=display_cost_per_action)
             mock_load.return_value = mock_config
 
-            # Mock the actual formatting logic for when we have stats and config enabled
             if expected_result == "formatted_metrics":
                 with patch.object(
                     visualizer,
                     "_format_metrics_subtitle",
                     wraps=visualizer._format_metrics_subtitle,
                 ):
-                    # Let the real method run but intercept the result
                     result = visualizer._format_metrics_subtitle()
                     if display_cost_per_action and has_stats:
-                        # Should have called the real formatting logic
-                        assert (
-                            result is not None or result == ""
-                        )  # Could be empty string if no formatting
+                        assert result is not None or result == ""
                     else:
                         assert result is None
             else:
                 result = visualizer._format_metrics_subtitle()
                 assert result == expected_result
 
-    def test_reload_configuration_clears_cache(self):
+    def test_reload_configuration_clears_cache(self, visualizer):
         """Test that reload_configuration properly clears the cached configuration."""
-        from unittest.mock import patch
-
-        # Create a mock app and container for the visualizer
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
-
         with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-            from openhands_cli.stores import (
-                CliSettings,
-            )
-
-            # Create different configs for each load
             config1 = CliSettings(display_cost_per_action=False)
             config2 = CliSettings(display_cost_per_action=True)
             mock_load.side_effect = [config1, config2]
@@ -527,55 +491,33 @@ class TestCliSettingsCaching:
         "initial_cache_state",
         [None, "cached_config"],
     )
-    def test_cli_settings_property_initialization(self, initial_cache_state):
+    def test_cli_settings_property_initialization(
+        self, visualizer, initial_cache_state
+    ):
         """Test cli_settings property behavior with different initial cache states."""
-        from unittest.mock import patch
-
-        # Create a mock app and container for the visualizer
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
-
         # Set initial cache state
         if initial_cache_state == "cached_config":
-            from openhands_cli.stores import (
-                CliSettings,
-            )
-
             visualizer._cli_settings = CliSettings(display_cost_per_action=True)
         else:
             visualizer._cli_settings = None
 
         with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-            from openhands_cli.stores import (
-                CliSettings,
-            )
-
             mock_config = CliSettings(display_cost_per_action=False)
             mock_load.return_value = mock_config
 
-            # Access cli_settings property
             result = visualizer.cli_settings
 
             if initial_cache_state is None:
-                # Should load from file
                 assert mock_load.call_count == 1
                 assert result == mock_config
             else:
-                # Should use cached version
                 assert mock_load.call_count == 0
                 assert result.display_cost_per_action is True
 
-    def test_conversation_stats_property_integration(self):
+    def test_conversation_stats_property_integration(self, visualizer):
         """Test that conversation_stats property works correctly with app config."""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import MagicMock
 
-        # Create a mock app and container for the visualizer
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
-
-        # Mock conversation_stats property with proper structure
         mock_usage = MagicMock()
         mock_usage.prompt_tokens = 1600
         mock_usage.completion_tokens = 400
@@ -595,11 +537,6 @@ class TestCliSettingsCaching:
             new_callable=lambda: property(lambda self: mock_stats),
         ):
             with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-                from openhands_cli.stores import (
-                    CliSettings,
-                )
-
-                # Test with display enabled
                 mock_config = CliSettings(display_cost_per_action=True)
                 mock_load.return_value = mock_config
 

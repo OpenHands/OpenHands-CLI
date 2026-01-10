@@ -66,6 +66,9 @@ class TestGetSplashContent:
                 "2. Use @ to look up a file in the folder structure"
                 in content["instructions"][1]
             )
+            # Verify /help and /feedback are mentioned in instructions
+            assert "/help" in content["instructions"][2]
+            assert "/feedback" in content["instructions"][2]
 
             # Should contain conversation ID
             assert "conversation_text" in content

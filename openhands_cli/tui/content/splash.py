@@ -5,6 +5,19 @@ from textual.theme import Theme
 from openhands_cli.version_check import check_for_updates
 
 
+def get_conversation_text(conversation_id: str, *, theme: Theme) -> str:
+    """Get the formatted conversation initialization text.
+
+    Args:
+        conversation_id: The conversation ID to display
+        theme: Theme to use for colors
+
+    Returns:
+        Formatted string with conversation initialization message
+    """
+    return f"[{theme.accent}]Initialized conversation[/] {conversation_id}"
+
+
 def get_openhands_banner() -> str:
     """Get the OpenHands ASCII art banner."""
     # ASCII art with consistent line lengths for proper alignment
@@ -35,7 +48,6 @@ def get_splash_content(conversation_id: str, *, theme: Theme) -> dict:
     """
     # Use theme colors
     primary_color = theme.primary
-    accent_color = theme.accent
 
     # Use Rich markup for colored banner (apply color to each line)
     banner_lines = get_openhands_banner().split("\n")
@@ -50,17 +62,15 @@ def get_splash_content(conversation_id: str, *, theme: Theme) -> dict:
         "banner": banner,
         "version": f"OpenHands CLI v{version_info.current_version}",
         "status_text": "All set up!",
-        "conversation_text": (
-            f"[{accent_color}]Initialized conversation[/] {conversation_id}"
-        ),
+        "conversation_text": get_conversation_text(conversation_id, theme=theme),
         "conversation_id": conversation_id,
         "instructions_header": f"[{primary_color}]What do you want to build?[/]",
         "instructions": [
             "1. Ask questions, edit files, or run commands.",
             "2. Use @ to look up a file in the folder structure",
             (
-                "3. Type /help for help or / to immediately scroll through "
-                "available commands"
+                "3. Type /help for help, /feedback to leave anonymous feedback, "
+                "or / to scroll through available commands"
             ),
         ],
         "update_notice": None,
