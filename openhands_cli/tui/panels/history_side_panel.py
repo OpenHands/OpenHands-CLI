@@ -33,6 +33,8 @@ class HistoryConversationRow:
     created_date: datetime
     first_user_prompt: str | None
     source: str  # SOURCE_LOCAL | SOURCE_CLOUD
+    runtime_host: str | None = None
+    session_api_key: str | None = None
 
 
 class HistoryItem(Static):
@@ -278,6 +280,8 @@ class HistorySidePanel(Container):
                     created_date=conv.created_date,
                     first_user_prompt=conv.title,
                     source=HistoryConversationRow.SOURCE_CLOUD,
+                    runtime_host=conv.runtime_host,
+                    session_api_key=conv.session_api_key,
                 )
                 for conv in cloud_convs
             ]
@@ -299,6 +303,18 @@ class HistorySidePanel(Container):
                 self._render_list()
 
             self.app.call_from_thread(_apply_error)
+
+    def get_cloud_connection_info(
+        self, cloud_conversation_id: str
+    ) -> tuple[str, str] | None:
+        """Return (runtime_host, session_api_key) for a cloud conversation if known."""
+        for row in self._cloud_rows:
+            if row.display_id != cloud_conversation_id:
+                continue
+            if row.runtime_host and row.session_api_key:
+                return (row.runtime_host, row.session_api_key)
+            return None
+        return None
 
     def _render_list(self) -> None:
         """Render both tab lists (Local and Cloud)."""

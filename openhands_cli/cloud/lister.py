@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlparse
 
 from pydantic import BaseModel
 
@@ -17,6 +18,20 @@ class CloudConversationInfo(BaseModel):
     id: str
     created_date: datetime
     title: str | None = None
+    runtime_host: str | None = None
+    session_api_key: str | None = None
+
+
+def _extract_runtime_host(url: str | None) -> str | None:
+    if not url:
+        return None
+    try:
+        parsed = urlparse(str(url))
+        if not parsed.scheme or not parsed.netloc:
+            return None
+        return f"{parsed.scheme}://{parsed.netloc}"
+    except Exception:
+        return None
 
 
 class CloudConversationLister:
@@ -30,12 +45,17 @@ class CloudConversationLister:
         client = OpenHandsApiClient(self.server_url, self.api_key)
         data = await client.list_conversations()
 
-        # Accept both: {"conversations": [...]} and [...].
+        # Accept:
+        # - {"conversations": [...]} (legacy)
+        # - {"results": [...]} (current cloud API)
+        # - [...] (already a list)
         conversations: list[dict[str, Any]]
         if isinstance(data, list):
             conversations = data
         else:
-            conversations = list(data.get("conversations", []))
+            conversations = list(
+                data.get("results", data.get("conversations", []))  # type: ignore[arg-type]
+            )
 
         results: list[CloudConversationInfo] = []
         for item in conversations:
@@ -62,10 +82,20 @@ class CloudConversationLister:
             except Exception:
                 created_date = datetime.now()
 
+            # Normalize to naive UTC to avoid mixing aware/naive datetimes in the TUI.
+            if created_date.tzinfo is not None:
+                created_date = created_date.astimezone(UTC).replace(tzinfo=None)
+
             title = item.get("title") or item.get("name") or item.get("preview")
+            runtime_host = _extract_runtime_host(item.get("url"))
+            session_api_key = item.get("session_api_key") or item.get("sessionApiKey")
             results.append(
                 CloudConversationInfo(
-                    id=conv_id, created_date=created_date, title=title
+                    id=conv_id,
+                    created_date=created_date,
+                    title=title,
+                    runtime_host=runtime_host,
+                    session_api_key=session_api_key,
                 )
             )
 

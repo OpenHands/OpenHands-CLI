@@ -9,9 +9,7 @@ It creates a basic app with:
 """
 
 import asyncio
-import os
 import uuid
-import webbrowser
 from collections.abc import Iterable
 from typing import ClassVar
 
@@ -34,6 +32,7 @@ from openhands.sdk.security.confirmation_policy import (
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
+from openhands_cli.tui.core.cloud_conversation_runner import CloudConversationRunner
 from openhands_cli.tui.core.commands import is_valid_command, show_help
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.modals import SettingsScreen
@@ -128,6 +127,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
         self._switch_loading_notification: Notification | None = None
+        self.cloud_conversation_runner: CloudConversationRunner | None = None
         self._reload_visualizer = (
             lambda: self.conversation_runner.visualizer.reload_configuration()
             if self.conversation_runner
@@ -461,6 +461,30 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     async def _handle_user_message(self, user_message: str) -> None:
         """Handle regular user messages with the conversation runner."""
+        # Cloud conversation: forward to runtime via CloudConversationRunner.
+        if self.cloud_conversation_runner is not None:
+            cloud_runner = self.cloud_conversation_runner
+            try:
+                self.run_worker(
+                    lambda: cloud_runner.send_user_message(user_message),
+                    name="cloud_send_message",
+                    group="cloud_send_message",
+                    exclusive=True,
+                    thread=True,
+                    exit_on_error=False,
+                )
+            except RuntimeError:
+                # Tests / non-running app: best-effort synchronous send.
+                try:
+                    cloud_runner.send_user_message(user_message)
+                except Exception as e:
+                    self.notify(
+                        title="Cloud Error",
+                        message=f"{type(e).__name__}: {e}",
+                        severity="error",
+                    )
+            return
+
         # Check if conversation runner is initialized
         if self.conversation_runner is None:
             self.conversation_runner = self.create_conversation_runner()
@@ -831,27 +855,136 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         )
 
     def _resume_cloud_conversation(self, conversation_id: str) -> None:
-        """Best-effort resume for cloud conversations.
-
-        Current implementation opens the cloud conversation in the browser.
-        """
-        server_url = os.getenv(
-            "OPENHANDS_CLOUD_URL", "https://app.all-hands.dev"
-        ).rstrip("/")
-        url = f"{server_url}/conversations/{conversation_id}"
-        try:
-            webbrowser.open(url)
+        """Resume a cloud conversation inside the CLI (runtime API polling)."""
+        if self.conversation_runner and self.conversation_runner.is_running:
             self.notify(
-                title="Cloud",
-                message="Opening cloud conversation in browser…",
-                severity="information",
-            )
-        except Exception as e:
-            self.notify(
-                title="Cloud Error",
-                message=f"{type(e).__name__}: {e}",
+                title="Switch Error",
+                message="Cannot switch while a conversation is running. "
+                "Please wait or pause it first.",
                 severity="error",
             )
+            return
+
+        # Stop any previous cloud runner.
+        if self.cloud_conversation_runner is not None:
+            try:
+                self.cloud_conversation_runner.close()
+            except Exception:
+                pass
+            self.cloud_conversation_runner = None
+
+        try:
+            history_panel = self.query_one(HistorySidePanel)
+        except Exception:
+            history_panel = None
+
+        if history_panel is None:
+            self.notify(
+                title="Cloud",
+                message="Open the history panel (Ctrl+H) to load cloud metadata first.",
+                severity="error",
+            )
+            return
+
+        info = history_panel.get_cloud_connection_info(conversation_id)
+        if not info:
+            self.notify(
+                title="Cloud",
+                message="Missing cloud connection info (runtime host / session key).",
+                severity="error",
+            )
+            return
+
+        runtime_host, session_api_key = info
+
+        # Use a UUID for UI-only (splash text), runtime API uses the original id string.
+        try:
+            ui_id = uuid.UUID(hex=conversation_id)
+        except Exception:
+            ui_id = uuid.uuid4()
+
+        # Show loading toast before network I/O.
+        self._show_switch_loading_notification()
+
+        def _on_event(ev: dict) -> None:
+            # Runs in background thread; marshal to UI thread.
+            def _render() -> None:
+                source = str(ev.get("source") or "cloud")
+                ts = str(ev.get("timestamp") or "")
+                msg = str(ev.get("message") or "").strip()
+                obs = str(ev.get("observation") or "").strip()
+                content = str(ev.get("content") or "").strip()
+                extras = ev.get("extras")
+                extra_text = ""
+                if isinstance(extras, dict) and extras:
+                    extra_text = f"\n[dim]{extras}[/dim]"
+
+                body = msg or content or obs or "(no content)"
+                self.main_display.mount(
+                    Static(
+                        f"[bold]{source}[/bold] [dim]{ts}[/dim]\n{body}{extra_text}",
+                        markup=True,
+                        classes="status-message",
+                    )
+                )
+                self.main_display.scroll_end(animate=False)
+
+            self.call_from_thread(_render)
+
+        def _on_error(err: str) -> None:
+            def _render_err() -> None:
+                self.notify(title="Cloud", message=err, severity="error")
+
+            self.call_from_thread(_render_err)
+
+        def _worker() -> None:
+            try:
+                # Prepare UI (clear old widgets, update splash).
+                self.call_from_thread(self._prepare_ui_for_conversation_switch, ui_id)
+                self.conversation_runner = None
+
+                runner = CloudConversationRunner(
+                    runtime_host=runtime_host,
+                    session_api_key=session_api_key,
+                    conversation_id=conversation_id,
+                    on_event=_on_event,
+                    on_error=_on_error,
+                )
+                self.cloud_conversation_runner = runner
+                runner.load_history()
+                runner.start_streaming()
+
+                def _finish() -> None:
+                    self._dismiss_switch_loading_notification()
+                    self.notify(
+                        title="Cloud",
+                        message=(
+                            f"Connected to cloud conversation {conversation_id[:8]}"
+                        ),
+                        severity="information",
+                    )
+
+                self.call_from_thread(_finish)
+            except Exception as e:
+
+                def _fail(err: Exception = e) -> None:
+                    self._dismiss_switch_loading_notification()
+                    self.notify(
+                        title="Cloud Switch Error",
+                        message=f"{type(err).__name__}: {err}",
+                        severity="error",
+                    )
+
+                self.call_from_thread(_fail)
+
+        self.run_worker(
+            _worker,
+            name="switch_cloud_conversation",
+            group="switch_conversation",
+            exclusive=True,
+            thread=True,
+            exit_on_error=False,
+        )
 
     def _show_switch_loading_notification(self) -> None:
         """Show a loading notification that can be dismissed after the switch."""
