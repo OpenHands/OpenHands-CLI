@@ -8,7 +8,7 @@ from typing import ClassVar
 from textual import on
 from textual.binding import Binding
 from textual.containers import Container
-from textual.events import Key, Paste
+from textual.events import Paste
 from textual.message import Message
 from textual.signal import Signal
 from textual.widgets import Input, TextArea
@@ -74,7 +74,7 @@ class InputField(Container):
         Binding("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         Binding("ctrl+j", "submit_textarea", "Submit multi-line input"),
         Binding(
-            "ctrl+e", "open_external_editor", "Open external editor", priority=True
+            "ctrl+x", "open_external_editor", "Open external editor", priority=True
         ),
     ]
 
@@ -216,19 +216,11 @@ class InputField(Container):
         else:
             self.input_widget.focus()
 
-    def on_key(self, event: Key) -> None:
-        """Handle key events, including overriding built-in CTRL+E."""
-        if event.key == "ctrl+e":
-            # Override the built-in ctrl+e binding
-            event.prevent_default()
-            self.action_open_external_editor()
-        # Note: We don't call super().on_key(event) as Container lacks this method
-
     def action_open_external_editor(self) -> None:
         """Open external editor for composing input."""
         # Debug: notify that the action was triggered
         self.app.notify(
-            "CTRL+E triggered - opening external editor...", severity="information"
+            "CTRL+X triggered - opening external editor...", severity="information"
         )
 
         try:
