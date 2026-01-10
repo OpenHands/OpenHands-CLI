@@ -243,16 +243,21 @@ class TestVisualizerIntegration:
     """Integration tests for the visualizer with Chinese content."""
 
     def test_end_to_end_chinese_content_visualization(self, visualizer):
-        """End-to-end test: create event with Chinese content and visualize it."""
-        action = RichLogMockAction(
+        """End-to-end test: create event with Chinese content and visualize it.
+
+        Uses TerminalAction since the title includes the command for terminal actions.
+        """
+        from openhands.tools.terminal.definition import TerminalAction
+
+        action = TerminalAction(
             command="分析结果: 增长率+0.3%,月变化+0.8%,处于历史40%分位]"
         )
-        tool_call = create_tool_call("call_test", "analyze")
+        tool_call = create_tool_call("call_test", "terminal")
 
         event = ActionEvent(
             thought=[TextContent(text="执行分析")],
             action=action,
-            tool_name="analyze",
+            tool_name="terminal",
             tool_call_id="call_test",
             tool_call=tool_call,
             llm_response_id="resp_test",
@@ -265,10 +270,9 @@ class TestVisualizerIntegration:
 
         # The title should contain escaped content
         title_str = str(collapsible.title)
-        # If brackets were in the original, they should be escaped in the output
-        if "[" in action.command or "]" in action.command:
-            # The title extraction should have escaped them
-            assert r"\[" in title_str or r"\]" in title_str
+        # For terminal actions, the command is included in the title
+        # Brackets in the command should be escaped
+        assert r"\]" in title_str, f"Expected escaped bracket in title: {title_str}"
 
 
 class TestConversationErrorEventHandling:

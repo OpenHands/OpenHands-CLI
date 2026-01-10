@@ -215,7 +215,7 @@ class Collapsible(Widget):
         collapsed: bool = True,
         collapsed_symbol: str = "▶",
         expanded_symbol: str = "▼",
-        border_color: str = "$secondary",
+        border_color: str | None = "$secondary",
         name: str | None = None,
         id: str | None = None,
         classes: str | None = None,
@@ -229,7 +229,7 @@ class Collapsible(Widget):
             collapsed: Default status of the contents.
             collapsed_symbol: Collapsed symbol before the title.
             expanded_symbol: Expanded symbol before the title.
-            border_color: CSS color for the left border.
+            border_color: CSS color for the left border. None to disable border.
             name: The name of the collapsible.
             id: The ID of the collapsible in the DOM.
             classes: The CSS classes of the collapsible.
@@ -243,11 +243,34 @@ class Collapsible(Widget):
             collapsed=collapsed,
         )
         self.title = title
-        # Pass the original content to Static (can be Rich renderable)
-        self._content_widget = Static(content)
+        # Pass the original content to Static with markup=False to prevent
+        # MarkupError when content contains special characters like quotes,
+        # brackets, etc. This follows the same approach as toad's tool_call.py.
+        self._content_widget = Static(content, markup=False)
         self.collapsed = collapsed
         self._watch_collapsed(collapsed)
-        self.styles.border_left = ("thick", border_color)
+        if border_color is not None:
+            # Use "tall" for a thin vertical line, with gray color
+            self.styles.border_left = ("tall", "gray")
+
+    def update_title(self, new_title: str) -> None:
+        """Update the title of the collapsible.
+
+        Args:
+            new_title: The new title text to display.
+        """
+        self.title = new_title
+        self._title.label = Content.from_text(new_title)
+        self._title._update_label()
+
+    def update_content(self, new_content: Any) -> None:
+        """Update the content of the collapsible.
+
+        Args:
+            new_content: The new content to display (can be string or Rich renderable).
+        """
+        self._content_string = str(new_content)
+        self._content_widget.update(new_content)
 
     def _on_collapsible_title_toggle(self, event: CollapsibleTitle.Toggle) -> None:
         """Handle toggle request from title click or keyboard."""
