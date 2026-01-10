@@ -177,23 +177,45 @@ def get_tool_kind(tool_name: str, *, action: Action | None = None) -> ToolKind:
     return TOOL_KIND_MAPPING.get(tool_name, "other")
 
 
-def get_tool_title(tool_name: str, *, action: Action | None = None) -> str:
-    """Get tool title from tool name and optional complete action.
+def get_tool_title(
+    tool_name: str, *, action: Action | None = None, summary: str | None = None
+) -> str:
+    """Get tool title from tool name, action, and optional LLM-generated summary.
+
+    When a summary is provided, it is used as the primary title with action
+    details appended for context. This matches the TUI behavior.
 
     For streaming tool calls, use ToolCallState.title instead.
+
+    Args:
+        tool_name: The name of the tool being called
+        action: Optional complete action object for extracting details
+        summary: Optional LLM-generated summary describing the action's purpose
+
+    Returns:
+        A descriptive title for the tool call
     """
-    if tool_name == "task_tracker":
+    # Clean up summary if provided
+    clean_summary = summary.strip().replace("\n", " ") if summary else ""
+
+    if tool_name == "task_tracker" or isinstance(action, TaskTrackerAction):
         return "Plan updated"
 
     if isinstance(action, FileEditorAction):
-        if action.command == "view":
-            return f"Reading {action.path}"
-        return f"Editing {action.path}"
+        op = "Reading" if action.command == "view" else "Editing"
+        path = action.path or ""
+        if clean_summary:
+            return f"{clean_summary}: {op} {path}"
+        return f"{op} {path}"
 
     if isinstance(action, TerminalAction):
-        return f"{action.command}"
+        cmd = action.command.strip().replace("\n", " ") if action.command else ""
+        if clean_summary:
+            return f"{clean_summary}: $ {cmd}"
+        return f"$ {cmd}" if cmd else tool_name
 
-    if isinstance(action, TaskTrackerAction):
-        return "Plan updated"
+    # For other actions, use summary if available
+    if clean_summary:
+        return clean_summary
 
     return ""
