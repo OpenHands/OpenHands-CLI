@@ -73,6 +73,19 @@ class OpenHandsApiClient(BaseHttpClient):
     async def create_conversation(self, json_data=None):
         return await self.post("/api/conversations", self._headers, json_data)
 
+    async def list_conversations(self) -> dict[str, Any] | list[dict[str, Any]]:
+        """List conversations from OpenHands Cloud.
+
+        Returns:
+            Either a dict containing a "conversations" list or a raw list,
+            depending on server implementation.
+        """
+        data = await self._get_json("/api/conversations")
+        # Some servers may return a raw list; preserve as-is.
+        if isinstance(data, list):
+            return data
+        return data
+
 
 def _print_settings_summary(settings: dict[str, Any]) -> None:
     _p(

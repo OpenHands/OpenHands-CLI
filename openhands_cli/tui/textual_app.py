@@ -9,7 +9,9 @@ It creates a basic app with:
 """
 
 import asyncio
+import os
 import uuid
+import webbrowser
 from collections.abc import Iterable
 from typing import ClassVar
 
@@ -775,6 +777,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         Args:
             conversation_id: The conversation ID to switch to
         """
+        # Cloud conversations are identified as "cloud:<id>"
+        if conversation_id.startswith("cloud:"):
+            self._resume_cloud_conversation(conversation_id.removeprefix("cloud:"))
+            return
+
         try:
             target_id = uuid.UUID(conversation_id)
         except ValueError:
@@ -822,6 +829,29 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             thread=True,
             exit_on_error=False,
         )
+
+    def _resume_cloud_conversation(self, conversation_id: str) -> None:
+        """Best-effort resume for cloud conversations.
+
+        Current implementation opens the cloud conversation in the browser.
+        """
+        server_url = os.getenv(
+            "OPENHANDS_CLOUD_URL", "https://app.all-hands.dev"
+        ).rstrip("/")
+        url = f"{server_url}/conversations/{conversation_id}"
+        try:
+            webbrowser.open(url)
+            self.notify(
+                title="Cloud",
+                message="Opening cloud conversation in browser…",
+                severity="information",
+            )
+        except Exception as e:
+            self.notify(
+                title="Cloud Error",
+                message=f"{type(e).__name__}: {e}",
+                severity="error",
+            )
 
     def _show_switch_loading_notification(self) -> None:
         """Show a loading notification that can be dismissed after the switch."""
