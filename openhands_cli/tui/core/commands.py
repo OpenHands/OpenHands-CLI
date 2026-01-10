@@ -15,6 +15,7 @@ from openhands_cli.theme import OPENHANDS_THEME
 COMMANDS = [
     DropdownItem(main="/help - Display available commands"),
     DropdownItem(main="/new - Start a new conversation"),
+    DropdownItem(main="/history - Toggle conversation history"),
     DropdownItem(main="/confirm - Configure confirmation settings"),
     DropdownItem(main="/condense - Condense conversation history"),
     DropdownItem(main="/feedback - Send anonymous feedback about CLI"),
@@ -67,6 +68,7 @@ def show_help(main_display: VerticalScroll) -> None:
 
   [{secondary}]/help[/{secondary}] - Display available commands
   [{secondary}]/new[/{secondary}] - Start a new conversation
+  [{secondary}]/history[/{secondary}] - Toggle conversation history (Ctrl+H)
   [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
   [{secondary}]/condense[/{secondary}] - Condense conversation history
   [{secondary}]/feedback[/{secondary}] - Send anonymous feedback about CLI
