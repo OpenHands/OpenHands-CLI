@@ -545,3 +545,160 @@ class TestCliSettingsCaching:
                 # The actual formatting depends on the implementation,
                 # but it should not be None when enabled and stats exist
                 assert result is not None or mock_stats is not None
+
+
+class TestCommandTruncation:
+    """Tests for truncating long terminal commands in action titles."""
+
+    def test_short_command_not_truncated(self, visualizer):
+        """Test that short commands are displayed in full."""
+        from openhands.tools.terminal.definition import TerminalAction
+
+        short_cmd = "ls -la"
+        action = TerminalAction(command=short_cmd)
+        tool_call = create_tool_call("call_1", "terminal")
+
+        action_event = ActionEvent(
+            thought=[TextContent(text="List files")],
+            action=action,
+            tool_name="terminal",
+            tool_call_id="call_1",
+            tool_call=tool_call,
+            llm_response_id="response_1",
+        )
+
+        title = visualizer._build_action_title(action_event)
+        assert short_cmd in title
+        assert "..." not in title
+
+    def test_long_command_truncated(self, visualizer):
+        """Test that commands exceeding 70 chars are truncated with ellipsis."""
+        from openhands.tools.terminal.definition import TerminalAction
+
+        # Create a command longer than 70 characters
+        long_cmd = "curl -X POST https://api.example.com/endpoint " + "-d " * 20
+        assert len(long_cmd) > 70
+
+        action = TerminalAction(command=long_cmd)
+        tool_call = create_tool_call("call_1", "terminal")
+
+        action_event = ActionEvent(
+            thought=[TextContent(text="Make API request")],
+            action=action,
+            tool_name="terminal",
+            tool_call_id="call_1",
+            tool_call=tool_call,
+            llm_response_id="response_1",
+        )
+
+        title = visualizer._build_action_title(action_event)
+        # Should contain truncation indicator
+        assert "..." in title
+        # Title should not contain the full command
+        assert long_cmd not in title
+
+    def test_multiline_command_flattened_and_truncated(self, visualizer):
+        """Test that multiline commands are flattened and truncated."""
+        from openhands.tools.terminal.definition import TerminalAction
+
+        # Create a multiline command that's long when flattened
+        multiline_cmd = """cat << 'EOF' > /path/to/file.txt
+This is line 1
+This is line 2
+This is line 3
+And many more lines
+EOF"""
+        assert len(multiline_cmd) > 70
+
+        action = TerminalAction(command=multiline_cmd)
+        tool_call = create_tool_call("call_1", "terminal")
+
+        action_event = ActionEvent(
+            thought=[TextContent(text="Write file")],
+            action=action,
+            tool_name="terminal",
+            tool_call_id="call_1",
+            tool_call=tool_call,
+            llm_response_id="response_1",
+        )
+
+        title = visualizer._build_action_title(action_event)
+        # Should contain truncation indicator
+        assert "..." in title
+        # Should not contain newlines
+        assert "\n" not in title
+
+    def test_command_exactly_at_limit(self, visualizer):
+        """Test that commands exactly at 70 chars are not truncated."""
+        from openhands.tools.terminal.definition import TerminalAction
+
+        # Create a command exactly 70 characters
+        cmd = "a" * 70
+        assert len(cmd) == 70
+
+        action = TerminalAction(command=cmd)
+        tool_call = create_tool_call("call_1", "terminal")
+
+        action_event = ActionEvent(
+            thought=[TextContent(text="Test command")],
+            action=action,
+            tool_name="terminal",
+            tool_call_id="call_1",
+            tool_call=tool_call,
+            llm_response_id="response_1",
+        )
+
+        title = visualizer._build_action_title(action_event)
+        # Should NOT be truncated
+        assert "..." not in title
+        assert cmd in title
+
+    def test_command_one_over_limit_truncated(self, visualizer):
+        """Test that commands one char over 70 are truncated."""
+        from openhands.tools.terminal.definition import TerminalAction
+
+        # Create a command 71 characters (one over limit)
+        cmd = "a" * 71
+        assert len(cmd) == 71
+
+        action = TerminalAction(command=cmd)
+        tool_call = create_tool_call("call_1", "terminal")
+
+        action_event = ActionEvent(
+            thought=[TextContent(text="Test command")],
+            action=action,
+            tool_name="terminal",
+            tool_call_id="call_1",
+            tool_call=tool_call,
+            llm_response_id="response_1",
+        )
+
+        title = visualizer._build_action_title(action_event)
+        # Should be truncated
+        assert "..." in title
+        # The truncated part should be 67 chars of 'a' + '...'
+        assert "a" * 67 + "..." in title
+
+    def test_command_without_summary(self, visualizer):
+        """Test truncation works when there's no summary (just $ command)."""
+        from openhands.tools.terminal.definition import TerminalAction
+
+        long_cmd = "b" * 100
+        action = TerminalAction(command=long_cmd)
+        tool_call = create_tool_call("call_1", "terminal")
+
+        action_event = ActionEvent(
+            thought=[],  # No thought/summary
+            action=action,
+            tool_name="terminal",
+            tool_call_id="call_1",
+            tool_call=tool_call,
+            llm_response_id="response_1",
+            summary=None,
+        )
+
+        title = visualizer._build_action_title(action_event)
+        # Should start with $ (no bold summary prefix)
+        assert title.startswith("$ ")
+        # Should be truncated
+        assert "..." in title

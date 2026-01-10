@@ -196,9 +196,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
         )
         action = event.action
 
-        # Terminal actions: show summary + command
+        # Terminal actions: show summary + command (truncated for display)
         if isinstance(action, TerminalAction) and action.command:
             cmd = self._escape_rich_markup(action.command.strip().replace("\n", " "))
+            # Truncate long commands to keep collapsed view on single line
+            # Uses 70 chars for consistency with _extract_meaningful_title
+            if len(cmd) > 70:
+                cmd = cmd[:67] + "..."
             if summary:
                 return f"[bold]{summary}[/bold]: $ {cmd}"
             return f"$ {cmd}"
