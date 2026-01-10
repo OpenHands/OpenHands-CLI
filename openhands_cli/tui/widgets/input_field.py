@@ -288,12 +288,6 @@ class InputField(Container):
                 self.action_toggle_input_mode()
             self.input_widget.value = content
 
-    def _set_content_and_submit(self, content: str) -> None:
-        """Set content in the appropriate widget and submit it."""
-        self._set_content_only(content)
-        # Submit the content
-        self.post_message(self.Submitted(content))
-
     @on(PasteAwareInput.PasteDetected)
     def on_paste_aware_input_paste_detected(
         self, event: PasteAwareInput.PasteDetected
