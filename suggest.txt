@@ -12,7 +12,8 @@ Users can now press **CTRL+X** to open their preferred external editor for compo
 - Opens the editor defined by $VISUAL or $EDITOR environment variables
 - Falls back to common editors (nano, vim, code) if env vars not set
 - Content is loaded into the editor, user edits and saves
-- Content is automatically loaded back into the input field when editor closes
+- Content is loaded back into the input field when editor closes
+- User must press Enter/Ctrl+Enter to submit the edited content
 - Works in both single-line and multi-line input modes
 
 ## UI Updates
