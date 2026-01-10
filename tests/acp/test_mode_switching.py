@@ -9,7 +9,7 @@ from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     NeverConfirm,
 )
-from openhands_cli.acp_impl.agent import OpenHandsACPAgent
+from openhands_cli.acp_impl.agent import LocalOpenHandsACPAgent
 from openhands_cli.acp_impl.confirmation import get_available_modes
 from openhands_cli.acp_impl.slash_commands import (
     get_confirmation_mode_from_conversation,
@@ -91,19 +91,19 @@ class TestAgentModeSwitching:
     @pytest.fixture
     def acp_agent(self, mock_connection):
         """Create an OpenHands ACP agent instance."""
-        return OpenHandsACPAgent(mock_connection, "always-ask")
+        return LocalOpenHandsACPAgent(mock_connection, "always-ask")
 
     @pytest.mark.asyncio
     async def test_agent_initializes_with_default_mode(self, mock_connection):
         """Test that agent initializes with specified mode."""
-        agent = OpenHandsACPAgent(mock_connection, "always-approve")
+        agent = LocalOpenHandsACPAgent(mock_connection, "always-approve")
         assert agent._initial_confirmation_mode == "always-approve"
 
     @pytest.mark.asyncio
     async def test_default_confirmation_mode_is_always_ask(self, mock_connection):
         """Test that the default confirmation mode for ACP is 'always-ask'."""
         # When no mode is specified, agent should default to "always-ask"
-        agent = OpenHandsACPAgent(mock_connection, "always-ask")
+        agent = LocalOpenHandsACPAgent(mock_connection, "always-ask")
         assert agent._initial_confirmation_mode == "always-ask"
 
         # Verify this matches the default parameter in run_acp_server
@@ -121,8 +121,10 @@ class TestAgentModeSwitching:
     async def test_new_session_returns_mode_state(self, acp_agent, tmp_path):
         """Test that new_session returns session mode state."""
         with (
-            patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-            patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+            patch(
+                "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+            ) as mock_load,
+            patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
         ):
             mock_agent = MagicMock()
             mock_agent.llm.model = "test-model"
@@ -140,8 +142,10 @@ class TestAgentModeSwitching:
     async def test_mode_not_persists_across_session(self, acp_agent, tmp_path):
         """Test that confirmation mode persists within a session."""
         with (
-            patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-            patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+            patch(
+                "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+            ) as mock_load,
+            patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
         ):
             mock_agent = MagicMock()
             mock_agent.llm.model = "test-model"
@@ -176,8 +180,10 @@ class TestAgentModeSwitching:
         """Test that /confirm command updates the conversation's confirmation policy."""
 
         with (
-            patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-            patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+            patch(
+                "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+            ) as mock_load,
+            patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
         ):
             mock_agent = MagicMock()
             mock_agent.llm.model = "test-model"
@@ -205,8 +211,10 @@ class TestAgentModeSwitching:
     async def test_multiple_mode_switches_in_session(self, acp_agent, tmp_path):
         """Test switching modes multiple times within a session."""
         with (
-            patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-            patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+            patch(
+                "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+            ) as mock_load,
+            patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
         ):
             mock_agent = MagicMock()
             mock_agent.llm.model = "test-model"
@@ -252,8 +260,10 @@ class TestAgentModeSwitching:
     async def test_invalid_mode_keeps_current_mode(self, acp_agent, tmp_path):
         """Test that invalid mode doesn't change current mode."""
         with (
-            patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-            patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+            patch(
+                "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+            ) as mock_load,
+            patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
         ):
             mock_agent = MagicMock()
             mock_agent.llm.model = "test-model"
@@ -280,8 +290,10 @@ class TestAgentModeSwitching:
     async def test_different_sessions_have_independent_modes(self, acp_agent, tmp_path):
         """Test that different sessions can have different confirmation modes."""
         with (
-            patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-            patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+            patch(
+                "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+            ) as mock_load,
+            patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
         ):
             mock_agent = MagicMock()
             mock_agent.llm.model = "test-model"
@@ -338,14 +350,16 @@ class TestSlashCommandIntegration:
     @pytest.fixture
     def acp_agent(self, mock_connection):
         """Create an OpenHands ACP agent instance."""
-        return OpenHandsACPAgent(mock_connection, "always-ask")
+        return LocalOpenHandsACPAgent(mock_connection, "always-ask")
 
     @pytest.mark.asyncio
     async def test_help_command_returns_available_commands(self, acp_agent, tmp_path):
         """Test that /help command returns list of available commands."""
         with (
-            patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-            patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+            patch(
+                "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+            ) as mock_load,
+            patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
         ):
             mock_agent = MagicMock()
             mock_agent.llm.model = "test-model"
@@ -374,8 +388,10 @@ class TestSlashCommandIntegration:
     async def test_unknown_slash_command_returns_error(self, acp_agent, tmp_path):
         """Test that unknown slash commands return helpful error."""
         with (
-            patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-            patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+            patch(
+                "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+            ) as mock_load,
+            patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
         ):
             mock_agent = MagicMock()
             mock_agent.llm.model = "test-model"
@@ -401,8 +417,10 @@ class TestSlashCommandIntegration:
     async def test_confirm_without_argument_shows_help(self, acp_agent, tmp_path):
         """Test that /confirm without argument shows help text."""
         with (
-            patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-            patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+            patch(
+                "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+            ) as mock_load,
+            patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
         ):
             mock_agent = MagicMock()
             mock_agent.llm.model = "test-model"
@@ -436,8 +454,10 @@ class TestSlashCommandIntegration:
     async def test_slash_command_case_insensitive(self, acp_agent, tmp_path):
         """Test that slash commands are case-insensitive."""
         with (
-            patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-            patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+            patch(
+                "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+            ) as mock_load,
+            patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
         ):
             mock_agent = MagicMock()
             mock_agent.llm.model = "test-model"

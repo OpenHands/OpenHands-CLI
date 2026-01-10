@@ -1,0 +1,32 @@
+import logging
+from typing import Literal
+
+from acp.schema import (
+    SessionModeState,
+)
+
+from openhands_cli.acp_impl.confirmation import (
+    ConfirmationMode,
+    get_available_modes,
+)
+
+
+logger = logging.getLogger(__name__)
+
+
+def get_session_mode_state(current_mode: ConfirmationMode) -> SessionModeState:
+    """Get the session mode state for a given confirmation mode.
+
+    Args:
+        current_mode: The current confirmation mode
+
+    Returns:
+        SessionModeState with available modes and current mode
+    """
+    return SessionModeState(
+        current_mode_id=current_mode,
+        available_modes=get_available_modes(),
+    )
+
+
+AgentType = Literal["remote", "local"]

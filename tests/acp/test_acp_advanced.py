@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 
 from openhands.tools.file_editor.definition import FileEditorAction
-from openhands_cli.acp_impl.agent import OpenHandsACPAgent
+from openhands_cli.acp_impl.agent import LocalOpenHandsACPAgent
 from openhands_cli.acp_impl.events.utils import extract_action_locations
 
 
@@ -20,7 +20,7 @@ def mock_connection():
 @pytest.fixture
 def acp_agent(mock_connection):
     """Create an OpenHands ACP agent instance."""
-    return OpenHandsACPAgent(mock_connection, "always-ask")
+    return LocalOpenHandsACPAgent(mock_connection, "always-ask")
 
 
 @pytest.mark.asyncio
@@ -29,8 +29,8 @@ async def test_get_or_create_conversation_caching(acp_agent, tmp_path):
     session_id = str(uuid4())
 
     with (
-        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-        patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+        patch("openhands_cli.acp_impl.agent.local_agent.load_agent_specs") as mock_load,
+        patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
     ):
         mock_agent = MagicMock()
         mock_load.return_value = mock_agent
@@ -39,7 +39,7 @@ async def test_get_or_create_conversation_caching(acp_agent, tmp_path):
         mock_conv.return_value = mock_conversation
 
         # First call should create a new conversation
-        conv1 = acp_agent._get_or_create_conversation(
+        conv1 = await acp_agent._get_or_create_conversation(
             session_id=session_id, working_dir=str(tmp_path)
         )
 
@@ -47,7 +47,7 @@ async def test_get_or_create_conversation_caching(acp_agent, tmp_path):
         assert session_id in acp_agent._active_sessions
 
         # Second call should return cached conversation
-        conv2 = acp_agent._get_or_create_conversation(session_id=session_id)
+        conv2 = await acp_agent._get_or_create_conversation(session_id=session_id)
 
         assert conv2 == conv1
         assert conv2 == mock_conversation
