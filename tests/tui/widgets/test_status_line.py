@@ -152,14 +152,17 @@ def test_handle_multiline_mode_updates_indicator_and_refreshes(dummy_app, monkey
 
     # Enable multiline mode
     widget._on_handle_mutliline_mode(True)
-    assert widget.mode_indicator == "[Multi-line: Ctrl+J to submit]"
+    assert (
+        widget.mode_indicator
+        == "[Multi-line: Ctrl+J to submit • Ctrl+E for custom editor]"
+    )
     update_text_mock.assert_called_once()
 
     update_text_mock.reset_mock()
 
     # Disable multiline mode
     widget._on_handle_mutliline_mode(False)
-    assert widget.mode_indicator == "[Ctrl+L for multi-line]"
+    assert widget.mode_indicator == "[Ctrl+L for multi-line • Ctrl+E for custom editor]"
     update_text_mock.assert_called_once()
 
 

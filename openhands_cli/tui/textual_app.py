@@ -61,7 +61,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+o", "toggle_cells", "Toggle Cells"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
-        ("ctrl+t", "open_external_editor", "Open external editor"),
+        ("ctrl+e", "open_external_editor", "Open external editor"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
         ("ctrl+c", "request_quit", "Quit the application"),
@@ -611,6 +611,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def action_open_external_editor(self) -> None:
         """Forward open external editor action to the input field."""
+        # Debug: notify that the main app action was triggered
+        self.notify("Main app CTRL+E action triggered", severity="information")
         self.input_field.action_open_external_editor()
 
     def _handle_confirm_command(self) -> None:

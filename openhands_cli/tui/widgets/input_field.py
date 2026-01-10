@@ -8,7 +8,7 @@ from typing import ClassVar
 from textual import on
 from textual.binding import Binding
 from textual.containers import Container
-from textual.events import Paste
+from textual.events import Key, Paste
 from textual.message import Message
 from textual.signal import Signal
 from textual.widgets import Input, TextArea
@@ -40,12 +40,12 @@ class PasteAwareInput(Input):
 
 def get_external_editor() -> str:
     """Get the user's preferred external editor from environment variables.
-    
+
     Checks VISUAL first, then EDITOR, then falls back to common editors.
-    
+
     Returns:
         str: The editor command to use
-        
+
     Raises:
         RuntimeError: If no suitable editor is found
     """
@@ -57,20 +57,25 @@ def get_external_editor() -> str:
             editor_cmd = editor.split()[0]
             if shutil.which(editor_cmd):
                 return editor
-    
+
     # Fallback to common editors
     for editor in ["vim", "nano", "emacs", "vi"]:
         if shutil.which(editor):
             return editor
-    
-    raise RuntimeError("No suitable editor found. Set VISUAL or EDITOR environment variable, or install vim/nano/emacs.")
+
+    raise RuntimeError(
+        "No suitable editor found. Set VISUAL or EDITOR environment variable, "
+        "or install vim/nano/emacs."
+    )
 
 
 class InputField(Container):
     BINDINGS: ClassVar = [
         Binding("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         Binding("ctrl+j", "submit_textarea", "Submit multi-line input"),
-        Binding("ctrl+t", "open_external_editor", "Open external editor"),
+        Binding(
+            "ctrl+e", "open_external_editor", "Open external editor", priority=True
+        ),
     ]
 
     DEFAULT_CSS = """
@@ -211,8 +216,21 @@ class InputField(Container):
         else:
             self.input_widget.focus()
 
+    def on_key(self, event: Key) -> None:
+        """Handle key events, including overriding built-in CTRL+E."""
+        if event.key == "ctrl+e":
+            # Override the built-in ctrl+e binding
+            event.prevent_default()
+            self.action_open_external_editor()
+        # Note: We don't call super().on_key(event) as Container lacks this method
+
     def action_open_external_editor(self) -> None:
         """Open external editor for composing input."""
+        # Debug: notify that the action was triggered
+        self.app.notify(
+            "CTRL+E triggered - opening external editor...", severity="information"
+        )
+
         try:
             editor_cmd = get_external_editor()
         except RuntimeError as e:
@@ -222,10 +240,10 @@ class InputField(Container):
         try:
             # Get current content
             current_content = self.get_current_value()
-            
+
             # Create temporary file with current content
             with tempfile.NamedTemporaryFile(
-                mode='w+', suffix='.txt', delete=False, encoding='utf-8'
+                mode="w+", suffix=".txt", delete=False, encoding="utf-8"
             ) as tmp_file:
                 tmp_file.write(current_content)
                 tmp_path = tmp_file.name
@@ -233,30 +251,32 @@ class InputField(Container):
             try:
                 # Notify user that editor is opening
                 self.app.notify("Opening external editor...", timeout=1)
-                
+
                 # Suspend the TUI and launch editor
                 with self.app.suspend():
                     # Split editor command to handle arguments (e.g., "code --wait")
                     editor_args = editor_cmd.split()
                     subprocess.run(editor_args + [tmp_path], check=True)
-                
+
                 # Read the edited content
-                with open(tmp_path, 'r', encoding='utf-8') as f:
+                with open(tmp_path, encoding="utf-8") as f:
                     edited_content = f.read().rstrip()  # Remove trailing whitespace
-                
+
                 # Only update and submit if content was provided
                 if edited_content:
                     self._set_content_and_submit(edited_content)
                     # Show feedback if content changed
                     if edited_content != current_content:
-                        self.app.notify("Content updated from editor", severity="information")
+                        self.app.notify(
+                            "Content updated from editor", severity="information"
+                        )
                 else:
                     self.app.notify("Editor closed without content", severity="warning")
-                    
+
             finally:
                 # Clean up temporary file
                 Path(tmp_path).unlink(missing_ok=True)
-                
+
         except subprocess.CalledProcessError:
             self.app.notify("Editor was cancelled or failed", severity="warning")
         except Exception as e:
@@ -275,7 +295,7 @@ class InputField(Container):
             if self.is_multiline_mode:
                 self.action_toggle_input_mode()
             self.input_widget.value = content
-        
+
         # Submit the content
         self.post_message(self.Submitted(content))
 
