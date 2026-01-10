@@ -16,7 +16,7 @@ class ConversationInfo(BaseModel):
     """Information about a conversation."""
 
     id: str
-    first_user_prompt: str | None
+    first_user_prompt: str | None  # Also serves as title
     created_date: datetime
 
 
@@ -156,3 +156,6 @@ class ConversationLister:
 
         # Conversations are already sorted by created_date (latest first)
         return conversations[0].id
+
+    # Note: we intentionally do not cache titles yet; the UI can derive them
+    # from the first user message.

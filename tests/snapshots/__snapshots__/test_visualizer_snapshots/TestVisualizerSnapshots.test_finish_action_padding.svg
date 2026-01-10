@@ -33,7 +33,7 @@
     }
 
     .terminal-r1 { fill: #c5c8c6 }
-.terminal-r2 { fill: #fee165 }
+.terminal-r2 { fill: #dedede }
 .terminal-r3 { fill: #ffffff }
     </style>
 
