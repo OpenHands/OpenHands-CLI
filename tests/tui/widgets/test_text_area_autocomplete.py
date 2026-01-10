@@ -120,7 +120,7 @@ class TestTextAreaAutoComplete:
         (tmp_path / "src").mkdir()
 
         monkeypatch.setattr(
-            "openhands_cli.refactor.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
             str(tmp_path),
         )
 
@@ -146,7 +146,7 @@ class TestTextAreaAutoComplete:
     def test_file_candidates_for_nonexistent_directory(self, tmp_path, monkeypatch):
         """Non-existent directories produce no file candidates."""
         monkeypatch.setattr(
-            "openhands_cli.refactor.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
             str(tmp_path),
         )
 
@@ -162,7 +162,7 @@ class TestTextAreaAutoComplete:
         (tmp_path / "setup.py").write_text("test")
 
         monkeypatch.setattr(
-            "openhands_cli.refactor.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
             str(tmp_path),
         )
 
@@ -183,7 +183,7 @@ class TestTextAreaAutoComplete:
         (src_dir / "utils.py").write_text("test")
 
         monkeypatch.setattr(
-            "openhands_cli.refactor.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
             str(tmp_path),
         )
 
@@ -200,7 +200,7 @@ class TestTextAreaAutoComplete:
         (tmp_path / "visible.txt").write_text("test")
 
         monkeypatch.setattr(
-            "openhands_cli.refactor.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
             str(tmp_path),
         )
 
@@ -219,7 +219,7 @@ class TestTextAreaAutoComplete:
         (tmp_path / "visible.txt").write_text("test")
 
         monkeypatch.setattr(
-            "openhands_cli.refactor.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
             str(tmp_path),
         )
 
@@ -232,7 +232,7 @@ class TestTextAreaAutoComplete:
     def test_file_candidates_handles_permission_error(self, tmp_path, monkeypatch):
         """File candidates gracefully handle permission errors."""
         monkeypatch.setattr(
-            "openhands_cli.refactor.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
             str(tmp_path),
         )
 
@@ -336,46 +336,6 @@ class TestTextAreaAutoComplete:
         assert result == item
         assert autocomplete.display is False
 
-    def test_move_highlight_does_nothing_when_not_visible(self, autocomplete):
-        """move_highlight does nothing when dropdown is not visible."""
-        autocomplete.display = False
-
-        mock_option_list = mock.MagicMock()
-        with mock.patch.object(
-            type(autocomplete), "option_list", new_callable=mock.PropertyMock
-        ) as mock_prop:
-            mock_prop.return_value = mock_option_list
-            autocomplete.move_highlight(1)
-
-        mock_option_list.action_cursor_down.assert_not_called()
-        mock_option_list.action_cursor_up.assert_not_called()
-
-    def test_move_highlight_moves_cursor_down(self, autocomplete):
-        """move_highlight with positive direction moves cursor down."""
-        autocomplete.display = True
-
-        mock_option_list = mock.MagicMock()
-        with mock.patch.object(
-            type(autocomplete), "option_list", new_callable=mock.PropertyMock
-        ) as mock_prop:
-            mock_prop.return_value = mock_option_list
-            autocomplete.move_highlight(1)
-
-        mock_option_list.action_cursor_down.assert_called_once()
-
-    def test_move_highlight_moves_cursor_up(self, autocomplete):
-        """move_highlight with negative direction moves cursor up."""
-        autocomplete.display = True
-
-        mock_option_list = mock.MagicMock()
-        with mock.patch.object(
-            type(autocomplete), "option_list", new_callable=mock.PropertyMock
-        ) as mock_prop:
-            mock_prop.return_value = mock_option_list
-            autocomplete.move_highlight(-1)
-
-        mock_option_list.action_cursor_up.assert_called_once()
-
     # process_key tests
 
     def test_process_key_returns_false_when_not_visible(self, autocomplete):
@@ -388,25 +348,33 @@ class TestTextAreaAutoComplete:
         assert autocomplete.process_key("enter") is False
         assert autocomplete.process_key("escape") is False
 
-    def test_process_key_down_moves_highlight(self, autocomplete):
-        """process_key 'down' moves highlight down."""
+    def test_process_key_down_moves_cursor_down(self, autocomplete):
+        """process_key 'down' moves cursor down via option_list."""
         autocomplete.display = True
 
-        with mock.patch.object(autocomplete, "move_highlight") as mock_move:
+        mock_option_list = mock.MagicMock()
+        with mock.patch.object(
+            type(autocomplete), "option_list", new_callable=mock.PropertyMock
+        ) as mock_prop:
+            mock_prop.return_value = mock_option_list
             result = autocomplete.process_key("down")
 
         assert result is True
-        mock_move.assert_called_once_with(1)
+        mock_option_list.action_cursor_down.assert_called_once()
 
-    def test_process_key_up_moves_highlight(self, autocomplete):
-        """process_key 'up' moves highlight up."""
+    def test_process_key_up_moves_cursor_up(self, autocomplete):
+        """process_key 'up' moves cursor up via option_list."""
         autocomplete.display = True
 
-        with mock.patch.object(autocomplete, "move_highlight") as mock_move:
+        mock_option_list = mock.MagicMock()
+        with mock.patch.object(
+            type(autocomplete), "option_list", new_callable=mock.PropertyMock
+        ) as mock_prop:
+            mock_prop.return_value = mock_option_list
             result = autocomplete.process_key("up")
 
         assert result is True
-        mock_move.assert_called_once_with(-1)
+        mock_option_list.action_cursor_up.assert_called_once()
 
     def test_process_key_escape_hides_dropdown(self, autocomplete):
         """process_key 'escape' hides the dropdown."""
@@ -498,7 +466,7 @@ class TestTextAreaAutoComplete:
         (tmp_path / "test.txt").write_text("test")
 
         monkeypatch.setattr(
-            "openhands_cli.refactor.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
             str(tmp_path),
         )
 

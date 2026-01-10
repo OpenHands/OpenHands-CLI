@@ -32,10 +32,16 @@ def field_with_mocks(input_field: InputField) -> Generator[InputField, None, Non
     input_field.input_widget.focus = input_focus_mock
     input_field.textarea_widget.focus = textarea_focus_mock
 
+    # Mock the document property for input_widget (needed for move_cursor)
+    mock_input_document = MagicMock()
+    mock_input_document.end = (0, 0)  # Mock end location
+    input_field.input_widget.document = mock_input_document
+    input_field.input_widget.move_cursor = MagicMock()
+
     # Mock the document property for textarea_widget (needed for move_cursor)
-    mock_document = MagicMock()
-    mock_document.end = (0, 0)  # Mock end location
-    input_field.textarea_widget.document = mock_document
+    mock_textarea_document = MagicMock()
+    mock_textarea_document.end = (0, 0)  # Mock end location
+    input_field.textarea_widget.document = mock_textarea_document
     input_field.textarea_widget.move_cursor = MagicMock()
 
     # Create mock for the signal and its publish method
@@ -73,25 +79,25 @@ class TestInputField:
         # Widgets themselves are created in compose() / on_mount(), so not asserted.
 
     @pytest.mark.parametrize(
-        "mutliline_content, expected_singleline_content",
+        "content",
         [
-            ("Simple text", "Simple text"),
-            (
-                "Line 1\nLine 2",
-                "Line 1\\nLine 2",
-            ),
-            ("Multi\nLine\nText", "Multi\\nLine\\nText"),
-            ("", ""),
-            ("\n\n", "\\n\\n"),
+            "Simple text",
+            "Line 1\nLine 2",
+            "Multi\nLine\nText",
+            "",
+            "\n\n",
         ],
     )
-    def test_toggle_input_mode_converts_and_toggles_visibility(
+    def test_toggle_input_mode_preserves_content_and_toggles_visibility(
         self,
         field_with_mocks: InputField,
-        mutliline_content,
-        expected_singleline_content,
+        content,
     ) -> None:
-        """Toggling mode converts newline representation and flips displays + signal."""
+        """Toggling mode preserves content and flips displays + signal.
+
+        Note: With AutoGrowTextArea, newlines are preserved as-is (no conversion
+        to literal \\n) since the widget supports soft wrapping.
+        """
         # Mock the screen and query_one for input_area
         mock_screen = MagicMock()
         mock_input_area = MagicMock()
@@ -110,20 +116,20 @@ class TestInputField:
             assert field_with_mocks.textarea_widget.display is True
 
             # Seed instructions
-            field_with_mocks.textarea_widget.text = mutliline_content
+            field_with_mocks.textarea_widget.text = content
 
             field_with_mocks.action_toggle_input_mode()
             field_with_mocks.mutliline_mode_status.publish.assert_called()  # type: ignore
 
-            # Mutli-line -> single-line
-            assert field_with_mocks.input_widget.text == expected_singleline_content
+            # Mutli-line -> single-line: content is preserved as-is
+            assert field_with_mocks.input_widget.text == content
 
             # Single-line -> multi-line
             field_with_mocks.action_toggle_input_mode()
             field_with_mocks.mutliline_mode_status.publish.assert_called()  # type: ignore
 
             # Check original content is preserved
-            assert field_with_mocks.textarea_widget.text == mutliline_content
+            assert field_with_mocks.textarea_widget.text == content
 
     @pytest.mark.parametrize(
         "content, should_submit",
