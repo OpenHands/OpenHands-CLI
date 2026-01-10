@@ -246,47 +246,9 @@ class InputField(Container):
         if not self.is_multiline_mode:
             # Get current text and cursor position before switching modes
             current_text = self.input_widget.text
-            cursor_pos = self.input_widget.cursor_position
-
-            # Insert the pasted text at the cursor position
-            new_text = (
-                current_text[:cursor_pos] + event.text + current_text[cursor_pos:]
+            self.input_widget.insert(
+                event.text, 
+                self.input_widget.cursor_location,
             )
-
-            # Calculate where cursor should be after paste (end of pasted content)
-            new_cursor_pos = cursor_pos + len(event.text)
-
-            # Set the combined text in the input widget first
-            self.input_widget.text = new_text
-
             # Switch to multi-line mode
             self.action_toggle_input_mode()
-
-            # Move cursor to end of pasted content (not end of entire text)
-            target_location = self._offset_to_location(new_text, new_cursor_pos)
-            self.textarea_widget.move_cursor(target_location)
-
-    def _offset_to_location(self, text: str, offset: int) -> tuple[int, int]:
-        """Convert character offset to (row, col) location for any text.
-
-        Args:
-            text: The text content
-            offset: Character offset from start of text
-
-        Returns:
-            Tuple of (row, col) for TextArea cursor location
-        """
-        offset = max(0, min(offset, len(text)))
-
-        row = 0
-        col = 0
-        for i, char in enumerate(text):
-            if i == offset:
-                break
-            if char == "\n":
-                row += 1
-                col = 0
-            else:
-                col += 1
-
-        return (row, col)
