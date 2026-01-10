@@ -254,9 +254,9 @@ class InputField(Container):
                 with open(tmp_path, encoding="utf-8") as f:
                     edited_content = f.read().rstrip()  # Remove trailing whitespace
 
-                # Only update and submit if content was provided
+                # Only update if content was provided (don't auto-submit)
                 if edited_content:
-                    self._set_content_and_submit(edited_content)
+                    self._set_content_only(edited_content)
                     # Show feedback if content changed
                     if edited_content != current_content:
                         self.app.notify(
@@ -274,8 +274,8 @@ class InputField(Container):
         except Exception as e:
             self.app.notify(f"Editor error: {e}", severity="error")
 
-    def _set_content_and_submit(self, content: str) -> None:
-        """Set content in the appropriate widget and submit it."""
+    def _set_content_only(self, content: str) -> None:
+        """Set content in the appropriate widget without submitting."""
         # Check if content has multiple lines
         if "\n" in content:
             # Multi-line content - ensure we're in textarea mode
@@ -288,6 +288,9 @@ class InputField(Container):
                 self.action_toggle_input_mode()
             self.input_widget.value = content
 
+    def _set_content_and_submit(self, content: str) -> None:
+        """Set content in the appropriate widget and submit it."""
+        self._set_content_only(content)
         # Submit the content
         self.post_message(self.Submitted(content))
 
