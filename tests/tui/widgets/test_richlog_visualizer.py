@@ -638,7 +638,9 @@ EOF"""
         action_event = create_terminal_action_event(long_cmd, summary=None)
 
         title = visualizer._build_action_title(action_event)
-        assert title.startswith("$ ")
+        # Command without summary is wrapped in [dim] tags
+        assert title.startswith("[dim]$ ")
+        assert title.endswith("[/dim]")
         assert "..." in title
 
     def test_truncate_from_end_for_paths(self, visualizer):

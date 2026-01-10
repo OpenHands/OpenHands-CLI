@@ -189,9 +189,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def _build_action_title(self, event: ActionEvent) -> str:
         """Build a title for an action event.
 
-        Format: "[bold]{summary}[/bold]" for most actions
-                "[bold]{summary}[/bold]: $ {command}" for terminal actions
-                "[bold]{summary}[/bold]: Reading/Editing {path}" for file operations
+        Format:
+            "[bold]{summary}[/bold]" for most actions
+            "[bold]{summary}[/bold][dim]: $ {command}[/dim]" for terminal
+            "[bold]{summary}[/bold][dim]: Reading/Editing {path}[/dim]" for files
+
+        The detail portion (after the colon) is rendered in dim style to
+        visually distinguish it from the main summary text.
         """
         summary = (
             self._escape_rich_markup(str(event.summary).strip().replace("\n", " "))
@@ -205,16 +209,16 @@ class ConversationVisualizer(ConversationVisualizerBase):
             cmd = self._escape_rich_markup(action.command.strip().replace("\n", " "))
             cmd = self._truncate_for_display(cmd)
             if summary:
-                return f"[bold]{summary}[/bold]: $ {cmd}"
-            return f"$ {cmd}"
+                return f"[bold]{summary}[/bold][dim]: $ {cmd}[/dim]"
+            return f"[dim]$ {cmd}[/dim]"
 
         # File operations: include path with Reading/Editing
         if isinstance(action, FileEditorAction) and action.path:
             op = "Reading" if action.command == "view" else "Editing"
             path = self._escape_rich_markup(action.path)
             if summary:
-                return f"[bold]{summary}[/bold]: {op} {path}"
-            return f"[bold]{op}[/bold] {path}"
+                return f"[bold]{summary}[/bold][dim]: {op} {path}[/dim]"
+            return f"[bold]{op}[/bold][dim] {path}[/dim]"
 
         # All other actions: just use summary
         if summary:
