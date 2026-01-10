@@ -49,7 +49,7 @@ HISTORY_PANEL_STYLE = """
         margin-top: 1;
     }
 
-    #history-list {
+    #history-list-local, #history-list-cloud {
         height: 1fr;
     }
 
