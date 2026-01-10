@@ -24,11 +24,15 @@ from openhands_cli.tui.panels.history_panel_style import HISTORY_PANEL_STYLE
 class HistoryConversationRow:
     """A normalized conversation row for the History panel (local or cloud)."""
 
+    # Source constants (avoid magic strings)
+    SOURCE_LOCAL = "local"
+    SOURCE_CLOUD = "cloud"
+
     select_id: str
     display_id: str
     created_date: datetime
     first_user_prompt: str | None
-    source: str  # "local" | "cloud"
+    source: str  # SOURCE_LOCAL | SOURCE_CLOUD
 
 
 class HistoryItem(Static):
@@ -52,7 +56,11 @@ class HistoryItem(Static):
         # Build the content string - show first_user_prompt as title, id as secondary
         time_str = _format_time(conversation.created_date)
         full_id = conversation.display_id
-        source_prefix = "[dim]cloud[/dim] " if conversation.source == "cloud" else ""
+        source_prefix = (
+            "[dim]cloud[/dim] "
+            if conversation.source == HistoryConversationRow.SOURCE_CLOUD
+            else ""
+        )
 
         # Use first_user_prompt as title if available, otherwise use ID
         has_title = bool(conversation.first_user_prompt)
@@ -98,10 +106,14 @@ class HistoryItem(Static):
         """Update the displayed title for this history item."""
         time_str = _format_time(self._created_date)
         title_text = _truncate(title, 100)
-        source_prefix = "[dim]cloud[/dim] " if self._source == "cloud" else ""
+        source_prefix = (
+            "[dim]cloud[/dim] "
+            if self._source == HistoryConversationRow.SOURCE_CLOUD
+            else ""
+        )
         display_id = (
             self.conversation_id.removeprefix("cloud:")
-            if self._source == "cloud"
+            if self._source == HistoryConversationRow.SOURCE_CLOUD
             else self.conversation_id
         )
         self.update(
@@ -217,7 +229,7 @@ class HistorySidePanel(Container):
                     display_id=conv.id,
                     created_date=conv.created_date,
                     first_user_prompt=conv.first_user_prompt,
-                    source="local",
+                    source=HistoryConversationRow.SOURCE_LOCAL,
                 )
             )
         return rows
@@ -259,7 +271,7 @@ class HistorySidePanel(Container):
                     display_id=conv.id,
                     created_date=conv.created_date,
                     first_user_prompt=conv.title,
-                    source="cloud",
+                    source=HistoryConversationRow.SOURCE_CLOUD,
                 )
                 for conv in cloud_convs
             ]
@@ -296,7 +308,7 @@ class HistorySidePanel(Container):
                     display_id="cloud",
                     created_date=datetime.now(),
                     first_user_prompt="Loading cloud conversations…",
-                    source="cloud",
+                    source=HistoryConversationRow.SOURCE_CLOUD,
                 )
             )
         elif self._cloud_error:
@@ -306,7 +318,7 @@ class HistorySidePanel(Container):
                     display_id="cloud",
                     created_date=datetime.now(),
                     first_user_prompt=f"Cloud unavailable: {self._cloud_error}",
-                    source="cloud",
+                    source=HistoryConversationRow.SOURCE_CLOUD,
                 )
             )
         else:
@@ -334,9 +346,12 @@ class HistorySidePanel(Container):
         )
 
         for conv in visible_items:
-            is_current = conv.source == "local" and conv.select_id == current_id_str
+            is_current = (
+                conv.source == HistoryConversationRow.SOURCE_LOCAL
+                and conv.select_id == current_id_str
+            )
             is_selected = (
-                conv.source == "local"
+                conv.source == HistoryConversationRow.SOURCE_LOCAL
                 and conv.select_id == selected_id_str
                 and selected_id_str is not None
             )
