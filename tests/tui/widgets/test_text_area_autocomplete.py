@@ -6,7 +6,6 @@ import pytest
 
 from openhands_cli.tui.widgets.user_input.autocomplete_dropdown import (
     AutoCompleteDropdown,
-    detect_completion_type,
 )
 from openhands_cli.tui.widgets.user_input.models import (
     CompletionItem,
@@ -14,8 +13,21 @@ from openhands_cli.tui.widgets.user_input.models import (
 )
 
 
+def create_mock_single_line_widget(text=""):
+    """Create a mock SingleLineInputWithWraping widget."""
+    mock_widget = mock.MagicMock()
+    mock_widget.text = text
+    return mock_widget
+
+
 class TestDetectCompletionType:
-    """Tests for the detect_completion_type function."""
+    """Tests for the _detect_completion_type method."""
+
+    @pytest.fixture
+    def autocomplete(self):
+        """Create an autocomplete instance for testing."""
+        mock_widget = create_mock_single_line_widget()
+        return AutoCompleteDropdown(mock_widget, command_candidates=[])
 
     @pytest.mark.parametrize(
         "text,expected_type",
@@ -44,9 +56,9 @@ class TestDetectCompletionType:
             ("hello world", CompletionType.NONE),
         ],
     )
-    def test_detect_completion_type(self, text, expected_type):
-        """detect_completion_type correctly identifies completion context."""
-        assert detect_completion_type(text) == expected_type
+    def test_detect_completion_type(self, autocomplete, text, expected_type):
+        """_detect_completion_type correctly identifies completion context."""
+        assert autocomplete._detect_completion_type(text) == expected_type
 
 
 class TestAutoCompleteDropdown:
@@ -55,7 +67,8 @@ class TestAutoCompleteDropdown:
     @pytest.fixture
     def autocomplete(self):
         """Create an autocomplete instance."""
-        return AutoCompleteDropdown(command_candidates=[])
+        mock_widget = create_mock_single_line_widget()
+        return AutoCompleteDropdown(mock_widget, command_candidates=[])
 
     # Command candidate logic
 
@@ -68,7 +81,10 @@ class TestAutoCompleteDropdown:
             ("/e", 1),  # Should filter to /exit
             ("/c", 1),  # Should filter to /clear
             ("/x", 0),  # No match
-            ("/help ", 0),  # Space ends command completion (via detect_completion_type)
+            (
+                "/help ",
+                0,
+            ),  # Space ends command completion (via _detect_completion_type)
         ],
     )
     def test_get_command_candidates_filters_correctly(self, text, expected_count):
@@ -85,7 +101,10 @@ class TestAutoCompleteDropdown:
             cmd.main.plain = cmd_text
             command_candidates.append(cmd)
 
-        autocomplete = AutoCompleteDropdown(command_candidates=command_candidates)
+        mock_widget = create_mock_single_line_widget()
+        autocomplete = AutoCompleteDropdown(
+            mock_widget, command_candidates=command_candidates
+        )
 
         # Note: _get_command_candidates doesn't check for spaces - that's done
         # in update_candidates. So we need to only test valid command prefixes.
@@ -103,7 +122,8 @@ class TestAutoCompleteDropdown:
         cmd.main = mock.MagicMock()
         cmd.main.plain = "/help - Display help"
 
-        autocomplete = AutoCompleteDropdown(command_candidates=[cmd])
+        mock_widget = create_mock_single_line_widget()
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[cmd])
         candidates = autocomplete._get_command_candidates("/h")
 
         assert len(candidates) == 1
@@ -124,7 +144,8 @@ class TestAutoCompleteDropdown:
             str(tmp_path),
         )
 
-        autocomplete = AutoCompleteDropdown(command_candidates=[])
+        mock_widget = create_mock_single_line_widget()
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
         candidates = autocomplete._get_file_candidates("@")
 
         # Verify we got candidates
@@ -150,7 +171,8 @@ class TestAutoCompleteDropdown:
             str(tmp_path),
         )
 
-        autocomplete = AutoCompleteDropdown(command_candidates=[])
+        mock_widget = create_mock_single_line_widget()
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
         candidates = autocomplete._get_file_candidates("@nonexistent/")
 
         assert candidates == []
@@ -166,7 +188,8 @@ class TestAutoCompleteDropdown:
             str(tmp_path),
         )
 
-        autocomplete = AutoCompleteDropdown(command_candidates=[])
+        mock_widget = create_mock_single_line_widget()
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
         candidates = autocomplete._get_file_candidates("@R")
         display_texts = [c.display_text for c in candidates]
 
@@ -187,7 +210,8 @@ class TestAutoCompleteDropdown:
             str(tmp_path),
         )
 
-        autocomplete = AutoCompleteDropdown(command_candidates=[])
+        mock_widget = create_mock_single_line_widget()
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
         candidates = autocomplete._get_file_candidates("@src/")
         display_texts = [c.display_text for c in candidates]
 
@@ -204,7 +228,8 @@ class TestAutoCompleteDropdown:
             str(tmp_path),
         )
 
-        autocomplete = AutoCompleteDropdown(command_candidates=[])
+        mock_widget = create_mock_single_line_widget()
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
         candidates = autocomplete._get_file_candidates("@")
         display_texts = [c.display_text for c in candidates]
 
@@ -223,7 +248,8 @@ class TestAutoCompleteDropdown:
             str(tmp_path),
         )
 
-        autocomplete = AutoCompleteDropdown(command_candidates=[])
+        mock_widget = create_mock_single_line_widget()
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
         candidates = autocomplete._get_file_candidates("@.")
         display_texts = [c.display_text for c in candidates]
 
@@ -236,7 +262,8 @@ class TestAutoCompleteDropdown:
             str(tmp_path),
         )
 
-        autocomplete = AutoCompleteDropdown(command_candidates=[])
+        mock_widget = create_mock_single_line_widget()
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
 
         with mock.patch("pathlib.Path.iterdir", side_effect=PermissionError):
             candidates = autocomplete._get_file_candidates("@")
@@ -386,8 +413,8 @@ class TestAutoCompleteDropdown:
         assert result is True
         mock_hide.assert_called_once()
 
-    def test_process_key_tab_selects_and_posts_message(self, autocomplete):
-        """process_key 'tab' selects highlighted and posts message."""
+    def test_process_key_tab_selects_and_applies_completion(self, autocomplete):
+        """process_key 'tab' selects highlighted and applies completion."""
         item = CompletionItem(
             display_text="test",
             completion_value="test",
@@ -397,18 +424,15 @@ class TestAutoCompleteDropdown:
 
         with (
             mock.patch.object(autocomplete, "select_highlighted", return_value=item),
-            mock.patch.object(autocomplete, "post_message") as mock_post,
+            mock.patch.object(autocomplete, "apply_completion") as mock_apply,
         ):
             result = autocomplete.process_key("tab")
 
         assert result is True
-        mock_post.assert_called_once()
-        message = mock_post.call_args[0][0]
-        assert isinstance(message, AutoCompleteDropdown.CompletionSelected)
-        assert message.item == item
+        mock_apply.assert_called_once_with(item)
 
-    def test_process_key_enter_selects_and_posts_message(self, autocomplete):
-        """process_key 'enter' selects highlighted and posts message."""
+    def test_process_key_enter_selects_and_applies_completion(self, autocomplete):
+        """process_key 'enter' selects highlighted and applies completion."""
         item = CompletionItem(
             display_text="test",
             completion_value="test",
@@ -418,17 +442,20 @@ class TestAutoCompleteDropdown:
 
         with (
             mock.patch.object(autocomplete, "select_highlighted", return_value=item),
-            mock.patch.object(autocomplete, "post_message") as mock_post,
+            mock.patch.object(autocomplete, "apply_completion") as mock_apply,
         ):
             result = autocomplete.process_key("enter")
 
         assert result is True
-        mock_post.assert_called_once()
+        mock_apply.assert_called_once_with(item)
 
     # update_candidates tests
 
-    def test_update_candidates_routes_to_command(self, autocomplete):
+    def test_update_candidates_routes_to_command(self):
         """update_candidates calls _get_command_candidates for / prefix."""
+        mock_widget = create_mock_single_line_widget("/help")
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
+
         with (
             mock.patch.object(
                 autocomplete, "_get_command_candidates", return_value=[]
@@ -438,13 +465,16 @@ class TestAutoCompleteDropdown:
             ) as mock_file,
             mock.patch.object(autocomplete, "hide_dropdown"),
         ):
-            autocomplete.update_candidates("/help")
+            autocomplete.update_candidates()
 
         mock_cmd.assert_called_once_with("/help")
         mock_file.assert_not_called()
 
-    def test_update_candidates_routes_to_file(self, autocomplete):
+    def test_update_candidates_routes_to_file(self):
         """update_candidates calls _get_file_candidates for @ prefix."""
+        mock_widget = create_mock_single_line_widget("@README")
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
+
         with (
             mock.patch.object(
                 autocomplete, "_get_command_candidates", return_value=[]
@@ -454,7 +484,7 @@ class TestAutoCompleteDropdown:
             ) as mock_file,
             mock.patch.object(autocomplete, "hide_dropdown"),
         ):
-            autocomplete.update_candidates("@README")
+            autocomplete.update_candidates()
 
         mock_file.assert_called_once_with("@README")
         mock_cmd.assert_not_called()
@@ -470,27 +500,34 @@ class TestAutoCompleteDropdown:
             str(tmp_path),
         )
 
-        autocomplete = AutoCompleteDropdown(command_candidates=[])
+        mock_widget = create_mock_single_line_widget("@t")
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
 
         with mock.patch.object(autocomplete, "show_dropdown") as mock_show:
-            autocomplete.update_candidates("@t")
+            autocomplete.update_candidates()
             mock_show.assert_called_once()
             args = mock_show.call_args[0][0]
             assert len(args) > 0
             assert all(isinstance(c, CompletionItem) for c in args)
 
-    def test_update_candidates_hides_dropdown_for_no_candidates(self, autocomplete):
+    def test_update_candidates_hides_dropdown_for_no_candidates(self):
         """update_candidates hides dropdown when no candidates are found."""
+        mock_widget = create_mock_single_line_widget("no match here")
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
+
         with mock.patch.object(autocomplete, "hide_dropdown") as mock_hide:
-            autocomplete.update_candidates("no match here")
+            autocomplete.update_candidates()
             mock_hide.assert_called_once()
 
-    def test_update_candidates_sets_completion_type(self, autocomplete):
+    def test_update_candidates_sets_completion_type(self):
         """update_candidates sets the current_completion_type."""
+        mock_widget = create_mock_single_line_widget("/help")
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
+
         with (
             mock.patch.object(autocomplete, "_get_command_candidates", return_value=[]),
             mock.patch.object(autocomplete, "hide_dropdown"),
         ):
-            autocomplete.update_candidates("/help")
+            autocomplete.update_candidates()
 
         assert autocomplete._current_completion_type == CompletionType.COMMAND

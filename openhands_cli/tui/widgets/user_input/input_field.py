@@ -152,7 +152,7 @@ class InputField(Container):
         self.active_input_widget = self.multiline_widget
 
     @on(TextArea.Changed)
-    def _on_text_area_changed(self, event: TextArea.Changed) -> None:
+    def _on_text_area_changed(self, _event: TextArea.Changed) -> None:
         """Update autocomplete when text changes in single-line mode."""
         if self.is_multiline_mode:
             return
