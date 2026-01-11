@@ -333,7 +333,9 @@ class TestInputFieldPasteIntegration:
             assert input_field.is_multiline_mode
             assert not input_field.input_widget.display
             assert input_field.textarea_widget.display
-            assert input_field.textarea_widget.text == paste_text
+            # TextArea normalizes all newlines (\r\n, \r) to \n
+            expected_text = paste_text.replace("\r\n", "\n").replace("\r", "\n")
+            assert input_field.textarea_widget.text == expected_text
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
