@@ -8,10 +8,10 @@ from textual.signal import Signal
 from textual.widgets import TextArea
 
 from openhands_cli.tui.core.commands import COMMANDS
-from openhands_cli.tui.widgets.user_input.expandable_text_area import (
+from openhands_cli.tui.widgets.user_input.multiline_mode import MultilineMode
+from openhands_cli.tui.widgets.user_input.single_line_input import (
     SingleLineInputWithWraping,
 )
-from openhands_cli.tui.widgets.user_input.multiline_mode import MultilineMode
 from openhands_cli.tui.widgets.user_input.single_line_mode import SingleLineMode
 from openhands_cli.tui.widgets.user_input.text_area_with_autocomplete import (
     TextAreaAutoComplete,
