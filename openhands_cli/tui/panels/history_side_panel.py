@@ -48,14 +48,15 @@ class HistoryItem(Static):
         # Build the content string - show first_user_prompt as title, id as secondary
         time_str = _format_time(conversation.created_date)
         full_id = conversation.display_id
+        short_id = full_id[:8]
 
         # Use first_user_prompt as title if available, otherwise use ID
         has_title = bool(conversation.first_user_prompt)
         if conversation.first_user_prompt:
             title = _truncate(conversation.first_user_prompt, 100)
-            content = f"{title}\n[dim]{full_id} • {time_str}[/dim]"
+            content = f"{title}\n[dim]{short_id} • {time_str}[/dim]"
         else:
-            content = f"[dim]New conversation[/dim]\n[dim]{full_id} • {time_str}[/dim]"
+            content = f"[dim]New conversation[/dim]\n[dim]{short_id} • {time_str}[/dim]"
 
         super().__init__(content, markup=True, **kwargs)
         self.conversation_id = conversation.select_id
@@ -89,7 +90,8 @@ class HistoryItem(Static):
         """Update the displayed title for this history item."""
         time_str = _format_time(self._created_date)
         title_text = _truncate(title, 100)
-        self.update(f"{title_text}\n[dim]{self.conversation_id} • {time_str}[/dim]")
+        short_id = self.conversation_id[:8]
+        self.update(f"{title_text}\n[dim]{short_id} • {time_str}[/dim]")
         self._has_title = True
 
     def set_current(self, is_current: bool) -> None:
