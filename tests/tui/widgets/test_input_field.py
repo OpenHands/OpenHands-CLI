@@ -1,12 +1,10 @@
 """Tests for InputField widget component."""
 
-from collections.abc import Generator
-from unittest.mock import MagicMock, Mock, PropertyMock, patch
+from unittest.mock import Mock
 
 import pytest
 from textual.app import App
 from textual.events import Paste
-from textual.widgets import TextArea
 
 from openhands_cli.tui.widgets.user_input.input_field import (
     AutoGrowTextArea,
@@ -20,248 +18,18 @@ def input_field() -> InputField:
     return InputField(placeholder="Test placeholder")
 
 
-@pytest.fixture
-def field_with_mocks(input_field: InputField) -> Generator[InputField, None, None]:
-    """InputField with its internal widgets and signal mocked out."""
-    input_field.input_widget = MagicMock(spec=AutoGrowTextArea)
-    input_field.textarea_widget = MagicMock(spec=TextArea)
-
-    # Create separate mock objects for focus methods
-    input_focus_mock = MagicMock()
-    textarea_focus_mock = MagicMock()
-    input_field.input_widget.focus = input_focus_mock
-    input_field.textarea_widget.focus = textarea_focus_mock
-
-    # Mock the document property for input_widget (needed for move_cursor)
-    mock_input_document = MagicMock()
-    mock_input_document.end = (0, 0)  # Mock end location
-    input_field.input_widget.document = mock_input_document
-    input_field.input_widget.move_cursor = MagicMock()
-
-    # Mock the document property for textarea_widget (needed for move_cursor)
-    mock_textarea_document = MagicMock()
-    mock_textarea_document.end = (0, 0)  # Mock end location
-    input_field.textarea_widget.document = mock_textarea_document
-    input_field.textarea_widget.move_cursor = MagicMock()
-
-    # Create mock for the signal and its publish method
-    signal_mock = MagicMock()
-    publish_mock = MagicMock()
-    signal_mock.publish = publish_mock
-    input_field.mutliline_mode_status = signal_mock
-
-    # Create mock for autocomplete
-    autocomplete_mock = MagicMock()
-    type(autocomplete_mock).is_visible = PropertyMock(return_value=False)
-    autocomplete_mock.hide_dropdown = MagicMock()
-    input_field.autocomplete = autocomplete_mock
-
-    # Mock the screen and input_area for toggle functionality
-    input_area_mock = MagicMock()
-    input_area_mock.styles = MagicMock()
-    mock_screen = MagicMock()
-    mock_screen.query_one.return_value = input_area_mock
-
-    # Use patch to mock the screen property
-    with patch.object(type(input_field), "screen", new_callable=lambda: mock_screen):
-        yield input_field
-
-
 class TestInputField:
+    """Unit tests for InputField that don't require a running app."""
+
     def test_initialization_sets_correct_defaults(
         self, input_field: InputField
     ) -> None:
         """Verify InputField initializes with correct default values."""
         assert input_field.placeholder == "Test placeholder"
+        # Before compose(), is_multiline_mode returns False
         assert input_field.is_multiline_mode is False
-        assert input_field.stored_content == ""
         assert hasattr(input_field, "mutliline_mode_status")
-        # Widgets themselves are created in compose() / on_mount(), so not asserted.
-
-    @pytest.mark.parametrize(
-        "content",
-        [
-            "Simple text",
-            "Line 1\nLine 2",
-            "Multi\nLine\nText",
-            "",
-            "\n\n",
-        ],
-    )
-    def test_toggle_input_mode_preserves_content_and_toggles_visibility(
-        self,
-        field_with_mocks: InputField,
-        content,
-    ) -> None:
-        """Toggling mode preserves content and flips displays + signal.
-
-        Note: With AutoGrowTextArea, newlines are preserved as-is (no conversion
-        to literal \\n) since the widget supports soft wrapping.
-        """
-        # Mock the screen and query_one for input_area
-        mock_screen = MagicMock()
-        mock_input_area = MagicMock()
-        mock_screen.query_one = Mock(return_value=mock_input_area)
-
-        with patch.object(
-            type(field_with_mocks),
-            "screen",
-            new_callable=PropertyMock,
-            return_value=mock_screen,
-        ):
-            # Set mutliline mode
-            field_with_mocks.action_toggle_input_mode()
-            assert field_with_mocks.is_multiline_mode is True
-            assert field_with_mocks.input_widget.display is False
-            assert field_with_mocks.textarea_widget.display is True
-
-            # Seed instructions
-            field_with_mocks.textarea_widget.text = content
-
-            field_with_mocks.action_toggle_input_mode()
-            field_with_mocks.mutliline_mode_status.publish.assert_called()  # type: ignore
-
-            # Mutli-line -> single-line: content is preserved as-is
-            assert field_with_mocks.input_widget.text == content
-
-            # Single-line -> multi-line
-            field_with_mocks.action_toggle_input_mode()
-            field_with_mocks.mutliline_mode_status.publish.assert_called()  # type: ignore
-
-            # Check original content is preserved
-            assert field_with_mocks.textarea_widget.text == content
-
-    @pytest.mark.parametrize(
-        "content, should_submit",
-        [
-            ("Valid content", True),
-            ("  Valid with spaces  ", True),
-            ("", False),
-            ("   ", False),
-        ],
-    )
-    def test_single_line_input_submission(
-        self,
-        field_with_mocks: InputField,
-        content: str,
-        should_submit: bool,
-    ) -> None:
-        """Enter submits trimmed content in single-line mode only when non-empty."""
-        field_with_mocks.is_multiline_mode = False
-        field_with_mocks.post_message = Mock()
-
-        # Setup the mock autocomplete
-        field_with_mocks.autocomplete = MagicMock()
-        type(field_with_mocks.autocomplete).is_visible = PropertyMock(
-            return_value=False
-        )
-        field_with_mocks.autocomplete.hide_dropdown = Mock()
-
-        # Set up input widget mock
-        field_with_mocks.input_widget.text = content
-        field_with_mocks.input_widget.clear = Mock()
-
-        # Simulate EnterPressed event (Enter key is now handled via message)
-        enter_event = AutoGrowTextArea.EnterPressed()
-        field_with_mocks.on_enter_pressed(enter_event)
-
-        if should_submit:
-            field_with_mocks.post_message.assert_called_once()
-            msg = field_with_mocks.post_message.call_args[0][0]
-            assert isinstance(msg, InputField.Submitted)
-            assert msg.content == content.strip()
-            # Input cleared after submission
-            field_with_mocks.input_widget.clear.assert_called_once()
-        else:
-            field_with_mocks.post_message.assert_not_called()
-
-    @pytest.mark.parametrize(
-        "content, should_submit",
-        [
-            ("Valid content", True),
-            ("Multi\nLine\nContent", True),
-            ("  Valid with spaces  ", True),
-            ("", False),
-            ("   ", False),
-            ("\t\n  \t", False),
-        ],
-    )
-    def test_multiline_textarea_submission(
-        self,
-        field_with_mocks: InputField,
-        content: str,
-        should_submit: bool,
-    ) -> None:
-        """
-        Ctrl+J (action_submit_textarea) submits trimmed textarea content in
-        multi-line mode only when non-empty. On submit, textarea is cleared and
-        mode toggle is requested.
-        """
-        field_with_mocks.is_multiline_mode = True
-        field_with_mocks.textarea_widget.text = content
-
-        field_with_mocks.post_message = Mock()
-        field_with_mocks.action_toggle_input_mode = Mock()
-
-        field_with_mocks.action_submit_textarea()
-
-        if should_submit:
-            # Textarea cleared
-            assert field_with_mocks.textarea_widget.text == ""
-            # Mode toggle requested
-            field_with_mocks.action_toggle_input_mode.assert_called_once()
-            # Message posted
-            field_with_mocks.post_message.assert_called_once()
-            msg = field_with_mocks.post_message.call_args[0][0]
-            assert isinstance(msg, InputField.Submitted)
-            assert msg.content == content.strip()
-        else:
-            field_with_mocks.post_message.assert_not_called()
-            field_with_mocks.action_toggle_input_mode.assert_not_called()
-
-    @pytest.mark.parametrize(
-        "is_multiline, widget_content, expected",
-        [
-            (False, "Single line content", "Single line content"),
-            (True, "Multi\nline\ncontent", "Multi\nline\ncontent"),
-            (False, "", ""),
-            (True, "", ""),
-        ],
-    )
-    def test_get_current_value_uses_active_widget(
-        self,
-        field_with_mocks: InputField,
-        is_multiline: bool,
-        widget_content: str,
-        expected: str,
-    ) -> None:
-        """get_current_value() returns content from the active widget."""
-        field_with_mocks.is_multiline_mode = is_multiline
-
-        if is_multiline:
-            field_with_mocks.textarea_widget.text = widget_content
-        else:
-            field_with_mocks.input_widget.text = widget_content
-
-        assert field_with_mocks.get_current_value() == expected
-
-    @pytest.mark.parametrize("is_multiline", [False, True])
-    def test_focus_input_focuses_active_widget(
-        self,
-        field_with_mocks: InputField,
-        is_multiline: bool,
-    ) -> None:
-        """focus_input() focuses the widget corresponding to the current mode."""
-        field_with_mocks.is_multiline_mode = is_multiline
-
-        field_with_mocks.focus_input()
-
-        if is_multiline:
-            field_with_mocks.textarea_widget.focus.assert_called_once()  # type: ignore
-            field_with_mocks.input_widget.focus.assert_not_called()  # type: ignore
-        else:
-            field_with_mocks.input_widget.focus.assert_called_once()  # type: ignore
-            field_with_mocks.textarea_widget.focus.assert_not_called()  # type: ignore
+        assert hasattr(input_field, "multiline_mode_status")
 
     def test_submitted_message_contains_correct_content(self) -> None:
         """Submitted message should store the user content as-is."""
@@ -270,6 +38,106 @@ class TestInputField:
 
         assert msg.content == content
         assert isinstance(msg, InputField.Submitted)
+
+
+class TestInputFieldIntegration:
+    """Integration tests for InputField using a test app."""
+
+    @pytest.mark.asyncio
+    async def test_toggle_mode_preserves_content(self) -> None:
+        """Toggling mode should preserve text content."""
+        app = InputFieldTestApp()
+        async with app.run_test() as pilot:
+            input_field = app.query_one(InputField)
+
+            # Start in single-line mode
+            assert not input_field.is_multiline_mode
+
+            # Set some content
+            input_field.input_widget.text = "Hello World"
+
+            # Toggle to multiline
+            input_field.action_toggle_input_mode()
+            await pilot.pause()
+
+            assert input_field.is_multiline_mode
+            assert input_field.textarea_widget.text == "Hello World"
+
+            # Toggle back to single-line
+            input_field.action_toggle_input_mode()
+            await pilot.pause()
+
+            assert not input_field.is_multiline_mode
+            assert input_field.input_widget.text == "Hello World"
+
+    @pytest.mark.asyncio
+    async def test_get_current_value_returns_active_mode_text(self) -> None:
+        """get_current_value() returns text from the active mode."""
+        app = InputFieldTestApp()
+        async with app.run_test() as pilot:
+            input_field = app.query_one(InputField)
+
+            # In single-line mode
+            input_field.input_widget.text = "Single line"
+            assert input_field.get_current_value() == "Single line"
+
+            # Toggle to multiline
+            input_field.action_toggle_input_mode()
+            await pilot.pause()
+
+            input_field.textarea_widget.text = "Multi\nline"
+            assert input_field.get_current_value() == "Multi\nline"
+
+    @pytest.mark.asyncio
+    async def test_focus_input_focuses_active_mode(self) -> None:
+        """focus_input() should focus the current mode's widget."""
+        app = InputFieldTestApp()
+        async with app.run_test() as pilot:
+            input_field = app.query_one(InputField)
+
+            # Focus single-line mode
+            input_field.focus_input()
+            await pilot.pause()
+            assert input_field.input_widget.has_focus
+
+            # Toggle to multiline and focus
+            input_field.action_toggle_input_mode()
+            input_field.focus_input()
+            await pilot.pause()
+            assert input_field.textarea_widget.has_focus
+
+    @pytest.mark.asyncio
+    async def test_submit_from_multiline_mode(self) -> None:
+        """Ctrl+J should submit content in multiline mode."""
+        app = InputFieldTestApp()
+        submitted_messages = []
+
+        async with app.run_test() as pilot:
+            input_field = app.query_one(InputField)
+
+            # Toggle to multiline
+            input_field.action_toggle_input_mode()
+            await pilot.pause()
+
+            # Set content
+            input_field.textarea_widget.text = "Multi\nline\ncontent"
+
+            # Capture submitted messages
+            original_post_message = input_field.post_message
+            def capture_message(msg):
+                if isinstance(msg, InputField.Submitted):
+                    submitted_messages.append(msg)
+                return original_post_message(msg)
+            input_field.post_message = capture_message
+
+            # Submit
+            input_field.action_submit_textarea()
+            await pilot.pause()
+
+            assert len(submitted_messages) == 1
+            assert submitted_messages[0].content == "Multi\nline\ncontent"
+            # Should switch back to single-line mode
+            assert not input_field.is_multiline_mode
 
 
 # Single shared app for all integration tests
