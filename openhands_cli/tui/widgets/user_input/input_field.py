@@ -53,7 +53,7 @@ class InputField(Container):
             border: solid $primary !important;
         }
 
-        #user_input:focus {
+        #single_line_input:focus {
             border: solid $primary !important;
             background: $background;
         }
