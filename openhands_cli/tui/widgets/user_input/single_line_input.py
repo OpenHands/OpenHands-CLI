@@ -5,7 +5,7 @@ from textual.message import Message
 from textual.widgets import TextArea
 
 
-class SingleLineInputWithWraping(TextArea):
+class SingleLineInputWithWrapping(TextArea):
     """A TextArea that auto-grows with content and supports soft wrapping.
 
     This implementation is based on the toad project's approach:
@@ -15,7 +15,7 @@ class SingleLineInputWithWraping(TextArea):
     - CSS max-height limits maximum growth
     """
 
-    class MutliLinePasteDetected(Message):
+    class MultiLinePasteDetected(Message):
         """Message sent when multi-line paste is detected."""
 
         def __init__(self, text: str) -> None:
@@ -74,7 +74,7 @@ class SingleLineInputWithWraping(TextArea):
         """Handle paste events and detect multi-line content."""
         if "\n" in event.text or "\r" in event.text:
             # Multi-line content detected - notify parent
-            self.post_message(self.MutliLinePasteDetected(event.text))
+            self.post_message(self.MultiLinePasteDetected(event.text))
             event.prevent_default()
             event.stop()
         # For single-line content, let the default paste behavior handle it

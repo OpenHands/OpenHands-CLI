@@ -14,7 +14,7 @@ from openhands_cli.tui.widgets.user_input.models import (
 
 
 def create_mock_single_line_widget(text=""):
-    """Create a mock SingleLineInputWithWraping widget."""
+    """Create a mock SingleLineInputWithWrapping widget."""
     mock_widget = mock.MagicMock()
     mock_widget.text = text
     return mock_widget

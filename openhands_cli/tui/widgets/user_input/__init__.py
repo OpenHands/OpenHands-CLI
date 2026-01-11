@@ -9,7 +9,7 @@ from openhands_cli.tui.widgets.user_input.models import (
     CompletionType,
 )
 from openhands_cli.tui.widgets.user_input.single_line_input import (
-    SingleLineInputWithWraping,
+    SingleLineInputWithWrapping,
 )
 
 
@@ -18,5 +18,5 @@ __all__ = [
     "CompletionItem",
     "CompletionType",
     "InputField",
-    "SingleLineInputWithWraping",
+    "SingleLineInputWithWrapping",
 ]

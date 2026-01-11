@@ -12,7 +12,7 @@ from openhands_cli.tui.widgets.user_input.autocomplete_dropdown import (
     AutoCompleteDropdown,
 )
 from openhands_cli.tui.widgets.user_input.single_line_input import (
-    SingleLineInputWithWraping,
+    SingleLineInputWithWrapping,
 )
 
 
@@ -20,7 +20,7 @@ class InputField(Container):
     """Input field with two modes: auto-growing single-line and multiline.
 
     Single-line mode (default):
-    - Uses SingleLineInputWithWraping
+    - Uses SingleLineInputWithWrapping
     - Auto-grows height as text wraps (up to max-height)
     - Enter to submit, Shift+Enter/Ctrl+J for newline
     - Full autocomplete support
@@ -94,7 +94,7 @@ class InputField(Container):
         super().__init__(**kwargs)
         self.placeholder = placeholder
         self.multiline_mode_status = Signal(self, "multiline_mode_status")
-        self.single_line_widget = SingleLineInputWithWraping(
+        self.single_line_widget = SingleLineInputWithWrapping(
             placeholder=self.placeholder,
             id="user_input",
         )
@@ -108,7 +108,7 @@ class InputField(Container):
             single_line_widget=self.single_line_widget, command_candidates=COMMANDS
         )
 
-        self.active_input_widget: SingleLineInputWithWraping | TextArea = (
+        self.active_input_widget: SingleLineInputWithWrapping | TextArea = (
             self.single_line_widget
         )
 
@@ -128,7 +128,7 @@ class InputField(Container):
     @property
     def is_multiline_mode(self) -> bool:
         """Check if currently in multiline mode."""
-        return not isinstance(self.active_input_widget, SingleLineInputWithWraping)
+        return not isinstance(self.active_input_widget, SingleLineInputWithWrapping)
 
     def _get_current_text(self) -> str:
         """Get text from the current mode's widget."""
@@ -168,8 +168,8 @@ class InputField(Container):
             event.prevent_default()
             event.stop()
 
-    @on(SingleLineInputWithWraping.EnterPressed)
-    def _on_enter_pressed(self, event: SingleLineInputWithWraping.EnterPressed) -> None:  # noqa: ARG002
+    @on(SingleLineInputWithWrapping.EnterPressed)
+    def _on_enter_pressed(self, event: SingleLineInputWithWrapping.EnterPressed) -> None:  # noqa: ARG002
         """Handle Enter key press from the single-line input."""
         # Let autocomplete handle enter if visible
         if self.autocomplete.is_visible and self.autocomplete.process_key("enter"):
@@ -208,9 +208,9 @@ class InputField(Container):
             self._clear_current()
             self.post_message(self.Submitted(content))
 
-    @on(SingleLineInputWithWraping.MutliLinePasteDetected)
+    @on(SingleLineInputWithWrapping.MultiLinePasteDetected)
     def _on_paste_detected(
-        self, event: SingleLineInputWithWraping.MutliLinePasteDetected
+        self, event: SingleLineInputWithWrapping.MultiLinePasteDetected
     ) -> None:
         """Handle multi-line paste detection - switch to multiline mode."""
         if not self.is_multiline_mode:

@@ -10,7 +10,7 @@ from openhands_cli.tui.widgets.user_input.models import (
     CompletionType,
 )
 from openhands_cli.tui.widgets.user_input.single_line_input import (
-    SingleLineInputWithWraping,
+    SingleLineInputWithWrapping,
 )
 
 
@@ -51,7 +51,7 @@ class AutoCompleteDropdown(Container):
 
     def __init__(
         self,
-        single_line_widget: SingleLineInputWithWraping,
+        single_line_widget: SingleLineInputWithWrapping,
         command_candidates: list | None = None,
         **kwargs,
     ) -> None:
