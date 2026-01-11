@@ -88,7 +88,7 @@ openhands mcp enable <server-name>
 openhands mcp disable <server-name>
 ```
 
-### Confirmation Modes
+### [Confirmation Modes](https://docs.openhands.dev/openhands/usage/cli/command-reference)
 
 Control how the agent handles actions:
 
