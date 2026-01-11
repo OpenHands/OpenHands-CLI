@@ -365,8 +365,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self,
         conversation_id: uuid.UUID | None = None,
         visualizer: ConversationVisualizer | None = None,
-        workspace=None,
-        sdk_visualizer=None,
     ) -> ConversationRunner:
         """Create a ConversationRunner for a given conversation id.
 
@@ -395,10 +393,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 self.notify(title=title, message=message, severity=severity)
             ),
             conversation_visualizer,
-            sdk_visualizer,
             self.initial_confirmation_policy,
             event_callback,
-            workspace=workspace,
         )
 
     def _process_queued_inputs(self) -> None:
