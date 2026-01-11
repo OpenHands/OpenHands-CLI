@@ -205,34 +205,37 @@ class AutoCompleteDropdown(Container):
             filename_part = path_part
 
         candidates = []
+
+        if not (search_dir.exists() and search_dir.is_dir()):
+            return candidates
+
         try:
-            if search_dir.exists() and search_dir.is_dir():
-                for item in sorted(search_dir.iterdir()):
-                    # Skip hidden files unless specifically typing them
-                    if item.name.startswith(".") and not filename_part.startswith("."):
-                        continue
+            for item in sorted(search_dir.iterdir()):
+                # Skip hidden files unless specifically typing them
+                if item.name.startswith(".") and not filename_part.startswith("."):
+                    continue
 
-                    # Match against filename part
-                    if not item.name.lower().startswith(filename_part.lower()):
-                        continue
+                # Match against filename part
+                if not item.name.lower().startswith(filename_part.lower()):
+                    continue
 
-                    try:
-                        rel_path = item.relative_to(Path(WORK_DIR))
-                        path_str = str(rel_path)
-                        prefix = "📁 " if item.is_dir() else "📄 "
-                        if item.is_dir():
-                            path_str += "/"
+                try:
+                    rel_path = item.relative_to(Path(WORK_DIR))
+                    path_str = str(rel_path)
+                    prefix = "📁 " if item.is_dir() else "📄 "
+                    if item.is_dir():
+                        path_str += "/"
 
-                        display = f"{prefix}@{path_str}"
-                        candidates.append(
-                            CompletionItem(
-                                display_text=display,
-                                completion_value=f"@{path_str}",
-                                completion_type=CompletionType.FILE,
-                            )
+                    display = f"{prefix}@{path_str}"
+                    candidates.append(
+                        CompletionItem(
+                            display_text=display,
+                            completion_value=f"@{path_str}",
+                            completion_type=CompletionType.FILE,
                         )
-                    except ValueError:
-                        continue
+                    )
+                except ValueError:
+                    continue
         except (OSError, PermissionError):
             pass
 

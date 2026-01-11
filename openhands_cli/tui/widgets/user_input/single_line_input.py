@@ -47,9 +47,6 @@ class SingleLineInputWithWraping(TextArea):
         )
         self.compact = True
         self._placeholder = placeholder
-        # Cache for cursor position calculation
-        self._cached_line_offsets: list[int] | None = None
-        self._cached_text_for_offsets: str | None = None
 
     def on_mount(self) -> None:
         """Configure the text area on mount."""

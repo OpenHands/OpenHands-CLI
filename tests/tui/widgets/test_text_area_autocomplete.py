@@ -4,13 +4,13 @@ from unittest import mock
 
 import pytest
 
+from openhands_cli.tui.widgets.user_input.autocomplete_dropdown import (
+    AutoCompleteDropdown,
+    detect_completion_type,
+)
 from openhands_cli.tui.widgets.user_input.models import (
     CompletionItem,
     CompletionType,
-)
-from openhands_cli.tui.widgets.user_input.text_area_with_autocomplete import (
-    AutoCompleteDropdown,
-    detect_completion_type,
 )
 
 
