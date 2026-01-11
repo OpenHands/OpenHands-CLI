@@ -104,7 +104,9 @@ class InputField(Container):
             show_line_numbers=False,
         )
         self.multiline_widget.display = False
-        self.autocomplete = AutoCompleteDropdown(command_candidates=COMMANDS)
+        self.autocomplete = AutoCompleteDropdown(
+            single_line_widget=self.single_line_widget, command_candidates=COMMANDS
+        )
 
         self.active_input_widget: SingleLineInputWithWraping | TextArea = (
             self.single_line_widget
@@ -152,13 +154,16 @@ class InputField(Container):
     @on(TextArea.Changed)
     def _on_text_area_changed(self, event: TextArea.Changed) -> None:
         """Update autocomplete when text changes in single-line mode."""
-        if event.text_area is self.single_line_widget and not self.is_multiline_mode:
-            self.autocomplete.update_candidates(self.single_line_widget.text)
+        if self.is_multiline_mode:
+            return
+
+        self.autocomplete.update_candidates()
 
     def on_key(self, event) -> None:
         """Handle key events for autocomplete navigation."""
         if self.is_multiline_mode:
             return
+
         if self.autocomplete.process_key(event.key):
             event.prevent_default()
             event.stop()
@@ -166,21 +171,11 @@ class InputField(Container):
     @on(SingleLineInputWithWraping.EnterPressed)
     def _on_enter_pressed(self, event: SingleLineInputWithWraping.EnterPressed) -> None:  # noqa: ARG002
         """Handle Enter key press from the single-line input."""
-        if self.is_multiline_mode:
-            return
-
         # Let autocomplete handle enter if visible
         if self.autocomplete.is_visible and self.autocomplete.process_key("enter"):
             return
 
         self._submit_current_content()
-
-    @on(AutoCompleteDropdown.CompletionSelected)
-    def _on_completion_selected(
-        self, event: AutoCompleteDropdown.CompletionSelected
-    ) -> None:
-        """Handle completion selection from autocomplete."""
-        self.autocomplete.apply_completion(self.single_line_widget, event.item)
 
     def action_toggle_input_mode(self) -> None:
         """Toggle between single-line and multiline modes."""
@@ -211,7 +206,6 @@ class InputField(Container):
         content = self._get_current_text().strip()
         if content:
             self._clear_current()
-            self.autocomplete.hide_dropdown()
             self.post_message(self.Submitted(content))
 
     @on(SingleLineInputWithWraping.MutliLinePasteDetected)

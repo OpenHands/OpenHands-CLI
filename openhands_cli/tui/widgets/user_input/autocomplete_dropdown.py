@@ -1,8 +1,7 @@
 from pathlib import Path
 
 from textual.containers import Container
-from textual.message import Message
-from textual.widgets import OptionList, TextArea
+from textual.widgets import OptionList
 from textual.widgets.option_list import Option
 
 from openhands_cli.locations import WORK_DIR
@@ -10,24 +9,9 @@ from openhands_cli.tui.widgets.user_input.models import (
     CompletionItem,
     CompletionType,
 )
-
-
-def detect_completion_type(text: str) -> CompletionType:
-    """Detect the type of completion based on input text."""
-    stripped = text.lstrip()
-    if stripped.startswith("/"):
-        # Check if there's a space (command already typed)
-        if " " in stripped:
-            return CompletionType.NONE
-        return CompletionType.COMMAND
-    elif "@" in text:
-        # Check if there's a space after the last @
-        at_index = text.rfind("@")
-        path_part = text[at_index + 1 :]
-        if " " in path_part:
-            return CompletionType.NONE
-        return CompletionType.FILE
-    return CompletionType.NONE
+from openhands_cli.tui.widgets.user_input.single_line_input import (
+    SingleLineInputWithWraping,
+)
 
 
 class AutoCompleteDropdown(Container):
@@ -65,19 +49,14 @@ class AutoCompleteDropdown(Container):
     }
     """
 
-    class CompletionSelected(Message):
-        """Message sent when a completion is selected."""
-
-        def __init__(self, item: CompletionItem) -> None:
-            super().__init__()
-            self.item = item
-
     def __init__(
         self,
+        single_line_widget: SingleLineInputWithWraping,
         command_candidates: list | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
+        self.single_line_widget = single_line_widget
         self.command_candidates = command_candidates or []
         self._current_completion_type = CompletionType.NONE
         self._completion_items: list[CompletionItem] = []
@@ -85,6 +64,23 @@ class AutoCompleteDropdown(Container):
     def compose(self):
         """Create the option list for autocomplete."""
         yield OptionList()
+
+    def _detect_completion_type(self, text: str) -> CompletionType:
+        """Detect the type of completion based on input text."""
+        stripped = text.lstrip()
+        if stripped.startswith("/"):
+            # Check if there's a space (command already typed)
+            if " " in stripped:
+                return CompletionType.NONE
+            return CompletionType.COMMAND
+        elif "@" in text:
+            # Check if there's a space after the last @
+            at_index = text.rfind("@")
+            path_part = text[at_index + 1 :]
+            if " " in path_part:
+                return CompletionType.NONE
+            return CompletionType.FILE
+        return CompletionType.NONE
 
     @property
     def option_list(self) -> OptionList:
@@ -152,7 +148,8 @@ class AutoCompleteDropdown(Container):
         elif key == "tab" or key == "enter":
             item = self.select_highlighted()
             if item:
-                self.post_message(self.CompletionSelected(item))
+                self.apply_completion(item)
+                # self.post_message(self.CompletionSelected(item))
                 return True
         elif key == "escape":
             self.hide_dropdown()
@@ -241,9 +238,11 @@ class AutoCompleteDropdown(Container):
 
         return candidates
 
-    def update_candidates(self, text: str) -> None:
+    def update_candidates(self) -> None:
         """Update candidates based on current input text."""
-        completion_type = detect_completion_type(text)
+
+        text = self.single_line_widget.text
+        completion_type = self._detect_completion_type(text)
         self._current_completion_type = completion_type
 
         candidates: list[CompletionItem] = []
@@ -257,17 +256,17 @@ class AutoCompleteDropdown(Container):
         else:
             self.hide_dropdown()
 
-    def apply_completion(self, text_area: TextArea, item: CompletionItem) -> None:
+    def apply_completion(self, item: CompletionItem) -> None:
         """Apply the selected completion to a text area."""
-        current_text = text_area.text
+        current_text = self.single_line_widget.text
         completion_value = item.completion_value
 
         if item.completion_type == CompletionType.COMMAND:
-            text_area.text = completion_value + " "
+            self.single_line_widget.text = completion_value + " "
         elif item.completion_type == CompletionType.FILE:
             at_index = current_text.rfind("@")
             prefix = current_text[:at_index] if at_index >= 0 else ""
-            text_area.text = prefix + completion_value + " "
+            self.single_line_widget.text = prefix + completion_value + " "
 
         # Move cursor to end
-        text_area.move_cursor((0, len(text_area.text)))
+        self.single_line_widget.move_cursor((0, len(self.single_line_widget.text)))

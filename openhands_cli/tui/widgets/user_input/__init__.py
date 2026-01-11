@@ -2,7 +2,6 @@
 
 from openhands_cli.tui.widgets.user_input.autocomplete_dropdown import (
     AutoCompleteDropdown,
-    detect_completion_type,
 )
 from openhands_cli.tui.widgets.user_input.input_field import InputField
 from openhands_cli.tui.widgets.user_input.models import (
@@ -20,5 +19,4 @@ __all__ = [
     "CompletionType",
     "InputField",
     "SingleLineInputWithWraping",
-    "detect_completion_type",
 ]
