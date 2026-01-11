@@ -42,7 +42,7 @@ class InputField(Container):
         min-height: 3;
         layers: base autocomplete;
 
-        #user_input {
+        #single_line_input {
             layer: base;
             width: 100%;
             height: auto;
@@ -58,18 +58,18 @@ class InputField(Container):
             background: $background;
         }
 
-        #user_textarea {
+        #multiline_input {
             layer: base;
             width: 100%;
             height: 6;
             background: $background;
             color: $foreground;
-            border: solid $primary !important;
+            border: solid $primary;
             display: none;
         }
 
-        #user_textarea:focus {
-            border: solid $primary !important;
+        #multiline_input:focus {
+            border: solid $primary;
             background: $background;
         }
 
@@ -96,10 +96,10 @@ class InputField(Container):
         self.multiline_mode_status = Signal(self, "multiline_mode_status")
         self.single_line_widget = SingleLineInputWithWrapping(
             placeholder=self.placeholder,
-            id="user_input",
+            id="single_line_input",
         )
         self.multiline_widget = TextArea(
-            id="user_textarea",
+            id="multiline_input",
             soft_wrap=True,
             show_line_numbers=False,
         )
