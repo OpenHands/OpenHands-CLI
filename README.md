@@ -2,7 +2,7 @@
 
 A **lightweight, modern CLI** to interact with the OpenHands agent (powered by [OpenHands Software Agent SDK](https://github.com/OpenHands/software-agent-sdk)).
 
-Run an autonomous OpenHands agent directly in your terminal, IDE, CI pipelines, browser, etc. Easily create local or remote cloud based conversations
+Run an autonomous OpenHands agent directly in your terminal, IDE, CI pipelines, browser, etc. Easily launch local or remote sandboxed conversations.
 
 ## Installation
 
