@@ -149,7 +149,6 @@ class AutoCompleteDropdown(Container):
             item = self.select_highlighted()
             if item:
                 self.apply_completion(item)
-                # self.post_message(self.CompletionSelected(item))
                 return True
         elif key == "escape":
             self.hide_dropdown()

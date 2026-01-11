@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from textual import on
+from textual import events, on
 from textual.binding import Binding
 from textual.containers import Container
 from textual.message import Message
@@ -159,7 +159,7 @@ class InputField(Container):
 
         self.autocomplete.update_candidates()
 
-    def on_key(self, event) -> None:
+    def on_key(self, event: events.Key) -> None:
         """Handle key events for autocomplete navigation."""
         if self.is_multiline_mode:
             return
