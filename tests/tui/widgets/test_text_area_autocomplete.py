@@ -120,7 +120,7 @@ class TestAutoCompleteDropdown:
         (tmp_path / "src").mkdir()
 
         monkeypatch.setattr(
-            "openhands_cli.tui.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.WORK_DIR",
             str(tmp_path),
         )
 
@@ -146,7 +146,7 @@ class TestAutoCompleteDropdown:
     def test_file_candidates_for_nonexistent_directory(self, tmp_path, monkeypatch):
         """Non-existent directories produce no file candidates."""
         monkeypatch.setattr(
-            "openhands_cli.tui.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.WORK_DIR",
             str(tmp_path),
         )
 
@@ -162,7 +162,7 @@ class TestAutoCompleteDropdown:
         (tmp_path / "setup.py").write_text("test")
 
         monkeypatch.setattr(
-            "openhands_cli.tui.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.WORK_DIR",
             str(tmp_path),
         )
 
@@ -183,7 +183,7 @@ class TestAutoCompleteDropdown:
         (src_dir / "utils.py").write_text("test")
 
         monkeypatch.setattr(
-            "openhands_cli.tui.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.WORK_DIR",
             str(tmp_path),
         )
 
@@ -200,7 +200,7 @@ class TestAutoCompleteDropdown:
         (tmp_path / "visible.txt").write_text("test")
 
         monkeypatch.setattr(
-            "openhands_cli.tui.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.WORK_DIR",
             str(tmp_path),
         )
 
@@ -219,7 +219,7 @@ class TestAutoCompleteDropdown:
         (tmp_path / "visible.txt").write_text("test")
 
         monkeypatch.setattr(
-            "openhands_cli.tui.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.WORK_DIR",
             str(tmp_path),
         )
 
@@ -232,7 +232,7 @@ class TestAutoCompleteDropdown:
     def test_file_candidates_handles_permission_error(self, tmp_path, monkeypatch):
         """File candidates gracefully handle permission errors."""
         monkeypatch.setattr(
-            "openhands_cli.tui.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.WORK_DIR",
             str(tmp_path),
         )
 
@@ -466,7 +466,7 @@ class TestAutoCompleteDropdown:
         (tmp_path / "test.txt").write_text("test")
 
         monkeypatch.setattr(
-            "openhands_cli.tui.widgets.user_input.text_area_with_autocomplete.WORK_DIR",
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.WORK_DIR",
             str(tmp_path),
         )
 

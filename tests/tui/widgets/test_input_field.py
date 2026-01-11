@@ -27,7 +27,6 @@ class TestInputField:
         assert input_field.placeholder == "Test placeholder"
         # Before compose(), is_multiline_mode returns False
         assert input_field.is_multiline_mode is False
-        assert hasattr(input_field, "mutliline_mode_status")
         assert hasattr(input_field, "multiline_mode_status")
 
     def test_submitted_message_contains_correct_content(self) -> None:
@@ -71,21 +70,21 @@ class TestInputFieldIntegration:
 
     @pytest.mark.asyncio
     async def test_get_current_value_returns_active_mode_text(self) -> None:
-        """get_current_value() returns text from the active mode."""
+        """_get_current_text() returns text from the active mode."""
         app = InputFieldTestApp()
         async with app.run_test() as pilot:
             input_field = app.query_one(InputField)
 
             # In single-line mode
             input_field.single_line_widget.text = "Single line"
-            assert input_field.get_current_value() == "Single line"
+            assert input_field._get_current_text() == "Single line"
 
             # Toggle to multiline
             input_field.action_toggle_input_mode()
             await pilot.pause()
 
             input_field.multiline_widget.text = "Multi\nline"
-            assert input_field.get_current_value() == "Multi\nline"
+            assert input_field._get_current_text() == "Multi\nline"
 
     @pytest.mark.asyncio
     async def test_focus_input_focuses_active_mode(self) -> None:
@@ -124,10 +123,10 @@ class TestInputFieldIntegration:
             # Capture submitted messages
             original_post_message = input_field.post_message
 
-            def capture_message(msg):
-                if isinstance(msg, InputField.Submitted):
-                    submitted_messages.append(msg)
-                return original_post_message(msg)
+            def capture_message(message):
+                if isinstance(message, InputField.Submitted):
+                    submitted_messages.append(message)
+                return original_post_message(message)
 
             input_field.post_message = capture_message
 
