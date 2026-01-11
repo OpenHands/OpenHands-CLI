@@ -13,7 +13,7 @@ class TestCliSettings:
         cfg = CliSettings()
         assert cfg.display_cost_per_action is False
         assert cfg.default_cells_expanded is True
-        assert cfg.show_plan_panel_on_startup is True
+        assert cfg.show_plan_panel_on_startup is False
 
     @pytest.mark.parametrize("value", [True, False])
     def test_model_accepts_bool(self, value: bool):

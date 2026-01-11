@@ -78,8 +78,9 @@ class CliSettingsTab(Container):
                 label="Show Plan Panel on Startup",
                 description=(
                     "When enabled, the plan panel will be shown on the right side "
-                    "when the CLI starts. The panel displays the agent's task plan "
-                    "and progress. You can toggle it anytime via the command palette."
+                    "when the CLI starts. When disabled, the panel will automatically "
+                    "open when the agent first uses the task tracker. "
+                    "You can toggle it anytime via the command palette."
                 ),
                 switch_id="show_plan_panel_on_startup_switch",
                 value=self.cli_settings.show_plan_panel_on_startup,

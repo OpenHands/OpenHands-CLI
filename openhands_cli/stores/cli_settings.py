@@ -12,7 +12,7 @@ class CliSettings(BaseModel):
 
     display_cost_per_action: bool = False
     default_cells_expanded: bool = True
-    show_plan_panel_on_startup: bool = True
+    show_plan_panel_on_startup: bool = False
 
     @classmethod
     def get_config_path(cls) -> Path:

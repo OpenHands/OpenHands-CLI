@@ -105,18 +105,25 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         This method handles thread safety - it can be called from any thread
         and will ensure the panel refresh happens on the main thread.
-        """
-        try:
-            panel = self._app.query_one(PlanSidePanel)
-        except Exception:
-            # Panel doesn't exist, nothing to refresh
-            return
 
+        If the panel doesn't exist yet, it will be automatically created and
+        opened (auto-open on first task tracker event).
+        """
         current_thread_id = threading.get_ident()
+
+        def do_refresh():
+            # Get or create the panel (auto-opens on first task tracker event)
+            panel = PlanSidePanel.get_or_create(self._app)
+            # Set persistence directory if the app has a conversation runner
+            if self._app.conversation_runner and panel.persistence_dir is None:
+                panel.set_persistence_dir(self._app.conversation_runner.persistence_dir)
+            else:
+                panel.refresh_from_disk()
+
         if current_thread_id == self._main_thread_id:
-            panel.refresh_from_disk()
+            do_refresh()
         else:
-            self._app.call_from_thread(panel.refresh_from_disk)
+            self._app.call_from_thread(do_refresh)
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates Collapsible widgets for events."""
