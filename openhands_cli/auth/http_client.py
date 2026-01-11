@@ -59,6 +59,7 @@ class BaseHttpClient:
         headers: dict[str, str] | None = None,
         json_data: dict[str, Any] | None = None,
         form_data: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
         raise_for_status: bool = True,
     ) -> httpx.Response:
         """Make HTTP request with common error handling.
@@ -87,6 +88,8 @@ class BaseHttpClient:
                     "url": url,
                     "headers": headers,
                 }
+                if params is not None:
+                    request_kwargs["params"] = params
 
                 # Add either JSON or form data, but not both
                 if json_data is not None:
@@ -112,6 +115,7 @@ class BaseHttpClient:
         self,
         endpoint: str,
         headers: dict[str, str] | None = None,
+        params: dict[str, Any] | None = None,
         raise_for_status: bool = True,
     ) -> httpx.Response:
         """Make GET request.
@@ -125,7 +129,11 @@ class BaseHttpClient:
             HTTP response object
         """
         return await self._make_request(
-            "GET", endpoint, headers, raise_for_status=raise_for_status
+            "GET",
+            endpoint,
+            headers,
+            params=params,
+            raise_for_status=raise_for_status,
         )
 
     async def post(
@@ -149,5 +157,11 @@ class BaseHttpClient:
             HTTP response object
         """
         return await self._make_request(
-            "POST", endpoint, headers, json_data, form_data, raise_for_status
+            "POST",
+            endpoint,
+            headers,
+            json_data,
+            form_data,
+            params=None,
+            raise_for_status=raise_for_status,
         )
