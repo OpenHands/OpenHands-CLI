@@ -1,19 +1,11 @@
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any
 from uuid import UUID
 
 from rich.console import Console
 
-from openhands.sdk import (
-    Agent,
-    AgentContext,
-    BaseConversation,
-    Conversation,
-    RemoteWorkspace,
-    Workspace,
-)
+from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, Workspace
 from openhands.sdk.context import Skill
-from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
 from openhands.sdk.event.base import Event
 from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
@@ -26,6 +18,7 @@ from openhands.tools.task_tracker import TaskTrackerTool  # noqa: F401
 from openhands.tools.terminal import TerminalTool  # noqa: F401
 from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
 from openhands_cli.stores import AgentStore
+from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
 
 class MissingAgentSpec(Exception):
@@ -91,9 +84,8 @@ def load_agent_specs(
 def setup_conversation(
     conversation_id: UUID,
     confirmation_policy: ConfirmationPolicyBase,
-    visualizer: ConversationVisualizerBase | None = None,
+    visualizer: ConversationVisualizer | None = None,
     event_callback: Callable[[Event], None] | None = None,
-    workspace: Workspace | RemoteWorkspace | None = None,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
@@ -116,29 +108,19 @@ def setup_conversation(
     # Prepare callbacks list
     callbacks = [event_callback] if event_callback else None
 
-    workspace_obj = (
-        workspace if workspace is not None else Workspace(working_dir=WORK_DIR)
-    )
-
-    conversation_kwargs: dict[str, Any] = dict(
+    # Create conversation - agent context is now set in AgentStore.load()
+    conversation: BaseConversation = Conversation(
         agent=agent,
-        workspace=workspace_obj,
+        workspace=Workspace(working_dir=WORK_DIR),
+        # Conversation will add /<conversation_id> to this path
+        persistence_dir=CONVERSATIONS_DIR,
         conversation_id=conversation_id,
         visualizer=visualizer,
         callbacks=callbacks,
     )
-    # Only local conversations should use local persistence_dir.
-    if not isinstance(workspace_obj, RemoteWorkspace):
-        # Conversation will add /<conversation_id> to this path
-        conversation_kwargs["persistence_dir"] = CONVERSATIONS_DIR
 
-    conversation = cast(BaseConversation, Conversation(**conversation_kwargs))
-
-    # BaseConversation typing in the SDK stubs may not include these convenience
-    # setters. Keep runtime behavior while preserving type safety elsewhere.
-    conversation_obj = cast(Any, conversation)
-    conversation_obj.set_security_analyzer(LLMSecurityAnalyzer())
-    conversation_obj.set_confirmation_policy(confirmation_policy)
+    conversation.set_security_analyzer(LLMSecurityAnalyzer())
+    conversation.set_confirmation_policy(confirmation_policy)
 
     console.print(f"✓ Agent initialized with model: {agent.llm.model}", style="green")
     return conversation

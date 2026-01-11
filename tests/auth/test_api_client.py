@@ -47,9 +47,7 @@ class TestOpenHandsApiClient:
             result = await client._get_json("/test")
 
             assert result == {"key": "value"}
-            mock_get.assert_called_once_with(
-                "/test", headers=client._headers, params=None
-            )
+            mock_get.assert_called_once_with("/test", headers=client._headers)
 
     @pytest.mark.asyncio
     async def test_get_json_http_error(self):

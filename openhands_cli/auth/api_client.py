@@ -38,12 +38,10 @@ class OpenHandsApiClient(BaseHttpClient):
             "Content-Type": "application/json",
         }
 
-    async def _get_json(
-        self, path: str, *, params: dict[str, Any] | None = None
-    ) -> Any:
+    async def _get_json(self, path: str) -> dict[str, Any]:
         """Perform GET and return JSON with unified error handling."""
         try:
-            response = await self.get(path, headers=self._headers, params=params)
+            response = await self.get(path, headers=self._headers)
         except AuthHttpError as e:
             # Check if this is a 401 Unauthorized error
             if "HTTP 401" in str(e):
@@ -74,60 +72,6 @@ class OpenHandsApiClient(BaseHttpClient):
 
     async def create_conversation(self, json_data=None):
         return await self.post("/api/conversations", self._headers, json_data)
-
-    async def list_conversations(self) -> dict[str, Any] | list[dict[str, Any]]:
-        """List conversations from OpenHands Cloud.
-
-        Returns:
-            Either a dict containing a "conversations" list or a raw list,
-            depending on server implementation.
-        """
-        data = await self._get_json("/api/conversations")
-        # Some servers may return a raw list; preserve as-is.
-        if isinstance(data, list):
-            return data
-        return data
-
-    async def get_conversation(self, conversation_id: str) -> dict[str, Any]:
-        """Get a single conversation from OpenHands Cloud control plane."""
-        return await self._get_json(f"/api/conversations/{conversation_id}")
-
-    async def get_conversation_events_page(
-        self,
-        conversation_id: str,
-        *,
-        start_id: int = 0,
-        limit: int = 100,
-    ) -> dict[str, Any]:
-        """Fetch one page of conversation events from control plane."""
-        data = await self._get_json(
-            f"/api/conversations/{conversation_id}/events",
-            params={"start_id": start_id, "limit": limit},
-        )
-        assert isinstance(data, dict)
-        return data
-
-    async def get_conversation_events_all(
-        self, conversation_id: str, *, limit: int = 100
-    ) -> list[dict[str, Any]]:
-        """Fetch all conversation events from control plane (handles pagination)."""
-        start_id = 0
-        out: list[dict[str, Any]] = []
-        while True:
-            page = await self.get_conversation_events_page(
-                conversation_id, start_id=start_id, limit=limit
-            )
-            events = page.get("events", [])
-            if isinstance(events, list):
-                out.extend([e for e in events if isinstance(e, dict)])
-            has_more = bool(page.get("has_more", False))
-            if not has_more:
-                break
-            if out and isinstance(out[-1].get("id"), int):
-                start_id = int(out[-1]["id"]) + 1
-            else:
-                start_id = start_id + limit
-        return out
 
 
 def _print_settings_summary(settings: dict[str, Any]) -> None:

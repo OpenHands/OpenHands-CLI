@@ -12,15 +12,12 @@ from openhands.sdk import (
     BaseConversation,
     ConversationExecutionStatus,
     Message,
-    RemoteWorkspace,
     TextContent,
-    Workspace,
 )
 from openhands.sdk.conversation.exceptions import ConversationRunError
 from openhands.sdk.conversation.state import (
     ConversationState,
 )
-from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
 from openhands.sdk.event.base import Event
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
@@ -43,10 +40,8 @@ class ConversationRunner:
         confirmation_callback: Callable,
         notification_callback: Callable[[str, str, SeverityLevel], None],
         visualizer: ConversationVisualizer,
-        sdk_visualizer: ConversationVisualizerBase | None = None,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
         event_callback: Callable[[Event], None] | None = None,
-        workspace: Workspace | RemoteWorkspace | None = None,
     ):
         """Initialize the conversation runner.
 
@@ -63,9 +58,8 @@ class ConversationRunner:
         self.conversation: BaseConversation = setup_conversation(
             conversation_id,
             confirmation_policy=starting_confirmation_policy,
-            visualizer=sdk_visualizer or visualizer,
+            visualizer=visualizer,
             event_callback=event_callback,
-            workspace=workspace,
         )
 
         self._running = False

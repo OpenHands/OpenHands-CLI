@@ -195,7 +195,7 @@ class TestBaseHttpClient:
 
             assert response == mock_response
             mock_make_request.assert_called_once_with(
-                "GET", "/test", headers, params=None, raise_for_status=True
+                "GET", "/test", headers, raise_for_status=True
             )
 
     @pytest.mark.asyncio
@@ -213,13 +213,7 @@ class TestBaseHttpClient:
 
             assert response == mock_response
             mock_make_request.assert_called_once_with(
-                "POST",
-                "/test",
-                headers,
-                json_data,
-                None,
-                params=None,
-                raise_for_status=True,
+                "POST", "/test", headers, json_data, None, True
             )
 
     @pytest.mark.asyncio
@@ -235,13 +229,7 @@ class TestBaseHttpClient:
 
             assert response == mock_response
             mock_make_request.assert_called_once_with(
-                "POST",
-                "/test",
-                None,
-                None,
-                None,
-                params=None,
-                raise_for_status=False,
+                "POST", "/test", None, None, None, False
             )
 
     @pytest.mark.asyncio
@@ -284,11 +272,5 @@ class TestBaseHttpClient:
 
             assert response == mock_response
             mock_make_request.assert_called_once_with(
-                "POST",
-                "/test",
-                None,
-                None,
-                form_data,
-                params=None,
-                raise_for_status=True,
+                "POST", "/test", None, None, form_data, True
             )
