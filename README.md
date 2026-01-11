@@ -1,6 +1,8 @@
 # OpenHands V1 CLI
 
-A command-line interface for [OpenHands](https://github.com/All-Hands-AI/OpenHands), the AI-powered software development agent. Run OpenHands directly from your terminal with an interactive TUI, headless mode for automation, or integrate with your favorite IDE.
+A **lightweight, modern CLI** to interact with the OpenHands agent (powered by [OpenHands Software Agent SDK](https://github.com/OpenHands/software-agent-sdk)).
+
+Run an autonomous OpenHands agent directly in your terminal, IDE, CI pipelines, browser, etc. Easily create local or remote cloud based conversations
 
 ## Installation
 
@@ -64,10 +66,10 @@ openhands login
 | Mode | Command | Best For |
 | --- | --- | --- |
 | Terminal (TUI) | `openhands` | Interactive development |
-| Headless | `openhands --headless -t "task"` | Scripts & automation |
+| Headless | `openhands --headless -t "task"` | CI, scripts, and automation |
 | Web Interface | `openhands web` | Browser-based TUI |
 | GUI Server | `openhands serve` | Full web GUI |
-| IDE Integration | `openhands acp` | Zed, VS Code, JetBrains |
+| IDE Integration | `openhands acp` | IDEs (Toad, Zed, VSCode, JetBrains, etc) |
 
 ### IDE Integration (ACP)
 
