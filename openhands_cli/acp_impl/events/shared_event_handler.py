@@ -164,7 +164,11 @@ class SharedEventHandler:
     async def handle_action_event(self, ctx: _ACPContext, event: ActionEvent):
         content = None
         tool_kind = get_tool_kind(tool_name=event.tool_name, action=event.action)
-        title = get_tool_title(tool_name=event.tool_name, action=event.action)
+        # Use LLM-generated summary for the title when available
+        summary = str(event.summary) if event.summary else None
+        title = get_tool_title(
+            tool_name=event.tool_name, action=event.action, summary=summary
+        )
         if event.action:
             action_viz = _event_visualize_to_plain(event)
             content = format_content_blocks(action_viz)

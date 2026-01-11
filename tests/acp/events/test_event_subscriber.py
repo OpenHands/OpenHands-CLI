@@ -93,6 +93,7 @@ async def test_handle_action_event(event_subscriber, mock_connection):
         action = MockAction()
         tool_call = MockToolCall()
         visualize = Text("Executing test action")
+        summary = "Running a test command"
 
     event = MockEvent()
 
