@@ -61,6 +61,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+o", "toggle_cells", "Toggle Cells"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
+        ("ctrl+x", "open_external_editor", "Open external editor"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
         ("ctrl+c", "request_quit", "Quit the application"),
@@ -601,6 +602,20 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self.conversation_runner.pause_runner_without_blocking()
         else:
             self.notify(message="No running conversation to pause", severity="error")
+
+    def action_toggle_input_mode(self) -> None:
+        """Forward toggle input mode action to the input field."""
+        self.input_field.action_toggle_input_mode()
+
+    def action_submit_textarea(self) -> None:
+        """Forward submit textarea action to the input field."""
+        self.input_field.action_submit_textarea()
+
+    def action_open_external_editor(self) -> None:
+        """Forward open external editor action to the input field."""
+        # Debug: notify that the main app action was triggered
+        self.notify("Main app CTRL+E action triggered", severity="information")
+        self.input_field.action_open_external_editor()
 
     def _handle_confirm_command(self) -> None:
         """Handle the /confirm command to show confirmation settings modal."""
