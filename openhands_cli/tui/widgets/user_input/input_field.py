@@ -169,7 +169,10 @@ class InputField(Container):
             event.stop()
 
     @on(SingleLineInputWithWrapping.EnterPressed)
-    def _on_enter_pressed(self, event: SingleLineInputWithWrapping.EnterPressed) -> None:  # noqa: ARG002
+    def _on_enter_pressed(
+        self,
+        event: SingleLineInputWithWrapping.EnterPressed,  # noqa: ARG002
+    ) -> None:
         """Handle Enter key press from the single-line input."""
         # Let autocomplete handle enter if visible
         if self.autocomplete.is_visible and self.autocomplete.process_key("enter"):

@@ -269,4 +269,4 @@ class AutoCompleteDropdown(Container):
             self.single_line_widget.text = prefix + completion_value + " "
 
         # Move cursor to end
-        self.single_line_widget.move_cursor((0, len(self.single_line_widget.text)))
+        self.single_line_widget.move_cursor(self.single_line_widget.document.end)
