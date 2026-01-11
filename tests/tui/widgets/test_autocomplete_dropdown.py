@@ -531,3 +531,80 @@ class TestAutoCompleteDropdown:
             autocomplete.update_candidates()
 
         assert autocomplete._current_completion_type == CompletionType.COMMAND
+
+
+class TestApplyCompletion:
+    """Tests for the apply_completion method."""
+
+    def test_apply_completion_for_command_replaces_text(self):
+        """Command completion replaces entire input text with command + space."""
+        mock_widget = create_mock_single_line_widget("/hel")
+        mock_widget.document = mock.MagicMock()
+        mock_widget.document.end = (0, 6)
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
+
+        item = CompletionItem(
+            display_text="/help - Display help",
+            completion_value="/help",
+            completion_type=CompletionType.COMMAND,
+        )
+
+        autocomplete.apply_completion(item)
+
+        assert mock_widget.text == "/help "
+        mock_widget.move_cursor.assert_called_once_with((0, 6))
+
+    def test_apply_completion_for_file_preserves_prefix(self):
+        """File completion keeps text before @ and appends completion + space."""
+        mock_widget = create_mock_single_line_widget("read @READ")
+        mock_widget.document = mock.MagicMock()
+        mock_widget.document.end = (0, 17)
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
+
+        item = CompletionItem(
+            display_text="📄 @README.md",
+            completion_value="@README.md",
+            completion_type=CompletionType.FILE,
+        )
+
+        autocomplete.apply_completion(item)
+
+        assert mock_widget.text == "read @README.md "
+        mock_widget.move_cursor.assert_called_once_with((0, 17))
+
+    def test_apply_completion_with_multiple_at_symbols(self):
+        """File completion replaces from the last @ only."""
+        mock_widget = create_mock_single_line_widget("email@test.com and @src")
+        mock_widget.document = mock.MagicMock()
+        mock_widget.document.end = (0, 25)
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
+
+        item = CompletionItem(
+            display_text="📁 @src/",
+            completion_value="@src/",
+            completion_type=CompletionType.FILE,
+        )
+
+        autocomplete.apply_completion(item)
+
+        # Should preserve "email@test.com and " and replace from last @
+        assert mock_widget.text == "email@test.com and @src/ "
+        mock_widget.move_cursor.assert_called_once_with((0, 25))
+
+    def test_apply_completion_moves_cursor_to_end(self):
+        """Cursor is positioned at the end of text after completion."""
+        mock_widget = create_mock_single_line_widget("/cl")
+        mock_widget.document = mock.MagicMock()
+        mock_widget.document.end = (0, 7)
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
+
+        item = CompletionItem(
+            display_text="/clear - Clear screen",
+            completion_value="/clear",
+            completion_type=CompletionType.COMMAND,
+        )
+
+        autocomplete.apply_completion(item)
+
+        # Verify move_cursor was called with document.end
+        mock_widget.move_cursor.assert_called_once_with(mock_widget.document.end)

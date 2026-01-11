@@ -9,6 +9,10 @@ from textual.events import Paste
 from openhands_cli.tui.widgets.user_input.input_field import (
     InputField,
 )
+from openhands_cli.tui.widgets.user_input.models import (
+    CompletionItem,
+    CompletionType,
+)
 
 
 @pytest.fixture
@@ -368,3 +372,173 @@ class TestInputFieldPasteIntegration:
 
             # Still single-line, nothing changed
             assert not input_field.is_multiline_mode
+
+
+class TestInputFieldAutocompleteIntegration:
+    """Integration tests for InputField with autocomplete functionality."""
+
+    @pytest.mark.asyncio
+    async def test_enter_submits_when_autocomplete_hidden(self) -> None:
+        """Pressing Enter when autocomplete is hidden submits content."""
+        app = InputFieldTestApp()
+        submitted_messages = []
+
+        async with app.run_test() as pilot:
+            input_field = app.query_one(InputField)
+
+            # Capture submitted messages
+            original_post_message = input_field.post_message
+
+            def capture_message(message):
+                if isinstance(message, InputField.Submitted):
+                    submitted_messages.append(message)
+                return original_post_message(message)
+
+            input_field.post_message = capture_message
+
+            # Type non-command text (autocomplete should be hidden)
+            input_field.single_line_widget.text = "Hello world"
+            input_field.single_line_widget.focus()
+            await pilot.pause()
+
+            # Ensure autocomplete is hidden
+            assert not input_field.autocomplete.is_visible
+
+            # Press Enter - should submit
+            await pilot.press("enter")
+            await pilot.pause()
+
+            assert len(submitted_messages) == 1
+            assert submitted_messages[0].content == "Hello world"
+
+    @pytest.mark.asyncio
+    async def test_enter_applies_completion_when_autocomplete_visible(self) -> None:
+        """Pressing Enter when autocomplete is visible applies completion."""
+        app = InputFieldTestApp()
+        submitted_messages = []
+
+        async with app.run_test() as pilot:
+            input_field = app.query_one(InputField)
+
+            # Capture submitted messages
+            original_post_message = input_field.post_message
+
+            def capture_message(message):
+                if isinstance(message, InputField.Submitted):
+                    submitted_messages.append(message)
+                return original_post_message(message)
+
+            input_field.post_message = capture_message
+
+            # Type a slash command prefix
+            input_field.single_line_widget.text = "/hel"
+            input_field.single_line_widget.focus()
+            await pilot.pause()
+
+            # Force autocomplete to be visible with a mock completion item
+            input_field.autocomplete.display = True
+            completion_item = CompletionItem(
+                display_text="/help - Display help",
+                completion_value="/help",
+                completion_type=CompletionType.COMMAND,
+            )
+            input_field.autocomplete._completion_items = [completion_item]
+
+            # Add option to the option list so highlighted=0 works
+            input_field.autocomplete.option_list.clear_options()
+            from textual.widgets.option_list import Option
+
+            input_field.autocomplete.option_list.add_option(
+                Option(
+                    completion_item.display_text, id=completion_item.completion_value
+                )
+            )
+            input_field.autocomplete.option_list.highlighted = 0
+
+            # Press Enter - should apply completion, NOT submit
+            await pilot.press("enter")
+            await pilot.pause()
+
+            # No submission should have occurred
+            assert len(submitted_messages) == 0
+            # Text should be updated with completion
+            assert input_field.single_line_widget.text == "/help "
+
+    @pytest.mark.asyncio
+    async def test_text_change_updates_autocomplete_candidates(self) -> None:
+        """Typing triggers autocomplete.update_candidates()."""
+        app = InputFieldTestApp()
+
+        async with app.run_test() as pilot:
+            input_field = app.query_one(InputField)
+
+            # Track calls to update_candidates
+            update_calls = []
+            original_update = input_field.autocomplete.update_candidates
+
+            def track_update():
+                update_calls.append(True)
+                return original_update()
+
+            input_field.autocomplete.update_candidates = track_update
+
+            input_field.single_line_widget.focus()
+            await pilot.pause()
+
+            # Clear any initial calls
+            update_calls.clear()
+
+            # Simulate typing by changing text
+            input_field.single_line_widget.text = "/"
+            await pilot.pause()
+
+            # update_candidates should have been called
+            assert len(update_calls) >= 1
+
+    @pytest.mark.asyncio
+    async def test_arrow_keys_navigate_autocomplete_when_visible(self) -> None:
+        """Up/Down keys are forwarded to autocomplete when visible."""
+        app = InputFieldTestApp()
+
+        async with app.run_test() as pilot:
+            input_field = app.query_one(InputField)
+
+            input_field.single_line_widget.focus()
+            await pilot.pause()
+
+            # Make autocomplete visible with items
+            input_field.autocomplete.display = True
+            input_field.autocomplete._completion_items = [
+                CompletionItem(
+                    display_text="/help",
+                    completion_value="/help",
+                    completion_type=CompletionType.COMMAND,
+                ),
+                CompletionItem(
+                    display_text="/exit",
+                    completion_value="/exit",
+                    completion_type=CompletionType.COMMAND,
+                ),
+            ]
+
+            # Track process_key calls
+            process_key_calls = []
+            original_process_key = input_field.autocomplete.process_key
+
+            def track_process_key(key):
+                process_key_calls.append(key)
+                return original_process_key(key)
+
+            input_field.autocomplete.process_key = track_process_key
+
+            # Press down arrow
+            await pilot.press("down")
+            await pilot.pause()
+
+            # Press up arrow
+            await pilot.press("up")
+            await pilot.pause()
+
+            # Both keys should have been processed by autocomplete
+            assert "down" in process_key_calls
+            assert "up" in process_key_calls
