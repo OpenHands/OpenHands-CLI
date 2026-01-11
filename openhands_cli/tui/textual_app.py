@@ -35,7 +35,7 @@ from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
-from openhands_cli.tui.modals import SettingsScreen, SwitchConversationModal
+from openhands_cli.tui.modals import SettingsScreen, SwitchConversationOverlay
 from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModal
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
@@ -786,6 +786,19 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             get_conversation_text(self.conversation_id.hex, theme=OPENHANDS_THEME)
         )
 
+        # If History panel is open, switch highlight to the new conversation.
+        try:
+            history_panel = self.query_one(HistorySidePanel)
+        except Exception:
+            history_panel = None
+
+        if history_panel is not None:
+            history_panel.ensure_conversation_visible(self.conversation_id)
+            history_panel.set_current_conversation(self.conversation_id)
+            history_panel.select_current_conversation()
+        else:
+            self._sync_history_panel_current(self.conversation_id)
+
         # Scroll to top to show the splash screen
         self.main_display.scroll_home(animate=False)
 
@@ -841,8 +854,23 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # If an agent is currently running, confirm before switching.
         if self.conversation_runner and self.conversation_runner.is_running:
-            self.push_screen(
-                SwitchConversationModal(
+
+            def _stay() -> None:
+                # Revert selection highlight back to current conversation so the
+                # user doesn't think the app switched chats.
+                try:
+                    history_panel = self.query_one(HistorySidePanel)
+                    history_panel.select_current_conversation()
+                except Exception:
+                    pass
+                # Keep typing flow smooth.
+                try:
+                    self.input_field.focus_input()
+                except Exception:
+                    pass
+
+            self.mount(
+                SwitchConversationOverlay(
                     prompt=(
                         "The agent is still running.\n\n"
                         "Switching conversations will pause the current run.\n"
@@ -851,6 +879,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                     on_confirmed=lambda: self._switch_to_conversation_with_stop(
                         target_id
                     ),
+                    on_cancelled=_stay,
                 )
             )
             return

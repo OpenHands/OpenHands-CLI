@@ -252,6 +252,33 @@ class HistorySidePanel(Container):
         self.selected_conversation_id = None
         self._render_list()
 
+    def select_current_conversation(self) -> None:
+        """Select the current conversation in the list (without switching)."""
+        if self.current_conversation_id is None:
+            return
+        self.selected_conversation_id = self.current_conversation_id
+        self._update_highlights()
+
+    def ensure_conversation_visible(self, conversation_id: uuid.UUID) -> None:
+        """Ensure a conversation row exists in the list (even before persistence).
+
+        This is used for newly created conversations so the history panel can
+        immediately show and select them.
+        """
+        conv_hex = conversation_id.hex
+        if any(row.select_id == conv_hex for row in self._local_rows):
+            return
+
+        self._local_rows.insert(
+            0,
+            HistoryConversationRow(
+                select_id=conv_hex,
+                display_id=conv_hex,
+                created_date=datetime.now(),
+                first_user_prompt=None,
+            ),
+        )
+
     def update_conversation_title_if_needed(
         self,
         *,
