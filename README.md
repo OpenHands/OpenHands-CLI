@@ -22,23 +22,6 @@ Install the standalone binary with the install script:
 curl -fsSL https://install.openhands.dev/install.sh | sh
 ```
 
-### Using Docker
-
-```bash
-docker run -it \
-    --pull=always \
-    -e SANDBOX_RUNTIME_CONTAINER_IMAGE=docker.openhands.dev/openhands/runtime:1.1-nikolaik \
-    -e SANDBOX_USER_ID=$(id -u) \
-    -e SANDBOX_VOLUMES=$SANDBOX_VOLUMES \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    -v ~/.openhands:/root/.openhands \
-    --add-host host.docker.internal:host-gateway \
-    --name openhands-cli-$(date +%Y%m%d%H%M%S) \
-    python:3.12-slim \
-    bash -c "pip install uv && uv tool install openhands --python 3.12 && openhands"
-```
-
-Set `SANDBOX_VOLUMES` to the directory you want OpenHands to access.
 
 ## Usage
 
