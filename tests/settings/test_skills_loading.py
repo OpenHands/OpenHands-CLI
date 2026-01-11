@@ -24,7 +24,8 @@ triggers: ["test", "skill"]
 This is a test skill for testing purposes.
 """)
 
-        # Create additional skill-like files (formerly stored under .openhands/microagents)
+        # Create additional skill-like files (previously stored under
+        # .openhands/microagents)
         microagent1 = skills_dir / "test_microagent.md"
         microagent1.write_text("""---
 name: test_microagent

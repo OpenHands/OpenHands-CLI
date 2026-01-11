@@ -2,15 +2,20 @@
 
 ## Repository Purpose & Context
 - OpenHands CLI is a standalone terminal interface (Textual TUI) for interacting with the OpenHands agent.
-- This repo ports legacy CLI code from the main OpenHands repository (`openhands/cli`) and refactors it to use the OpenHands agent-sdk (`openhands-sdk`, `openhands-tools`).
-- When you need reference behavior/UI: consult upstream OpenHands. When you need agent behavior/tooling details: consult the agent-sdk repo.
+- This repo contains the current CLI UX, including the Textual TUI and a browser-served view via `openhands web`.
+- The CLI originated as a port from the main OpenHands repository (`openhands/cli`) and was refactored to use the OpenHands agent-sdk (`openhands-sdk`, `openhands-tools`). Upstream OpenHands can still be a useful reference for behavior parity and shared concepts.
+
+### References
+- Agent-sdk example: https://github.com/All-Hands-AI/agent-sdk/blob/main/examples/hello_world.py
+- If you need to compare with upstream OpenHands code, use `$GITHUB_TOKEN` for access.
 
 ## Project Structure & Module Organization
 - `openhands_cli/`: Core CLI/TUI code (`entrypoint.py`, `tui/`, `auth/`, `mcp/`, `cloud/`, `user_actions/`, `conversations/`, `theme.py`, helpers in `utils.py`). Keep new modules snake_case and colocate tests.
 - `tests/`: Pytest suite covering units, integration, and snapshot tests; mirrors source layout. `e2e_tests/`: end-to-end ACP/UI flows.
 - `scripts/acp/`: JSON-RPC and debug helpers for ACP development; `hooks/`: PyInstaller/runtime hooks.
 - Tooling & packaging: `Makefile` for common tasks, `build.sh`/`build.py` for PyInstaller artifacts, `openhands-cli.spec` for the frozen binary, `uv.lock` for resolved deps.
-- `.openhands/`: agent-specific guidance; avoid adding extra root-level docs unless explicitly requested.
+- `.openhands/skills/`: agent guidance for this repo.
+  - `.openhands/skills/repo.md` is a symlink to the root `AGENTS.md` (single source of truth).
 
 ## Setup, Build, and Development Commands
 - `make install`: `uv sync`
@@ -18,7 +23,10 @@
 - `make build`: checks uv version, runs `uv sync --dev`, and installs pre-commit hooks (`uv run pre-commit install`).
 - `make lint`: run all pre-commit hooks (`uv run pre-commit run --all-files`) — run before committing.
 - `make format`: `uv run ruff format openhands_cli/`
-- `make run` (or `uv run openhands`): launch the CLI; `uv run openhands-acp` for the ACP entrypoint.
+- `make run` (or `uv run openhands`): launch the Textual TUI.
+- `openhands web`: launch the CLI as a browser-served web app (Textual `textual-serve`).
+- `openhands serve`: launch the Docker-based OpenHands GUI server.
+- `uv run openhands-acp`: run the ACP entrypoint.
 - `make test`: `uv run pytest` (use `-m "not integration"` to skip slower paths). `uv run pytest e2e_tests` runs end-to-end flows.
 - Packaging: `./build.sh --install-pyinstaller` produces binaries in `dist/`.
 
@@ -38,6 +46,13 @@
 - Run snapshot tests: `uv run pytest tests/snapshots -v`
 - Update snapshots (intentional UI changes): `uv run pytest tests/snapshots --snapshot-update`
 - Test files live under `tests/snapshots/`; generated SVG snapshots live under `tests/snapshots/__snapshots__/`.
+- Snapshot tests must be synchronous (the `snap_compare` fixture handles async internally).
+
+Best practices:
+- Mock external dependencies so snapshots are deterministic.
+- Always pass a fixed `terminal_size=(width, height)`.
+- Commit SVG snapshots.
+- Review snapshot diffs carefully.
 
 ## Dependency update playbook (agent-sdk / openhands-sdk)
 If asked to “update the agent-sdk SHA” / bump `openhands-sdk` / `openhands-tools`:
