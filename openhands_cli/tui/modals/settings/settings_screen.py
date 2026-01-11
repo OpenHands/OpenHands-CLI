@@ -5,6 +5,7 @@ the main UI, allowing users to configure their settings including
 LLM provider, model, API keys, and advanced options.
 """
 
+import os
 from collections.abc import Callable
 from typing import ClassVar, Literal, cast
 
@@ -420,7 +421,16 @@ class SettingsScreen(ModalScreen):
         Returns:
             True if initial setup is needed (no existing settings), False otherwise
         """
-
         agent_store = AgentStore()
+        
+        # Check file
         existing_agent = agent_store.load()
-        return existing_agent is None
+        if existing_agent is not None:
+            return False
+        
+        # Check env vars
+        model = os.getenv("OPENHANDS_LLM_MODEL")
+        api_key = os.getenv("OPENHANDS_LLM_API_KEY")
+        
+        # Both required for env var config
+        return not (model and api_key)
