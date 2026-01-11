@@ -7,6 +7,7 @@ from rich.console import Console
 from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, Workspace
 from openhands.sdk.context import Skill
 from openhands.sdk.event.base import Event
+from openhands.sdk.hooks import HookConfig
 from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
 )
@@ -81,11 +82,32 @@ def load_agent_specs(
     return agent
 
 
+def load_hook_config(working_dir: str | None = None) -> HookConfig | None:
+    """Load hook configuration from the working directory or home directory.
+
+    Searches for .openhands/hooks.json in:
+    1. The working directory (if provided, otherwise current directory)
+    2. The user's home directory
+
+    Args:
+        working_dir: Optional working directory to search for hooks.json
+
+    Returns:
+        HookConfig if found and valid, None otherwise
+    """
+    hook_config = HookConfig.load(working_dir=working_dir or WORK_DIR)
+    # Return None if no hooks are configured (empty config)
+    if not hook_config.hooks:
+        return None
+    return hook_config
+
+
 def setup_conversation(
     conversation_id: UUID,
     confirmation_policy: ConfirmationPolicyBase,
     visualizer: ConversationVisualizer | None = None,
     event_callback: Callable[[Event], None] | None = None,
+    hook_config: HookConfig | None = None,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
@@ -96,6 +118,8 @@ def setup_conversation(
         confirmation_policy: Confirmation policy to use.
         visualizer: Optional visualizer to use. If None, a default will be used
         event_callback: Optional callback function to handle events (e.g., JSON output)
+        hook_config: Optional hook configuration for event-driven hooks.
+            If not provided, will attempt to load from .openhands/hooks.json
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
@@ -104,6 +128,10 @@ def setup_conversation(
     console.print("Initializing agent...", style="white")
 
     agent = load_agent_specs(str(conversation_id))
+
+    # Load hook config if not provided
+    if hook_config is None:
+        hook_config = load_hook_config(WORK_DIR)
 
     # Prepare callbacks list
     callbacks = [event_callback] if event_callback else None
@@ -117,10 +145,13 @@ def setup_conversation(
         conversation_id=conversation_id,
         visualizer=visualizer,
         callbacks=callbacks,
+        hook_config=hook_config,
     )
 
     conversation.set_security_analyzer(LLMSecurityAnalyzer())
     conversation.set_confirmation_policy(confirmation_policy)
 
     console.print(f"✓ Agent initialized with model: {agent.llm.model}", style="green")
+    if hook_config:
+        console.print("✓ Hooks loaded from .openhands/hooks.json", style="green")
     return conversation
