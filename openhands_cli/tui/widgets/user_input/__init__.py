@@ -1,10 +1,11 @@
 """User input widgets for the OpenHands CLI."""
 
+from tui.widgets.user_input.single_line_input import (
+    SingleLineInputWithWraping,
+)
+
 from openhands_cli.tui.widgets.user_input.autocomplete_coordinator import (
     AutocompleteCoordinator,
-)
-from openhands_cli.tui.widgets.user_input.expandable_text_area import (
-    AutoGrowTextArea,
 )
 from openhands_cli.tui.widgets.user_input.input_field import InputField
 from openhands_cli.tui.widgets.user_input.input_mode import InputMode
@@ -22,7 +23,7 @@ from openhands_cli.tui.widgets.user_input.text_area_with_autocomplete import (
 
 __all__ = [
     "AutocompleteCoordinator",
-    "AutoGrowTextArea",
+    "SingleLineInputWithWraping",
     "CompletionItem",
     "CompletionType",
     "InputField",

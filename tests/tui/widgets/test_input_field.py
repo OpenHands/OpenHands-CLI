@@ -7,7 +7,6 @@ from textual.app import App
 from textual.events import Paste
 
 from openhands_cli.tui.widgets.user_input.input_field import (
-    AutoGrowTextArea,
     InputField,
 )
 
@@ -124,10 +123,12 @@ class TestInputFieldIntegration:
 
             # Capture submitted messages
             original_post_message = input_field.post_message
+
             def capture_message(msg):
                 if isinstance(msg, InputField.Submitted):
                     submitted_messages.append(msg)
                 return original_post_message(msg)
+
             input_field.post_message = capture_message
 
             # Submit
@@ -221,7 +222,7 @@ class TestInputFieldPasteIntegration:
         self, paste_text: str, expected_text: str
     ) -> None:
         """Any multi-line-ish paste should trigger automatic mode switch.
-        
+
         TextArea normalizes all newline sequences (\\r\\n, \\r) to \\n.
         """
         await self._assert_multiline_paste_switches_mode(paste_text, expected_text)

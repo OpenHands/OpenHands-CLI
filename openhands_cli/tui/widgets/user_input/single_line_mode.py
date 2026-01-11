@@ -1,12 +1,12 @@
 """Single-line input mode with autocomplete support."""
 
 from textual.widget import Widget
+from tui.widgets.user_input.single_line_input import (
+    SingleLineInputWithWraping,
+)
 
 from openhands_cli.tui.widgets.user_input.autocomplete_coordinator import (
     AutocompleteCoordinator,
-)
-from openhands_cli.tui.widgets.user_input.expandable_text_area import (
-    AutoGrowTextArea,
 )
 from openhands_cli.tui.widgets.user_input.input_mode import InputMode
 from openhands_cli.tui.widgets.user_input.text_area_with_autocomplete import (
@@ -18,7 +18,7 @@ class SingleLineMode(InputMode):
     """Single-line input mode with auto-growing height and autocomplete.
 
     Features:
-    - Uses AutoGrowTextArea with soft wrapping
+    - Uses SingleLineInputWithWraping with soft wrapping
     - Auto-grows height as text wraps (up to max-height)
     - Enter to submit, Shift+Enter/Ctrl+J for newline
     - Full autocomplete support for commands and file paths
@@ -26,7 +26,7 @@ class SingleLineMode(InputMode):
 
     def __init__(
         self,
-        text_area: AutoGrowTextArea,
+        text_area: SingleLineInputWithWraping,
         autocomplete: TextAreaAutoComplete,
     ) -> None:
         self._text_area = text_area

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from textual.widget import Widget
 
+
 if TYPE_CHECKING:
     from openhands_cli.tui.widgets.user_input.autocomplete_coordinator import (
         AutocompleteCoordinator,

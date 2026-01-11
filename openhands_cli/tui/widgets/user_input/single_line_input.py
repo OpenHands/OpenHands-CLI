@@ -5,7 +5,7 @@ from textual.message import Message
 from textual.widgets import TextArea
 
 
-class AutoGrowTextArea(TextArea):
+class SingleLineInputWithWraping(TextArea):
     """A TextArea that auto-grows with content and supports soft wrapping.
 
     This implementation is based on the toad project's approach:

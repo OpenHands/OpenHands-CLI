@@ -9,7 +9,7 @@ from textual.widgets import TextArea
 
 from openhands_cli.tui.core.commands import COMMANDS
 from openhands_cli.tui.widgets.user_input.expandable_text_area import (
-    AutoGrowTextArea,
+    SingleLineInputWithWraping,
 )
 from openhands_cli.tui.widgets.user_input.multiline_mode import MultilineMode
 from openhands_cli.tui.widgets.user_input.single_line_mode import SingleLineMode
@@ -25,7 +25,7 @@ class InputField(Container):
     SingleLineMode and MultilineMode classes.
 
     Single-line mode (default):
-    - Uses AutoGrowTextArea with soft wrapping
+    - Uses SingleLineInputWithWraping
     - Auto-grows height as text wraps (up to max-height)
     - Enter to submit, Shift+Enter/Ctrl+J for newline
     - Full autocomplete support
@@ -107,7 +107,7 @@ class InputField(Container):
     def compose(self):
         """Create the input widgets and initialize modes."""
         # Create widgets
-        self._single_line_widget = AutoGrowTextArea(
+        self._single_line_widget = SingleLineInputWithWraping(
             placeholder=self.placeholder,
             id="user_input",
         )
@@ -157,8 +157,8 @@ class InputField(Container):
             event.prevent_default()
             event.stop()
 
-    @on(AutoGrowTextArea.EnterPressed)
-    def _on_enter_pressed(self, event: AutoGrowTextArea.EnterPressed) -> None:  # noqa: ARG002
+    @on(SingleLineInputWithWraping.EnterPressed)
+    def _on_enter_pressed(self, event: SingleLineInputWithWraping.EnterPressed) -> None:  # noqa: ARG002
         """Handle Enter key press from the single-line input."""
         if self.is_multiline_mode:
             return
@@ -220,8 +220,10 @@ class InputField(Container):
         """Focus the current mode's input widget."""
         self._current_mode.focus()
 
-    @on(AutoGrowTextArea.PasteDetected)
-    def _on_paste_detected(self, event: AutoGrowTextArea.PasteDetected) -> None:
+    @on(SingleLineInputWithWraping.PasteDetected)
+    def _on_paste_detected(
+        self, event: SingleLineInputWithWraping.PasteDetected
+    ) -> None:
         """Handle multi-line paste detection - switch to multiline mode."""
         if not self.is_multiline_mode:
             self._single_line_widget.insert(
@@ -232,7 +234,7 @@ class InputField(Container):
 
     # Backward compatibility properties
     @property
-    def input_widget(self) -> AutoGrowTextArea:
+    def input_widget(self) -> SingleLineInputWithWraping:
         """Get the single-line input widget (for backward compatibility)."""
         return self._single_line_widget
 

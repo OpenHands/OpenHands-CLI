@@ -20,9 +20,7 @@ class AutocompleteCoordinator:
     - Applying selected completions
     """
 
-    def __init__(
-        self, text_area: TextArea, autocomplete: TextAreaAutoComplete
-    ) -> None:
+    def __init__(self, text_area: TextArea, autocomplete: TextAreaAutoComplete) -> None:
         self.text_area = text_area
         self.autocomplete = autocomplete
 
