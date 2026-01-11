@@ -309,7 +309,9 @@ class TestInputFieldPasteIntegration:
     # Shared helper for basic multi-line variants
     # ------------------------------
 
-    async def _assert_multiline_paste_switches_mode(self, paste_text: str) -> None:
+    async def _assert_multiline_paste_switches_mode(
+        self, paste_text: str, expected_text: str
+    ) -> None:
         """Shared scenario: multi-line-ish paste should flip to multi-line mode."""
         app = InputFieldTestApp()
         async with app.run_test() as pilot:
@@ -333,24 +335,28 @@ class TestInputFieldPasteIntegration:
             assert input_field.is_multiline_mode
             assert not input_field.input_widget.display
             assert input_field.textarea_widget.display
-            # TextArea normalizes all newlines (\r\n, \r) to \n
-            expected_text = paste_text.replace("\r\n", "\n").replace("\r", "\n")
             assert input_field.textarea_widget.text == expected_text
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "paste_text",
+        "paste_text,expected_text",
         [
-            "Line 1\nLine 2\nLine 3",  # Unix newlines
-            "Line 1\rLine 2",  # Classic Mac CR
-            "Line 1\r\nLine 2\r\nLine 3",  # Windows CRLF
+            # Unix newlines - already normalized
+            ("Line 1\nLine 2\nLine 3", "Line 1\nLine 2\nLine 3"),
+            # Classic Mac CR - TextArea normalizes \r to \n
+            ("Line 1\rLine 2", "Line 1\nLine 2"),
+            # Windows CRLF - TextArea normalizes \r\n to \n
+            ("Line 1\r\nLine 2\r\nLine 3", "Line 1\nLine 2\nLine 3"),
         ],
     )
     async def test_multiline_paste_variants_switch_to_multiline_mode(
-        self, paste_text: str
+        self, paste_text: str, expected_text: str
     ) -> None:
-        """Any multi-line-ish paste should trigger automatic mode switch."""
-        await self._assert_multiline_paste_switches_mode(paste_text)
+        """Any multi-line-ish paste should trigger automatic mode switch.
+        
+        TextArea normalizes all newline sequences (\\r\\n, \\r) to \\n.
+        """
+        await self._assert_multiline_paste_switches_mode(paste_text, expected_text)
 
     # ------------------------------
     # Parametrized insertion behavior
