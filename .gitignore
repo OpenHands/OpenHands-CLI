@@ -194,3 +194,6 @@ $RECYCLE.BIN/
 .coverage
 .pytest_cache/
 software-agent-sdk/
+
+# Local working plans (do not commit)
+PLAN_HISTORY_COMMAND.md
