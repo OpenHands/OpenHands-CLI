@@ -94,8 +94,6 @@ class InputField(Container):
         super().__init__(**kwargs)
         self.placeholder = placeholder
         self.multiline_mode_status = Signal(self, "multiline_mode_status")
-        # Alias for backward compatibility (typo in original)
-        self.mutliline_mode_status = self.multiline_mode_status
         self.is_multiline = False
 
     def compose(self):

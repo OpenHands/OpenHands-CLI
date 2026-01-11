@@ -118,7 +118,7 @@ class InfoStatusLine(Static):
     def on_mount(self) -> None:
         """Initialize the info status line."""
         self._update_text()
-        self.main_app.input_field.mutliline_mode_status.subscribe(
+        self.main_app.input_field.multiline_mode_status.subscribe(
             self, self._on_handle_mutliline_mode
         )
 
