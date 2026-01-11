@@ -1,4 +1,4 @@
-# OpenHands CLI
+# OpenHands V1 CLI
 
 A command-line interface for [OpenHands](https://github.com/All-Hands-AI/OpenHands), the AI-powered software development agent. Run OpenHands directly from your terminal with an interactive TUI, headless mode for automation, or integrate with your favorite IDE.
 
