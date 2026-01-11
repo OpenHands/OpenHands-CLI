@@ -16,6 +16,37 @@ from openhands.sdk.event.base import Event
 from openhands.tools.preset import get_default_agent
 
 
+def abbreviate_number(n: int | float) -> str:
+    """Abbreviate large numbers with K/M/B suffixes.
+
+    Examples:
+        1234 -> '1.23K'
+        1200000 -> '1.2M'
+        2500000000 -> '2.5B'
+        999 -> '999'
+    """
+    n = int(n or 0)
+    if n >= 1_000_000_000:
+        val, suffix = n / 1_000_000_000, "B"
+    elif n >= 1_000_000:
+        val, suffix = n / 1_000_000, "M"
+    elif n >= 1_000:
+        val, suffix = n / 1_000, "K"
+    else:
+        return str(n)
+    return f"{val:.2f}".rstrip("0").rstrip(".") + suffix
+
+
+def format_cost(cost: float) -> str:
+    """Format cost value for display.
+
+    Returns '0.00' for zero or negative costs, otherwise formats to 4 decimal places.
+    """
+    if cost <= 0:
+        return "0.00"
+    return f"{cost:.4f}"
+
+
 def get_os_description() -> str:
     system = platform.system() or "Unknown"
 
