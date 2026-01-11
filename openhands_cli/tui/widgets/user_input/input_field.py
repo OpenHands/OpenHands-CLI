@@ -211,9 +211,9 @@ class InputField(Container):
             self.autocomplete.hide_dropdown()
             self.post_message(self.Submitted(content))
 
-    @on(SingleLineInputWithWraping.PasteDetected)
+    @on(SingleLineInputWithWraping.MutliLinePasteDetected)
     def _on_paste_detected(
-        self, event: SingleLineInputWithWraping.PasteDetected
+        self, event: SingleLineInputWithWraping.MutliLinePasteDetected
     ) -> None:
         """Handle multi-line paste detection - switch to multiline mode."""
         if not self.is_multiline_mode:

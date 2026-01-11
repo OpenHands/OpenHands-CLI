@@ -15,7 +15,7 @@ class SingleLineInputWithWraping(TextArea):
     - CSS max-height limits maximum growth
     """
 
-    class PasteDetected(Message):
+    class MutliLinePasteDetected(Message):
         """Message sent when multi-line paste is detected."""
 
         def __init__(self, text: str) -> None:
@@ -74,7 +74,7 @@ class SingleLineInputWithWraping(TextArea):
         """Handle paste events and detect multi-line content."""
         if "\n" in event.text or "\r" in event.text:
             # Multi-line content detected - notify parent
-            self.post_message(self.PasteDetected(event.text))
+            self.post_message(self.MutliLinePasteDetected(event.text))
             event.prevent_default()
             event.stop()
         # For single-line content, let the default paste behavior handle it
