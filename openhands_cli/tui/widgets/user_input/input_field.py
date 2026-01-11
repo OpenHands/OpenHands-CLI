@@ -8,21 +8,16 @@ from textual.signal import Signal
 from textual.widgets import TextArea
 
 from openhands_cli.tui.core.commands import COMMANDS
-from openhands_cli.tui.widgets.user_input.multiline_mode import MultilineMode
 from openhands_cli.tui.widgets.user_input.single_line_input import (
     SingleLineInputWithWraping,
 )
-from openhands_cli.tui.widgets.user_input.single_line_mode import SingleLineMode
 from openhands_cli.tui.widgets.user_input.text_area_with_autocomplete import (
-    TextAreaAutoComplete,
+    AutoCompleteDropdown,
 )
 
 
 class InputField(Container):
     """Input field with two modes: auto-growing single-line and multiline.
-
-    Uses the Strategy pattern to delegate mode-specific behavior to
-    SingleLineMode and MultilineMode classes.
 
     Single-line mode (default):
     - Uses SingleLineInputWithWraping
@@ -78,7 +73,7 @@ class InputField(Container):
             background: $background;
         }
 
-        TextAreaAutoComplete {
+        AutoCompleteDropdown {
             layer: autocomplete;
             offset-x: 1;
             offset-y: -2;
@@ -99,14 +94,12 @@ class InputField(Container):
         super().__init__(**kwargs)
         self.placeholder = placeholder
         self.multiline_mode_status = Signal(self, "multiline_mode_status")
-        # For backward compatibility
+        # Alias for backward compatibility (typo in original)
         self.mutliline_mode_status = self.multiline_mode_status
-        # Track if compose() has been called
-        self._composed = False
+        self.is_multiline = False
 
     def compose(self):
-        """Create the input widgets and initialize modes."""
-        # Create widgets
+        """Create the input widgets."""
         self.single_line_widget = SingleLineInputWithWraping(
             placeholder=self.placeholder,
             id="user_input",
@@ -121,111 +114,144 @@ class InputField(Container):
         self.multiline_widget.display = False
         yield self.multiline_widget
 
-        self.autocomplete = TextAreaAutoComplete(command_candidates=COMMANDS)
+        self.autocomplete = AutoCompleteDropdown(command_candidates=COMMANDS)
         yield self.autocomplete
-
-        # Initialize modes
-        self._single_line_mode = SingleLineMode(
-            self.single_line_widget, self.autocomplete
-        )
-        self._multiline_mode = MultilineMode(self.multiline_widget)
-        self._current_mode = self._single_line_mode
-        self._composed = True
 
     def on_mount(self) -> None:
         """Focus the input when mounted."""
-        self._current_mode.focus()
+        self._focus_current()
 
     @property
     def is_multiline_mode(self) -> bool:
         """Check if currently in multiline mode."""
-        if not self._composed:
-            return False
-        return self._current_mode is self._multiline_mode
+        return self.is_multiline
+
+    def _focus_current(self) -> None:
+        """Focus the current mode's widget."""
+        if self.is_multiline:
+            self.multiline_widget.focus()
+        else:
+            self.single_line_widget.focus()
+
+    def _get_current_text(self) -> str:
+        """Get text from the current mode's widget."""
+        if self.is_multiline:
+            return self.multiline_widget.text
+        return self.single_line_widget.text
+
+    def _set_current_text(self, value: str) -> None:
+        """Set text on the current mode's widget."""
+        if self.is_multiline:
+            self.multiline_widget.text = value
+        else:
+            self.single_line_widget.text = value
+
+    def _clear_current(self) -> None:
+        """Clear the current mode's widget."""
+        if self.is_multiline:
+            self.multiline_widget.text = ""
+        else:
+            self.single_line_widget.clear()
+
+    def _move_cursor_to_end(self) -> None:
+        """Move cursor to end of current widget."""
+        if self.is_multiline:
+            self.multiline_widget.move_cursor(self.multiline_widget.document.end)
+        else:
+            self.single_line_widget.move_cursor(self.single_line_widget.document.end)
+
+    def _activate_single_line(self) -> None:
+        """Activate single-line mode."""
+        self.multiline_widget.display = False
+        self.single_line_widget.display = True
+        self.is_multiline = False
+
+    def _activate_multiline(self) -> None:
+        """Activate multiline mode."""
+        self.autocomplete.hide_dropdown()
+        self.single_line_widget.display = False
+        self.multiline_widget.display = True
+        self.is_multiline = True
 
     @on(TextArea.Changed)
     def _on_text_area_changed(self, event: TextArea.Changed) -> None:
         """Update autocomplete when text changes in single-line mode."""
-        if event.text_area is self.single_line_widget and not self.is_multiline_mode:
-            self._single_line_mode.handle_text_changed()
+        if event.text_area is self.single_line_widget and not self.is_multiline:
+            self.autocomplete.update_candidates(self.single_line_widget.text)
 
     def on_key(self, event) -> None:
         """Handle key events for autocomplete navigation."""
-        if self.is_multiline_mode:
+        if self.is_multiline:
             return
-        if self._single_line_mode.handle_key(event.key):
+        if self.autocomplete.process_key(event.key):
             event.prevent_default()
             event.stop()
 
     @on(SingleLineInputWithWraping.EnterPressed)
     def _on_enter_pressed(self, event: SingleLineInputWithWraping.EnterPressed) -> None:  # noqa: ARG002
         """Handle Enter key press from the single-line input."""
-        if self.is_multiline_mode:
+        if self.is_multiline:
             return
 
         # Let autocomplete handle enter if visible
-        if self._single_line_mode.handle_enter_for_autocomplete():
+        if self.autocomplete.is_visible and self.autocomplete.process_key("enter"):
             return
 
         self._submit_current_content()
 
-    @on(TextAreaAutoComplete.CompletionSelected)
+    @on(AutoCompleteDropdown.CompletionSelected)
     def _on_completion_selected(
-        self, event: TextAreaAutoComplete.CompletionSelected
+        self, event: AutoCompleteDropdown.CompletionSelected
     ) -> None:
         """Handle completion selection from autocomplete."""
-        coordinator = self._single_line_mode.get_autocomplete_coordinator()
-        coordinator.apply_completion(event.item)
+        self.autocomplete.apply_completion(self.single_line_widget, event.item)
 
     def action_toggle_input_mode(self) -> None:
         """Toggle between single-line and multiline modes."""
-        content = self._current_mode.text
-        self._current_mode.on_deactivate()
+        content = self._get_current_text()
 
-        if self.is_multiline_mode:
-            self._current_mode = self._single_line_mode
+        if self.is_multiline:
+            self._activate_single_line()
         else:
-            self._current_mode = self._multiline_mode
+            self._activate_multiline()
 
-        self._current_mode.text = content
-        self._current_mode.on_activate()
-        self._current_mode.move_cursor_to_end()
+        self._set_current_text(content)
+        self._move_cursor_to_end()
+        self._focus_current()
 
-        self.multiline_mode_status.publish(self.is_multiline_mode)
+        self.multiline_mode_status.publish(self.is_multiline)
 
     def action_submit_textarea(self) -> None:
         """Submit content from multiline mode (Ctrl+J)."""
-        if self.is_multiline_mode:
-            content = self._current_mode.text.strip()
+        if self.is_multiline:
+            content = self._get_current_text().strip()
             if content:
-                self._current_mode.clear()
+                self._clear_current()
                 self.action_toggle_input_mode()
                 self.post_message(self.Submitted(content))
 
     def _submit_current_content(self) -> None:
         """Submit current content and clear input."""
-        content = self._current_mode.text.strip()
+        content = self._get_current_text().strip()
         if content:
-            self._current_mode.clear()
-            coordinator = self._current_mode.get_autocomplete_coordinator()
-            if coordinator:
-                coordinator.hide()
+            self._clear_current()
+            self.autocomplete.hide_dropdown()
             self.post_message(self.Submitted(content))
 
     def get_current_value(self) -> str:
         """Get the current input value."""
-        return self._current_mode.text
+        return self._get_current_text()
 
     def focus_input(self) -> None:
         """Focus the current mode's input widget."""
-        self._current_mode.focus()
+        self._focus_current()
 
     @on(SingleLineInputWithWraping.PasteDetected)
     def _on_paste_detected(
         self, event: SingleLineInputWithWraping.PasteDetected
     ) -> None:
         """Handle multi-line paste detection - switch to multiline mode."""
-        if not self.is_multiline_mode:
+        if not self.is_multiline:
             self.single_line_widget.insert(
                 event.text,
                 self.single_line_widget.cursor_location,

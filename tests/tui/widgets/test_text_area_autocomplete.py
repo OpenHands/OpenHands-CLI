@@ -1,4 +1,4 @@
-"""Tests for TextAreaAutoComplete widget functionality."""
+"""Tests for AutoCompleteDropdown widget functionality."""
 
 from unittest import mock
 
@@ -9,7 +9,7 @@ from openhands_cli.tui.widgets.user_input.models import (
     CompletionType,
 )
 from openhands_cli.tui.widgets.user_input.text_area_with_autocomplete import (
-    TextAreaAutoComplete,
+    AutoCompleteDropdown,
     detect_completion_type,
 )
 
@@ -49,13 +49,13 @@ class TestDetectCompletionType:
         assert detect_completion_type(text) == expected_type
 
 
-class TestTextAreaAutoComplete:
-    """Tests for the TextAreaAutoComplete behavior (commands + file paths)."""
+class TestAutoCompleteDropdown:
+    """Tests for the AutoCompleteDropdown behavior (commands + file paths)."""
 
     @pytest.fixture
     def autocomplete(self):
         """Create an autocomplete instance."""
-        return TextAreaAutoComplete(command_candidates=[])
+        return AutoCompleteDropdown(command_candidates=[])
 
     # Command candidate logic
 
@@ -85,7 +85,7 @@ class TestTextAreaAutoComplete:
             cmd.main.plain = cmd_text
             command_candidates.append(cmd)
 
-        autocomplete = TextAreaAutoComplete(command_candidates=command_candidates)
+        autocomplete = AutoCompleteDropdown(command_candidates=command_candidates)
 
         # Note: _get_command_candidates doesn't check for spaces - that's done
         # in update_candidates. So we need to only test valid command prefixes.
@@ -103,7 +103,7 @@ class TestTextAreaAutoComplete:
         cmd.main = mock.MagicMock()
         cmd.main.plain = "/help - Display help"
 
-        autocomplete = TextAreaAutoComplete(command_candidates=[cmd])
+        autocomplete = AutoCompleteDropdown(command_candidates=[cmd])
         candidates = autocomplete._get_command_candidates("/h")
 
         assert len(candidates) == 1
@@ -124,7 +124,7 @@ class TestTextAreaAutoComplete:
             str(tmp_path),
         )
 
-        autocomplete = TextAreaAutoComplete(command_candidates=[])
+        autocomplete = AutoCompleteDropdown(command_candidates=[])
         candidates = autocomplete._get_file_candidates("@")
 
         # Verify we got candidates
@@ -150,7 +150,7 @@ class TestTextAreaAutoComplete:
             str(tmp_path),
         )
 
-        autocomplete = TextAreaAutoComplete(command_candidates=[])
+        autocomplete = AutoCompleteDropdown(command_candidates=[])
         candidates = autocomplete._get_file_candidates("@nonexistent/")
 
         assert candidates == []
@@ -166,7 +166,7 @@ class TestTextAreaAutoComplete:
             str(tmp_path),
         )
 
-        autocomplete = TextAreaAutoComplete(command_candidates=[])
+        autocomplete = AutoCompleteDropdown(command_candidates=[])
         candidates = autocomplete._get_file_candidates("@R")
         display_texts = [c.display_text for c in candidates]
 
@@ -187,7 +187,7 @@ class TestTextAreaAutoComplete:
             str(tmp_path),
         )
 
-        autocomplete = TextAreaAutoComplete(command_candidates=[])
+        autocomplete = AutoCompleteDropdown(command_candidates=[])
         candidates = autocomplete._get_file_candidates("@src/")
         display_texts = [c.display_text for c in candidates]
 
@@ -204,7 +204,7 @@ class TestTextAreaAutoComplete:
             str(tmp_path),
         )
 
-        autocomplete = TextAreaAutoComplete(command_candidates=[])
+        autocomplete = AutoCompleteDropdown(command_candidates=[])
         candidates = autocomplete._get_file_candidates("@")
         display_texts = [c.display_text for c in candidates]
 
@@ -223,7 +223,7 @@ class TestTextAreaAutoComplete:
             str(tmp_path),
         )
 
-        autocomplete = TextAreaAutoComplete(command_candidates=[])
+        autocomplete = AutoCompleteDropdown(command_candidates=[])
         candidates = autocomplete._get_file_candidates("@.")
         display_texts = [c.display_text for c in candidates]
 
@@ -236,7 +236,7 @@ class TestTextAreaAutoComplete:
             str(tmp_path),
         )
 
-        autocomplete = TextAreaAutoComplete(command_candidates=[])
+        autocomplete = AutoCompleteDropdown(command_candidates=[])
 
         with mock.patch("pathlib.Path.iterdir", side_effect=PermissionError):
             candidates = autocomplete._get_file_candidates("@")
@@ -404,7 +404,7 @@ class TestTextAreaAutoComplete:
         assert result is True
         mock_post.assert_called_once()
         message = mock_post.call_args[0][0]
-        assert isinstance(message, TextAreaAutoComplete.CompletionSelected)
+        assert isinstance(message, AutoCompleteDropdown.CompletionSelected)
         assert message.item == item
 
     def test_process_key_enter_selects_and_posts_message(self, autocomplete):
@@ -470,7 +470,7 @@ class TestTextAreaAutoComplete:
             str(tmp_path),
         )
 
-        autocomplete = TextAreaAutoComplete(command_candidates=[])
+        autocomplete = AutoCompleteDropdown(command_candidates=[])
 
         with mock.patch.object(autocomplete, "show_dropdown") as mock_show:
             autocomplete.update_candidates("@t")

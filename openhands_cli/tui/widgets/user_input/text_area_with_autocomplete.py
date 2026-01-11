@@ -2,7 +2,7 @@ from pathlib import Path
 
 from textual.containers import Container
 from textual.message import Message
-from textual.widgets import OptionList
+from textual.widgets import OptionList, TextArea
 from textual.widgets.option_list import Option
 
 from openhands_cli.locations import WORK_DIR
@@ -30,7 +30,7 @@ def detect_completion_type(text: str) -> CompletionType:
     return CompletionType.NONE
 
 
-class TextAreaAutoComplete(Container):
+class AutoCompleteDropdown(Container):
     """Custom autocomplete dropdown for text input.
 
     This is a lightweight alternative to textual-autocomplete that works
@@ -39,7 +39,7 @@ class TextAreaAutoComplete(Container):
     """
 
     DEFAULT_CSS = """
-    TextAreaAutoComplete {
+    AutoCompleteDropdown {
         layer: autocomplete;
         width: auto;
         min-width: 30;
@@ -253,3 +253,18 @@ class TextAreaAutoComplete(Container):
             self.show_dropdown(candidates)
         else:
             self.hide_dropdown()
+
+    def apply_completion(self, text_area: TextArea, item: CompletionItem) -> None:
+        """Apply the selected completion to a text area."""
+        current_text = text_area.text
+        completion_value = item.completion_value
+
+        if item.completion_type == CompletionType.COMMAND:
+            text_area.text = completion_value + " "
+        elif item.completion_type == CompletionType.FILE:
+            at_index = current_text.rfind("@")
+            prefix = current_text[:at_index] if at_index >= 0 else ""
+            text_area.text = prefix + completion_value + " "
+
+        # Move cursor to end
+        text_area.move_cursor((0, len(text_area.text)))
