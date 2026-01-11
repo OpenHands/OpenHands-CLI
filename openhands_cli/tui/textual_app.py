@@ -35,7 +35,7 @@ from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
-from openhands_cli.tui.modals import SettingsScreen
+from openhands_cli.tui.modals import SettingsScreen, SwitchConversationModal
 from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModal
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
@@ -128,6 +128,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
         self._switch_loading_notification: Notification | None = None
+        self._is_switching_conversation: bool = False
         # Track if CLI is in cloud mode (logged in to OpenHands Cloud).
         # History panel is only available in local mode.
         self._is_cloud_mode: bool = TokenStorage().has_api_key()
@@ -424,6 +425,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     async def handle_user_input(self, message: InputField.Submitted) -> None:
         content = message.content.strip()
         if not content:
+            return
+        if self._is_switching_conversation:
+            self.notify(
+                title="Loading",
+                message="Please wait for the conversation switch to finish.",
+                severity="warning",
+            )
             return
 
         # Add the user message to the main display as a Static widget
@@ -831,13 +839,19 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             )
             return
 
-        # Check if a conversation is currently running
+        # If an agent is currently running, confirm before switching.
         if self.conversation_runner and self.conversation_runner.is_running:
-            self.notify(
-                title="Switch Error",
-                message="Cannot switch while a conversation is running. "
-                "Please wait or pause it first.",
-                severity="error",
+            self.push_screen(
+                SwitchConversationModal(
+                    prompt=(
+                        "The agent is still running.\n\n"
+                        "Switching conversations will pause the current run.\n"
+                        "Do you want to switch anyway?"
+                    ),
+                    on_confirmed=lambda: self._switch_to_conversation_with_stop(
+                        target_id
+                    ),
+                )
             )
             return
 
@@ -869,8 +883,50 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             exit_on_error=False,
         )
 
+    def _switch_to_conversation_with_stop(self, target_id: uuid.UUID) -> None:
+        """Switch conversations, pausing the current run if needed."""
+        # Show a persistent loading notification (we will dismiss it manually).
+        self._show_switch_loading_notification()
+
+        visualizer = ConversationVisualizer(
+            self.main_display, self, skip_user_messages=True
+        )
+
+        def _worker() -> None:
+            try:
+                runner = self.conversation_runner
+                if runner and runner.is_running:
+                    # Pause current conversation to stop background work.
+                    try:
+                        runner.conversation.pause()
+                    except Exception:
+                        pass
+                self._switch_to_conversation_thread(target_id, visualizer)
+            except Exception as e:
+                error_message = f"{type(e).__name__}: {e}"
+
+                def _show_error() -> None:
+                    self._dismiss_switch_loading_notification()
+                    self.notify(
+                        title="Switch Error",
+                        message=error_message,
+                        severity="error",
+                    )
+
+                self.call_from_thread(_show_error)
+
+        self.run_worker(
+            _worker,
+            name="switch_conversation",
+            group="switch_conversation",
+            exclusive=True,
+            thread=True,
+            exit_on_error=False,
+        )
+
     def _show_switch_loading_notification(self) -> None:
         """Show a loading notification that can be dismissed after the switch."""
+        self._is_switching_conversation = True
         # Dismiss any previous loading notification
         if self._switch_loading_notification is not None:
             try:
@@ -897,6 +953,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self._unnotify(self._switch_loading_notification)
         finally:
             self._switch_loading_notification = None
+            self._is_switching_conversation = False
 
     def _prepare_ui_for_conversation_switch(self, conversation_id: uuid.UUID) -> None:
         """Prepare UI for switching conversations (runs on the UI thread)."""
