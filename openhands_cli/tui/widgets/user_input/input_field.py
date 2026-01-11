@@ -107,28 +107,28 @@ class InputField(Container):
     def compose(self):
         """Create the input widgets and initialize modes."""
         # Create widgets
-        self._single_line_widget = SingleLineInputWithWraping(
+        self.single_line_widget = SingleLineInputWithWraping(
             placeholder=self.placeholder,
             id="user_input",
         )
-        yield self._single_line_widget
+        yield self.single_line_widget
 
-        self._multiline_widget = TextArea(
+        self.multiline_widget = TextArea(
             id="user_textarea",
             soft_wrap=True,
             show_line_numbers=False,
         )
-        self._multiline_widget.display = False
-        yield self._multiline_widget
+        self.multiline_widget.display = False
+        yield self.multiline_widget
 
-        self._autocomplete = TextAreaAutoComplete(command_candidates=COMMANDS)
-        yield self._autocomplete
+        self.autocomplete = TextAreaAutoComplete(command_candidates=COMMANDS)
+        yield self.autocomplete
 
         # Initialize modes
         self._single_line_mode = SingleLineMode(
-            self._single_line_widget, self._autocomplete
+            self.single_line_widget, self.autocomplete
         )
-        self._multiline_mode = MultilineMode(self._multiline_widget)
+        self._multiline_mode = MultilineMode(self.multiline_widget)
         self._current_mode = self._single_line_mode
         self._composed = True
 
@@ -146,7 +146,7 @@ class InputField(Container):
     @on(TextArea.Changed)
     def _on_text_area_changed(self, event: TextArea.Changed) -> None:
         """Update autocomplete when text changes in single-line mode."""
-        if event.text_area is self._single_line_widget and not self.is_multiline_mode:
+        if event.text_area is self.single_line_widget and not self.is_multiline_mode:
             self._single_line_mode.handle_text_changed()
 
     def on_key(self, event) -> None:
@@ -226,24 +226,8 @@ class InputField(Container):
     ) -> None:
         """Handle multi-line paste detection - switch to multiline mode."""
         if not self.is_multiline_mode:
-            self._single_line_widget.insert(
+            self.single_line_widget.insert(
                 event.text,
-                self._single_line_widget.cursor_location,
+                self.single_line_widget.cursor_location,
             )
             self.action_toggle_input_mode()
-
-    # Backward compatibility properties
-    @property
-    def input_widget(self) -> SingleLineInputWithWraping:
-        """Get the single-line input widget (for backward compatibility)."""
-        return self._single_line_widget
-
-    @property
-    def textarea_widget(self) -> TextArea:
-        """Get the multiline textarea widget (for backward compatibility)."""
-        return self._multiline_widget
-
-    @property
-    def autocomplete(self) -> TextAreaAutoComplete:
-        """Get the autocomplete widget (for backward compatibility)."""
-        return self._autocomplete

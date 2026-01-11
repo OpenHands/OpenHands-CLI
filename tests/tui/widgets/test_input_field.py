@@ -53,21 +53,21 @@ class TestInputFieldIntegration:
             assert not input_field.is_multiline_mode
 
             # Set some content
-            input_field.input_widget.text = "Hello World"
+            input_field.single_line_widget.text = "Hello World"
 
             # Toggle to multiline
             input_field.action_toggle_input_mode()
             await pilot.pause()
 
             assert input_field.is_multiline_mode
-            assert input_field.textarea_widget.text == "Hello World"
+            assert input_field.multiline_widget.text == "Hello World"
 
             # Toggle back to single-line
             input_field.action_toggle_input_mode()
             await pilot.pause()
 
             assert not input_field.is_multiline_mode
-            assert input_field.input_widget.text == "Hello World"
+            assert input_field.single_line_widget.text == "Hello World"
 
     @pytest.mark.asyncio
     async def test_get_current_value_returns_active_mode_text(self) -> None:
@@ -77,14 +77,14 @@ class TestInputFieldIntegration:
             input_field = app.query_one(InputField)
 
             # In single-line mode
-            input_field.input_widget.text = "Single line"
+            input_field.single_line_widget.text = "Single line"
             assert input_field.get_current_value() == "Single line"
 
             # Toggle to multiline
             input_field.action_toggle_input_mode()
             await pilot.pause()
 
-            input_field.textarea_widget.text = "Multi\nline"
+            input_field.multiline_widget.text = "Multi\nline"
             assert input_field.get_current_value() == "Multi\nline"
 
     @pytest.mark.asyncio
@@ -97,13 +97,13 @@ class TestInputFieldIntegration:
             # Focus single-line mode
             input_field.focus_input()
             await pilot.pause()
-            assert input_field.input_widget.has_focus
+            assert input_field.single_line_widget.has_focus
 
             # Toggle to multiline and focus
             input_field.action_toggle_input_mode()
             input_field.focus_input()
             await pilot.pause()
-            assert input_field.textarea_widget.has_focus
+            assert input_field.multiline_widget.has_focus
 
     @pytest.mark.asyncio
     async def test_submit_from_multiline_mode(self) -> None:
@@ -119,7 +119,7 @@ class TestInputFieldIntegration:
             await pilot.pause()
 
             # Set content
-            input_field.textarea_widget.text = "Multi\nline\ncontent"
+            input_field.multiline_widget.text = "Multi\nline\ncontent"
 
             # Capture submitted messages
             original_post_message = input_field.post_message
@@ -161,18 +161,18 @@ class TestInputFieldPasteIntegration:
             assert not input_field.is_multiline_mode
 
             # Ensure the input widget has focus
-            input_field.input_widget.focus()
+            input_field.single_line_widget.focus()
             await pilot.pause()
 
             # Single-line paste
             paste_event = Paste(text="Single line text")
-            input_field.input_widget.post_message(paste_event)
+            input_field.single_line_widget.post_message(paste_event)
             await pilot.pause()
 
             # Still single-line
             assert not input_field.is_multiline_mode
-            assert input_field.input_widget.display
-            assert not input_field.textarea_widget.display
+            assert input_field.single_line_widget.display
+            assert not input_field.multiline_widget.display
 
     # ------------------------------
     # Shared helper for basic multi-line variants
@@ -193,18 +193,18 @@ class TestInputFieldPasteIntegration:
 
             assert not input_field.is_multiline_mode
 
-            input_field.input_widget.focus()
+            input_field.single_line_widget.focus()
             await pilot.pause()
 
             paste_event = Paste(text=paste_text)
-            input_field.input_widget.post_message(paste_event)
+            input_field.single_line_widget.post_message(paste_event)
             await pilot.pause()
 
             # Switched to multi-line and content transferred
             assert input_field.is_multiline_mode
-            assert not input_field.input_widget.display
-            assert input_field.textarea_widget.display
-            assert input_field.textarea_widget.text == expected_text
+            assert not input_field.single_line_widget.display
+            assert input_field.multiline_widget.display
+            assert input_field.multiline_widget.text == expected_text
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -250,22 +250,22 @@ class TestInputFieldPasteIntegration:
 
             # Start in single-line mode with initial text
             assert not input_field.is_multiline_mode
-            input_field.input_widget.text = initial_text
+            input_field.single_line_widget.text = initial_text
 
             # Move cursor to position using TextArea's move_cursor method
             # Cursor is positioned at (row, col) - for single line it's (0, col)
-            input_field.input_widget.move_cursor((0, cursor_pos))
+            input_field.single_line_widget.move_cursor((0, cursor_pos))
 
-            input_field.input_widget.focus()
+            input_field.single_line_widget.focus()
             await pilot.pause()
 
             paste_event = Paste(text=paste_text)
-            input_field.input_widget.post_message(paste_event)
+            input_field.single_line_widget.post_message(paste_event)
             await pilot.pause()
 
             # Should have switched to multi-line mode with correct final text
             assert input_field.is_multiline_mode
-            assert input_field.textarea_widget.text == expected_text
+            assert input_field.multiline_widget.text == expected_text
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -338,18 +338,18 @@ class TestInputFieldPasteIntegration:
 
             # Initial content in textarea
             initial_content = "Initial content"
-            input_field.textarea_widget.text = initial_content
+            input_field.multiline_widget.text = initial_content
 
-            input_field.textarea_widget.focus()
+            input_field.multiline_widget.focus()
             await pilot.pause()
 
             # Paste into input_widget (not focused) – should be ignored
             paste_event = Paste(text="Pasted\nContent")
-            input_field.input_widget.post_message(paste_event)
+            input_field.single_line_widget.post_message(paste_event)
             await pilot.pause()
 
             assert input_field.is_multiline_mode
-            assert input_field.textarea_widget.text == initial_content
+            assert input_field.multiline_widget.text == initial_content
 
     @pytest.mark.asyncio
     async def test_empty_paste_does_not_switch_mode(self) -> None:
@@ -360,11 +360,11 @@ class TestInputFieldPasteIntegration:
 
             assert not input_field.is_multiline_mode
 
-            input_field.input_widget.focus()
+            input_field.single_line_widget.focus()
             await pilot.pause()
 
             paste_event = Paste(text="")
-            input_field.input_widget.post_message(paste_event)
+            input_field.single_line_widget.post_message(paste_event)
             await pilot.pause()
 
             # Still single-line, nothing changed
