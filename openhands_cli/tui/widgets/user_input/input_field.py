@@ -118,6 +118,9 @@ class InputField(Container):
 
     def on_mount(self) -> None:
         """Focus the input when mounted."""
+        self.focus_input()
+
+    def focus_input(self) -> None:
         self.active_input_widget.focus()
 
     @property
@@ -190,7 +193,7 @@ class InputField(Container):
 
         self.active_input_widget.text = content
         self.active_input_widget.move_cursor(self.active_input_widget.document.end)
-        self.active_input_widget.focus()
+        self.focus_input()
 
         self.multiline_mode_status.publish(self.is_multiline_mode)
 
