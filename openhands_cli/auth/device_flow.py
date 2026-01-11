@@ -44,7 +44,7 @@ class DeviceFlowClient(BaseHttpClient):
             return (
                 result["device_code"],
                 result["user_code"],
-                result["verification_uri"],
+                result.get("verification_uri_complete") or result["verification_uri"],
                 result["interval"],
             )
         except (AuthHttpError, KeyError) as e:
@@ -141,8 +141,13 @@ class DeviceFlowClient(BaseHttpClient):
             _p(f"[{OPENHANDS_THEME.error}]Error: {e}[/{OPENHANDS_THEME.error}]")
             raise
 
-        # Step 2: Construct URL with user_code parameter and open browser
-        verification_url = f"{verification_uri}?user_code={user_code}"
+        # Step 2: Open browser to verification URL
+        # OpenHands may return a complete URL; but our tests (and older servers)
+        # expect/return a base verification_uri without the query param.
+        if "user_code=" in verification_uri:
+            verification_url = verification_uri
+        else:
+            verification_url = f"{verification_uri}?user_code={user_code}"
 
         _p(
             f"\n[{OPENHANDS_THEME.warning}]Opening your web browser for "
