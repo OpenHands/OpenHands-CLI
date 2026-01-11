@@ -38,12 +38,12 @@ from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModa
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
+from openhands_cli.tui.widgets import InputField
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
     CollapsibleNavigationMixin,
     CollapsibleTitle,
 )
-from openhands_cli.tui.widgets.input_field import InputField
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.tui.widgets.status_line import (
     InfoStatusLine,
