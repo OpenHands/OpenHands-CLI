@@ -8,13 +8,16 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
-import time
 from collections.abc import Callable
 from typing import Any
 
 import websockets
 
+from openhands.sdk import get_logger
 from openhands_cli.cloud.runtime_client import CloudRuntimeClient
+
+
+logger = get_logger(__name__)
 
 
 class CloudConversationRunner:
@@ -28,14 +31,12 @@ class CloudConversationRunner:
         conversation_id: str,
         on_event: Callable[[dict[str, Any]], None],
         on_error: Callable[[str], None],
-        poll_interval_s: float = 1.0,
     ) -> None:
         self._runtime_host = runtime_host
         self._session_api_key = session_api_key
         self._conversation_id = conversation_id
         self._on_event = on_event
         self._on_error = on_error
-        self._poll_interval_s = poll_interval_s
 
         self._client = CloudRuntimeClient(
             runtime_host=runtime_host, session_api_key=session_api_key
@@ -43,6 +44,12 @@ class CloudConversationRunner:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._last_event_id: int | None = None
+        # Stream internals (set inside the streaming thread)
+        self._loop: asyncio.AbstractEventLoop | None = None
+        # websockets typing differs by version; keep it loose for pyright.
+        self._ws: Any | None = None
+        self._stream_task: asyncio.Task[None] | None = None
+        self._read_only: bool = False
 
     @property
     def conversation_id(self) -> str:
@@ -60,7 +67,7 @@ class CloudConversationRunner:
             events, has_more = self._client.get_events(
                 conversation_id=self._conversation_id,
                 start_id=start_id,
-                limit=200,
+                limit=CloudRuntimeClient.MAX_EVENTS_LIMIT,
             )
             for ev in events:
                 self._on_event(ev)
@@ -70,7 +77,11 @@ class CloudConversationRunner:
             if not has_more:
                 break
             # If server paginates, continue from the next id.
-            start_id = (seen_max + 1) if seen_max is not None else start_id + 200
+            start_id = (
+                (seen_max + 1)
+                if seen_max is not None
+                else start_id + CloudRuntimeClient.MAX_EVENTS_LIMIT
+            )
         self._last_event_id = seen_max
 
     def start_streaming(self) -> None:
@@ -81,21 +92,69 @@ class CloudConversationRunner:
         self._thread.start()
 
     def stop_streaming(self) -> None:
-        if self._thread is None:
+        thread = self._thread
+        if thread is None:
             return
         self._stop.set()
-        self._thread.join(timeout=2.0)
+        # Wake up any pending `ws.recv()` immediately by closing the websocket
+        # from the loop thread, instead of waiting for timeouts.
+        loop = self._loop
+        ws = self._ws
+        task = self._stream_task
+        if loop is not None:
+            if ws is not None:
+                loop.call_soon_threadsafe(self._safe_close_ws, ws)
+            if task is not None:
+                loop.call_soon_threadsafe(task.cancel)
+
+        # Wait a bit longer than the recv timeout, so we can reliably stop.
+        thread.join(timeout=7.0)
+        if thread.is_alive():
+            # Best-effort: don't lie about stopping. Keep thread ref so caller
+            # can retry stopping later.
+            self._on_error("Cloud stream did not stop within timeout.")
+            return
         self._thread = None
 
-    def _stream_loop(self) -> None:
+    @staticmethod
+    def _safe_close_ws(ws: Any) -> None:
+        """Close websocket in the owning event loop thread."""
         try:
-            asyncio.run(self._stream_loop_async())
-        except RuntimeError:
-            # Fallback in environments with an already running loop.
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(self._stream_loop_async())
+            asyncio.create_task(ws.close(code=1000))
+        except Exception:
+            logger.debug("Failed to close cloud websocket", exc_info=True)
+
+    @staticmethod
+    def _safe_close_loop(loop: asyncio.AbstractEventLoop) -> None:
+        """Best-effort close of an event loop (called from loop thread)."""
+        try:
+            if loop.is_running():
+                loop.stop()
+        except Exception:
+            logger.debug("Failed to stop cloud event loop", exc_info=True)
+
+        try:
             loop.close()
+        except Exception:
+            logger.debug("Failed to close cloud event loop", exc_info=True)
+
+    def _stream_loop(self) -> None:
+        loop = asyncio.new_event_loop()
+        self._loop = loop
+        try:
+            asyncio.set_event_loop(loop)
+            self._stream_task = loop.create_task(self._stream_loop_async())
+            loop.run_until_complete(self._stream_task)
+        except asyncio.CancelledError:
+            logger.debug("Cloud stream task cancelled")
+        except Exception as e:
+            self._on_error(f"Cloud stream crashed: {type(e).__name__}: {e}")
+        finally:
+            # Close loop and clear references to avoid cross-thread use-after-close.
+            self._safe_close_loop(loop)
+            self._loop = None
+            self._stream_task = None
+            self._ws = None
 
     async def _stream_loop_async(self) -> None:
         ws_base = self._runtime_host.replace("https://", "wss://").replace(
@@ -109,6 +168,7 @@ class CloudConversationRunner:
         )
 
         async with websockets.connect(ws_url, open_timeout=10) as ws:
+            self._ws = ws
             # Engine.IO open packet: `0{...}`
             _ = await ws.recv()
 
@@ -124,8 +184,6 @@ class CloudConversationRunner:
                 + json.dumps(["subscribe", {"conversation_id": self._conversation_id}])
             )
 
-            last_activity = time.time()
-
             while not self._stop.is_set():
                 try:
                     msg = await asyncio.wait_for(ws.recv(), timeout=5)
@@ -136,8 +194,6 @@ class CloudConversationRunner:
 
                 if not isinstance(msg, str) or not msg:
                     continue
-
-                last_activity = time.time()
 
                 # Engine.IO ping/pong
                 if msg == "2":
@@ -166,9 +222,15 @@ class CloudConversationRunner:
                     continue
 
                 # Socket.IO connect ack `40{...}` or other packets -> ignore
-                _ = last_activity
+                continue
 
     def send_user_message(self, message: str) -> None:
+        if self._read_only:
+            raise RuntimeError("Cloud conversation is read-only (runtime unavailable).")
         self._client.send_user_message(
             conversation_id=self._conversation_id, message=message
         )
+
+    def mark_read_only(self) -> None:
+        """Mark conversation as read-only (e.g., finished runtime)."""
+        self._read_only = True

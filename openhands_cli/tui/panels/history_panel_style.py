@@ -51,17 +51,7 @@ HISTORY_PANEL_STYLE = """
 
     #history-list-local, #history-list-cloud {
         height: 1fr;
-    }
-
-    .history-more {
-        padding: 0 1;
-        color: $foreground 60%;
-        text-style: italic;
-        margin-top: 1;
-    }
-
-    .history-more:hover {
-        background: $surface;
-        color: $foreground 85%;
+        overflow-y: auto;
+        scrollbar-size-vertical: 1;
     }
 """

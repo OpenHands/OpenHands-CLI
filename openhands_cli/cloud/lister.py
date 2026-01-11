@@ -80,11 +80,14 @@ class CloudConversationLister:
                     str(created_raw).replace("Z", "+00:00")
                 )
             except Exception:
-                created_date = datetime.now()
+                created_date = datetime.now(UTC)
 
-            # Normalize to naive UTC to avoid mixing aware/naive datetimes in the TUI.
-            if created_date.tzinfo is not None:
-                created_date = created_date.astimezone(UTC).replace(tzinfo=None)
+            # Keep cloud timestamps timezone-aware (UTC) so relative time works
+            # regardless of the user's local timezone.
+            if created_date.tzinfo is None:
+                created_date = created_date.replace(tzinfo=UTC)
+            else:
+                created_date = created_date.astimezone(UTC)
 
             title = item.get("title") or item.get("name") or item.get("preview")
             runtime_host = _extract_runtime_host(item.get("url"))

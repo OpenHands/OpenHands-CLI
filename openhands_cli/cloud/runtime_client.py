@@ -14,6 +14,9 @@ import httpx
 class CloudRuntimeClient:
     """Synchronous client for a single runtime host."""
 
+    # Runtime rejects large limits (observed: 200 -> 400 "Invalid limit").
+    MAX_EVENTS_LIMIT = 100
+
     def __init__(self, *, runtime_host: str, session_api_key: str) -> None:
         self._client = httpx.Client(
             base_url=runtime_host.rstrip("/"),
@@ -41,12 +44,12 @@ class CloudRuntimeClient:
         start_id: int = 0,
         end_id: int | None = None,
         reverse: bool = False,
-        limit: int = 200,
+        limit: int = MAX_EVENTS_LIMIT,
     ) -> tuple[list[dict[str, Any]], bool]:
         params: dict[str, Any] = {
             "start_id": start_id,
             "reverse": reverse,
-            "limit": limit,
+            "limit": min(limit, self.MAX_EVENTS_LIMIT),
         }
         if end_id is not None:
             params["end_id"] = end_id
