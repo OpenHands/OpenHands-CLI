@@ -8,7 +8,12 @@ from textual.containers import VerticalScroll
 from textual_autocomplete import DropdownItem
 
 from openhands.sdk.security.confirmation_policy import AlwaysConfirm
-from openhands_cli.tui.core.commands import COMMANDS, is_valid_command, show_help
+from openhands_cli.tui.core.commands import (
+    COMMANDS,
+    get_commands,
+    is_valid_command,
+    show_help,
+)
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.confirmation_modal import (
     ConfirmationSettingsModal,
@@ -21,9 +26,9 @@ class TestCommands:
     """Tests for command definitions and handlers."""
 
     def test_commands_list_structure(self):
-        """Test that COMMANDS list has correct structure."""
+        """Test that COMMANDS list has correct structure (base commands only)."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 7
+        assert len(COMMANDS) == 6  # Base commands, /history is conditional
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -37,7 +42,7 @@ class TestCommands:
         [
             ("/help", "Display available commands"),
             ("/new", "Start a new conversation"),
-            ("/history", "Toggle conversation history"),
+            # /history is conditional (local-only), tested separately
             ("/confirm", "Configure confirmation settings"),
             ("/condense", "Condense conversation history"),
             ("/feedback", "Send anonymous feedback about CLI"),
@@ -45,7 +50,7 @@ class TestCommands:
         ],
     )
     def test_commands_content(self, expected_command, expected_description):
-        """Test that commands contain expected content."""
+        """Test that base commands contain expected content."""
         command_strings = [str(cmd.main) for cmd in COMMANDS]
 
         # Find the command that starts with expected_command
@@ -59,6 +64,19 @@ class TestCommands:
         assert expected_description in matching_command
         assert " - " in matching_command  # Should have separator
 
+    def test_history_command_is_conditional(self):
+        """Test that /history is a conditional command available in local mode."""
+        # /history should NOT be in base COMMANDS
+        command_strings = [str(cmd.main) for cmd in COMMANDS]
+        assert not any(cmd.startswith("/history") for cmd in command_strings)
+
+        # /history SHOULD be in get_commands(is_cloud_mode=False)
+        local_commands = get_commands(is_cloud_mode=False)
+        local_strings = [str(cmd.main) for cmd in local_commands]
+        matching = [cmd for cmd in local_strings if cmd.startswith("/history")]
+        assert len(matching) == 1
+        assert "Toggle conversation history" in matching[0]
+
     def test_show_help_function_signature(self):
         """Test that show_help has correct function signature."""
         import inspect
@@ -66,8 +84,9 @@ class TestCommands:
         sig = inspect.signature(show_help)
         params = list(sig.parameters.keys())
 
-        assert len(params) == 1
+        assert len(params) == 2
         assert params[0] == "main_display"
+        assert params[1] == "is_cloud_mode"
 
     @pytest.mark.parametrize(
         "expected_content",
@@ -93,11 +112,11 @@ class TestCommands:
             "Press Enter to select",
         ],
     )
-    def test_show_help_content_elements(self, expected_content):
-        """Test that show_help includes all expected content elements."""
+    def test_show_help_content_elements_local_mode(self, expected_content):
+        """Test that show_help includes all expected content in local mode."""
         mock_main_display = mock.MagicMock(spec=VerticalScroll)
 
-        show_help(mock_main_display)
+        show_help(mock_main_display, is_cloud_mode=False)
 
         # Get the help text that was mounted
         mock_main_display.mount.assert_called_once()
@@ -105,6 +124,23 @@ class TestCommands:
         help_text = help_widget.content
 
         assert expected_content in help_text
+
+    def test_show_help_cloud_mode_excludes_history(self):
+        """Test that show_help excludes /history in cloud mode."""
+        mock_main_display = mock.MagicMock(spec=VerticalScroll)
+
+        show_help(mock_main_display, is_cloud_mode=True)
+
+        help_widget = mock_main_display.mount.call_args[0][0]
+        help_text = help_widget.content
+
+        # /history should NOT be in cloud mode help
+        assert "/history" not in help_text
+        assert "Toggle conversation history" not in help_text
+        # But other commands should still be there
+        assert "/help" in help_text
+        assert "/new" in help_text
+        assert "/exit" in help_text
 
     def test_show_help_uses_theme_colors(self):
         """Test that show_help uses OpenHands theme colors."""
@@ -152,6 +188,7 @@ class TestCommands:
         [
             ("/help", True),
             ("/new", True),
+            ("/history", True),  # Valid in local mode (default)
             ("/confirm", True),
             ("/condense", True),
             ("/feedback", True),
@@ -165,8 +202,36 @@ class TestCommands:
         ],
     )
     def test_is_valid_command(self, cmd, expected):
-        """Command validation is strict and argument-sensitive."""
-        assert is_valid_command(cmd) is expected
+        """Command validation is strict and argument-sensitive (local mode)."""
+        assert is_valid_command(cmd, is_cloud_mode=False) is expected
+
+    def test_is_valid_command_cloud_mode_excludes_history(self):
+        """In cloud mode, /history should not be a valid command."""
+        assert is_valid_command("/history", is_cloud_mode=False) is True
+        assert is_valid_command("/history", is_cloud_mode=True) is False
+        # Other commands should still be valid in cloud mode
+        assert is_valid_command("/help", is_cloud_mode=True) is True
+        assert is_valid_command("/new", is_cloud_mode=True) is True
+
+    def test_get_commands_local_mode(self):
+        """Test get_commands returns all commands in local mode."""
+        commands = get_commands(is_cloud_mode=False)
+        command_names = [str(cmd.main).split(" - ")[0] for cmd in commands]
+
+        assert "/history" in command_names
+        assert "/help" in command_names
+        assert "/new" in command_names
+        assert len(commands) == 7  # All commands
+
+    def test_get_commands_cloud_mode(self):
+        """Test get_commands excludes /history in cloud mode."""
+        commands = get_commands(is_cloud_mode=True)
+        command_names = [str(cmd.main).split(" - ")[0] for cmd in commands]
+
+        assert "/history" not in command_names
+        assert "/help" in command_names
+        assert "/new" in command_names
+        assert len(commands) == 6  # All commands except /history
 
     def test_all_commands_included_in_help(self):
         """Test that all commands from COMMANDS list are included in help text.

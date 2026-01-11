@@ -49,7 +49,7 @@ HISTORY_PANEL_STYLE = """
         margin-top: 1;
     }
 
-    #history-list-local, #history-list-cloud {
+    #history-list {
         height: 1fr;
         overflow-y: auto;
         scrollbar-size-vertical: 1;

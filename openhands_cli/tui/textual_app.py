@@ -9,11 +9,9 @@ It creates a basic app with:
 """
 
 import asyncio
-import os
 import uuid
 from collections.abc import Iterable
 from typing import ClassVar
-from urllib.parse import urlparse
 
 from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
@@ -32,12 +30,9 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
-from openhands_cli.auth.api_client import OpenHandsApiClient
 from openhands_cli.auth.token_storage import TokenStorage
-from openhands_cli.cloud.event_adapter import adapt_cloud_runtime_event
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
-from openhands_cli.tui.core.cloud_conversation_runner import CloudConversationRunner
 from openhands_cli.tui.core.commands import is_valid_command, show_help
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.modals import SettingsScreen
@@ -68,7 +63,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     BINDINGS: ClassVar = [
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+o", "toggle_cells", "Toggle Cells"),
-        ("ctrl+h", "toggle_history", "Toggle history panel"),
+        # NOTE: ctrl+h (history panel) is registered dynamically in __init__
+        # only for local mode (cloud mode hides history).
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
@@ -132,7 +128,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
         self._switch_loading_notification: Notification | None = None
-        self.cloud_conversation_runner: CloudConversationRunner | None = None
+        # Track if CLI is in cloud mode (logged in to OpenHands Cloud).
+        # History panel is only available in local mode.
+        self._is_cloud_mode: bool = TokenStorage().has_api_key()
+        if not self._is_cloud_mode:
+            # Register history panel hotkey only in local mode.
+            self._bindings.bind("ctrl+h", "toggle_history", "Toggle history panel")
         self._reload_visualizer = (
             lambda: self.conversation_runner.visualizer.reload_configuration()
             if self.conversation_runner
@@ -174,7 +175,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             with Container(id="input_area"):
                 yield WorkingStatusLine(self)
                 yield InputField(
-                    placeholder="Type your message, @mention a file, or / for commands"
+                    placeholder="Type your message, @mention a file, or / for commands",
+                    is_cloud_mode=self._is_cloud_mode,
                 )
 
                 yield InfoStatusLine(self)
@@ -363,6 +365,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self,
         conversation_id: uuid.UUID | None = None,
         visualizer: ConversationVisualizer | None = None,
+        workspace=None,
+        sdk_visualizer=None,
     ) -> ConversationRunner:
         """Create a ConversationRunner for a given conversation id.
 
@@ -391,8 +395,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 self.notify(title=title, message=message, severity=severity)
             ),
             conversation_visualizer,
+            sdk_visualizer,
             self.initial_confirmation_policy,
             event_callback,
+            workspace=workspace,
         )
 
     def _process_queued_inputs(self) -> None:
@@ -434,7 +440,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.refresh()
 
         # Handle commands - only exact matches
-        if is_valid_command(content):
+        if is_valid_command(content, is_cloud_mode=self._is_cloud_mode):
             self._handle_command(content)
         else:
             # Handle regular messages with conversation runner
@@ -444,7 +450,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """Handle command execution."""
 
         if command == "/help":
-            show_help(self.main_display)
+            show_help(self.main_display, is_cloud_mode=self._is_cloud_mode)
         elif command == "/new":
             self._handle_new_command()
         elif command == "/history":
@@ -466,35 +472,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     async def _handle_user_message(self, user_message: str) -> None:
         """Handle regular user messages with the conversation runner."""
-        # Cloud conversation: forward to runtime via CloudConversationRunner.
-        if self.cloud_conversation_runner is not None:
-            cloud_runner = self.cloud_conversation_runner
-
-            def _send() -> None:
-                try:
-                    cloud_runner.send_user_message(user_message)
-                except Exception as e:
-                    self.call_from_thread(
-                        self.notify,
-                        title="Cloud",
-                        message=str(e),
-                        severity="error",
-                    )
-
-            try:
-                self.run_worker(
-                    _send,
-                    name="cloud_send_message",
-                    group="cloud_send_message",
-                    exclusive=True,
-                    thread=True,
-                    exit_on_error=False,
-                )
-            except RuntimeError:
-                # Tests / non-running app: best-effort synchronous send.
-                _send()
-            return
-
         # Check if conversation runner is initialized
         if self.conversation_runner is None:
             self.conversation_runner = self.create_conversation_runner()
@@ -819,8 +796,21 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """Handle the /history command to show conversation history panel."""
         self.action_toggle_history()
 
+    def check_action_toggle_history(self) -> bool:
+        """Check if toggle_history action is available.
+
+        Returns False in cloud mode to hide the keybinding from footer.
+        """
+        return not self._is_cloud_mode
+
     def action_toggle_history(self) -> None:
-        """Toggle the history side panel (Ctrl+H binding)."""
+        """Toggle the history side panel (Ctrl+H binding).
+
+        History panel is only available in local mode.
+        """
+        if self._is_cloud_mode:
+            return
+
         HistorySidePanel.toggle(
             self,
             current_conversation_id=self.conversation_id,
@@ -828,18 +818,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         )
 
     def _switch_to_conversation(self, conversation_id: str) -> None:
-        """Switch to an existing conversation.
+        """Switch to an existing local conversation.
 
         This loads the conversation history from disk and displays it in the UI.
 
         Args:
             conversation_id: The conversation ID to switch to
         """
-        # Cloud conversations are identified as "cloud:<id>"
-        if conversation_id.startswith("cloud:"):
-            self._resume_cloud_conversation(conversation_id.removeprefix("cloud:"))
-            return
-
         try:
             target_id = uuid.UUID(conversation_id)
         except ValueError:
@@ -882,213 +867,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.run_worker(
             lambda: self._switch_to_conversation_thread(target_id, visualizer),
             name="switch_conversation",
-            group="switch_conversation",
-            exclusive=True,
-            thread=True,
-            exit_on_error=False,
-        )
-
-    def _resume_cloud_conversation(self, conversation_id: str) -> None:
-        """Resume a cloud conversation inside the CLI (runtime Socket.IO streaming)."""
-        if self.conversation_runner and self.conversation_runner.is_running:
-            self.notify(
-                title="Switch Error",
-                message="Cannot switch while a conversation is running. "
-                "Please wait or pause it first.",
-                severity="error",
-            )
-            return
-
-        # Stop any previous cloud runner.
-        if self.cloud_conversation_runner is not None:
-            try:
-                self.cloud_conversation_runner.close()
-            except Exception:
-                pass
-            self.cloud_conversation_runner = None
-
-        try:
-            history_panel = self.query_one(HistorySidePanel)
-        except Exception:
-            history_panel = None
-
-        if history_panel is None:
-            self.notify(
-                title="Cloud",
-                message="Open the history panel (Ctrl+H) to load cloud metadata first.",
-                severity="error",
-            )
-            return
-
-        info = history_panel.get_cloud_connection_info(conversation_id)
-        runtime_host: str | None = info[0] if info else None
-        session_api_key: str | None = info[1] if info else None
-
-        # Use a UUID for UI-only (splash text), runtime API uses the original id string.
-        try:
-            ui_id = uuid.UUID(hex=conversation_id)
-        except Exception:
-            ui_id = uuid.uuid4()
-
-        # Show loading toast before network I/O.
-        self._show_switch_loading_notification()
-
-        # Use the same visualizer as local conversations to keep rendering consistent.
-        visualizer = ConversationVisualizer(
-            self.main_display, self, skip_user_messages=True
-        )
-
-        def _on_event(ev: dict) -> None:
-            event = adapt_cloud_runtime_event(ev)
-            if event is None:
-                return
-            # Keep behavior consistent with local:
-            # user messages are rendered directly by the app, while the visualizer
-            # skips them to avoid duplicates.
-            if isinstance(event, MessageEvent):
-                try:
-                    if self.call_from_thread(self._render_user_message_event, event):
-                        return
-                except Exception:
-                    pass
-            visualizer.on_event(event)
-
-        def _on_error(err: str) -> None:
-            def _render_err() -> None:
-                self.notify(title="Cloud", message=err, severity="error")
-
-            self.call_from_thread(_render_err)
-
-        def _worker() -> None:
-            try:
-                local_runtime_host = runtime_host
-                local_session_api_key = session_api_key
-
-                # The list endpoint may omit runtime metadata. Fetch it lazily from
-                # the control plane if needed.
-                if not local_runtime_host or not local_session_api_key:
-                    api_key = TokenStorage().get_api_key()
-                    if not api_key:
-                        raise RuntimeError("Not logged in. Run `openhands login`.")
-
-                    server_url = os.getenv(
-                        "OPENHANDS_CLOUD_URL", "https://app.all-hands.dev"
-                    )
-                    data = asyncio.run(
-                        OpenHandsApiClient(server_url, api_key).get_conversation(
-                            conversation_id
-                        )
-                    )
-
-                    raw_url = (
-                        data.get("url")
-                        or data.get("runtime_url")
-                        or data.get("runtimeUrl")
-                        or data.get("runtime_host")
-                        or data.get("runtimeHost")
-                    )
-                    parsed = urlparse(str(raw_url)) if raw_url else None
-                    resolved_runtime_host = (
-                        f"{parsed.scheme}://{parsed.netloc}"
-                        if parsed and parsed.scheme and parsed.netloc
-                        else None
-                    )
-                    resolved_session_key = (
-                        data.get("session_api_key")
-                        or data.get("sessionApiKey")
-                        or data.get("sessionKey")
-                    )
-                    if not resolved_runtime_host or not resolved_session_key:
-                        raise RuntimeError(
-                            "Cloud conversation runtime is unavailable "
-                            "(missing runtime host / session key)."
-                        )
-
-                    local_runtime_host = resolved_runtime_host
-                    local_session_api_key = str(resolved_session_key)
-                    self.call_from_thread(
-                        history_panel.set_cloud_connection_info,
-                        conversation_id,
-                        local_runtime_host,
-                        local_session_api_key,
-                    )
-
-                # Prepare UI (clear old widgets, update splash).
-                self.call_from_thread(self._prepare_ui_for_conversation_switch, ui_id)
-                self.conversation_runner = None
-
-                runner = CloudConversationRunner(
-                    runtime_host=local_runtime_host,
-                    session_api_key=local_session_api_key,
-                    conversation_id=conversation_id,
-                    on_event=_on_event,
-                    on_error=_on_error,
-                )
-                self.cloud_conversation_runner = runner
-                history_loaded = False
-                try:
-                    runner.load_history()
-                    runner.start_streaming()
-                    history_loaded = True
-                except Exception as e:
-                    # Some finished conversations no longer have a live runtime host.
-                    # In that case, fall back to control-plane events (read-only).
-                    err_text = f"{type(e).__name__}: {e}"
-                    if "404" in err_text or "Not Found" in err_text:
-                        api_key = TokenStorage().get_api_key()
-                        if not api_key:
-                            raise
-                        server_url = os.getenv(
-                            "OPENHANDS_CLOUD_URL", "https://app.all-hands.dev"
-                        )
-                        events_raw = asyncio.run(
-                            OpenHandsApiClient(
-                                server_url, api_key
-                            ).get_conversation_events_all(conversation_id)
-                        )
-                        for ev in events_raw:
-                            if isinstance(ev, dict):
-                                _on_event(ev)
-                        runner.mark_read_only()
-                        history_loaded = True
-                    else:
-                        raise
-
-                def _finish() -> None:
-                    self._dismiss_switch_loading_notification()
-                    try:
-                        history = self.query_one(HistorySidePanel)
-                        history.set_current_cloud_conversation(conversation_id)
-                    except Exception:
-                        pass
-                    self.notify(
-                        title="Cloud",
-                        message=(
-                            f"Connected to cloud conversation {conversation_id[:8]}"
-                        ),
-                        severity="information",
-                    )
-
-                # Ensure loading notification always disappears.
-                if history_loaded:
-                    self.call_from_thread(_finish)
-                else:
-                    self.call_from_thread(self._dismiss_switch_loading_notification)
-            except Exception as e:
-
-                def _fail(err: Exception = e) -> None:
-                    self._dismiss_switch_loading_notification()
-                    self.notify(
-                        title="Cloud Switch Error",
-                        message=f"{type(err).__name__}: {err}",
-                        severity="error",
-                    )
-
-                self.call_from_thread(_fail)
-
-        self.run_worker(
-            _worker,
-            name="switch_cloud_conversation",
             group="switch_conversation",
             exclusive=True,
             thread=True,
@@ -1199,13 +977,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             events = list(runner.conversation.state.events)
             for event in events:
                 if isinstance(event, MessageEvent):
-                    try:
-                        if self.call_from_thread(
-                            self._render_user_message_event, event
-                        ):
-                            continue
-                    except Exception:
-                        pass
+                    user_text = self._get_user_text_from_message_event(event)
+                    if user_text:
+                        self.call_from_thread(self._mount_user_message_text, user_text)
+                        continue
                 runner.visualizer.on_event(event)
 
             # Finalize on UI thread (set runner, dismiss loading toast).

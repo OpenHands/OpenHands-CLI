@@ -8,7 +8,7 @@ from textual.message import Message
 from textual.signal import Signal
 from textual.widgets import Input, TextArea
 
-from openhands_cli.tui.core.commands import COMMANDS
+from openhands_cli.tui.core.commands import get_commands
 from openhands_cli.tui.widgets.autocomplete import EnhancedAutoComplete
 
 
@@ -81,11 +81,14 @@ class InputField(Container):
             super().__init__()
             self.content = content
 
-    def __init__(self, placeholder: str = "", **kwargs) -> None:
+    def __init__(
+        self, placeholder: str = "", *, is_cloud_mode: bool = False, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.placeholder = placeholder
         self.is_multiline_mode = False
         self.stored_content = ""
+        self._is_cloud_mode = is_cloud_mode
         self.mutliline_mode_status = Signal(self, "mutliline_mode_status")
 
     def compose(self):
@@ -106,7 +109,10 @@ class InputField(Container):
         self.textarea_widget.display = False
         yield self.textarea_widget
 
-        yield EnhancedAutoComplete(self.input_widget, command_candidates=COMMANDS)
+        yield EnhancedAutoComplete(
+            self.input_widget,
+            command_candidates=get_commands(is_cloud_mode=self._is_cloud_mode),
+        )
 
     def on_mount(self) -> None:
         """Focus the input when mounted."""
