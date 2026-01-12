@@ -174,6 +174,7 @@ def test_update_text_uses_work_dir_and_metrics(dummy_app, monkeypatch):
     widget._input_tokens = 0
     widget._output_tokens = 0
     widget._cache_hit_rate = "N/A"
+    widget._last_request_input_tokens = 0
     widget._context_window = 0
     widget._accumulated_cost = 0.0
 
@@ -187,14 +188,15 @@ def test_update_text_uses_work_dir_and_metrics(dummy_app, monkeypatch):
 
 
 def test_update_text_shows_all_metrics(dummy_app, monkeypatch):
-    """_update_text shows context window, cost, and token details."""
+    """_update_text shows context (current/total), cost, and token details."""
     widget = InfoStatusLine(app=dummy_app)
 
     widget.work_dir_display = "~/my-dir"
-    widget._input_tokens = 5220000  # 5.22M
+    widget._input_tokens = 5220000  # 5.22M accumulated
     widget._output_tokens = 42010  # 42.01K
     widget._cache_hit_rate = "77%"
-    widget._context_window = 128000  # 128K
+    widget._last_request_input_tokens = 50000  # 50K current context
+    widget._context_window = 128000  # 128K total
     widget._accumulated_cost = 10.5507
 
     update_mock = MagicMock()
@@ -202,36 +204,56 @@ def test_update_text_shows_all_metrics(dummy_app, monkeypatch):
 
     widget._update_text()
 
-    expected = "~/my-dir    ctx 128K • $ 10.5507 (↑ 5.22M ↓ 42.01K cache 77%)"
+    expected = "~/my-dir    ctx 50K / 128K • $ 10.5507 (↑ 5.22M ↓ 42.01K cache 77%)"
     update_mock.assert_called_once_with(expected)
 
 
-def test_format_metrics_display_with_context_window(dummy_app):
-    """_format_metrics_display shows context window, cost, and token details."""
+def test_format_metrics_display_with_context_current_and_total(dummy_app):
+    """_format_metrics_display shows current context / total context window."""
     widget = InfoStatusLine(app=dummy_app)
 
     widget._input_tokens = 1000
     widget._output_tokens = 500
     widget._cache_hit_rate = "50%"
-    widget._context_window = 200000  # 200K
+    widget._last_request_input_tokens = 50000  # 50K current
+    widget._context_window = 200000  # 200K total
     widget._accumulated_cost = 0.05
 
     result = widget._format_metrics_display()
 
-    assert "ctx 200K" in result
+    assert "ctx 50K / 200K" in result
     assert "$ 0.0500" in result
     assert "↑ 1K" in result
     assert "↓ 500" in result
     assert "cache 50%" in result
 
 
-def test_format_metrics_display_without_context_window(dummy_app):
-    """_format_metrics_display shows N/A when context window is zero."""
+def test_format_metrics_display_with_context_current_only(dummy_app):
+    """_format_metrics_display shows only current context when total is unavailable."""
     widget = InfoStatusLine(app=dummy_app)
 
     widget._input_tokens = 1000
     widget._output_tokens = 500
     widget._cache_hit_rate = "50%"
+    widget._last_request_input_tokens = 50000  # 50K current
+    widget._context_window = 0  # No total available
+    widget._accumulated_cost = 0.05
+
+    result = widget._format_metrics_display()
+
+    assert "ctx 50K" in result
+    assert "/ " not in result  # No total shown
+    assert "$ 0.0500" in result
+
+
+def test_format_metrics_display_without_context(dummy_app):
+    """_format_metrics_display shows N/A when no context info available."""
+    widget = InfoStatusLine(app=dummy_app)
+
+    widget._input_tokens = 1000
+    widget._output_tokens = 500
+    widget._cache_hit_rate = "50%"
+    widget._last_request_input_tokens = 0
     widget._context_window = 0
     widget._accumulated_cost = 0.05
 
@@ -335,17 +357,22 @@ def test_update_metrics_gets_all_metrics_from_conversation_runner(
     """_update_metrics retrieves all metrics from conversation runner's visualizer."""
     widget = InfoStatusLine(app=dummy_app)
 
-    # Mock token usage
+    # Mock accumulated token usage
     mock_usage = MagicMock()
     mock_usage.prompt_tokens = 5000
     mock_usage.completion_tokens = 1000
     mock_usage.context_window = 128000
     mock_usage.cache_read_tokens = 2500  # 50% cache hit
 
+    # Mock last request token usage (for current context)
+    mock_last_usage = MagicMock()
+    mock_last_usage.prompt_tokens = 3000  # Last request input tokens
+
     # Mock the conversation runner and its visualizer
     mock_combined_metrics = MagicMock()
     mock_combined_metrics.accumulated_cost = 0.5678
     mock_combined_metrics.accumulated_token_usage = mock_usage
+    mock_combined_metrics.token_usages = [mock_last_usage]
 
     mock_stats = MagicMock()
     mock_stats.get_combined_metrics.return_value = mock_combined_metrics
@@ -367,6 +394,7 @@ def test_update_metrics_gets_all_metrics_from_conversation_runner(
     assert widget._input_tokens == 5000
     assert widget._output_tokens == 1000
     assert widget._context_window == 128000
+    assert widget._last_request_input_tokens == 3000
     assert widget._cache_hit_rate == "50%"
     update_text_mock.assert_called_once()
 
@@ -423,6 +451,7 @@ def test_update_metrics_handles_zero_prompt_tokens(dummy_app, monkeypatch):
     mock_combined_metrics = MagicMock()
     mock_combined_metrics.accumulated_cost = 0.01
     mock_combined_metrics.accumulated_token_usage = mock_usage
+    mock_combined_metrics.token_usages = []  # No token usages
 
     mock_stats = MagicMock()
     mock_stats.get_combined_metrics.return_value = mock_combined_metrics
@@ -441,4 +470,5 @@ def test_update_metrics_handles_zero_prompt_tokens(dummy_app, monkeypatch):
     widget._update_metrics()
 
     assert widget._cache_hit_rate == "N/A"
+    assert widget._last_request_input_tokens == 0
     update_text_mock.assert_called_once()

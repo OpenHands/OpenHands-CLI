@@ -119,7 +119,8 @@ class InfoStatusLine(Static):
         self._input_tokens: int = 0
         self._output_tokens: int = 0
         self._cache_hit_rate: str = "N/A"
-        self._context_window: int = 0
+        self._last_request_input_tokens: int = 0  # Current context usage
+        self._context_window: int = 0  # Total context window
         self._accumulated_cost: float = 0.0
         self._metrics_update_timer: Timer | None = None
 
@@ -174,6 +175,14 @@ class InfoStatusLine(Static):
                             self._cache_hit_rate = f"{(cache_read / prompt * 100):.0f}%"
                         else:
                             self._cache_hit_rate = "N/A"
+                    # Get last request's input tokens (current context usage)
+                    token_usages = combined_metrics.token_usages
+                    if token_usages:
+                        self._last_request_input_tokens = (
+                            token_usages[-1].prompt_tokens or 0
+                        )
+                    else:
+                        self._last_request_input_tokens = 0
         self._update_text()
 
     def _on_handle_mutliline_mode(self, is_multiline_mode: bool) -> None:
@@ -194,13 +203,19 @@ class InfoStatusLine(Static):
     def _format_metrics_display(self) -> str:
         """Format the conversation metrics for display.
 
-        Shows: context window • cost (input tokens • output tokens • cache rate)
+        Shows: context (current / total) • cost (input tokens • output tokens • cache)
         """
-        ctx_display = (
-            f"ctx {abbreviate_number(self._context_window)}"
-            if self._context_window > 0
-            else "ctx N/A"
-        )
+        # Context display: show current context usage / total context window
+        if self._last_request_input_tokens > 0:
+            ctx_current = abbreviate_number(self._last_request_input_tokens)
+            if self._context_window > 0:
+                ctx_total = abbreviate_number(self._context_window)
+                ctx_display = f"ctx {ctx_current} / {ctx_total}"
+            else:
+                ctx_display = f"ctx {ctx_current}"
+        else:
+            ctx_display = "ctx N/A"
+
         cost_display = f"$ {format_cost(self._accumulated_cost)}"
         token_details = (
             f"↑ {abbreviate_number(self._input_tokens)} "
