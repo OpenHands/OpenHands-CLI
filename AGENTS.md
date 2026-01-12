@@ -25,7 +25,9 @@ This repo contains the current CLI UX, including the Textual TUI and a browser-s
 - build (sync + install hooks): `make build`
 - lint (all pre-commit hooks): `make lint`
 - format: `make format`
-- run the Textual TUI: `make run` (or `uv run openhands`)
+- run the Textual TUI (interactive): `make run` (or `uv run openhands`)
+- run the Textual TUI (automation-friendly; use for agent-driven runs): `uv run openhands --exit-without-confirmation` (quit with `Ctrl+Q`; `Ctrl+C` does not work once the TUI is running)
+
 - run the browser-served web app (Textual `textual-serve`): `openhands web`
 - run the Docker-based OpenHands GUI server: `openhands serve`
 - run the ACP entrypoint: `uv run openhands-acp`
