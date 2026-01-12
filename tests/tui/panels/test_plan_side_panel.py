@@ -10,7 +10,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal
-from textual.css.query import NoMatches
 from textual.widgets import Static
 
 from openhands.tools.task_tracker.definition import TaskItem
@@ -18,7 +17,7 @@ from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
 
 
 if TYPE_CHECKING:
-    from openhands_cli.tui.textual_app import OpenHandsApp
+    pass
 
 
 def _create_mock_app(conversation_dir: str | Path | None = None) -> Any:
@@ -183,6 +182,7 @@ class TestToggle:
         app = PlanPanelTestApp(conversation_dir=tmp_path)
         async with app.run_test() as pilot:
             await pilot.pause()  # Wait for on_mount
+            assert app.plan_panel is not None
 
             # Mock refresh_from_disk for first toggle
             with patch.object(app.plan_panel, "refresh_from_disk"):
@@ -203,6 +203,7 @@ class TestToggle:
         app = PlanPanelTestApp(conversation_dir=tmp_path)
         async with app.run_test() as pilot:
             await pilot.pause()
+            assert app.plan_panel is not None
 
             # Mount the panel first
             with patch.object(app.plan_panel, "refresh_from_disk"):
@@ -256,7 +257,7 @@ class TestRefreshFromDisk:
         panel = PlanSidePanel(mock_app)
 
         # Pre-populate task list
-        panel._task_list = [TaskItem(title="Old Task", status="done")]
+        panel._task_list = [TaskItem(title="Old Task", notes="", status="done")]
 
         # Mock _refresh_content since panel is not composed
         with patch.object(panel, "_refresh_content"):

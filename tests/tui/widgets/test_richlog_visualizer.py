@@ -730,8 +730,6 @@ class TestPlanPanelIntegration:
         self, auto_open_enabled: bool
     ):
         """Verify panel toggle behavior respects auto_open_plan_panel setting."""
-        from typing import Any
-        from unittest.mock import MagicMock
 
         from textual.app import App
         from textual.containers import Horizontal, VerticalScroll
@@ -784,8 +782,7 @@ class TestPlanPanelIntegration:
     @pytest.mark.asyncio
     async def test_refresh_plan_panel_updates_existing_panel(self):
         """Verify existing panel is refreshed regardless of auto_open setting."""
-        from typing import Any
-        from unittest.mock import MagicMock, PropertyMock
+        from unittest.mock import PropertyMock
 
         from textual.app import App
         from textual.containers import Horizontal, VerticalScroll
@@ -841,8 +838,6 @@ class TestPlanPanelIntegration:
     async def test_refresh_plan_panel_calls_toggle_when_auto_open_enabled(self):
         """Verify toggle() is called when auto_open_plan_panel is enabled
         and panel is not on screen."""
-        from typing import Any
-        from unittest.mock import MagicMock
 
         from textual.app import App
         from textual.containers import Horizontal, VerticalScroll
@@ -876,6 +871,7 @@ class TestPlanPanelIntegration:
             visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
             # Ensure panel is not on screen
+            assert app.plan_panel is not None
             assert app.plan_panel.is_on_screen is False
 
             with patch.object(

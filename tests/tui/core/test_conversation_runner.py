@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
-from unittest.mock import MagicMock, patch
 import uuid
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
 

@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 from textual.containers import Horizontal, VerticalScroll
-from textual.css.query import NoMatches
 from textual.widgets import Button, Static
 
 from openhands.tools.task_tracker.definition import (

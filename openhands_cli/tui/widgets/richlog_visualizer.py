@@ -135,14 +135,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
             plan_panel.refresh_from_disk()
             return
 
-        # Not mounted: only open if user opted in 
+        # Not mounted: only open if user opted in
         # and hasn't dismissed it once already
         if not auto_open or plan_panel.user_dismissed:
             return
 
         # Open the plan panel
         plan_panel.toggle()
-
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""

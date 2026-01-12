@@ -26,7 +26,7 @@ from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
 
 
 if TYPE_CHECKING:
-    from openhands_cli.tui.textual_app import OpenHandsApp
+    pass
 
 
 class TestExitModalSnapshots:
@@ -164,4 +164,6 @@ class TestPlanSidePanelSnapshots:
                 # Toggle to show the panel
                 self.plan_panel.toggle()
 
-        assert snap_compare(PlanPanelAllDoneApp(tasks=task_list), terminal_size=(100, 30))
+        assert snap_compare(
+            PlanPanelAllDoneApp(tasks=task_list), terminal_size=(100, 30)
+        )
