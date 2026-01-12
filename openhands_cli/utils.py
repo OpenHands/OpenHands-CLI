@@ -10,10 +10,15 @@ from typing import Any
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 
-from openhands.sdk import LLM, ImageContent, TextContent
+from openhands.sdk import LLM, Agent, ImageContent, TextContent
 from openhands.sdk.event import SystemPromptEvent
 from openhands.sdk.event.base import Event
-from openhands.tools.preset import get_default_agent
+from openhands.sdk.tool import Tool
+from openhands.tools.delegate import DelegateTool
+from openhands.tools.file_editor import FileEditorTool
+from openhands.tools.preset.default import get_default_condenser
+from openhands.tools.task_tracker import TaskTrackerTool
+from openhands.tools.terminal import TerminalTool
 
 
 def get_os_description() -> str:
@@ -108,9 +113,38 @@ def get_llm_metadata(
     return metadata
 
 
-def get_default_cli_agent(llm: LLM):
-    agent = get_default_agent(llm=llm, cli_mode=True)
+def get_default_cli_agent(llm: LLM) -> Agent:
+    """Create the default CLI agent with all tools including delegate.
 
+    This function explicitly constructs the agent with the following tools:
+    - terminal: Execute bash commands
+    - file_editor: View and edit files
+    - task_tracker: Plan and track tasks
+    - delegate: Spawn sub-agents and delegate tasks
+
+    Browser tools are disabled in CLI mode.
+
+    Args:
+        llm: The LLM to use for the agent
+
+    Returns:
+        Configured Agent instance with all CLI tools
+    """
+    tools = [
+        Tool(name=TerminalTool.name),
+        Tool(name=FileEditorTool.name),
+        Tool(name=TaskTrackerTool.name),
+        Tool(name=DelegateTool.name),
+    ]
+
+    agent = Agent(
+        llm=llm,
+        tools=tools,
+        system_prompt_kwargs={"cli_mode": True},
+        condenser=get_default_condenser(
+            llm=llm.model_copy(update={"usage_id": "condenser"})
+        ),
+    )
     return agent
 
 
