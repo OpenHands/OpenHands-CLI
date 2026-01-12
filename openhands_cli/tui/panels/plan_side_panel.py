@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
+from rich.markup import escape
 from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Button, Static
 
@@ -86,7 +87,7 @@ class PlanSidePanel(VerticalScroll):
         with Horizontal(classes="plan-header-row"):
             yield Static("Agent Plan", classes="plan-header")
             yield Button("✕", id="plan-close-btn", classes="plan-close-btn")
-        yield Static("", id="plan-content", markup=False)
+        yield Static("", id="plan-content")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""
@@ -132,15 +133,19 @@ class PlanSidePanel(VerticalScroll):
             icon = STATUS_ICONS.get(task.status, "○")
             color = STATUS_COLORS.get(task.status, OPENHANDS_THEME.foreground)
 
+            # Escape user-provided content to prevent markup injection
+            title = escape(task.title)
+
             # Format task line
-            task_line = f"[{color}]{icon} {task.title}[/{color}]"
+            task_line = f"[{color}]{icon} {title}[/{color}]"
             content_parts.append(task_line)
 
             # Add notes if present (indented)
             if task.notes:
+                notes = escape(task.notes)
                 notes_line = (
                     f"  [{OPENHANDS_THEME.foreground} 70%]"
-                    f"{task.notes}[/{OPENHANDS_THEME.foreground} 70%]"
+                    f"{notes}[/{OPENHANDS_THEME.foreground} 70%]"
                 )
                 content_parts.append(notes_line)
 
