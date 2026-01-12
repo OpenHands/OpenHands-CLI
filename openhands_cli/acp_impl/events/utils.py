@@ -198,6 +198,9 @@ def get_tool_title(
     # Clean up summary if provided
     clean_summary = summary.strip().replace("\n", " ") if summary else ""
 
+    # Task tracker always returns a constant title
+    if tool_name == "task_tracker" or isinstance(action, TaskTrackerAction):
+        return "Plan updated"
 
     if isinstance(action, FileEditorAction):
         op = "Reading" if action.command == "view" else "Editing"
