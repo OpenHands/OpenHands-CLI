@@ -125,14 +125,24 @@ class ConversationVisualizer(ConversationVisualizerBase):
         This method handles thread safety - it can be called from any thread
         and will ensure the panel refresh happens on the main thread.
 
-        If the panel doesn't exist yet, it will be automatically created and
-        opened (auto-open on first task tracker event).
+        If the panel doesn't exist yet and auto_open_plan_panel is enabled,
+        the panel will be automatically created and opened.
         """
         current_thread_id = threading.get_ident()
 
         def do_refresh():
-            # Get or create the panel (auto-opens on first task tracker event)
-            panel = PlanSidePanel.get_or_create(self._app)
+            # Check if panel already exists
+            try:
+                panel = self._app.query_one(PlanSidePanel)
+            except Exception:
+                panel = None
+
+            if panel is None:
+                # Panel doesn't exist - only create if auto-open is enabled
+                if not self.cli_settings.auto_open_plan_panel:
+                    return
+                panel = PlanSidePanel.get_or_create(self._app)
+
             # Set persistence directory if the app has a conversation runner
             if self._app.conversation_runner and panel.persistence_dir is None:
                 panel.set_persistence_dir(self._app.conversation_runner.persistence_dir)

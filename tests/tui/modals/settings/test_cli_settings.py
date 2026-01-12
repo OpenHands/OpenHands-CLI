@@ -13,7 +13,7 @@ class TestCliSettings:
         cfg = CliSettings()
         assert cfg.display_cost_per_action is False
         assert cfg.default_cells_expanded is True
-        assert cfg.show_plan_panel_on_startup is False
+        assert cfg.auto_open_plan_panel is True
 
     @pytest.mark.parametrize("value", [True, False])
     def test_model_accepts_bool(self, value: bool):
@@ -111,7 +111,7 @@ class TestCliSettings:
         cfg = CliSettings(
             display_cost_per_action=True,
             default_cells_expanded=False,
-            show_plan_panel_on_startup=True,
+            auto_open_plan_panel=False,
         )
 
         with patch.object(CliSettings, "get_config_path", return_value=config_path):
@@ -121,7 +121,7 @@ class TestCliSettings:
             {
                 "display_cost_per_action": True,
                 "default_cells_expanded": False,
-                "show_plan_panel_on_startup": True,
+                "auto_open_plan_panel": False,
             },
             indent=2,
         )

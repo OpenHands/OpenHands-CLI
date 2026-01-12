@@ -75,15 +75,14 @@ class CliSettingsTab(Container):
             )
 
             yield SettingsSwitch(
-                label="Show Plan Panel on Startup",
+                label="Auto-open Plan Panel",
                 description=(
-                    "When enabled, the plan panel will be shown on the right side "
-                    "when the CLI starts. When disabled, the panel will automatically "
-                    "open when the agent first uses the task tracker. "
+                    "When enabled, the plan panel will automatically open on the "
+                    "right side when the agent first uses the task tracker. "
                     "You can toggle it anytime via the command palette."
                 ),
-                switch_id="show_plan_panel_on_startup_switch",
-                value=self.cli_settings.show_plan_panel_on_startup,
+                switch_id="auto_open_plan_panel_switch",
+                value=self.cli_settings.auto_open_plan_panel,
             )
 
     def get_cli_settings(self) -> CliSettings:
@@ -92,12 +91,12 @@ class CliSettingsTab(Container):
         default_cells_expanded_switch = self.query_one(
             "#default_cells_expanded_switch", Switch
         )
-        show_plan_panel_on_startup_switch = self.query_one(
-            "#show_plan_panel_on_startup_switch", Switch
+        auto_open_plan_panel_switch = self.query_one(
+            "#auto_open_plan_panel_switch", Switch
         )
 
         return CliSettings(
             display_cost_per_action=display_cost_switch.value,
             default_cells_expanded=default_cells_expanded_switch.value,
-            show_plan_panel_on_startup=show_plan_panel_on_startup_switch.value,
+            auto_open_plan_panel=auto_open_plan_panel_switch.value,
         )
