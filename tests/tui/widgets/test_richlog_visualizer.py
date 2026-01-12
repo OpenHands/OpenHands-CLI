@@ -729,12 +729,12 @@ class TestPlanPanelIntegration:
     async def test_refresh_plan_panel_respects_auto_open_setting(
         self, auto_open_enabled: bool
     ):
-        """Verify panel creation respects auto_open_plan_panel setting."""
+        """Verify panel toggle behavior respects auto_open_plan_panel setting."""
         from typing import Any
+        from unittest.mock import MagicMock
 
         from textual.app import App
         from textual.containers import Horizontal, VerticalScroll
-        from textual.css.query import NoMatches
         from textual.widgets import Static
 
         from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
@@ -744,51 +744,48 @@ class TestPlanPanelIntegration:
             Screen { layout: horizontal; }
             #main_content { width: 2fr; }
             """
-            conversation_runner: Any = None
+
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+                self.conversation_dir = "/test/conversation/dir"
+                self.plan_panel: PlanSidePanel | None = None
 
             def compose(self):
                 with Horizontal(id="content_area"):
                     with VerticalScroll(id="main_display"):
                         yield Static("Content")
 
+            def on_mount(self):
+                self.plan_panel = PlanSidePanel(self)  # type: ignore[arg-type]
+
         app = TestApp()
         async with app.run_test() as pilot:
+            await pilot.pause()  # Wait for on_mount
             container = app.query_one("#main_display", VerticalScroll)
             visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
-            # Mock settings and patch refresh_from_disk to avoid needing compose
+            # Mock settings and toggle
             with patch.object(
                 CliSettings,
                 "load",
                 return_value=CliSettings(auto_open_plan_panel=auto_open_enabled),
             ):
                 visualizer._cli_settings = None  # Clear cache
-
-                if auto_open_enabled:
-                    # Mock refresh_from_disk to avoid compose timing issues
-                    with patch.object(
-                        PlanSidePanel, "refresh_from_disk", return_value=None
-                    ):
-                        visualizer._do_refresh_plan_panel()
-                        await pilot.pause()
-                else:
+                with patch.object(app.plan_panel, "toggle") as mock_toggle:
                     visualizer._do_refresh_plan_panel()
-                    await pilot.pause()
 
-            if auto_open_enabled:
-                # Panel should be created
-                panel = app.query_one(PlanSidePanel)
-                assert panel is not None
-            else:
-                # Panel should NOT be created
-                with pytest.raises(NoMatches):
-                    app.query_one(PlanSidePanel)
+                    if auto_open_enabled:
+                        # toggle() should be called to open the panel
+                        mock_toggle.assert_called_once()
+                    else:
+                        # toggle() should NOT be called
+                        mock_toggle.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_refresh_plan_panel_updates_existing_panel(self):
         """Verify existing panel is refreshed regardless of auto_open setting."""
         from typing import Any
-        from unittest.mock import MagicMock
+        from unittest.mock import MagicMock, PropertyMock
 
         from textual.app import App
         from textual.containers import Horizontal, VerticalScroll
@@ -801,43 +798,49 @@ class TestPlanPanelIntegration:
             Screen { layout: horizontal; }
             #main_content { width: 2fr; }
             """
-            conversation_runner: Any = None
+
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+                self.conversation_dir = "/test/conversation/dir"
+                self.plan_panel: PlanSidePanel | None = None
 
             def compose(self):
                 with Horizontal(id="content_area"):
                     with VerticalScroll(id="main_display"):
                         yield Static("Content")
-                    yield PlanSidePanel()
+
+            def on_mount(self):
+                self.plan_panel = PlanSidePanel(self)  # type: ignore[arg-type]
 
         app = TestApp()
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()  # Wait for on_mount
             container = app.query_one("#main_display", VerticalScroll)
             visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
-            panel = app.query_one(PlanSidePanel)
+            # Mock that panel is already on screen
+            with patch.object(
+                type(app.plan_panel), "is_on_screen", new_callable=PropertyMock
+            ) as mock_is_on_screen:
+                mock_is_on_screen.return_value = True
 
-            # Mock conversation_runner with persistence_dir
-            mock_runner = MagicMock()
-            mock_runner.persistence_dir = "/test/persistence/dir"
-            app.conversation_runner = mock_runner
+                # Mock refresh_from_disk to verify it gets called
+                with patch.object(app.plan_panel, "refresh_from_disk") as mock_refresh:
+                    # Even with auto_open disabled, existing panel should refresh
+                    with patch.object(
+                        CliSettings,
+                        "load",
+                        return_value=CliSettings(auto_open_plan_panel=False),
+                    ):
+                        visualizer._cli_settings = None  # Clear cache
+                        visualizer._do_refresh_plan_panel()
 
-            # Mock refresh_from_disk to verify it gets called
-            with patch.object(panel, "refresh_from_disk") as mock_refresh:
-                # Even with auto_open disabled, existing panel should refresh
-                with patch.object(
-                    CliSettings,
-                    "load",
-                    return_value=CliSettings(auto_open_plan_panel=False),
-                ):
-                    visualizer._cli_settings = None  # Clear cache
-                    visualizer._do_refresh_plan_panel()
-
-                mock_refresh.assert_called_once_with("/test/persistence/dir")
+                    mock_refresh.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_refresh_plan_panel_calls_refresh_from_disk_on_new_panel(self):
-        """Verify refresh_from_disk is called with
-        persistence_dir when creating a new panel."""
+    async def test_refresh_plan_panel_calls_toggle_when_auto_open_enabled(self):
+        """Verify toggle() is called when auto_open_plan_panel is enabled
+        and panel is not on screen."""
         from typing import Any
         from unittest.mock import MagicMock
 
@@ -852,22 +855,28 @@ class TestPlanPanelIntegration:
             Screen { layout: horizontal; }
             #main_content { width: 2fr; }
             """
-            conversation_runner: Any = None
+
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+                self.conversation_dir = "/test/conversation/dir"
+                self.plan_panel: PlanSidePanel | None = None
 
             def compose(self):
                 with Horizontal(id="content_area"):
                     with VerticalScroll(id="main_display"):
                         yield Static("Content")
 
+            def on_mount(self):
+                self.plan_panel = PlanSidePanel(self)  # type: ignore[arg-type]
+
         app = TestApp()
         async with app.run_test() as pilot:
+            await pilot.pause()  # Wait for on_mount
             container = app.query_one("#main_display", VerticalScroll)
             visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
-            # Mock conversation runner with persistence_dir
-            mock_runner = MagicMock()
-            mock_runner.persistence_dir = "/test/persistence/dir"
-            app.conversation_runner = mock_runner
+            # Ensure panel is not on screen
+            assert app.plan_panel.is_on_screen is False
 
             with patch.object(
                 CliSettings,
@@ -875,14 +884,6 @@ class TestPlanPanelIntegration:
                 return_value=CliSettings(auto_open_plan_panel=True),
             ):
                 visualizer._cli_settings = None  # Clear cache
-                # Mock refresh_from_disk to avoid compose timing issues
-                with patch.object(
-                    PlanSidePanel, "refresh_from_disk"
-                ) as mock_refresh_from_disk:
+                with patch.object(app.plan_panel, "toggle") as mock_toggle:
                     visualizer._do_refresh_plan_panel()
-                    await pilot.pause()
-
-                    # Verify refresh_from_disk was called with the right path
-                    mock_refresh_from_disk.assert_called_once_with(
-                        "/test/persistence/dir"
-                    )
+                    mock_toggle.assert_called_once()

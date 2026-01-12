@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 from textual.app import App, ComposeResult
@@ -13,6 +15,18 @@ from textual.widgets import Static
 
 from openhands.tools.task_tracker.definition import TaskItem
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
+
+
+if TYPE_CHECKING:
+    from openhands_cli.tui.textual_app import OpenHandsApp
+
+
+def _create_mock_app(conversation_dir: str | Path | None = None) -> Any:
+    """Create a mock OpenHandsApp with required attributes."""
+    mock_app = MagicMock()
+    mock_app.conversation_dir = str(conversation_dir) if conversation_dir else ""
+    mock_app.query_one = MagicMock()
+    return mock_app
 
 
 # ============================================================================
@@ -28,31 +42,39 @@ class PlanPanelTestApp(App):
     #main_content { width: 2fr; }
     """
 
+    def __init__(self, conversation_dir: str | Path | None = None, **kwargs):
+        super().__init__(**kwargs)
+        self.conversation_dir = str(conversation_dir) if conversation_dir else ""
+        self.plan_panel: PlanSidePanel | None = None
+
     def compose(self) -> ComposeResult:
         with Horizontal(id="content_area"):
             yield Static("Main content", id="main_content")
 
+    def on_mount(self) -> None:
+        self.plan_panel = PlanSidePanel(self)  # type: ignore[arg-type]
+
 
 # ============================================================================
-# _load_tasks_from_path Tests
+# _load_tasks Tests (instance method)
 # ============================================================================
 
 
-class TestLoadTasksFromPath:
-    """Tests for PlanSidePanel._load_tasks_from_path static method."""
+class TestLoadTasks:
+    """Tests for PlanSidePanel._load_tasks instance method."""
 
-    @pytest.mark.parametrize(
-        "persistence_dir",
-        [None, ""],
-    )
-    def test_returns_none_when_no_persistence_dir(self, persistence_dir):
-        """Verify _load_tasks_from_path returns None when path is None or empty."""
-        result = PlanSidePanel._load_tasks_from_path(persistence_dir)
+    def test_returns_none_when_no_conversation_dir(self):
+        """Verify _load_tasks returns None when conversation_dir is empty."""
+        mock_app = _create_mock_app("")
+        panel = PlanSidePanel(mock_app)
+        result = panel._load_tasks()
         assert result is None
 
     def test_returns_none_when_file_missing(self, tmp_path: Path):
         """Verify returns None when TASKS.json doesn't exist."""
-        result = PlanSidePanel._load_tasks_from_path(tmp_path)
+        mock_app = _create_mock_app(tmp_path)
+        panel = PlanSidePanel(mock_app)
+        result = panel._load_tasks()
         assert result is None
 
     @pytest.mark.parametrize(
@@ -68,7 +90,9 @@ class TestLoadTasksFromPath:
         tasks_file = tmp_path / "TASKS.json"
         tasks_file.write_text(invalid_content)
 
-        result = PlanSidePanel._load_tasks_from_path(tmp_path)
+        mock_app = _create_mock_app(tmp_path)
+        panel = PlanSidePanel(mock_app)
+        result = panel._load_tasks()
         assert result is None
 
     @pytest.mark.parametrize(
@@ -86,7 +110,9 @@ class TestLoadTasksFromPath:
         tasks_file = tmp_path / "TASKS.json"
         tasks_file.write_text(json.dumps(invalid_task_data))
 
-        result = PlanSidePanel._load_tasks_from_path(tmp_path)
+        mock_app = _create_mock_app(tmp_path)
+        panel = PlanSidePanel(mock_app)
+        result = panel._load_tasks()
         assert result is None
 
     @pytest.mark.parametrize(
@@ -111,7 +137,9 @@ class TestLoadTasksFromPath:
         tasks_file = tmp_path / "TASKS.json"
         tasks_file.write_text(json.dumps(tasks_data))
 
-        result = PlanSidePanel._load_tasks_from_path(tmp_path)
+        mock_app = _create_mock_app(tmp_path)
+        panel = PlanSidePanel(mock_app)
+        result = panel._load_tasks()
 
         assert result is not None
         assert len(result) == expected_count
@@ -127,42 +155,69 @@ class TestLoadTasksFromPath:
 
 
 class TestToggle:
-    """Tests for PlanSidePanel.toggle class method."""
+    """Tests for PlanSidePanel.toggle instance method."""
 
     @pytest.mark.asyncio
-    async def test_creates_panel_when_not_exists(self):
-        """Verify toggle() creates and mounts a new panel when none exists."""
-        app = PlanPanelTestApp()
+    async def test_mounts_panel_when_not_on_screen(self, tmp_path: Path):
+        """Verify toggle() mounts the panel and marks it as on_screen."""
+        app = PlanPanelTestApp(conversation_dir=tmp_path)
         async with app.run_test() as pilot:
-            # Verify no panel exists
-            with pytest.raises(NoMatches):
-                app.query_one(PlanSidePanel)
+            await pilot.pause()  # Wait for on_mount
 
-            # Toggle to create
-            PlanSidePanel.toggle(app)
-            await pilot.pause()
+            # Verify panel exists but is not mounted
+            assert app.plan_panel is not None
+            assert app.plan_panel.is_on_screen is False
 
-            # Verify panel now exists
-            panel = app.query_one(PlanSidePanel)
-            assert panel is not None
+            # Mock refresh_from_disk to avoid compose timing issues
+            with patch.object(app.plan_panel, "refresh_from_disk"):
+                # Toggle to mount - this mounts the panel
+                app.plan_panel.toggle()
+                await pilot.pause()
+
+                # Verify panel is now mounted
+                assert app.plan_panel.is_on_screen is True
 
     @pytest.mark.asyncio
-    async def test_removes_panel_when_exists(self):
+    async def test_removes_panel_when_on_screen(self, tmp_path: Path):
         """Verify toggle() removes an existing panel."""
-        app = PlanPanelTestApp()
+        app = PlanPanelTestApp(conversation_dir=tmp_path)
         async with app.run_test() as pilot:
-            # Create panel first
-            PlanSidePanel.toggle(app)
-            await pilot.pause()
-            assert app.query_one(PlanSidePanel) is not None
+            await pilot.pause()  # Wait for on_mount
 
-            # Toggle to remove
-            PlanSidePanel.toggle(app)
+            # Mock refresh_from_disk for first toggle
+            with patch.object(app.plan_panel, "refresh_from_disk"):
+                app.plan_panel.toggle()
+                await pilot.pause()
+                assert app.plan_panel.is_on_screen is True
+
+            # Toggle to remove (no refresh needed when removing)
+            app.plan_panel.toggle()
             await pilot.pause()
 
             # Verify panel is removed
-            with pytest.raises(NoMatches):
-                app.query_one(PlanSidePanel)
+            assert app.plan_panel.is_on_screen is False
+
+    @pytest.mark.asyncio
+    async def test_toggle_sets_user_dismissed_flag(self, tmp_path: Path):
+        """Verify toggle() sets user_dismissed flag when removing panel."""
+        app = PlanPanelTestApp(conversation_dir=tmp_path)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+
+            # Mount the panel first
+            with patch.object(app.plan_panel, "refresh_from_disk"):
+                app.plan_panel.toggle()
+                await pilot.pause()
+
+            # Verify user_dismissed is initially False
+            assert app.plan_panel.user_dismissed is False
+
+            # Toggle to remove
+            app.plan_panel.toggle()
+            await pilot.pause()
+
+            # Verify user_dismissed is now True
+            assert app.plan_panel.user_dismissed is True
 
 
 # ============================================================================
@@ -173,59 +228,48 @@ class TestToggle:
 class TestRefreshFromDisk:
     """Tests for PlanSidePanel.refresh_from_disk method."""
 
-    @pytest.mark.asyncio
-    async def test_updates_task_list_from_file(self, tmp_path: Path):
-        """Verify refresh_from_disk reloads tasks from persistence directory."""
+    def test_loads_tasks_and_updates_task_list(self, tmp_path: Path):
+        """Verify refresh_from_disk loads tasks from conversation directory."""
+        # Create tasks file
+        tasks_data = [{"title": "New Task", "status": "in_progress"}]
+        tasks_file = tmp_path / "TASKS.json"
+        tasks_file.write_text(json.dumps(tasks_data))
 
-        class TestApp(App):
-            CSS = """
-            Screen { layout: horizontal; }
-            #main_content { width: 2fr; }
-            """
+        mock_app = _create_mock_app(tmp_path)
+        panel = PlanSidePanel(mock_app)
 
-            def compose(self):
-                with Horizontal(id="content_area"):
-                    yield Static("Main content", id="main_content")
-                    yield PlanSidePanel()
+        # Initially no tasks
+        assert panel.task_list == []
 
-        app = TestApp()
-        async with app.run_test():
-            panel = app.query_one(PlanSidePanel)
+        # Mock _refresh_content since panel is not composed
+        with patch.object(panel, "_refresh_content"):
+            panel.refresh_from_disk()
 
-            # Initially no tasks file
-            assert panel.task_list == []
+        # Verify tasks were loaded
+        assert len(panel.task_list) == 1
+        assert panel.task_list[0].title == "New Task"
+        assert panel.task_list[0].status == "in_progress"
 
-            # Create tasks file
-            tasks_data = [{"title": "New Task", "status": "in_progress"}]
-            tasks_file = tmp_path / "TASKS.json"
-            tasks_file.write_text(json.dumps(tasks_data))
+    def test_clears_tasks_when_file_missing(self, tmp_path: Path):
+        """Verify refresh_from_disk clears tasks when file doesn't exist."""
+        mock_app = _create_mock_app(tmp_path)
+        panel = PlanSidePanel(mock_app)
 
-            # Refresh from disk with persistence_dir argument
-            panel.refresh_from_disk(str(tmp_path))
+        # Pre-populate task list
+        panel._task_list = [TaskItem(title="Old Task", status="done")]
 
-            assert len(panel.task_list) == 1
-            assert panel.task_list[0].title == "New Task"
-            assert panel.task_list[0].status == "in_progress"
+        # Mock _refresh_content since panel is not composed
+        with patch.object(panel, "_refresh_content"):
+            panel.refresh_from_disk()
 
-    @pytest.mark.asyncio
-    async def test_safe_when_no_persistence_dir(self):
-        """Verify refresh_from_disk is safe to call with None persistence dir."""
+        # Verify tasks were cleared
+        assert panel.task_list == []
 
-        class TestApp(App):
-            CSS = """
-            Screen { layout: horizontal; }
-            #main_content { width: 2fr; }
-            """
+    def test_calls_refresh_content(self, tmp_path: Path):
+        """Verify refresh_from_disk calls _refresh_content."""
+        mock_app = _create_mock_app(tmp_path)
+        panel = PlanSidePanel(mock_app)
 
-            def compose(self):
-                with Horizontal(id="content_area"):
-                    yield Static("Main content", id="main_content")
-                    yield PlanSidePanel()
-
-        app = TestApp()
-        async with app.run_test():
-            panel = app.query_one(PlanSidePanel)
-
-            # Should not raise when passing None
-            panel.refresh_from_disk(None)  # type: ignore[arg-type]
-            assert panel.task_list == []
+        with patch.object(panel, "_refresh_content") as mock_refresh:
+            panel.refresh_from_disk()
+            mock_refresh.assert_called_once()

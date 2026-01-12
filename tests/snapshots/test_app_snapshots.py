@@ -14,6 +14,8 @@ For more information:
     https://github.com/Textualize/pytest-textual-snapshot
 """
 
+from typing import TYPE_CHECKING
+
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Footer, Static
@@ -21,6 +23,10 @@ from textual.widgets import Footer, Static
 from openhands.tools.task_tracker.definition import TaskItem
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
+
+
+if TYPE_CHECKING:
+    from openhands_cli.tui.textual_app import OpenHandsApp
 
 
 class TestExitModalSnapshots:
@@ -62,11 +68,20 @@ class TestPlanSidePanelSnapshots:
             }
             """
 
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+                self.conversation_dir = ""
+                self.plan_panel: PlanSidePanel | None = None
+
             def compose(self) -> ComposeResult:
                 with Horizontal(id="content_area"):
                     yield Static("Main content area", id="main_content")
-                    yield PlanSidePanel()
                 yield Footer()
+
+            def on_mount(self) -> None:
+                self.plan_panel = PlanSidePanel(self)  # type: ignore[arg-type]
+                # Toggle to show the panel
+                self.plan_panel.toggle()
 
         assert snap_compare(PlanPanelTestApp(), terminal_size=(100, 30))
 
@@ -93,15 +108,26 @@ class TestPlanSidePanelSnapshots:
             }
             """
 
+            def __init__(self, tasks: list[TaskItem], **kwargs):
+                super().__init__(**kwargs)
+                self.conversation_dir = ""
+                self.plan_panel: PlanSidePanel | None = None
+                self._tasks = tasks
+
             def compose(self) -> ComposeResult:
                 with Horizontal(id="content_area"):
                     yield Static("Main content area", id="main_content")
-                    panel = PlanSidePanel()
-                    panel._task_list = task_list
-                    yield panel
                 yield Footer()
 
-        assert snap_compare(PlanPanelWithTasksApp(), terminal_size=(100, 30))
+            def on_mount(self) -> None:
+                self.plan_panel = PlanSidePanel(self)  # type: ignore[arg-type]
+                self.plan_panel._task_list = self._tasks
+                # Toggle to show the panel
+                self.plan_panel.toggle()
+
+        assert snap_compare(
+            PlanPanelWithTasksApp(tasks=task_list), terminal_size=(100, 30)
+        )
 
     def test_plan_panel_all_done(self, snap_compare):
         """Snapshot test for plan panel with all tasks completed."""
@@ -121,12 +147,21 @@ class TestPlanSidePanelSnapshots:
             }
             """
 
+            def __init__(self, tasks: list[TaskItem], **kwargs):
+                super().__init__(**kwargs)
+                self.conversation_dir = ""
+                self.plan_panel: PlanSidePanel | None = None
+                self._tasks = tasks
+
             def compose(self) -> ComposeResult:
                 with Horizontal(id="content_area"):
                     yield Static("Main content area", id="main_content")
-                    panel = PlanSidePanel()
-                    panel._task_list = task_list
-                    yield panel
                 yield Footer()
 
-        assert snap_compare(PlanPanelAllDoneApp(), terminal_size=(100, 30))
+            def on_mount(self) -> None:
+                self.plan_panel = PlanSidePanel(self)  # type: ignore[arg-type]
+                self.plan_panel._task_list = self._tasks
+                # Toggle to show the panel
+                self.plan_panel.toggle()
+
+        assert snap_compare(PlanPanelAllDoneApp(tasks=task_list), terminal_size=(100, 30))
