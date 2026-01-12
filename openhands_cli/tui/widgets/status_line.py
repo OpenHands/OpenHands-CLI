@@ -140,6 +140,10 @@ class InfoStatusLine(Static):
             self._metrics_update_timer.stop()
             self._metrics_update_timer = None
 
+    def on_resize(self) -> None:
+        """Recalculate layout when widget is resized."""
+        self._update_text()
+
     def _on_conversation_state_changed(self, is_running: bool) -> None:
         """Update metrics display when conversation state changes."""
         if is_running:
