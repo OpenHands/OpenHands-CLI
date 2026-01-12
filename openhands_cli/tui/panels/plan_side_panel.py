@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from pydantic import ValidationError
 from textual.containers import Horizontal, VerticalScroll
 from textual.css.query import NoMatches
-from textual.widgets import Static
+from textual.widgets import Button, Static
 
 from openhands.tools.task_tracker.definition import (
     TaskItem,
@@ -79,8 +79,15 @@ class PlanSidePanel(VerticalScroll):
 
     def compose(self):
         """Compose the Plan side panel content."""
-        yield Static("Agent Plan", classes="plan-header")
+        with Horizontal(classes="plan-header-row"):
+            yield Static("Agent Plan", classes="plan-header")
+            yield Button("✕", id="plan-close-btn", classes="plan-close-btn")
         yield Static("", id="plan-content")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button press events."""
+        if event.button.id == "plan-close-btn":
+            self.toggle()
 
     def _load_tasks(
         self,
