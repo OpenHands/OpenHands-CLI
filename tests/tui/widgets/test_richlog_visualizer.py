@@ -14,8 +14,13 @@ from openhands.sdk import Action, MessageEvent, TextContent
 from openhands.sdk.event import ActionEvent
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.llm import MessageToolCall
+from openhands.tools.terminal.definition import TerminalAction
 from openhands_cli.stores import CliSettings
-from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
+from openhands_cli.tui.widgets.richlog_visualizer import (
+    ELLIPSIS,
+    MAX_LINE_LENGTH,
+    ConversationVisualizer,
+)
 
 
 if TYPE_CHECKING:
@@ -83,6 +88,24 @@ def create_tool_call(
         name=function_name,
         arguments=arguments,
         origin="completion",
+    )
+
+
+def create_terminal_action_event(
+    command: str, summary: str | None = "Test command"
+) -> ActionEvent:
+    """Helper to create a terminal ActionEvent for testing."""
+    action = TerminalAction(command=command)
+    tool_call = create_tool_call("call_1", "terminal")
+    thought = [TextContent(text=summary)] if summary else []
+    return ActionEvent(
+        thought=thought,
+        action=action,
+        tool_name="terminal",
+        tool_call_id="call_1",
+        tool_call=tool_call,
+        llm_response_id="response_1",
+        summary=summary,
     )
 
 
@@ -432,3 +455,101 @@ class TestCliSettingsCaching:
             else:
                 assert mock_load.call_count == 0
                 assert result.display_cost_per_action is True
+
+
+class TestCommandTruncation:
+    """Tests for truncating long terminal commands in action titles."""
+
+    def test_short_command_not_truncated(self, visualizer):
+        """Test that short commands are displayed in full."""
+        short_cmd = "ls -la"
+        action_event = create_terminal_action_event(short_cmd, "List files")
+
+        title = visualizer._build_action_title(action_event)
+        assert short_cmd in title
+        assert "..." not in title
+
+    def test_long_command_truncated(self, visualizer):
+        """Test that commands exceeding MAX_LINE_LENGTH are truncated with ellipsis."""
+        long_cmd = "curl -X POST https://api.example.com/endpoint " + "-d " * 20
+        assert len(long_cmd) > MAX_LINE_LENGTH
+
+        action_event = create_terminal_action_event(long_cmd, "Make API request")
+
+        title = visualizer._build_action_title(action_event)
+        assert "..." in title
+        assert long_cmd not in title
+
+    def test_multiline_command_flattened_and_truncated(self, visualizer):
+        """Test that multiline commands are flattened and truncated."""
+        multiline_cmd = """cat << 'EOF' > /path/to/file.txt
+This is line 1
+This is line 2
+This is line 3
+And many more lines
+EOF"""
+        assert len(multiline_cmd) > MAX_LINE_LENGTH
+
+        action_event = create_terminal_action_event(multiline_cmd, "Write file")
+
+        title = visualizer._build_action_title(action_event)
+        assert "..." in title
+        assert "\n" not in title
+
+    def test_command_exactly_at_limit(self, visualizer):
+        """Test that commands exactly at MAX_LINE_LENGTH are not truncated."""
+        cmd = "a" * MAX_LINE_LENGTH
+        assert len(cmd) == MAX_LINE_LENGTH
+
+        action_event = create_terminal_action_event(cmd)
+
+        title = visualizer._build_action_title(action_event)
+        assert "..." not in title
+        assert cmd in title
+
+    def test_command_one_over_limit_truncated(self, visualizer):
+        """Test that commands one char over MAX_LINE_LENGTH are truncated."""
+        cmd = "a" * (MAX_LINE_LENGTH + 1)
+        assert len(cmd) == MAX_LINE_LENGTH + 1
+
+        action_event = create_terminal_action_event(cmd)
+
+        title = visualizer._build_action_title(action_event)
+        assert ELLIPSIS in title
+        truncated_length = MAX_LINE_LENGTH - len(ELLIPSIS)
+        assert "a" * truncated_length + ELLIPSIS in title
+
+    def test_command_without_summary(self, visualizer):
+        """Test truncation works when there's no summary (just $ command)."""
+        long_cmd = "b" * 100
+        action_event = create_terminal_action_event(long_cmd, summary=None)
+
+        title = visualizer._build_action_title(action_event)
+        # Command without summary is wrapped in [dim] tags
+        assert title.startswith("[dim]$ ")
+        assert title.endswith("[/dim]")
+        assert "..." in title
+
+    def test_truncate_from_end_for_paths(self, visualizer):
+        """Test that path truncation keeps the end (filename) and truncates start."""
+        # Create a path that exceeds MAX_LINE_LENGTH (70 chars)
+        long_path = (
+            "/very/long/directory/structure/with/many/nested/folders/extras/file.txt"
+        )
+        assert len(long_path) > MAX_LINE_LENGTH, f"Path length is {len(long_path)}"
+        truncated = visualizer._truncate_for_display(long_path, from_start=False)
+
+        # Should keep the end (filename) and add ellipsis at start
+        assert truncated.startswith(ELLIPSIS)
+        assert truncated.endswith("file.txt")
+        assert len(truncated) == MAX_LINE_LENGTH
+
+    def test_truncate_from_start_default(self, visualizer):
+        """Test default truncation keeps start and adds ellipsis at end."""
+        long_text = "a" * 100
+        truncated = visualizer._truncate_for_display(long_text)
+
+        # Should keep start and add ellipsis at end
+        assert truncated.endswith(ELLIPSIS)
+        assert truncated.startswith("a")
+        assert len(truncated) == MAX_LINE_LENGTH

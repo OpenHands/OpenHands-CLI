@@ -79,10 +79,11 @@ class SettingsFormData(BaseModel):
             return str(self.custom_model)
 
         model_str = str(self.model)
-        full_model = (
-            f"{self.provider}/{model_str}" if "/" not in model_str else model_str
-        )
-        return full_model
+
+        # Always add provider prefix - litellm requires it for routing.
+        # Even if model contains '/' (e.g. "openai/gpt-4.1" from openrouter)
+        # See: https://docs.litellm.ai/docs/providers
+        return f"{self.provider}/{model_str}"
 
 
 class SettingsSaveResult(BaseModel):

@@ -37,6 +37,10 @@ SUCCESS_ICON = "✓"
 ERROR_ICON = "✗"
 AGENT_MESSAGE_PADDING = (1, 0, 1, 1)  # top, right, bottom, left
 
+# Maximum line length for truncating titles/commands in collapsed view
+MAX_LINE_LENGTH = 70
+ELLIPSIS = "..."
+
 
 if TYPE_CHECKING:
     from textual.containers import VerticalScroll
@@ -185,9 +189,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def _build_action_title(self, event: ActionEvent) -> str:
         """Build a title for an action event.
 
-        Format: "[bold]{summary}[/bold]" for most actions
-                "[bold]{summary}[/bold]: $ {command}" for terminal actions
-                "[bold]{summary}[/bold]: Reading/Editing {path}" for file operations
+        Format:
+            "[bold]{summary}[/bold]" for most actions
+            "[bold]{summary}[/bold][dim]: $ {command}[/dim]" for terminal
+            "[bold]{summary}[/bold][dim]: Reading/Editing {path}[/dim]" for files
+
+        The detail portion (after the colon) is rendered in dim style to
+        visually distinguish it from the main summary text.
         """
         summary = (
             self._escape_rich_markup(str(event.summary).strip().replace("\n", " "))
@@ -196,20 +204,21 @@ class ConversationVisualizer(ConversationVisualizerBase):
         )
         action = event.action
 
-        # Terminal actions: show summary + command
+        # Terminal actions: show summary + command (truncated for display)
         if isinstance(action, TerminalAction) and action.command:
             cmd = self._escape_rich_markup(action.command.strip().replace("\n", " "))
+            cmd = self._truncate_for_display(cmd)
             if summary:
-                return f"[bold]{summary}[/bold]: $ {cmd}"
-            return f"$ {cmd}"
+                return f"[bold]{summary}[/bold][dim]: $ {cmd}[/dim]"
+            return f"[dim]$ {cmd}[/dim]"
 
         # File operations: include path with Reading/Editing
         if isinstance(action, FileEditorAction) and action.path:
             op = "Reading" if action.command == "view" else "Editing"
             path = self._escape_rich_markup(action.path)
             if summary:
-                return f"[bold]{summary}[/bold]: {op} {path}"
-            return f"[bold]{op}[/bold] {path}"
+                return f"[bold]{summary}[/bold][dim]: {op} {path}[/dim]"
+            return f"[bold]{op}[/bold][dim] {path}[/dim]"
 
         # All other actions: just use summary
         if summary:
@@ -237,14 +246,31 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Escape square brackets which are used for Rich markup
         return text.replace("[", r"\[").replace("]", r"\]")
 
+    def _truncate_for_display(
+        self, text: str, max_length: int = MAX_LINE_LENGTH, *, from_start: bool = True
+    ) -> str:
+        """Truncate text with ellipsis if it exceeds max_length.
+
+        Args:
+            text: The text to truncate.
+            max_length: Maximum length before truncation.
+            from_start: If True, keep the start and add ellipsis at end.
+                       If False, keep the end and add ellipsis at start (for paths).
+        """
+        if len(text) > max_length:
+            if from_start:
+                return text[: max_length - len(ELLIPSIS)] + ELLIPSIS
+            else:
+                return ELLIPSIS + text[-(max_length - len(ELLIPSIS)) :]
+        return text
+
     def _extract_meaningful_title(self, event, fallback_title: str) -> str:
         """Extract a meaningful title from an event, with fallback to truncated
         content."""
         # For ActionEvents, prefer the LLM-generated summary if available
         if hasattr(event, "summary") and event.summary:
             summary = str(event.summary).strip().replace("\n", " ")
-            if len(summary) > 70:
-                summary = summary[:67] + "..."
+            summary = self._truncate_for_display(summary)
             return self._escape_rich_markup(summary)
 
         # Try to extract meaningful information from the event
@@ -257,26 +283,22 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if hasattr(action, "command") and action.command:
                 # For command actions, show the command
                 cmd = str(action.command).strip()
-                if len(cmd) > 50:
-                    cmd = cmd[:47] + "..."
+                cmd = self._truncate_for_display(cmd)
                 return f"{action_type}: {self._escape_rich_markup(cmd)}"
             elif hasattr(action, "path") and action.path:
-                # For file actions, show the path
+                # For file actions, show the path (truncate from start to show filename)
                 path = str(action.path)
-                if len(path) > 50:
-                    path = "..." + path[-47:]  # Show end of path if too long
+                path = self._truncate_for_display(path, from_start=False)
                 return f"{action_type}: {self._escape_rich_markup(path)}"
             elif hasattr(action, "content") and action.content:
                 # For content-based actions, show truncated content
                 content = str(action.content).strip().replace("\n", " ")
-                if len(content) > 50:
-                    content = content[:47] + "..."
+                content = self._truncate_for_display(content)
                 return f"{action_type}: {self._escape_rich_markup(content)}"
             elif hasattr(action, "message") and action.message:
                 # For message actions, show truncated message
                 msg = str(action.message).strip().replace("\n", " ")
-                if len(msg) > 50:
-                    msg = msg[:47] + "..."
+                msg = self._truncate_for_display(msg)
                 return f"{action_type}: {self._escape_rich_markup(msg)}"
             else:
                 return f"{action_type} Action"
@@ -288,8 +310,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
             if hasattr(obs, "content") and obs.content:
                 content = str(obs.content).strip().replace("\n", " ")
-                if len(content) > 50:
-                    content = content[:47] + "..."
+                content = self._truncate_for_display(content)
                 return f"{obs_type}: {self._escape_rich_markup(content)}"
             else:
                 return f"{obs_type} Observation"
@@ -311,16 +332,14 @@ class ConversationVisualizer(ConversationVisualizerBase):
                     content_text = str(msg.content)
 
                 content_text = content_text.strip().replace("\n", " ")
-                if len(content_text) > 60:
-                    content_text = content_text[:57] + "..."
+                content_text = self._truncate_for_display(content_text)
                 role = "User" if msg.role == "user" else "Agent"
                 return f"{role}: {self._escape_rich_markup(content_text)}"
 
         elif hasattr(event, "message") and event.message:
             # For events with direct message attribute
             content = str(event.message).strip().replace("\n", " ")
-            if len(content) > 60:
-                content = content[:57] + "..."
+            content = self._truncate_for_display(content)
             return f"{fallback_title}: {self._escape_rich_markup(content)}"
 
         # If we can't extract meaningful info, try to truncate the visualized content
@@ -338,8 +357,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
                     r"\x1b\[[0-9;]*m", "", content_str
                 )  # Remove ANSI codes
 
-                if len(content_str) > 60:
-                    content_str = content_str[:57] + "..."
+                content_str = self._truncate_for_display(content_str)
 
                 if content_str.strip():
                     return f"{fallback_title}: {self._escape_rich_markup(content_str)}"
