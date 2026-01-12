@@ -18,24 +18,19 @@ This repo contains the current CLI UX, including the Textual TUI and a browser-s
 - `.openhands/skills/`: agent guidance for this repo.
   - `.openhands/skills/repo.md` is a symlink to the root `AGENTS.md` (single source of truth).
 
-## Setup Instructions
-To set up the development environment:
-1. Install dependencies: `make install-dev`
-2. Install pre-commit hooks: `make install-pre-commit-hooks`
-
 ## Setup, Build, and Development Commands
-- `make install`: `uv sync`
-- `make install-dev`: `uv sync --group dev`
-- `make install-pre-commit-hooks`: install pre-commit hooks.
-- `make build`: checks uv version, runs `uv sync --dev`, and installs pre-commit hooks (`uv run pre-commit install`).
-- `make lint`: run all pre-commit hooks (`uv run pre-commit run --all-files`) — run before committing.
-- `make format`: `uv run ruff format openhands_cli/`
-- `make run` (or `uv run openhands`): launch the Textual TUI.
-- `openhands web`: launch the CLI as a browser-served web app (Textual `textual-serve`).
-- `openhands serve`: launch the Docker-based OpenHands GUI server.
-- `uv run openhands-acp`: run the ACP entrypoint.
-- `make test`: `uv run pytest` (use `-m "not integration"` to skip slower paths). `uv run pytest e2e_tests` runs end-to-end flows.
-- Packaging: `./build.sh --install-pyinstaller` produces binaries under `dist/` (created by the build; PyInstaller output).
+- install dependencies: `make install`
+- install dev dependencies: `make install-dev`
+- install pre-commit hooks: `make install-pre-commit-hooks`
+- build (sync + install hooks): `make build`
+- lint (all pre-commit hooks): `make lint`
+- format: `make format`
+- run the Textual TUI: `make run` (or `uv run openhands`)
+- run the browser-served web app (Textual `textual-serve`): `openhands web`
+- run the Docker-based OpenHands GUI server: `openhands serve`
+- run the ACP entrypoint: `uv run openhands-acp`
+- run tests: `make test` (for faster runs: `uv run pytest -m "not integration"`; end-to-end: `uv run pytest e2e_tests`)
+- build PyInstaller binaries: `./build.sh --install-pyinstaller`
 
 ## Development Guidelines
 
