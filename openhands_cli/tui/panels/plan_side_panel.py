@@ -33,7 +33,7 @@ STATUS_ICONS: dict[TaskTrackerStatusType, str] = {
 }
 
 # Status colors for visual representation
-STATUS_COLORS: dict[TaskTrackerStatusType, str] = {
+STATUS_COLORS: dict[TaskTrackerStatusType, str | None] = {
     "done": OPENHANDS_THEME.success,
     "in_progress": OPENHANDS_THEME.warning,
 }
