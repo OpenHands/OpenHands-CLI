@@ -208,8 +208,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 console.print(
                     f"[{OPENHANDS_THEME.error}]Headless mode requires existing "
                     f"settings.[/{OPENHANDS_THEME.error}]\n"
-                    f"[bold]Please run:[/bold] [{OPENHANDS_THEME.success}]openhands "
-                    f"--exp[/{OPENHANDS_THEME.success}] to configure your settings "
+                    f"[bold]Please run:[/bold] [{OPENHANDS_THEME.success}]openhands"
+                    f"[/{OPENHANDS_THEME.success}] to configure your settings "
                     f"before using [{OPENHANDS_THEME.accent}]--headless"
                     f"[/{OPENHANDS_THEME.accent}]."
                 )

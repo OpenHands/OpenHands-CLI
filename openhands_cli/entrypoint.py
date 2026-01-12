@@ -190,8 +190,7 @@ def main() -> None:
                 # Either showed conversation list or had an error
                 return
 
-            # Use textual-based UI as default (experimental UI is now the default)
-            # The --exp flag is kept for compatibility but does the same thing
+            # Use textual-based UI as default
             from openhands_cli.tui.textual_app import main as textual_main
 
             queued_inputs = create_seeded_instructions_from_args(args)
