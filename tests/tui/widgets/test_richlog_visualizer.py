@@ -666,3 +666,212 @@ EOF"""
         assert truncated.endswith(ELLIPSIS)
         assert truncated.startswith("a")
         assert len(truncated) == MAX_LINE_LENGTH
+
+
+# ============================================================================
+# Plan Panel Integration Tests
+# ============================================================================
+
+
+class TestPlanPanelIntegration:
+    """Tests for ConversationVisualizer plan panel integration."""
+
+    @pytest.mark.asyncio
+    async def test_task_tracker_observation_triggers_plan_panel_refresh(self):
+        """Verify that receiving a TaskTrackerObservation calls _refresh_plan_panel."""
+        from unittest.mock import patch
+
+        from textual.app import App
+        from textual.containers import Horizontal, VerticalScroll
+        from textual.widgets import Static
+
+        from openhands.sdk.event import ObservationEvent
+        from openhands.tools.task_tracker.definition import (
+            TaskItem,
+            TaskTrackerObservation,
+        )
+
+        class TestApp(App):
+            CSS = """
+            Screen { layout: horizontal; }
+            #main_content { width: 2fr; }
+            """
+
+            def compose(self):
+                with Horizontal(id="content_area"):
+                    with VerticalScroll(id="main_display"):
+                        yield Static("Content")
+
+        app = TestApp()
+        async with app.run_test():
+            container = app.query_one("#main_display", VerticalScroll)
+            visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+            # Create a TaskTrackerObservation event
+            task_tracker_obs = TaskTrackerObservation(
+                command="plan",
+                task_list=[TaskItem(title="Test", notes="", status="todo")],
+            )
+            event = ObservationEvent(
+                observation=task_tracker_obs,
+                tool_call_id="test-123",
+                tool_name="task_tracker",
+                action_id="action-1",
+            )
+
+            # Mock _refresh_plan_panel to verify it gets called
+            with patch.object(visualizer, "_refresh_plan_panel") as mock_refresh:
+                visualizer.on_event(event)
+                mock_refresh.assert_called_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("auto_open_enabled", [True, False])
+    async def test_refresh_plan_panel_respects_auto_open_setting(
+        self, auto_open_enabled: bool
+    ):
+        """Verify panel creation respects auto_open_plan_panel setting."""
+        from typing import Any
+
+        from textual.app import App
+        from textual.containers import Horizontal, VerticalScroll
+        from textual.css.query import NoMatches
+        from textual.widgets import Static
+
+        from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
+
+        class TestApp(App):
+            CSS = """
+            Screen { layout: horizontal; }
+            #main_content { width: 2fr; }
+            """
+            conversation_runner: Any = None
+
+            def compose(self):
+                with Horizontal(id="content_area"):
+                    with VerticalScroll(id="main_display"):
+                        yield Static("Content")
+
+        app = TestApp()
+        async with app.run_test() as pilot:
+            container = app.query_one("#main_display", VerticalScroll)
+            visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+            # Mock settings and patch refresh_from_disk to avoid needing compose
+            with patch.object(
+                CliSettings,
+                "load",
+                return_value=CliSettings(auto_open_plan_panel=auto_open_enabled),
+            ):
+                visualizer._cli_settings = None  # Clear cache
+
+                if auto_open_enabled:
+                    # Mock refresh_from_disk to avoid compose timing issues
+                    with patch.object(
+                        PlanSidePanel, "refresh_from_disk", return_value=None
+                    ):
+                        visualizer._refresh_plan_panel()
+                        await pilot.pause()
+                else:
+                    visualizer._refresh_plan_panel()
+                    await pilot.pause()
+
+            if auto_open_enabled:
+                # Panel should be created
+                panel = app.query_one(PlanSidePanel)
+                assert panel is not None
+            else:
+                # Panel should NOT be created
+                with pytest.raises(NoMatches):
+                    app.query_one(PlanSidePanel)
+
+    @pytest.mark.asyncio
+    async def test_refresh_plan_panel_updates_existing_panel(self):
+        """Verify existing panel is refreshed regardless of auto_open setting."""
+        from typing import Any
+
+        from textual.app import App
+        from textual.containers import Horizontal, VerticalScroll
+        from textual.widgets import Static
+
+        from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
+
+        class TestApp(App):
+            CSS = """
+            Screen { layout: horizontal; }
+            #main_content { width: 2fr; }
+            """
+            conversation_runner: Any = None
+
+            def compose(self):
+                with Horizontal(id="content_area"):
+                    with VerticalScroll(id="main_display"):
+                        yield Static("Content")
+                    yield PlanSidePanel()
+
+        app = TestApp()
+        async with app.run_test():
+            container = app.query_one("#main_display", VerticalScroll)
+            visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+            panel = app.query_one(PlanSidePanel)
+
+            # Mock refresh_from_disk to verify it gets called
+            with patch.object(panel, "refresh_from_disk") as mock_refresh:
+                # Even with auto_open disabled, existing panel should refresh
+                with patch.object(
+                    CliSettings,
+                    "load",
+                    return_value=CliSettings(auto_open_plan_panel=False),
+                ):
+                    visualizer._cli_settings = None  # Clear cache
+                    visualizer._refresh_plan_panel()
+
+                mock_refresh.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_refresh_plan_panel_sets_persistence_dir_on_new_panel(self):
+        """Verify persistence directory is set when creating a new panel."""
+        from typing import Any
+        from unittest.mock import MagicMock
+
+        from textual.app import App
+        from textual.containers import Horizontal, VerticalScroll
+        from textual.widgets import Static
+
+        from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
+
+        class TestApp(App):
+            CSS = """
+            Screen { layout: horizontal; }
+            #main_content { width: 2fr; }
+            """
+            conversation_runner: Any = None
+
+            def compose(self):
+                with Horizontal(id="content_area"):
+                    with VerticalScroll(id="main_display"):
+                        yield Static("Content")
+
+        app = TestApp()
+        async with app.run_test() as pilot:
+            container = app.query_one("#main_display", VerticalScroll)
+            visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+            # Mock conversation runner with persistence_dir
+            mock_runner = MagicMock()
+            mock_runner.persistence_dir = "/test/persistence/dir"
+            app.conversation_runner = mock_runner
+
+            with patch.object(
+                CliSettings,
+                "load",
+                return_value=CliSettings(auto_open_plan_panel=True),
+            ):
+                visualizer._cli_settings = None  # Clear cache
+                # Mock set_persistence_dir to avoid compose timing issues
+                with patch.object(PlanSidePanel, "set_persistence_dir") as mock_set_dir:
+                    visualizer._refresh_plan_panel()
+                    await pilot.pause()
+
+                    # Verify set_persistence_dir was called with the right path
+                    mock_set_dir.assert_called_once_with("/test/persistence/dir")

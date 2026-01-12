@@ -123,3 +123,43 @@ class TestCliSettingsTab:
             result = tab.get_cli_settings()
             assert isinstance(result, CliSettings)
             assert result.default_cells_expanded is new_value
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("initial_value", [True, False])
+    async def test_compose_renders_auto_open_plan_panel_switch(
+        self, initial_value: bool
+    ):
+        """Verify the auto_open_plan_panel switch is rendered with correct value."""
+        cfg = CliSettings(auto_open_plan_panel=initial_value)
+        app = _TestApp(cfg)
+
+        async with app.run_test():
+            tab = app.query_one(CliSettingsTab)
+            switch = tab.query_one("#auto_open_plan_panel_switch", Switch)
+            assert switch.value is initial_value
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "initial_value, new_value",
+        [
+            (False, True),
+            (True, False),
+        ],
+    )
+    async def test_get_cli_settings_reflects_auto_open_plan_panel(
+        self, initial_value: bool, new_value: bool
+    ):
+        """Verify get_cli_settings() captures auto_open_plan_panel switch state."""
+        cfg = CliSettings(auto_open_plan_panel=initial_value)
+        app = _TestApp(cfg)
+
+        async with app.run_test():
+            tab = app.query_one(CliSettingsTab)
+            switch = tab.query_one("#auto_open_plan_panel_switch", Switch)
+
+            # simulate user change
+            switch.value = new_value
+
+            result = tab.get_cli_settings()
+            assert isinstance(result, CliSettings)
+            assert result.auto_open_plan_panel is new_value
