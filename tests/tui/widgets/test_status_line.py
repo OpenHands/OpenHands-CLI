@@ -174,7 +174,7 @@ def test_update_text_uses_work_dir_and_metrics(dummy_app, monkeypatch):
     widget._input_tokens = 0
     widget._output_tokens = 0
     widget._cache_hit_rate = "N/A"
-    widget._reasoning_tokens = 0
+    widget._context_window = 0
     widget._accumulated_cost = 0.0
 
     update_mock = MagicMock()
@@ -182,19 +182,19 @@ def test_update_text_uses_work_dir_and_metrics(dummy_app, monkeypatch):
 
     widget._update_text()
 
-    expected = "~/my-dir    ↑ input 0 • cache hit N/A • ↓ output 0 • $ 0.00"
+    expected = "~/my-dir    ctx N/A • $ 0.00 (↑ 0 ↓ 0 cache N/A)"
     update_mock.assert_called_once_with(expected)
 
 
 def test_update_text_shows_all_metrics(dummy_app, monkeypatch):
-    """_update_text shows all metrics including reasoning tokens when present."""
+    """_update_text shows context window, cost, and token details."""
     widget = InfoStatusLine(app=dummy_app)
 
     widget.work_dir_display = "~/my-dir"
     widget._input_tokens = 5220000  # 5.22M
     widget._output_tokens = 42010  # 42.01K
-    widget._cache_hit_rate = "77.05%"
-    widget._reasoning_tokens = 1860  # 1.86K
+    widget._cache_hit_rate = "77%"
+    widget._context_window = 128000  # 128K
     widget._accumulated_cost = 10.5507
 
     update_mock = MagicMock()
@@ -202,29 +202,42 @@ def test_update_text_shows_all_metrics(dummy_app, monkeypatch):
 
     widget._update_text()
 
-    expected = (
-        "~/my-dir    ↑ input 5.22M • cache hit 77.05% • "
-        "reasoning 1.86K • ↓ output 42.01K • $ 10.5507"
-    )
+    expected = "~/my-dir    ctx 128K • $ 10.5507 (↑ 5.22M ↓ 42.01K cache 77%)"
     update_mock.assert_called_once_with(expected)
 
 
-def test_format_metrics_display_without_reasoning(dummy_app):
-    """_format_metrics_display omits reasoning when zero."""
+def test_format_metrics_display_with_context_window(dummy_app):
+    """_format_metrics_display shows context window, cost, and token details."""
     widget = InfoStatusLine(app=dummy_app)
 
     widget._input_tokens = 1000
     widget._output_tokens = 500
-    widget._cache_hit_rate = "50.00%"
-    widget._reasoning_tokens = 0
+    widget._cache_hit_rate = "50%"
+    widget._context_window = 200000  # 200K
     widget._accumulated_cost = 0.05
 
     result = widget._format_metrics_display()
 
-    assert "reasoning" not in result
-    assert "↑ input 1K" in result
-    assert "cache hit 50.00%" in result
-    assert "↓ output 500" in result
+    assert "ctx 200K" in result
+    assert "$ 0.0500" in result
+    assert "↑ 1K" in result
+    assert "↓ 500" in result
+    assert "cache 50%" in result
+
+
+def test_format_metrics_display_without_context_window(dummy_app):
+    """_format_metrics_display shows N/A when context window is zero."""
+    widget = InfoStatusLine(app=dummy_app)
+
+    widget._input_tokens = 1000
+    widget._output_tokens = 500
+    widget._cache_hit_rate = "50%"
+    widget._context_window = 0
+    widget._accumulated_cost = 0.05
+
+    result = widget._format_metrics_display()
+
+    assert "ctx N/A" in result
     assert "$ 0.0500" in result
 
 
@@ -326,7 +339,7 @@ def test_update_metrics_gets_all_metrics_from_conversation_runner(
     mock_usage = MagicMock()
     mock_usage.prompt_tokens = 5000
     mock_usage.completion_tokens = 1000
-    mock_usage.reasoning_tokens = 500
+    mock_usage.context_window = 128000
     mock_usage.cache_read_tokens = 2500  # 50% cache hit
 
     # Mock the conversation runner and its visualizer
@@ -353,8 +366,8 @@ def test_update_metrics_gets_all_metrics_from_conversation_runner(
     assert widget._accumulated_cost == 0.5678
     assert widget._input_tokens == 5000
     assert widget._output_tokens == 1000
-    assert widget._reasoning_tokens == 500
-    assert widget._cache_hit_rate == "50.00%"
+    assert widget._context_window == 128000
+    assert widget._cache_hit_rate == "50%"
     update_text_mock.assert_called_once()
 
 
@@ -404,7 +417,7 @@ def test_update_metrics_handles_zero_prompt_tokens(dummy_app, monkeypatch):
     mock_usage = MagicMock()
     mock_usage.prompt_tokens = 0
     mock_usage.completion_tokens = 100
-    mock_usage.reasoning_tokens = 0
+    mock_usage.context_window = 0
     mock_usage.cache_read_tokens = 0
 
     mock_combined_metrics = MagicMock()

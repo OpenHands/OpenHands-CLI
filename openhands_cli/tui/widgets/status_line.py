@@ -119,7 +119,7 @@ class InfoStatusLine(Static):
         self._input_tokens: int = 0
         self._output_tokens: int = 0
         self._cache_hit_rate: str = "N/A"
-        self._reasoning_tokens: int = 0
+        self._context_window: int = 0
         self._accumulated_cost: float = 0.0
         self._metrics_update_timer: Timer | None = None
 
@@ -166,12 +166,12 @@ class InfoStatusLine(Static):
                     if usage:
                         self._input_tokens = usage.prompt_tokens or 0
                         self._output_tokens = usage.completion_tokens or 0
-                        self._reasoning_tokens = usage.reasoning_tokens or 0
+                        self._context_window = usage.context_window or 0
                         # Calculate cache hit rate
                         prompt = usage.prompt_tokens or 0
                         cache_read = usage.cache_read_tokens or 0
                         if prompt > 0:
-                            self._cache_hit_rate = f"{(cache_read / prompt * 100):.2f}%"
+                            self._cache_hit_rate = f"{(cache_read / prompt * 100):.0f}%"
                         else:
                             self._cache_hit_rate = "N/A"
         self._update_text()
@@ -192,15 +192,22 @@ class InfoStatusLine(Static):
         return work_dir
 
     def _format_metrics_display(self) -> str:
-        """Format the conversation metrics for display."""
-        parts = []
-        parts.append(f"↑ input {abbreviate_number(self._input_tokens)}")
-        parts.append(f"cache hit {self._cache_hit_rate}")
-        if self._reasoning_tokens > 0:
-            parts.append(f"reasoning {abbreviate_number(self._reasoning_tokens)}")
-        parts.append(f"↓ output {abbreviate_number(self._output_tokens)}")
-        parts.append(f"$ {format_cost(self._accumulated_cost)}")
-        return " • ".join(parts)
+        """Format the conversation metrics for display.
+
+        Shows: context window • cost (input tokens • output tokens • cache rate)
+        """
+        ctx_display = (
+            f"ctx {abbreviate_number(self._context_window)}"
+            if self._context_window > 0
+            else "ctx N/A"
+        )
+        cost_display = f"$ {format_cost(self._accumulated_cost)}"
+        token_details = (
+            f"↑ {abbreviate_number(self._input_tokens)} "
+            f"↓ {abbreviate_number(self._output_tokens)} "
+            f"cache {self._cache_hit_rate}"
+        )
+        return f"{ctx_display} • {cost_display} ({token_details})"
 
     def _update_text(self) -> None:
         """Rebuild the info status text."""
