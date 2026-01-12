@@ -23,6 +23,7 @@ from openhands.sdk.event.condenser import Condensation, CondensationRequest
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.tool.builtins.finish import FinishAction
 from openhands.sdk.tool.builtins.think import ThinkAction
+from openhands.tools.delegate.definition import DelegateAction
 from openhands.tools.file_editor.definition import FileEditorAction
 from openhands.tools.terminal.definition import TerminalAction
 from openhands_cli.stores import CliSettings
@@ -219,6 +220,38 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if summary:
                 return f"[bold]{summary}[/bold][dim]: {op} {path}[/dim]"
             return f"[bold]{op}[/bold][dim] {path}[/dim]"
+
+        # Delegate actions: show command and details
+        if isinstance(action, DelegateAction):
+            if action.command == "spawn":
+                ids = action.ids or []
+                agent_types = action.agent_types or []
+                agents_info = []
+                for i, agent_id in enumerate(ids):
+                    agent_type = (
+                        agent_types[i] if i < len(agent_types) else "default"
+                    )
+                    if agent_type and agent_type != "default":
+                        agents_info.append(f"{agent_id} ({agent_type})")
+                    else:
+                        agents_info.append(agent_id)
+                agents_str = ", ".join(agents_info)
+                if summary:
+                    return f"[bold]{summary}[/bold][dim]: spawning {agents_str}[/dim]"
+                return f"[bold]Spawn Sub-agents[/bold][dim]: {agents_str}[/dim]"
+            elif action.command == "delegate":
+                tasks = action.tasks or {}
+                task_count = len(tasks)
+                agent_names = ", ".join(tasks.keys())
+                if summary:
+                    return (
+                        f"[bold]{summary}[/bold][dim]: delegating "
+                        f"{task_count} task(s) to {agent_names}[/dim]"
+                    )
+                return (
+                    f"[bold]Delegate Tasks[/bold][dim]: "
+                    f"{task_count} task(s) to {agent_names}[/dim]"
+                )
 
         # All other actions: just use summary
         if summary:

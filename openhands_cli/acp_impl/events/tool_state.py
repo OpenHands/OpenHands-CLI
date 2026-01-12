@@ -105,6 +105,9 @@ class ToolCallState:
                 return "read"
             return "edit"
 
+        if self.tool_name == "delegate":
+            return "other"
+
         return TOOL_KIND_MAPPING.get(self.tool_name, "other")
 
     @property
@@ -146,6 +149,22 @@ class ToolCallState:
             command = args.get("command")
             if isinstance(command, str) and command:
                 return command
+
+        if self.tool_name == "delegate":
+            command = args.get("command")
+            if command == "spawn":
+                ids = args.get("ids", [])
+                if isinstance(ids, list) and ids:
+                    return f"Spawning {len(ids)} sub-agent(s): {', '.join(ids)}"
+                return "Spawning sub-agents"
+            elif command == "delegate":
+                tasks = args.get("tasks", {})
+                if isinstance(tasks, dict) and tasks:
+                    return (
+                        f"Delegating {len(tasks)} task(s) to: {', '.join(tasks.keys())}"
+                    )
+                return "Delegating tasks"
+            return "Delegate"
 
         return self.tool_name
 
@@ -190,6 +209,12 @@ class ToolCallState:
 
         # For file_editor, require 'command' to be present to determine kind correctly
         if self.tool_name == "file_editor":
+            command = parsed.get("command")
+            if not isinstance(command, str) or not command:
+                return False
+
+        # For delegate, require 'command' to be present to determine title correctly
+        if self.tool_name == "delegate":
             command = parsed.get("command")
             if not isinstance(command, str) or not command:
                 return False
