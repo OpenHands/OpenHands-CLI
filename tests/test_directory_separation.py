@@ -33,7 +33,7 @@ class TestToolFix:
     """Test that tool specs are replaced with default tools using current directory."""
 
     def test_tools_replaced_with_default_tools_on_load(self):
-        """Test that entire tools list is replaced with default tools when loading
+        """Test that entire tools list is replaced with default CLI tools when loading
         agent."""
         # Create a mock agent with different tools and working directories
         mock_agent = Agent(
@@ -59,12 +59,12 @@ class TestToolFix:
             # Verify the agent was loaded
             assert loaded_agent is not None
 
-            # Verify that tools are replaced with default tools
-            assert (
-                len(loaded_agent.tools) == 3
-            )  # BashTool, FileEditorTool, TaskTrackerTool
+            # Verify that tools are replaced with default CLI tools
+            # (terminal, file_editor, task_tracker, delegate)
+            assert len(loaded_agent.tools) == 4
 
             tool_names = [tool.name for tool in loaded_agent.tools]
             assert "terminal" in tool_names
             assert "file_editor" in tool_names
             assert "task_tracker" in tool_names
+            assert "delegate" in tool_names

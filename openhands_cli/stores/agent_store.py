@@ -13,7 +13,6 @@ from openhands.sdk import (
     LocalFileStore,
 )
 from openhands.sdk.context import load_project_skills
-from openhands.tools.preset.default import get_default_tools
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
     PERSISTENCE_DIR,
@@ -21,6 +20,7 @@ from openhands_cli.locations import (
 )
 from openhands_cli.mcp.mcp_utils import list_enabled_servers
 from openhands_cli.utils import (
+    get_default_cli_tools,
     get_llm_metadata,
     get_os_description,
     should_set_litellm_extra_body,
@@ -38,8 +38,8 @@ class AgentStore:
             str_spec = self.file_store.read(AGENT_SETTINGS_PATH)
             agent = Agent.model_validate_json(str_spec)
 
-            # Update tools with most recent working directory
-            updated_tools = get_default_tools(enable_browser=False)
+            # Update tools with CLI tools (includes delegate)
+            updated_tools = get_default_cli_tools()
 
             # Load skills from user directories and project-specific directories
             skills = load_project_skills(WORK_DIR)
@@ -156,7 +156,7 @@ class AgentStore:
 
         agent = Agent(
             llm=llm,
-            tools=get_default_tools(enable_browser=False),
+            tools=get_default_cli_tools(),
             mcp_config={},
             condenser=condenser,
         )
