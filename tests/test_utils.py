@@ -11,9 +11,17 @@ from openhands.sdk.llm import Message, TextContent
 from openhands_cli.acp_impl.utils import convert_acp_mcp_servers_to_agent_format
 from openhands_cli.utils import (
     create_seeded_instructions_from_args,
+    get_default_cli_tools,
     json_callback,
     should_set_litellm_extra_body,
 )
+
+
+def test_get_default_cli_tools_returns_expected_tools():
+    """Test that get_default_cli_tools returns exactly the expected tools."""
+    tools = get_default_cli_tools()
+    tool_names = {t.name for t in tools}
+    assert tool_names == {"terminal", "file_editor", "task_tracker", "delegate"}
 
 
 def test_should_set_litellm_extra_body_for_openhands():
