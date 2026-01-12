@@ -15,8 +15,8 @@ This repo contains the current CLI UX, including the Textual TUI and a browser-s
 - `tests/`: Pytest suite covering units, integration, and snapshot tests; mirrors source layout. `e2e_tests/`: end-to-end ACP/UI flows.
 - `scripts/acp/`: JSON-RPC and debug helpers for ACP development; `hooks/`: PyInstaller/runtime hooks.
 - Tooling & packaging: `Makefile` for common tasks, `build.sh`/`build.py` for PyInstaller artifacts, `openhands-cli.spec` for the frozen binary, `uv.lock` for resolved deps.
-- `.openhands/skills/`: legacy OpenHands skill directory (still supported), but repo-wide guidance should live in the root `AGENTS.md`.
-  - We do not use the old `.openhands/skills/repo.md` symlink approach (it can cause duplicate loading).
+- `.openhands/skills/`: agent guidance for this repo.
+  - Repository guidance lives in the root `AGENTS.md`.
 
 ## Setup, Build, and Development Commands
 - install dependencies: `make install`
