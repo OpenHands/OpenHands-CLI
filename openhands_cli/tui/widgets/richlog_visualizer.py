@@ -119,6 +119,30 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def reload_configuration(self) -> None:
         self._cli_settings = CliSettings.load()
 
+    def _run_on_main_thread(self, func, *args) -> None:
+        """Run a function on the main thread, calling directly or via call_from_thread."""
+        if threading.get_ident() == self._main_thread_id:
+            func(*args)
+        else:
+            self._app.call_from_thread(func, *args)
+
+    def _do_refresh_plan_panel(self) -> None:
+        """Refresh the plan panel (must be called from main thread)."""
+        try:
+            panel = self._app.query_one(PlanSidePanel)
+        except Exception:
+            panel = None
+
+        if panel is None:
+            if not self.cli_settings.auto_open_plan_panel:
+                return
+            panel = PlanSidePanel.get_or_create(self._app)
+
+        if self._app.conversation_runner and panel.persistence_dir is None:
+            panel.set_persistence_dir(self._app.conversation_runner.persistence_dir)
+        else:
+            panel.refresh_from_disk()
+
     def _refresh_plan_panel(self) -> None:
         """Refresh the plan panel by reloading tasks from disk.
 
@@ -128,31 +152,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         If the panel doesn't exist yet and auto_open_plan_panel is enabled,
         the panel will be automatically created and opened.
         """
-        current_thread_id = threading.get_ident()
-
-        def do_refresh():
-            # Check if panel already exists
-            try:
-                panel = self._app.query_one(PlanSidePanel)
-            except Exception:
-                panel = None
-
-            if panel is None:
-                # Panel doesn't exist - only create if auto-open is enabled
-                if not self.cli_settings.auto_open_plan_panel:
-                    return
-                panel = PlanSidePanel.get_or_create(self._app)
-
-            # Set persistence directory if the app has a conversation runner
-            if self._app.conversation_runner and panel.persistence_dir is None:
-                panel.set_persistence_dir(self._app.conversation_runner.persistence_dir)
-            else:
-                panel.refresh_from_disk()
-
-        if current_thread_id == self._main_thread_id:
-            do_refresh()
-        else:
-            self._app.call_from_thread(do_refresh)
+        self._run_on_main_thread(self._do_refresh_plan_panel)
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
@@ -171,14 +171,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         widget = self._create_event_widget(event)
         if widget:
-            # Check if we're in the main thread or a background thread
-            current_thread_id = threading.get_ident()
-            if current_thread_id == self._main_thread_id:
-                # We're in the main thread, update UI directly
-                self._add_widget_to_ui(widget)
-            else:
-                # We're in a background thread, use call_from_thread
-                self._app.call_from_thread(self._add_widget_to_ui, widget)
+            self._run_on_main_thread(self._add_widget_to_ui, widget)
 
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
@@ -218,15 +211,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Build the new content (observation result only)
         new_content = self._build_observation_content(event)
 
-        # Update the collapsible
-        current_thread_id = threading.get_ident()
-        if current_thread_id == self._main_thread_id:
-            self._update_widget_in_ui(collapsible, new_title, new_content)
-        else:
-            self._app.call_from_thread(
-                self._update_widget_in_ui, collapsible, new_title, new_content
-            )
-
+        self._run_on_main_thread(
+            self._update_widget_in_ui, collapsible, new_title, new_content
+        )
         return True
 
     def _build_action_title(self, event: ActionEvent) -> str:
