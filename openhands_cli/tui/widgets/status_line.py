@@ -227,5 +227,5 @@ class InfoStatusLine(Static):
     def _update_text(self) -> None:
         """Rebuild the info status text."""
         metrics_display = self._format_metrics_display()
-        status_text = f"{self.work_dir_display}    {metrics_display}"
+        status_text = f"{self.mode_indicator} • {self.work_dir_display} • {metrics_display}"
         self.update(status_text)
