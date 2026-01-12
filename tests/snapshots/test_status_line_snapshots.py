@@ -90,14 +90,10 @@ class TestStatusLineSnapshots:
         The input box has a border which adds visual offset. The status line
         should have matching left padding so text aligns properly.
         """
-        with patch(
-            "openhands_cli.tui.widgets.status_line.WORK_DIR", MOCK_WORK_DIR
-        ):
+        with patch("openhands_cli.tui.widgets.status_line.WORK_DIR", MOCK_WORK_DIR):
             assert snap_compare(StatusLineTestApp(), terminal_size=(100, 10))
 
     def test_status_line_alignment_narrow_terminal(self, snap_compare):
         """Verify status line alignment in narrow terminal."""
-        with patch(
-            "openhands_cli.tui.widgets.status_line.WORK_DIR", MOCK_WORK_DIR
-        ):
+        with patch("openhands_cli.tui.widgets.status_line.WORK_DIR", MOCK_WORK_DIR):
             assert snap_compare(StatusLineTestApp(), terminal_size=(60, 10))
