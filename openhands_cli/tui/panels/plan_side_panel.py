@@ -21,9 +21,9 @@ from openhands_cli.tui.panels.plan_panel_style import PLAN_PANEL_STYLE
 
 # Status icons for visual representation
 STATUS_ICONS: dict[TaskTrackerStatusType, str] = {
-    "todo": "○",
-    "in_progress": "◐",
-    "done": "●",
+    "todo": "⏳",
+    "in_progress": "🔄",
+    "done": "✅",
 }
 
 
