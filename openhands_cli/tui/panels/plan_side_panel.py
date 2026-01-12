@@ -73,27 +73,6 @@ class PlanSidePanel(VerticalScroll):
         self._refresh_content()
 
     @classmethod
-    def toggle(cls, app: App) -> None:
-        """Toggle the Plan side panel on/off within the given app.
-
-        - If a panel already exists, remove it.
-        - If not, create it, mount it into #content_area.
-        """
-        try:
-            existing = app.query_one(cls)
-        except NoMatches:
-            existing = None
-
-        if existing is not None:
-            existing.remove()
-            return
-
-        # Create a new panel and mount it into the content area
-        content_area = app.query_one("#content_area", Horizontal)
-        panel = cls()
-        content_area.mount(panel)
-
-    @classmethod
     def get_or_create(cls, app: App) -> PlanSidePanel:
         """Get existing panel or create a new one.
 
@@ -110,6 +89,14 @@ class PlanSidePanel(VerticalScroll):
             panel = cls()
             content_area.mount(panel)
             return panel
+
+    @classmethod
+    def toggle(cls, app: App) -> None:
+        """Toggle the Plan side panel on/off within the given app."""
+        try:
+            app.query_one(cls).remove()
+        except NoMatches:
+            cls.get_or_create(app)
 
     def compose(self):
         """Compose the Plan side panel content."""

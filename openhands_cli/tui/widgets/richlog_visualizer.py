@@ -120,7 +120,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._cli_settings = CliSettings.load()
 
     def _run_on_main_thread(self, func, *args) -> None:
-        """Run a function on the main thread, calling directly or via call_from_thread."""
+        """Run a function on the main thread via call_from_thread if needed."""
         if threading.get_ident() == self._main_thread_id:
             func(*args)
         else:
