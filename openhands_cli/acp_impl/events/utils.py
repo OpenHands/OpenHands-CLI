@@ -14,6 +14,7 @@ from openhands.tools.file_editor.definition import (
 )
 from openhands.tools.task_tracker import TaskTrackerAction
 from openhands.tools.terminal import TerminalAction
+from openhands_cli.delegate_formatter import format_delegate_title
 
 
 # Shared mapping from tool names to ACP ToolKind values
@@ -201,12 +202,6 @@ def get_tool_title(tool_name: str, *, action: Action | None = None) -> str:
         return "Plan updated"
 
     if isinstance(action, DelegateAction):
-        if action.command == "spawn":
-            ids = action.ids or []
-            return f"Spawning {len(ids)} sub-agent(s): {', '.join(ids)}"
-        elif action.command == "delegate":
-            tasks = action.tasks or {}
-            return f"Delegating {len(tasks)} task(s) to: {', '.join(tasks.keys())}"
-        return "Delegate"
+        return format_delegate_title(action.command, ids=action.ids, tasks=action.tasks)
 
     return ""

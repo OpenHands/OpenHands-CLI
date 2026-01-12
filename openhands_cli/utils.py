@@ -114,19 +114,7 @@ def get_llm_metadata(
 
 
 def get_default_cli_tools() -> list[Tool]:
-    """Get the default set of tool specifications for CLI mode.
-
-    Returns tools for CLI mode:
-    - terminal: Execute bash commands
-    - file_editor: View and edit files
-    - task_tracker: Plan and track tasks
-    - delegate: Spawn sub-agents and delegate tasks
-
-    Browser tools are disabled in CLI mode.
-
-    Returns:
-        List of Tool specifications for CLI mode
-    """
+    """Get the default tool specifications for CLI mode (browser disabled)."""
     return [
         Tool(name=TerminalTool.name),
         Tool(name=FileEditorTool.name),
@@ -136,23 +124,8 @@ def get_default_cli_tools() -> list[Tool]:
 
 
 def get_default_cli_agent(llm: LLM) -> Agent:
-    """Create the default CLI agent with all tools including delegate.
-
-    This function explicitly constructs the agent with the following tools:
-    - terminal: Execute bash commands
-    - file_editor: View and edit files
-    - task_tracker: Plan and track tasks
-    - delegate: Spawn sub-agents and delegate tasks
-
-    Browser tools are disabled in CLI mode.
-
-    Args:
-        llm: The LLM to use for the agent
-
-    Returns:
-        Configured Agent instance with all CLI tools
-    """
-    agent = Agent(
+    """Create the default CLI agent with all tools (browser disabled)."""
+    return Agent(
         llm=llm,
         tools=get_default_cli_tools(),
         system_prompt_kwargs={"cli_mode": True},
@@ -160,7 +133,6 @@ def get_default_cli_agent(llm: LLM) -> Agent:
             llm=llm.model_copy(update={"usage_id": "condenser"})
         ),
     )
-    return agent
 
 
 def create_seeded_instructions_from_args(args: Namespace) -> list[str] | None:

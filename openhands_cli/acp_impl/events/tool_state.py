@@ -5,6 +5,7 @@ from streamingjson import Lexer
 
 from openhands_cli.acp_impl.events.shared_event_handler import THOUGHT_HEADER
 from openhands_cli.acp_impl.events.utils import TOOL_KIND_MAPPING
+from openhands_cli.delegate_formatter import format_delegate_title
 
 
 class ToolCallState:
@@ -152,19 +153,9 @@ class ToolCallState:
 
         if self.tool_name == "delegate":
             command = args.get("command")
-            if command == "spawn":
-                ids = args.get("ids", [])
-                if isinstance(ids, list) and ids:
-                    return f"Spawning {len(ids)} sub-agent(s): {', '.join(ids)}"
-                return "Spawning sub-agents"
-            elif command == "delegate":
-                tasks = args.get("tasks", {})
-                if isinstance(tasks, dict) and tasks:
-                    return (
-                        f"Delegating {len(tasks)} task(s) to: {', '.join(tasks.keys())}"
-                    )
-                return "Delegating tasks"
-            return "Delegate"
+            ids = args.get("ids") if isinstance(args.get("ids"), list) else None
+            tasks = args.get("tasks") if isinstance(args.get("tasks"), dict) else None
+            return format_delegate_title(command, ids=ids, tasks=tasks)
 
         return self.tool_name
 
