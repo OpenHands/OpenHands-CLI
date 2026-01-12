@@ -179,6 +179,16 @@ If asked to “update the agent-sdk SHA” / bump `openhands-sdk` / `openhands-t
 - PRs should describe behavior changes, list key commands run (e.g., tests/build), link related issues, and include before/after notes or screenshots for UI/TUI updates.
 - Check in `uv.lock` changes when dependency versions move; avoid committing secrets or local config.
 
+### Contribution standards (agents-first)
+- Keep PRs minimally scoped; prefer multiple PRs over one large PR when it reduces risk and review load.
+- Include tests for behavior changes (unit/integration/e2e as appropriate). If you can’t add tests, explain why and what manual verification you performed.
+- For any UI/TUI change, include screenshots or a short screen recording (and note the terminal size used if relevant).
+- Before opening a PR, run a realistic flow:
+  - Prefer `uv run pytest e2e_tests` when applicable.
+  - Otherwise, run the TUI (`make run`) and/or web mode (`openhands web`) and include relevant logs/output.
+- De-risk large changes: favor incremental rollouts, feature flags, or small refactors landing ahead of behavior changes.
+
+
 ## Security & Configuration Tips
 - Do not embed API keys or endpoints in code; rely on runtime configuration/env vars when integrating new services.
 - When packaging, verify no sensitive files are included in `dist/`; adjust `openhands-cli.spec` if new assets are added.
