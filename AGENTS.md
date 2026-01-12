@@ -16,7 +16,6 @@ This repo contains the current CLI UX, including the Textual TUI and a browser-s
 - `scripts/acp/`: JSON-RPC and debug helpers for ACP development; `hooks/`: PyInstaller/runtime hooks.
 - Tooling & packaging: `Makefile` for common tasks, `build.sh`/`build.py` for PyInstaller artifacts, `openhands-cli.spec` for the frozen binary, `uv.lock` for resolved deps.
 - `.openhands/skills/`: agent guidance for this repo.
-  - Repository guidance lives in the root `AGENTS.md`.
 
 ## Setup, Build, and Development Commands
 - install dependencies: `make install`
