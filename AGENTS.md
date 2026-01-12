@@ -74,8 +74,8 @@ uv run pytest tests/snapshots/ --snapshot-update
 ```
 
 ### Snapshot Test Location
-- **Test files**: `tests/snapshots/test_app_snapshots.py`
-- **Generated snapshots**: `tests/snapshots/__snapshots__/test_app_snapshots/*.svg`
+- **Test files**: `tests/snapshots/test_*.py`
+- **Generated snapshots**: `tests/snapshots/__snapshots__/*/*.svg`
 
 ### Writing Snapshot Tests
 Snapshot tests must be **synchronous** (not async). The `snap_compare` fixture handles async internally:
@@ -186,8 +186,8 @@ If asked to “update the agent-sdk SHA” / bump `openhands-sdk` / `openhands-t
 - Before opening a PR, run this verification flow (and include the exact commands run in the PR description):
   1. `make lint`
   2. `make test`
-  3. If your change affects end-to-end ACP/UI flows: `uv run pytest e2e_tests`
-  4. If your change affects the TUI: `uv run pytest tests/snapshots -v` (use `--snapshot-update` only for intentional UI changes)
+  3. If you touched ACP / end-to-end UI flow code (e.g., `e2e_tests/`, `openhands_cli/acp/`, `openhands_cli/mcp/`, auth/connection flow): `uv run pytest e2e_tests`
+  4. If you touched TUI code (e.g., `openhands_cli/tui/`, widgets, styles, layout): `uv run pytest tests/snapshots -v` (use `--snapshot-update` only for intentional UI changes)
 
 #### PR submission checklist
 - [ ] Scope is minimal and focused on one change
