@@ -836,7 +836,8 @@ class TestPlanPanelIntegration:
 
     @pytest.mark.asyncio
     async def test_refresh_plan_panel_calls_refresh_from_disk_on_new_panel(self):
-        """Verify refresh_from_disk is called with persistence_dir when creating a new panel."""
+        """Verify refresh_from_disk is called with
+        persistence_dir when creating a new panel."""
         from typing import Any
         from unittest.mock import MagicMock
 

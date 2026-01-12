@@ -137,11 +137,11 @@ class ConversationVisualizer(ConversationVisualizerBase):
         if panel is None and not self.cli_settings.auto_open_plan_panel:
             return
         elif panel is None:
-            PlanSidePanel.toggle(self._app)
+            PlanSidePanel.toggle(self._app, self._app.conversation_dir)
             panel = self._app.query_one(PlanSidePanel)
 
         if self._app.conversation_runner:
-            panel.refresh_from_disk(self._app.conversation_runner.persistence_dir)
+            panel.refresh_from_disk(self._app.conversation_dir)
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""

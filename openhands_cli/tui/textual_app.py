@@ -21,6 +21,7 @@ from textual.signal import Signal
 from textual.widgets import Footer, Input, Static, TextArea
 from textual_autocomplete import AutoComplete
 
+from openhands.sdk import BaseConversation
 from openhands.sdk.event import ActionEvent
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
@@ -29,6 +30,7 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
+from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
@@ -112,6 +114,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.conversation_id = (
             resume_conversation_id if resume_conversation_id else uuid.uuid4()
         )
+        self.conversation_dir = BaseConversation.get_persistence_dir(
+            CONVERSATIONS_DIR, self.conversation_id
+        )
 
         # Store queued inputs (copy to prevent mutating caller's list)
         self.pending_inputs = list(queued_inputs) if queued_inputs else []
@@ -178,7 +183,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             "MCP", "View MCP configurations", lambda: MCPSidePanel.toggle(self)
         )
         yield SystemCommand(
-            "PLAN", "View agent plan", lambda: PlanSidePanel.toggle(self)
+            "PLAN",
+            "View agent plan",
+            lambda: PlanSidePanel.toggle(self, self.conversation_dir),
         )
         yield SystemCommand("SETTINGS", "Configure settings", self.action_open_settings)
 

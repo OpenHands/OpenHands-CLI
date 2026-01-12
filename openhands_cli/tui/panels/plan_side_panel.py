@@ -61,7 +61,7 @@ class PlanSidePanel(VerticalScroll):
         self._refresh_content()
 
     @classmethod
-    def toggle(cls, app: App) -> None:
+    def toggle(cls, app: App, persistence_dir: str) -> None:
         """Toggle the Plan side panel on/off within the given app."""
         try:
             app.query_one(cls).remove()
@@ -69,15 +69,12 @@ class PlanSidePanel(VerticalScroll):
             content_area = app.query_one("#content_area", Horizontal)
             panel = cls()
             content_area.mount(panel)
+            panel.refresh_from_disk(persistence_dir)
 
     def compose(self):
         """Compose the Plan side panel content."""
         yield Static("Agent Plan", classes="plan-header")
         yield Static("", id="plan-content")
-
-    def on_mount(self):
-        """Called when the panel is mounted."""
-        self._refresh_content()
 
     @staticmethod
     def _load_tasks_from_path(
