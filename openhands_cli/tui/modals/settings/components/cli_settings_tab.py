@@ -54,16 +54,6 @@ class CliSettingsTab(Container):
             yield Static("CLI Settings", classes="form_section_title")
 
             yield SettingsSwitch(
-                label="Display Cost Per Action",
-                description=(
-                    "Show the estimated cost for each action performed "
-                    "by the agent in the interface."
-                ),
-                switch_id="display_cost_switch",
-                value=self.cli_settings.display_cost_per_action,
-            )
-
-            yield SettingsSwitch(
                 label="Default Cells Expanded",
                 description=(
                     "When enabled, new action/observation cells will be expanded "
@@ -87,7 +77,6 @@ class CliSettingsTab(Container):
 
     def get_cli_settings(self) -> CliSettings:
         """Get the current CLI settings from the form."""
-        display_cost_switch = self.query_one("#display_cost_switch", Switch)
         default_cells_expanded_switch = self.query_one(
             "#default_cells_expanded_switch", Switch
         )
@@ -96,7 +85,6 @@ class CliSettingsTab(Container):
         )
 
         return CliSettings(
-            display_cost_per_action=display_cost_switch.value,
             default_cells_expanded=default_cells_expanded_switch.value,
             auto_open_plan_panel=auto_open_plan_panel_switch.value,
         )
