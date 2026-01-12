@@ -247,7 +247,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 action.command,
                 ids=action.ids,
                 tasks=action.tasks,
-                agent_types=getattr(action, "agent_types", None),
+                agent_types=action.agent_types,
                 include_agent_types=True,
             )
             if summary:

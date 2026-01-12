@@ -84,13 +84,10 @@ class AgentStore:
             # Determine which tools to use:
             # - If resuming a conversation, use the tools from the persisted state
             # - If creating a new conversation, use the default CLI tools
-            updated_tools = None
-            if session_id:
-                updated_tools = get_persisted_conversation_tools(session_id)
-
-            if updated_tools is None:
-                # New conversation or couldn't read persisted tools
-                updated_tools = get_default_cli_tools()
+            updated_tools = (
+                get_persisted_conversation_tools(session_id) if session_id else None
+            )
+            updated_tools = updated_tools or get_default_cli_tools()
 
             # Load skills from user directories and project-specific directories
             skills = load_project_skills(WORK_DIR)

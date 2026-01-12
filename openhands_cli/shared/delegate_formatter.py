@@ -7,6 +7,11 @@ richlog_visualizer.py) code paths.
 
 from typing import Any
 
+from openhands.sdk.logger import get_logger
+
+
+logger = get_logger(__name__)
+
 
 def format_delegate_title(
     command: str | None,
@@ -50,6 +55,7 @@ def _format_spawn_title(
             if agent_type and agent_type != "default":
                 agents_info.append(f"{agent_id} ({agent_type})")
             else:
+                logger.warning("Length of IDs did not match agent types")
                 agents_info.append(agent_id)
         agents_str = ", ".join(agents_info)
     else:
