@@ -32,6 +32,12 @@ STATUS_ICONS: dict[TaskTrackerStatusType, str] = {
     "done": "✅",
 }
 
+# Status colors for visual representation
+STATUS_COLORS: dict[TaskTrackerStatusType, str] = {
+    "done": OPENHANDS_THEME.success,
+    "in_progress": OPENHANDS_THEME.warning,
+}
+
 
 class PlanSidePanel(VerticalScroll):
     """Side panel widget that displays the agent's task plan.
@@ -48,7 +54,6 @@ class PlanSidePanel(VerticalScroll):
         super().__init__(**kwargs)
         self._task_list: list[TaskItem] = []
         self._app = app
-        self.conversation_dir = app.conversation_dir
         self.user_dismissed = False
 
     @property
@@ -97,7 +102,7 @@ class PlanSidePanel(VerticalScroll):
         Returns:
             List of TaskItem objects if a plan exists, None otherwise
         """
-        tasks_file = Path(self.conversation_dir) / "TASKS.json"
+        tasks_file = Path(self._app.conversation_dir) / "TASKS.json"
         if not tasks_file.exists():
             return None
 
@@ -125,14 +130,7 @@ class PlanSidePanel(VerticalScroll):
 
         for task in self._task_list:
             icon = STATUS_ICONS.get(task.status, "○")
-
-            # Get color based on status
-            if task.status == "done":
-                color = OPENHANDS_THEME.success
-            elif task.status == "in_progress":
-                color = OPENHANDS_THEME.warning
-            else:
-                color = OPENHANDS_THEME.foreground
+            color = STATUS_COLORS.get(task.status, OPENHANDS_THEME.foreground)
 
             # Format task line
             task_line = f"[{color}]{icon} {task.title}[/{color}]"
