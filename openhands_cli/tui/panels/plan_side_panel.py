@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -18,6 +19,8 @@ from openhands.tools.task_tracker.definition import (
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.panels.plan_panel_style import PLAN_PANEL_STYLE
 
+
+logger = logging.getLogger(__name__)
 
 # Status icons for visual representation
 STATUS_ICONS: dict[TaskTrackerStatusType, str] = {
@@ -132,7 +135,8 @@ class PlanSidePanel(VerticalScroll):
         try:
             with open(tasks_file, encoding="utf-8") as f:
                 return [TaskItem.model_validate(d) for d in json.load(f)]
-        except (OSError, json.JSONDecodeError, TypeError, ValidationError):
+        except (OSError, json.JSONDecodeError, TypeError, ValidationError) as e:
+            logger.warning("Failed to load tasks from %s: %s", tasks_file, e)
             return None
 
     def _refresh_content(self):
