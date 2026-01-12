@@ -14,7 +14,7 @@ from openhands.tools.file_editor.definition import (
 )
 from openhands.tools.task_tracker import TaskTrackerAction
 from openhands.tools.terminal import TerminalAction
-from openhands_cli.delegate_formatter import format_delegate_title
+from openhands_cli.shared.delegate_formatter import format_delegate_title
 from openhands_cli.utils import abbreviate_number, format_cost
 
 

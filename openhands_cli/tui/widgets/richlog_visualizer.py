@@ -27,7 +27,7 @@ from openhands.tools.delegate.definition import DelegateAction
 from openhands.tools.file_editor.definition import FileEditorAction
 from openhands.tools.task_tracker.definition import TaskTrackerObservation
 from openhands.tools.terminal.definition import TerminalAction
-from openhands_cli.delegate_formatter import format_delegate_title
+from openhands_cli.shared.delegate_formatter import format_delegate_title
 from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.widgets.collapsible import (

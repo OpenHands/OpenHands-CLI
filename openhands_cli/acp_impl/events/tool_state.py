@@ -5,7 +5,7 @@ from streamingjson import Lexer
 
 from openhands_cli.acp_impl.events.shared_event_handler import THOUGHT_HEADER
 from openhands_cli.acp_impl.events.utils import TOOL_KIND_MAPPING
-from openhands_cli.delegate_formatter import format_delegate_title
+from openhands_cli.shared.delegate_formatter import format_delegate_title
 
 
 class ToolCallState:
