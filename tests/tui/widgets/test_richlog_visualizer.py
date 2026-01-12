@@ -63,9 +63,9 @@ def mock_cli_settings():
 
 
 @pytest.fixture
-def mock_cli_settings_with_cost(mock_cli_settings):
-    """Provide mock CliSettings with display_cost_per_action=True."""
-    return mock_cli_settings(display_cost_per_action=True)
+def mock_cli_settings_with_defaults(mock_cli_settings):
+    """Provide mock CliSettings with default values."""
+    return mock_cli_settings()
 
 
 # ============================================================================
@@ -369,7 +369,7 @@ class TestCliSettingsCaching:
     def test_cli_settings_caching(self, visualizer):
         """Test that app configuration is cached and not loaded repeatedly."""
         with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-            mock_config = CliSettings(display_cost_per_action=True)
+            mock_config = CliSettings(default_cells_expanded=True)
             mock_load.return_value = mock_config
 
             # First call should load from file
@@ -390,8 +390,8 @@ class TestCliSettingsCaching:
     def test_cli_settings_refresh(self, visualizer):
         """Test that reload_configuration reloads the configuration."""
         with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-            mock_config1 = CliSettings(display_cost_per_action=False)
-            mock_config2 = CliSettings(display_cost_per_action=True)
+            mock_config1 = CliSettings(default_cells_expanded=False)
+            mock_config2 = CliSettings(default_cells_expanded=True)
             mock_load.side_effect = [mock_config1, mock_config2]
 
             # First call should load from file
@@ -411,13 +411,13 @@ class TestCliSettingsCaching:
     def test_reload_configuration_clears_cache(self, visualizer):
         """Test that reload_configuration properly clears the cached configuration."""
         with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-            config1 = CliSettings(display_cost_per_action=False)
-            config2 = CliSettings(display_cost_per_action=True)
+            config1 = CliSettings(default_cells_expanded=False)
+            config2 = CliSettings(default_cells_expanded=True)
             mock_load.side_effect = [config1, config2]
 
             # First access should load config1
             first_config = visualizer.cli_settings
-            assert first_config.display_cost_per_action is False
+            assert first_config.default_cells_expanded is False
             assert mock_load.call_count == 1
 
             # Reload should clear cache and load config2
@@ -426,7 +426,7 @@ class TestCliSettingsCaching:
 
             # Next access should return config2 (from cache)
             second_config = visualizer.cli_settings
-            assert second_config.display_cost_per_action is True
+            assert second_config.default_cells_expanded is True
             assert mock_load.call_count == 2  # No additional load
 
     @pytest.mark.parametrize(
@@ -439,12 +439,12 @@ class TestCliSettingsCaching:
         """Test cli_settings property behavior with different initial cache states."""
         # Set initial cache state
         if initial_cache_state == "cached_config":
-            visualizer._cli_settings = CliSettings(display_cost_per_action=True)
+            visualizer._cli_settings = CliSettings(default_cells_expanded=False)
         else:
             visualizer._cli_settings = None
 
         with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-            mock_config = CliSettings(display_cost_per_action=False)
+            mock_config = CliSettings(default_cells_expanded=True)
             mock_load.return_value = mock_config
 
             result = visualizer.cli_settings
@@ -454,7 +454,7 @@ class TestCliSettingsCaching:
                 assert result == mock_config
             else:
                 assert mock_load.call_count == 0
-                assert result.display_cost_per_action is True
+                assert result.default_cells_expanded is False
 
 
 class TestCommandTruncation:
