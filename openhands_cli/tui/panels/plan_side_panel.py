@@ -88,16 +88,11 @@ class PlanSidePanel(VerticalScroll):
         if event.button.id == "plan-close-btn":
             self.toggle()
 
-    def _load_tasks(
-        self,
-    ) -> list[TaskItem] | None:
-        """Load tasks from the TASKS.json file in the given persistence directory.
+    def _load_tasks(self) -> list[TaskItem] | None:
+        """Load tasks from the TASKS.json file in the conversation directory.
 
         The TaskTrackerExecutor saves tasks to TASKS.json in the conversation's
         persistence directory. This method reads from that file directly.
-
-        Args:
-            persistence_dir: Path to the conversation's persistence directory
 
         Returns:
             List of TaskItem objects if a plan exists, None otherwise

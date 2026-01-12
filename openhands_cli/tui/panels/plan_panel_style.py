@@ -8,7 +8,6 @@ PLAN_PANEL_STYLE = """
         max-width: 60;
         border-left: vkey $foreground 30%;
         padding: 0 1;
-        height: 1fr;
         padding-right: 1;
         layout: vertical;
         height: 100%;
@@ -57,33 +56,5 @@ PLAN_PANEL_STYLE = """
         background: #333333;
         color: $error;
         border: none;
-    }
-
-    .plan-task {
-        margin-bottom: 0;
-        padding: 0;
-    }
-
-    .plan-task-todo {
-        color: $foreground;
-    }
-
-    .plan-task-in-progress {
-        color: $warning;
-    }
-
-    .plan-task-done {
-        color: $success;
-    }
-
-    .plan-empty {
-        color: $foreground;
-        text-style: italic;
-    }
-
-    .plan-notes {
-        color: $foreground 70%;
-        margin-left: 2;
-        text-style: italic;
     }
 """
