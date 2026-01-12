@@ -44,54 +44,21 @@ class PlanSidePanel(VerticalScroll):
         """Initialize the Plan side panel."""
         super().__init__(**kwargs)
         self._task_list: list[TaskItem] = []
-        self._persistence_dir: str | Path | None = None
 
     @property
     def task_list(self) -> list[TaskItem]:
         """Get the current task list."""
         return self._task_list
 
-    @property
-    def persistence_dir(self) -> str | Path | None:
-        """Get the persistence directory path."""
-        return self._persistence_dir
-
-    def set_persistence_dir(self, path: str | Path | None) -> None:
-        """Set the persistence directory and load initial tasks.
-
-        Args:
-            path: Path to the conversation's persistence directory
-        """
-        self._persistence_dir = path
-        self.refresh_from_disk()
-
-    def refresh_from_disk(self) -> None:
+    def refresh_from_disk(self, persistence_dir: str) -> None:
         """Reload tasks from the persistence directory and update display.
 
         This method reads the TASKS.json file from the persistence directory
         and updates the panel's content. It's safe to call even if no
         persistence directory is set or if the file doesn't exist.
         """
-        self._task_list = self._load_tasks_from_path(self._persistence_dir) or []
+        self._task_list = self._load_tasks_from_path(persistence_dir) or []
         self._refresh_content()
-
-    @classmethod
-    def get_or_create(cls, app: App) -> PlanSidePanel:
-        """Get existing panel or create a new one.
-
-        Args:
-            app: The Textual app instance
-
-        Returns:
-            The PlanSidePanel instance
-        """
-        try:
-            return app.query_one(cls)
-        except NoMatches:
-            content_area = app.query_one("#content_area", Horizontal)
-            panel = cls()
-            content_area.mount(panel)
-            return panel
 
     @classmethod
     def toggle(cls, app: App) -> None:
@@ -99,7 +66,9 @@ class PlanSidePanel(VerticalScroll):
         try:
             app.query_one(cls).remove()
         except NoMatches:
-            cls.get_or_create(app)
+            content_area = app.query_one("#content_area", Horizontal)
+            panel = cls()
+            content_area.mount(panel)
 
     def compose(self):
         """Compose the Plan side panel content."""

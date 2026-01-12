@@ -80,14 +80,15 @@ class ConversationRunner:
         return self._confirmation_mode_active
 
     @property
-    def persistence_dir(self) -> str | None:
+    def persistence_dir(self) -> str:
         """Get the persistence directory for the conversation.
 
         Returns:
             Path to the persistence directory, or None if not available
         """
-        if not self.conversation or not self.conversation.state:
-            return None
+        if not self.conversation.state.persistence_dir:
+            raise Exception("Conversation is not being persisted")
+
         return self.conversation.state.persistence_dir
 
     def get_confirmation_policy(self) -> ConfirmationPolicyBase:

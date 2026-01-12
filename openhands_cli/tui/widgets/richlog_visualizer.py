@@ -6,6 +6,7 @@ This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 import threading
 from typing import TYPE_CHECKING
 
+from textual.css.query import NoMatches
 from textual.widgets import Markdown
 
 from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
@@ -130,29 +131,17 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """Refresh the plan panel (must be called from main thread)."""
         try:
             panel = self._app.query_one(PlanSidePanel)
-        except Exception:
+        except NoMatches:
             panel = None
 
-        if panel is None:
-            if not self.cli_settings.auto_open_plan_panel:
-                return
-            panel = PlanSidePanel.get_or_create(self._app)
+        if panel is None and not self.cli_settings.auto_open_plan_panel:
+            return
+        elif panel is None:
+            PlanSidePanel.toggle(self._app)
+            panel = self._app.query_one(PlanSidePanel)
 
-        if self._app.conversation_runner and panel.persistence_dir is None:
-            panel.set_persistence_dir(self._app.conversation_runner.persistence_dir)
-        else:
-            panel.refresh_from_disk()
-
-    def _refresh_plan_panel(self) -> None:
-        """Refresh the plan panel by reloading tasks from disk.
-
-        This method handles thread safety - it can be called from any thread
-        and will ensure the panel refresh happens on the main thread.
-
-        If the panel doesn't exist yet and auto_open_plan_panel is enabled,
-        the panel will be automatically created and opened.
-        """
-        self._run_on_main_thread(self._do_refresh_plan_panel)
+        if self._app.conversation_runner:
+            panel.refresh_from_disk(self._app.conversation_runner.persistence_dir)
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
@@ -160,7 +149,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         if isinstance(event, ObservationEvent) and isinstance(
             event.observation, TaskTrackerObservation
         ):
-            self._refresh_plan_panel()
+            self._run_on_main_thread(self._do_refresh_plan_panel)
 
         # Handle observation events by updating existing action collapsibles
         if isinstance(
