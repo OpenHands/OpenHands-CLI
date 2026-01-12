@@ -186,7 +186,6 @@ If asked to “update the agent-sdk SHA” / bump `openhands-sdk` / `openhands-t
 - Before opening a PR, run a realistic flow:
   - Prefer `uv run pytest e2e_tests` when applicable.
   - Otherwise, run the TUI (`make run`) and/or web mode (`openhands web`) and include relevant logs/output.
-- De-risk large changes: favor incremental rollouts, feature flags, or small refactors landing ahead of behavior changes.
 
 
 ## Security & Configuration Tips
