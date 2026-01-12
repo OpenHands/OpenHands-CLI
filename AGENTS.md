@@ -176,8 +176,6 @@ To view the generated SVG snapshots in a browser:
 - [ ] (If TUI touched) snapshot tests run and snapshots updated/reviewed
 - [ ] PR description includes: what changed, why, commands run, and UI evidence (snapshots/screenshots)
 
-
-
 ## Security & Configuration Tips
 - Do not embed API keys or endpoints in code; rely on runtime configuration/env vars when integrating new services.
 - When packaging, verify no sensitive files are included in `dist/`; adjust `openhands-cli.spec` if new assets are added.
