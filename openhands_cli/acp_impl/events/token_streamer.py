@@ -86,6 +86,10 @@ class TokenBasedEventSubscriber:
         # Header tracking for consistent formatting with non-streaming mode
         self._reasoning_header_emitted = False
 
+        # Buffer assistant content tokens as a provisional summary
+        # for the next tool call
+        self._summary_buffer: str = ""
+
     def reset_header_state(self) -> None:
         """Reset header tracking for a new LLM response.
 
@@ -214,7 +218,26 @@ class TokenBasedEventSubscriber:
                     self._schedule_update(update_agent_thought_text(reasoning))
 
                 if isinstance(content, str) and content:
+                    # Accumulate content tokens as a provisional summary for the
+                    # next tool call. Keep it concise and single-line.
+                    self._summary_buffer += content.replace("\n", " ")
+                    self._summary_buffer = self._summary_buffer.strip()
                     self._schedule_update(update_agent_message_text(content))
+
+                    # Stream the evolving summary into any started tool-call titles.
+                    # This keeps the UI title in sync with the assistant's intent.
+                    for state in self._streaming_tool_calls.values():
+                        if getattr(state, "started", False) and not getattr(state, "is_think", False):
+                            state.summary = self._summary_buffer or state.summary
+                            self._schedule_update(
+                                update_tool_call(
+                                    tool_call_id=state.tool_call_id,
+                                    title=state.title,
+                                    kind=state.kind,
+                                    status="in_progress",
+                                    content=format_content_blocks(state.args),
+                                )
+                            )
 
         except Exception as e:
             logger.warning("Error during token streaming: %s", e, exc_info=True)
@@ -255,6 +278,8 @@ class TokenBasedEventSubscriber:
         if index not in self._streaming_tool_calls:
             if tool_call_id and name:
                 state = ToolCallState(tool_call_id, name)
+                # Seed the state's summary from any buffered assistant text
+                state.summary = self._summary_buffer
                 self._streaming_tool_calls[index] = state
 
         elif tool_call_id and name:
@@ -263,6 +288,7 @@ class TokenBasedEventSubscriber:
             if existing_state.tool_call_id != tool_call_id:
                 # New tool call at same index - replace state
                 state = ToolCallState(tool_call_id, name)
+                state.summary = existing_state.summary or self._summary_buffer
                 self._streaming_tool_calls[index] = state
 
         state = self._streaming_tool_calls.get(index)
@@ -286,6 +312,9 @@ class TokenBasedEventSubscriber:
                 self._schedule_update(update_agent_thought_text(thought_piece))
             return
 
+        # Keep the state's summary in sync with buffered assistant text
+        state.summary = self._summary_buffer
+
         if not state.started:
             state.started = True
             tool_call_start = start_tool_call(
@@ -296,9 +325,13 @@ class TokenBasedEventSubscriber:
                 content=format_content_blocks(state.args),
             )
             self._schedule_update(tool_call_start)
+            # Clear buffer so subsequent tool calls don't inherit this summary
+            self._summary_buffer = ""
 
-        # Emit progress updates after start
+        # Emit progress updates after start (title will include updated summary)
         if state.started and arguments_chunk:
+            # Keep the state's summary in sync with any new buffered text
+            state.summary = self._summary_buffer or state.summary
             self._schedule_update(
                 update_tool_call(
                     tool_call_id=state.tool_call_id,
