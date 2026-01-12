@@ -49,14 +49,10 @@ curl -fsSL https://install.openhands.dev/install.sh | sh
 ## Usage
 
 ### Quick Start
-The first time you run the CLI, it will guide you through configuring your LLM settings. You can also authenticate with OpenHands Cloud for easy setup:
+The first time you run the CLI, it will guide you through configuring your LLM settings:
 
 ```bash
-# Start the interactive TUI and manually configure settings
 openhands
-
-# Fetch settings from OpenHands cloud and launch CLI
-openhands login && openhands
 ```
 
 ### Running Modes
@@ -105,9 +101,13 @@ openhands --llm-approve
 
 ### [Cloud Conversations](https://docs.openhands.dev/openhands/usage/cli/cloud)
 
-Run tasks on OpenHands Cloud:
+Run tasks on OpenHands Cloud. First, authenticate with OpenHands Cloud to fetch your settings:
 
 ```bash
+# Login to OpenHands Cloud
+openhands login
+
+# Run a task on OpenHands Cloud
 openhands cloud -t "Fix the login bug"
 ```
 
