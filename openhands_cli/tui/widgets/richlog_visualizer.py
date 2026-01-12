@@ -131,7 +131,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         auto_open = self.cli_settings.auto_open_plan_panel
 
         # Panel is already open, refresh contents
-        if plan_panel.is_mounted:
+        if plan_panel.is_on_screen:
             plan_panel.refresh_from_disk()
             return
 
