@@ -147,16 +147,6 @@ To view the generated SVG snapshots in a browser:
    pkill -f "python -m http.server 12000"
    ```
 
-### Current Snapshot Tests
-
-| Test Class | Test Name | Description |
-|------------|-----------|-------------|
-| `TestExitModalSnapshots` | `test_exit_modal_initial_state` | Exit confirmation modal initial view |
-| `TestExitModalSnapshots` | `test_exit_modal_with_focus_on_yes` | Exit modal with focus on Yes button |
-| `TestInputFieldSnapshots` | `test_input_field_single_line_mode` | Input field in default state |
-| `TestInputFieldSnapshots` | `test_input_field_with_text` | Input field with typed text |
-| `TestOpenHandsAppSnapshots` | `test_openhands_app_splash_screen` | Main app splash screen (mocked) |
-| `TestConfirmationModalSnapshots` | `test_confirmation_settings_modal` | Confirmation settings modal |
 
 ### Snapshot Best Practices
 - Mock external dependencies so snapshots are deterministic.
