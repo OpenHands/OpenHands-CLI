@@ -50,6 +50,7 @@ class PlanSidePanel(VerticalScroll):
         self._task_list: list[TaskItem] = []
         self._app = app
         self.conversation_dir = app.conversation_dir
+        self.user_dismissed = False
 
     @property
     def task_list(self) -> list[TaskItem]:
@@ -70,6 +71,7 @@ class PlanSidePanel(VerticalScroll):
         """Toggle the Plan side panel on/off within the given app."""
         if self.is_mounted:
             self.remove()
+            self.user_dismissed = True
         else:
             content_area = self._app.query_one("#content_area", Horizontal)
             content_area.mount(self)
