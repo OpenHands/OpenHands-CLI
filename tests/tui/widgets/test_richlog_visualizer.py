@@ -719,8 +719,8 @@ class TestPlanPanelIntegration:
                 action_id="action-1",
             )
 
-            # Mock _refresh_plan_panel to verify it gets called
-            with patch.object(visualizer, "_refresh_plan_panel") as mock_refresh:
+            # Mock _do_refresh_plan_panel to verify it gets called
+            with patch.object(visualizer, "_do_refresh_plan_panel") as mock_refresh:
                 visualizer.on_event(event)
                 mock_refresh.assert_called_once()
 
@@ -769,10 +769,10 @@ class TestPlanPanelIntegration:
                     with patch.object(
                         PlanSidePanel, "refresh_from_disk", return_value=None
                     ):
-                        visualizer._refresh_plan_panel()
+                        visualizer._do_refresh_plan_panel()
                         await pilot.pause()
                 else:
-                    visualizer._refresh_plan_panel()
+                    visualizer._do_refresh_plan_panel()
                     await pilot.pause()
 
             if auto_open_enabled:
@@ -788,6 +788,7 @@ class TestPlanPanelIntegration:
     async def test_refresh_plan_panel_updates_existing_panel(self):
         """Verify existing panel is refreshed regardless of auto_open setting."""
         from typing import Any
+        from unittest.mock import MagicMock
 
         from textual.app import App
         from textual.containers import Horizontal, VerticalScroll
@@ -815,6 +816,11 @@ class TestPlanPanelIntegration:
 
             panel = app.query_one(PlanSidePanel)
 
+            # Mock conversation_runner with persistence_dir
+            mock_runner = MagicMock()
+            mock_runner.persistence_dir = "/test/persistence/dir"
+            app.conversation_runner = mock_runner
+
             # Mock refresh_from_disk to verify it gets called
             with patch.object(panel, "refresh_from_disk") as mock_refresh:
                 # Even with auto_open disabled, existing panel should refresh
@@ -824,13 +830,13 @@ class TestPlanPanelIntegration:
                     return_value=CliSettings(auto_open_plan_panel=False),
                 ):
                     visualizer._cli_settings = None  # Clear cache
-                    visualizer._refresh_plan_panel()
+                    visualizer._do_refresh_plan_panel()
 
-                mock_refresh.assert_called_once()
+                mock_refresh.assert_called_once_with("/test/persistence/dir")
 
     @pytest.mark.asyncio
-    async def test_refresh_plan_panel_sets_persistence_dir_on_new_panel(self):
-        """Verify persistence directory is set when creating a new panel."""
+    async def test_refresh_plan_panel_calls_refresh_from_disk_on_new_panel(self):
+        """Verify refresh_from_disk is called with persistence_dir when creating a new panel."""
         from typing import Any
         from unittest.mock import MagicMock
 
@@ -868,10 +874,14 @@ class TestPlanPanelIntegration:
                 return_value=CliSettings(auto_open_plan_panel=True),
             ):
                 visualizer._cli_settings = None  # Clear cache
-                # Mock set_persistence_dir to avoid compose timing issues
-                with patch.object(PlanSidePanel, "set_persistence_dir") as mock_set_dir:
-                    visualizer._refresh_plan_panel()
+                # Mock refresh_from_disk to avoid compose timing issues
+                with patch.object(
+                    PlanSidePanel, "refresh_from_disk"
+                ) as mock_refresh_from_disk:
+                    visualizer._do_refresh_plan_panel()
                     await pilot.pause()
 
-                    # Verify set_persistence_dir was called with the right path
-                    mock_set_dir.assert_called_once_with("/test/persistence/dir")
+                    # Verify refresh_from_disk was called with the right path
+                    mock_refresh_from_disk.assert_called_once_with(
+                        "/test/persistence/dir"
+                    )

@@ -122,49 +122,6 @@ class TestLoadTasksFromPath:
 
 
 # ============================================================================
-# set_persistence_dir Tests
-# ============================================================================
-
-
-class TestSetPersistenceDir:
-    """Tests for PlanSidePanel.set_persistence_dir method."""
-
-    @pytest.mark.asyncio
-    async def test_triggers_refresh_and_loads_tasks(self, tmp_path: Path):
-        """Verify calling set_persistence_dir() loads tasks and updates content."""
-        # Create tasks file
-        tasks_data = [{"title": "Test Task", "status": "todo"}]
-        tasks_file = tmp_path / "TASKS.json"
-        tasks_file.write_text(json.dumps(tasks_data))
-
-        class TestApp(App):
-            CSS = """
-            Screen { layout: horizontal; }
-            #main_content { width: 2fr; }
-            """
-
-            def compose(self):
-                with Horizontal(id="content_area"):
-                    yield Static("Main content", id="main_content")
-                    yield PlanSidePanel()
-
-        app = TestApp()
-        async with app.run_test():
-            panel = app.query_one(PlanSidePanel)
-
-            # Initially no tasks
-            assert panel.task_list == []
-            assert panel.persistence_dir is None
-
-            # Set persistence dir
-            panel.set_persistence_dir(tmp_path)
-
-            assert panel.persistence_dir == tmp_path
-            assert len(panel.task_list) == 1
-            assert panel.task_list[0].title == "Test Task"
-
-
-# ============================================================================
 # toggle Tests
 # ============================================================================
 
@@ -209,46 +166,6 @@ class TestToggle:
 
 
 # ============================================================================
-# get_or_create Tests
-# ============================================================================
-
-
-class TestGetOrCreate:
-    """Tests for PlanSidePanel.get_or_create class method."""
-
-    @pytest.mark.asyncio
-    async def test_returns_existing_panel(self):
-        """Verify returns existing panel instance without creating new one."""
-        app = PlanPanelTestApp()
-        async with app.run_test() as pilot:
-            # Create panel first
-            first_panel = PlanSidePanel.get_or_create(app)
-            await pilot.pause()
-
-            # Get again - should return same instance
-            second_panel = PlanSidePanel.get_or_create(app)
-
-            assert first_panel is second_panel
-
-    @pytest.mark.asyncio
-    async def test_creates_new_panel_when_missing(self):
-        """Verify creates and mounts a new panel when none exists."""
-        app = PlanPanelTestApp()
-        async with app.run_test() as pilot:
-            # Verify no panel exists
-            with pytest.raises(NoMatches):
-                app.query_one(PlanSidePanel)
-
-            # Get or create
-            panel = PlanSidePanel.get_or_create(app)
-            await pilot.pause()
-
-            # Verify panel exists and is the same instance
-            queried_panel = app.query_one(PlanSidePanel)
-            assert panel is queried_panel
-
-
-# ============================================================================
 # refresh_from_disk Tests
 # ============================================================================
 
@@ -274,7 +191,6 @@ class TestRefreshFromDisk:
         app = TestApp()
         async with app.run_test():
             panel = app.query_one(PlanSidePanel)
-            panel._persistence_dir = tmp_path
 
             # Initially no tasks file
             assert panel.task_list == []
@@ -284,8 +200,8 @@ class TestRefreshFromDisk:
             tasks_file = tmp_path / "TASKS.json"
             tasks_file.write_text(json.dumps(tasks_data))
 
-            # Refresh from disk
-            panel.refresh_from_disk()
+            # Refresh from disk with persistence_dir argument
+            panel.refresh_from_disk(str(tmp_path))
 
             assert len(panel.task_list) == 1
             assert panel.task_list[0].title == "New Task"
@@ -293,7 +209,7 @@ class TestRefreshFromDisk:
 
     @pytest.mark.asyncio
     async def test_safe_when_no_persistence_dir(self):
-        """Verify refresh_from_disk is safe to call with no persistence dir."""
+        """Verify refresh_from_disk is safe to call with None persistence dir."""
 
         class TestApp(App):
             CSS = """
@@ -310,6 +226,6 @@ class TestRefreshFromDisk:
         async with app.run_test():
             panel = app.query_one(PlanSidePanel)
 
-            # Should not raise
-            panel.refresh_from_disk()
+            # Should not raise when passing None
+            panel.refresh_from_disk(None)  # type: ignore[arg-type]
             assert panel.task_list == []
