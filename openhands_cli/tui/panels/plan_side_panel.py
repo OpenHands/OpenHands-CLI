@@ -53,7 +53,7 @@ class PlanSidePanel(VerticalScroll):
         """Initialize the Plan side panel."""
         super().__init__(**kwargs)
         self._task_list: list[TaskItem] = []
-        self._app = app
+        self._oh_app = app
         self.user_dismissed = False
 
     @property
@@ -77,7 +77,7 @@ class PlanSidePanel(VerticalScroll):
             self.remove()
             self.user_dismissed = True
         else:
-            content_area = self._app.query_one("#content_area", Horizontal)
+            content_area = self._oh_app.query_one("#content_area", Horizontal)
             content_area.mount(self)
             self.refresh_from_disk()
 
@@ -86,7 +86,7 @@ class PlanSidePanel(VerticalScroll):
         with Horizontal(classes="plan-header-row"):
             yield Static("Agent Plan", classes="plan-header")
             yield Button("✕", id="plan-close-btn", classes="plan-close-btn")
-        yield Static("", id="plan-content", markup = False)
+        yield Static("", id="plan-content", markup=False)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""
@@ -102,7 +102,7 @@ class PlanSidePanel(VerticalScroll):
         Returns:
             List of TaskItem objects if a plan exists, None otherwise
         """
-        tasks_file = Path(self._app.conversation_dir) / "TASKS.json"
+        tasks_file = Path(self._oh_app.conversation_dir) / "TASKS.json"
         if not tasks_file.exists():
             return None
 
