@@ -30,7 +30,6 @@ from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
 )
-from openhands_cli.utils import abbreviate_number, format_cost
 
 
 # Icons for different event types
@@ -448,9 +447,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
             # Build title using new format: "🔧 {summary}: $ {command}"
             title = self._build_action_title(event)
             content_string = self._escape_rich_markup(str(content))
-            metrics = self._format_metrics_subtitle()
-            if metrics:
-                content_string = f"{content_string}\n\n{metrics}"
 
             # Action events default to collapsed since we have summary in title
             collapsible = self._make_collapsible(content_string, title, event)
@@ -474,18 +470,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
         elif isinstance(event, AgentErrorEvent):
             title = self._extract_meaningful_title(event, "Agent Error")
             content_string = self._escape_rich_markup(str(content))
-            metrics = self._format_metrics_subtitle()
-            if metrics:
-                content_string = f"{content_string}\n\n{metrics}"
-
             return self._make_collapsible(content_string, title, event)
         elif isinstance(event, ConversationErrorEvent):
             title = self._extract_meaningful_title(event, "Conversation Error")
             content_string = self._escape_rich_markup(str(content))
-            metrics = self._format_metrics_subtitle()
-            if metrics:
-                content_string = f"{content_string}\n\n{metrics}"
-
             return self._make_collapsible(content_string, title, event)
         elif isinstance(event, PauseEvent):
             title = self._extract_meaningful_title(event, "User Paused")
@@ -495,10 +483,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         elif isinstance(event, Condensation):
             title = self._extract_meaningful_title(event, "Condensation")
             content_string = self._escape_rich_markup(str(content))
-            metrics = self._format_metrics_subtitle()
-            if metrics:
-                content_string = f"{content_string}\n\n{metrics}"
-
             return self._make_collapsible(content_string, title, event)
         else:
             # Fallback for unknown event types
@@ -509,46 +493,3 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 f"{self._escape_rich_markup(str(content))}\n\nSource: {event.source}"
             )
             return self._make_collapsible(content_string, title, event)
-
-    def _format_metrics_subtitle(self) -> str | None:
-        """Format LLM metrics as a visually appealing subtitle string."""
-        # Check CLI settings to see if metrics should be displayed
-        if not self.cli_settings.display_cost_per_action:
-            return None
-
-        stats = self.conversation_stats
-        if not stats:
-            return None
-
-        combined_metrics = stats.get_combined_metrics()
-        if not combined_metrics or not combined_metrics.accumulated_token_usage:
-            return None
-
-        usage = combined_metrics.accumulated_token_usage
-        cost = combined_metrics.accumulated_cost or 0.0
-
-        input_tokens = abbreviate_number(usage.prompt_tokens or 0)
-        output_tokens = abbreviate_number(usage.completion_tokens or 0)
-
-        # Cache hit rate (prompt + cache)
-        prompt = usage.prompt_tokens or 0
-        cache_read = usage.cache_read_tokens or 0
-        cache_rate = f"{(cache_read / prompt * 100):.2f}%" if prompt > 0 else "N/A"
-        reasoning_tokens = usage.reasoning_tokens or 0
-
-        # Build with theme color scheme
-        parts: list[str] = []
-        accent = OPENHANDS_THEME.accent
-        primary = OPENHANDS_THEME.primary
-        warning = OPENHANDS_THEME.warning
-        success = OPENHANDS_THEME.success
-
-        parts.append(f"[{accent}]↑ input {input_tokens}[/{accent}]")
-        parts.append(f"[{primary}]cache hit {cache_rate}[/{primary}]")
-        if reasoning_tokens > 0:
-            reasoning_abbr = abbreviate_number(reasoning_tokens)
-            parts.append(f"[{warning}] reasoning {reasoning_abbr}[/{warning}]")
-        parts.append(f"[{accent}]↓ output {output_tokens}[/{accent}]")
-        parts.append(f"[{success}]$ {format_cost(cost)}[/{success}]")
-
-        return "Tokens: " + " • ".join(parts)
