@@ -135,9 +135,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # MCP panel tracking
         self.mcp_panel: MCPSidePanel | None = None
 
-        # Plan panel tracking
-        self.plan_panel: PlanSidePanel | None = None
-
         # Register the custom theme
         self.register_theme(OPENHANDS_THEME)
 
@@ -378,10 +375,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self.initial_confirmation_policy,
             event_callback,
         )
-
-        # Set persistence directory on plan panel so it can load/refresh tasks
-        if self.plan_panel:
-            self.plan_panel.set_persistence_dir(runner.persistence_dir)
 
         return runner
 
