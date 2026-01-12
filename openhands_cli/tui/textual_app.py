@@ -35,7 +35,7 @@ from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
-from openhands_cli.tui.modals import SettingsScreen, SwitchConversationOverlay
+from openhands_cli.tui.modals import SettingsScreen, SwitchConversationModal
 from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModal
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
@@ -869,8 +869,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 except Exception:
                     pass
 
-            self.mount(
-                SwitchConversationOverlay(
+            self.push_screen(
+                SwitchConversationModal(
                     prompt=(
                         "The agent is still running.\n\n"
                         "Switching conversations will pause the current run.\n"
