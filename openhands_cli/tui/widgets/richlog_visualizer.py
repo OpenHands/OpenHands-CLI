@@ -24,6 +24,7 @@ from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.tool.builtins.finish import FinishAction
 from openhands.sdk.tool.builtins.think import ThinkAction
 from openhands.tools.file_editor.definition import FileEditorAction
+from openhands.tools.task_tracker.definition import TaskTrackerObservation
 from openhands.tools.terminal.definition import TerminalAction
 from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
@@ -145,6 +146,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
+        # Check for TaskTrackerObservation to update/open the plan panel
+        if isinstance(event, ObservationEvent) and isinstance(
+            event.observation, TaskTrackerObservation
+        ):
+            self._refresh_plan_panel()
+
         # Handle observation events by updating existing action collapsibles
         if isinstance(
             event, ObservationEvent | UserRejectObservation | AgentErrorEvent
