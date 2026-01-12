@@ -10,7 +10,7 @@ from pydantic import SecretStr
 from openhands.sdk import LLM, Agent
 from openhands.sdk.conversation.persistence_const import BASE_STATE
 from openhands.sdk.tool import Tool
-from openhands_cli.locations import AGENT_SETTINGS_PATH, CONVERSATIONS_DIR
+from openhands_cli.locations import AGENT_SETTINGS_PATH
 from openhands_cli.stores import AgentStore
 from openhands_cli.stores.agent_store import get_persisted_conversation_tools
 
@@ -31,9 +31,7 @@ def persistence_dir(tmp_path, monkeypatch) -> Path:
     root = tmp_path / "openhands"
     root.mkdir()
     monkeypatch.setattr("openhands_cli.locations.PERSISTENCE_DIR", str(root))
-    monkeypatch.setattr(
-        "openhands_cli.stores.agent_store.PERSISTENCE_DIR", str(root)
-    )
+    monkeypatch.setattr("openhands_cli.stores.agent_store.PERSISTENCE_DIR", str(root))
     return root
 
 
