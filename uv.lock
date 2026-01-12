@@ -1535,8 +1535,8 @@ dev = [
 requires-dist = [
     { name = "agent-client-protocol", specifier = ">=0.7.0,<0.8.0" },
     { name = "httpx", specifier = ">=0.25.0" },
-    { name = "openhands-sdk", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=09b5c39cd7d2ff85fe75989bc01ff77ccfc10c2f" },
-    { name = "openhands-tools", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=09b5c39cd7d2ff85fe75989bc01ff77ccfc10c2f" },
+    { name = "openhands-sdk", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=c76e5bd220ea9eb95a9d351313bdb4e533c9da6e" },
+    { name = "openhands-tools", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=c76e5bd220ea9eb95a9d351313bdb4e533c9da6e" },
     { name = "prompt-toolkit", specifier = ">=3" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyperclip", specifier = ">=1.9.0" },
@@ -1568,7 +1568,7 @@ dev = [
 [[package]]
 name = "openhands-sdk"
 version = "1.8.1"
-source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=09b5c39cd7d2ff85fe75989bc01ff77ccfc10c2f#09b5c39cd7d2ff85fe75989bc01ff77ccfc10c2f" }
+source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=c76e5bd220ea9eb95a9d351313bdb4e533c9da6e#c76e5bd220ea9eb95a9d351313bdb4e533c9da6e" }
 dependencies = [
     { name = "deprecation" },
     { name = "fastmcp" },
@@ -1586,7 +1586,7 @@ dependencies = [
 [[package]]
 name = "openhands-tools"
 version = "1.8.1"
-source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=09b5c39cd7d2ff85fe75989bc01ff77ccfc10c2f#09b5c39cd7d2ff85fe75989bc01ff77ccfc10c2f" }
+source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=c76e5bd220ea9eb95a9d351313bdb4e533c9da6e#c76e5bd220ea9eb95a9d351313bdb4e533c9da6e" }
 dependencies = [
     { name = "bashlex" },
     { name = "binaryornot" },
