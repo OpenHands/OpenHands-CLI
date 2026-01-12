@@ -23,7 +23,7 @@ class WorkingStatusLine(Static):
         height: 1;
         background: $background;
         color: $secondary;
-        padding: 0 1;
+        padding: 0 1 0 3;
     }
     """
 
@@ -106,7 +106,7 @@ class InfoStatusLine(Static):
         height: 1;
         background: $background;
         color: $secondary;
-        padding: 0 1;
+        padding: 0 1 0 3;
     }
     """
 
@@ -233,14 +233,15 @@ class InfoStatusLine(Static):
         left_part = f"{self.mode_indicator} • {self.work_dir_display}"
         metrics_display = self._format_metrics_display()
 
-        # Calculate available width for spacing (account for padding of 2 chars)
+        # Calculate available width for spacing (account for padding: 3 left + 1 right = 4)
         try:
-            total_width = self.size.width - 2
-        except Exception:
+            total_width = self.size.width - 4
+        except AttributeError:
             total_width = 80  # Fallback width
 
         # Calculate spacing needed to right-align metrics
-        left_len = len(left_part)
+        # Note: left_part contains escaped brackets (\\[) which render as single chars
+        left_len = len(left_part) - left_part.count("\\[")
         right_len = len(metrics_display)
         spacing = max(1, total_width - left_len - right_len)
 
