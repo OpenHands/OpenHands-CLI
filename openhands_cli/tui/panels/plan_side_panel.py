@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
-from textual.app import App
 from textual.containers import Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.widgets import Static
@@ -18,6 +18,10 @@ from openhands.tools.task_tracker.definition import (
 )
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.panels.plan_panel_style import PLAN_PANEL_STYLE
+
+
+if TYPE_CHECKING:
+    from openhands_cli.tui.textual_app import OpenHandsApp
 
 
 logger = logging.getLogger(__name__)
@@ -40,45 +44,44 @@ class PlanSidePanel(VerticalScroll):
 
     DEFAULT_CSS = PLAN_PANEL_STYLE
 
-    def __init__(self, **kwargs):
+    def __init__(self, app: OpenHandsApp, **kwargs):
         """Initialize the Plan side panel."""
         super().__init__(**kwargs)
         self._task_list: list[TaskItem] = []
+        self._app = app
+        self.conversation_dir = app.conversation_dir
 
     @property
     def task_list(self) -> list[TaskItem]:
         """Get the current task list."""
         return self._task_list
 
-    def refresh_from_disk(self, persistence_dir: str) -> None:
+    def refresh_from_disk(self) -> None:
         """Reload tasks from the persistence directory and update display.
 
         This method reads the TASKS.json file from the persistence directory
         and updates the panel's content. It's safe to call even if no
         persistence directory is set or if the file doesn't exist.
         """
-        self._task_list = self._load_tasks_from_path(persistence_dir) or []
+        self._task_list = self._load_tasks() or []
         self._refresh_content()
 
-    @classmethod
-    def toggle(cls, app: App, persistence_dir: str) -> None:
+    def toggle(self) -> None:
         """Toggle the Plan side panel on/off within the given app."""
-        try:
-            app.query_one(cls).remove()
-        except NoMatches:
-            content_area = app.query_one("#content_area", Horizontal)
-            panel = cls()
-            content_area.mount(panel)
-            panel.refresh_from_disk(persistence_dir)
+        if self.is_mounted:
+            self.remove()
+        else:
+            content_area = self._app.query_one("#content_area", Horizontal)
+            content_area.mount(self)
+            self.refresh_from_disk()
 
     def compose(self):
         """Compose the Plan side panel content."""
         yield Static("Agent Plan", classes="plan-header")
         yield Static("", id="plan-content")
 
-    @staticmethod
-    def _load_tasks_from_path(
-        persistence_dir: str | Path | None,
+    def _load_tasks(
+        self,
     ) -> list[TaskItem] | None:
         """Load tasks from the TASKS.json file in the given persistence directory.
 
@@ -91,10 +94,7 @@ class PlanSidePanel(VerticalScroll):
         Returns:
             List of TaskItem objects if a plan exists, None otherwise
         """
-        if not persistence_dir:
-            return None
-
-        tasks_file = Path(persistence_dir) / "TASKS.json"
+        tasks_file = Path(self.conversation_dir) / "TASKS.json"
         if not tasks_file.exists():
             return None
 

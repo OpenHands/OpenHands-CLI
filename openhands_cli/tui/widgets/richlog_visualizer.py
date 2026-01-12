@@ -6,7 +6,6 @@ This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 import threading
 from typing import TYPE_CHECKING
 
-from textual.css.query import NoMatches
 from textual.widgets import Markdown
 
 from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
@@ -29,7 +28,6 @@ from openhands.tools.task_tracker.definition import TaskTrackerObservation
 from openhands.tools.terminal.definition import TerminalAction
 from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
 )
@@ -129,19 +127,15 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     def _do_refresh_plan_panel(self) -> None:
         """Refresh the plan panel (must be called from main thread)."""
-        try:
-            panel = self._app.query_one(PlanSidePanel)
-        except NoMatches:
-            panel = None
-
-        if panel is None and not self.cli_settings.auto_open_plan_panel:
+        panel_mounted = self._app.plan_panel.is_mounted
+        if not panel_mounted and not self.cli_settings.auto_open_plan_panel:
             return
-        elif panel is None:
-            PlanSidePanel.toggle(self._app, self._app.conversation_dir)
-            panel = self._app.query_one(PlanSidePanel)
 
-        if self._app.conversation_runner:
-            panel.refresh_from_disk(self._app.conversation_dir)
+        elif not panel_mounted:
+            self._app.plan_panel.toggle()
+
+        else:
+            self._app.plan_panel.refresh_from_disk()
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""

@@ -140,6 +140,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # MCP panel tracking
         self.mcp_panel: MCPSidePanel | None = None
 
+        self.plan_panel: PlanSidePanel = PlanSidePanel(self)
+
         # Register the custom theme
         self.register_theme(OPENHANDS_THEME)
 
@@ -185,7 +187,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         yield SystemCommand(
             "PLAN",
             "View agent plan",
-            lambda: PlanSidePanel.toggle(self, self.conversation_dir),
+            lambda: self.plan_panel.toggle(),
         )
         yield SystemCommand("SETTINGS", "Configure settings", self.action_open_settings)
 
