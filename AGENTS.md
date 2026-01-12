@@ -5,7 +5,7 @@ OpenHands CLI is a standalone terminal interface (Textual TUI) for interacting w
 
 This repo contains the current CLI UX, including the Textual TUI and a browser-served view via `openhands web`.
 
-The CLI originated as a port from the main OpenHands repository (CLI code under `openhands/cli/` in that repository) and was refactored to use the OpenHands agent-sdk (`openhands-sdk`, `openhands-tools`). Upstream OpenHands can still be a useful reference for behavior parity and shared concepts.
+The CLI originated as a port from the main OpenHands repository and was rebuilt based on the OpenHands agent-sdk (`openhands-sdk`, `openhands-tools`). Upstream OpenHands can still be a useful reference for behavior parity and shared concepts.
 
 ### References
 - Agent-sdk example: https://github.com/All-Hands-AI/agent-sdk/blob/main/examples/hello_world.py
