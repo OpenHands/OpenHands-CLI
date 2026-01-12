@@ -154,13 +154,6 @@ To view the generated SVG snapshots in a browser:
 - Commit SVG snapshots.
 - Review snapshot diffs carefully.
 
-## Updating Agent-SDK SHA (agent-sdk / openhands-sdk)
-If asked to “update the agent-sdk SHA” / bump `openhands-sdk` / `openhands-tools`:
-1. Use `$GITHUB_TOKEN` to find the latest commit/tag in the agent-sdk repository.
-2. Update the dependency pins in `pyproject.toml` (version or git `rev`).
-3. Regenerate the `uv.lock` file (e.g., `uv sync`).
-4. Run `./build.sh` to confirm that the build still works.
-5. Open a PR. If the build fails, still open the PR and describe what error you’re seeing and the next steps; don’t fix it yet.
 
 ## Commit & Pull Request Guidelines
 - Follow the repo’s pattern: `<scope>: <concise message> (#NNN)` (see `git log`), where scope is the touched area (e.g., `auth`, `tui`, `fix`).
