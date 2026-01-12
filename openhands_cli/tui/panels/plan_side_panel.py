@@ -72,7 +72,6 @@ class PlanSidePanel(VerticalScroll):
         if self.is_on_screen:
             self.remove()
             self.user_dismissed = True
-            self.notify('planel dismissed')
         else:
             content_area = self._app.query_one("#content_area", Horizontal)
             content_area.mount(self)
