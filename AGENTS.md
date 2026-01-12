@@ -5,14 +5,14 @@ OpenHands CLI is a standalone terminal interface (Textual TUI) for interacting w
 
 This repo contains the current CLI UX, including the Textual TUI and a browser-served view via `openhands web`.
 
-The CLI originated as a port from the main OpenHands repository (`openhands/cli`) and was refactored to use the OpenHands agent-sdk (`openhands-sdk`, `openhands-tools`). Upstream OpenHands can still be a useful reference for behavior parity and shared concepts.
+The CLI originated as a port from the main OpenHands repository (CLI code under `openhands/cli/` in that repository) and was refactored to use the OpenHands agent-sdk (`openhands-sdk`, `openhands-tools`). Upstream OpenHands can still be a useful reference for behavior parity and shared concepts.
 
 ### References
 - Agent-sdk example: https://github.com/All-Hands-AI/agent-sdk/blob/main/examples/hello_world.py
 - If you need to compare with upstream OpenHands code, use `$GITHUB_TOKEN` for access.
 
 ## Project Structure & Module Organization
-- `openhands_cli/`: Core CLI/TUI code (`entrypoint.py`, `tui/`, `auth/`, `mcp/`, `cloud/`, `user_actions/`, `conversations/`, `theme.py`, helpers in `utils.py`). Keep new modules snake_case and colocate tests.
+- `openhands_cli/`: Core CLI/TUI code (`openhands_cli/entrypoint.py`, `openhands_cli/tui/`, `openhands_cli/auth/`, `openhands_cli/mcp/`, `openhands_cli/cloud/`, `openhands_cli/user_actions/`, `openhands_cli/conversations/`, `openhands_cli/theme.py`, helpers in `openhands_cli/utils.py`). Keep new modules snake_case and colocate tests.
 - `tests/`: Pytest suite covering units, integration, and snapshot tests; mirrors source layout. `e2e_tests/`: end-to-end ACP/UI flows.
 - `scripts/acp/`: JSON-RPC and debug helpers for ACP development; `hooks/`: PyInstaller/runtime hooks.
 - Tooling & packaging: `Makefile` for common tasks, `build.sh`/`build.py` for PyInstaller artifacts, `openhands-cli.spec` for the frozen binary, `uv.lock` for resolved deps.
@@ -36,7 +36,7 @@ To set up the development environment:
 - `openhands serve`: launch the Docker-based OpenHands GUI server.
 - `uv run openhands-acp`: run the ACP entrypoint.
 - `make test`: `uv run pytest` (use `-m "not integration"` to skip slower paths). `uv run pytest e2e_tests` runs end-to-end flows.
-- Packaging: `./build.sh --install-pyinstaller` produces binaries in `dist/`.
+- Packaging: `./build.sh --install-pyinstaller` produces binaries under `dist/` (created by the build; PyInstaller output).
 
 ## Development Guidelines
 
@@ -57,7 +57,7 @@ Prefer modern typing syntax (`X | None` over `Optional[X]`) in new code.
 
 ## Testing Guidelines
 - Pytest discovery: files `test_*.py`, classes `Test*`, functions `test_*`. Use `@pytest.mark.integration` for costly flows.
-- Match test locations to implementation (`tests/<area>/test_<module>.py`); add fixtures in `tests/conftest.py` when shared.
+- Match test locations to implementation (`tests/` mirrors `openhands_cli/`); add fixtures in `tests/conftest.py` when shared.
 - Run `make test` before PRs.
 
 ## Snapshot Testing with pytest-textual-snapshot
@@ -74,8 +74,8 @@ uv run pytest tests/snapshots/ --snapshot-update
 ```
 
 ### Snapshot Test Location
-- **Test files**: `tests/snapshots/test_*.py`
-- **Generated snapshots**: `tests/snapshots/__snapshots__/*/*.svg`
+- **Test files**: `tests/snapshots/test_app_snapshots.py`, `tests/snapshots/test_visualizer_snapshots.py`
+- **Generated snapshots**: `tests/snapshots/__snapshots__/test_app_snapshots/*.svg`, `tests/snapshots/__snapshots__/test_visualizer_snapshots/*.svg`
 
 ### Writing Snapshot Tests
 Snapshot tests must be **synchronous** (not async). The `snap_compare` fixture handles async internally:
@@ -140,8 +140,7 @@ To view the generated SVG snapshots in a browser:
 
    Example snapshot names:
    - `TestExitModalSnapshots.test_exit_modal_initial_state.svg`
-   - `TestOpenHandsAppSnapshots.test_openhands_app_splash_screen.svg`
-   - `TestInputFieldSnapshots.test_input_field_with_text.svg`
+   - `TestVisualizerSnapshots.test_multiple_actions_alignment.svg`
 
 3. **Stop the server** when done:
    ```bash
@@ -186,7 +185,7 @@ If asked to “update the agent-sdk SHA” / bump `openhands-sdk` / `openhands-t
 - Before opening a PR, run this verification flow (and include the exact commands run in the PR description):
   1. `make lint`
   2. `make test`
-  3. If you touched ACP / end-to-end UI flow code (e.g., `e2e_tests/`, `openhands_cli/acp/`, `openhands_cli/mcp/`, auth/connection flow): `uv run pytest e2e_tests`
+  3. If you touched ACP / end-to-end UI flow code (e.g., `e2e_tests/`, `openhands_cli/acp_impl/`, `openhands_cli/mcp/`, auth/connection flow): `uv run pytest e2e_tests`
   4. If you touched TUI code (e.g., `openhands_cli/tui/`, widgets, styles, layout): `uv run pytest tests/snapshots -v` (use `--snapshot-update` only for intentional UI changes)
 
 #### PR submission checklist
