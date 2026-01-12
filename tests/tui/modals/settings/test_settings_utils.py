@@ -133,6 +133,40 @@ def test_preserves_existing_api_key_when_not_provided(
             ("custom_model", "base_url"),
         ),
         (
+            "basic",
+            "openrouter",
+            "google/gemini-3-flash-preview",
+            "should-be-cleared",
+            "https://advanced.example",
+            # All providers require prefix even for models with '/' in their name
+            # See: https://docs.litellm.ai/docs/providers/openrouter
+            "openrouter/google/gemini-3-flash-preview",
+            None,
+            ("custom_model", "base_url"),
+        ),
+        (
+            "basic",
+            "nvidia_nim",
+            "meta/llama3-70b-instruct",
+            "should-be-cleared",
+            "https://advanced.example",
+            # See: https://docs.litellm.ai/docs/providers/nvidia_nim
+            "nvidia_nim/meta/llama3-70b-instruct",
+            None,
+            ("custom_model", "base_url"),
+        ),
+        (
+            "basic",
+            "deepinfra",
+            "meta-llama/Meta-Llama-3.1-8B-Instruct",
+            "should-be-cleared",
+            "https://advanced.example",
+            # See: https://docs.litellm.ai/docs/providers
+            "deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct",
+            None,
+            ("custom_model", "base_url"),
+        ),
+        (
             "advanced",
             "openai",
             "gpt-4o",
