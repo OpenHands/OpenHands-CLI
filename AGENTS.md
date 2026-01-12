@@ -182,10 +182,22 @@ If asked to “update the agent-sdk SHA” / bump `openhands-sdk` / `openhands-t
 ### Contribution standards (agents-first)
 - Keep PRs minimally scoped; prefer multiple PRs over one large PR when it reduces risk and review load.
 - Include tests for behavior changes (unit/integration/e2e as appropriate). If you can’t add tests, explain why and what manual verification you performed.
-- For any UI/TUI change, include screenshots or a short screen recording (and note the terminal size used if relevant).
-- Before opening a PR, run a realistic flow:
-  - Prefer `uv run pytest e2e_tests` when applicable.
-  - Otherwise, run the TUI (`make run`) and/or web mode (`openhands web`) and include relevant logs/output.
+- For UI/TUI changes, snapshot tests are the preferred evidence. If snapshots aren't available/appropriate, include screenshots (and note the terminal size used).
+- Before opening a PR, run this verification flow (and include the exact commands run in the PR description):
+  1. `make lint`
+  2. `make test`
+  3. If your change affects end-to-end ACP/UI flows: `uv run pytest e2e_tests`
+  4. If your change affects the TUI: `uv run pytest tests/snapshots -v` (use `--snapshot-update` only for intentional UI changes)
+
+#### PR submission checklist
+- [ ] Scope is minimal and focused on one change
+- [ ] Tests added/updated for behavior changes (or PR explains why not)
+- [ ] `make lint`
+- [ ] `make test`
+- [ ] (If ACP/UI flow touched) `uv run pytest e2e_tests`
+- [ ] (If TUI touched) snapshot tests run and snapshots updated/reviewed
+- [ ] PR description includes: what changed, why, commands run, and UI evidence (snapshots/screenshots)
+
 
 
 ## Security & Configuration Tips
