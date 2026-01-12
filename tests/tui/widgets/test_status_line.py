@@ -155,19 +155,19 @@ def test_handle_multiline_mode_updates_indicator_and_refreshes(dummy_app, monkey
 
     # Enable multiline mode
     widget._on_handle_mutliline_mode(True)
-    assert widget.mode_indicator == "[Multi-line: Ctrl+J to submit]"
+    assert widget.mode_indicator == "\\[Multi-line: Ctrl+J to submit]"
     update_text_mock.assert_called_once()
 
     update_text_mock.reset_mock()
 
     # Disable multiline mode
     widget._on_handle_mutliline_mode(False)
-    assert widget.mode_indicator == "[Ctrl+L for multi-line]"
+    assert widget.mode_indicator == "\\[Ctrl+L for multi-line]"
     update_text_mock.assert_called_once()
 
 
 def test_update_text_uses_work_dir_and_metrics(dummy_app, monkeypatch):
-    """_update_text composes the status line from work dir and metrics."""
+    """_update_text composes the status line with metrics right-aligned in grey."""
     widget = InfoStatusLine(app=dummy_app)
 
     widget.work_dir_display = "~/my-dir"
@@ -183,12 +183,21 @@ def test_update_text_uses_work_dir_and_metrics(dummy_app, monkeypatch):
 
     widget._update_text()
 
-    expected = "~/my-dir    ctx N/A • $ 0.00 (↑ 0 ↓ 0 cache N/A)"
-    update_mock.assert_called_once_with(expected)
+    # Check that update was called with the right structure
+    update_mock.assert_called_once()
+    call_arg = update_mock.call_args[0][0]
+    # Should contain left part (mode indicator and work dir)
+    assert "\\[Ctrl+L for multi-line] • ~/my-dir" in call_arg
+    # Should contain grey markup around metrics
+    assert "[grey50]" in call_arg
+    assert "[/grey50]" in call_arg
+    # Should contain metrics
+    assert "ctx N/A" in call_arg
+    assert "$ 0.00" in call_arg
 
 
 def test_update_text_shows_all_metrics(dummy_app, monkeypatch):
-    """_update_text shows context (current/total), cost, and token details."""
+    """_update_text shows context (current/total), cost, and token details in grey."""
     widget = InfoStatusLine(app=dummy_app)
 
     widget.work_dir_display = "~/my-dir"
@@ -204,8 +213,20 @@ def test_update_text_shows_all_metrics(dummy_app, monkeypatch):
 
     widget._update_text()
 
-    expected = "~/my-dir    ctx 50K / 128K • $ 10.5507 (↑ 5.22M ↓ 42.01K cache 77%)"
-    update_mock.assert_called_once_with(expected)
+    # Check that update was called with the right structure
+    update_mock.assert_called_once()
+    call_arg = update_mock.call_args[0][0]
+    # Should contain left part
+    assert "\\[Ctrl+L for multi-line] • ~/my-dir" in call_arg
+    # Should contain grey markup
+    assert "[grey50]" in call_arg
+    assert "[/grey50]" in call_arg
+    # Should contain all metrics
+    assert "ctx 50K / 128K" in call_arg
+    assert "$ 10.5507" in call_arg
+    assert "↑ 5.22M" in call_arg
+    assert "↓ 42.01K" in call_arg
+    assert "cache 77%" in call_arg
 
 
 def test_format_metrics_display_with_context_current_and_total(dummy_app):

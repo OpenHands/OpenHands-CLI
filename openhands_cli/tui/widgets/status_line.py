@@ -111,9 +111,9 @@ class InfoStatusLine(Static):
     """
 
     def __init__(self, app: OpenHandsApp, **kwargs) -> None:
-        super().__init__("", id="info_status_line", markup=False, **kwargs)
+        super().__init__("", id="info_status_line", markup=True, **kwargs)
         self.main_app = app
-        self.mode_indicator = "[Ctrl+L for multi-line]"
+        self.mode_indicator = "\\[Ctrl+L for multi-line]"
         self.work_dir_display = self._get_work_dir_display()
         # Conversation metrics
         self._input_tokens: int = 0
@@ -187,9 +187,9 @@ class InfoStatusLine(Static):
 
     def _on_handle_mutliline_mode(self, is_multiline_mode: bool) -> None:
         if is_multiline_mode:
-            self.mode_indicator = "[Multi-line: Ctrl+J to submit]"
+            self.mode_indicator = "\\[Multi-line: Ctrl+J to submit]"
         else:
-            self.mode_indicator = "[Ctrl+L for multi-line]"
+            self.mode_indicator = "\\[Ctrl+L for multi-line]"
         self._update_text()
 
     def _get_work_dir_display(self) -> str:
@@ -225,7 +225,21 @@ class InfoStatusLine(Static):
         return f"{ctx_display} • {cost_display} ({token_details})"
 
     def _update_text(self) -> None:
-        """Rebuild the info status text."""
+        """Rebuild the info status text with metrics right-aligned in grey."""
+        left_part = f"{self.mode_indicator} • {self.work_dir_display}"
         metrics_display = self._format_metrics_display()
-        status_text = f"{self.mode_indicator} • {self.work_dir_display} • {metrics_display}"
+
+        # Calculate available width for spacing (account for padding of 2 chars)
+        try:
+            total_width = self.size.width - 2
+        except Exception:
+            total_width = 80  # Fallback width
+
+        # Calculate spacing needed to right-align metrics
+        left_len = len(left_part)
+        right_len = len(metrics_display)
+        spacing = max(1, total_width - left_len - right_len)
+
+        # Build status text with grey metrics on the right
+        status_text = f"{left_part}{' ' * spacing}[grey50]{metrics_display}[/grey50]"
         self.update(status_text)
