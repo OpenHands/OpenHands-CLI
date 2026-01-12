@@ -86,7 +86,7 @@ class PlanSidePanel(VerticalScroll):
         with Horizontal(classes="plan-header-row"):
             yield Static("Agent Plan", classes="plan-header")
             yield Button("✕", id="plan-close-btn", classes="plan-close-btn")
-        yield Static("", id="plan-content")
+        yield Static("", id="plan-content", markup = False)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""
