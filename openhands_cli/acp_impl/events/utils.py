@@ -13,6 +13,7 @@ from openhands.tools.file_editor.definition import (
 )
 from openhands.tools.task_tracker import TaskTrackerAction
 from openhands.tools.terminal import TerminalAction
+from openhands_cli.utils import abbreviate_number, format_cost
 
 
 # Shared mapping from tool names to ACP ToolKind values
@@ -37,22 +38,8 @@ def _format_status_line(usage, cost: float) -> str:
         Formatted status line string
         (e.g., "↑ input 1.2K • cache hit 50.00% • ↓ output 500 • $ 0.0050")
     """
-
-    # Helper function to abbreviate large numbers
-    def abbr(n: int | float) -> str:
-        n = int(n or 0)
-        if n >= 1_000_000_000:
-            val, suffix = n / 1_000_000_000, "B"
-        elif n >= 1_000_000:
-            val, suffix = n / 1_000_000, "M"
-        elif n >= 1_000:
-            val, suffix = n / 1_000, "K"
-        else:
-            return str(n)
-        return f"{val:.2f}".rstrip("0").rstrip(".") + suffix
-
-    input_tokens = abbr(usage.prompt_tokens or 0)
-    output_tokens = abbr(usage.completion_tokens or 0)
+    input_tokens = abbreviate_number(usage.prompt_tokens or 0)
+    output_tokens = abbreviate_number(usage.completion_tokens or 0)
 
     # Calculate cache hit rate (convert to int to handle mock objects safely)
     prompt = int(usage.prompt_tokens or 0)
@@ -60,18 +47,14 @@ def _format_status_line(usage, cost: float) -> str:
     cache_rate = f"{(cache_read / prompt * 100):.2f}%" if prompt > 0 else "N/A"
     reasoning_tokens = int(usage.reasoning_tokens or 0)
 
-    # Format cost (convert to float to handle mock objects safely)
-    cost_val = float(cost or 0)
-    cost_str = f"{cost_val:.4f}" if cost_val > 0 else "0.00"
-
     # Build status line
     parts: list[str] = []
     parts.append(f"↑ input {input_tokens}")
     parts.append(f"cache hit {cache_rate}")
     if reasoning_tokens > 0:
-        parts.append(f"reasoning {abbr(reasoning_tokens)}")
+        parts.append(f"reasoning {abbreviate_number(reasoning_tokens)}")
     parts.append(f"↓ output {output_tokens}")
-    parts.append(f"$ {cost_str}")
+    parts.append(f"$ {format_cost(float(cost or 0))}")
 
     return " • ".join(parts)
 

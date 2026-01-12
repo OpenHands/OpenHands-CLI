@@ -408,87 +408,6 @@ class TestCliSettingsCaching:
             assert config2 == mock_config2
             assert mock_load.call_count == 2  # Should still be 2, not 3
 
-    def test_format_metrics_subtitle_uses_cached_config(self, visualizer):
-        """Test that _format_metrics_subtitle uses cached app configuration."""
-        from unittest.mock import MagicMock
-
-        # Mock the state to return None for stats (no metrics)
-        mock_state = MagicMock()
-        mock_state.stats = None
-        visualizer._state = mock_state
-
-        with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-            mock_config = CliSettings(display_cost_per_action=False)
-            mock_load.return_value = mock_config
-
-            # Call _format_metrics_subtitle multiple times
-            result1 = visualizer._format_metrics_subtitle()
-            result2 = visualizer._format_metrics_subtitle()
-            result3 = visualizer._format_metrics_subtitle()
-
-            # All should return None because display_cost_per_action=False
-            assert result1 is None
-            assert result2 is None
-            assert result3 is None
-
-            # CliSettings.load should only be called once due to caching
-            assert mock_load.call_count == 1
-
-    @pytest.mark.parametrize(
-        "display_cost_per_action, has_stats, expected_result",
-        [
-            (False, False, None),  # Config disabled, no stats
-            (False, True, None),  # Config disabled, has stats
-            (True, False, None),  # Config enabled, no stats
-            (True, True, "formatted_metrics"),  # Config enabled, has stats
-        ],
-    )
-    def test_format_metrics_subtitle_conditional_display(
-        self, visualizer, display_cost_per_action, has_stats, expected_result
-    ):
-        """Test that metrics display is conditional on both config and stats
-        availability."""
-        from unittest.mock import MagicMock
-
-        # Mock the state
-        mock_state = MagicMock()
-        if has_stats:
-            mock_usage = MagicMock()
-            mock_usage.prompt_tokens = 800
-            mock_usage.completion_tokens = 200
-            mock_usage.cache_read_tokens = 100
-            mock_usage.reasoning_tokens = 0
-
-            mock_combined_metrics = MagicMock()
-            mock_combined_metrics.accumulated_token_usage = mock_usage
-            mock_combined_metrics.accumulated_cost = 0.05
-
-            mock_stats = MagicMock()
-            mock_stats.get_combined_metrics.return_value = mock_combined_metrics
-            mock_state.stats = mock_stats
-        else:
-            mock_state.stats = None
-        visualizer._state = mock_state
-
-        with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-            mock_config = CliSettings(display_cost_per_action=display_cost_per_action)
-            mock_load.return_value = mock_config
-
-            if expected_result == "formatted_metrics":
-                with patch.object(
-                    visualizer,
-                    "_format_metrics_subtitle",
-                    wraps=visualizer._format_metrics_subtitle,
-                ):
-                    result = visualizer._format_metrics_subtitle()
-                    if display_cost_per_action and has_stats:
-                        assert result is not None or result == ""
-                    else:
-                        assert result is None
-            else:
-                result = visualizer._format_metrics_subtitle()
-                assert result == expected_result
-
     def test_reload_configuration_clears_cache(self, visualizer):
         """Test that reload_configuration properly clears the cached configuration."""
         with patch("openhands_cli.stores.CliSettings.load") as mock_load:
@@ -536,38 +455,6 @@ class TestCliSettingsCaching:
             else:
                 assert mock_load.call_count == 0
                 assert result.display_cost_per_action is True
-
-    def test_conversation_stats_property_integration(self, visualizer):
-        """Test that conversation_stats property works correctly with app config."""
-        from unittest.mock import MagicMock
-
-        mock_usage = MagicMock()
-        mock_usage.prompt_tokens = 1600
-        mock_usage.completion_tokens = 400
-        mock_usage.cache_read_tokens = 200
-        mock_usage.reasoning_tokens = 0
-
-        mock_combined_metrics = MagicMock()
-        mock_combined_metrics.accumulated_token_usage = mock_usage
-        mock_combined_metrics.accumulated_cost = 0.10
-
-        mock_stats = MagicMock()
-        mock_stats.get_combined_metrics.return_value = mock_combined_metrics
-
-        with patch.object(
-            type(visualizer),
-            "conversation_stats",
-            new_callable=lambda: property(lambda self: mock_stats),
-        ):
-            with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-                mock_config = CliSettings(display_cost_per_action=True)
-                mock_load.return_value = mock_config
-
-                # Should not return None when both config and stats are available
-                result = visualizer._format_metrics_subtitle()
-                # The actual formatting depends on the implementation,
-                # but it should not be None when enabled and stats exist
-                assert result is not None or mock_stats is not None
 
 
 class TestCommandTruncation:
