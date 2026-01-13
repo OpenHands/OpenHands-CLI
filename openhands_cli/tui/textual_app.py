@@ -614,7 +614,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     def action_open_external_editor(self) -> None:
         """Forward open external editor action to the input field."""
         # Debug: notify that the main app action was triggered
-        self.notify("Main app CTRL+E action triggered", severity="information")
+        self.notify("Main app CTRL+X action triggered", severity="information")
         self.input_field.action_open_external_editor()
 
     def _handle_confirm_command(self) -> None:
