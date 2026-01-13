@@ -22,7 +22,7 @@ from textual.signal import Signal
 from textual.widgets import Footer, Input, Static, TextArea
 from textual_autocomplete import AutoComplete
 
-from openhands.sdk.event import ActionEvent, MessageEvent
+from openhands.sdk.event import ActionEvent
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmationPolicyBase,
@@ -52,7 +52,7 @@ from openhands_cli.tui.widgets.status_line import (
     WorkingStatusLine,
 )
 from openhands_cli.user_actions.types import UserConfirmation
-from openhands_cli.utils import extract_text_from_message_content, json_callback
+from openhands_cli.utils import json_callback
 
 
 class OpenHandsApp(CollapsibleNavigationMixin, App):
@@ -501,30 +501,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             )
             self.main_display.mount(placeholder_widget)
             self.main_display.scroll_end(animate=False)
-
-    def _mount_user_message_text(self, text: str) -> None:
-        """Mount a user message widget (used for replaying history)."""
-        if not text.strip():
-            return
-        self.main_display.mount(
-            Static(f"> {text}", classes="user-message", markup=False)
-        )
-        self.main_display.scroll_end(animate=False)
-
-    def _get_user_text_from_message_event(self, event: MessageEvent) -> str | None:
-        if not event.llm_message or event.llm_message.role != "user":
-            return None
-        return extract_text_from_message_content(
-            list(event.llm_message.content), has_exactly_one=False
-        )
-
-    def _render_user_message_event(self, event: MessageEvent) -> bool:
-        """Render user MessageEvent like normal chat and return True if rendered."""
-        text = self._get_user_text_from_message_event(event)
-        if not text:
-            return False
-        self._mount_user_message_text(text)
-        return True
 
     def _update_history_panel_title_if_needed(self, user_message: str) -> None:
         """Update History panel title for the current conversation if needed."""
@@ -1024,8 +1000,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     ) -> None:
         """Background thread worker for switching conversations.
 
-        Loads state/events from disk without blocking the UI, then replays events
-        through the visualizer (which updates UI via call_from_thread).
+        Loads persisted state/events from disk without blocking the UI.
+
+        Note: UI rehydration (history replay) is intentionally tracked separately
+        (see Issue #204) to keep this PR focused.
         """
         try:
             # Prepare UI first (on main thread) so old content is cleared.
@@ -1035,16 +1013,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             runner = self.create_conversation_runner(
                 conversation_id=target_id, visualizer=visualizer
             )
-
-            # Replay historic events through the visualizer.
-            events = list(runner.conversation.state.events)
-            for event in events:
-                if isinstance(event, MessageEvent):
-                    user_text = self._get_user_text_from_message_event(event)
-                    if user_text:
-                        self.call_from_thread(self._mount_user_message_text, user_text)
-                        continue
-                runner.visualizer.on_event(event)
 
             # Finalize on UI thread (set runner, dismiss loading toast).
             self.call_from_thread(self._finish_conversation_switch, runner, target_id)
