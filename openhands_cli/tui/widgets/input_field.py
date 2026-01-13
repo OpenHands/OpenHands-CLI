@@ -52,20 +52,22 @@ def get_external_editor() -> str:
     # Check environment variables in order of preference (VISUAL, then EDITOR)
     for env_var in ["VISUAL", "EDITOR"]:
         editor = os.environ.get(env_var)
-        if editor:
+        if editor and editor.strip():
             # Handle editors with arguments (e.g., "code --wait")
-            editor_cmd = editor.split()[0]
-            if shutil.which(editor_cmd):
-                return editor
+            editor_parts = editor.split()
+            if editor_parts:
+                editor_cmd = editor_parts[0]
+                if shutil.which(editor_cmd):
+                    return editor
 
     # Fallback to common editors
-    for editor in ["vim", "nano", "emacs", "vi"]:
+    for editor in ["nano", "vim", "emacs", "vi"]:
         if shutil.which(editor):
             return editor
 
     raise RuntimeError(
         "No suitable editor found. Set VISUAL or EDITOR environment variable, "
-        "or install vim/nano/emacs."
+        "or install nano/vim/emacs."
     )
 
 
@@ -287,12 +289,6 @@ class InputField(Container):
             if self.is_multiline_mode:
                 self.action_toggle_input_mode()
             self.input_widget.value = content
-
-    def _set_content_and_submit(self, content: str) -> None:
-        """Set content in the appropriate widget and submit it."""
-        self._set_content_only(content)
-        # Submit the content
-        self.post_message(self.Submitted(content))
 
     @on(PasteAwareInput.PasteDetected)
     def on_paste_aware_input_paste_detected(
