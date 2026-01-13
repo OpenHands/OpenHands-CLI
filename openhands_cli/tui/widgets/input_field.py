@@ -81,14 +81,11 @@ class InputField(Container):
             super().__init__()
             self.content = content
 
-    def __init__(
-        self, placeholder: str = "", *, is_cloud_mode: bool = False, **kwargs
-    ) -> None:
+    def __init__(self, placeholder: str = "", **kwargs) -> None:
         super().__init__(**kwargs)
         self.placeholder = placeholder
         self.is_multiline_mode = False
         self.stored_content = ""
-        self._is_cloud_mode = is_cloud_mode
         self.mutliline_mode_status = Signal(self, "mutliline_mode_status")
 
     def compose(self):
@@ -111,7 +108,7 @@ class InputField(Container):
 
         yield EnhancedAutoComplete(
             self.input_widget,
-            command_candidates=get_commands(is_cloud_mode=self._is_cloud_mode),
+            command_candidates=get_commands(),
         )
 
     def on_mount(self) -> None:

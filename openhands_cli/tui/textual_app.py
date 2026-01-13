@@ -30,7 +30,6 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
-from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
@@ -63,8 +62,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     BINDINGS: ClassVar = [
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+o", "toggle_cells", "Toggle Cells"),
-        # NOTE: ctrl+h (history panel) is registered dynamically in __init__
-        # only for local mode (cloud mode hides history).
+        ("ctrl+h", "toggle_history", "Toggle history panel"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
@@ -129,12 +127,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.conversation_runner = None
         self._switch_loading_notification: Notification | None = None
         self._is_switching_conversation: bool = False
-        # Track if CLI is in cloud mode (logged in to OpenHands Cloud).
-        # History panel is only available in local mode.
-        self._is_cloud_mode: bool = TokenStorage().has_api_key()
-        if not self._is_cloud_mode:
-            # Register history panel hotkey only in local mode.
-            self._bindings.bind("ctrl+h", "toggle_history", "Toggle history panel")
+        # Note: History pane (this PR) is local-only and should not depend on the
+        # selected LLM provider (including "openhands/*"). Cloud conversations in
+        # the pane will be implemented separately (see #277).
         self._reload_visualizer = (
             lambda: self.conversation_runner.visualizer.reload_configuration()
             if self.conversation_runner
@@ -176,8 +171,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             with Container(id="input_area"):
                 yield WorkingStatusLine(self)
                 yield InputField(
-                    placeholder="Type your message, @mention a file, or / for commands",
-                    is_cloud_mode=self._is_cloud_mode,
+                    placeholder="Type your message, @mention a file, or / for commands"
                 )
 
                 yield InfoStatusLine(self)
@@ -444,7 +438,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.refresh()
 
         # Handle commands - only exact matches
-        if is_valid_command(content, is_cloud_mode=self._is_cloud_mode):
+        if is_valid_command(content):
             self._handle_command(content)
         else:
             # Handle regular messages with conversation runner
@@ -454,7 +448,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """Handle command execution."""
 
         if command == "/help":
-            show_help(self.main_display, is_cloud_mode=self._is_cloud_mode)
+            show_help(self.main_display)
         elif command == "/new":
             self._handle_new_command()
         elif command == "/history":
@@ -813,21 +807,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """Handle the /history command to show conversation history panel."""
         self.action_toggle_history()
 
-    def check_action_toggle_history(self) -> bool:
-        """Check if toggle_history action is available.
-
-        Returns False in cloud mode to hide the keybinding from footer.
-        """
-        return not self._is_cloud_mode
-
     def action_toggle_history(self) -> None:
-        """Toggle the history side panel (Ctrl+H binding).
-
-        History panel is only available in local mode.
-        """
-        if self._is_cloud_mode:
-            return
-
+        """Toggle the history side panel (Ctrl+H binding)."""
         HistorySidePanel.toggle(
             self,
             current_conversation_id=self.conversation_id,
