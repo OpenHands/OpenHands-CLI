@@ -165,8 +165,8 @@ class TokenBasedEventSubscriber:
                 reasoning = getattr(delta, "reasoning_content", None)
                 content = getattr(delta, "content", None)
 
-                if isinstance(reasoning, str) and reasoning:
-                    # Prepend header on first reasoning chunk for consistency
+                if isinstance(reasoning, str) and reasoning.strip():
+                    # Prepend header on first non-empty reasoning chunk for consistency
                     # with non-streaming mode (EventSubscriber)
                     if not self._reasoning_header_emitted:
                         self._reasoning_header_emitted = True
