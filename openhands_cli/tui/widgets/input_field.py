@@ -14,6 +14,9 @@ from openhands_cli.tui.widgets.autocomplete import EnhancedAutoComplete
 
 class PasteAwareInput(Input):
     """Custom Input widget that can handle paste events and notify parent."""
+    BINDINGS = [
+        Binding("ctrl+a", "select_all", "Select all"),
+    ]
 
     class PasteDetected(Message):
         """Message sent when multi-line paste is detected."""
@@ -32,6 +35,11 @@ class PasteAwareInput(Input):
             event.stop()
         # For single-line content, let the default paste behavior handle it
 
+class SelectAwareTextArea(TextArea):
+    """TextArea that overrides Ctrl+A to select all."""
+    BINDINGS = [
+        Binding("ctrl+a", "select_all", "Select all"),
+    ]
 
 class InputField(Container):
     BINDINGS: ClassVar = [
@@ -98,7 +106,7 @@ class InputField(Container):
         yield self.input_widget
 
         # Multi-line textarea (initially hidden)
-        self.textarea_widget = TextArea(
+        self.textarea_widget = SelectAwareTextArea(
             id="user_textarea",
             soft_wrap=True,
             show_line_numbers=False,
