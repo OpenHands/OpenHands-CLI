@@ -227,7 +227,9 @@ class TokenBasedEventSubscriber:
                     # Stream the evolving summary into any started tool-call titles.
                     # This keeps the UI title in sync with the assistant's intent.
                     for state in self._streaming_tool_calls.values():
-                        if getattr(state, "started", False) and not getattr(state, "is_think", False):
+                        if getattr(state, "started", False) and not getattr(
+                            state, "is_think", False
+                        ):
                             state.summary = self._summary_buffer or state.summary
                             self._schedule_update(
                                 update_tool_call(
