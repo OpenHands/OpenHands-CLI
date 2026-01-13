@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from textual.app import App
@@ -12,19 +11,9 @@ from textual.containers import Container, Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.widgets import Static
 
-from openhands_cli.conversations.lister import ConversationLister
+from openhands_cli.conversations.lister import ConversationInfo, ConversationLister
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.panels.history_panel_style import HISTORY_PANEL_STYLE
-
-
-@dataclass(frozen=True, slots=True)
-class HistoryConversationRow:
-    """A normalized conversation row for the History panel (local only)."""
-
-    select_id: str
-    display_id: str
-    created_date: datetime
-    first_user_prompt: str | None
 
 
 class HistoryItem(Static):
@@ -32,7 +21,7 @@ class HistoryItem(Static):
 
     def __init__(
         self,
-        conversation: HistoryConversationRow,
+        conversation: ConversationInfo,
         is_current: bool,
         is_selected: bool,
         on_select: Callable[[str], None],
@@ -47,7 +36,7 @@ class HistoryItem(Static):
         """
         # Build the content string - show first_user_prompt as title, id as secondary
         time_str = _format_time(conversation.created_date)
-        full_id = conversation.display_id
+        full_id = conversation.id
         short_id = full_id[:8]
 
         # Use first_user_prompt as title if available, otherwise use ID
@@ -59,7 +48,7 @@ class HistoryItem(Static):
             content = f"[dim]New conversation[/dim]\n[dim]{short_id} • {time_str}[/dim]"
 
         super().__init__(content, markup=True, **kwargs)
-        self.conversation_id = conversation.select_id
+        self.conversation_id = conversation.id
         self._created_date = conversation.created_date
         self._has_title = has_title
         self.is_current = is_current
@@ -128,7 +117,7 @@ class HistorySidePanel(Container):
         self.current_conversation_id = current_conversation_id
         self.selected_conversation_id: uuid.UUID | None = None
         self._on_conversation_selected = on_conversation_selected
-        self._local_rows: list[HistoryConversationRow] = []
+        self._local_rows: list[ConversationInfo] = []
 
     @classmethod
     def toggle(
@@ -175,19 +164,9 @@ class HistorySidePanel(Container):
         self._local_rows = self._load_local_rows()
         self._render_list()
 
-    def _load_local_rows(self) -> list[HistoryConversationRow]:
+    def _load_local_rows(self) -> list[ConversationInfo]:
         """Load local conversation rows."""
-        rows: list[HistoryConversationRow] = []
-        for conv in ConversationLister().list():
-            rows.append(
-                HistoryConversationRow(
-                    select_id=conv.id,
-                    display_id=conv.id,
-                    created_date=conv.created_date,
-                    first_user_prompt=conv.first_user_prompt,
-                )
-            )
-        return rows
+        return list(ConversationLister().list())
 
     def _render_list(self) -> None:
         """Render the conversation list."""
@@ -212,10 +191,8 @@ class HistorySidePanel(Container):
         )
 
         for conv in self._local_rows:
-            is_current = conv.select_id == current_id_str
-            is_selected = (
-                conv.select_id == selected_id_str and selected_id_str is not None
-            )
+            is_current = conv.id == current_id_str
+            is_selected = conv.id == selected_id_str and selected_id_str is not None
             list_container.mount(
                 HistoryItem(
                     conversation=conv,
@@ -266,16 +243,13 @@ class HistorySidePanel(Container):
         immediately show and select them.
         """
         conv_hex = conversation_id.hex
-        if any(row.select_id == conv_hex for row in self._local_rows):
+        if any(row.id == conv_hex for row in self._local_rows):
             return
 
         self._local_rows.insert(
             0,
-            HistoryConversationRow(
-                select_id=conv_hex,
-                display_id=conv_hex,
-                created_date=datetime.now(),
-                first_user_prompt=None,
+            ConversationInfo(
+                id=conv_hex, created_date=datetime.now(), first_user_prompt=None
             ),
         )
 
@@ -289,12 +263,9 @@ class HistorySidePanel(Container):
         conv_hex = conversation_id.hex
 
         for i, conv in enumerate(self._local_rows):
-            if conv.select_id == conv_hex and not conv.first_user_prompt:
-                self._local_rows[i] = HistoryConversationRow(
-                    select_id=conv.select_id,
-                    display_id=conv.display_id,
-                    created_date=conv.created_date,
-                    first_user_prompt=title,
+            if conv.id == conv_hex and not conv.first_user_prompt:
+                self._local_rows[i] = conv.model_copy(
+                    update={"first_user_prompt": title}
                 )
                 break
 
