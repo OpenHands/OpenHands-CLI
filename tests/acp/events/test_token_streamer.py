@@ -164,7 +164,6 @@ class TestOnTokenContentAndReasoning:
         assert update.content.text.startswith(REASONING_HEADER)
         assert "Real reasoning" in update.content.text
 
-
     def test_choice_without_delta_is_ignored(
         self, token_subscriber, mock_connection, event_loop
     ):
