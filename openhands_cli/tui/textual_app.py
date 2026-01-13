@@ -618,7 +618,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         else:
             self.notify(message="No running conversation to pause", severity="error")
 
-
     def action_open_external_editor(self) -> None:
         """Forward open external editor action to the input field."""
         # Debug: notify that the main app action was triggered
