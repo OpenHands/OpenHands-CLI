@@ -618,13 +618,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         else:
             self.notify(message="No running conversation to pause", severity="error")
 
-    def action_toggle_input_mode(self) -> None:
-        """Forward toggle input mode action to the input field."""
-        self.input_field.action_toggle_input_mode()
-
-    def action_submit_textarea(self) -> None:
-        """Forward submit textarea action to the input field."""
-        self.input_field.action_submit_textarea()
 
     def action_open_external_editor(self) -> None:
         """Forward open external editor action to the input field."""
