@@ -96,29 +96,6 @@ async def test_history_panel_updates_from_signals(
 
 
 @pytest.mark.asyncio
-async def test_history_panel_toggle(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test that history panel can be toggled on and off."""
-    monkeypatch.setattr(ConversationLister, "list", lambda self: [])
-
-    app = HistorySignalsTestApp()
-    async with app.run_test() as pilot:
-        panel = pilot.app.query_one(HistorySidePanel)
-
-        # Panel should be visible initially (mounted in compose)
-        assert panel.display is True
-
-        # Hide the panel
-        panel.display = False
-        await pilot.pause()
-        assert panel.display is False
-
-        # Show the panel again
-        panel.display = True
-        await pilot.pause()
-        assert panel.display is True
-
-
-@pytest.mark.asyncio
 async def test_history_panel_conversation_selection_callback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

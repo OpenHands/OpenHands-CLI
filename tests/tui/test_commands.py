@@ -28,7 +28,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 7  # Includes /history
+        assert len(COMMANDS) == 7
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -50,7 +50,7 @@ class TestCommands:
         ],
     )
     def test_commands_content(self, expected_command, expected_description):
-        """Test that base commands contain expected content."""
+        """Test that commands contain expected content."""
         command_strings = [str(cmd.main) for cmd in COMMANDS]
 
         # Find the command that starts with expected_command
@@ -98,8 +98,8 @@ class TestCommands:
             "Press Enter to select",
         ],
     )
-    def test_show_help_content_elements_local_mode(self, expected_content):
-        """Test that show_help includes all expected content."""
+    def test_show_help_content_elements(self, expected_content):
+        """Test that show_help includes all expected content elements."""
         mock_main_display = mock.MagicMock(spec=VerticalScroll)
 
         show_help(mock_main_display)
@@ -157,7 +157,7 @@ class TestCommands:
         [
             ("/help", True),
             ("/new", True),
-            ("/history", True),  # Valid in local mode (default)
+            ("/history", True),
             ("/confirm", True),
             ("/condense", True),
             ("/feedback", True),
@@ -181,7 +181,7 @@ class TestCommands:
         assert "/history" in command_names
         assert "/help" in command_names
         assert "/new" in command_names
-        assert len(COMMANDS) == 7  # All commands
+        assert len(COMMANDS) == 7
 
     def test_all_commands_included_in_help(self):
         """Test that all commands from COMMANDS list are included in help text.

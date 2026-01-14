@@ -139,9 +139,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.conversation_runner = None
         self._switch_loading_notification: Notification | None = None
         self._is_switching_conversation: bool = False
-        # Note: History pane (this PR) is local-only and should not depend on the
-        # selected LLM provider (including "openhands/*"). Cloud conversations in
-        # the pane will be implemented separately (see #277).
         self._reload_visualizer = (
             lambda: self.conversation_runner.visualizer.reload_configuration()
             if self.conversation_runner

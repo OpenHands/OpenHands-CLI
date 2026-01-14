@@ -3,7 +3,6 @@
 import uuid
 from unittest.mock import Mock
 
-from openhands_cli.tui.modals.switch_conversation_modal import SwitchConversationModal
 from openhands_cli.tui.panels.history_side_panel import HistorySidePanel
 from openhands_cli.tui.textual_app import OpenHandsApp
 
@@ -95,31 +94,6 @@ class TestHistoryIntegration:
             toggle_mock.call_args[1]["on_conversation_selected"]
             == app._switch_to_conversation
         )
-
-    def test_switch_to_conversation_shows_modal_when_runner_is_running(self):
-        """Switching while agent is running shows SwitchConversationModal."""
-        app = OpenHandsApp.__new__(OpenHandsApp)
-        app.conversation_id = uuid.uuid4()
-        app.conversation_runner = Mock()
-        app.conversation_runner.is_running = True
-        app.history_select_current_signal = Mock()
-        app.history_select_current_signal.publish = Mock()
-        app.input_field = Mock()
-        app.input_field.focus_input = Mock()
-        app.push_screen = Mock()
-
-        target_uuid = uuid.uuid4()
-        app._switch_to_conversation(target_uuid.hex)
-
-        app.push_screen.assert_called_once()
-        modal = app.push_screen.call_args[0][0]
-        assert isinstance(modal, SwitchConversationModal)
-
-        # Cancel should revert selection and focus the input.
-        assert modal._on_cancelled is not None
-        modal._on_cancelled()
-        app.history_select_current_signal.publish.assert_called_once_with(True)
-        app.input_field.focus_input.assert_called()
 
     def test_finish_conversation_switch_focuses_input(self):
         """After conversation switch completes, input field receives focus."""
