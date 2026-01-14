@@ -51,8 +51,8 @@ class TestGetToolKind:
 
 
 class TestGetToolTitle:
-    def test_task_tracker_title_constant(self):
-        assert get_tool_title("task_tracker") == "Plan updated"
+    def test_task_tracker_title_empty_without_action(self):
+        assert get_tool_title("task_tracker") == ""
 
     @pytest.mark.parametrize(
         "action,expected",
@@ -66,7 +66,7 @@ class TestGetToolTitle:
                 "Editing /src/main.py",
             ),
             (TerminalAction(command="git status"), "$ git status"),
-            (TaskTrackerAction(command="plan", task_list=[]), "Plan updated"),
+            (TaskTrackerAction(command="plan", task_list=[]), ""),
         ],
     )
     def test_title_from_action(self, action, expected: str):

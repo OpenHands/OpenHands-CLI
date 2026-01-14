@@ -11,7 +11,6 @@ from openhands.sdk import Action, BaseConversation
 from openhands.tools.file_editor.definition import (
     FileEditorAction,
 )
-from openhands.tools.task_tracker import TaskTrackerAction
 from openhands.tools.terminal import TerminalAction
 from openhands_cli.utils import abbreviate_number, format_cost
 
@@ -180,7 +179,6 @@ def get_tool_title(
     """
     # Clean up summary if provided
     clean_summary = summary.strip().replace("\n", " ") if summary else ""
-
 
     if isinstance(action, FileEditorAction):
         op = "Reading" if action.command == "view" else "Editing"
