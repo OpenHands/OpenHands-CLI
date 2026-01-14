@@ -36,6 +36,11 @@ from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
+from openhands_cli.tui.core.history_replay import (
+    HistoryReplayState,
+    create_history_state,
+    replay_events_to_visualizer,
+)
 from openhands_cli.tui.modals import SettingsScreen, SwitchConversationModal
 from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModal
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
@@ -156,6 +161,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # MCP panel tracking
         self.mcp_panel: MCPSidePanel | None = None
+
+        # History replay state for pagination (scroll-up to load more)
+        self._history_replay_state: HistoryReplayState | None = None
 
         self.plan_panel: PlanSidePanel = PlanSidePanel(self)
 
@@ -580,6 +588,80 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         autocompletes = self.query(AutoComplete)
         return any(ac.display for ac in autocompletes)
 
+    @on(events.MouseScrollUp, "#main_display")
+    def on_main_display_scroll_up(self) -> None:
+        """Handle scroll up in main display to load more history.
+
+        When user scrolls to the top and there's more history to load,
+        prepend older events to the display.
+        """
+        if self._history_replay_state is None:
+            return
+        if not self._history_replay_state.has_more:
+            return
+
+        # Check if we're near the top (within 50 pixels)
+        if self.main_display.scroll_y > 50:
+            return
+
+        # Load more history
+        self._load_more_history()
+
+    def _load_more_history(self) -> None:
+        """Load the next page of history events."""
+        if self._history_replay_state is None:
+            return
+        if not self._history_replay_state.has_more:
+            return
+
+        # Get next page of events
+        next_page = self._history_replay_state.get_next_page()
+        if not next_page:
+            return
+
+        # Get the visualizer from the runner
+        if self.conversation_runner is None:
+            return
+
+        visualizer = self.conversation_runner.visualizer
+
+        # Show loading indicator
+        remaining = self._history_replay_state.remaining_count
+        self.notify(
+            f"Loading {len(next_page)} more events... ({remaining} remaining)",
+            title="History",
+            timeout=2,
+        )
+
+        # Prepend events to the display (they need to appear at the top)
+        self._prepend_history_events(next_page, visualizer)
+
+    def _prepend_history_events(
+        self,
+        events: list,
+        visualizer: ConversationVisualizer,
+    ) -> None:
+        """Prepend history events to the main display.
+
+        Events are inserted at the beginning of the display (after splash widgets).
+        """
+        # Find the first non-splash widget index
+        insert_index = 0
+        for i, widget in enumerate(self.main_display.children):
+            widget_id = widget.id or ""
+            if not widget_id.startswith("splash_"):
+                insert_index = i
+                break
+        else:
+            # All widgets are splash widgets, insert after them
+            insert_index = len(list(self.main_display.children))
+
+        # Create widgets for each event and insert them
+        for event in events:
+            widget = visualizer._create_event_widget(event)
+            if widget:
+                self.main_display.mount(widget, before=insert_index)
+
     def on_mouse_up(self, _event: events.MouseUp) -> None:
         """Handle mouse up events for auto-copy on text selection.
 
@@ -743,8 +825,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Generate a new conversation ID
         self.conversation_id = uuid.uuid4()
 
-        # Reset the conversation runner
+        # Reset the conversation runner and history state
         self.conversation_runner = None
+        self._history_replay_state = None
 
         # Remove any existing confirmation panel
         if self.confirmation_panel:
@@ -992,10 +1075,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     ) -> None:
         """Background thread worker for switching conversations.
 
-        Loads persisted state/events from disk without blocking the UI.
-
-        Note: UI rehydration (history replay) is intentionally tracked separately
-        (see Issue #204) to keep this PR focused.
+        Loads persisted state/events from disk without blocking the UI,
+        then replays the last N events to show conversation history.
         """
         try:
             # Prepare UI first (on main thread) so old content is cleared.
@@ -1005,6 +1086,23 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             runner = self.create_conversation_runner(
                 conversation_id=target_id, visualizer=visualizer
             )
+
+            # Replay conversation history (last N events initially).
+            events = (
+                list(runner.conversation.state.events)
+                if runner.conversation.state
+                else []
+            )
+            if events:
+                # Create history state for pagination
+                history_state = create_history_state(events)
+                initial_events = history_state.get_initial_page()
+
+                # Store state for scroll-up loading
+                self.call_from_thread(self._set_history_replay_state, history_state)
+
+                # Replay initial events through visualizer
+                replay_events_to_visualizer(initial_events, visualizer)
 
             # Finalize on UI thread (set runner, dismiss loading toast).
             self.call_from_thread(self._finish_conversation_switch, runner, target_id)
@@ -1021,6 +1119,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 )
 
             self.call_from_thread(_show_error)
+
+    def _set_history_replay_state(self, state: HistoryReplayState | None) -> None:
+        """Set the history replay state (must be called from UI thread)."""
+        self._history_replay_state = state
 
     def _handle_confirmation_request(
         self, pending_actions: list[ActionEvent]
