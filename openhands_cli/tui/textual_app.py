@@ -784,7 +784,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     def _switch_to_conversation(self, conversation_id: str) -> None:
         """Switch to an existing local conversation.
 
-        This loads the conversation history from disk and displays it in the UI.
+        This switches the active conversation and loads persisted state/events
+        from disk.
 
         Args:
             conversation_id: The conversation ID to switch to
