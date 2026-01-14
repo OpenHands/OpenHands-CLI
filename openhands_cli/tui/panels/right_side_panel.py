@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Static
 
 from openhands_cli.tui.panels.ask_agent_panel import AskAgentPanel
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from openhands_cli.tui.textual_app import OpenHandsApp
 
 
-class RightSidePanel(VerticalScroll):
+class RightSidePanel(Vertical):
     """Container panel that holds both the Agent Plan and Ask Agent panels.
 
     This panel appears on the right side of the screen and contains:

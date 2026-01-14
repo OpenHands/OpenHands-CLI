@@ -9,6 +9,7 @@ RIGHT_SIDE_PANEL_STYLE = """
         border-left: vkey $foreground 30%;
         layout: vertical;
         height: 100%;
+        overflow: hidden;
     }
 
     .right-panel-divider {
@@ -51,7 +52,7 @@ RIGHT_SIDE_PANEL_STYLE = """
 
     .right-panel-header-row {
         width: 100%;
-        height: 1;
+        height: auto;
         align-vertical: middle;
         padding: 0 1;
     }
@@ -64,18 +65,25 @@ RIGHT_SIDE_PANEL_STYLE = """
     }
 
     /* Override PlanSidePanel styles when inside RightSidePanel */
-    RightSidePanel PlanSidePanel {
-        width: 100%;
+    RightSidePanel > PlanSidePanel {
+        width: 100% !important;
         min-width: 0;
         max-width: 100%;
         border-left: none;
-        height: auto;
+        height: 1fr !important;
         min-height: 5;
-        max-height: 50%;
-        padding: 0;
+        padding: 0 1;
+        split: none !important;
     }
 
     RightSidePanel .plan-header-row {
         display: none;
+    }
+
+    /* Override AskAgentPanel styles when inside RightSidePanel */
+    RightSidePanel > AskAgentPanel {
+        width: 100% !important;
+        height: 1fr !important;
+        min-height: 12;
     }
 """
