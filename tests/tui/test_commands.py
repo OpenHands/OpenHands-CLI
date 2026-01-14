@@ -8,12 +8,7 @@ from textual.containers import VerticalScroll
 from textual_autocomplete import DropdownItem
 
 from openhands.sdk.security.confirmation_policy import AlwaysConfirm
-from openhands_cli.tui.core.commands import (
-    COMMANDS,
-    get_commands,
-    is_valid_command,
-    show_help,
-)
+from openhands_cli.tui.core.commands import COMMANDS, is_valid_command, show_help
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.confirmation_modal import (
     ConfirmationSettingsModal,
@@ -174,15 +169,14 @@ class TestCommands:
         """Command validation is strict and argument-sensitive."""
         assert is_valid_command(cmd) is expected
 
-    def test_get_commands_local_mode(self):
-        """Test get_commands returns all commands."""
-        commands = get_commands()
-        command_names = [str(cmd.main).split(" - ")[0] for cmd in commands]
+    def test_commands_contains_history(self):
+        """Test COMMANDS includes /history."""
+        command_names = [str(cmd.main).split(" - ")[0] for cmd in COMMANDS]
 
         assert "/history" in command_names
         assert "/help" in command_names
         assert "/new" in command_names
-        assert len(commands) == 7  # All commands
+        assert len(COMMANDS) == 7  # All commands
 
     def test_all_commands_included_in_help(self):
         """Test that all commands from COMMANDS list are included in help text.

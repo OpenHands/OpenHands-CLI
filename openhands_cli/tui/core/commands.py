@@ -11,10 +11,7 @@ from textual_autocomplete import DropdownItem
 from openhands_cli.theme import OPENHANDS_THEME
 
 
-# ---------------------------------------------------------------------------
-# Command definitions
-# ---------------------------------------------------------------------------
-
+# Available commands with descriptions after the command
 COMMANDS = [
     DropdownItem(main="/help - Display available commands"),
     DropdownItem(main="/new - Start a new conversation"),
@@ -26,19 +23,14 @@ COMMANDS = [
 ]
 
 
-def get_commands() -> list[DropdownItem]:
-    """Get available commands."""
-    return list(COMMANDS)
-
-
 def get_valid_commands() -> set[str]:
-    """Extract valid command names from commands list.
+    """Extract valid command names from COMMANDS list.
 
     Returns:
         Set of valid command strings (e.g., {"/help", "/exit"})
     """
     valid_commands = set()
-    for command_item in get_commands():
+    for command_item in COMMANDS:
         command_text = str(command_item.main)
         # Extract command part (before " - " if present)
         if " - " in command_text:
@@ -70,16 +62,13 @@ def show_help(main_display: VerticalScroll) -> None:
     primary = OPENHANDS_THEME.primary
     secondary = OPENHANDS_THEME.secondary
 
-    base_help = f"""
+    help_text = f"""
 [bold {primary}]OpenHands CLI Help[/bold {primary}]
 [dim]Available commands:[/dim]
 
   [{secondary}]/help[/{secondary}] - Display available commands
   [{secondary}]/new[/{secondary}] - Start a new conversation
   [{secondary}]/history[/{secondary}] - Toggle conversation history
-"""
-
-    rest_help = f"""\
   [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
   [{secondary}]/condense[/{secondary}] - Condense conversation history
   [{secondary}]/feedback[/{secondary}] - Send anonymous feedback about CLI
@@ -90,7 +79,5 @@ def show_help(main_display: VerticalScroll) -> None:
   • Use arrow keys to navigate through suggestions
   • Press Enter to select a command
 """
-
-    help_text = base_help + rest_help
     help_widget = Static(help_text, classes="help-message")
     main_display.mount(help_widget)

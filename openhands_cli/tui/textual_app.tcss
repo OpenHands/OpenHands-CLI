@@ -37,7 +37,6 @@ Screen {
     color: $foreground;
 }
 
-
 #input_area {
     height: 7;
     dock: bottom;

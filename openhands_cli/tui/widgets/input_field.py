@@ -8,7 +8,7 @@ from textual.message import Message
 from textual.signal import Signal
 from textual.widgets import Input, TextArea
 
-from openhands_cli.tui.core.commands import get_commands
+from openhands_cli.tui.core.commands import COMMANDS
 from openhands_cli.tui.widgets.autocomplete import EnhancedAutoComplete
 
 
@@ -106,10 +106,7 @@ class InputField(Container):
         self.textarea_widget.display = False
         yield self.textarea_widget
 
-        yield EnhancedAutoComplete(
-            self.input_widget,
-            command_candidates=get_commands(),
-        )
+        yield EnhancedAutoComplete(self.input_widget, command_candidates=COMMANDS)
 
     def on_mount(self) -> None:
         """Focus the input when mounted."""
