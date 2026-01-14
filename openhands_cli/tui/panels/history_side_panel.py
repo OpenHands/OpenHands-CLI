@@ -36,16 +36,15 @@ class HistoryItem(Static):
         """
         # Build the content string - show first_user_prompt as title, id as secondary
         time_str = _format_time(conversation.created_date)
-        full_id = conversation.id
-        short_id = full_id[:8]
+        conv_id = conversation.id
 
         # Use first_user_prompt as title if available, otherwise use ID
         has_title = bool(conversation.first_user_prompt)
         if conversation.first_user_prompt:
             title = _truncate(conversation.first_user_prompt, 100)
-            content = f"{title}\n[dim]{short_id} • {time_str}[/dim]"
+            content = f"{title}\n[dim]{conv_id} • {time_str}[/dim]"
         else:
-            content = f"[dim]New conversation[/dim]\n[dim]{short_id} • {time_str}[/dim]"
+            content = f"[dim]New conversation[/dim]\n[dim]{conv_id} • {time_str}[/dim]"
 
         super().__init__(content, markup=True, **kwargs)
         self.conversation_id = conversation.id
@@ -79,8 +78,7 @@ class HistoryItem(Static):
         """Update the displayed title for this history item."""
         time_str = _format_time(self._created_date)
         title_text = _truncate(title, 100)
-        short_id = self.conversation_id[:8]
-        self.update(f"{title_text}\n[dim]{short_id} • {time_str}[/dim]")
+        self.update(f"{title_text}\n[dim]{self.conversation_id} • {time_str}[/dim]")
         self._has_title = True
 
     def set_current(self, is_current: bool) -> None:
@@ -158,6 +156,48 @@ class HistorySidePanel(Container):
         """Called when the panel is mounted."""
         self.selected_conversation_id = self.current_conversation_id
         self.refresh_content()
+        self._subscribe_to_app_signals()
+
+    def _subscribe_to_app_signals(self) -> None:
+        """Subscribe to app signals (if present) so the panel can self-update."""
+        app = self.app
+
+        new_conv_signal = getattr(app, "history_new_conversation_signal", None)
+        if new_conv_signal is not None:
+            new_conv_signal.subscribe(self, self._on_history_new_conversation)
+
+        current_conv_signal = getattr(app, "history_current_conversation_signal", None)
+        if current_conv_signal is not None:
+            current_conv_signal.subscribe(self, self._on_history_current_conversation)
+
+        title_signal = getattr(app, "history_title_updated_signal", None)
+        if title_signal is not None:
+            title_signal.subscribe(self, self._on_history_title_updated)
+
+        select_current_signal = getattr(app, "history_select_current_signal", None)
+        if select_current_signal is not None:
+            select_current_signal.subscribe(self, self._on_history_select_current)
+
+    def _on_history_new_conversation(self, conversation_id: uuid.UUID) -> None:
+        """Handle app signal: a new conversation was created and should be selected."""
+        self.ensure_conversation_visible(conversation_id)
+        self.set_current_conversation(conversation_id)
+        self.select_current_conversation()
+
+    def _on_history_current_conversation(self, conversation_id: uuid.UUID) -> None:
+        """Handle app signal: current conversation changed."""
+        self.set_current_conversation(conversation_id)
+
+    def _on_history_title_updated(self, payload: tuple[uuid.UUID, str]) -> None:
+        """Handle app signal: conversation title should be updated if needed."""
+        conversation_id, title = payload
+        self.update_conversation_title_if_needed(
+            conversation_id=conversation_id, title=title
+        )
+
+    def _on_history_select_current(self, _data: bool) -> None:
+        """Handle app signal: revert selection highlight to the current conversation."""
+        self.select_current_conversation()
 
     def refresh_content(self) -> None:
         """Reload conversations and render the list."""

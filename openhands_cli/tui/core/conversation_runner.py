@@ -3,7 +3,6 @@
 import asyncio
 import uuid
 from collections.abc import Callable
-from typing import Any, cast
 
 from rich.console import Console
 from rich.text import Text
@@ -146,25 +145,6 @@ class ConversationRunner:
         """
         self._update_run_status(True)
         try:
-            # If resuming an old conversation that was previously finished/paused,
-            # reset it to an actionable state so `.run()` will actually execute.
-            try:
-                status = self.conversation.state.execution_status
-                if status in (
-                    ConversationExecutionStatus.FINISHED,
-                    ConversationExecutionStatus.PAUSED,
-                    ConversationExecutionStatus.ERROR,
-                    ConversationExecutionStatus.STUCK,
-                ):
-                    # The SDK typing marks execution_status as read-only in the
-                    # protocol, but the concrete state is mutable at runtime.
-                    cast(
-                        Any, self.conversation.state
-                    ).execution_status = ConversationExecutionStatus.IDLE
-            except Exception:
-                # Best-effort: if state is unavailable, proceed normally.
-                pass
-
             # Send message and run conversation
             self.conversation.send_message(message)
             if self._confirmation_mode_active:

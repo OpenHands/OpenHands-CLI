@@ -99,6 +99,18 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         super().__init__(**kwargs)
 
         self.conversation_running_signal = Signal(self, "conversation_running_signal")
+        # History panel update signals (so the panel can self-update without the app
+        # directly orchestrating it).
+        self.history_new_conversation_signal = Signal(
+            self, "history_new_conversation_signal"
+        )
+        self.history_current_conversation_signal = Signal(
+            self, "history_current_conversation_signal"
+        )
+        self.history_title_updated_signal = Signal(self, "history_title_updated_signal")
+        self.history_select_current_signal = Signal(
+            self, "history_select_current_signal"
+        )
         self.is_ui_initialized = False
 
         # Store exit confirmation setting
@@ -474,14 +486,14 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if self.conversation_runner is None:
             self.conversation_runner = self.create_conversation_runner()
 
+        # If History panel is open, update "New conversation" title immediately
+        # on the first message (without waiting for persistence on disk).
+        self.history_title_updated_signal.publish((self.conversation_id, user_message))
+
         # Show that we're processing the message
         if self.conversation_runner.is_running:
             await self.conversation_runner.queue_message(user_message)
             return
-
-        # If History panel is open, update "New conversation" title immediately
-        # on the first message (without waiting for persistence on disk).
-        self._update_history_panel_title_if_needed(user_message)
 
         # Process message asynchronously to keep UI responsive
         # Only run worker if we have an active app (not in tests)
@@ -501,18 +513,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             )
             self.main_display.mount(placeholder_widget)
             self.main_display.scroll_end(animate=False)
-
-    def _update_history_panel_title_if_needed(self, user_message: str) -> None:
-        """Update History panel title for the current conversation if needed."""
-        try:
-            history_panel = self.query_one(HistorySidePanel)
-        except Exception:
-            return
-
-        history_panel.update_conversation_title_if_needed(
-            conversation_id=self.conversation_id,
-            title=user_message,
-        )
 
     def action_request_quit(self) -> None:
         """Action to handle Ctrl+Q key binding."""
@@ -756,18 +756,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             get_conversation_text(self.conversation_id.hex, theme=OPENHANDS_THEME)
         )
 
-        # If History panel is open, switch highlight to the new conversation.
-        try:
-            history_panel = self.query_one(HistorySidePanel)
-        except Exception:
-            history_panel = None
-
-        if history_panel is not None:
-            history_panel.ensure_conversation_visible(self.conversation_id)
-            history_panel.set_current_conversation(self.conversation_id)
-            history_panel.select_current_conversation()
-        else:
-            self._sync_history_panel_current(self.conversation_id)
+        # Notify history panel (if mounted) to add/select the new conversation.
+        self.history_new_conversation_signal.publish(self.conversation_id)
 
         # Scroll to top to show the splash screen
         self.main_display.scroll_home(animate=False)
@@ -815,11 +805,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             def _stay() -> None:
                 # Revert selection highlight back to current conversation so the
                 # user doesn't think the app switched chats.
-                try:
-                    history_panel = self.query_one(HistorySidePanel)
-                    history_panel.select_current_conversation()
-                except Exception:
-                    pass
+                self.history_select_current_signal.publish(True)
                 # Keep typing flow smooth.
                 try:
                     self.input_field.focus_input()
@@ -922,8 +908,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self._switch_loading_notification = None
 
         notification = Notification(
-            "⏳ Loading conversation history...",
-            title="Loading",
+            "⏳ Switching conversation...",
+            title="Switching",
             severity="information",
             timeout=3600,
             markup=True,
@@ -978,20 +964,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.conversation_runner = runner
         self.main_display.scroll_end(animate=False)
         self._dismiss_switch_loading_notification()
-        self._sync_history_panel_current(target_id)
+        self.history_current_conversation_signal.publish(target_id)
         self.notify(
             title="Switched",
             message=f"Resumed conversation {target_id.hex[:8]}",
             severity="information",
         )
-
-    def _sync_history_panel_current(self, conversation_id: uuid.UUID) -> None:
-        """If History panel is open, sync current conversation highlight."""
-        try:
-            history_panel = self.query_one(HistorySidePanel)
-        except Exception:
-            return
-        history_panel.set_current_conversation(conversation_id)
+        self.input_field.focus_input()
 
     def _switch_to_conversation_thread(
         self,
