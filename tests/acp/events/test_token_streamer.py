@@ -671,14 +671,15 @@ class TestScheduleUpdate:
         loop.close()
 
 
-@pytest.mark.asyncio
-async def test_terminal_tool_lifecycle_stream_then_action_then_observation():
+def test_terminal_tool_lifecycle_stream_then_action_then_observation(
+    mock_connection, event_loop
+):
     """
     Lifecycle:
       1) on_token streams partial TerminalAction -> emits
          ToolCallStart(in_progress) then ToolCallProgress(in_progress)
       2) unstreamed ActionEvent arrives (same tool_call_id) -> may emit
-         another ToolCallStart(in_progress)
+         ToolCallProgress(in_progress) to update title with summary
       3) unstreamed ObservationEvent arrives (same tool_call_id) -> emits
          ToolCallProgress(completed)
 
@@ -687,12 +688,10 @@ async def test_terminal_tool_lifecycle_stream_then_action_then_observation():
       tool_call (in_progress) -> tool_call_update (in_progress) ->
       tool_call_update (completed)
     """
-    conn = AsyncMock()
-    loop = asyncio.get_running_loop()
     subscriber = TokenBasedEventSubscriber(
         session_id="test-session",
-        conn=conn,
-        loop=loop,
+        conn=mock_connection,
+        loop=event_loop,
     )
 
     tool_call_id = "call-123"
@@ -714,9 +713,10 @@ async def test_terminal_tool_lifecycle_stream_then_action_then_observation():
         arguments='and":"ls"}',
     )
 
-    # with patch.object(loop, "is_running", return_value=False):
-    subscriber.on_token(_chunk(tool_calls=[tc1]))
-    subscriber.on_token(_chunk(tool_calls=[tc2]))
+    # Patch is_running to False so updates are executed synchronously
+    with patch.object(event_loop, "is_running", return_value=False):
+        subscriber.on_token(_chunk(tool_calls=[tc1]))
+        subscriber.on_token(_chunk(tool_calls=[tc2]))
 
     # -----------------------
     # 2) Final ActionEvent arrives (same tool_call_id)
@@ -742,7 +742,8 @@ async def test_terminal_tool_lifecycle_stream_then_action_then_observation():
         llm_response_id="llm-1",
         tool_call=message_tool_call,
     )
-    await subscriber.unstreamed_event_handler(action_event)
+    with patch.object(event_loop, "is_running", return_value=False):
+        event_loop.run_until_complete(subscriber.unstreamed_event_handler(action_event))
 
     # -----------------------
     # 3) ObservationEvent arrives (same tool_call_id)
@@ -761,14 +762,15 @@ async def test_terminal_tool_lifecycle_stream_then_action_then_observation():
         action_id=action_id,  # REQUIRED linkage
     )
 
-    await subscriber.unstreamed_event_handler(obs_event)
+    with patch.object(event_loop, "is_running", return_value=False):
+        event_loop.run_until_complete(subscriber.unstreamed_event_handler(obs_event))
 
     # -----------------------
     # Assert: status progression
     # -----------------------
     # Gather ONLY the updates related to our tool_call_id.
     updates = []
-    for call in conn.session_update.call_args_list:
+    for call in mock_connection.session_update.call_args_list:
         update = call.kwargs["update"]
         # Filter only tool-call updates for this tool_call_id
         if getattr(update, "tool_call_id", None) == tool_call_id:
@@ -777,17 +779,18 @@ async def test_terminal_tool_lifecycle_stream_then_action_then_observation():
     assert updates, "Expected at least one ACP update for tool_call_id"
 
     # We want to see:
-    # - at least one ToolCallStart with status in_progress
-    # - at least one ToolCallProgress with status in_progress
+    # - at least one ToolCallStart with status in_progress (from streaming)
+    # - at least one ToolCallProgress with status in_progress (from streaming or
+    #   ActionEvent updating the title with summary)
     # - final ToolCallProgress with status completed
     starts = [u for u in updates if isinstance(u, ToolCallStart)]
     progresses = [u for u in updates if isinstance(u, ToolCallProgress)]
 
     assert any(isinstance(s, ToolCallStart) for s in starts), (
-        "Expected a ToolCallStart from streaming and/or ActionEvent"
+        "Expected a ToolCallStart from streaming"
     )
     assert any(isinstance(p, ToolCallProgress) for p in progresses), (
-        "Expected at least one ToolCallProgress during streaming"
+        "Expected at least one ToolCallProgress during streaming or from ActionEvent"
     )
 
     # The last tool-call-related update should be completion.
