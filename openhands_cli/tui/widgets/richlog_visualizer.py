@@ -108,6 +108,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._cli_settings: CliSettings | None = None
         # Track pending actions by tool_call_id for action-observation pairing
         self._pending_actions: dict[str, tuple[ActionEvent, Collapsible]] = {}
+        # Track the last critic score for showing diffs
+        self._last_critic_score: float | None = None
 
     @property
     def cli_settings(self) -> CliSettings:
@@ -255,7 +257,23 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 score_style = "green"
             else:
                 score_style = "yellow"
-            title += f" [dim]\\[Critic: [/{score_style}]{score:.2f}[/{score_style}]\\][/dim]"
+            
+            # Build critic score display with diff from previous score
+            critic_display = f"[/{score_style}]{score:.2f}[/{score_style}]"
+            
+            # Add diff if we have a previous score
+            if self._last_critic_score is not None:
+                diff = score - self._last_critic_score
+                if abs(diff) >= 0.01:  # Only show diff if meaningful (≥0.01)
+                    diff_sign = "+" if diff > 0 else ""
+                    # Color code the diff: green for positive, red for negative
+                    diff_style = "green" if diff > 0 else "red"
+                    critic_display += f", [/{diff_style}]{diff_sign}{diff:.2f}[/{diff_style}]"
+            
+            title += f" [dim]\\[Critic: {critic_display}\\][/dim]"
+            
+            # Update last critic score for next comparison
+            self._last_critic_score = score
 
         return title
 
