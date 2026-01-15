@@ -136,8 +136,8 @@ pythonVersion = "3.12"
 useLibraryCodeForTypes = true
 typeCheckingMode = "standard"
 
-# USE EXACT COMMIT FROM AGENT-SDK (PR #1368 - Add condense method to conversation class)
+# USE EXACT COMMIT FROM AGENT-SDK (PR #1269 - Add API-Based Critic for Real-Time Agent Action Evaluation)
 
-# [tool.uv.sources]
-# openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "5ee81068fd16bb84d9a611e9af44825478155e15" }
-# openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "5ee81068fd16bb84d9a611e9af44825478155e15" }
+[tool.uv.sources]
+openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "e9a84c57e3839192277293337c8c7312f41ace08" }
+openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "e9a84c57e3839192277293337c8c7312f41ace08" }

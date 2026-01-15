@@ -213,6 +213,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
             "[bold]{summary}[/bold][dim]: $ {command}[/dim]" for terminal
             "[bold]{summary}[/bold][dim]: Reading/Editing {path}[/dim]" for files
 
+        If critic result is present, adds a score indicator at the end.
+
         The detail portion (after the colon) is rendered in dim style to
         visually distinguish it from the main summary text.
         """
@@ -228,21 +230,34 @@ class ConversationVisualizer(ConversationVisualizerBase):
             cmd = self._escape_rich_markup(action.command.strip().replace("\n", " "))
             cmd = self._truncate_for_display(cmd)
             if summary:
-                return f"[bold]{summary}[/bold][dim]: $ {cmd}[/dim]"
-            return f"[dim]$ {cmd}[/dim]"
-
+                title = f"[bold]{summary}[/bold][dim]: $ {cmd}[/dim]"
+            else:
+                title = f"[dim]$ {cmd}[/dim]"
         # File operations: include path with Reading/Editing
-        if isinstance(action, FileEditorAction) and action.path:
+        elif isinstance(action, FileEditorAction) and action.path:
             op = "Reading" if action.command == "view" else "Editing"
             path = self._escape_rich_markup(action.path)
             if summary:
-                return f"[bold]{summary}[/bold][dim]: {op} {path}[/dim]"
-            return f"[bold]{op}[/bold][dim] {path}[/dim]"
-
+                title = f"[bold]{summary}[/bold][dim]: {op} {path}[/dim]"
+            else:
+                title = f"[bold]{op}[/bold][dim] {path}[/dim]"
         # All other actions: just use summary
-        if summary:
-            return f"[bold]{summary}[/bold]"
-        return event.tool_name
+        elif summary:
+            title = f"[bold]{summary}[/bold]"
+        else:
+            title = event.tool_name
+
+        # Add critic score indicator if present
+        if event.critic_result is not None:
+            score = event.critic_result.score
+            # Color code the score based on success threshold
+            if event.critic_result.success:
+                score_style = "green"
+            else:
+                score_style = "yellow"
+            title += f" [dim]\\[Critic: [/{score_style}]{score:.2f}[/{score_style}]\\][/dim]"
+
+        return title
 
     def _build_observation_content(
         self, event: ObservationEvent | UserRejectObservation | AgentErrorEvent
@@ -442,7 +457,11 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 # For finish action, render as markdown with padding to align
                 # User message has "padding: 0 1" and starts with "> ", so text
                 # starts at position 3 (1 padding + 2 for "> ")
-                widget = Markdown(str(action.message))
+                # If critic result is present, use full event.visualize to include it
+                if event.critic_result is not None:
+                    widget = Markdown(str(content))
+                else:
+                    widget = Markdown(str(action.message))
                 widget.styles.padding = AGENT_MESSAGE_PADDING
                 return widget
             elif isinstance(action, ThinkAction):
@@ -459,6 +478,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             ):
                 return None
             # Display messages as markdown for proper rendering
+            # The event.visualize already includes critic result if present
             widget = Markdown(str(content))
             widget.styles.padding = AGENT_MESSAGE_PADDING
             return widget
