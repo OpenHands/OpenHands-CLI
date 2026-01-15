@@ -15,6 +15,7 @@ from typing import ClassVar
 
 from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
+from textual.binding import Binding
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.notifications import Notification, Notify
 from textual.screen import Screen
@@ -39,7 +40,6 @@ from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.core.history_replay import (
     HistoryReplayState,
     create_history_state,
-    replay_events_to_visualizer,
 )
 from openhands_cli.tui.modals import SettingsScreen, SwitchConversationModal
 from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModal
@@ -71,6 +71,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+o", "toggle_cells", "Toggle Cells"),
         ("ctrl+h", "toggle_history", "Toggle history panel"),
+        Binding("ctrl+u", "load_more_history", "Load more history", show=False),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
@@ -588,26 +589,17 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         autocompletes = self.query(AutoComplete)
         return any(ac.display for ac in autocompletes)
 
-    @on(events.MouseScrollUp, "#main_display")
-    def on_main_display_scroll_up(self) -> None:
-        """Handle scroll up in main display to load more history.
-
-        When user scrolls to the top and there's more history to load,
-        prepend older events to the display.
-        """
+    async def action_load_more_history(self) -> None:
+        """Action to manually load more history (Ctrl+U binding)."""
         if self._history_replay_state is None:
+            self.notify("No history state")
             return
         if not self._history_replay_state.has_more:
+            self.notify("No more history")
             return
+        await self._load_more_history()
 
-        # Check if we're near the top (within 50 pixels)
-        if self.main_display.scroll_y > 50:
-            return
-
-        # Load more history
-        self._load_more_history()
-
-    def _load_more_history(self) -> None:
+    async def _load_more_history(self) -> None:
         """Load the next page of history events."""
         if self._history_replay_state is None:
             return
@@ -619,12 +611,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if not next_page:
             return
 
-        # Get the visualizer from the runner
-        if self.conversation_runner is None:
-            return
-
-        visualizer = self.conversation_runner.visualizer
-
         # Show loading indicator
         remaining = self._history_replay_state.remaining_count
         self.notify(
@@ -634,17 +620,20 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         )
 
         # Prepend events to the display (they need to appear at the top)
-        self._prepend_history_events(next_page, visualizer)
+        await self._prepend_history_events(next_page)
 
-    def _prepend_history_events(
-        self,
-        events: list,
-        visualizer: ConversationVisualizer,
-    ) -> None:
+    async def _prepend_history_events(self, events_list: list) -> None:
         """Prepend history events to the main display.
 
         Events are inserted at the beginning of the display (after splash widgets).
+        Scroll position is preserved so the user stays at the same content.
+
+        Strategy: mount all widgets, await layout, then adjust scroll atomically.
         """
+        # Save current scroll position and virtual height BEFORE adding widgets
+        old_scroll_y = self.main_display.scroll_y
+        old_virtual_height = self.main_display.virtual_size.height
+
         # Find the first non-splash widget index
         insert_index = 0
         for i, widget in enumerate(self.main_display.children):
@@ -656,11 +645,32 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             # All widgets are splash widgets, insert after them
             insert_index = len(list(self.main_display.children))
 
-        # Create widgets for each event and insert them
-        for event in events:
-            widget = visualizer._create_event_widget(event)
+        # Create all widgets first
+        widgets_to_mount = []
+        for event in events_list:
+            widget = self._create_history_event_widget(event)
             if widget:
-                self.main_display.mount(widget, before=insert_index)
+                widgets_to_mount.append(widget)
+
+        if not widgets_to_mount:
+            return
+
+        # Mount all widgets and await completion
+        # mount() with multiple widgets returns AwaitMount that waits for all
+        await self.main_display.mount(*widgets_to_mount, before=insert_index)
+
+        # Now layout is guaranteed complete - get the new virtual height
+        new_virtual_height = self.main_display.virtual_size.height
+        height_added = new_virtual_height - old_virtual_height
+
+        # After adding content at top, the old content moved down by height_added
+        # To keep viewing the same content, scroll down by the same amount
+        # Use batch_update to make scroll adjustment atomic (no intermediate render)
+        if height_added > 0:
+            with self.app.batch_update():
+                self.main_display.scroll_to(
+                    y=old_scroll_y + height_added, animate=False
+                )
 
     def on_mouse_up(self, _event: events.MouseUp) -> None:
         """Handle mouse up events for auto-copy on text selection.
@@ -1098,11 +1108,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 history_state = create_history_state(events)
                 initial_events = history_state.get_initial_page()
 
-                # Store state for scroll-up loading
-                self.call_from_thread(self._set_history_replay_state, history_state)
-
-                # Replay initial events through visualizer
-                replay_events_to_visualizer(initial_events, visualizer)
+                # Replay must happen on main thread (visualizer creates widgets)
+                self.call_from_thread(
+                    self._replay_initial_history, history_state, initial_events
+                )
 
             # Finalize on UI thread (set runner, dismiss loading toast).
             self.call_from_thread(self._finish_conversation_switch, runner, target_id)
@@ -1123,6 +1132,54 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     def _set_history_replay_state(self, state: HistoryReplayState | None) -> None:
         """Set the history replay state (must be called from UI thread)."""
         self._history_replay_state = state
+
+    def _create_history_event_widget(self, event):
+        """Create a widget for a history event.
+
+        User messages get the same style as live user messages ("> " prefix).
+        Other events use the visualizer.
+        """
+        from openhands.sdk.event import MessageEvent
+
+        # Check if this is a user message
+        if isinstance(event, MessageEvent):
+            if event.llm_message and event.llm_message.role == "user":
+                # Extract text from user message
+                text = ""
+                if event.llm_message.content:
+                    for item in event.llm_message.content:
+                        if hasattr(item, "text"):
+                            text += getattr(item, "text", "")
+                if text:
+                    return Static(f"> {text}", classes="user-message", markup=False)
+                return None
+
+        # For other events, use visualizer
+        replay_visualizer = ConversationVisualizer(
+            self.main_display, self, skip_user_messages=True
+        )
+        return replay_visualizer._create_event_widget(event)
+
+    def _replay_initial_history(
+        self, history_state: HistoryReplayState, initial_events: list
+    ) -> None:
+        """Replay initial history events on the UI thread.
+
+        Args:
+            history_state: The pagination state to store.
+            initial_events: Events to replay immediately.
+        """
+        # Store state for scroll-up loading
+        self._history_replay_state = history_state
+
+        # Replay events - this creates and mounts widgets
+        for event in initial_events:
+            widget = self._create_history_event_widget(event)
+            if widget:
+                self.main_display.mount(widget)
+
+        # Scroll to bottom to show most recent
+        self.main_display.scroll_end(animate=False)
 
     def _handle_confirmation_request(
         self, pending_actions: list[ActionEvent]

@@ -188,13 +188,13 @@ class TestPaginationIntegration:
         assert state.displayed_count == 5
         assert state.has_more
 
-        # First scroll-up: events 2-6
+        # First "load more": events 2-6
         page1 = state.get_next_page()
         assert len(page1) == 5
         assert state.displayed_count == 10
         assert state.has_more
 
-        # Second scroll-up: events 0-1
+        # Second "load more": events 0-1
         page2 = state.get_next_page()
         assert len(page2) == 2
         assert state.displayed_count == 12
