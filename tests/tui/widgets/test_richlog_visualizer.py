@@ -63,9 +63,9 @@ def mock_cli_settings():
 
 
 @pytest.fixture
-def mock_cli_settings_with_cost(mock_cli_settings):
-    """Provide mock CliSettings with display_cost_per_action=True."""
-    return mock_cli_settings(display_cost_per_action=True)
+def mock_cli_settings_with_defaults(mock_cli_settings):
+    """Provide mock CliSettings with default values."""
+    return mock_cli_settings()
 
 
 # ============================================================================
@@ -369,7 +369,7 @@ class TestCliSettingsCaching:
     def test_cli_settings_caching(self, visualizer):
         """Test that app configuration is cached and not loaded repeatedly."""
         with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-            mock_config = CliSettings(display_cost_per_action=True)
+            mock_config = CliSettings(default_cells_expanded=True)
             mock_load.return_value = mock_config
 
             # First call should load from file
@@ -390,8 +390,8 @@ class TestCliSettingsCaching:
     def test_cli_settings_refresh(self, visualizer):
         """Test that reload_configuration reloads the configuration."""
         with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-            mock_config1 = CliSettings(display_cost_per_action=False)
-            mock_config2 = CliSettings(display_cost_per_action=True)
+            mock_config1 = CliSettings(default_cells_expanded=False)
+            mock_config2 = CliSettings(default_cells_expanded=True)
             mock_load.side_effect = [mock_config1, mock_config2]
 
             # First call should load from file
@@ -411,13 +411,13 @@ class TestCliSettingsCaching:
     def test_reload_configuration_clears_cache(self, visualizer):
         """Test that reload_configuration properly clears the cached configuration."""
         with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-            config1 = CliSettings(display_cost_per_action=False)
-            config2 = CliSettings(display_cost_per_action=True)
+            config1 = CliSettings(default_cells_expanded=False)
+            config2 = CliSettings(default_cells_expanded=True)
             mock_load.side_effect = [config1, config2]
 
             # First access should load config1
             first_config = visualizer.cli_settings
-            assert first_config.display_cost_per_action is False
+            assert first_config.default_cells_expanded is False
             assert mock_load.call_count == 1
 
             # Reload should clear cache and load config2
@@ -426,7 +426,7 @@ class TestCliSettingsCaching:
 
             # Next access should return config2 (from cache)
             second_config = visualizer.cli_settings
-            assert second_config.display_cost_per_action is True
+            assert second_config.default_cells_expanded is True
             assert mock_load.call_count == 2  # No additional load
 
     @pytest.mark.parametrize(
@@ -439,12 +439,12 @@ class TestCliSettingsCaching:
         """Test cli_settings property behavior with different initial cache states."""
         # Set initial cache state
         if initial_cache_state == "cached_config":
-            visualizer._cli_settings = CliSettings(display_cost_per_action=True)
+            visualizer._cli_settings = CliSettings(default_cells_expanded=False)
         else:
             visualizer._cli_settings = None
 
         with patch("openhands_cli.stores.CliSettings.load") as mock_load:
-            mock_config = CliSettings(display_cost_per_action=False)
+            mock_config = CliSettings(default_cells_expanded=True)
             mock_load.return_value = mock_config
 
             result = visualizer.cli_settings
@@ -454,7 +454,7 @@ class TestCliSettingsCaching:
                 assert result == mock_config
             else:
                 assert mock_load.call_count == 0
-                assert result.display_cost_per_action is True
+                assert result.default_cells_expanded is False
 
 
 class TestCommandTruncation:
@@ -553,3 +553,220 @@ EOF"""
         assert truncated.endswith(ELLIPSIS)
         assert truncated.startswith("a")
         assert len(truncated) == MAX_LINE_LENGTH
+
+
+# ============================================================================
+# Plan Panel Integration Tests
+# ============================================================================
+
+
+class TestPlanPanelIntegration:
+    """Tests for ConversationVisualizer plan panel integration."""
+
+    @pytest.mark.asyncio
+    async def test_task_tracker_observation_triggers_plan_panel_refresh(self):
+        """Verify that receiving a TaskTrackerObservation calls _refresh_plan_panel."""
+        from unittest.mock import patch
+
+        from textual.app import App
+        from textual.containers import Horizontal, VerticalScroll
+        from textual.widgets import Static
+
+        from openhands.sdk.event import ObservationEvent
+        from openhands.tools.task_tracker.definition import (
+            TaskItem,
+            TaskTrackerObservation,
+        )
+
+        class TestApp(App):
+            CSS = """
+            Screen { layout: horizontal; }
+            #main_content { width: 2fr; }
+            """
+
+            def compose(self):
+                with Horizontal(id="content_area"):
+                    with VerticalScroll(id="main_display"):
+                        yield Static("Content")
+
+        app = TestApp()
+        async with app.run_test():
+            container = app.query_one("#main_display", VerticalScroll)
+            visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+            # Create a TaskTrackerObservation event
+            task_tracker_obs = TaskTrackerObservation(
+                command="plan",
+                task_list=[TaskItem(title="Test", notes="", status="todo")],
+            )
+            event = ObservationEvent(
+                observation=task_tracker_obs,
+                tool_call_id="test-123",
+                tool_name="task_tracker",
+                action_id="action-1",
+            )
+
+            # Mock _do_refresh_plan_panel to verify it gets called
+            with patch.object(visualizer, "_do_refresh_plan_panel") as mock_refresh:
+                visualizer.on_event(event)
+                mock_refresh.assert_called_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("auto_open_enabled", [True, False])
+    async def test_refresh_plan_panel_respects_auto_open_setting(
+        self, auto_open_enabled: bool
+    ):
+        """Verify panel toggle behavior respects auto_open_plan_panel setting."""
+
+        from textual.app import App
+        from textual.containers import Horizontal, VerticalScroll
+        from textual.widgets import Static
+
+        from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
+
+        class TestApp(App):
+            CSS = """
+            Screen { layout: horizontal; }
+            #main_content { width: 2fr; }
+            """
+
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+                self.conversation_dir = "/test/conversation/dir"
+                self.plan_panel: PlanSidePanel | None = None
+
+            def compose(self):
+                with Horizontal(id="content_area"):
+                    with VerticalScroll(id="main_display"):
+                        yield Static("Content")
+
+            def on_mount(self):
+                self.plan_panel = PlanSidePanel(self)  # type: ignore[arg-type]
+
+        app = TestApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()  # Wait for on_mount
+            container = app.query_one("#main_display", VerticalScroll)
+            visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+            # Mock settings and toggle
+            with patch.object(
+                CliSettings,
+                "load",
+                return_value=CliSettings(auto_open_plan_panel=auto_open_enabled),
+            ):
+                visualizer._cli_settings = None  # Clear cache
+                with patch.object(app.plan_panel, "toggle") as mock_toggle:
+                    visualizer._do_refresh_plan_panel()
+
+                    if auto_open_enabled:
+                        # toggle() should be called to open the panel
+                        mock_toggle.assert_called_once()
+                    else:
+                        # toggle() should NOT be called
+                        mock_toggle.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_refresh_plan_panel_updates_existing_panel(self):
+        """Verify existing panel is refreshed regardless of auto_open setting."""
+        from unittest.mock import PropertyMock
+
+        from textual.app import App
+        from textual.containers import Horizontal, VerticalScroll
+        from textual.widgets import Static
+
+        from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
+
+        class TestApp(App):
+            CSS = """
+            Screen { layout: horizontal; }
+            #main_content { width: 2fr; }
+            """
+
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+                self.conversation_dir = "/test/conversation/dir"
+                self.plan_panel: PlanSidePanel | None = None
+
+            def compose(self):
+                with Horizontal(id="content_area"):
+                    with VerticalScroll(id="main_display"):
+                        yield Static("Content")
+
+            def on_mount(self):
+                self.plan_panel = PlanSidePanel(self)  # type: ignore[arg-type]
+
+        app = TestApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()  # Wait for on_mount
+            container = app.query_one("#main_display", VerticalScroll)
+            visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+            # Mock that panel is already on screen
+            with patch.object(
+                type(app.plan_panel), "is_on_screen", new_callable=PropertyMock
+            ) as mock_is_on_screen:
+                mock_is_on_screen.return_value = True
+
+                # Mock refresh_from_disk to verify it gets called
+                with patch.object(app.plan_panel, "refresh_from_disk") as mock_refresh:
+                    # Even with auto_open disabled, existing panel should refresh
+                    with patch.object(
+                        CliSettings,
+                        "load",
+                        return_value=CliSettings(auto_open_plan_panel=False),
+                    ):
+                        visualizer._cli_settings = None  # Clear cache
+                        visualizer._do_refresh_plan_panel()
+
+                    mock_refresh.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_refresh_plan_panel_calls_toggle_when_auto_open_enabled(self):
+        """Verify toggle() is called when auto_open_plan_panel is enabled
+        and panel is not on screen."""
+
+        from textual.app import App
+        from textual.containers import Horizontal, VerticalScroll
+        from textual.widgets import Static
+
+        from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
+
+        class TestApp(App):
+            CSS = """
+            Screen { layout: horizontal; }
+            #main_content { width: 2fr; }
+            """
+
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+                self.conversation_dir = "/test/conversation/dir"
+                self.plan_panel: PlanSidePanel | None = None
+
+            def compose(self):
+                with Horizontal(id="content_area"):
+                    with VerticalScroll(id="main_display"):
+                        yield Static("Content")
+
+            def on_mount(self):
+                self.plan_panel = PlanSidePanel(self)  # type: ignore[arg-type]
+
+        app = TestApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()  # Wait for on_mount
+            container = app.query_one("#main_display", VerticalScroll)
+            visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+
+            # Ensure panel is not on screen
+            assert app.plan_panel is not None
+            assert app.plan_panel.is_on_screen is False
+
+            with patch.object(
+                CliSettings,
+                "load",
+                return_value=CliSettings(auto_open_plan_panel=True),
+            ):
+                visualizer._cli_settings = None  # Clear cache
+                with patch.object(app.plan_panel, "toggle") as mock_toggle:
+                    visualizer._do_refresh_plan_panel()
+                    mock_toggle.assert_called_once()

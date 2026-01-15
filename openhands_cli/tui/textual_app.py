@@ -21,6 +21,7 @@ from textual.signal import Signal
 from textual.widgets import Footer, Input, Static, TextArea
 from textual_autocomplete import AutoComplete
 
+from openhands.sdk import BaseConversation
 from openhands.sdk.event import ActionEvent
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
@@ -29,6 +30,7 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
+from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
@@ -38,6 +40,7 @@ from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModa
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
+from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
     CollapsibleNavigationMixin,
@@ -61,6 +64,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+o", "toggle_cells", "Toggle Cells"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
+        ("ctrl+x", "open_external_editor", "Open external editor"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
         ("ctrl+c", "request_quit", "Quit the application"),
@@ -111,6 +115,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.conversation_id = (
             resume_conversation_id if resume_conversation_id else uuid.uuid4()
         )
+        self.conversation_dir = BaseConversation.get_persistence_dir(
+            CONVERSATIONS_DIR, self.conversation_id
+        )
 
         # Store queued inputs (copy to prevent mutating caller's list)
         self.pending_inputs = list(queued_inputs) if queued_inputs else []
@@ -133,6 +140,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # MCP panel tracking
         self.mcp_panel: MCPSidePanel | None = None
+
+        self.plan_panel: PlanSidePanel = PlanSidePanel(self)
 
         # Register the custom theme
         self.register_theme(OPENHANDS_THEME)
@@ -176,6 +185,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         yield SystemCommand(
             "MCP", "View MCP configurations", lambda: MCPSidePanel.toggle(self)
         )
+        yield SystemCommand(
+            "PLAN",
+            "View agent plan",
+            lambda: self.plan_panel.toggle(),
+        )
         yield SystemCommand("SETTINGS", "Configure settings", self.action_open_settings)
 
     def on_mount(self) -> None:
@@ -195,8 +209,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 console.print(
                     f"[{OPENHANDS_THEME.error}]Headless mode requires existing "
                     f"settings.[/{OPENHANDS_THEME.error}]\n"
-                    f"[bold]Please run:[/bold] [{OPENHANDS_THEME.success}]openhands "
-                    f"--exp[/{OPENHANDS_THEME.success}] to configure your settings "
+                    f"[bold]Please run:[/bold] [{OPENHANDS_THEME.success}]openhands"
+                    f"[/{OPENHANDS_THEME.success}] to configure your settings "
                     f"before using [{OPENHANDS_THEME.accent}]--headless"
                     f"[/{OPENHANDS_THEME.accent}]."
                 )
@@ -360,7 +374,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if self.json_mode:
             event_callback = json_callback
 
-        return ConversationRunner(
+        runner = ConversationRunner(
             self.conversation_id,
             self.conversation_running_signal.publish,
             self._handle_confirmation_request,
@@ -371,6 +385,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self.initial_confirmation_policy,
             event_callback,
         )
+
+        return runner
 
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.
@@ -601,6 +617,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self.conversation_runner.pause_runner_without_blocking()
         else:
             self.notify(message="No running conversation to pause", severity="error")
+
+    def action_open_external_editor(self) -> None:
+        """Forward open external editor action to the input field."""
+        # Debug: notify that the main app action was triggered
+        self.notify("Main app CTRL+X action triggered", severity="information")
+        self.input_field.action_open_external_editor()
 
     def _handle_confirm_command(self) -> None:
         """Handle the /confirm command to show confirmation settings modal."""

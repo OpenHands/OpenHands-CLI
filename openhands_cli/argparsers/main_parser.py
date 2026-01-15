@@ -31,7 +31,6 @@ def create_main_parser() -> argparse.ArgumentParser:
 
             Examples:
                 openhands                           # Start textual UI mode
-                openhands --exp                     # Start textual UI (same as default)
                 openhands --headless                # Start textual UI in headless mode
                 openhands --headless --json -t "Fix bug"  # Headless with JSON output
                 openhands --resume conversation-id  # Resume conversation
@@ -74,11 +73,6 @@ def create_main_parser() -> argparse.ArgumentParser:
 
     # CLI arguments at top level (default mode)
     add_resume_args(parser)
-    parser.add_argument(
-        "--exp",
-        action="store_true",
-        help="Use textual-based UI (now default, flag kept for compatibility)",
-    )
     parser.add_argument(
         "--headless",
         action="store_true",

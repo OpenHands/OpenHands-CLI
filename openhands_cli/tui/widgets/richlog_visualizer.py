@@ -24,6 +24,7 @@ from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.tool.builtins.finish import FinishAction
 from openhands.sdk.tool.builtins.think import ThinkAction
 from openhands.tools.file_editor.definition import FileEditorAction
+from openhands.tools.task_tracker.definition import TaskTrackerObservation
 from openhands.tools.terminal.definition import TerminalAction
 from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
@@ -117,8 +118,39 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def reload_configuration(self) -> None:
         self._cli_settings = CliSettings.load()
 
+    def _run_on_main_thread(self, func, *args) -> None:
+        """Run a function on the main thread via call_from_thread if needed."""
+        if threading.get_ident() == self._main_thread_id:
+            func(*args)
+        else:
+            self._app.call_from_thread(func, *args)
+
+    def _do_refresh_plan_panel(self) -> None:
+        """Refresh the plan panel (must be called from main thread)."""
+        plan_panel = self._app.plan_panel
+        auto_open = self.cli_settings.auto_open_plan_panel
+
+        # Panel is already open, refresh contents
+        if plan_panel.is_on_screen:
+            plan_panel.refresh_from_disk()
+            return
+
+        # Not mounted: only open if user opted in
+        # and hasn't dismissed it once already
+        if not auto_open or plan_panel.user_dismissed:
+            return
+
+        # Open the plan panel
+        plan_panel.toggle()
+
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
+        # Check for TaskTrackerObservation to update/open the plan panel
+        if isinstance(event, ObservationEvent) and isinstance(
+            event.observation, TaskTrackerObservation
+        ):
+            self._run_on_main_thread(self._do_refresh_plan_panel)
+
         # Handle observation events by updating existing action collapsibles
         if isinstance(
             event, ObservationEvent | UserRejectObservation | AgentErrorEvent
@@ -128,14 +160,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         widget = self._create_event_widget(event)
         if widget:
-            # Check if we're in the main thread or a background thread
-            current_thread_id = threading.get_ident()
-            if current_thread_id == self._main_thread_id:
-                # We're in the main thread, update UI directly
-                self._add_widget_to_ui(widget)
-            else:
-                # We're in a background thread, use call_from_thread
-                self._app.call_from_thread(self._add_widget_to_ui, widget)
+            self._run_on_main_thread(self._add_widget_to_ui, widget)
 
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
@@ -175,15 +200,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Build the new content (observation result only)
         new_content = self._build_observation_content(event)
 
-        # Update the collapsible
-        current_thread_id = threading.get_ident()
-        if current_thread_id == self._main_thread_id:
-            self._update_widget_in_ui(collapsible, new_title, new_content)
-        else:
-            self._app.call_from_thread(
-                self._update_widget_in_ui, collapsible, new_title, new_content
-            )
-
+        self._run_on_main_thread(
+            self._update_widget_in_ui, collapsible, new_title, new_content
+        )
         return True
 
     def _build_action_title(self, event: ActionEvent) -> str:

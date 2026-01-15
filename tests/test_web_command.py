@@ -96,7 +96,7 @@ def test_launch_web_server_constructs_and_serves(
     launch_web_server(**kwargs)
 
     mock_server_class.assert_called_once_with(
-        "uv run openhands --exp",
+        "uv run openhands",
         host=expected_host,
         port=expected_port,
     )
