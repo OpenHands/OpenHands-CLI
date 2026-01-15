@@ -123,4 +123,12 @@ def setup_conversation(
     conversation.set_confirmation_policy(confirmation_policy)
 
     console.print(f"✓ Agent initialized with model: {agent.llm.model}", style="green")
+    
+    # Display critic status if enabled
+    if agent.critic is not None:
+        console.print(
+            "✓ [bold cyan]Critic enabled[/bold cyan] - Agent actions will be evaluated in real-time",
+            style="cyan"
+        )
+    
     return conversation

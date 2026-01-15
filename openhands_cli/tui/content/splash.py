@@ -1,8 +1,13 @@
 """Welcome message utilities for OpenHands CLI textual app."""
 
+from typing import TYPE_CHECKING
+
 from textual.theme import Theme
 
 from openhands_cli.version_check import check_for_updates
+
+if TYPE_CHECKING:
+    from openhands.sdk import Agent
 
 
 def get_conversation_text(conversation_id: str, *, theme: Theme) -> str:
@@ -39,12 +44,15 @@ def get_openhands_banner() -> str:
     return "\n".join(padded_lines)
 
 
-def get_splash_content(conversation_id: str, *, theme: Theme) -> dict:
+def get_splash_content(
+    conversation_id: str, *, theme: Theme, agent: "Agent | None" = None
+) -> dict:
     """Get structured splash screen content for native Textual widgets.
 
     Args:
         conversation_id: Optional conversation ID to display
         theme: Theme to use for colors
+        agent: Optional agent to display configuration details
     """
     # Use theme colors
     primary_color = theme.primary
@@ -82,5 +90,13 @@ def get_splash_content(conversation_id: str, *, theme: Theme) -> dict:
             f"[{primary_color}]⚠ Update available: {version_info.latest_version}[/]\n"
             "Run 'uv tool upgrade openhands' to update"
         )
+    
+    # Add critic notification if enabled
+    if agent is not None and agent.critic is not None:
+        critic_notice = f"[bold cyan]✓ Critic Enabled[/bold cyan] - Agent actions will be evaluated in real-time"
+        if content["update_notice"]:
+            content["update_notice"] += f"\n\n{critic_notice}"
+        else:
+            content["update_notice"] = critic_notice
 
     return content

@@ -329,9 +329,16 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if self.is_ui_initialized:
             return
 
+        # Load agent to check for critic configuration
+        from openhands_cli.stores import AgentStore
+        agent_store = AgentStore()
+        agent = agent_store.load(session_id=self.conversation_id.hex)
+
         # Get structured splash content
         splash_content = get_splash_content(
-            conversation_id=self.conversation_id.hex, theme=OPENHANDS_THEME
+            conversation_id=self.conversation_id.hex,
+            theme=OPENHANDS_THEME,
+            agent=agent
         )
 
         # Update individual splash widgets
