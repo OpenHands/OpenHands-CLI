@@ -1,8 +1,8 @@
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+from pathlib import Path
 from typing import ClassVar
 
 from textual import events, on
@@ -19,6 +19,7 @@ from openhands_cli.tui.widgets.user_input.autocomplete_dropdown import (
 from openhands_cli.tui.widgets.user_input.single_line_input import (
     SingleLineInputWithWrapping,
 )
+
 
 def get_external_editor() -> str:
     """Get the user's preferred external editor from environment variables.
@@ -51,7 +52,6 @@ def get_external_editor() -> str:
         "No suitable editor found. Set VISUAL or EDITOR environment variable, "
         "or install nano/vim/emacs."
     )
-
 
 
 class InputField(Container):
@@ -233,7 +233,9 @@ class InputField(Container):
                 # Only update if content was provided (don't auto-submit)
                 if edited_content:
                     self.active_input_widget.text = edited_content
-                    self.active_input_widget.move_cursor(self.active_input_widget.document.end)
+                    self.active_input_widget.move_cursor(
+                        self.active_input_widget.document.end
+                    )
                     # Show feedback if content changed
                     if edited_content != current_content:
                         self.app.notify(
