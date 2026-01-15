@@ -337,11 +337,9 @@ class TestVisualizerIntegration:
         assert collapsible.title is not None
 
         # Verify that the visualizer successfully created a collapsible widget
-        # The content should be present in some form, even if not escaped
         title_str = str(collapsible.title)
-        # Title should include a visible snippet of the XML-like command
-        assert "<function=execute_bash" in title_str
-        assert "execute_bash" in title_str  # The function name should be present
+        # Title should show the tool name (new implementation uses clean titles)
+        assert "execute_bash" in title_str
         assert len(title_str) > 0  # Title should not be empty
 
 
