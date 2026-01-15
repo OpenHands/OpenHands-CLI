@@ -1,6 +1,7 @@
 # openhands_cli/settings/store.py
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from prompt_toolkit import HTML, print_formatted_text
@@ -13,6 +14,8 @@ from openhands.sdk import (
     LocalFileStore,
 )
 from openhands.sdk.context import load_project_skills
+from openhands.sdk.critic import APIBasedCritic
+from openhands.sdk.critic.base import CriticBase
 from openhands.tools.preset.default import get_default_tools
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
@@ -25,6 +28,39 @@ from openhands_cli.utils import (
     get_os_description,
     should_set_litellm_extra_body,
 )
+
+
+def get_default_critic(llm: LLM) -> CriticBase | None:
+    """Auto-configure critic for All-Hands LLM proxy.
+
+    When the LLM base_url matches `llm-proxy.*.all-hands.dev`, returns an
+    APIBasedCritic configured with:
+    - server_url: {base_url}/vllm
+    - api_key: same as LLM
+    - model_name: "critic"
+
+    Returns None if base_url doesn't match or api_key is not set.
+    """
+    base_url = llm.base_url
+    api_key = llm.api_key
+    if base_url is None or api_key is None:
+        return None
+
+    # Match: llm-proxy.{env}.all-hands.dev (e.g., staging, prod, eval, app)
+    pattern = r"^https?://llm-proxy\.[^./]+\.all-hands\.dev"
+    if not re.match(pattern, base_url):
+        return None
+
+    try:
+        return APIBasedCritic(
+            server_url=f"{base_url.rstrip('/')}/vllm",
+            api_key=api_key,
+            model_name="critic",
+        )
+    except Exception:
+        # If critic creation fails, silently return None
+        # This allows the CLI to continue working without critic
+        return None
 
 
 class AgentStore:
@@ -92,6 +128,9 @@ class AgentStore:
                 )
                 condenser = LLMSummarizingCondenser(llm=condenser_llm)
 
+            # Auto-configure critic if applicable
+            critic = get_default_critic(updated_llm)
+
             # Update tools and context
             agent = agent.model_copy(
                 update={
@@ -102,6 +141,7 @@ class AgentStore:
                     else {},
                     "agent_context": agent_context,
                     "condenser": condenser,
+                    "critic": critic,
                 }
             )
 
@@ -154,11 +194,15 @@ class AgentStore:
 
         condenser = LLMSummarizingCondenser(llm=condenser_llm)
 
+        # Auto-configure critic if applicable
+        critic = get_default_critic(llm)
+
         agent = Agent(
             llm=llm,
             tools=get_default_tools(enable_browser=False),
             mcp_config={},
             condenser=condenser,
+            critic=critic,
         )
 
         # Save the agent configuration
