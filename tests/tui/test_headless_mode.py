@@ -385,13 +385,13 @@ class TestHeadlessInitialSetupGuard:
             # Should NOT try to open the interactive settings screen
             app._show_initial_settings.assert_not_called()
 
-            # We should have printed a message that mentions `openhands --exp`
-            printed_any_exp_hint = any(
-                "openhands --exp" in str(arg)
+            # We should have printed a message that mentions `openhands`
+            printed_any_hint = any(
+                "openhands" in str(arg)
                 for call in mock_console.print.call_args_list
                 for arg in call.args
             )
-            assert printed_any_exp_hint
+            assert printed_any_hint
 
 
 # ---------------------------------------------------------------------------

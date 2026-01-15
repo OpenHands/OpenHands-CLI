@@ -141,6 +141,29 @@ class TestOnTokenContentAndReasoning:
 
         assert not mock_connection.session_update.called
 
+    def test_whitespace_reasoning_is_ignored_and_does_not_emit_header(
+        self, token_subscriber, mock_connection, event_loop
+    ):
+        """Whitespace-only reasoning chunks should be ignored.
+
+        Some providers emit "reasoning_content" tokens that are just whitespace.
+        If we treat those as real reasoning, we'll emit a dangling "Reasoning" header.
+        """
+        from openhands_cli.acp_impl.events.shared_event_handler import REASONING_HEADER
+
+        chunk1 = _chunk(content=None, reasoning=" \n", tool_calls=None)
+        chunk2 = _chunk(content=None, reasoning="Real reasoning", tool_calls=None)
+
+        with patch.object(event_loop, "is_running", return_value=False):
+            token_subscriber.on_token(chunk1)
+            token_subscriber.on_token(chunk2)
+
+        assert mock_connection.session_update.call_count == 1
+        update = mock_connection.session_update.call_args_list[0][1]["update"]
+        assert isinstance(update, AgentThoughtChunk)
+        assert update.content.text.startswith(REASONING_HEADER)
+        assert "Real reasoning" in update.content.text
+
     def test_choice_without_delta_is_ignored(
         self, token_subscriber, mock_connection, event_loop
     ):

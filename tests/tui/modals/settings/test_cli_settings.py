@@ -11,13 +11,8 @@ from openhands_cli.stores import CliSettings
 class TestCliSettings:
     def test_defaults(self):
         cfg = CliSettings()
-        assert cfg.display_cost_per_action is False
         assert cfg.default_cells_expanded is True
-
-    @pytest.mark.parametrize("value", [True, False])
-    def test_model_accepts_bool(self, value: bool):
-        cfg = CliSettings(display_cost_per_action=value)
-        assert cfg.display_cost_per_action is value
+        assert cfg.auto_open_plan_panel is True
 
     @pytest.mark.parametrize("value", [True, False])
     def test_default_cells_expanded_accepts_bool(self, value: bool):
@@ -59,18 +54,18 @@ class TestCliSettings:
     @pytest.mark.parametrize(
         "file_content, expected",
         [
-            (json.dumps({"display_cost_per_action": True}), True),
-            (json.dumps({"display_cost_per_action": False}), False),
-            (json.dumps({}), False),  # missing field -> default
-            ("not json", False),  # JSONDecodeError -> defaults
+            (json.dumps({"default_cells_expanded": True}), True),
+            (json.dumps({"default_cells_expanded": False}), False),
+            (json.dumps({}), True),  # missing field -> default
+            ("not json", True),  # JSONDecodeError -> defaults
             (
-                json.dumps({"display_cost_per_action": "nope"}),
-                False,
+                json.dumps({"default_cells_expanded": "nope"}),
+                True,
             ),  # ValidationError -> caught -> defaults
             (
                 json.dumps({"unknown_field": True}),
-                False,
-            ),  # extra ignored; still default False
+                True,
+            ),  # extra ignored; still default True
         ],
     )
     def test_load_various_inputs(
@@ -82,11 +77,11 @@ class TestCliSettings:
         with patch.object(CliSettings, "get_config_path", return_value=config_path):
             cfg = CliSettings.load()
 
-        assert cfg.display_cost_per_action is expected
+        assert cfg.default_cells_expanded is expected
 
     def test_load_permission_error_propagates(self, tmp_path: Path):
         config_path = tmp_path / "cli_config.json"
-        config_path.write_text(json.dumps({"display_cost_per_action": True}))
+        config_path.write_text(json.dumps({"default_cells_expanded": True}))
 
         with patch.object(CliSettings, "get_config_path", return_value=config_path):
             with patch("builtins.open", side_effect=PermissionError("Access denied")):
@@ -96,29 +91,36 @@ class TestCliSettings:
     @pytest.mark.parametrize("value", [True, False])
     def test_save_creates_parent_dir_and_roundtrips(self, tmp_path: Path, value: bool):
         config_path = tmp_path / "nested" / "dir" / "cli_config.json"
-        cfg = CliSettings(display_cost_per_action=value)
+        cfg = CliSettings(default_cells_expanded=value)
 
         with patch.object(CliSettings, "get_config_path", return_value=config_path):
             cfg.save()
             assert config_path.exists()
             loaded = CliSettings.load()
 
-        assert loaded.display_cost_per_action is value
+        assert loaded.default_cells_expanded is value
 
     def test_save_writes_expected_json_format(self, tmp_path: Path):
         config_path = tmp_path / "cli_config.json"
-        cfg = CliSettings(display_cost_per_action=True, default_cells_expanded=False)
+        cfg = CliSettings(
+            default_cells_expanded=False,
+            auto_open_plan_panel=False,
+        )
 
         with patch.object(CliSettings, "get_config_path", return_value=config_path):
             cfg.save()
 
         assert config_path.read_text() == json.dumps(
-            {"display_cost_per_action": True, "default_cells_expanded": False}, indent=2
+            {
+                "default_cells_expanded": False,
+                "auto_open_plan_panel": False,
+            },
+            indent=2,
         )
 
     def test_save_permission_error_propagates(self, tmp_path: Path):
         config_path = tmp_path / "cli_config.json"
-        cfg = CliSettings(display_cost_per_action=True)
+        cfg = CliSettings(default_cells_expanded=True)
 
         with patch.object(CliSettings, "get_config_path", return_value=config_path):
             with patch("builtins.open", side_effect=PermissionError("Access denied")):
