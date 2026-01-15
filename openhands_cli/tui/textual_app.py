@@ -10,7 +10,7 @@ It creates a basic app with:
 
 import asyncio
 import uuid
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import ClassVar
 
 from textual import events, getters, on
@@ -510,6 +510,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Process message asynchronously to keep UI responsive
         # Only run worker if we have an active app (not in tests)
         try:
+            # Show "Working" indicator immediately while the worker thread starts
+            self.conversation_running_signal.publish(True)
             self.run_worker(
                 self.conversation_runner.process_message_async(
                     user_message, self.headless_mode
@@ -517,6 +519,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 name="process_message",
             )
         except RuntimeError:
+            # Revert running indicator if worker failed to start
+            self.conversation_running_signal.publish(False)
             # In test environment, just show a placeholder message
             placeholder_widget = Static(
                 f"[{OPENHANDS_THEME.success}]Message would be processed by "
@@ -840,6 +844,33 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             )
             return
 
+        self._perform_conversation_switch(target_id)
+
+    def _switch_to_conversation_with_stop(self, target_id: uuid.UUID) -> None:
+        """Switch conversations, pausing the current run if needed."""
+
+        def _pause_if_running() -> None:
+            runner = self.conversation_runner
+            if runner and runner.is_running:
+                # Pause current conversation to stop background work.
+                runner.conversation.pause()
+
+        self._perform_conversation_switch(
+            target_id, pre_switch_action=_pause_if_running
+        )
+
+    def _perform_conversation_switch(
+        self,
+        target_id: uuid.UUID,
+        pre_switch_action: Callable[[], None] | None = None,
+    ) -> None:
+        """Common logic for switching conversations.
+
+        Args:
+            target_id: The conversation ID to switch to
+            pre_switch_action: Optional action to run in the background thread
+                              before the switch begins (e.g., pausing current run).
+        """
         # Don't switch if already on this conversation
         if self.conversation_id == target_id:
             self.notify(
@@ -858,48 +889,16 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self.main_display, self, skip_user_messages=True
         )
 
-        # Run the heavy work in a thread worker so the UI can render notifications.
-        self.run_worker(
-            lambda: self._switch_to_conversation_thread(target_id, visualizer),
-            name="switch_conversation",
-            group="switch_conversation",
-            exclusive=True,
-            thread=True,
-            exit_on_error=False,
-        )
-
-    def _switch_to_conversation_with_stop(self, target_id: uuid.UUID) -> None:
-        """Switch conversations, pausing the current run if needed."""
-        # Show a persistent loading notification (we will dismiss it manually).
-        self._show_switch_loading_notification()
-
-        visualizer = ConversationVisualizer(
-            self.main_display, self, skip_user_messages=True
-        )
-
         def _worker() -> None:
-            try:
-                runner = self.conversation_runner
-                if runner and runner.is_running:
-                    # Pause current conversation to stop background work.
-                    try:
-                        runner.conversation.pause()
-                    except Exception:
-                        pass
-                self._switch_to_conversation_thread(target_id, visualizer)
-            except Exception as e:
-                error_message = f"{type(e).__name__}: {e}"
+            if pre_switch_action:
+                try:
+                    pre_switch_action()
+                except Exception:
+                    # We don't want pre-switch failures to block the switch itself.
+                    pass
+            self._switch_to_conversation_thread(target_id, visualizer)
 
-                def _show_error() -> None:
-                    self._dismiss_switch_loading_notification()
-                    self.notify(
-                        title="Switch Error",
-                        message=error_message,
-                        severity="error",
-                    )
-
-                self.call_from_thread(_show_error)
-
+        # Run the heavy work in a thread worker so the UI can render notifications.
         self.run_worker(
             _worker,
             name="switch_conversation",
