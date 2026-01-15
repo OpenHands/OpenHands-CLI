@@ -3,7 +3,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar, cast
 
 from textual import on
 from textual.binding import Binding
@@ -17,8 +17,18 @@ from openhands_cli.tui.core.commands import COMMANDS
 from openhands_cli.tui.widgets.autocomplete import EnhancedAutoComplete
 
 
+if TYPE_CHECKING:
+    from openhands_cli.tui.textual_app import OpenHandsApp
+
+
 class PasteAwareInput(Input):
     """Custom Input widget that can handle paste events and notify parent."""
+
+    BINDINGS: ClassVar = [
+        # Textual Input has a default Ctrl+U (kill line). We override it so the app
+        # can use Ctrl+U for history pagination even when focus is inside the input.
+        Binding("ctrl+u", "load_more_history", "Load more history", show=False),
+    ]
 
     class PasteDetected(Message):
         """Message sent when multi-line paste is detected."""
@@ -36,6 +46,23 @@ class PasteAwareInput(Input):
             event.prevent_default()
             event.stop()
         # For single-line content, let the default paste behavior handle it
+
+    async def action_load_more_history(self) -> None:
+        """Delegate Ctrl+U to the app-level history pagination action."""
+        app = cast("OpenHandsApp", self.app)
+        await app.action_load_more_history()
+
+
+class HistoryAwareTextArea(TextArea):
+    """TextArea that delegates Ctrl+U to the app-level history pagination action."""
+
+    BINDINGS: ClassVar = [
+        Binding("ctrl+u", "load_more_history", "Load more history", show=False),
+    ]
+
+    async def action_load_more_history(self) -> None:
+        app = cast("OpenHandsApp", self.app)
+        await app.action_load_more_history()
 
 
 def get_external_editor() -> str:
@@ -74,6 +101,7 @@ def get_external_editor() -> str:
 class InputField(Container):
     BINDINGS: ClassVar = [
         Binding("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
+        Binding("ctrl+u", "load_more_history", "Load more history", show=False),
         Binding("ctrl+j", "submit_textarea", "Submit multi-line input"),
         Binding(
             "ctrl+x", "open_external_editor", "Open external editor", priority=True
@@ -139,7 +167,7 @@ class InputField(Container):
         yield self.input_widget
 
         # Multi-line textarea (initially hidden)
-        self.textarea_widget = TextArea(
+        self.textarea_widget = HistoryAwareTextArea(
             id="user_textarea",
             soft_wrap=True,
             show_line_numbers=False,
@@ -193,6 +221,14 @@ class InputField(Container):
                 self.action_toggle_input_mode()
                 # Submit the content
                 self.post_message(self.Submitted(content))
+
+    async def action_load_more_history(self) -> None:
+        """Delegate Ctrl+U to the app-level history pagination action."""
+        # This binding helps when focus is on the container itself, but in practice
+        # `Ctrl+U` is usually pressed while focus is in `Input`/`TextArea` (which have
+        # their own default `Ctrl+U`). We also override those defaults above.
+        app = cast("OpenHandsApp", self.app)
+        await app.action_load_more_history()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle single-line input submission."""
