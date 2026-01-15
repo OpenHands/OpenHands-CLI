@@ -8,7 +8,11 @@ from textual.app import App
 from textual.events import Paste
 from textual.widgets import TextArea
 
-from openhands_cli.tui.widgets.input_field import InputField, PasteAwareInput
+from openhands_cli.tui.widgets.input_field import (
+    InputField,
+    PasteAwareInput,
+    get_external_editor,
+)
 
 
 @pytest.fixture
@@ -459,3 +463,538 @@ class TestInputFieldPasteIntegration:
 
             # Still single-line, nothing changed
             assert not input_field.is_multiline_mode
+
+
+class TestInputFieldExternalEditor:
+    """Test external editor functionality."""
+
+    @pytest.mark.asyncio
+    async def test_set_content_only_single_line_in_single_mode(self) -> None:
+        """Setting single-line content when already in single-line mode."""
+        app = InputFieldTestApp()
+        async with app.run_test() as pilot:
+            input_field = app.query_one(InputField)
+
+            # Mock the screen for toggle functionality
+            mock_input_area = Mock()
+            mock_input_area.styles = Mock()
+            input_field.screen.query_one = Mock(return_value=mock_input_area)
+
+            # Ensure we're in single-line mode
+            assert not input_field.is_multiline_mode
+
+            # Set single-line content
+            content = "Single line content"
+            input_field._set_content_only(content)
+            await pilot.pause()
+
+            # Should stay in single-line mode
+            assert not input_field.is_multiline_mode
+            assert input_field.input_widget.value == content
+            assert input_field.get_current_value() == content
+
+    @pytest.mark.asyncio
+    async def test_set_content_only_single_line_in_multiline_mode(self) -> None:
+        """Setting single-line content when in multiline mode should toggle."""
+        app = InputFieldTestApp()
+        async with app.run_test() as pilot:
+            input_field = app.query_one(InputField)
+
+            # Mock the screen for toggle functionality
+            mock_input_area = Mock()
+            mock_input_area.styles = Mock()
+            input_field.screen.query_one = Mock(return_value=mock_input_area)
+
+            # Switch to multiline mode first
+            input_field.action_toggle_input_mode()
+            await pilot.pause()
+            assert input_field.is_multiline_mode
+
+            # Set single-line content
+            content = "Single line content"
+            input_field._set_content_only(content)
+            await pilot.pause()
+
+            # Should toggle back to single-line mode
+            assert not input_field.is_multiline_mode
+            assert input_field.input_widget.value == content
+            assert input_field.get_current_value() == content
+
+    @pytest.mark.asyncio
+    async def test_set_content_only_multiline_in_single_mode(self) -> None:
+        """Setting multiline content when in single-line mode should toggle."""
+        app = InputFieldTestApp()
+        async with app.run_test() as pilot:
+            input_field = app.query_one(InputField)
+
+            # Mock the screen for toggle functionality
+            mock_input_area = Mock()
+            mock_input_area.styles = Mock()
+            input_field.screen.query_one = Mock(return_value=mock_input_area)
+
+            # Ensure we're in single-line mode
+            assert not input_field.is_multiline_mode
+
+            # Set multiline content
+            content = "Line 1\nLine 2\nLine 3"
+            input_field._set_content_only(content)
+            await pilot.pause()
+
+            # Should toggle to multiline mode
+            assert input_field.is_multiline_mode
+            assert input_field.textarea_widget.text == content
+            assert input_field.get_current_value() == content
+
+    @pytest.mark.asyncio
+    async def test_set_content_only_multiline_in_multiline_mode(self) -> None:
+        """Setting multiline content when already in multiline mode."""
+        app = InputFieldTestApp()
+        async with app.run_test() as pilot:
+            input_field = app.query_one(InputField)
+
+            # Mock the screen for toggle functionality
+            mock_input_area = Mock()
+            mock_input_area.styles = Mock()
+            input_field.screen.query_one = Mock(return_value=mock_input_area)
+
+            # Switch to multiline mode first
+            input_field.action_toggle_input_mode()
+            await pilot.pause()
+            assert input_field.is_multiline_mode
+
+            # Set multiline content
+            content = "Line 1\nLine 2\nLine 3"
+            input_field._set_content_only(content)
+            await pilot.pause()
+
+            # Should stay in multiline mode
+            assert input_field.is_multiline_mode
+            assert input_field.textarea_widget.text == content
+            assert input_field.get_current_value() == content
+
+    @patch("openhands_cli.tui.widgets.input_field.get_external_editor")
+    @patch("tempfile.NamedTemporaryFile")
+    @patch("subprocess.run")
+    @patch("builtins.open")
+    @patch("pathlib.Path.unlink")
+    def test_action_open_external_editor_success(
+        self,
+        mock_unlink,
+        mock_open,
+        mock_subprocess,
+        mock_tempfile,
+        mock_get_editor,
+        field_with_mocks,
+    ) -> None:
+        """Test successful external editor workflow."""
+        # Setup mocks
+        mock_get_editor.return_value = "nano"
+
+        # Mock the temporary file context manager
+        mock_temp_file = Mock()
+        mock_temp_file.name = "/tmp/test_file"
+        mock_temp_file.write = Mock()
+        mock_tempfile.return_value.__enter__.return_value = mock_temp_file
+        mock_tempfile.return_value.__exit__.return_value = None
+
+        # Mock subprocess
+        mock_subprocess.return_value.returncode = 0
+
+        # Mock file reading
+        mock_file = Mock()
+        mock_file.read.return_value = "Edited content from external editor"
+        mock_open.return_value.__enter__.return_value = mock_file
+        mock_open.return_value.__exit__.return_value = None
+
+        # Mock app and methods
+        mock_app = Mock()
+        mock_suspend_context = Mock()
+        mock_suspend_context.__enter__ = Mock()
+        mock_suspend_context.__exit__ = Mock(return_value=None)
+        mock_app.suspend.return_value = mock_suspend_context
+        field_with_mocks.get_current_value = Mock(return_value="Initial content")
+        field_with_mocks._set_content_only = Mock()
+
+        with patch.object(type(field_with_mocks), "app", new_callable=lambda: mock_app):
+            # Call the method
+            field_with_mocks.action_open_external_editor()
+
+            # Verify the workflow
+            mock_get_editor.assert_called_once()
+            mock_tempfile.assert_called_once_with(
+                mode="w+", suffix=".txt", delete=False, encoding="utf-8"
+            )
+            mock_subprocess.assert_called_once_with(
+                ["nano", "/tmp/test_file"], check=True
+            )
+            field_with_mocks._set_content_only.assert_called_once_with(
+                "Edited content from external editor"
+            )
+            mock_app.notify.assert_called_with(
+                "Content updated from editor", severity="information"
+            )
+
+    @patch("openhands_cli.tui.widgets.input_field.get_external_editor")
+    def test_action_open_external_editor_no_editor_found(
+        self, mock_get_editor, field_with_mocks
+    ) -> None:
+        """Test external editor when no editor is found."""
+        # Setup mock to raise RuntimeError
+        mock_get_editor.side_effect = RuntimeError("No external editor found")
+
+        # Mock app
+        mock_app = Mock()
+
+        with patch.object(type(field_with_mocks), "app", new_callable=lambda: mock_app):
+            # Call the method
+            field_with_mocks.action_open_external_editor()
+
+            # Verify error handling
+            mock_app.notify.assert_called_with(
+                "No external editor found", severity="error"
+            )
+
+    @patch("openhands_cli.tui.widgets.input_field.get_external_editor")
+    @patch("tempfile.NamedTemporaryFile")
+    @patch("subprocess.run")
+    @patch("builtins.open")
+    @patch("pathlib.Path.unlink")
+    def test_action_open_external_editor_empty_content(
+        self,
+        mock_unlink,
+        mock_open,
+        mock_subprocess,
+        mock_tempfile,
+        mock_get_editor,
+        field_with_mocks,
+    ) -> None:
+        """Test external editor with empty content returned."""
+        # Setup mocks
+        mock_get_editor.return_value = "nano"
+
+        # Mock the temporary file context manager
+        mock_temp_file = Mock()
+        mock_temp_file.name = "/tmp/test_file"
+        mock_temp_file.write = Mock()
+        mock_tempfile.return_value.__enter__.return_value = mock_temp_file
+        mock_tempfile.return_value.__exit__.return_value = None
+
+        # Mock subprocess
+        mock_subprocess.return_value.returncode = 0
+
+        # Mock file reading - empty content
+        mock_file = Mock()
+        mock_file.read.return_value = ""
+        mock_open.return_value.__enter__.return_value = mock_file
+        mock_open.return_value.__exit__.return_value = None
+
+        # Mock app and methods
+        mock_app = Mock()
+        mock_suspend_context = Mock()
+        mock_suspend_context.__enter__ = Mock()
+        mock_suspend_context.__exit__ = Mock(return_value=None)
+        mock_app.suspend.return_value = mock_suspend_context
+        field_with_mocks.get_current_value = Mock(return_value="Initial content")
+        field_with_mocks._set_content_only = Mock()
+
+        with patch.object(type(field_with_mocks), "app", new_callable=lambda: mock_app):
+            # Call the method
+            field_with_mocks.action_open_external_editor()
+
+            # Verify empty content handling
+            field_with_mocks._set_content_only.assert_not_called()
+            mock_app.notify.assert_called_with(
+                "Editor closed without content", severity="warning"
+            )
+
+    @patch("openhands_cli.tui.widgets.input_field.get_external_editor")
+    @patch("tempfile.NamedTemporaryFile")
+    @patch("subprocess.run")
+    @patch("pathlib.Path.unlink")
+    def test_action_open_external_editor_subprocess_error(
+        self,
+        mock_unlink,
+        mock_subprocess,
+        mock_tempfile,
+        mock_get_editor,
+        field_with_mocks,
+    ) -> None:
+        """Test external editor when subprocess fails."""
+        # Setup mocks
+        mock_get_editor.return_value = "nano"
+
+        # Mock the temporary file context manager
+        mock_temp_file = Mock()
+        mock_temp_file.name = "/tmp/test_file"
+        mock_temp_file.write = Mock()
+        mock_tempfile.return_value.__enter__.return_value = mock_temp_file
+        mock_tempfile.return_value.__exit__.return_value = None
+
+        # Mock subprocess to fail
+        mock_subprocess.side_effect = Exception("Editor failed")
+
+        # Mock app and methods
+        mock_app = Mock()
+        mock_suspend_context = Mock()
+        mock_suspend_context.__enter__ = Mock()
+        mock_suspend_context.__exit__ = Mock(return_value=None)
+        mock_app.suspend.return_value = mock_suspend_context
+        field_with_mocks.get_current_value = Mock(return_value="Initial content")
+
+        with patch.object(type(field_with_mocks), "app", new_callable=lambda: mock_app):
+            # Call the method
+            field_with_mocks.action_open_external_editor()
+
+            # Verify error handling
+            mock_app.notify.assert_called_with(
+                "Editor error: Editor failed", severity="error"
+            )
+
+    @patch("openhands_cli.tui.widgets.input_field.get_external_editor")
+    @patch("tempfile.NamedTemporaryFile")
+    @patch("subprocess.run")
+    @patch("builtins.open")
+    @patch("pathlib.Path.unlink")
+    def test_action_open_external_editor_content_unchanged(
+        self,
+        mock_unlink,
+        mock_open,
+        mock_subprocess,
+        mock_tempfile,
+        mock_get_editor,
+        field_with_mocks,
+    ) -> None:
+        """Test external editor when content is unchanged."""
+        # Setup mocks
+        mock_get_editor.return_value = "nano"
+        # Mock the temporary file context manager
+        mock_temp_file = Mock()
+        mock_temp_file.name = "/tmp/test_file"
+        mock_temp_file.write = Mock()
+        mock_tempfile.return_value.__enter__.return_value = mock_temp_file
+        mock_tempfile.return_value.__exit__.return_value = None
+        mock_subprocess.return_value.returncode = 0
+
+        # Mock file reading - same content as initial
+        initial_content = "Initial content"
+        mock_file = Mock()
+        mock_file.read.return_value = initial_content
+        mock_open.return_value.__enter__.return_value = mock_file
+        mock_open.return_value.__exit__.return_value = None
+
+        # Mock app and methods
+        mock_app = Mock()
+        mock_suspend_context = Mock()
+        mock_suspend_context.__enter__ = Mock()
+        mock_suspend_context.__exit__ = Mock(return_value=None)
+        mock_app.suspend.return_value = mock_suspend_context
+        field_with_mocks.get_current_value = Mock(return_value=initial_content)
+        field_with_mocks._set_content_only = Mock()
+
+        with patch.object(type(field_with_mocks), "app", new_callable=lambda: mock_app):
+            # Call the method
+            field_with_mocks.action_open_external_editor()
+
+            # Verify content is set but no "content changed" notification
+            field_with_mocks._set_content_only.assert_called_once_with(initial_content)
+            # Should NOT get "content updated" notification since content didn't change
+            # Only the initial notifications should be called
+            assert mock_app.notify.call_count == 2
+            mock_app.notify.assert_any_call(
+                "CTRL+X triggered - opening external editor...", severity="information"
+            )
+            mock_app.notify.assert_any_call("Opening external editor...", timeout=1)
+
+
+class TestGetExternalEditor:
+    """Test the get_external_editor function."""
+
+    @patch.dict("os.environ", {}, clear=True)
+    @patch("shutil.which")
+    def test_get_external_editor_visual_env_var(self, mock_which) -> None:
+        """Test that VISUAL environment variable takes precedence."""
+        with patch.dict("os.environ", {"VISUAL": "code --wait"}):
+            mock_which.return_value = "/usr/bin/code"
+
+            result = get_external_editor()
+
+            assert result == "code --wait"
+            mock_which.assert_called_once_with("code")
+
+    @patch.dict("os.environ", {}, clear=True)
+    @patch("shutil.which")
+    def test_get_external_editor_editor_env_var(self, mock_which) -> None:
+        """Test that EDITOR environment variable is used when VISUAL is not set."""
+        with patch.dict("os.environ", {"EDITOR": "vim"}):
+            mock_which.return_value = "/usr/bin/vim"
+
+            result = get_external_editor()
+
+            assert result == "vim"
+            mock_which.assert_called_once_with("vim")
+
+    @patch.dict("os.environ", {}, clear=True)
+    @patch("shutil.which")
+    def test_get_external_editor_visual_takes_precedence_over_editor(
+        self, mock_which
+    ) -> None:
+        """Test that VISUAL takes precedence over EDITOR when both are set."""
+        with patch.dict("os.environ", {"VISUAL": "emacs", "EDITOR": "vim"}):
+            mock_which.return_value = "/usr/bin/emacs"
+
+            result = get_external_editor()
+
+            assert result == "emacs"
+            mock_which.assert_called_once_with("emacs")
+
+    @patch.dict("os.environ", {}, clear=True)
+    @patch("shutil.which")
+    def test_get_external_editor_env_var_with_args(self, mock_which) -> None:
+        """Test handling of editor commands with arguments."""
+        with patch.dict("os.environ", {"VISUAL": "code --wait --new-window"}):
+            mock_which.return_value = "/usr/bin/code"
+
+            result = get_external_editor()
+
+            assert result == "code --wait --new-window"
+            mock_which.assert_called_once_with("code")
+
+    @patch.dict("os.environ", {}, clear=True)
+    @patch("shutil.which")
+    def test_get_external_editor_fallback_nano(self, mock_which) -> None:
+        """Test fallback to nano when no environment variables are set."""
+
+        def mock_which_side_effect(cmd):
+            return "/usr/bin/nano" if cmd == "nano" else None
+
+        mock_which.side_effect = mock_which_side_effect
+
+        result = get_external_editor()
+
+        assert result == "nano"
+        mock_which.assert_any_call("nano")
+
+    @patch.dict("os.environ", {}, clear=True)
+    @patch("shutil.which")
+    def test_get_external_editor_fallback_vim(self, mock_which) -> None:
+        """Test fallback to vim when nano is not available."""
+
+        def mock_which_side_effect(cmd):
+            if cmd == "vim":
+                return "/usr/bin/vim"
+            return None
+
+        mock_which.side_effect = mock_which_side_effect
+
+        result = get_external_editor()
+
+        assert result == "vim"
+        mock_which.assert_any_call("nano")
+        mock_which.assert_any_call("vim")
+
+    @patch.dict("os.environ", {}, clear=True)
+    @patch("shutil.which")
+    def test_get_external_editor_fallback_emacs(self, mock_which) -> None:
+        """Test fallback to emacs when nano and vim are not available."""
+
+        def mock_which_side_effect(cmd):
+            if cmd == "emacs":
+                return "/usr/bin/emacs"
+            return None
+
+        mock_which.side_effect = mock_which_side_effect
+
+        result = get_external_editor()
+
+        assert result == "emacs"
+        mock_which.assert_any_call("nano")
+        mock_which.assert_any_call("vim")
+        mock_which.assert_any_call("emacs")
+
+    @patch.dict("os.environ", {}, clear=True)
+    @patch("shutil.which")
+    def test_get_external_editor_fallback_vi(self, mock_which) -> None:
+        """Test fallback to vi when nano, vim, and emacs are not available."""
+
+        def mock_which_side_effect(cmd):
+            if cmd == "vi":
+                return "/usr/bin/vi"
+            return None
+
+        mock_which.side_effect = mock_which_side_effect
+
+        result = get_external_editor()
+
+        assert result == "vi"
+        mock_which.assert_any_call("nano")
+        mock_which.assert_any_call("vim")
+        mock_which.assert_any_call("emacs")
+        mock_which.assert_any_call("vi")
+
+    @patch.dict("os.environ", {}, clear=True)
+    @patch("shutil.which")
+    def test_get_external_editor_no_editor_found(self, mock_which) -> None:
+        """Test RuntimeError when no suitable editor is found."""
+        mock_which.return_value = None
+
+        with pytest.raises(RuntimeError) as exc_info:
+            get_external_editor()
+
+        assert "No suitable editor found" in str(exc_info.value)
+        assert "Set VISUAL or EDITOR environment variable" in str(exc_info.value)
+        # Should check all fallback editors
+        mock_which.assert_any_call("nano")
+        mock_which.assert_any_call("vim")
+        mock_which.assert_any_call("emacs")
+        mock_which.assert_any_call("vi")
+
+    @patch.dict("os.environ", {}, clear=True)
+    @patch("shutil.which")
+    def test_get_external_editor_env_var_not_found(self, mock_which) -> None:
+        """Test fallback when environment variable points to non-existent editor."""
+        with patch.dict("os.environ", {"VISUAL": "nonexistent-editor"}):
+
+            def mock_which_side_effect(cmd):
+                if cmd == "nano":
+                    return "/usr/bin/nano"
+                return None
+
+            mock_which.side_effect = mock_which_side_effect
+
+            result = get_external_editor()
+
+            assert result == "nano"
+            mock_which.assert_any_call("nonexistent-editor")
+            mock_which.assert_any_call("nano")
+
+    @patch.dict("os.environ", {}, clear=True)
+    @patch("shutil.which")
+    def test_get_external_editor_empty_env_var(self, mock_which) -> None:
+        """Test that empty environment variables are ignored."""
+        with patch.dict("os.environ", {"VISUAL": "", "EDITOR": ""}):
+
+            def mock_which_side_effect(cmd):
+                return "/usr/bin/nano" if cmd == "nano" else None
+
+            mock_which.side_effect = mock_which_side_effect
+
+            result = get_external_editor()
+
+            assert result == "nano"
+            mock_which.assert_any_call("nano")
+
+    @patch.dict("os.environ", {}, clear=True)
+    @patch("shutil.which")
+    def test_get_external_editor_whitespace_env_var(self, mock_which) -> None:
+        """Test that whitespace-only environment variables are ignored."""
+        with patch.dict("os.environ", {"VISUAL": "   ", "EDITOR": "\t\n"}):
+
+            def mock_which_side_effect(cmd):
+                return "/usr/bin/nano" if cmd == "nano" else None
+
+            mock_which.side_effect = mock_which_side_effect
+
+            result = get_external_editor()
+
+            assert result == "nano"
+            mock_which.assert_any_call("nano")

@@ -11,7 +11,7 @@ from .utils import seed_dummy_settings
 
 
 def test_experimental_ui() -> TestResult:
-    """Test the experimental textual UI with --exp flag."""
+    """Test the textual UI."""
     test_name = "experimental_ui"
     start_time = time.time()
 
@@ -36,7 +36,7 @@ def test_experimental_ui() -> TestResult:
 
             boot_start = time.time()
             proc = subprocess.Popen(
-                [str(exe_path), "--exp", "--exit-without-confirmation"],
+                [str(exe_path), "--exit-without-confirmation"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,

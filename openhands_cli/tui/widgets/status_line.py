@@ -113,7 +113,7 @@ class InfoStatusLine(Static):
     def __init__(self, app: OpenHandsApp, **kwargs) -> None:
         super().__init__("", id="info_status_line", markup=True, **kwargs)
         self.main_app = app
-        self.mode_indicator = "\\[Ctrl+L for multi-line]"
+        self.mode_indicator = "\\[Ctrl+L for multi-line • Ctrl+X for custom editor]"
         self.work_dir_display = self._get_work_dir_display()
         # Conversation metrics
         self._input_tokens: int = 0
@@ -191,9 +191,11 @@ class InfoStatusLine(Static):
 
     def _on_handle_mutliline_mode(self, is_multiline_mode: bool) -> None:
         if is_multiline_mode:
-            self.mode_indicator = "\\[Multi-line: Ctrl+J to submit]"
+            self.mode_indicator = (
+                "\\[Multi-line: Ctrl+J to submit • Ctrl+X for custom editor]"
+            )
         else:
-            self.mode_indicator = "\\[Ctrl+L for multi-line]"
+            self.mode_indicator = "\\[Ctrl+L for multi-line • Ctrl+X for custom editor]"
         self._update_text()
 
     def _get_work_dir_display(self) -> str:
