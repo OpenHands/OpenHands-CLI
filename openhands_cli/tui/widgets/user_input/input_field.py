@@ -1,3 +1,8 @@
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
 from typing import ClassVar
 
 from textual import events, on
@@ -14,6 +19,39 @@ from openhands_cli.tui.widgets.user_input.autocomplete_dropdown import (
 from openhands_cli.tui.widgets.user_input.single_line_input import (
     SingleLineInputWithWrapping,
 )
+
+def get_external_editor() -> str:
+    """Get the user's preferred external editor from environment variables.
+
+    Checks VISUAL first, then EDITOR, then falls back to common editors.
+
+    Returns:
+        str: The editor command to use
+
+    Raises:
+        RuntimeError: If no suitable editor is found
+    """
+    # Check environment variables in order of preference (VISUAL, then EDITOR)
+    for env_var in ["VISUAL", "EDITOR"]:
+        editor = os.environ.get(env_var)
+        if editor and editor.strip():
+            # Handle editors with arguments (e.g., "code --wait")
+            editor_parts = editor.split()
+            if editor_parts:
+                editor_cmd = editor_parts[0]
+                if shutil.which(editor_cmd):
+                    return editor
+
+    # Fallback to common editors
+    for editor in ["nano", "vim", "emacs", "vi"]:
+        if shutil.which(editor):
+            return editor
+
+    raise RuntimeError(
+        "No suitable editor found. Set VISUAL or EDITOR environment variable, "
+        "or install nano/vim/emacs."
+    )
+
 
 
 class InputField(Container):
@@ -150,6 +188,64 @@ class InputField(Container):
         self.single_line_widget.display = False
         self.multiline_widget.display = True
         self.active_input_widget = self.multiline_widget
+
+    def action_open_external_editor(self) -> None:
+        """Open external editor for composing input."""
+        # Debug: notify that the action was triggered
+        self.app.notify(
+            "CTRL+X triggered - opening external editor...", severity="information"
+        )
+
+        try:
+            editor_cmd = get_external_editor()
+        except RuntimeError as e:
+            self.app.notify(str(e), severity="error")
+            return
+
+        try:
+            # Get current content
+            current_content = self._get_current_text()
+
+            # Create temporary file with current content
+            with tempfile.NamedTemporaryFile(
+                mode="w+", suffix=".txt", delete=False, encoding="utf-8"
+            ) as tmp_file:
+                tmp_file.write(current_content)
+                tmp_path = tmp_file.name
+
+            try:
+                # Notify user that editor is opening
+                self.app.notify("Opening external editor...", timeout=1)
+
+                # Suspend the TUI and launch editor
+                with self.app.suspend():
+                    # Split editor command to handle arguments (e.g., "code --wait")
+                    editor_args = editor_cmd.split()
+                    subprocess.run(editor_args + [tmp_path], check=True)
+
+                # Read the edited content
+                with open(tmp_path, encoding="utf-8") as f:
+                    edited_content = f.read().rstrip()  # Remove trailing whitespace
+
+                # Only update if content was provided (don't auto-submit)
+                if edited_content:
+                    self.active_input_widget.text = edited_content
+                    # Show feedback if content changed
+                    if edited_content != current_content:
+                        self.app.notify(
+                            "Content updated from editor", severity="information"
+                        )
+                else:
+                    self.app.notify("Editor closed without content", severity="warning")
+
+            finally:
+                # Clean up temporary file
+                Path(tmp_path).unlink(missing_ok=True)
+
+        except subprocess.CalledProcessError:
+            self.app.notify("Editor was cancelled or failed", severity="warning")
+        except Exception as e:
+            self.app.notify(f"Editor error: {e}", severity="error")
 
     @on(TextArea.Changed)
     def _on_text_area_changed(self, _event: TextArea.Changed) -> None:
