@@ -130,10 +130,6 @@ class AgentStore:
 
             # Auto-configure critic if applicable
             critic = get_default_critic(updated_llm)
-            if critic is not None:
-                print(f"[DEBUG] Critic auto-configured: {critic.server_url}")
-            else:
-                print(f"[DEBUG] Critic NOT configured. base_url={updated_llm.base_url}, api_key={'set' if updated_llm.api_key else 'None'}")
 
             # Update tools and context
             agent = agent.model_copy(
