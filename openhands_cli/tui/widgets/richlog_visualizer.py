@@ -495,9 +495,39 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 and event.llm_message.role == "user"
             ):
                 return None
-            # Display messages as markdown for proper rendering
-            # The event.visualize already includes critic result if present
-            widget = Markdown(str(content))
+            
+            # If message has critic result, add a visual header
+            if event.critic_result is not None:
+                score = event.critic_result.score
+                # Color code the score based on success threshold
+                if event.critic_result.success:
+                    score_style = "green"
+                else:
+                    score_style = "yellow"
+                
+                # Build critic score display with diff from previous score
+                critic_display = f"[bold {score_style}]Critic Score: {score:.2f}[/bold {score_style}]"
+                
+                # Add diff if we have a previous score
+                if self._last_critic_score is not None:
+                    diff = score - self._last_critic_score
+                    if abs(diff) >= 0.01:  # Only show diff if meaningful (≥0.01)
+                        diff_sign = "+" if diff > 0 else ""
+                        # Color code the diff: green for positive, red for negative
+                        diff_style = "green" if diff > 0 else "red"
+                        critic_display += f" [bold {diff_style}]({diff_sign}{diff:.2f})[/bold {diff_style}]"
+                
+                # Update last critic score for next comparison
+                self._last_critic_score = score
+                
+                # Prepend critic score header to the message content
+                content_with_critic = f"{critic_display}\n\n{str(content)}"
+                widget = Markdown(content_with_critic)
+            else:
+                # Display messages as markdown for proper rendering
+                # The event.visualize already includes critic result if present
+                widget = Markdown(str(content))
+            
             widget.styles.padding = AGENT_MESSAGE_PADDING
             return widget
 
