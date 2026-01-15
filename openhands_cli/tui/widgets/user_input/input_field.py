@@ -71,6 +71,9 @@ class InputField(Container):
     BINDINGS: ClassVar = [
         Binding("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         Binding("ctrl+j", "submit_textarea", "Submit multi-line input"),
+        Binding(
+            "ctrl+x", "open_external_editor", "Open external editor", priority=True
+        ),
     ]
 
     DEFAULT_CSS = """
@@ -230,6 +233,7 @@ class InputField(Container):
                 # Only update if content was provided (don't auto-submit)
                 if edited_content:
                     self.active_input_widget.text = edited_content
+                    self.active_input_widget.move_cursor(self.active_input_widget.document.end)
                     # Show feedback if content changed
                     if edited_content != current_content:
                         self.app.notify(
