@@ -155,14 +155,19 @@ def test_handle_multiline_mode_updates_indicator_and_refreshes(dummy_app, monkey
 
     # Enable multiline mode
     widget._on_handle_mutliline_mode(True)
-    assert widget.mode_indicator == "\\[Multi-line: Ctrl+J to submit]"
+    assert (
+        widget.mode_indicator
+        == "\\[Multi-line: Ctrl+J to submit • Ctrl+X for custom editor]"
+    )
     update_text_mock.assert_called_once()
 
     update_text_mock.reset_mock()
 
     # Disable multiline mode
     widget._on_handle_mutliline_mode(False)
-    assert widget.mode_indicator == "\\[Ctrl+L for multi-line]"
+    assert (
+        widget.mode_indicator == "\\[Ctrl+L for multi-line • Ctrl+X for custom editor]"
+    )
     update_text_mock.assert_called_once()
 
 
@@ -187,7 +192,7 @@ def test_update_text_uses_work_dir_and_metrics(dummy_app, monkeypatch):
     update_mock.assert_called_once()
     call_arg = update_mock.call_args[0][0]
     # Should contain left part (mode indicator and work dir)
-    assert "\\[Ctrl+L for multi-line] • ~/my-dir" in call_arg
+    assert "\\[Ctrl+L for multi-line • Ctrl+X for custom editor] • ~/my-dir" in call_arg
     # Should contain grey markup around metrics
     assert "[grey50]" in call_arg
     assert "[/grey50]" in call_arg
@@ -217,7 +222,7 @@ def test_update_text_shows_all_metrics(dummy_app, monkeypatch):
     update_mock.assert_called_once()
     call_arg = update_mock.call_args[0][0]
     # Should contain left part
-    assert "\\[Ctrl+L for multi-line] • ~/my-dir" in call_arg
+    assert "\\[Ctrl+L for multi-line • Ctrl+X for custom editor] • ~/my-dir" in call_arg
     # Should contain grey markup
     assert "[grey50]" in call_arg
     assert "[/grey50]" in call_arg
