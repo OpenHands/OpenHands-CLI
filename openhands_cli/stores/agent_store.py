@@ -194,18 +194,20 @@ class AgentStore:
 
         condenser = LLMSummarizingCondenser(llm=condenser_llm)
 
-        # Auto-configure critic if applicable
-        critic = get_default_critic(llm)
-
         agent = Agent(
             llm=llm,
             tools=get_default_tools(enable_browser=False),
             mcp_config={},
             condenser=condenser,
-            critic=critic,
+            # Note: critic is NOT included here - it will be derived on-the-fly
         )
 
-        # Save the agent configuration
+        # Save the agent configuration (without critic)
         self.save(agent)
+
+        # Now add critic on-the-fly for the returned agent (not persisted)
+        critic = get_default_critic(llm)
+        if critic is not None:
+            agent = agent.model_copy(update={"critic": critic})
 
         return agent
