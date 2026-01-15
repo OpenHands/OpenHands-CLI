@@ -14,8 +14,8 @@ from openhands.sdk import (
     LocalFileStore,
 )
 from openhands.sdk.context import load_project_skills
-from openhands.sdk.critic import APIBasedCritic
 from openhands.sdk.critic.base import CriticBase
+from openhands.sdk.critic.impl.api import APIBasedCritic
 from openhands.tools.preset.default import get_default_tools
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
