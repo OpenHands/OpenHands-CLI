@@ -510,8 +510,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Process message asynchronously to keep UI responsive
         # Only run worker if we have an active app (not in tests)
         try:
-            # Show "Working" indicator immediately while the worker thread starts
-            self.conversation_running_signal.publish(True)
             self.run_worker(
                 self.conversation_runner.process_message_async(
                     user_message, self.headless_mode
@@ -519,8 +517,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 name="process_message",
             )
         except RuntimeError:
-            # Revert running indicator if worker failed to start
-            self.conversation_running_signal.publish(False)
             # In test environment, just show a placeholder message
             placeholder_widget = Static(
                 f"[{OPENHANDS_THEME.success}]Message would be processed by "
