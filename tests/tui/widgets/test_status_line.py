@@ -510,29 +510,32 @@ def test_cloud_status_display_when_checking(dummy_app):
     widget = InfoStatusLine(app=dummy_app)
     widget._cloud_connected = None
 
-    result = widget._get_cloud_status_display()
+    result, length = widget._get_cloud_status_display()
 
-    assert "[grey50]☁[/grey50]" == result
+    assert "[grey50]☁ Cloud[/grey50]" == result
+    assert length == 7  # "☁ Cloud"
 
 
 def test_cloud_status_display_when_connected(dummy_app):
-    """_get_cloud_status_display returns green checkmark when connected."""
+    """_get_cloud_status_display returns green checkmark with Cloud text when connected."""
     widget = InfoStatusLine(app=dummy_app)
     widget._cloud_connected = True
 
-    result = widget._get_cloud_status_display()
+    result, length = widget._get_cloud_status_display()
 
-    assert "[#00ff00]✓[/#00ff00]" == result
+    assert "[#00ff00]✓ Cloud[/#00ff00]" == result
+    assert length == 7  # "✓ Cloud"
 
 
 def test_cloud_status_display_when_disconnected(dummy_app):
-    """_get_cloud_status_display returns red X when disconnected."""
+    """_get_cloud_status_display returns red X with Cloud text when disconnected."""
     widget = InfoStatusLine(app=dummy_app)
     widget._cloud_connected = False
 
-    result = widget._get_cloud_status_display()
+    result, length = widget._get_cloud_status_display()
 
-    assert "[#ff6b6b]✗[/#ff6b6b]" == result
+    assert "[#ff6b6b]✗ Cloud[/#ff6b6b]" == result
+    assert length == 7  # "✗ Cloud"
 
 
 def test_update_text_includes_cloud_status(dummy_app, monkeypatch):
@@ -548,12 +551,12 @@ def test_update_text_includes_cloud_status(dummy_app, monkeypatch):
 
     update_mock.assert_called_once()
     call_arg = update_mock.call_args[0][0]
-    # Should contain the green checkmark for connected status
-    assert "[#00ff00]✓[/#00ff00]" in call_arg
+    # Should contain the green checkmark with Cloud text for connected status
+    assert "[#00ff00]✓ Cloud[/#00ff00]" in call_arg
 
 
 def test_update_text_includes_disconnected_cloud_status(dummy_app, monkeypatch):
-    """_update_text includes red X when disconnected."""
+    """_update_text includes red X with Cloud text when disconnected."""
     widget = InfoStatusLine(app=dummy_app)
     widget._cloud_connected = False
     widget.work_dir_display = "~/test"
@@ -565,8 +568,8 @@ def test_update_text_includes_disconnected_cloud_status(dummy_app, monkeypatch):
 
     update_mock.assert_called_once()
     call_arg = update_mock.call_args[0][0]
-    # Should contain the red X for disconnected status
-    assert "[#ff6b6b]✗[/#ff6b6b]" in call_arg
+    # Should contain the red X with Cloud text for disconnected status
+    assert "[#ff6b6b]✗ Cloud[/#ff6b6b]" in call_arg
 
 
 @pytest.mark.asyncio

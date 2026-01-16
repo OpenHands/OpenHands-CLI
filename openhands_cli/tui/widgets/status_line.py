@@ -259,20 +259,27 @@ class InfoStatusLine(Static):
         )
         return f"{ctx_display} • {cost_display} ({token_details})"
 
-    def _get_cloud_status_display(self) -> str:
-        """Get the cloud connection status indicator with color markup."""
+    def _get_cloud_status_display(self) -> tuple[str, int]:
+        """Get the cloud connection status indicator with color markup.
+
+        Returns:
+            Tuple of (formatted status string, plain text length for spacing calculation)
+        """
         if self._cloud_connected is None:
-            return "[grey50]☁[/grey50]"  # Checking
+            text = "☁ Cloud"
+            return f"[grey50]{text}[/grey50]", len(text)
         elif self._cloud_connected:
-            return "[#00ff00]✓[/#00ff00]"  # Connected - green
+            text = "✓ Cloud"
+            return f"[#00ff00]{text}[/#00ff00]", len(text)
         else:
-            return "[#ff6b6b]✗[/#ff6b6b]"  # Disconnected - red
+            text = "✗ Cloud"
+            return f"[#ff6b6b]{text}[/#ff6b6b]", len(text)
 
     def _update_text(self) -> None:
         """Rebuild the info status text with metrics and cloud status right-aligned."""
         left_part = f"{self.mode_indicator} • {self.work_dir_display}"
         metrics_display = self._format_metrics_display()
-        cloud_status = self._get_cloud_status_display()
+        cloud_status, cloud_status_len = self._get_cloud_status_display()
 
         # Calculate available width for spacing (account for padding of 2 chars)
         try:
@@ -281,9 +288,8 @@ class InfoStatusLine(Static):
             total_width = 80  # Fallback width
 
         # Right part includes metrics and cloud status indicator
-        # Cloud status is 1 char + space separator
         right_part_plain = f"{metrics_display} "  # Space before cloud indicator
-        right_len = len(right_part_plain) + 1  # +1 for the cloud status char
+        right_len = len(right_part_plain) + cloud_status_len
 
         # Calculate spacing needed to right-align
         left_len = len(left_part)
@@ -302,8 +308,8 @@ class InfoStatusLine(Static):
         # The cloud indicator is at the far right of the status line
         try:
             total_width = self.size.width - 2
-            # Cloud indicator is in the last ~3 characters
-            if event.x >= total_width - 3:
+            # Cloud indicator is in the last ~10 characters (for "✓ Cloud" text)
+            if event.x >= total_width - 10:
                 self._open_cloud_modal()
         except Exception:
             pass
