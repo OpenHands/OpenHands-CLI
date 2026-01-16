@@ -267,7 +267,7 @@ class HistorySidePanel(Container):
         """Set current conversation and update highlights in-place."""
         self.current_conversation_id = conversation_id
         self.selected_conversation_id = None
-        self._render_list()
+        self._update_highlights()
 
     def select_current_conversation(self) -> None:
         """Select the current conversation in the list (without switching)."""
@@ -292,6 +292,7 @@ class HistorySidePanel(Container):
                 id=conv_hex, created_date=datetime.now(), first_user_prompt=None
             ),
         )
+        self._render_list()
 
     def update_conversation_title_if_needed(
         self,
