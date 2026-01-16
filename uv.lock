@@ -1496,7 +1496,7 @@ wheels = [
 
 [[package]]
 name = "openhands"
-version = "1.8.2"
+version = "1.9.0"
 source = { editable = "." }
 dependencies = [
     { name = "agent-client-protocol" },
@@ -1535,8 +1535,8 @@ dev = [
 requires-dist = [
     { name = "agent-client-protocol", specifier = ">=0.7.0,<0.8.0" },
     { name = "httpx", specifier = ">=0.25.0" },
-    { name = "openhands-sdk", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=e9a84c57e3839192277293337c8c7312f41ace08" },
-    { name = "openhands-tools", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=e9a84c57e3839192277293337c8c7312f41ace08" },
+    { name = "openhands-sdk", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=ed81a95ddfe26ce40b32153a216b472eb2163f02" },
+    { name = "openhands-tools", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=ed81a95ddfe26ce40b32153a216b472eb2163f02" },
     { name = "prompt-toolkit", specifier = ">=3" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyperclip", specifier = ">=1.9.0" },
@@ -1568,7 +1568,7 @@ dev = [
 [[package]]
 name = "openhands-sdk"
 version = "1.8.2"
-source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=e9a84c57e3839192277293337c8c7312f41ace08#e9a84c57e3839192277293337c8c7312f41ace08" }
+source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=ed81a95ddfe26ce40b32153a216b472eb2163f02#ed81a95ddfe26ce40b32153a216b472eb2163f02" }
 dependencies = [
     { name = "deprecation" },
     { name = "fastmcp" },
@@ -1586,7 +1586,7 @@ dependencies = [
 [[package]]
 name = "openhands-tools"
 version = "1.8.2"
-source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=e9a84c57e3839192277293337c8c7312f41ace08#e9a84c57e3839192277293337c8c7312f41ace08" }
+source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=ed81a95ddfe26ce40b32153a216b472eb2163f02#ed81a95ddfe26ce40b32153a216b472eb2163f02" }
 dependencies = [
     { name = "bashlex" },
     { name = "binaryornot" },
