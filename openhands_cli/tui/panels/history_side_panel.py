@@ -193,7 +193,7 @@ class HistorySidePanel(Container):
             conversation_id=conversation_id, title=title
         )
 
-    def _on_history_select_current(self, _data: bool) -> None:
+    def _on_history_select_current(self, _) -> None:
         """Handle app signal: revert selection highlight to the current conversation."""
         self.select_current_conversation()
 
@@ -327,6 +327,8 @@ def _format_time(dt: datetime) -> str:
         diff = timedelta(seconds=0)
 
     if diff.days == 0:
+        if diff.seconds < 60:
+            return "just now"
         if diff.seconds < 3600:
             minutes = diff.seconds // 60
             return f"{minutes}m ago"

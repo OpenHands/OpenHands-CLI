@@ -90,7 +90,7 @@ async def test_history_panel_updates_from_signals(
         assert panel.selected_conversation_id is not None
         assert panel.selected_conversation_id.hex == base_id
 
-        app.history_select_current_signal.publish(True)
+        app.history_select_current_signal.publish(None)
         await pilot.pause()
         assert panel.selected_conversation_id == panel.current_conversation_id
 

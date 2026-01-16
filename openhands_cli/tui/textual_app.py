@@ -839,7 +839,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         else:
             # Revert selection highlight back to current conversation so the
             # user doesn't think the app switched chats.
-            self.history_select_current_signal.publish(True)
+            self.history_select_current_signal.publish(None)
             # Keep typing flow smooth.
             self.input_field.focus_input()
 
