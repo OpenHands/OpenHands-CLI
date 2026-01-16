@@ -37,8 +37,7 @@ async def _ensure_valid_auth(server_url: str) -> str:
             )
 
         console.print(
-            f"[{OPENHANDS_THEME.accent}]Starting login..."
-            f"[/{OPENHANDS_THEME.accent}]"
+            f"[{OPENHANDS_THEME.accent}]Starting login...[/{OPENHANDS_THEME.accent}]"
         )
         success = await login_command(server_url)
         if not success:

@@ -294,7 +294,7 @@ class TestLoginCommand:
                         assert result is True
 
                         # Verify the complete flow
-                        # get_api_key is called twice: once at start, once after re-reading
+                        # get_api_key called twice: at start + after re-reading
                         assert mock_storage.get_api_key.call_count == 2
                         mock_auth.assert_called_once_with(server_url)
                         mock_storage.store_api_key.assert_called_once_with(

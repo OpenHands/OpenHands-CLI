@@ -77,9 +77,7 @@ async def test_ensure_valid_auth_returns_existing_valid_key():
             "openhands_cli.cloud.conversation.is_token_valid",
             return_value=True,
         ),
-        patch(
-            "openhands_cli.auth.login_command.login_command"
-        ) as mock_login,
+        patch("openhands_cli.auth.login_command.login_command") as mock_login,
     ):
         store = Mock()
         store.get_api_key.return_value = "valid-key"
