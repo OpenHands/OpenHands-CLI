@@ -92,7 +92,7 @@ class ConversationSwitcher:
             self._switch_with_pause(target_id)
         else:
             # Revert selection highlight back to current conversation.
-            self.manager.post_to_history_panel(RevertSelectionRequest())
+            self.app.post_message(RevertSelectionRequest())
             self.app.input_field.focus_input()
 
     def _switch_with_pause(self, target_id: uuid.UUID) -> None:
@@ -217,7 +217,7 @@ class ConversationSwitcher:
         self.app.conversation_runner = runner
         self.app.main_display.scroll_end(animate=False)
         self._dismiss_loading()
-        self.manager.post_to_history_panel(ConversationSwitched(target_id))
+        self.app.post_message(ConversationSwitched(target_id))
         self.app.notify(
             title="Switched",
             message=f"Resumed conversation {target_id.hex[:8]}",

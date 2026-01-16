@@ -104,10 +104,10 @@ class TestConversationSwitcher:
         app.notify = Mock()
         app.input_field = Mock()
         app.input_field.focus_input = Mock()
+        app.post_message = Mock()  # Mock post_message on app
 
         manager = Mock()
         manager.app = app
-        manager.post_to_history_panel = Mock()
 
         switcher = ConversationSwitcher(manager)
         switcher._dismiss_loading = Mock()
@@ -118,8 +118,8 @@ class TestConversationSwitcher:
         switcher._finish_switch(runner, target_id)
 
         app.input_field.focus_input.assert_called_once()
-        # Verify that ConversationSwitched message was posted via manager
-        manager.post_to_history_panel.assert_called_once()
+        # Verify that ConversationSwitched message was posted to app
+        app.post_message.assert_called_once()
 
     def test_switch_to_invalid_uuid_shows_error(self):
         """Switching with an invalid UUID shows an error notification."""
@@ -162,7 +162,7 @@ class TestConversationManager:
     """Tests for ConversationManager."""
 
     def test_create_new_resets_conversation(self):
-        """create_new resets conversation state and notifies history panel."""
+        """create_new resets conversation state and posts creation message."""
         app = Mock()
         app.conversation_runner = None
         app.confirmation_panel = None
@@ -170,16 +170,16 @@ class TestConversationManager:
         app.main_display.children = []
         app.query_one = Mock(return_value=Mock())
         app.notify = Mock()
+        app.post_message = Mock()  # Mock post_message on app
 
         manager = ConversationManager(app, Mock())
         manager.store.create.return_value = uuid.uuid4().hex  # type: ignore
-        manager.post_to_history_panel = Mock()
 
         result = manager.create_new()
 
         assert result is not None
         assert app.conversation_id == result
-        manager.post_to_history_panel.assert_called_once()
+        app.post_message.assert_called_once()  # Expect ConversationCreated message
         app.notify.assert_called_once()
 
     def test_create_new_blocked_when_running(self):
@@ -202,10 +202,10 @@ class TestConversationManager:
         """update_title posts ConversationTitleUpdated message."""
         app = Mock()
         app.conversation_id = uuid.uuid4()
+        app.post_message = Mock()  # Mock post_message on app
 
         manager = ConversationManager(app, Mock())
-        manager.post_to_history_panel = Mock()
 
         manager.update_title("Test title")
 
-        manager.post_to_history_panel.assert_called_once()
+        app.post_message.assert_called_once()

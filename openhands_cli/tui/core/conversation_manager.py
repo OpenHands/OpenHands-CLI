@@ -12,7 +12,6 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from textual.css.query import NoMatches
 from textual.widgets import Static
 
 from openhands_cli.conversations.models import ConversationMetadata
@@ -27,8 +26,6 @@ from openhands_cli.tui.core.messages import (
 
 
 if TYPE_CHECKING:
-    from textual.message import Message
-
     from openhands_cli.tui.textual_app import OpenHandsApp
 
 
@@ -104,8 +101,8 @@ class ConversationManager:
             get_conversation_text(app.conversation_id.hex, theme=OPENHANDS_THEME)
         )
 
-        # Notify history panel (if mounted) to add/select the new conversation
-        self.post_to_history_panel(ConversationCreated(app.conversation_id))
+        # Notify app about creation (App will propagate to history panel)
+        app.post_message(ConversationCreated(app.conversation_id))
 
         # Scroll to top to show the splash screen
         app.main_display.scroll_home(animate=False)
@@ -125,26 +122,7 @@ class ConversationManager:
         Args:
             title: The new title (typically the first user message)
         """
-        self.post_to_history_panel(
-            ConversationTitleUpdated(self.app.conversation_id, title)
-        )
-
-    def post_to_history_panel(self, message: Message) -> None:
-        """Post a message to the history panel if it exists.
-
-        This is the single point for all history panel communication.
-        Messages are only delivered if the panel is currently mounted.
-
-        Args:
-            message: The Textual message to post
-        """
-        from openhands_cli.tui.panels.history_side_panel import HistorySidePanel
-
-        try:
-            panel = self.app.query_one(HistorySidePanel)
-            panel.post_message(message)
-        except NoMatches:
-            pass
+        self.app.post_message(ConversationTitleUpdated(self.app.conversation_id, title))
 
     def list_conversations(self, limit: int = 100) -> list[ConversationMetadata]:
         """List conversations from the store."""
