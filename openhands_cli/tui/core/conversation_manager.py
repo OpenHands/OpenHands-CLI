@@ -39,7 +39,7 @@ class ConversationManager:
     def __init__(self, app: OpenHandsApp, store: ConversationStore):
         self.app = app
         self.store = store
-        self._switcher = ConversationSwitcher(self)
+        self._switcher = ConversationSwitcher(app)
 
     @property
     def is_switching(self) -> bool:

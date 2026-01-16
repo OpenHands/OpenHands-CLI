@@ -106,10 +106,7 @@ class TestConversationSwitcher:
         app.input_field.focus_input = Mock()
         app.post_message = Mock()  # Mock post_message on app
 
-        manager = Mock()
-        manager.app = app
-
-        switcher = ConversationSwitcher(manager)
+        switcher = ConversationSwitcher(app)
         switcher._dismiss_loading = Mock()
 
         runner = Mock()
@@ -126,10 +123,7 @@ class TestConversationSwitcher:
         app = Mock()
         app.notify = Mock()
 
-        manager = Mock()
-        manager.app = app
-
-        switcher = ConversationSwitcher(manager)
+        switcher = ConversationSwitcher(app)
         switcher.switch_to("not-a-valid-uuid")
 
         app.notify.assert_called_once()
@@ -146,10 +140,7 @@ class TestConversationSwitcher:
         app.conversation_runner = None  # No runner, so we skip the "is_running" check
         app.notify = Mock()
 
-        manager = Mock()
-        manager.app = app
-
-        switcher = ConversationSwitcher(manager)
+        switcher = ConversationSwitcher(app)
         switcher.switch_to(current_id.hex)
 
         app.notify.assert_called_once()

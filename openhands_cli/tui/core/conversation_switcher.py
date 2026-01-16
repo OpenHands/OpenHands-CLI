@@ -20,11 +20,11 @@ from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text
 from openhands_cli.tui.core.messages import ConversationSwitched, RevertSelectionRequest
 from openhands_cli.tui.modals import SwitchConversationModal
+from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
 
 if TYPE_CHECKING:
-    from openhands_cli.tui.core.conversation_manager import ConversationManager
-    from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
+    from openhands_cli.tui.textual_app import OpenHandsApp
 
 
 class ConversationSwitcher:
@@ -34,15 +34,10 @@ class ConversationSwitcher:
     providing a single responsibility for all conversation switching concerns.
     """
 
-    def __init__(self, manager: ConversationManager):
-        self.manager = manager
+    def __init__(self, app: OpenHandsApp):
+        self.app = app
         self._loading_notification: Notification | None = None
         self._is_switching: bool = False
-
-    @property
-    def app(self):
-        """Shortcut to access the app through the manager."""
-        return self.manager.app
 
     @property
     def is_switching(self) -> bool:
@@ -129,8 +124,6 @@ class ConversationSwitcher:
         self._show_loading()
 
         # Create visualizer on UI thread (captures correct main thread id)
-        from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
-
         visualizer = ConversationVisualizer(
             self.app.main_display, self.app, skip_user_messages=True
         )
