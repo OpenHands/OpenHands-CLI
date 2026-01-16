@@ -44,9 +44,8 @@ class ExitConfirmationModal(ModalScreen):
                 self.on_exit_confirmed()
             except Exception as e:
                 self.notify(f"Error during exit confirmation: {e}", severity="error")
-            return
 
-        if self.on_exit_cancelled:
+        elif self.on_exit_cancelled:
             try:
                 self.on_exit_cancelled()
             except Exception as e:

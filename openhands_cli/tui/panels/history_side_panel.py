@@ -70,6 +70,11 @@ class HistoryItem(Static):
         else:
             self.remove_class("history-item-selected")
 
+    @property
+    def has_title(self) -> bool:
+        """Check if this item already has a user-provided title."""
+        return self._has_title
+
     def on_click(self) -> None:
         """Handle click on history item."""
         self._on_select(self.conversation_id)
@@ -312,7 +317,7 @@ class HistorySidePanel(Container):
         for item in list_container.query(HistoryItem):
             if item.conversation_id != conv_hex:
                 continue
-            if not item._has_title:
+            if not item.has_title:
                 item.set_title(title)
             return
 
