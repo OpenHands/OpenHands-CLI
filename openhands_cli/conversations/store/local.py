@@ -22,7 +22,7 @@ from openhands_cli.utils import extract_text_from_message_content
 
 # Register default tools to ensure all Action subclasses are available
 # for proper deserialization of events
-register_default_tools()
+# register_default_tools() moved to __init__
 
 
 class LocalFileStore(ConversationStore):
@@ -34,6 +34,9 @@ class LocalFileStore(ConversationStore):
         Args:
             base_dir: Base directory for storing conversations.
         """
+        # Register default tools to ensure all Action subclasses are available
+        # for proper deserialization of events
+        register_default_tools()
         self.base_dir = Path(base_dir)
         self._event_adapter = TypeAdapter(Event)
 
