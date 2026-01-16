@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 from typing import TYPE_CHECKING
@@ -7,7 +8,9 @@ from typing import TYPE_CHECKING
 from textual.timer import Timer
 from textual.widgets import Static
 
-from openhands_cli.locations import WORK_DIR
+from openhands_cli.auth.token_storage import TokenStorage
+from openhands_cli.cloud.conversation import is_token_valid
+from openhands_cli.constants import WORK_DIR
 from openhands_cli.utils import abbreviate_number, format_cost
 
 
@@ -123,6 +126,9 @@ class InfoStatusLine(Static):
         self._context_window: int = 0  # Total context window
         self._accumulated_cost: float = 0.0
         self._metrics_update_timer: Timer | None = None
+        # Cloud connection status
+        self._cloud_connected: bool | None = None  # None = unknown/checking
+        self._cloud_check_task: asyncio.Task | None = None
 
     def on_mount(self) -> None:
         """Initialize the info status line."""
@@ -133,15 +139,38 @@ class InfoStatusLine(Static):
         self.main_app.conversation_running_signal.subscribe(
             self, self._on_conversation_state_changed
         )
+        # Start async check for cloud connection
+        self._cloud_check_task = asyncio.create_task(self._check_cloud_connection())
 
     def on_unmount(self) -> None:
         """Stop timer when widget is removed."""
         if self._metrics_update_timer:
             self._metrics_update_timer.stop()
             self._metrics_update_timer = None
+        if self._cloud_check_task and not self._cloud_check_task.done():
+            self._cloud_check_task.cancel()
 
     def on_resize(self) -> None:
         """Recalculate layout when widget is resized."""
+        self._update_text()
+
+    async def _check_cloud_connection(self) -> None:
+        """Check if the cloud connection is valid."""
+        token_storage = TokenStorage()
+        api_key = token_storage.get_api_key()
+
+        if not api_key:
+            self._cloud_connected = False
+            self._update_text()
+            return
+
+        try:
+            cloud_url = self.main_app.cloud_url
+            self._cloud_connected = await is_token_valid(cloud_url, api_key)
+        except Exception:
+            # Any error means we can't connect
+            self._cloud_connected = False
+
         self._update_text()
 
     def _on_conversation_state_changed(self, is_running: bool) -> None:
@@ -230,10 +259,27 @@ class InfoStatusLine(Static):
         )
         return f"{ctx_display} • {cost_display} ({token_details})"
 
+    def _get_cloud_status_display(self) -> tuple[str, int]:
+        """Get the cloud connection status indicator with color markup.
+
+        Returns:
+            Tuple of (formatted status string, plain text length for spacing calculation)
+        """
+        if self._cloud_connected is None:
+            text = "☁ Cloud"
+            return f"[grey50]{text}[/grey50]", len(text)
+        elif self._cloud_connected:
+            text = "✓ Cloud"
+            return f"[#00ff00]{text}[/#00ff00]", len(text)
+        else:
+            text = "✗ Cloud"
+            return f"[#ff6b6b]{text}[/#ff6b6b]", len(text)
+
     def _update_text(self) -> None:
-        """Rebuild the info status text with metrics right-aligned in grey."""
+        """Rebuild the info status text with metrics and cloud status right-aligned."""
         left_part = f"{self.mode_indicator} • {self.work_dir_display}"
         metrics_display = self._format_metrics_display()
+        cloud_status, cloud_status_len = self._get_cloud_status_display()
 
         # Calculate available width for spacing (account for padding of 2 chars)
         try:
@@ -241,11 +287,59 @@ class InfoStatusLine(Static):
         except Exception:
             total_width = 80  # Fallback width
 
-        # Calculate spacing needed to right-align metrics
+        # Right part includes metrics and cloud status indicator
+        right_part_plain = f"{metrics_display} "  # Space before cloud indicator
+        right_len = len(right_part_plain) + cloud_status_len
+
+        # Calculate spacing needed to right-align
         left_len = len(left_part)
-        right_len = len(metrics_display)
         spacing = max(1, total_width - left_len - right_len)
 
-        # Build status text with grey metrics on the right
-        status_text = f"{left_part}{' ' * spacing}[grey50]{metrics_display}[/grey50]"
+        # Build status text with grey metrics and colored cloud status on the right
+        status_text = (
+            f"{left_part}{' ' * spacing}"
+            f"[grey50]{metrics_display}[/grey50] {cloud_status}"
+        )
         self.update(status_text)
+
+    def on_click(self, event) -> None:
+        """Handle click events - open cloud link modal if clicking on cloud indicator."""
+        # Check if click is on the right side (cloud indicator area)
+        # The cloud indicator is at the far right of the status line
+        try:
+            total_width = self.size.width - 2
+            # Cloud indicator is in the last ~10 characters (for "✓ Cloud" text)
+            if event.x >= total_width - 10:
+                self._open_cloud_modal()
+        except Exception:
+            pass
+
+    def _open_cloud_modal(self) -> None:
+        """Open the cloud link modal."""
+        from openhands_cli.tui.modals.cloud_link_modal import CloudLinkModal
+
+        modal = CloudLinkModal(
+            is_connected=self._cloud_connected or False,
+            on_link_complete=self._on_cloud_link_complete,
+            cloud_url=self.main_app.cloud_url,
+        )
+        self.main_app.push_screen(modal)
+
+    def _on_cloud_link_complete(self, success: bool) -> None:
+        """Handle completion of cloud linking."""
+        if success:
+            # Re-check connection status
+            self._cloud_connected = None
+            self._update_text()
+            self._cloud_check_task = asyncio.create_task(self._check_cloud_connection())
+
+    @property
+    def cloud_connected(self) -> bool | None:
+        """Return the current cloud connection status."""
+        return self._cloud_connected
+
+    async def refresh_cloud_status(self) -> None:
+        """Manually refresh the cloud connection status."""
+        self._cloud_connected = None
+        self._update_text()
+        await self._check_cloud_connection()

@@ -1,0 +1,81 @@
+CloudLinkModal {
+    align: center middle;
+    background: rgba(0, 0, 0, 0.8);
+}
+
+#cloud_dialog {
+    grid-size: 1;
+    grid-gutter: 1;
+    padding: 1 2;
+    width: 70;
+    height: auto;
+    min-width: 50;
+    border: $primary 80%;
+    background: $surface 90%;
+    margin: 1 1;
+}
+
+#status_label {
+    height: auto;
+    width: 1fr;
+    content-align: center middle;
+    text-align: center;
+    padding: 1 0;
+    text-style: bold;
+}
+
+#status_label.connected {
+    color: #00ff00;
+}
+
+#status_label.disconnected {
+    color: #ff6b6b;
+}
+
+#description {
+    height: auto;
+    width: 1fr;
+    content-align: center middle;
+    text-align: center;
+    padding: 0 1;
+    color: $secondary;
+}
+
+#options_container {
+    height: auto;
+    width: 1fr;
+    padding: 1 0;
+}
+
+#override_settings {
+    width: 1fr;
+    height: auto;
+    padding: 0 1;
+}
+
+#button_container {
+    height: auto;
+    width: 1fr;
+    align: center middle;
+    padding: 1 0;
+}
+
+#button_container Button {
+    width: 100%;
+    max-width: 30;
+    height: 3;
+    margin: 0 1;
+}
+
+#link_button {
+    margin-bottom: 1;
+}
+
+#status_message {
+    height: auto;
+    width: 1fr;
+    content-align: center middle;
+    text-align: center;
+    padding: 0 1;
+    color: $secondary;
+}

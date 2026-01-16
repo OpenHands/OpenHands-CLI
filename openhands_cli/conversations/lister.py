@@ -8,7 +8,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from openhands.sdk import MessageEvent
-from openhands_cli.locations import CONVERSATIONS_DIR
+from openhands_cli.constants import CONVERSATIONS_DIR
 from openhands_cli.utils import extract_text_from_message_content
 
 

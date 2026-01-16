@@ -25,6 +25,8 @@ def dummy_app() -> object:
     )
     # For metrics display
     app.conversation_runner = None
+    # For cloud status
+    app.cloud_url = "https://app.all-hands.dev"
     return app
 
 
@@ -498,3 +500,189 @@ def test_update_metrics_handles_zero_prompt_tokens(dummy_app, monkeypatch):
     assert widget._cache_hit_rate == "N/A"
     assert widget._last_request_input_tokens == 0
     update_text_mock.assert_called_once()
+
+
+# ----- Cloud status indicator tests -----
+
+
+def test_cloud_status_display_when_checking(dummy_app):
+    """_get_cloud_status_display returns grey cloud when status is unknown."""
+    widget = InfoStatusLine(app=dummy_app)
+    widget._cloud_connected = None
+
+    result, length = widget._get_cloud_status_display()
+
+    assert "[grey50]☁ Cloud[/grey50]" == result
+    assert length == 7  # "☁ Cloud"
+
+
+def test_cloud_status_display_when_connected(dummy_app):
+    """_get_cloud_status_display returns green checkmark with Cloud text when connected."""
+    widget = InfoStatusLine(app=dummy_app)
+    widget._cloud_connected = True
+
+    result, length = widget._get_cloud_status_display()
+
+    assert "[#00ff00]✓ Cloud[/#00ff00]" == result
+    assert length == 7  # "✓ Cloud"
+
+
+def test_cloud_status_display_when_disconnected(dummy_app):
+    """_get_cloud_status_display returns red X with Cloud text when disconnected."""
+    widget = InfoStatusLine(app=dummy_app)
+    widget._cloud_connected = False
+
+    result, length = widget._get_cloud_status_display()
+
+    assert "[#ff6b6b]✗ Cloud[/#ff6b6b]" == result
+    assert length == 7  # "✗ Cloud"
+
+
+def test_update_text_includes_cloud_status(dummy_app, monkeypatch):
+    """_update_text includes cloud status indicator in the output."""
+    widget = InfoStatusLine(app=dummy_app)
+    widget._cloud_connected = True
+    widget.work_dir_display = "~/test"
+
+    update_mock = MagicMock()
+    monkeypatch.setattr(widget, "update", update_mock)
+
+    widget._update_text()
+
+    update_mock.assert_called_once()
+    call_arg = update_mock.call_args[0][0]
+    # Should contain the green checkmark with Cloud text for connected status
+    assert "[#00ff00]✓ Cloud[/#00ff00]" in call_arg
+
+
+def test_update_text_includes_disconnected_cloud_status(dummy_app, monkeypatch):
+    """_update_text includes red X with Cloud text when disconnected."""
+    widget = InfoStatusLine(app=dummy_app)
+    widget._cloud_connected = False
+    widget.work_dir_display = "~/test"
+
+    update_mock = MagicMock()
+    monkeypatch.setattr(widget, "update", update_mock)
+
+    widget._update_text()
+
+    update_mock.assert_called_once()
+    call_arg = update_mock.call_args[0][0]
+    # Should contain the red X with Cloud text for disconnected status
+    assert "[#ff6b6b]✗ Cloud[/#ff6b6b]" in call_arg
+
+
+@pytest.mark.asyncio
+async def test_check_cloud_connection_no_api_key(dummy_app, monkeypatch):
+    """_check_cloud_connection sets disconnected when no API key."""
+    widget = InfoStatusLine(app=dummy_app)
+
+    # Mock TokenStorage to return no API key
+    mock_storage = MagicMock()
+    mock_storage.get_api_key.return_value = None
+    monkeypatch.setattr(
+        status_line_module, "TokenStorage", lambda: mock_storage
+    )
+
+    update_text_mock = MagicMock()
+    monkeypatch.setattr(widget, "_update_text", update_text_mock)
+
+    await widget._check_cloud_connection()
+
+    assert widget._cloud_connected is False
+    update_text_mock.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_check_cloud_connection_valid_token(dummy_app, monkeypatch):
+    """_check_cloud_connection sets connected when token is valid."""
+    widget = InfoStatusLine(app=dummy_app)
+
+    # Mock TokenStorage to return an API key
+    mock_storage = MagicMock()
+    mock_storage.get_api_key.return_value = "test-api-key"
+    monkeypatch.setattr(
+        status_line_module, "TokenStorage", lambda: mock_storage
+    )
+
+    # Mock is_token_valid to return True
+    async def mock_is_token_valid(server_url, api_key):
+        return True
+
+    monkeypatch.setattr(status_line_module, "is_token_valid", mock_is_token_valid)
+
+    update_text_mock = MagicMock()
+    monkeypatch.setattr(widget, "_update_text", update_text_mock)
+
+    await widget._check_cloud_connection()
+
+    assert widget._cloud_connected is True
+    update_text_mock.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_check_cloud_connection_invalid_token(dummy_app, monkeypatch):
+    """_check_cloud_connection sets disconnected when token is invalid."""
+    widget = InfoStatusLine(app=dummy_app)
+
+    # Mock TokenStorage to return an API key
+    mock_storage = MagicMock()
+    mock_storage.get_api_key.return_value = "test-api-key"
+    monkeypatch.setattr(
+        status_line_module, "TokenStorage", lambda: mock_storage
+    )
+
+    # Mock is_token_valid to return False
+    async def mock_is_token_valid(server_url, api_key):
+        return False
+
+    monkeypatch.setattr(status_line_module, "is_token_valid", mock_is_token_valid)
+
+    update_text_mock = MagicMock()
+    monkeypatch.setattr(widget, "_update_text", update_text_mock)
+
+    await widget._check_cloud_connection()
+
+    assert widget._cloud_connected is False
+    update_text_mock.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_check_cloud_connection_exception(dummy_app, monkeypatch):
+    """_check_cloud_connection sets disconnected when exception occurs."""
+    widget = InfoStatusLine(app=dummy_app)
+
+    # Mock TokenStorage to return an API key
+    mock_storage = MagicMock()
+    mock_storage.get_api_key.return_value = "test-api-key"
+    monkeypatch.setattr(
+        status_line_module, "TokenStorage", lambda: mock_storage
+    )
+
+    # Mock is_token_valid to raise an exception
+    async def mock_is_token_valid(server_url, api_key):
+        raise Exception("Network error")
+
+    monkeypatch.setattr(status_line_module, "is_token_valid", mock_is_token_valid)
+
+    update_text_mock = MagicMock()
+    monkeypatch.setattr(widget, "_update_text", update_text_mock)
+
+    await widget._check_cloud_connection()
+
+    assert widget._cloud_connected is False
+    update_text_mock.assert_called()
+
+
+def test_cloud_connected_property(dummy_app):
+    """cloud_connected property returns the current connection status."""
+    widget = InfoStatusLine(app=dummy_app)
+
+    widget._cloud_connected = None
+    assert widget.cloud_connected is None
+
+    widget._cloud_connected = True
+    assert widget.cloud_connected is True
+
+    widget._cloud_connected = False
+    assert widget.cloud_connected is False

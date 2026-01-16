@@ -30,7 +30,9 @@ class TestLoginCommand:
                     server_url, api_key, already_logged_in=True
                 )
 
-                mock_fetch.assert_called_once_with(server_url, api_key)
+                mock_fetch.assert_called_once_with(
+                    server_url, api_key, sync_settings=None, silent=False
+                )
 
                 # Check that appropriate messages were printed
                 print_calls = [call[0][0] for call in mock_print.call_args_list]
@@ -53,7 +55,9 @@ class TestLoginCommand:
                     server_url, api_key, already_logged_in=False
                 )
 
-                mock_fetch.assert_called_once_with(server_url, api_key)
+                mock_fetch.assert_called_once_with(
+                    server_url, api_key, sync_settings=None, silent=False
+                )
 
                 # Check that appropriate messages were printed
                 print_calls = [call[0][0] for call in mock_print.call_args_list]
@@ -103,7 +107,11 @@ class TestLoginCommand:
 
                     assert result is True
                     mock_fetch.assert_called_once_with(
-                        server_url, "existing-api-key", already_logged_in=True
+                        server_url,
+                        "existing-api-key",
+                        already_logged_in=True,
+                        sync_settings=None,
+                        silent=False,
                     )
 
     @pytest.mark.asyncio
@@ -140,7 +148,11 @@ class TestLoginCommand:
                             "new-api-key"
                         )
                         mock_fetch.assert_called_once_with(
-                            server_url, "new-api-key", already_logged_in=False
+                            server_url,
+                            "new-api-key",
+                            already_logged_in=False,
+                            sync_settings=None,
+                            silent=False,
                         )
 
     @pytest.mark.asyncio
@@ -297,7 +309,11 @@ class TestLoginCommand:
                             "new-api-key"
                         )
                         mock_fetch.assert_called_once_with(
-                            server_url, "new-api-key", already_logged_in=False
+                            server_url,
+                            "new-api-key",
+                            already_logged_in=False,
+                            sync_settings=None,
+                            silent=False,
                         )
 
                         # Verify success messages

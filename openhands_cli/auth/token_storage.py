@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-from openhands_cli.locations import PERSISTENCE_DIR
+from openhands_cli.constants import PERSISTENCE_DIR
 
 
 class TokenStorage:

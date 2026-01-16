@@ -7,7 +7,7 @@ from openhands.sdk import Agent
 from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
 from openhands_cli.auth.utils import _p
-from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
+from openhands_cli.constants import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
 from openhands_cli.stores import AgentStore
 from openhands_cli.stores.agent_store import resolve_llm_base_url
 from openhands_cli.theme import OPENHANDS_THEME
@@ -186,13 +186,23 @@ def _ask_user_consent_for_overwrite(
 def create_and_save_agent_configuration(
     llm_api_key: str,
     settings: dict[str, Any],
+    sync_settings: bool | None = None,
+    silent: bool = False,
 ) -> None:
     """Create and save an Agent configuration using AgentStore.
 
     This function handles the consent logic by:
     1. Loading existing agent configuration
-    2. If exists, asking user for consent to overwrite
+    2. If exists, asking user for consent to overwrite (unless sync_settings is set)
     3. Only proceeding if user consents or no existing config
+
+    Args:
+        llm_api_key: LLM API key from cloud
+        settings: User settings from cloud
+        sync_settings: If True, always sync without prompting.
+                      If False, skip sync if existing config.
+                      If None, prompt user for consent.
+        silent: If True, suppress output messages
     """
     store = AgentStore()
 
@@ -201,13 +211,21 @@ def create_and_save_agent_configuration(
     # First, check if existing configuration exists
     existing_agent = store.load()
     if existing_agent is not None:
-        # Ask for user consent
-        if not _ask_user_consent_for_overwrite(
-            existing_agent,
-            settings,
-            base_url=base_url,
-        ):
+        # Determine whether to overwrite
+        if sync_settings is True:
+            # User explicitly requested sync - proceed without prompting
+            pass
+        elif sync_settings is False:
+            # User explicitly declined sync
             raise ValueError("User declined to overwrite existing configuration")
+        else:
+            # sync_settings is None - ask for user consent
+            if not _ask_user_consent_for_overwrite(
+                existing_agent,
+                settings,
+                base_url=base_url,
+            ):
+                raise ValueError("User declined to overwrite existing configuration")
 
     # User consented or no existing config - proceed with creation
     agent = store.create_and_save_from_settings(
@@ -216,89 +234,110 @@ def create_and_save_agent_configuration(
         base_url=base_url,
     )
 
-    _p(
-        f"[{OPENHANDS_THEME.success}]✓ Agent configuration created and "
-        f"saved![/{OPENHANDS_THEME.success}]"
-    )
-    _p(
-        f"[{OPENHANDS_THEME.secondary}]Configuration "
-        f"details:[/{OPENHANDS_THEME.secondary}]"
-    )
-
-    llm = agent.llm
-
-    _p(f"  • Model: [{OPENHANDS_THEME.accent}]{llm.model}[/{OPENHANDS_THEME.accent}]")
-    _p(
-        f"  • Base URL: [{OPENHANDS_THEME.accent}]{llm.base_url}"
-        f"[/{OPENHANDS_THEME.accent}]"
-    )
-    _p(
-        f"  • Usage ID: [{OPENHANDS_THEME.accent}]{llm.usage_id}"
-        f"[/{OPENHANDS_THEME.accent}]"
-    )
-    _p(f"  • API Key: [{OPENHANDS_THEME.accent}]✓ Set[/{OPENHANDS_THEME.accent}]")
-
-    tools_count = len(agent.tools)
-    _p(
-        f"  • Tools: [{OPENHANDS_THEME.accent}]{tools_count} default tools loaded"
-        f"[/{OPENHANDS_THEME.accent}]"
-    )
-
-    condenser = agent.condenser
-    if isinstance(condenser, LLMSummarizingCondenser):
+    if not silent:
         _p(
-            f"  • Condenser: [{OPENHANDS_THEME.accent}]LLM Summarizing "
-            f"(max_size: {condenser.max_size}, "
-            f"keep_first: {condenser.keep_first})[/{OPENHANDS_THEME.accent}]"
+            f"[{OPENHANDS_THEME.success}]✓ Agent configuration created and "
+            f"saved![/{OPENHANDS_THEME.success}]"
+        )
+        _p(
+            f"[{OPENHANDS_THEME.secondary}]Configuration "
+            f"details:[/{OPENHANDS_THEME.secondary}]"
         )
 
-    _p(
-        f"  • Saved to: [{OPENHANDS_THEME.accent}]{SETTINGS_PATH}"
-        f"[/{OPENHANDS_THEME.accent}]"
-    )
+        llm = agent.llm
+
+        _p(
+            f"  • Model: [{OPENHANDS_THEME.accent}]{llm.model}[/{OPENHANDS_THEME.accent}]"
+        )
+        _p(
+            f"  • Base URL: [{OPENHANDS_THEME.accent}]{llm.base_url}"
+            f"[/{OPENHANDS_THEME.accent}]"
+        )
+        _p(
+            f"  • Usage ID: [{OPENHANDS_THEME.accent}]{llm.usage_id}"
+            f"[/{OPENHANDS_THEME.accent}]"
+        )
+        _p(f"  • API Key: [{OPENHANDS_THEME.accent}]✓ Set[/{OPENHANDS_THEME.accent}]")
+
+        tools_count = len(agent.tools)
+        _p(
+            f"  • Tools: [{OPENHANDS_THEME.accent}]{tools_count} default tools loaded"
+            f"[/{OPENHANDS_THEME.accent}]"
+        )
+
+        condenser = agent.condenser
+        if isinstance(condenser, LLMSummarizingCondenser):
+            _p(
+                f"  • Condenser: [{OPENHANDS_THEME.accent}]LLM Summarizing "
+                f"(max_size: {condenser.max_size}, "
+                f"keep_first: {condenser.keep_first})[/{OPENHANDS_THEME.accent}]"
+            )
+
+        _p(
+            f"  • Saved to: [{OPENHANDS_THEME.accent}]{SETTINGS_PATH}"
+            f"[/{OPENHANDS_THEME.accent}]"
+        )
 
 
 async def fetch_user_data_after_oauth(
     server_url: str,
     api_key: str,
+    sync_settings: bool | None = None,
+    silent: bool = False,
 ) -> dict[str, Any]:
-    """Fetch user data after OAuth and optionally create & save an Agent."""
+    """Fetch user data after OAuth and optionally create & save an Agent.
+
+    Args:
+        server_url: OpenHands server URL
+        api_key: API key for authentication
+        sync_settings: If True, always sync settings without prompting.
+                      If False, skip settings sync.
+                      If None (default), prompt user for consent.
+        silent: If True, suppress output messages
+    """
     client = OpenHandsApiClient(server_url, api_key)
 
-    _p(f"[{OPENHANDS_THEME.accent}]Fetching user data...[/{OPENHANDS_THEME.accent}]")
+    if not silent:
+        _p(
+            f"[{OPENHANDS_THEME.accent}]Fetching user data...[/{OPENHANDS_THEME.accent}]"
+        )
 
     try:
         # Fetch LLM API key
-        _p(
-            f"[{OPENHANDS_THEME.secondary}]• Getting LLM API key..."
-            f"[/{OPENHANDS_THEME.secondary}]"
-        )
+        if not silent:
+            _p(
+                f"[{OPENHANDS_THEME.secondary}]• Getting LLM API key..."
+                f"[/{OPENHANDS_THEME.secondary}]"
+            )
         llm_api_key = await client.get_llm_api_key()
-        if llm_api_key:
-            _p(
-                f"[{OPENHANDS_THEME.success}]  ✓ LLM API key retrieved: "
-                f"{llm_api_key[:3]}...[/{OPENHANDS_THEME.success}]"
-            )
-        else:
-            _p(
-                f"[{OPENHANDS_THEME.warning}]  ! No "
-                f"LLM API key available[/{OPENHANDS_THEME.warning}]"
-            )
+        if not silent:
+            if llm_api_key:
+                _p(
+                    f"[{OPENHANDS_THEME.success}]  ✓ LLM API key retrieved: "
+                    f"{llm_api_key[:3]}...[/{OPENHANDS_THEME.success}]"
+                )
+            else:
+                _p(
+                    f"[{OPENHANDS_THEME.warning}]  ! No "
+                    f"LLM API key available[/{OPENHANDS_THEME.warning}]"
+                )
 
         # Fetch user settings
-        _p(
-            f"[{OPENHANDS_THEME.secondary}]• Getting user settings..."
-            f"[/{OPENHANDS_THEME.secondary}]"
-        )
+        if not silent:
+            _p(
+                f"[{OPENHANDS_THEME.secondary}]• Getting user settings..."
+                f"[/{OPENHANDS_THEME.secondary}]"
+            )
         settings = await client.get_user_settings()
 
-        if settings:
-            _print_settings_summary(settings)
-        else:
-            _p(
-                f"[{OPENHANDS_THEME.warning}]  ! No "
-                f"user settings available[/{OPENHANDS_THEME.warning}]"
-            )
+        if not silent:
+            if settings:
+                _print_settings_summary(settings)
+            else:
+                _p(
+                    f"[{OPENHANDS_THEME.warning}]  ! No "
+                    f"user settings available[/{OPENHANDS_THEME.warning}]"
+                )
 
         user_data = {
             "llm_api_key": llm_api_key,
@@ -308,35 +347,42 @@ async def fetch_user_data_after_oauth(
         # Create agent if possible
         if llm_api_key and settings:
             try:
-                create_and_save_agent_configuration(llm_api_key, settings)
+                create_and_save_agent_configuration(
+                    llm_api_key, settings, sync_settings=sync_settings, silent=silent
+                )
             except ValueError as e:
                 # User declined to overwrite existing configuration
-                _p("\n")
-                _p(f"[{OPENHANDS_THEME.warning}]{e}[/{OPENHANDS_THEME.warning}]")
-                _p(
-                    f"[{OPENHANDS_THEME.secondary}]Keeping existing "
-                    f"agent configuration.[/{OPENHANDS_THEME.secondary}]"
-                )
+                if not silent:
+                    _p("\n")
+                    _p(f"[{OPENHANDS_THEME.warning}]{e}[/{OPENHANDS_THEME.warning}]")
+                    _p(
+                        f"[{OPENHANDS_THEME.secondary}]Keeping existing "
+                        f"agent configuration.[/{OPENHANDS_THEME.secondary}]"
+                    )
             except Exception as e:
-                _p(
-                    f"[{OPENHANDS_THEME.warning}]Warning: Could not create "
-                    f"agent configuration: {e}[/{OPENHANDS_THEME.warning}]"
-                )
+                if not silent:
+                    _p(
+                        f"[{OPENHANDS_THEME.warning}]Warning: Could not create "
+                        f"agent configuration: {e}[/{OPENHANDS_THEME.warning}]"
+                    )
         else:
-            _p(
-                f"[{OPENHANDS_THEME.warning}]Skipping agent configuration; "
-                f"missing key or settings.[/{OPENHANDS_THEME.warning}]"
-            )
+            if not silent:
+                _p(
+                    f"[{OPENHANDS_THEME.warning}]Skipping agent configuration; "
+                    f"missing key or settings.[/{OPENHANDS_THEME.warning}]"
+                )
 
-        _p(
-            f"[{OPENHANDS_THEME.success}]✓ User data "
-            f"fetched successfully![/{OPENHANDS_THEME.success}]"
-        )
+        if not silent:
+            _p(
+                f"[{OPENHANDS_THEME.success}]✓ User data "
+                f"fetched successfully![/{OPENHANDS_THEME.success}]"
+            )
         return user_data
 
     except ApiClientError as e:
-        _p(
-            f"[{OPENHANDS_THEME.error}]Error fetching user data: "
-            f"{e}[/{OPENHANDS_THEME.error}]"
-        )
+        if not silent:
+            _p(
+                f"[{OPENHANDS_THEME.error}]Error fetching user data: "
+                f"{e}[/{OPENHANDS_THEME.error}]"
+            )
         raise

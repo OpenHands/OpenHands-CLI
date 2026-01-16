@@ -30,7 +30,7 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
-from openhands_cli.locations import CONVERSATIONS_DIR
+from openhands_cli.constants import CONVERSATIONS_DIR
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
@@ -82,6 +82,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
         headless_mode: bool = False,
         json_mode: bool = False,
+        cloud_url: str | None = None,
         **kwargs,
     ):
         """Initialize the app with custom OpenHands theme.
@@ -95,6 +96,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                                        If None, defaults to AlwaysConfirm.
             headless_mode: If True, run in headless mode.
             json_mode: If True, enable JSON output mode.
+            cloud_url: OpenHands Cloud URL for cloud connection status.
         """
         super().__init__(**kwargs)
 
@@ -109,6 +111,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Store JSON mode setting
         self.json_mode = json_mode
+
+        # Store cloud URL for cloud connection status
+        from openhands_cli.constants import DEFAULT_CLOUD_URL
+
+        self.cloud_url = cloud_url or DEFAULT_CLOUD_URL
 
         # Store resume conversation ID
         self.conversation_id = (
@@ -817,6 +824,7 @@ def main(
     exit_without_confirmation: bool = False,
     headless: bool = False,
     json_mode: bool = False,
+    cloud_url: str | None = None,
 ):
     """Run the textual app.
 
@@ -828,6 +836,7 @@ def main(
         exit_without_confirmation: If True, exit without showing confirmation dialog.
         headless: If True, run in headless mode (no UI output, auto-approve actions).
         json_mode: If True, enable JSON output mode (implies headless).
+        cloud_url: OpenHands Cloud URL for cloud connection status.
     """
     # Determine initial confirmation policy from CLI arguments
     # If headless mode is enabled, always use NeverConfirm (auto-approve all actions)
@@ -846,6 +855,7 @@ def main(
         initial_confirmation_policy=initial_confirmation_policy,
         headless_mode=headless,
         json_mode=json_mode,
+        cloud_url=cloud_url,
     )
     app.run(headless=headless)
 

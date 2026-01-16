@@ -23,6 +23,7 @@ from textual.containers import Horizontal
 from textual.widgets import Footer, Static
 
 from openhands.tools.task_tracker.definition import TaskItem
+from openhands_cli.tui.modals.cloud_link_modal import CloudLinkModal
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
@@ -349,3 +350,55 @@ class TestMCPSidePanelSnapshots:
         assert snap_compare(
             MCPPanelMixedServersApp(agent=mock_agent), terminal_size=(100, 30)
         )
+
+
+class TestCloudLinkModalSnapshots:
+    """Snapshot tests for the CloudLinkModal."""
+
+    def test_cloud_link_modal_disconnected_state(self, snap_compare):
+        """Snapshot test for cloud link modal when not connected."""
+
+        class CloudLinkModalDisconnectedApp(App):
+            CSS = """
+            Screen {
+                align: center middle;
+            }
+            """
+
+            def compose(self) -> ComposeResult:
+                yield Static("Background content")
+                yield Footer()
+
+            def on_mount(self) -> None:
+                self.push_screen(
+                    CloudLinkModal(
+                        is_connected=False,
+                        cloud_url="https://app.all-hands.dev",
+                    )
+                )
+
+        assert snap_compare(CloudLinkModalDisconnectedApp(), terminal_size=(80, 24))
+
+    def test_cloud_link_modal_connected_state(self, snap_compare):
+        """Snapshot test for cloud link modal when connected."""
+
+        class CloudLinkModalConnectedApp(App):
+            CSS = """
+            Screen {
+                align: center middle;
+            }
+            """
+
+            def compose(self) -> ComposeResult:
+                yield Static("Background content")
+                yield Footer()
+
+            def on_mount(self) -> None:
+                self.push_screen(
+                    CloudLinkModal(
+                        is_connected=True,
+                        cloud_url="https://app.all-hands.dev",
+                    )
+                )
+
+        assert snap_compare(CloudLinkModalConnectedApp(), terminal_size=(80, 24))
