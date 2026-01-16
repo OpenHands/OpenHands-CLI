@@ -13,7 +13,6 @@ from openhands_cli.stores.agent_store import (
     ENV_LLM_MODEL,
     LLMEnvOverrides,
     apply_llm_overrides,
-    get_env_llm_overrides,
 )
 
 
@@ -77,66 +76,61 @@ class TestLLMEnvOverrides:
         assert isinstance(overrides.api_key, SecretStr)
         assert overrides.api_key.get_secret_value() == "my-secret-key"
 
-    def test_from_env_with_no_env_vars(self) -> None:
-        """from_env() should return empty overrides when no env vars set."""
+    def test_auto_loads_from_env_with_no_env_vars(self) -> None:
+        """Constructor should return empty overrides when no env vars set."""
         with patch.dict(os.environ, {}, clear=True):
             for key in [ENV_LLM_API_KEY, ENV_LLM_BASE_URL, ENV_LLM_MODEL]:
                 os.environ.pop(key, None)
-            overrides = LLMEnvOverrides.from_env()
+            overrides = LLMEnvOverrides()
             assert overrides.api_key is None
             assert overrides.base_url is None
             assert overrides.model is None
 
-    def test_from_env_with_all_env_vars(self) -> None:
-        """from_env() should read all env vars when set."""
+    def test_auto_loads_from_env_with_all_env_vars(self) -> None:
+        """Constructor should automatically read all env vars when set."""
         env_vars = {
             ENV_LLM_API_KEY: "env-api-key",
             ENV_LLM_BASE_URL: "https://env.url/",
             ENV_LLM_MODEL: "env-model",
         }
         with patch.dict(os.environ, env_vars, clear=False):
-            overrides = LLMEnvOverrides.from_env()
+            overrides = LLMEnvOverrides()
             assert overrides.api_key is not None
             assert overrides.api_key.get_secret_value() == "env-api-key"
             assert overrides.base_url == "https://env.url/"
             assert overrides.model == "env-model"
 
-    def test_from_env_ignores_empty_strings(self) -> None:
-        """from_env() should treat empty strings as None."""
+    def test_auto_loads_ignores_empty_strings(self) -> None:
+        """Constructor should treat empty env var strings as None."""
         env_vars = {
             ENV_LLM_API_KEY: "",
             ENV_LLM_BASE_URL: "https://valid.url/",
             ENV_LLM_MODEL: "",
         }
         with patch.dict(os.environ, env_vars, clear=False):
-            overrides = LLMEnvOverrides.from_env()
+            overrides = LLMEnvOverrides()
             assert overrides.api_key is None
             assert overrides.base_url == "https://valid.url/"
             assert overrides.model is None
 
-
-class TestGetEnvLlmOverrides:
-    """Tests for get_env_llm_overrides function."""
-
-    def test_returns_llm_env_overrides_instance(self) -> None:
-        """Should return an LLMEnvOverrides instance."""
-        with patch.dict(os.environ, {}, clear=True):
-            for key in [ENV_LLM_API_KEY, ENV_LLM_BASE_URL, ENV_LLM_MODEL]:
-                os.environ.pop(key, None)
-            result = get_env_llm_overrides()
-            assert isinstance(result, LLMEnvOverrides)
-
-    def test_returns_overrides_from_env(self) -> None:
-        """Should return overrides populated from environment variables."""
+    def test_explicit_values_override_env_vars(self) -> None:
+        """Explicitly provided values should take precedence over env vars."""
         env_vars = {
-            ENV_LLM_API_KEY: "my-api-key",
-            ENV_LLM_MODEL: "claude-3-opus",
+            ENV_LLM_API_KEY: "env-api-key",
+            ENV_LLM_BASE_URL: "https://env.url/",
+            ENV_LLM_MODEL: "env-model",
         }
         with patch.dict(os.environ, env_vars, clear=False):
-            result = get_env_llm_overrides()
-            assert result.api_key is not None
-            assert result.api_key.get_secret_value() == "my-api-key"
-            assert result.model == "claude-3-opus"
+            overrides = LLMEnvOverrides(
+                api_key=SecretStr("explicit-key"),
+                model="explicit-model",
+            )
+            # Explicit values should be used
+            assert overrides.api_key is not None
+            assert overrides.api_key.get_secret_value() == "explicit-key"
+            assert overrides.model == "explicit-model"
+            # base_url should still come from env since not explicitly provided
+            assert overrides.base_url == "https://env.url/"
 
 
 class TestApplyLlmOverrides:

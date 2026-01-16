@@ -5,7 +5,7 @@ import os
 from typing import Any
 
 from prompt_toolkit import HTML, print_formatted_text
-from pydantic import BaseModel, SecretStr
+from pydantic import BaseModel, SecretStr, model_validator
 
 from openhands.sdk import (
     LLM,
@@ -43,39 +43,37 @@ class LLMEnvOverrides(BaseModel):
     All fields are optional - only override the ones which are provided.
     Environment variables take precedence over stored settings and are
     NOT persisted to disk (temporary override only).
+
+    When instantiated without arguments, automatically loads values from
+    environment variables (LLM_API_KEY, LLM_BASE_URL, LLM_MODEL).
     """
 
     api_key: SecretStr | None = None
     base_url: str | None = None
     model: str | None = None
 
+    @model_validator(mode="before")
     @classmethod
-    def from_env(cls) -> LLMEnvOverrides:
-        """Load LLM overrides from environment variables.
+    def load_from_env(cls, data: Any) -> Any:
+        """Load values from environment variables if not explicitly provided."""
+        if isinstance(data, dict):
+            # Only load from env if the field is not explicitly provided
+            if "api_key" not in data or data["api_key"] is None:
+                api_key_str = os.environ.get(ENV_LLM_API_KEY) or None
+                if api_key_str:
+                    data["api_key"] = SecretStr(api_key_str)
 
-        Returns:
-            LLMEnvOverrides instance with values from environment variables.
-            Fields will be None if the corresponding env var is not set or empty.
-        """
-        api_key_str = os.environ.get(ENV_LLM_API_KEY) or None
-        api_key = SecretStr(api_key_str) if api_key_str else None
-        base_url = os.environ.get(ENV_LLM_BASE_URL) or None
-        model = os.environ.get(ENV_LLM_MODEL) or None
+            if "base_url" not in data or data["base_url"] is None:
+                data["base_url"] = os.environ.get(ENV_LLM_BASE_URL) or None
 
-        return cls(api_key=api_key, base_url=base_url, model=model)
+            if "model" not in data or data["model"] is None:
+                data["model"] = os.environ.get(ENV_LLM_MODEL) or None
+
+        return data
 
     def has_overrides(self) -> bool:
         """Check if any overrides are set."""
         return any([self.api_key, self.base_url, self.model])
-
-
-def get_env_llm_overrides() -> LLMEnvOverrides:
-    """Get LLM configuration overrides from environment variables.
-
-    Returns:
-        LLMEnvOverrides instance with values from environment variables.
-    """
-    return LLMEnvOverrides.from_env()
 
 
 def apply_llm_overrides(llm: LLM, overrides: LLMEnvOverrides) -> LLM:
@@ -123,7 +121,7 @@ class AgentStore:
 
             # Get environment variable overrides (these take precedence over
             # stored settings and are NOT persisted to disk)
-            env_overrides = get_env_llm_overrides()
+            env_overrides = LLMEnvOverrides()
 
             # Update tools with most recent working directory
             updated_tools = get_default_tools(enable_browser=False)
