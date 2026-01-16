@@ -195,17 +195,27 @@ def create_and_save_agent_configuration(
     """
     store = AgentStore()
 
+    settings_base_url = settings.get("llm_base_url")
+    base_url = str(settings_base_url).strip() if settings_base_url is not None else ""
+    if not base_url:
+        base_url = "https://llm-proxy.app.all-hands.dev/"
+
     # First, check if existing configuration exists
     existing_agent = store.load()
     if existing_agent is not None:
         # Ask for user consent
-        if not _ask_user_consent_for_overwrite(existing_agent, settings):
+        if not _ask_user_consent_for_overwrite(
+            existing_agent,
+            settings,
+            base_url=base_url,
+        ):
             raise ValueError("User declined to overwrite existing configuration")
 
     # User consented or no existing config - proceed with creation
     agent = store.create_and_save_from_settings(
         llm_api_key=llm_api_key,
         settings=settings,
+        base_url=base_url,
     )
 
     _p(
