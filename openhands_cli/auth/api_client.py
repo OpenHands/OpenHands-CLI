@@ -9,6 +9,7 @@ from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
 from openhands_cli.auth.utils import _p
 from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
 from openhands_cli.stores import AgentStore
+from openhands_cli.stores.agent_store import resolve_llm_base_url
 from openhands_cli.theme import OPENHANDS_THEME
 
 
@@ -195,10 +196,7 @@ def create_and_save_agent_configuration(
     """
     store = AgentStore()
 
-    settings_base_url = settings.get("llm_base_url")
-    base_url = str(settings_base_url).strip() if settings_base_url is not None else ""
-    if not base_url:
-        base_url = "https://llm-proxy.app.all-hands.dev/"
+    base_url = resolve_llm_base_url(settings)
 
     # First, check if existing configuration exists
     existing_agent = store.load()
