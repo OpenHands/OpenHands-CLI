@@ -37,11 +37,12 @@ class TestLLMEnvOverrides:
     def test_all_fields(self) -> None:
         """Should allow setting all fields."""
         overrides = LLMEnvOverrides(
-            api_key="my-key",
+            api_key=SecretStr("my-key"),
             base_url="https://api.example.com/",
             model="claude-3",
         )
-        assert overrides.api_key == "my-key"
+        assert overrides.api_key is not None
+        assert overrides.api_key.get_secret_value() == "my-key"
         assert overrides.base_url == "https://api.example.com/"
         assert overrides.model == "claude-3"
 
@@ -52,30 +53,29 @@ class TestLLMEnvOverrides:
 
     def test_has_overrides_true_when_any_field_set(self) -> None:
         """has_overrides() should return True when any field is set."""
-        assert LLMEnvOverrides(api_key="key").has_overrides() is True
+        assert LLMEnvOverrides(api_key=SecretStr("key")).has_overrides() is True
         assert LLMEnvOverrides(base_url="url").has_overrides() is True
         assert LLMEnvOverrides(model="model").has_overrides() is True
 
-    def test_to_llm_update_dict_empty(self) -> None:
-        """to_llm_update_dict() should return empty dict when no fields set."""
-        overrides = LLMEnvOverrides()
-        assert overrides.to_llm_update_dict() == {}
-
-    def test_to_llm_update_dict_converts_api_key_to_secret_str(self) -> None:
-        """to_llm_update_dict() should convert api_key to SecretStr."""
-        overrides = LLMEnvOverrides(api_key="my-secret-key")
-        result = overrides.to_llm_update_dict()
-        assert "api_key" in result
-        assert isinstance(result["api_key"], SecretStr)
-        assert result["api_key"].get_secret_value() == "my-secret-key"
-
-    def test_to_llm_update_dict_only_includes_set_fields(self) -> None:
-        """to_llm_update_dict() should only include fields that are set."""
+    def test_model_dump_excludes_none_fields(self) -> None:
+        """model_dump(exclude_none=True) should only include set fields."""
         overrides = LLMEnvOverrides(model="gpt-4", base_url="https://api.com/")
-        result = overrides.to_llm_update_dict()
+        result = overrides.model_dump(exclude_none=True)
         assert "api_key" not in result
         assert result["base_url"] == "https://api.com/"
         assert result["model"] == "gpt-4"
+
+    def test_model_dump_empty_when_no_fields(self) -> None:
+        """model_dump(exclude_none=True) should return empty dict when no fields set."""
+        overrides = LLMEnvOverrides()
+        assert overrides.model_dump(exclude_none=True) == {}
+
+    def test_api_key_is_secret_str(self) -> None:
+        """api_key should be stored as SecretStr."""
+        overrides = LLMEnvOverrides(api_key=SecretStr("my-secret-key"))
+        assert overrides.api_key is not None
+        assert isinstance(overrides.api_key, SecretStr)
+        assert overrides.api_key.get_secret_value() == "my-secret-key"
 
     def test_from_env_with_no_env_vars(self) -> None:
         """from_env() should return empty overrides when no env vars set."""
@@ -96,7 +96,8 @@ class TestLLMEnvOverrides:
         }
         with patch.dict(os.environ, env_vars, clear=False):
             overrides = LLMEnvOverrides.from_env()
-            assert overrides.api_key == "env-api-key"
+            assert overrides.api_key is not None
+            assert overrides.api_key.get_secret_value() == "env-api-key"
             assert overrides.base_url == "https://env.url/"
             assert overrides.model == "env-model"
 
@@ -133,7 +134,8 @@ class TestGetEnvLlmOverrides:
         }
         with patch.dict(os.environ, env_vars, clear=False):
             result = get_env_llm_overrides()
-            assert result.api_key == "my-api-key"
+            assert result.api_key is not None
+            assert result.api_key.get_secret_value() == "my-api-key"
             assert result.model == "claude-3-opus"
 
 
@@ -160,7 +162,7 @@ class TestApplyLlmOverrides:
 
     def test_overrides_api_key(self, base_llm: LLM) -> None:
         """Should override api_key when provided."""
-        overrides = LLMEnvOverrides(api_key="new-api-key")
+        overrides = LLMEnvOverrides(api_key=SecretStr("new-api-key"))
         result = apply_llm_overrides(base_llm, overrides)
         assert result.api_key is not None
         assert isinstance(result.api_key, SecretStr)
@@ -190,7 +192,7 @@ class TestApplyLlmOverrides:
     def test_overrides_multiple_fields(self, base_llm: LLM) -> None:
         """Should override multiple fields when provided."""
         overrides = LLMEnvOverrides(
-            api_key="new-key",
+            api_key=SecretStr("new-key"),
             base_url="https://new.url/",
             model="new-model",
         )

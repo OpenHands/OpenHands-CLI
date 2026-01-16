@@ -45,7 +45,7 @@ class LLMEnvOverrides(BaseModel):
     NOT persisted to disk (temporary override only).
     """
 
-    api_key: str | None = None
+    api_key: SecretStr | None = None
     base_url: str | None = None
     model: str | None = None
 
@@ -57,7 +57,8 @@ class LLMEnvOverrides(BaseModel):
             LLMEnvOverrides instance with values from environment variables.
             Fields will be None if the corresponding env var is not set or empty.
         """
-        api_key = os.environ.get(ENV_LLM_API_KEY) or None
+        api_key_str = os.environ.get(ENV_LLM_API_KEY) or None
+        api_key = SecretStr(api_key_str) if api_key_str else None
         base_url = os.environ.get(ENV_LLM_BASE_URL) or None
         model = os.environ.get(ENV_LLM_MODEL) or None
 
@@ -66,23 +67,6 @@ class LLMEnvOverrides(BaseModel):
     def has_overrides(self) -> bool:
         """Check if any overrides are set."""
         return any([self.api_key, self.base_url, self.model])
-
-    def to_llm_update_dict(self) -> dict[str, str | SecretStr]:
-        """Convert to a dictionary suitable for LLM.model_copy(update=...).
-
-        Only includes fields that are set (not None).
-        Converts api_key to SecretStr as required by the LLM model.
-        """
-        update_dict: dict[str, str | SecretStr] = {}
-
-        if self.api_key is not None:
-            update_dict["api_key"] = SecretStr(self.api_key)
-        if self.base_url is not None:
-            update_dict["base_url"] = self.base_url
-        if self.model is not None:
-            update_dict["model"] = self.model
-
-        return update_dict
 
 
 def get_env_llm_overrides() -> LLMEnvOverrides:
@@ -107,7 +91,7 @@ def apply_llm_overrides(llm: LLM, overrides: LLMEnvOverrides) -> LLM:
     if not overrides.has_overrides():
         return llm
 
-    return llm.model_copy(update=overrides.to_llm_update_dict())
+    return llm.model_copy(update=overrides.model_dump(exclude_none=True))
 
 
 def resolve_llm_base_url(
