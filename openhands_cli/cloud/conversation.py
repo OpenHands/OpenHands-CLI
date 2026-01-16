@@ -5,7 +5,6 @@ from typing import Any
 from rich.console import Console
 
 from openhands_cli.auth.api_client import OpenHandsApiClient, UnauthenticatedError
-from openhands_cli.auth.logout_command import logout_command
 from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.theme import OPENHANDS_THEME
 
@@ -17,50 +16,38 @@ class CloudConversationError(Exception):
     """Exception raised for cloud conversation errors."""
 
 
-def _print_login_instructions(msg: str) -> None:
-    console.print(f"[{OPENHANDS_THEME.error}]{msg}[/{OPENHANDS_THEME.error}]")
-    console.print(
-        f"[{OPENHANDS_THEME.secondary}]"
-        "Please run the following command to authenticate:"
-        f"[/{OPENHANDS_THEME.secondary}]"
-    )
-    console.print(
-        f"[{OPENHANDS_THEME.accent}]  openhands login[/{OPENHANDS_THEME.accent}]"
-    )
+async def _ensure_valid_auth(server_url: str) -> str:
+    """Ensure valid authentication, running login if needed. Returns valid API key."""
+    from openhands_cli.auth.login_command import login_command
 
-
-def _logout_and_instruct(server_url: str) -> None:
-    console.print(
-        f"[{OPENHANDS_THEME.warning}]Your connection with OpenHands Cloud has expired."
-        f"[/{OPENHANDS_THEME.warning}]"
-    )
-    console.print(
-        f"[{OPENHANDS_THEME.accent}]Logging you out...[/{OPENHANDS_THEME.accent}]"
-    )
-    logout_command(server_url)
-    console.print(
-        f"[{OPENHANDS_THEME.secondary}]"
-        "Please re-run the following command "
-        "to reconnect and retry:"
-        f"[/{OPENHANDS_THEME.secondary}]"
-    )
-    console.print(
-        f"[{OPENHANDS_THEME.accent}]  openhands login[/{OPENHANDS_THEME.accent}]"
-    )
-
-
-def require_api_key() -> str:
-    """Return stored API key or raise with a helpful message."""
     store = TokenStorage()
-
-    if not store.has_api_key():
-        _print_login_instructions("Error: You are not logged in to OpenHands Cloud.")
-        raise CloudConversationError("User not authenticated")
-
     api_key = store.get_api_key()
-    if not api_key:
-        _print_login_instructions("Error: Invalid API key stored.")
-        raise CloudConversationError("Invalid API key")
+
+    # If no API key or token is invalid, run login
+    if not api_key or not await is_token_valid(server_url, api_key):
+        if not api_key:
+            console.print(
+                f"[{OPENHANDS_THEME.warning}]You are not logged in to OpenHands Cloud."
+                f"[/{OPENHANDS_THEME.warning}]"
+            )
+        else:
+            console.print(
+                f"[{OPENHANDS_THEME.warning}]Your connection with OpenHands Cloud "
+                f"has expired.[/{OPENHANDS_THEME.warning}]"
+            )
+
+        console.print(
+            f"[{OPENHANDS_THEME.accent}]Starting login..."
+            f"[/{OPENHANDS_THEME.accent}]"
+        )
+        success = await login_command(server_url)
+        if not success:
+            raise CloudConversationError("Login failed")
+
+        # Re-read the API key after login
+        api_key = store.get_api_key()
+        if not api_key:
+            raise CloudConversationError("No API key after login")
 
     return api_key
 
@@ -79,15 +66,7 @@ async def create_cloud_conversation(
     server_url: str, initial_user_msg: str
 ) -> dict[str, Any]:
     """Create a new conversation in OpenHands Cloud."""
-    api_key = require_api_key()
-
-    console.print(
-        f"[{OPENHANDS_THEME.secondary}]Validating authentication..."
-        f"[/{OPENHANDS_THEME.secondary}]"
-    )
-    if not await is_token_valid(server_url, api_key):
-        _logout_and_instruct(server_url)
-        raise CloudConversationError("Authentication expired - user logged out")
+    api_key = await _ensure_valid_auth(server_url)
 
     client = OpenHandsApiClient(server_url, api_key)
 
