@@ -136,19 +136,14 @@ class SwitchModalTestApp(App):
 
 
 @pytest.mark.asyncio
-async def test_switch_modal_confirm_calls_on_confirmed() -> None:
-    """Test that clicking 'Yes, switch' calls on_confirmed callback."""
-    confirmed_called = []
-    cancelled_called = []
-
+async def test_switch_modal_result_confirmed() -> None:
+    """Test that clicking 'Yes, switch' returns True."""
     app = SwitchModalTestApp()
     async with app.run_test() as pilot:
-        modal = SwitchConversationModal(
-            prompt="Switch?",
-            on_confirmed=lambda: confirmed_called.append(True),
-            on_cancelled=lambda: cancelled_called.append(True),
-        )
-        pilot.app.push_screen(modal)
+        modal = SwitchConversationModal(prompt="Switch?")
+
+        result: list[bool | None] = []
+        pilot.app.push_screen(modal, result.append)
         await pilot.pause()
 
         # Click "Yes, switch" button
@@ -156,24 +151,18 @@ async def test_switch_modal_confirm_calls_on_confirmed() -> None:
         yes_button.press()
         await pilot.pause()
 
-        assert len(confirmed_called) == 1
-        assert len(cancelled_called) == 0
+        assert result == [True]
 
 
 @pytest.mark.asyncio
-async def test_switch_modal_cancel_calls_on_cancelled() -> None:
-    """Test that clicking 'No, stay' calls on_cancelled callback."""
-    confirmed_called = []
-    cancelled_called = []
-
+async def test_switch_modal_result_cancelled() -> None:
+    """Test that clicking 'No, stay' returns False."""
     app = SwitchModalTestApp()
     async with app.run_test() as pilot:
-        modal = SwitchConversationModal(
-            prompt="Switch?",
-            on_confirmed=lambda: confirmed_called.append(True),
-            on_cancelled=lambda: cancelled_called.append(True),
-        )
-        pilot.app.push_screen(modal)
+        modal = SwitchConversationModal(prompt="Switch?")
+
+        result: list[bool | None] = []
+        pilot.app.push_screen(modal, result.append)
         await pilot.pause()
 
         # Click "No, stay" button
@@ -181,5 +170,4 @@ async def test_switch_modal_cancel_calls_on_cancelled() -> None:
         no_button.press()
         await pilot.pause()
 
-        assert len(confirmed_called) == 0
-        assert len(cancelled_called) == 1
+        assert result == [False]

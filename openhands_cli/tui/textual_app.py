@@ -814,33 +814,34 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # If an agent is currently running, confirm before switching.
         if self.conversation_runner and self.conversation_runner.is_running:
-
-            def _stay() -> None:
-                # Revert selection highlight back to current conversation so the
-                # user doesn't think the app switched chats.
-                self.history_select_current_signal.publish(True)
-                # Keep typing flow smooth.
-                try:
-                    self.input_field.focus_input()
-                except Exception:
-                    pass
-
             self.push_screen(
                 SwitchConversationModal(
                     prompt=(
                         "The agent is still running.\n\n"
                         "Switching conversations will pause the current run.\n"
                         "Do you want to switch anyway?"
-                    ),
-                    on_confirmed=lambda: self._switch_to_conversation_with_stop(
-                        target_id
-                    ),
-                    on_cancelled=_stay,
-                )
+                    )
+                ),
+                lambda confirmed: self._handle_switch_confirmation(
+                    confirmed, target_id
+                ),
             )
             return
 
         self._perform_conversation_switch(target_id)
+
+    def _handle_switch_confirmation(
+        self, confirmed: bool | None, target_id: uuid.UUID
+    ) -> None:
+        """Handle the result of the switch conversation confirmation modal."""
+        if confirmed:
+            self._switch_to_conversation_with_stop(target_id)
+        else:
+            # Revert selection highlight back to current conversation so the
+            # user doesn't think the app switched chats.
+            self.history_select_current_signal.publish(True)
+            # Keep typing flow smooth.
+            self.input_field.focus_input()
 
     def _switch_to_conversation_with_stop(self, target_id: uuid.UUID) -> None:
         """Switch conversations, pausing the current run if needed."""

@@ -159,24 +159,22 @@ class HistorySidePanel(Container):
         self._subscribe_to_app_signals()
 
     def _subscribe_to_app_signals(self) -> None:
-        """Subscribe to app signals (if present) so the panel can self-update."""
-        app = self.app
-
-        new_conv_signal = getattr(app, "history_new_conversation_signal", None)
-        if new_conv_signal is not None:
-            new_conv_signal.subscribe(self, self._on_history_new_conversation)
-
-        current_conv_signal = getattr(app, "history_current_conversation_signal", None)
-        if current_conv_signal is not None:
-            current_conv_signal.subscribe(self, self._on_history_current_conversation)
-
-        title_signal = getattr(app, "history_title_updated_signal", None)
-        if title_signal is not None:
-            title_signal.subscribe(self, self._on_history_title_updated)
-
-        select_current_signal = getattr(app, "history_select_current_signal", None)
-        if select_current_signal is not None:
-            select_current_signal.subscribe(self, self._on_history_select_current)
+        """Subscribe to app signals so the panel can self-update."""
+        signals = {
+            "history_new_conversation_signal": self._on_history_new_conversation,
+            "history_current_conversation_signal": (
+                self._on_history_current_conversation
+            ),
+            "history_title_updated_signal": self._on_history_title_updated,
+            "history_select_current_signal": self._on_history_select_current,
+        }
+        try:
+            for name, handler in signals.items():
+                getattr(self.app, name).subscribe(self, handler)
+        except AttributeError:
+            # If the app doesn't have these signals, history panel updates
+            # are not supported.
+            pass
 
     def _on_history_new_conversation(self, conversation_id: uuid.UUID) -> None:
         """Handle app signal: a new conversation was created and should be selected."""
