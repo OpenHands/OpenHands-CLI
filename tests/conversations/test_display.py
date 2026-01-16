@@ -1,21 +1,21 @@
 from datetime import UTC, datetime
 from unittest import mock
 
-from openhands_cli.conversations import lister
+from openhands_cli.conversations import display
 from openhands_cli.conversations.models import ConversationMetadata
 
 
-class TestLister:
+class TestDisplay:
     def test_display_recent_conversations_empty(self):
         with mock.patch(
-            "openhands_cli.conversations.lister.LocalFileStore"
+            "openhands_cli.conversations.display.LocalFileStore"
         ) as MockStore:
             MockStore.return_value.list_conversations.return_value = []
 
             with mock.patch(
-                "openhands_cli.conversations.lister.console"
+                "openhands_cli.conversations.display.console"
             ) as mock_console:
-                lister.display_recent_conversations()
+                display.display_recent_conversations()
 
                 # Should print "No conversations found"
                 # Check call args
@@ -35,14 +35,14 @@ class TestLister:
         ]
 
         with mock.patch(
-            "openhands_cli.conversations.lister.LocalFileStore"
+            "openhands_cli.conversations.display.LocalFileStore"
         ) as MockStore:
             MockStore.return_value.list_conversations.return_value = convs
 
             with mock.patch(
-                "openhands_cli.conversations.lister.console"
+                "openhands_cli.conversations.display.console"
             ) as mock_console:
-                lister.display_recent_conversations()
+                display.display_recent_conversations()
 
                 # Collect all printed text
                 printed_text = ""
