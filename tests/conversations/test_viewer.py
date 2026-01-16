@@ -32,6 +32,7 @@ class TestViewer:
             "openhands_cli.conversations.viewer.LocalFileStore"
         ) as MockStore:
             MockStore.return_value.exists.return_value = True
+            MockStore.return_value.get_event_count.return_value = 5
 
             # Mock load_events to return an iterator
             # MessageEvent schema: has llm_message
@@ -43,16 +44,26 @@ class TestViewer:
             )
             MockStore.return_value.load_events.return_value = iter([event])
 
-            with mock.patch("openhands_cli.conversations.viewer.console"):
+            with mock.patch(
+                "openhands_cli.conversations.viewer.console"
+            ) as mock_console:
                 # We mock DefaultConversationVisualizer to verify it's used
                 with mock.patch(
                     "openhands_cli.conversations.viewer.DefaultConversationVisualizer"
                 ) as MockVisualizer:
-                    result = viewer.view_conversation("exists-id")
+                    result = viewer.view_conversation("exists-id", limit=10)
                     assert result is True
 
                     # Verify visualizer was called
                     MockVisualizer.return_value.on_event.assert_called()
+
+                    # Verify "Showing" message
+                    showing_found = False
+                    for call in mock_console.print.call_args_list:
+                        if call.args and "Showing 5 of 5 event(s)" in str(call.args[0]):
+                            showing_found = True
+                            break
+                    assert showing_found
 
     def test_view_conversation_handles_load_error(self):
         """Test that viewer handles errors during event loading gracefully."""
@@ -60,6 +71,7 @@ class TestViewer:
             "openhands_cli.conversations.viewer.LocalFileStore"
         ) as MockStore:
             MockStore.return_value.exists.return_value = True
+            MockStore.return_value.get_event_count.return_value = 5
 
             # Create an iterator that yields one item then raises Exception
             def faulty_iterator():

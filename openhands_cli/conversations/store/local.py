@@ -66,7 +66,22 @@ class LocalFileStore(ConversationStore):
             return None
         return self._parse_conversation_dir(conversation_dir)
 
-    def load_events(self, conversation_id: str) -> Iterator[Event]:
+    def get_event_count(self, conversation_id: str) -> int:
+        """Get the total number of events in a conversation."""
+        conversation_dir = self.base_dir / conversation_id
+        events_dir = conversation_dir / "events"
+
+        if not events_dir.exists() or not events_dir.is_dir():
+            return 0
+
+        return len(list(events_dir.glob("event-*.json")))
+
+    def load_events(
+        self,
+        conversation_id: str,
+        limit: int | None = None,
+        start_from_newest: bool = False,
+    ) -> Iterator[Event]:
         """Load events for a conversation."""
         conversation_dir = self.base_dir / conversation_id
         events_dir = conversation_dir / "events"
@@ -77,6 +92,12 @@ class LocalFileStore(ConversationStore):
         # Get all event files and sort them
         event_files = list(events_dir.glob("event-*.json"))
         event_files.sort()
+
+        if limit is not None:
+            if start_from_newest:
+                event_files = event_files[-limit:]
+            else:
+                event_files = event_files[:limit]
 
         for event_file in event_files:
             event = self._load_event_from_file(event_file)

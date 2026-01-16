@@ -28,7 +28,16 @@ class CloudStore(ConversationStore):
         # TODO: Implement API call to GET /conversations/{id}
         raise NotImplementedError("Cloud storage is not yet implemented")
 
-    def load_events(self, conversation_id: str) -> Iterator[Event]:
+    def get_event_count(self, conversation_id: str) -> int:
+        # TODO: Implement API call to get event count
+        raise NotImplementedError("Cloud storage is not yet implemented")
+
+    def load_events(
+        self,
+        conversation_id: str,
+        limit: int | None = None,
+        start_from_newest: bool = False,
+    ) -> Iterator[Event]:
         # TODO: Implement API call to GET /conversations/{id}/events (streaming)
         raise NotImplementedError("Cloud storage is not yet implemented")
 

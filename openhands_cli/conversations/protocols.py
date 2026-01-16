@@ -32,11 +32,30 @@ class ConversationStore(Protocol):
         """
         ...
 
-    def load_events(self, conversation_id: str) -> Iterator[Event]:
+    def get_event_count(self, conversation_id: str) -> int:
+        """Get the total number of events in a conversation.
+
+        Args:
+            conversation_id: The conversation ID.
+
+        Returns:
+            Total count of events.
+        """
+        ...
+
+    def load_events(
+        self,
+        conversation_id: str,
+        limit: int | None = None,
+        start_from_newest: bool = False,
+    ) -> Iterator[Event]:
         """Load events for a conversation.
 
         Args:
             conversation_id: The conversation ID.
+            limit: Optional maximum number of events to load.
+            start_from_newest: If True and limit is set, loads the *last* N events
+                             (chronologically). If False, loads the *first* N events.
 
         Returns:
             Iterator of events.

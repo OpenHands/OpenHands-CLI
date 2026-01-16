@@ -133,3 +133,47 @@ class TestLocalFileStore:
 
         events = list(store.load_events(conv_id))
         assert len(events) == 1
+
+    def test_get_event_count(self, store, tmp_path):
+        conv_id = "count-test"
+        events_dir = tmp_path / conv_id / "events"
+        events_dir.mkdir(parents=True)
+
+        # Create 3 files
+        for i in range(3):
+            (events_dir / f"event-{i}.json").touch()
+
+        assert store.get_event_count(conv_id) == 3
+        assert store.get_event_count("non-existent") == 0
+
+    def test_load_events_limits(self, store, tmp_path):
+        conv_id = "limit-test"
+        events_dir = tmp_path / conv_id / "events"
+        events_dir.mkdir(parents=True)
+
+        # Create 5 events
+        for i in range(5):
+            event = {
+                "id": str(i),
+                "timestamp": f"2024-01-01T12:00:0{i}Z",
+                "source": "user",
+                "kind": "MessageEvent",
+                "llm_message": {
+                    "role": "user",
+                    "content": [{"type": "text", "text": f"Msg {i}"}],
+                },
+            }
+            with open(events_dir / f"event-{i}.json", "w") as f:
+                json.dump(event, f)
+
+        # Test normal limit (first 2)
+        events = list(store.load_events(conv_id, limit=2))
+        assert len(events) == 2
+        assert events[0].id == "0"
+        assert events[1].id == "1"
+
+        # Test reverse limit (last 2)
+        events = list(store.load_events(conv_id, limit=2, start_from_newest=True))
+        assert len(events) == 2
+        assert events[0].id == "3"
+        assert events[1].id == "4"

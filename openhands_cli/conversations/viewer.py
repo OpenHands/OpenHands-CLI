@@ -5,14 +5,9 @@ from __future__ import annotations
 from rich.console import Console
 
 from openhands.sdk.conversation.visualizer import DefaultConversationVisualizer
-from openhands.tools.preset.default import register_default_tools
 from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.theme import OPENHANDS_THEME
 
-
-# Register default tools to ensure all Action subclasses are available
-# for proper deserialization of events
-register_default_tools()
 
 console = Console()
 
@@ -41,7 +36,11 @@ class ConversationViewer:
             )
             return False
 
-        events_iterator = self.store.load_events(conversation_id)
+        # Get total count first
+        total_events = self.store.get_event_count(conversation_id)
+        events_to_show = min(limit, total_events)
+
+        events_iterator = self.store.load_events(conversation_id, limit=limit)
 
         # Create visualizer
         visualizer = DefaultConversationVisualizer()
@@ -51,15 +50,17 @@ class ConversationViewer:
             f"Conversation: {conversation_id}",
             style=f"{OPENHANDS_THEME.primary} bold",
         )
+        console.print(
+            f"Showing {events_to_show} of {total_events} event(s)",
+            style=f"{OPENHANDS_THEME.secondary} dim",
+        )
         console.print("-" * 80, style=f"{OPENHANDS_THEME.secondary} dim")
         console.print()
 
         # Load and display events
         events_displayed = 0
         try:
-            for i, event in enumerate(events_iterator):
-                if i >= limit:
-                    break
+            for event in events_iterator:
                 visualizer.on_event(event)
                 events_displayed += 1
         except Exception as e:
