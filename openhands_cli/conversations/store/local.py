@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
@@ -83,6 +84,26 @@ class LocalFileStore(ConversationStore):
     def exists(self, conversation_id: str) -> bool:
         """Check if a conversation exists."""
         return (self.base_dir / conversation_id).exists()
+
+    def create(self, conversation_id: str | None = None) -> str:
+        """Create a new conversation.
+
+        Args:
+            conversation_id: Optional ID for the new conversation.
+                           If not provided, one will be generated.
+
+        Returns:
+            The conversation ID.
+        """
+        if not conversation_id:
+            conversation_id = uuid.uuid4().hex
+
+        conversation_dir = self.base_dir / conversation_id
+        conversation_dir.mkdir(parents=True, exist_ok=True)
+        # Create events directory to be ready for writes
+        (conversation_dir / "events").mkdir(exist_ok=True)
+
+        return conversation_id
 
     def _parse_conversation_dir(
         self, conversation_dir: Path

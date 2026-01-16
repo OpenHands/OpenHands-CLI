@@ -53,3 +53,15 @@ class ConversationStore(Protocol):
             True if exists, False otherwise.
         """
         ...
+
+    def create(self, conversation_id: str | None = None) -> str:
+        """Create a new conversation.
+
+        Args:
+            conversation_id: Optional ID for the new conversation.
+                           If not provided, one will be generated.
+
+        Returns:
+            The conversation ID.
+        """
+        ...

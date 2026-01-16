@@ -76,8 +76,9 @@ class ConversationManager:
             )
             return None
 
-        # Generate a new conversation ID
-        app.conversation_id = uuid.uuid4()
+        # Create a new conversation via store
+        new_id_str = self.store.create()
+        app.conversation_id = uuid.UUID(new_id_str)
 
         # Reset the conversation runner
         app.conversation_runner = None

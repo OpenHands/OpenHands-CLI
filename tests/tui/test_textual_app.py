@@ -172,6 +172,7 @@ class TestConversationManager:
         app.notify = Mock()
 
         manager = ConversationManager(app, Mock())
+        manager.store.create.return_value = uuid.uuid4().hex  # type: ignore
         manager.post_to_history_panel = Mock()
 
         result = manager.create_new()
