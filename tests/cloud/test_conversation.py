@@ -2,51 +2,17 @@
 
 from __future__ import annotations
 
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
 from openhands_cli.cloud.conversation import (
     CloudConversationError,
+    _ensure_valid_auth,
     create_cloud_conversation,
     extract_repository_from_cwd,
     is_token_valid,
-    require_api_key,
 )
-
-
-# ----------------------------
-# require_api_key
-# ----------------------------
-
-
-@pytest.mark.parametrize(
-    "has_api_key,stored_key,expect_exc,exc_msg",
-    [
-        (False, None, True, "User not authenticated"),
-        (True, None, True, "Invalid API key"),
-        (True, "valid-api-key", False, None),
-    ],
-)
-def test_require_api_key(has_api_key, stored_key, expect_exc, exc_msg):
-    with (
-        patch("openhands_cli.cloud.conversation.TokenStorage") as mock_store_cls,
-        patch(
-            "openhands_cli.cloud.conversation._print_login_instructions"
-        ) as mock_print,
-    ):
-        store = Mock()
-        store.has_api_key.return_value = has_api_key
-        store.get_api_key.return_value = stored_key
-        mock_store_cls.return_value = store
-
-        if expect_exc:
-            with pytest.raises(CloudConversationError, match=exc_msg):
-                require_api_key()
-            mock_print.assert_called_once()  # UX helper called for both failure paths
-        else:
-            assert require_api_key() == "valid-api-key"
-            mock_print.assert_not_called()
 
 
 # ----------------------------
@@ -56,21 +22,13 @@ def test_require_api_key(has_api_key, stored_key, expect_exc, exc_msg):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "side_effect,expected,expect_exc,exc_msg",
+    "side_effect,expected",
     [
-        (None, True, False, None),
-        ("UnauthenticatedError", False, False, None),
-        (
-            Exception("Network error"),
-            None,
-            True,
-            "Failed to validate token: Network error",
-        ),
+        (None, True),
+        ("UnauthenticatedError", False),
     ],
 )
-async def test_is_token_valid(side_effect, expected, expect_exc, exc_msg):
-    from unittest.mock import AsyncMock
-
+async def test_is_token_valid(side_effect, expected):
     from openhands_cli.auth.api_client import UnauthenticatedError
 
     with patch(
@@ -84,18 +42,120 @@ async def test_is_token_valid(side_effect, expected, expect_exc, exc_msg):
             client.get_user_info = AsyncMock(
                 side_effect=UnauthenticatedError("bad token")
             )
-        else:
-            client.get_user_info = AsyncMock(side_effect=side_effect)
 
         mock_client_cls.return_value = client
 
-        if expect_exc:
-            with pytest.raises(CloudConversationError, match=exc_msg):
-                await is_token_valid("https://example.com", "token")
-        else:
-            assert await is_token_valid("https://example.com", "token") is expected
-
+        assert await is_token_valid("https://example.com", "token") is expected
         client.get_user_info.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_is_token_valid_propagates_other_exceptions():
+    """Other exceptions (e.g., network errors) should propagate naturally."""
+    with patch(
+        "openhands_cli.cloud.conversation.OpenHandsApiClient"
+    ) as mock_client_cls:
+        client = Mock()
+        client.get_user_info = AsyncMock(side_effect=Exception("Network error"))
+        mock_client_cls.return_value = client
+
+        with pytest.raises(Exception, match="Network error"):
+            await is_token_valid("https://example.com", "token")
+
+
+# ----------------------------
+# _ensure_valid_auth
+# ----------------------------
+
+
+@pytest.mark.asyncio
+async def test_ensure_valid_auth_returns_existing_valid_key():
+    """If API key exists and is valid, return it without calling login."""
+    with (
+        patch("openhands_cli.cloud.conversation.TokenStorage") as mock_store_cls,
+        patch(
+            "openhands_cli.cloud.conversation.is_token_valid",
+            return_value=True,
+        ),
+        patch(
+            "openhands_cli.auth.login_command.login_command"
+        ) as mock_login,
+    ):
+        store = Mock()
+        store.get_api_key.return_value = "valid-key"
+        mock_store_cls.return_value = store
+
+        result = await _ensure_valid_auth("https://server")
+        assert result == "valid-key"
+        mock_login.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_ensure_valid_auth_runs_login_when_no_key():
+    """If no API key exists, run login command."""
+    with (
+        patch("openhands_cli.cloud.conversation.TokenStorage") as mock_store_cls,
+        patch(
+            "openhands_cli.cloud.conversation.is_token_valid",
+            return_value=True,
+        ),
+        patch(
+            "openhands_cli.auth.login_command.login_command",
+            return_value=True,
+        ) as mock_login,
+    ):
+        store = Mock()
+        store.get_api_key.side_effect = [None, "new-key"]
+        mock_store_cls.return_value = store
+
+        result = await _ensure_valid_auth("https://server")
+        assert result == "new-key"
+        mock_login.assert_called_once_with("https://server")
+
+
+@pytest.mark.asyncio
+async def test_ensure_valid_auth_runs_login_when_token_invalid():
+    """If token is invalid, run login command."""
+    with (
+        patch("openhands_cli.cloud.conversation.TokenStorage") as mock_store_cls,
+        patch(
+            "openhands_cli.cloud.conversation.is_token_valid",
+            return_value=False,
+        ),
+        patch(
+            "openhands_cli.auth.login_command.login_command",
+            return_value=True,
+        ) as mock_login,
+    ):
+        store = Mock()
+        store.get_api_key.side_effect = ["expired-key", "new-key"]
+        mock_store_cls.return_value = store
+
+        result = await _ensure_valid_auth("https://server")
+        assert result == "new-key"
+        mock_login.assert_called_once_with("https://server")
+
+
+@pytest.mark.asyncio
+async def test_ensure_valid_auth_raises_on_login_failure():
+    """If login fails, raise CloudConversationError."""
+    with (
+        patch("openhands_cli.cloud.conversation.TokenStorage") as mock_store_cls,
+        patch(
+            "openhands_cli.cloud.conversation.is_token_valid",
+            return_value=False,
+        ),
+        patch(
+            "openhands_cli.auth.login_command.login_command",
+            return_value=False,
+        ),
+    ):
+        store = Mock()
+        store.get_api_key.return_value = "expired-key"
+        mock_store_cls.return_value = store
+
+        with pytest.raises(CloudConversationError, match="Login failed"):
+            await _ensure_valid_auth("https://server")
 
 
 # ----------------------------
@@ -155,22 +215,16 @@ def test_extract_repository_from_cwd_branch_missing_is_ok():
 
 
 @pytest.mark.asyncio
-async def test_create_cloud_conversation_logs_out_on_invalid_token():
-    # Behavior: invalid token -> logout_command called + CloudConversationError raised.
+async def test_create_cloud_conversation_runs_login_on_invalid_token():
+    """If token is invalid, login is run automatically (via _ensure_valid_auth)."""
     with (
-        patch("openhands_cli.cloud.conversation.require_api_key", return_value="key"),
         patch(
-            "openhands_cli.cloud.conversation.is_token_valid",
-            return_value=False,
+            "openhands_cli.cloud.conversation._ensure_valid_auth",
+            side_effect=CloudConversationError("Login failed"),
         ),
-        patch("openhands_cli.cloud.conversation.logout_command") as mock_logout,
     ):
-        with pytest.raises(
-            CloudConversationError, match="Authentication expired - user logged out"
-        ):
+        with pytest.raises(CloudConversationError, match="Login failed"):
             await create_cloud_conversation("https://server", "hello")
-
-        mock_logout.assert_called_once_with("https://server")
 
 
 @pytest.mark.asyncio
@@ -192,13 +246,10 @@ async def test_create_cloud_conversation_logs_out_on_invalid_token():
 async def test_create_cloud_conversation_payload_includes_repo_and_branch(
     repo_branch, expected_payload
 ):
-    from unittest.mock import AsyncMock
-
     with (
-        patch("openhands_cli.cloud.conversation.require_api_key", return_value="key"),
         patch(
-            "openhands_cli.cloud.conversation.is_token_valid",
-            return_value=True,
+            "openhands_cli.cloud.conversation._ensure_valid_auth",
+            return_value="key",
         ),
         patch(
             "openhands_cli.cloud.conversation.extract_repository_from_cwd",
@@ -219,13 +270,10 @@ async def test_create_cloud_conversation_payload_includes_repo_and_branch(
 
 @pytest.mark.asyncio
 async def test_create_cloud_conversation_propagates_api_error_as_cloud_error():
-    from unittest.mock import AsyncMock
-
     with (
-        patch("openhands_cli.cloud.conversation.require_api_key", return_value="key"),
         patch(
-            "openhands_cli.cloud.conversation.is_token_valid",
-            return_value=True,
+            "openhands_cli.cloud.conversation._ensure_valid_auth",
+            return_value="key",
         ),
         patch(
             "openhands_cli.cloud.conversation.extract_repository_from_cwd",
