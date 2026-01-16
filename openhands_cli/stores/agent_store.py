@@ -54,22 +54,28 @@ class LLMEnvOverrides(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def load_from_env(cls, data: Any) -> Any:
+    def load_from_env(cls, data: Any) -> dict[str, Any]:
         """Load values from environment variables if not explicitly provided."""
+        result: dict[str, Any] = {}
+
+        # Get values from env vars
+        api_key_str = os.environ.get(ENV_LLM_API_KEY) or None
+        if api_key_str:
+            result["api_key"] = SecretStr(api_key_str)
+
+        base_url = os.environ.get(ENV_LLM_BASE_URL) or None
+        if base_url:
+            result["base_url"] = base_url
+
+        model = os.environ.get(ENV_LLM_MODEL) or None
+        if model:
+            result["model"] = model
+
+        # Explicit values take precedence over env vars
         if isinstance(data, dict):
-            # Only load from env if the field is not explicitly provided
-            if "api_key" not in data or data["api_key"] is None:
-                api_key_str = os.environ.get(ENV_LLM_API_KEY) or None
-                if api_key_str:
-                    data["api_key"] = SecretStr(api_key_str)
+            result.update(data)
 
-            if "base_url" not in data or data["base_url"] is None:
-                data["base_url"] = os.environ.get(ENV_LLM_BASE_URL) or None
-
-            if "model" not in data or data["model"] is None:
-                data["model"] = os.environ.get(ENV_LLM_MODEL) or None
-
-        return data
+        return result
 
     def has_overrides(self) -> bool:
         """Check if any overrides are set."""
