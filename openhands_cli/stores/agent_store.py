@@ -14,7 +14,7 @@ from openhands.sdk import (
 )
 from openhands.sdk.context import load_project_skills
 from openhands.tools.preset.default import get_default_tools
-from openhands_cli.locations import (
+from openhands_cli.constants import (
     AGENT_SETTINGS_PATH,
     PERSISTENCE_DIR,
     WORK_DIR,

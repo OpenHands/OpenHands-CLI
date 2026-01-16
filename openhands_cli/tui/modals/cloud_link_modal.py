@@ -37,8 +37,7 @@ class CloudLinkModal(ModalScreen):
         self.on_link_complete = on_link_complete
         self._linking_in_progress = False
 
-        # Import default here to avoid circular imports
-        from openhands_cli.argparsers.main_parser import DEFAULT_CLOUD_URL
+        from openhands_cli.constants import DEFAULT_CLOUD_URL
 
         self.cloud_url = cloud_url or DEFAULT_CLOUD_URL
 

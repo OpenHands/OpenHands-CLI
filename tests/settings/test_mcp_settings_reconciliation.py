@@ -8,7 +8,7 @@ import pytest
 from pydantic import SecretStr
 
 from openhands.sdk import LLM, Agent
-from openhands_cli.locations import AGENT_SETTINGS_PATH, MCP_CONFIG_FILE
+from openhands_cli.constants import AGENT_SETTINGS_PATH, MCP_CONFIG_FILE
 from openhands_cli.stores import AgentStore
 
 
@@ -34,8 +34,8 @@ def persistence_dir(tmp_path, monkeypatch) -> Path:
     root = tmp_path / "openhands"
     root.mkdir()
     # Patch PERSISTENCE_DIR in both modules that use it
-    monkeypatch.setattr("openhands_cli.locations.PERSISTENCE_DIR", str(root))
-    monkeypatch.setattr("openhands_cli.locations.PERSISTENCE_DIR", str(root))
+    monkeypatch.setattr("openhands_cli.constants.PERSISTENCE_DIR", str(root))
+    monkeypatch.setattr("openhands_cli.constants.PERSISTENCE_DIR", str(root))
     return root
 
 

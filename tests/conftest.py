@@ -97,7 +97,7 @@ def setup_test_agent_config(tmp_path_factory):
 
     #  Also create the agent settings in the default location as a fallback
     # This ensures tests work even if the patch isn't applied early enough
-    from openhands_cli import locations
+    from openhands_cli import constants as locations
 
     default_persistence_dir = Path(locations.PERSISTENCE_DIR)
     if not default_persistence_dir.exists():
@@ -108,7 +108,7 @@ def setup_test_agent_config(tmp_path_factory):
 
     # Patch locations module
     with patch.multiple(
-        "openhands_cli.locations",
+        "openhands_cli.constants",
         PERSISTENCE_DIR=str(temp_persistence_dir),
         CONVERSATIONS_DIR=str(conversations_dir),
     ):

@@ -10,7 +10,7 @@ from textual.widgets import Static
 
 from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.cloud.conversation import is_token_valid
-from openhands_cli.locations import WORK_DIR
+from openhands_cli.constants import WORK_DIR
 from openhands_cli.utils import abbreviate_number, format_cost
 
 

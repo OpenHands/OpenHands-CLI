@@ -30,7 +30,7 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
-from openhands_cli.locations import CONVERSATIONS_DIR
+from openhands_cli.constants import CONVERSATIONS_DIR
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
@@ -113,8 +113,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.json_mode = json_mode
 
         # Store cloud URL for cloud connection status
-        # Import default here to avoid circular imports
-        from openhands_cli.argparsers.main_parser import DEFAULT_CLOUD_URL
+        from openhands_cli.constants import DEFAULT_CLOUD_URL
 
         self.cloud_url = cloud_url or DEFAULT_CLOUD_URL
 

@@ -12,3 +12,6 @@ AGENT_SETTINGS_PATH = "agent_settings.json"
 
 # MCP configuration file (relative to PERSISTENCE_DIR)
 MCP_CONFIG_FILE = "mcp.json"
+
+# Default OpenHands Cloud URL
+DEFAULT_CLOUD_URL = os.getenv("OPENHANDS_CLOUD_URL", "https://app.all-hands.dev")

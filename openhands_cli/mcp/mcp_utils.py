@@ -19,7 +19,7 @@ def _get_mcp_config_path() -> Path:
     correctly when PERSISTENCE_DIR is patched in tests.
     """
     # Import the module and get the current value to support patching
-    import openhands_cli.locations as locations
+    import openhands_cli.constants as locations
 
     return Path(locations.PERSISTENCE_DIR) / locations.MCP_CONFIG_FILE
 
