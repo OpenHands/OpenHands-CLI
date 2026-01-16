@@ -8,8 +8,6 @@ HISTORY_PANEL_STYLE = """
         max-width: 60;
         border-left: vkey $foreground 30%;
         padding: 0 1;
-        height: 1fr;
-        padding-right: 1;
         layout: vertical;
         height: 100%;
     }
