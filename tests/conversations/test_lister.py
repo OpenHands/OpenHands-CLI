@@ -1,19 +1,19 @@
 from datetime import UTC, datetime
 from unittest import mock
 
-from openhands_cli.conversations.cli import lister
+from openhands_cli.conversations import lister
 from openhands_cli.conversations.models import ConversationMetadata
 
 
 class TestLister:
     def test_display_recent_conversations_empty(self):
         with mock.patch(
-            "openhands_cli.conversations.cli.lister.LocalFileStore"
+            "openhands_cli.conversations.lister.LocalFileStore"
         ) as MockStore:
             MockStore.return_value.list_conversations.return_value = []
 
             with mock.patch(
-                "openhands_cli.conversations.cli.lister.console"
+                "openhands_cli.conversations.lister.console"
             ) as mock_console:
                 lister.display_recent_conversations()
 
@@ -35,12 +35,12 @@ class TestLister:
         ]
 
         with mock.patch(
-            "openhands_cli.conversations.cli.lister.LocalFileStore"
+            "openhands_cli.conversations.lister.LocalFileStore"
         ) as MockStore:
             MockStore.return_value.list_conversations.return_value = convs
 
             with mock.patch(
-                "openhands_cli.conversations.cli.lister.console"
+                "openhands_cli.conversations.lister.console"
             ) as mock_console:
                 lister.display_recent_conversations()
 

@@ -1,18 +1,18 @@
 from unittest import mock
 
 from openhands.sdk import MessageEvent
-from openhands_cli.conversations.cli import viewer
+from openhands_cli.conversations import viewer
 
 
 class TestViewer:
     def test_view_conversation_not_found(self):
         with mock.patch(
-            "openhands_cli.conversations.cli.viewer.LocalFileStore"
+            "openhands_cli.conversations.viewer.LocalFileStore"
         ) as MockStore:
             MockStore.return_value.exists.return_value = False
 
             with mock.patch(
-                "openhands_cli.conversations.cli.viewer.console"
+                "openhands_cli.conversations.viewer.console"
             ) as mock_console:
                 result = viewer.view_conversation("missing-id")
                 assert result is False
@@ -29,7 +29,7 @@ class TestViewer:
 
     def test_view_conversation_success(self):
         with mock.patch(
-            "openhands_cli.conversations.cli.viewer.LocalFileStore"
+            "openhands_cli.conversations.viewer.LocalFileStore"
         ) as MockStore:
             MockStore.return_value.exists.return_value = True
 
@@ -43,10 +43,10 @@ class TestViewer:
             )
             MockStore.return_value.load_events.return_value = iter([event])
 
-            with mock.patch("openhands_cli.conversations.cli.viewer.console"):
+            with mock.patch("openhands_cli.conversations.viewer.console"):
                 # We mock DefaultConversationVisualizer to verify it's used
                 with mock.patch(
-                    "openhands_cli.conversations.cli.viewer.DefaultConversationVisualizer"
+                    "openhands_cli.conversations.viewer.DefaultConversationVisualizer"
                 ) as MockVisualizer:
                     result = viewer.view_conversation("exists-id")
                     assert result is True

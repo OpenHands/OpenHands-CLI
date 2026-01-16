@@ -73,7 +73,7 @@ def handle_resume_logic(args) -> str | None:
     # Check if resume was called without ID and without --last
     elif args.resume is not None and args.resume == "":
         # Resume called without ID - show conversation list
-        from openhands_cli.conversations.cli.lister import display_recent_conversations
+        from openhands_cli.conversations.lister import display_recent_conversations
 
         display_recent_conversations()
         return None
@@ -169,7 +169,7 @@ def main() -> None:
             handle_cloud_command(args)
 
         elif args.command == "view":
-            from openhands_cli.conversations.cli.viewer import view_conversation
+            from openhands_cli.conversations.viewer import view_conversation
 
             success = view_conversation(args.conversation_id, args.limit)
             if not success:
