@@ -1,6 +1,7 @@
 # openhands_cli/settings/store.py
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from prompt_toolkit import HTML, print_formatted_text
@@ -28,6 +29,58 @@ from openhands_cli.utils import (
 
 
 DEFAULT_LLM_BASE_URL = "https://llm-proxy.app.all-hands.dev/"
+
+# Environment variable names for LLM configuration
+ENV_LLM_API_KEY = "LLM_API_KEY"
+ENV_LLM_BASE_URL = "LLM_BASE_URL"
+ENV_LLM_MODEL = "LLM_MODEL"
+
+
+def get_env_llm_overrides() -> dict[str, str]:
+    """Get LLM configuration overrides from environment variables.
+
+    Returns:
+        Dictionary with keys 'api_key', 'base_url', 'model' for any
+        environment variables that are set. Empty dict if none are set.
+    """
+    overrides: dict[str, str] = {}
+
+    api_key = os.environ.get(ENV_LLM_API_KEY)
+    if api_key:
+        overrides["api_key"] = api_key
+
+    base_url = os.environ.get(ENV_LLM_BASE_URL)
+    if base_url:
+        overrides["base_url"] = base_url
+
+    model = os.environ.get(ENV_LLM_MODEL)
+    if model:
+        overrides["model"] = model
+
+    return overrides
+
+
+def apply_llm_overrides(llm: LLM, overrides: dict[str, str]) -> LLM:
+    """Apply environment variable overrides to an LLM instance.
+
+    Args:
+        llm: The LLM instance to update
+        overrides: Dictionary of overrides from get_env_llm_overrides()
+
+    Returns:
+        Updated LLM instance with overrides applied
+    """
+    if not overrides:
+        return llm
+
+    # Convert api_key to SecretStr if present (LLM model expects SecretStr)
+    from pydantic import SecretStr
+
+    update_dict: dict[str, str | SecretStr] = dict(overrides)
+    if "api_key" in update_dict:
+        update_dict["api_key"] = SecretStr(update_dict["api_key"])
+
+    return llm.model_copy(update=update_dict)
 
 
 def resolve_llm_base_url(
@@ -57,6 +110,10 @@ class AgentStore:
             str_spec = self.file_store.read(AGENT_SETTINGS_PATH)
             agent = Agent.model_validate_json(str_spec)
 
+            # Get environment variable overrides (these take precedence over
+            # stored settings and are NOT persisted to disk)
+            env_overrides = get_env_llm_overrides()
+
             # Update tools with most recent working directory
             updated_tools = get_default_tools(enable_browser=False)
 
@@ -80,35 +137,45 @@ class AgentStore:
             # Get only enabled MCP servers
             enabled_servers = list_enabled_servers()
 
+            # Apply environment variable overrides first, then update metadata
+            updated_llm = apply_llm_overrides(agent.llm, env_overrides)
+
             # Update LLM metadata with current information
-            llm_update = {}
-            if should_set_litellm_extra_body(agent.llm.model):
+            llm_update: dict[str, Any] = {}
+            if should_set_litellm_extra_body(updated_llm.model):
                 llm_update["litellm_extra_body"] = {
                     "metadata": get_llm_metadata(
-                        model_name=agent.llm.model,
+                        model_name=updated_llm.model,
                         llm_type="agent",
                         session_id=session_id,
                     )
                 }
-            updated_llm = agent.llm.model_copy(update=llm_update)
+            if llm_update:
+                updated_llm = updated_llm.model_copy(update=llm_update)
 
             # Always create a fresh condenser with current defaults if condensation
             # is enabled. This ensures users get the latest condenser settings
             # (e.g., max_size, keep_first) without needing to reconfigure.
             condenser = None
             if agent.condenser and isinstance(agent.condenser, LLMSummarizingCondenser):
+                # Apply environment variable overrides to condenser LLM as well
+                condenser_llm = apply_llm_overrides(
+                    agent.condenser.llm, env_overrides
+                )
+
                 condenser_llm_update: dict[str, Any] = {}
-                if should_set_litellm_extra_body(agent.condenser.llm.model):
+                if should_set_litellm_extra_body(condenser_llm.model):
                     condenser_llm_update["litellm_extra_body"] = {
                         "metadata": get_llm_metadata(
-                            model_name=agent.condenser.llm.model,
+                            model_name=condenser_llm.model,
                             llm_type="condenser",
                             session_id=session_id,
                         )
                     }
-                condenser_llm = agent.condenser.llm.model_copy(
-                    update=condenser_llm_update
-                )
+                if condenser_llm_update:
+                    condenser_llm = condenser_llm.model_copy(
+                        update=condenser_llm_update
+                    )
                 condenser = LLMSummarizingCondenser(llm=condenser_llm)
 
             # Update tools and context
