@@ -4,7 +4,7 @@ from datetime import datetime
 
 from rich.console import Console
 
-from openhands_cli.conversations.lister import ConversationLister
+from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.theme import OPENHANDS_THEME
 
 
@@ -17,8 +17,8 @@ def display_recent_conversations(limit: int = 15) -> None:
     Args:
         limit: Maximum number of conversations to display (default: 15)
     """
-    lister = ConversationLister()
-    conversations = lister.list()
+    store = LocalFileStore()
+    conversations = store.list_conversations(limit=limit)
 
     if not conversations:
         console.print("No conversations found.", style=OPENHANDS_THEME.warning)
@@ -28,18 +28,15 @@ def display_recent_conversations(limit: int = 15) -> None:
         )
         return
 
-    # Limit to the requested number of conversations
-    conversations = conversations[:limit]
-
     console.print("Recent Conversations:", style=f"{OPENHANDS_THEME.primary} bold")
     console.print("-" * 80, style=f"{OPENHANDS_THEME.secondary} dim")
 
     for i, conv in enumerate(conversations, 1):
         # Format the date nicely
-        date_str = _format_date(conv.created_date)
+        date_str = _format_date(conv.created_at)
 
         # Truncate long prompts
-        prompt_preview = _truncate_prompt(conv.first_user_prompt)
+        prompt_preview = _truncate_prompt(conv.title)
 
         # Format the conversation entry
         console.print(f"{i:2d}. ", style=f"{OPENHANDS_THEME.primary} bold", end="")
@@ -78,7 +75,7 @@ def _format_date(dt: datetime) -> str:
     Returns:
         Formatted date string
     """
-    now = datetime.now()
+    now = datetime.now(dt.tzinfo) if dt.tzinfo else datetime.now()
     diff = now - dt
 
     if diff.days == 0:

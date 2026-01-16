@@ -12,7 +12,7 @@ from textual.containers import Container, Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.widgets import Static
 
-from openhands_cli.conversations.lister import ConversationInfo, ConversationLister
+from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.core.messages import (
     ConversationCreated,
@@ -33,7 +33,7 @@ class HistoryItem(Static):
 
     def __init__(
         self,
-        conversation: ConversationInfo,
+        conversation: ConversationMetadata,
         is_current: bool,
         is_selected: bool,
         on_select: Callable[[str], None],
@@ -42,25 +42,25 @@ class HistoryItem(Static):
         """Initialize history item.
 
         Args:
-            conversation: The conversation info to display
+            conversation: The conversation metadata to display
             is_current: Whether this is the currently active conversation
             on_select: Callback when this item is selected
         """
-        # Build the content string - show first_user_prompt as title, id as secondary
-        time_str = _format_time(conversation.created_date)
+        # Build the content string - show title, id as secondary
+        time_str = _format_time(conversation.created_at)
         conv_id = conversation.id
 
-        # Use first_user_prompt as title if available, otherwise use ID
-        has_title = bool(conversation.first_user_prompt)
-        if conversation.first_user_prompt:
-            title = _truncate(conversation.first_user_prompt, 100)
+        # Use title if available, otherwise use ID
+        has_title = bool(conversation.title)
+        if conversation.title:
+            title = _truncate(conversation.title, 100)
             content = f"{title}\n[dim]{conv_id} • {time_str}[/dim]"
         else:
             content = f"[dim]New conversation[/dim]\n[dim]{conv_id} • {time_str}[/dim]"
 
         super().__init__(content, markup=True, **kwargs)
         self.conversation_id = conversation.id
-        self._created_date = conversation.created_date
+        self._created_at = conversation.created_at
         self._has_title = has_title
         self.is_current = is_current
         self.is_selected = is_selected
@@ -93,7 +93,7 @@ class HistoryItem(Static):
 
     def set_title(self, title: str) -> None:
         """Update the displayed title for this history item."""
-        time_str = _format_time(self._created_date)
+        time_str = _format_time(self._created_at)
         title_text = _truncate(title, 100)
         self.update(f"{title_text}\n[dim]{self.conversation_id} • {time_str}[/dim]")
         self._has_title = True
@@ -132,7 +132,7 @@ class HistorySidePanel(Container):
         self._oh_app = app
         self.current_conversation_id = current_conversation_id
         self.selected_conversation_id: uuid.UUID | None = None
-        self._local_rows: list[ConversationInfo] = []
+        self._local_rows: list[ConversationMetadata] = []
 
     @classmethod
     def toggle(
@@ -203,9 +203,9 @@ class HistorySidePanel(Container):
         self._local_rows = self._load_local_rows()
         self._render_list()
 
-    def _load_local_rows(self) -> list[ConversationInfo]:
+    def _load_local_rows(self) -> list[ConversationMetadata]:
         """Load local conversation rows."""
-        return list(ConversationLister().list())
+        return self._oh_app._conversation_manager.list_conversations()
 
     def _render_list(self) -> None:
         """Render the conversation list."""
@@ -287,9 +287,7 @@ class HistorySidePanel(Container):
 
         self._local_rows.insert(
             0,
-            ConversationInfo(
-                id=conv_hex, created_date=datetime.now(), first_user_prompt=None
-            ),
+            ConversationMetadata(id=conv_hex, created_at=datetime.now(), title=None),
         )
         self._render_list()
 
@@ -303,9 +301,15 @@ class HistorySidePanel(Container):
         conv_hex = conversation_id.hex
 
         for i, conv in enumerate(self._local_rows):
-            if conv.id == conv_hex and not conv.first_user_prompt:
-                self._local_rows[i] = conv.model_copy(
-                    update={"first_user_prompt": title}
+            if conv.id == conv_hex and not conv.title:
+                # Update the object in the list
+                # (dataclass replace would be cleaner but this works for now)
+                # Since it's a dataclass, we can construct a new one.
+                self._local_rows[i] = ConversationMetadata(
+                    id=conv.id,
+                    created_at=conv.created_at,
+                    title=title,
+                    last_modified=conv.last_modified,
                 )
                 break
 

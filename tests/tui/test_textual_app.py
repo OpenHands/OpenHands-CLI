@@ -171,7 +171,7 @@ class TestConversationManager:
         app.query_one = Mock(return_value=Mock())
         app.notify = Mock()
 
-        manager = ConversationManager(app)
+        manager = ConversationManager(app, Mock())
         manager.post_to_history_panel = Mock()
 
         result = manager.create_new()
@@ -188,7 +188,7 @@ class TestConversationManager:
         app.conversation_runner.is_running = True
         app.notify = Mock()
 
-        manager = ConversationManager(app)
+        manager = ConversationManager(app, Mock())
 
         result = manager.create_new()
 
@@ -202,7 +202,7 @@ class TestConversationManager:
         app = Mock()
         app.conversation_id = uuid.uuid4()
 
-        manager = ConversationManager(app)
+        manager = ConversationManager(app, Mock())
         manager.post_to_history_panel = Mock()
 
         manager.update_title("Test title")

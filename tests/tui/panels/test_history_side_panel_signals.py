@@ -10,7 +10,9 @@ from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Button, Static
 
-from openhands_cli.conversations.lister import ConversationInfo, ConversationLister
+from openhands_cli.conversations.models import ConversationMetadata
+from openhands_cli.conversations.store.local import LocalFileStore
+from openhands_cli.tui.core.conversation_manager import ConversationManager
 from openhands_cli.tui.core.messages import (
     ConversationCreated,
     ConversationTitleUpdated,
@@ -28,6 +30,13 @@ class HistoryMessagesTestApp(App):
         super().__init__(**kwargs)
         # Track messages received by the app
         self.received_switch_requests: list[str] = []
+        self._store = LocalFileStore()
+        # Mock the store for tests if needed,
+        # but we rely on monkeypatching LocalFileStore in tests
+        self._conversation_manager = ConversationManager(
+            self,  # type: ignore[arg-type]
+            self._store,
+        )
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="content_area"):
@@ -47,13 +56,15 @@ async def test_history_panel_updates_from_messages(
     # Stub local conversations list.
     base_id = uuid.uuid4().hex
     conversations = [
-        ConversationInfo(
+        ConversationMetadata(
             id=base_id,
-            created_date=datetime(2025, 1, 1, tzinfo=UTC),
-            first_user_prompt="hello",
+            created_at=datetime(2025, 1, 1, tzinfo=UTC),
+            title="hello",
         ),
     ]
-    monkeypatch.setattr(ConversationLister, "list", lambda self: conversations)
+    monkeypatch.setattr(
+        LocalFileStore, "list_conversations", lambda self, limit=100: conversations
+    )
 
     app = HistoryMessagesTestApp()
     async with app.run_test() as pilot:
@@ -104,13 +115,15 @@ async def test_history_panel_posts_switch_request_on_selection(
     """Test that selecting a conversation posts SwitchConversationRequest."""
     conv_id = uuid.uuid4().hex
     conversations = [
-        ConversationInfo(
+        ConversationMetadata(
             id=conv_id,
-            created_date=datetime(2025, 1, 1, tzinfo=UTC),
-            first_user_prompt="test prompt",
+            created_at=datetime(2025, 1, 1, tzinfo=UTC),
+            title="test prompt",
         ),
     ]
-    monkeypatch.setattr(ConversationLister, "list", lambda self: conversations)
+    monkeypatch.setattr(
+        LocalFileStore, "list_conversations", lambda self, limit=100: conversations
+    )
 
     app = HistoryMessagesTestApp()
     async with app.run_test() as pilot:

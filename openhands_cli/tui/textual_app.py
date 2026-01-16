@@ -30,6 +30,7 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
+from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_splash_content
@@ -132,7 +133,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
-        self._conversation_manager = ConversationManager(self)
+        self._store = LocalFileStore()
+        self._conversation_manager = ConversationManager(self, self._store)
         self._reload_visualizer = (
             lambda: self.conversation_runner.visualizer.reload_configuration()
             if self.conversation_runner

@@ -51,16 +51,18 @@ def handle_resume_logic(args) -> str | None:
             return None
 
         # Get the latest conversation ID
-        from openhands_cli.conversations.lister import ConversationLister
+        from openhands_cli.conversations.store.local import LocalFileStore
 
-        lister = ConversationLister()
-        latest_id = lister.get_latest_conversation_id()
+        store = LocalFileStore()
+        conversations = store.list_conversations(limit=1)
 
-        if latest_id is None:
+        if not conversations:
             console.print(
                 "No conversations found to resume.", style=OPENHANDS_THEME.warning
             )
             return None
+
+        latest_id = conversations[0].id
 
         console.print(
             f"Resuming latest conversation: {latest_id}",
@@ -71,7 +73,7 @@ def handle_resume_logic(args) -> str | None:
     # Check if resume was called without ID and without --last
     elif args.resume is not None and args.resume == "":
         # Resume called without ID - show conversation list
-        from openhands_cli.conversations.display import display_recent_conversations
+        from openhands_cli.conversations.cli.display import display_recent_conversations
 
         display_recent_conversations()
         return None
@@ -167,7 +169,7 @@ def main() -> None:
             handle_cloud_command(args)
 
         elif args.command == "view":
-            from openhands_cli.conversations.viewer import view_conversation
+            from openhands_cli.conversations.cli.viewer import view_conversation
 
             success = view_conversation(args.conversation_id, args.limit)
             if not success:

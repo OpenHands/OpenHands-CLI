@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING
 from textual.css.query import NoMatches
 from textual.widgets import Static
 
+from openhands_cli.conversations.models import ConversationMetadata
+from openhands_cli.conversations.protocols import ConversationStore
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text
 from openhands_cli.tui.core.conversation_switcher import ConversationSwitcher
@@ -37,8 +39,9 @@ class ConversationManager:
     operations, delegating switching logic to ConversationSwitcher.
     """
 
-    def __init__(self, app: OpenHandsApp):
+    def __init__(self, app: OpenHandsApp, store: ConversationStore):
         self.app = app
+        self.store = store
         self._switcher = ConversationSwitcher(self)
 
     @property
@@ -141,3 +144,7 @@ class ConversationManager:
             panel.post_message(message)
         except NoMatches:
             pass
+
+    def list_conversations(self, limit: int = 100) -> list[ConversationMetadata]:
+        """List conversations from the store."""
+        return self.store.list_conversations(limit=limit)

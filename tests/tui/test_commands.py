@@ -10,7 +10,8 @@ from textual.containers import VerticalScroll
 from textual_autocomplete import DropdownItem
 
 from openhands.sdk.security.confirmation_policy import AlwaysConfirm
-from openhands_cli.conversations.lister import ConversationInfo, ConversationLister
+from openhands_cli.conversations.models import ConversationMetadata
+from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.tui.core.commands import COMMANDS, is_valid_command, show_help
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.confirmation_modal import (
@@ -686,13 +687,13 @@ class TestOpenHandsAppCommands:
         )
         existing_id = uuid.uuid4().hex
         monkeypatch.setattr(
-            ConversationLister,
-            "list",
-            lambda self: [
-                ConversationInfo(
+            LocalFileStore,
+            "list_conversations",
+            lambda self, limit=100: [
+                ConversationMetadata(
                     id=existing_id,
-                    created_date=datetime(2025, 1, 1, tzinfo=UTC),
-                    first_user_prompt="old chat",
+                    created_at=datetime(2025, 1, 1, tzinfo=UTC),
+                    title="old chat",
                 )
             ],
         )
@@ -733,18 +734,18 @@ class TestOpenHandsAppCommands:
         conv1_id = uuid.uuid4().hex
         conv2_id = uuid.uuid4().hex
         monkeypatch.setattr(
-            ConversationLister,
-            "list",
-            lambda self: [
-                ConversationInfo(
+            LocalFileStore,
+            "list_conversations",
+            lambda self, limit=100: [
+                ConversationMetadata(
                     id=conv1_id,
-                    created_date=datetime(2025, 1, 2, tzinfo=UTC),
-                    first_user_prompt="chat 1",
+                    created_at=datetime(2025, 1, 2, tzinfo=UTC),
+                    title="chat 1",
                 ),
-                ConversationInfo(
+                ConversationMetadata(
                     id=conv2_id,
-                    created_date=datetime(2025, 1, 1, tzinfo=UTC),
-                    first_user_prompt="chat 2",
+                    created_at=datetime(2025, 1, 1, tzinfo=UTC),
+                    title="chat 2",
                 ),
             ],
         )
@@ -784,13 +785,13 @@ class TestOpenHandsAppCommands:
         )
         target_id = uuid.uuid4().hex
         monkeypatch.setattr(
-            ConversationLister,
-            "list",
-            lambda self: [
-                ConversationInfo(
+            LocalFileStore,
+            "list_conversations",
+            lambda self, limit=100: [
+                ConversationMetadata(
                     id=target_id,
-                    created_date=datetime(2025, 1, 1, tzinfo=UTC),
-                    first_user_prompt="target chat",
+                    created_at=datetime(2025, 1, 1, tzinfo=UTC),
+                    title="target chat",
                 ),
             ],
         )
