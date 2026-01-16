@@ -73,8 +73,6 @@ async def is_token_valid(server_url: str, api_key: str) -> bool:
         return True
     except UnauthenticatedError:
         return False
-    except Exception as e:
-        raise CloudConversationError(f"Failed to validate token: {e}") from e
 
 
 async def create_cloud_conversation(
