@@ -5,6 +5,7 @@ import os
 from typing import Any
 
 from prompt_toolkit import HTML, print_formatted_text
+from pydantic import BaseModel, SecretStr
 
 from openhands.sdk import (
     LLM,
@@ -36,51 +37,77 @@ ENV_LLM_BASE_URL = "LLM_BASE_URL"
 ENV_LLM_MODEL = "LLM_MODEL"
 
 
-def get_env_llm_overrides() -> dict[str, str]:
+class LLMEnvOverrides(BaseModel):
+    """LLM configuration overrides from environment variables.
+
+    All fields are optional - only override the ones which are provided.
+    Environment variables take precedence over stored settings and are
+    NOT persisted to disk (temporary override only).
+    """
+
+    api_key: str | None = None
+    base_url: str | None = None
+    model: str | None = None
+
+    @classmethod
+    def from_env(cls) -> "LLMEnvOverrides":
+        """Load LLM overrides from environment variables.
+
+        Returns:
+            LLMEnvOverrides instance with values from environment variables.
+            Fields will be None if the corresponding env var is not set or empty.
+        """
+        api_key = os.environ.get(ENV_LLM_API_KEY) or None
+        base_url = os.environ.get(ENV_LLM_BASE_URL) or None
+        model = os.environ.get(ENV_LLM_MODEL) or None
+
+        return cls(api_key=api_key, base_url=base_url, model=model)
+
+    def has_overrides(self) -> bool:
+        """Check if any overrides are set."""
+        return any([self.api_key, self.base_url, self.model])
+
+    def to_llm_update_dict(self) -> dict[str, str | SecretStr]:
+        """Convert to a dictionary suitable for LLM.model_copy(update=...).
+
+        Only includes fields that are set (not None).
+        Converts api_key to SecretStr as required by the LLM model.
+        """
+        update_dict: dict[str, str | SecretStr] = {}
+
+        if self.api_key is not None:
+            update_dict["api_key"] = SecretStr(self.api_key)
+        if self.base_url is not None:
+            update_dict["base_url"] = self.base_url
+        if self.model is not None:
+            update_dict["model"] = self.model
+
+        return update_dict
+
+
+def get_env_llm_overrides() -> LLMEnvOverrides:
     """Get LLM configuration overrides from environment variables.
 
     Returns:
-        Dictionary with keys 'api_key', 'base_url', 'model' for any
-        environment variables that are set. Empty dict if none are set.
+        LLMEnvOverrides instance with values from environment variables.
     """
-    overrides: dict[str, str] = {}
-
-    api_key = os.environ.get(ENV_LLM_API_KEY)
-    if api_key:
-        overrides["api_key"] = api_key
-
-    base_url = os.environ.get(ENV_LLM_BASE_URL)
-    if base_url:
-        overrides["base_url"] = base_url
-
-    model = os.environ.get(ENV_LLM_MODEL)
-    if model:
-        overrides["model"] = model
-
-    return overrides
+    return LLMEnvOverrides.from_env()
 
 
-def apply_llm_overrides(llm: LLM, overrides: dict[str, str]) -> LLM:
+def apply_llm_overrides(llm: LLM, overrides: LLMEnvOverrides) -> LLM:
     """Apply environment variable overrides to an LLM instance.
 
     Args:
         llm: The LLM instance to update
-        overrides: Dictionary of overrides from get_env_llm_overrides()
+        overrides: LLMEnvOverrides instance from get_env_llm_overrides()
 
     Returns:
         Updated LLM instance with overrides applied
     """
-    if not overrides:
+    if not overrides.has_overrides():
         return llm
 
-    # Convert api_key to SecretStr if present (LLM model expects SecretStr)
-    from pydantic import SecretStr
-
-    update_dict: dict[str, str | SecretStr] = dict(overrides)
-    if "api_key" in update_dict:
-        update_dict["api_key"] = SecretStr(update_dict["api_key"])
-
-    return llm.model_copy(update=update_dict)
+    return llm.model_copy(update=overrides.to_llm_update_dict())
 
 
 def resolve_llm_base_url(
