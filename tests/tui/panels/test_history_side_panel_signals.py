@@ -8,40 +8,42 @@ from datetime import UTC, datetime
 import pytest
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalScroll
-from textual.signal import Signal
 from textual.widgets import Button, Static
 
 from openhands_cli.conversations.lister import ConversationInfo, ConversationLister
+from openhands_cli.tui.core.messages import (
+    ConversationCreated,
+    ConversationTitleUpdated,
+    RevertSelectionRequest,
+    SwitchConversationRequest,
+)
 from openhands_cli.tui.modals.switch_conversation_modal import SwitchConversationModal
 from openhands_cli.tui.panels.history_side_panel import HistoryItem, HistorySidePanel
 
 
-class HistorySignalsTestApp(App):
-    """Minimal app that exposes history signals for HistorySidePanel to subscribe to."""
+class HistoryMessagesTestApp(App):
+    """Minimal app for testing HistorySidePanel with Textual messages."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.history_new_conversation_signal = Signal(
-            self, "history_new_conversation_signal"
-        )
-        self.history_current_conversation_signal = Signal(
-            self, "history_current_conversation_signal"
-        )
-        self.history_title_updated_signal = Signal(self, "history_title_updated_signal")
-        self.history_select_current_signal = Signal(
-            self, "history_select_current_signal"
-        )
+        # Track messages received by the app
+        self.received_switch_requests: list[str] = []
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="content_area"):
             yield Static("main", id="main")
             yield HistorySidePanel(app=self, current_conversation_id=None)  # type: ignore
 
+    def on_switch_conversation_request(self, event: SwitchConversationRequest) -> None:
+        """Handle switch conversation request from history panel."""
+        self.received_switch_requests.append(event.conversation_id)
+
 
 @pytest.mark.asyncio
-async def test_history_panel_updates_from_signals(
+async def test_history_panel_updates_from_messages(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Test that the history panel responds to Textual messages."""
     # Stub local conversations list.
     base_id = uuid.uuid4().hex
     conversations = [
@@ -53,7 +55,7 @@ async def test_history_panel_updates_from_signals(
     ]
     monkeypatch.setattr(ConversationLister, "list", lambda self: conversations)
 
-    app = HistorySignalsTestApp()
+    app = HistoryMessagesTestApp()
     async with app.run_test() as pilot:
         panel = app.query_one(HistorySidePanel)
 
@@ -61,9 +63,9 @@ async def test_history_panel_updates_from_signals(
         list_container = panel.query_one("#history-list", VerticalScroll)
         assert len(list_container.query(HistoryItem)) == 1
 
-        # Publish "new conversation" → placeholder should be inserted and selected.
+        # Post "ConversationCreated" message directly to the panel.
         new_id = uuid.uuid4()
-        app.history_new_conversation_signal.publish(new_id)
+        panel.post_message(ConversationCreated(new_id))
         await pilot.pause()
 
         assert panel.current_conversation_id == new_id
@@ -78,28 +80,28 @@ async def test_history_panel_updates_from_signals(
         ]
         assert len(placeholder_items) == 1
 
-        # Publish title update → placeholder item should display title.
-        app.history_title_updated_signal.publish((new_id, "first message"))
+        # Post title update message directly to the panel.
+        panel.post_message(ConversationTitleUpdated(new_id, "first message"))
         await pilot.pause()
 
         placeholder = placeholder_items[0]
         assert "first message" in str(placeholder.content)
 
-        # Move selection away and then revert via select-current signal.
+        # Move selection away and then revert via RevertSelectionRequest.
         panel._handle_select(base_id)
         assert panel.selected_conversation_id is not None
         assert panel.selected_conversation_id.hex == base_id
 
-        app.history_select_current_signal.publish(None)
+        panel.post_message(RevertSelectionRequest())
         await pilot.pause()
         assert panel.selected_conversation_id == panel.current_conversation_id
 
 
 @pytest.mark.asyncio
-async def test_history_panel_conversation_selection_callback(
+async def test_history_panel_posts_switch_request_on_selection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test that selecting a conversation triggers the on_select callback."""
+    """Test that selecting a conversation posts SwitchConversationRequest."""
     conv_id = uuid.uuid4().hex
     conversations = [
         ConversationInfo(
@@ -110,22 +112,17 @@ async def test_history_panel_conversation_selection_callback(
     ]
     monkeypatch.setattr(ConversationLister, "list", lambda self: conversations)
 
-    selected_ids: list[str] = []
-
-    def on_select(cid: str) -> None:
-        selected_ids.append(cid)
-
-    app = HistorySignalsTestApp()
+    app = HistoryMessagesTestApp()
     async with app.run_test() as pilot:
         panel = pilot.app.query_one(HistorySidePanel)
-        panel._on_conversation_selected = on_select
 
         # Simulate selection
         panel._handle_select(conv_id)
         await pilot.pause()
 
-        assert len(selected_ids) == 1
-        assert selected_ids[0] == conv_id
+        # Verify that app received the SwitchConversationRequest message
+        assert len(app.received_switch_requests) == 1
+        assert app.received_switch_requests[0] == conv_id
 
 
 class SwitchModalTestApp(App):

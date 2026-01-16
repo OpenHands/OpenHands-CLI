@@ -759,7 +759,7 @@ class TestOpenHandsAppCommands:
             def mock_switch(cid: str) -> None:
                 switch_calls.append(cid)
 
-            oh_app._switch_to_conversation = mock_switch  # type: ignore[method-assign]
+            oh_app._conversation_manager.switch_to = mock_switch  # type: ignore[method-assign]
 
             oh_app._handle_command("/history")
             await pilot.pause()
@@ -804,7 +804,7 @@ class TestOpenHandsAppCommands:
             dummy_runner.is_running = True
             oh_app.conversation_runner = dummy_runner
 
-            oh_app._switch_to_conversation(target_id)
+            oh_app._conversation_manager.switch_to(target_id)
             await pilot.pause()
 
             top_screen = oh_app.screen_stack[-1]

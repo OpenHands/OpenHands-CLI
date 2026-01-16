@@ -10,13 +10,12 @@ It creates a basic app with:
 
 import asyncio
 import uuid
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from typing import ClassVar
 
 from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
 from textual.containers import Container, Horizontal, VerticalScroll
-from textual.notifications import Notification, Notify
 from textual.screen import Screen
 from textual.signal import Signal
 from textual.widgets import Footer, Input, Static, TextArea
@@ -33,10 +32,12 @@ from openhands.sdk.security.confirmation_policy import (
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
+from openhands_cli.tui.content.splash import get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
+from openhands_cli.tui.core.conversation_manager import ConversationManager
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
-from openhands_cli.tui.modals import SettingsScreen, SwitchConversationModal
+from openhands_cli.tui.core.messages import SwitchConversationRequest
+from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModal
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
@@ -102,18 +103,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         super().__init__(**kwargs)
 
         self.conversation_running_signal = Signal(self, "conversation_running_signal")
-        # History panel update signals (so the panel can self-update without the app
-        # directly orchestrating it).
-        self.history_new_conversation_signal = Signal(
-            self, "history_new_conversation_signal"
-        )
-        self.history_current_conversation_signal = Signal(
-            self, "history_current_conversation_signal"
-        )
-        self.history_title_updated_signal = Signal(self, "history_title_updated_signal")
-        self.history_select_current_signal = Signal(
-            self, "history_select_current_signal"
-        )
         self.is_ui_initialized = False
 
         # Store exit confirmation setting
@@ -143,8 +132,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
-        self._switch_loading_notification: Notification | None = None
-        self._is_switching_conversation: bool = False
+        self._conversation_manager = ConversationManager(self)
         self._reload_visualizer = (
             lambda: self.conversation_runner.visualizer.reload_configuration()
             if self.conversation_runner
@@ -444,7 +432,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         content = message.content.strip()
         if not content:
             return
-        if self._is_switching_conversation:
+        if self._conversation_manager.is_switching:
             self.notify(
                 title="Loading",
                 message="Please wait for the conversation switch to finish.",
@@ -500,7 +488,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # If History panel is open, update "New conversation" title immediately
         # on the first message (without waiting for persistence on disk).
-        self.history_title_updated_signal.publish((self.conversation_id, user_message))
+        self._conversation_manager.update_title(user_message)
 
         # Show that we're processing the message
         if self.conversation_runner.is_running:
@@ -726,60 +714,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         )
 
     def _handle_new_command(self) -> None:
-        """Handle the /new command to start a new conversation.
-
-        This clears the terminal UI and starts a fresh conversation runner.
-        """
-        # Check if a conversation is currently running
-        if self.conversation_runner and self.conversation_runner.is_running:
-            self.notify(
-                title="New Conversation Error",
-                message="Cannot start a new conversation while one is running. "
-                "Please wait for the current conversation to complete or pause it.",
-                severity="error",
-            )
-            return
-
-        # Generate a new conversation ID
-        self.conversation_id = uuid.uuid4()
-
-        # Reset the conversation runner
-        self.conversation_runner = None
-
-        # Remove any existing confirmation panel
-        if self.confirmation_panel:
-            self.confirmation_panel.remove()
-            self.confirmation_panel = None
-
-        # Clear all dynamically added widgets from main_display
-        # Keep only the splash widgets (those with IDs starting with "splash_")
-        widgets_to_remove = []
-        for widget in self.main_display.children:
-            widget_id = widget.id or ""
-            if not widget_id.startswith("splash_"):
-                widgets_to_remove.append(widget)
-
-        for widget in widgets_to_remove:
-            widget.remove()
-
-        # Update the splash conversation widget with the new conversation ID
-        splash_conversation = self.query_one("#splash_conversation", Static)
-        splash_conversation.update(
-            get_conversation_text(self.conversation_id.hex, theme=OPENHANDS_THEME)
-        )
-
-        # Notify history panel (if mounted) to add/select the new conversation.
-        self.history_new_conversation_signal.publish(self.conversation_id)
-
-        # Scroll to top to show the splash screen
-        self.main_display.scroll_home(animate=False)
-
-        # Notify user
-        self.notify(
-            title="New Conversation",
-            message="Started a new conversation",
-            severity="information",
-        )
+        """Handle the /new command to start a new conversation."""
+        self._conversation_manager.create_new()
 
     def _handle_history_command(self) -> None:
         """Handle the /history command to show conversation history panel."""
@@ -790,233 +726,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         HistorySidePanel.toggle(
             self,
             current_conversation_id=self.conversation_id,
-            on_conversation_selected=self._switch_to_conversation,
         )
 
-    def _switch_to_conversation(self, conversation_id: str) -> None:
-        """Switch to an existing local conversation.
-
-        This switches the active conversation and loads persisted state/events
-        from disk.
-
-        Args:
-            conversation_id: The conversation ID to switch to
-        """
-        try:
-            target_id = uuid.UUID(conversation_id)
-        except ValueError:
-            self.notify(
-                title="Switch Error",
-                message="Invalid conversation id.",
-                severity="error",
-            )
-            return
-
-        # If an agent is currently running, confirm before switching.
-        if self.conversation_runner and self.conversation_runner.is_running:
-            self.push_screen(
-                SwitchConversationModal(
-                    prompt=(
-                        "The agent is still running.\n\n"
-                        "Switching conversations will pause the current run.\n"
-                        "Do you want to switch anyway?"
-                    )
-                ),
-                lambda confirmed: self._handle_switch_confirmation(
-                    confirmed, target_id
-                ),
-            )
-            return
-
-        self._perform_conversation_switch(target_id)
-
-    def _handle_switch_confirmation(
-        self, confirmed: bool | None, target_id: uuid.UUID
-    ) -> None:
-        """Handle the result of the switch conversation confirmation modal."""
-        if confirmed:
-            self._switch_to_conversation_with_stop(target_id)
-        else:
-            # Revert selection highlight back to current conversation so the
-            # user doesn't think the app switched chats.
-            self.history_select_current_signal.publish(None)
-            # Keep typing flow smooth.
-            self.input_field.focus_input()
-
-    def _switch_to_conversation_with_stop(self, target_id: uuid.UUID) -> None:
-        """Switch conversations, pausing the current run if needed."""
-
-        def _pause_if_running() -> None:
-            runner = self.conversation_runner
-            if runner and runner.is_running:
-                # Pause current conversation to stop background work.
-                runner.conversation.pause()
-
-        self._perform_conversation_switch(
-            target_id, pre_switch_action=_pause_if_running
-        )
-
-    def _perform_conversation_switch(
-        self,
-        target_id: uuid.UUID,
-        pre_switch_action: Callable[[], None] | None = None,
-    ) -> None:
-        """Common logic for switching conversations.
-
-        Args:
-            target_id: The conversation ID to switch to
-            pre_switch_action: Optional action to run in the background thread
-                              before the switch begins (e.g., pausing current run).
-        """
-        # Don't switch if already on this conversation
-        if self.conversation_id == target_id:
-            self.notify(
-                title="Already Active",
-                message="This conversation is already active.",
-                severity="information",
-            )
-            return
-
-        # Show a persistent loading notification (we will dismiss it manually).
-        self._show_switch_loading_notification()
-
-        # Create a visualizer on the UI thread (so it captures the correct
-        # main thread id).
-        visualizer = ConversationVisualizer(
-            self.main_display, self, skip_user_messages=True
-        )
-
-        def _worker() -> None:
-            if pre_switch_action:
-                try:
-                    pre_switch_action()
-                except Exception:
-                    # We don't want pre-switch failures to block the switch itself.
-                    pass
-            self._switch_to_conversation_thread(target_id, visualizer)
-
-        # Run the heavy work in a thread worker so the UI can render notifications.
-        self.run_worker(
-            _worker,
-            name="switch_conversation",
-            group="switch_conversation",
-            exclusive=True,
-            thread=True,
-            exit_on_error=False,
-        )
-
-    def _show_switch_loading_notification(self) -> None:
-        """Show a loading notification that can be dismissed after the switch."""
-        self._is_switching_conversation = True
-        # Dismiss any previous loading notification
-        if self._switch_loading_notification is not None:
-            try:
-                self._unnotify(self._switch_loading_notification)
-            except Exception:
-                pass
-            self._switch_loading_notification = None
-
-        notification = Notification(
-            "⏳ Switching conversation...",
-            title="Switching",
-            severity="information",
-            timeout=3600,
-            markup=True,
-        )
-        self._switch_loading_notification = notification
-        self.post_message(Notify(notification))
-
-    def _dismiss_switch_loading_notification(self) -> None:
-        """Dismiss the switch loading notification if present."""
-        if self._switch_loading_notification is None:
-            return
-        try:
-            self._unnotify(self._switch_loading_notification)
-        finally:
-            self._switch_loading_notification = None
-            self._is_switching_conversation = False
-
-    def _prepare_ui_for_conversation_switch(self, conversation_id: uuid.UUID) -> None:
-        """Prepare UI for switching conversations (runs on the UI thread)."""
-        # Set the conversation ID immediately so the UI reflects the target.
-        self.conversation_id = conversation_id
-
-        # Reset the conversation runner - will be recreated in the worker.
-        self.conversation_runner = None
-
-        # Remove any existing confirmation panel.
-        if self.confirmation_panel:
-            self.confirmation_panel.remove()
-            self.confirmation_panel = None
-
-        # Clear all dynamically added widgets from main_display.
-        # Keep only the splash widgets (those with IDs starting with "splash_").
-        widgets_to_remove = []
-        for widget in self.main_display.children:
-            widget_id = widget.id or ""
-            if not widget_id.startswith("splash_"):
-                widgets_to_remove.append(widget)
-
-        for widget in widgets_to_remove:
-            widget.remove()
-
-        # Update the splash conversation widget with the new conversation ID.
-        splash_conversation = self.query_one("#splash_conversation", Static)
-        splash_conversation.update(
-            get_conversation_text(self.conversation_id.hex, theme=OPENHANDS_THEME)
-        )
-
-    def _finish_conversation_switch(
-        self, runner: ConversationRunner, target_id: uuid.UUID
-    ) -> None:
-        """Finalize conversation switch (runs on the UI thread)."""
-        self.conversation_runner = runner
-        self.main_display.scroll_end(animate=False)
-        self._dismiss_switch_loading_notification()
-        self.history_current_conversation_signal.publish(target_id)
-        self.notify(
-            title="Switched",
-            message=f"Resumed conversation {target_id.hex[:8]}",
-            severity="information",
-        )
-        self.input_field.focus_input()
-
-    def _switch_to_conversation_thread(
-        self,
-        target_id: uuid.UUID,
-        visualizer: ConversationVisualizer,
-    ) -> None:
-        """Background thread worker for switching conversations.
-
-        Loads persisted state/events from disk without blocking the UI.
-
-        Note: UI rehydration (history replay) is intentionally tracked separately
-        (see Issue #204) to keep this PR focused.
-        """
-        try:
-            # Prepare UI first (on main thread) so old content is cleared.
-            self.call_from_thread(self._prepare_ui_for_conversation_switch, target_id)
-
-            # Create conversation runner (loads persisted state + events from disk).
-            runner = self.create_conversation_runner(
-                conversation_id=target_id, visualizer=visualizer
-            )
-
-            # Finalize on UI thread (set runner, dismiss loading toast).
-            self.call_from_thread(self._finish_conversation_switch, runner, target_id)
-        except Exception as e:
-            # Ensure we dismiss loading toast and show error.
-            error_message = f"{type(e).__name__}: {e}"
-
-            def _show_error() -> None:
-                self._dismiss_switch_loading_notification()
-                self.notify(
-                    title="Switch Error",
-                    message=error_message,
-                    severity="error",
-                )
-
-            self.call_from_thread(_show_error)
+    @on(SwitchConversationRequest)
+    def _on_switch_conversation_request(self, event: SwitchConversationRequest) -> None:
+        """Handle request from history panel to switch conversations."""
+        self._conversation_manager.switch_to(event.conversation_id)
 
     def _handle_confirmation_request(
         self, pending_actions: list[ActionEvent]

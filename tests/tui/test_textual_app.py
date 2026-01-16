@@ -3,6 +3,8 @@
 import uuid
 from unittest.mock import Mock
 
+from openhands_cli.tui.core.conversation_manager import ConversationManager
+from openhands_cli.tui.core.conversation_switcher import ConversationSwitcher
 from openhands_cli.tui.panels.history_side_panel import HistorySidePanel
 from openhands_cli.tui.textual_app import OpenHandsApp
 
@@ -77,7 +79,6 @@ class TestHistoryIntegration:
         """action_toggle_history calls HistorySidePanel.toggle with correct args."""
         app = OpenHandsApp.__new__(OpenHandsApp)
         app.conversation_id = uuid.uuid4()
-        app._switch_to_conversation = Mock()
 
         toggle_mock = Mock()
         monkeypatch.setattr(HistorySidePanel, "toggle", toggle_mock)
@@ -90,35 +91,46 @@ class TestHistoryIntegration:
         assert (
             toggle_mock.call_args[1]["current_conversation_id"] == app.conversation_id
         )
-        assert (
-            toggle_mock.call_args[1]["on_conversation_selected"]
-            == app._switch_to_conversation
-        )
 
-    def test_finish_conversation_switch_focuses_input(self):
+
+class TestConversationSwitcher:
+    """Tests for ConversationSwitcher."""
+
+    def test_finish_switch_focuses_input(self):
         """After conversation switch completes, input field receives focus."""
-        app = OpenHandsApp.__new__(OpenHandsApp)
+        # Create mock app and manager
+        app = Mock()
         app.main_display = Mock()
-        app._dismiss_switch_loading_notification = Mock()
-        app.history_current_conversation_signal = Mock()
-        app.history_current_conversation_signal.publish = Mock()
         app.notify = Mock()
         app.input_field = Mock()
         app.input_field.focus_input = Mock()
 
+        manager = Mock()
+        manager.app = app
+        manager.post_to_history_panel = Mock()
+
+        switcher = ConversationSwitcher(manager)
+        switcher._dismiss_loading = Mock()
+
         runner = Mock()
         target_id = uuid.uuid4()
 
-        app._finish_conversation_switch(runner, target_id)
+        switcher._finish_switch(runner, target_id)
 
         app.input_field.focus_input.assert_called_once()
+        # Verify that ConversationSwitched message was posted via manager
+        manager.post_to_history_panel.assert_called_once()
 
-    def test_switch_to_conversation_invalid_uuid_shows_error(self):
+    def test_switch_to_invalid_uuid_shows_error(self):
         """Switching with an invalid UUID shows an error notification."""
-        app = OpenHandsApp.__new__(OpenHandsApp)
+        app = Mock()
         app.notify = Mock()
 
-        app._switch_to_conversation("not-a-valid-uuid")
+        manager = Mock()
+        manager.app = app
+
+        switcher = ConversationSwitcher(manager)
+        switcher.switch_to("not-a-valid-uuid")
 
         app.notify.assert_called_once()
         call_kwargs = app.notify.call_args[1]
@@ -127,15 +139,72 @@ class TestHistoryIntegration:
 
     def test_switch_to_same_conversation_shows_already_active(self):
         """Switching to the already active conversation shows info notification."""
-        app = OpenHandsApp.__new__(OpenHandsApp)
         current_id = uuid.uuid4()
+
+        app = Mock()
         app.conversation_id = current_id
         app.conversation_runner = None  # No runner, so we skip the "is_running" check
         app.notify = Mock()
 
-        app._switch_to_conversation(current_id.hex)
+        manager = Mock()
+        manager.app = app
+
+        switcher = ConversationSwitcher(manager)
+        switcher.switch_to(current_id.hex)
 
         app.notify.assert_called_once()
         call_kwargs = app.notify.call_args[1]
         assert call_kwargs["severity"] == "information"
         assert "already active" in call_kwargs["message"].lower()
+
+
+class TestConversationManager:
+    """Tests for ConversationManager."""
+
+    def test_create_new_resets_conversation(self):
+        """create_new resets conversation state and notifies history panel."""
+        app = Mock()
+        app.conversation_runner = None
+        app.confirmation_panel = None
+        app.main_display = Mock()
+        app.main_display.children = []
+        app.query_one = Mock(return_value=Mock())
+        app.notify = Mock()
+
+        manager = ConversationManager(app)
+        manager.post_to_history_panel = Mock()
+
+        result = manager.create_new()
+
+        assert result is not None
+        assert app.conversation_id == result
+        manager.post_to_history_panel.assert_called_once()
+        app.notify.assert_called_once()
+
+    def test_create_new_blocked_when_running(self):
+        """create_new returns None when a conversation is running."""
+        app = Mock()
+        app.conversation_runner = Mock()
+        app.conversation_runner.is_running = True
+        app.notify = Mock()
+
+        manager = ConversationManager(app)
+
+        result = manager.create_new()
+
+        assert result is None
+        app.notify.assert_called_once()
+        call_kwargs = app.notify.call_args[1]
+        assert call_kwargs["severity"] == "error"
+
+    def test_update_title_posts_message(self):
+        """update_title posts ConversationTitleUpdated message."""
+        app = Mock()
+        app.conversation_id = uuid.uuid4()
+
+        manager = ConversationManager(app)
+        manager.post_to_history_panel = Mock()
+
+        manager.update_title("Test title")
+
+        manager.post_to_history_panel.assert_called_once()

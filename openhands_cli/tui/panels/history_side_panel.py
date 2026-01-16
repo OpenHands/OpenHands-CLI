@@ -7,12 +7,20 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
+from textual import on
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.widgets import Static
 
 from openhands_cli.conversations.lister import ConversationInfo, ConversationLister
 from openhands_cli.theme import OPENHANDS_THEME
+from openhands_cli.tui.core.messages import (
+    ConversationCreated,
+    ConversationSwitched,
+    ConversationTitleUpdated,
+    RevertSelectionRequest,
+    SwitchConversationRequest,
+)
 from openhands_cli.tui.panels.history_panel_style import HISTORY_PANEL_STYLE
 
 
@@ -112,7 +120,6 @@ class HistorySidePanel(Container):
         self,
         app: OpenHandsApp,
         current_conversation_id: uuid.UUID | None = None,
-        on_conversation_selected: Callable[[str], None] | None = None,
         **kwargs,
     ):
         """Initialize the history side panel.
@@ -120,13 +127,11 @@ class HistorySidePanel(Container):
         Args:
             app: The OpenHands app instance
             current_conversation_id: The currently active conversation ID
-            on_conversation_selected: Callback when a conversation is selected
         """
         super().__init__(**kwargs)
         self._oh_app = app
         self.current_conversation_id = current_conversation_id
         self.selected_conversation_id: uuid.UUID | None = None
-        self._on_conversation_selected = on_conversation_selected
         self._local_rows: list[ConversationInfo] = []
 
     @classmethod
@@ -134,14 +139,12 @@ class HistorySidePanel(Container):
         cls,
         app: OpenHandsApp,
         current_conversation_id: uuid.UUID | None = None,
-        on_conversation_selected: Callable[[str], None] | None = None,
     ) -> None:
         """Toggle the history side panel on/off.
 
         Args:
             app: The OpenHands app instance
             current_conversation_id: The currently active conversation ID
-            on_conversation_selected: Callback when a conversation is selected
         """
         try:
             existing = app.query_one(cls)
@@ -156,7 +159,6 @@ class HistorySidePanel(Container):
         panel = cls(
             app=app,
             current_conversation_id=current_conversation_id,
-            on_conversation_selected=on_conversation_selected,
         )
         content_area.mount(panel)
 
@@ -169,41 +171,31 @@ class HistorySidePanel(Container):
         """Called when the panel is mounted."""
         self.selected_conversation_id = self.current_conversation_id
         self.refresh_content()
-        self._subscribe_to_app_signals()
 
-    def _subscribe_to_app_signals(self) -> None:
-        """Subscribe to app signals so the panel can self-update."""
-        app = self._oh_app
-        app.history_new_conversation_signal.subscribe(
-            self, self._on_history_new_conversation
-        )
-        app.history_current_conversation_signal.subscribe(
-            self, self._on_history_current_conversation
-        )
-        app.history_title_updated_signal.subscribe(self, self._on_history_title_updated)
-        app.history_select_current_signal.subscribe(
-            self, self._on_history_select_current
-        )
+    # --- Message Handlers (using Textual's native message system) ---
 
-    def _on_history_new_conversation(self, conversation_id: uuid.UUID) -> None:
-        """Handle app signal: a new conversation was created and should be selected."""
-        self.ensure_conversation_visible(conversation_id)
-        self.set_current_conversation(conversation_id)
+    @on(ConversationCreated)
+    def _on_conversation_created(self, event: ConversationCreated) -> None:
+        """Handle message: a new conversation was created."""
+        self.ensure_conversation_visible(event.conversation_id)
+        self.set_current_conversation(event.conversation_id)
         self.select_current_conversation()
 
-    def _on_history_current_conversation(self, conversation_id: uuid.UUID) -> None:
-        """Handle app signal: current conversation changed."""
-        self.set_current_conversation(conversation_id)
+    @on(ConversationSwitched)
+    def _on_conversation_switched(self, event: ConversationSwitched) -> None:
+        """Handle message: current conversation changed."""
+        self.set_current_conversation(event.conversation_id)
 
-    def _on_history_title_updated(self, payload: tuple[uuid.UUID, str]) -> None:
-        """Handle app signal: conversation title should be updated if needed."""
-        conversation_id, title = payload
+    @on(ConversationTitleUpdated)
+    def _on_conversation_title_updated(self, event: ConversationTitleUpdated) -> None:
+        """Handle message: conversation title should be updated."""
         self.update_conversation_title_if_needed(
-            conversation_id=conversation_id, title=title
+            conversation_id=event.conversation_id, title=event.title
         )
 
-    def _on_history_select_current(self, _) -> None:
-        """Handle app signal: revert selection highlight to the current conversation."""
+    @on(RevertSelectionRequest)
+    def _on_revert_selection(self, _event: RevertSelectionRequest) -> None:
+        """Handle message: revert selection highlight to the current conversation."""
         self.select_current_conversation()
 
     def refresh_content(self) -> None:
@@ -254,8 +246,8 @@ class HistorySidePanel(Container):
         self.selected_conversation_id = uuid.UUID(conversation_id)
         self._update_highlights()
 
-        if self._on_conversation_selected:
-            self._on_conversation_selected(conversation_id)
+        # Post a message to request conversation switch (App will handle it)
+        self.post_message(SwitchConversationRequest(conversation_id))
 
     def _update_highlights(self) -> None:
         """Update current/selected highlights without reloading the list."""
@@ -317,13 +309,12 @@ class HistorySidePanel(Container):
                 )
                 break
 
-        list_container = self.query_one("#history-list", VerticalScroll)
-        for item in list_container.query(HistoryItem):
-            if item.conversation_id != conv_hex:
-                continue
-            if not item.has_title:
-                item.set_title(title)
-            return
+        # 2. Update UI widget in-place if it exists (Source of Truth vs UI)
+        for item in self.query(HistoryItem):
+            if item.conversation_id == conv_hex:
+                if not item.has_title:
+                    item.set_title(title)
+                break
 
 
 def _format_time(dt: datetime) -> str:
