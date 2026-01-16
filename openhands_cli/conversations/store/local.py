@@ -13,7 +13,8 @@ from pydantic import TypeAdapter
 
 from openhands.sdk import MessageEvent
 from openhands.sdk.event.base import Event
-from openhands.tools.preset.default import register_default_tools
+
+# from openhands.tools.preset.default import register_default_tools (moved to __init__)
 from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.conversations.protocols import ConversationStore
 from openhands_cli.locations import CONVERSATIONS_DIR
@@ -35,8 +36,11 @@ class LocalFileStore(ConversationStore):
             base_dir: Base directory for storing conversations.
         """
         # Register default tools to ensure all Action subclasses are available
-        # for proper deserialization of events
-        register_default_tools()
+        # for proper deserialization of events.
+        # Import locally to avoid hard dependency on browser-use at module level.
+        from openhands.tools.preset.default import register_default_tools
+
+        register_default_tools(enable_browser=False)
         self.base_dir = Path(base_dir)
         self._event_adapter = TypeAdapter(Event)
 

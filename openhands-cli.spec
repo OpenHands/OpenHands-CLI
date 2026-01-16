@@ -87,8 +87,8 @@ a = Analysis(
         'boto3',
         'botocore',
         'posthog',
-        # 'browser-use',
-        # 'openhands.tools.browser_use'
+        'browser-use',
+        'openhands.tools.browser_use'
     ],
     noarchive=False,
     # IMPORTANT: do not use optimize=2 (-OO) because it strips docstrings used by PLY/bashlex grammar
