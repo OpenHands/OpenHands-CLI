@@ -53,3 +53,38 @@ class TestViewer:
 
                     # Verify visualizer was called
                     MockVisualizer.return_value.on_event.assert_called()
+
+    def test_view_conversation_handles_load_error(self):
+        """Test that viewer handles errors during event loading gracefully."""
+        with mock.patch(
+            "openhands_cli.conversations.viewer.LocalFileStore"
+        ) as MockStore:
+            MockStore.return_value.exists.return_value = True
+
+            # Create an iterator that yields one item then raises Exception
+            def faulty_iterator():
+                yield mock.Mock()  # one good event
+                raise ValueError("Corrupt data")
+
+            MockStore.return_value.load_events.return_value = faulty_iterator()
+
+            with mock.patch(
+                "openhands_cli.conversations.viewer.console"
+            ) as mock_console:
+                with mock.patch(
+                    "openhands_cli.conversations.viewer.DefaultConversationVisualizer"
+                ):
+                    result = viewer.view_conversation("faulty-id")
+
+                    # It should return True because one event was displayed
+                    assert result is True
+
+                    # Check that error was printed
+                    error_printed = False
+                    for call in mock_console.print.call_args_list:
+                        if call.args and "Error loading events: Corrupt data" in str(
+                            call.args[0]
+                        ):
+                            error_printed = True
+                            break
+                    assert error_printed

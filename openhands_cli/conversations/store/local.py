@@ -21,11 +21,6 @@ from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.utils import extract_text_from_message_content
 
 
-# Register default tools to ensure all Action subclasses are available
-# for proper deserialization of events
-# register_default_tools() moved to __init__
-
-
 class LocalFileStore(ConversationStore):
     """Local file system implementation of conversation storage."""
 

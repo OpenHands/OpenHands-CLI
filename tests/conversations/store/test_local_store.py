@@ -83,3 +83,53 @@ class TestLocalFileStore:
         assert meta is not None
         assert meta.id == conv_id
         assert meta.title == "Test Title"
+
+    def test_load_events(self, store, tmp_path):
+        """Test loading events from files."""
+        conv_id = "events-test"
+        events_dir = tmp_path / conv_id / "events"
+        events_dir.mkdir(parents=True)
+
+        user_event = {
+            "id": "1",
+            "timestamp": "2024-01-01T12:00:00Z",
+            "source": "user",
+            "kind": "MessageEvent",
+            "llm_message": {
+                "role": "user",
+                "content": [{"type": "text", "text": "Test Event"}],
+            },
+        }
+        with open(events_dir / "event-0.json", "w") as f:
+            json.dump(user_event, f)
+
+        events = list(store.load_events(conv_id))
+        assert len(events) == 1
+        assert events[0].source == "user"
+
+    def test_load_events_skips_malformed(self, store, tmp_path):
+        """Test that malformed event files are skipped."""
+        conv_id = "malformed-test"
+        events_dir = tmp_path / conv_id / "events"
+        events_dir.mkdir(parents=True)
+
+        # Good event
+        user_event = {
+            "id": "1",
+            "timestamp": "2024-01-01T12:00:00Z",
+            "source": "user",
+            "kind": "MessageEvent",  # Discriminator
+            "llm_message": {
+                "role": "user",
+                "content": [{"type": "text", "text": "Good"}],
+            },
+        }
+        with open(events_dir / "event-0.json", "w") as f:
+            json.dump(user_event, f)
+
+        # Bad event (garbage)
+        with open(events_dir / "event-1.json", "w") as f:
+            f.write("{ invalid json")
+
+        events = list(store.load_events(conv_id))
+        assert len(events) == 1
