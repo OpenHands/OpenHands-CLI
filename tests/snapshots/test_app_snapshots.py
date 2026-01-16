@@ -14,19 +14,29 @@ For more information:
     https://github.com/Textualize/pytest-textual-snapshot
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+from unittest.mock import MagicMock
 
+from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Footer, Static
 
 from openhands.tools.task_tracker.definition import TaskItem
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
+from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
 
 
 if TYPE_CHECKING:
     pass
+
+
+def _create_mock_agent(mcp_config: dict[str, Any] | None = None) -> Any:
+    """Create a mock Agent with MCP configuration."""
+    mock_agent = MagicMock()
+    mock_agent.mcp_config = mcp_config or {"mcpServers": {}}
+    return mock_agent
 
 
 class TestExitModalSnapshots:
@@ -166,4 +176,176 @@ class TestPlanSidePanelSnapshots:
 
         assert snap_compare(
             PlanPanelAllDoneApp(tasks=task_list), terminal_size=(100, 30)
+        )
+
+
+class TestMCPSidePanelSnapshots:
+    """Snapshot tests for the MCPSidePanel."""
+
+    def test_mcp_panel_empty_state(self, snap_compare):
+        """Snapshot test for MCP panel with no servers configured."""
+        mock_agent = _create_mock_agent({"mcpServers": {}})
+
+        class MCPPanelEmptyApp(App):
+            CSS = """
+            Screen {
+                layout: horizontal;
+            }
+            #main_content {
+                width: 2fr;
+            }
+            """
+
+            def __init__(self, agent, **kwargs):
+                super().__init__(**kwargs)
+                self._agent = agent
+
+            def compose(self) -> ComposeResult:
+                with Horizontal(id="content_area"):
+                    yield Static("Main content area", id="main_content")
+                yield Footer()
+
+            def on_mount(self) -> None:
+                panel = MCPSidePanel(agent=self._agent)
+                content_area = self.query_one("#content_area", Horizontal)
+                content_area.mount(panel)
+
+        assert snap_compare(MCPPanelEmptyApp(agent=mock_agent), terminal_size=(100, 30))
+
+    def test_mcp_panel_with_remote_servers(self, snap_compare):
+        """Snapshot test for MCP panel with RemoteMCPServer objects.
+
+        This test verifies the fix for issue #362 where RemoteMCPServer
+        objects caused a crash when opening the MCP menu.
+        """
+        mcp_config = {
+            "mcpServers": {
+                "notion": RemoteMCPServer(
+                    url="https://mcp.notion.com/mcp",
+                    transport="http",
+                    auth="oauth",
+                ),
+                "api_server": RemoteMCPServer(
+                    url="https://api.example.com/mcp",
+                    transport="http",
+                    headers={"Authorization": "Bearer token"},
+                ),
+            }
+        }
+        mock_agent = _create_mock_agent(mcp_config)
+
+        class MCPPanelWithRemoteServersApp(App):
+            CSS = """
+            Screen {
+                layout: horizontal;
+            }
+            #main_content {
+                width: 2fr;
+            }
+            """
+
+            def __init__(self, agent, **kwargs):
+                super().__init__(**kwargs)
+                self._agent = agent
+
+            def compose(self) -> ComposeResult:
+                with Horizontal(id="content_area"):
+                    yield Static("Main content area", id="main_content")
+                yield Footer()
+
+            def on_mount(self) -> None:
+                panel = MCPSidePanel(agent=self._agent)
+                content_area = self.query_one("#content_area", Horizontal)
+                content_area.mount(panel)
+
+        assert snap_compare(
+            MCPPanelWithRemoteServersApp(agent=mock_agent), terminal_size=(100, 30)
+        )
+
+    def test_mcp_panel_with_stdio_servers(self, snap_compare):
+        """Snapshot test for MCP panel with StdioMCPServer objects."""
+        mcp_config = {
+            "mcpServers": {
+                "local_server": StdioMCPServer(
+                    command="python",
+                    args=["-m", "mcp_server"],
+                    transport="stdio",
+                    env={"API_KEY": "secret"},
+                ),
+            }
+        }
+        mock_agent = _create_mock_agent(mcp_config)
+
+        class MCPPanelWithStdioServersApp(App):
+            CSS = """
+            Screen {
+                layout: horizontal;
+            }
+            #main_content {
+                width: 2fr;
+            }
+            """
+
+            def __init__(self, agent, **kwargs):
+                super().__init__(**kwargs)
+                self._agent = agent
+
+            def compose(self) -> ComposeResult:
+                with Horizontal(id="content_area"):
+                    yield Static("Main content area", id="main_content")
+                yield Footer()
+
+            def on_mount(self) -> None:
+                panel = MCPSidePanel(agent=self._agent)
+                content_area = self.query_one("#content_area", Horizontal)
+                content_area.mount(panel)
+
+        assert snap_compare(
+            MCPPanelWithStdioServersApp(agent=mock_agent), terminal_size=(100, 30)
+        )
+
+    def test_mcp_panel_with_mixed_servers(self, snap_compare):
+        """Snapshot test for MCP panel with both remote and stdio servers."""
+        mcp_config = {
+            "mcpServers": {
+                "notion": RemoteMCPServer(
+                    url="https://mcp.notion.com/mcp",
+                    transport="http",
+                    auth="oauth",
+                ),
+                "local_tool": StdioMCPServer(
+                    command="npx",
+                    args=["@modelcontextprotocol/server-filesystem"],
+                    transport="stdio",
+                ),
+            }
+        }
+        mock_agent = _create_mock_agent(mcp_config)
+
+        class MCPPanelMixedServersApp(App):
+            CSS = """
+            Screen {
+                layout: horizontal;
+            }
+            #main_content {
+                width: 2fr;
+            }
+            """
+
+            def __init__(self, agent, **kwargs):
+                super().__init__(**kwargs)
+                self._agent = agent
+
+            def compose(self) -> ComposeResult:
+                with Horizontal(id="content_area"):
+                    yield Static("Main content area", id="main_content")
+                yield Footer()
+
+            def on_mount(self) -> None:
+                panel = MCPSidePanel(agent=self._agent)
+                content_area = self.query_one("#content_area", Horizontal)
+                content_area.mount(panel)
+
+        assert snap_compare(
+            MCPPanelMixedServersApp(agent=mock_agent), terminal_size=(100, 30)
         )
