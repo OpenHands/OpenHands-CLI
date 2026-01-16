@@ -169,7 +169,7 @@ class TestCloudLinkModal:
             buttons = modal.query(Button)
             assert len(buttons) >= 1  # At least cancel button
 
-            # Verify checkbox exists
+            # Verify checkbox exists (only when disconnected)
             checkboxes = modal.query(Checkbox)
             assert len(checkboxes) == 1
 
@@ -178,7 +178,7 @@ class TestCloudLinkModal:
             assert override_checkbox.value is False
 
     async def test_modal_connected_state_no_link_button(self):
-        """Test that connected modal doesn't show link button."""
+        """Test that connected modal doesn't show link button but shows resync."""
         from textual.app import App
 
         class TestApp(App):
@@ -191,9 +191,117 @@ class TestCloudLinkModal:
             modal = pilot.app.screen
             assert isinstance(modal, CloudLinkModal)
 
-            # Should only have cancel button when connected
+            # Should have cancel and resync buttons when connected
             buttons = modal.query(Button)
             button_ids = {button.id for button in buttons}
             assert "cancel_button" in button_ids
+            assert "resync_button" in button_ids
             # Link button should not be present when connected
             assert "link_button" not in button_ids
+
+    async def test_modal_connected_state_no_checkbox(self):
+        """Test that connected modal doesn't show override checkbox."""
+        from textual.app import App
+
+        class TestApp(App):
+            def on_mount(self):
+                self.push_screen(CloudLinkModal(is_connected=True))
+
+        app = TestApp()
+
+        async with app.run_test() as pilot:
+            modal = pilot.app.screen
+            assert isinstance(modal, CloudLinkModal)
+
+            # Checkbox should not be present when connected
+            checkboxes = modal.query(Checkbox)
+            assert len(checkboxes) == 0
+
+    def test_resync_button_starts_resync_process(self):
+        """Test that clicking 'Re-sync Cloud Settings' starts the resync process."""
+        modal = CloudLinkModal(is_connected=True)
+
+        # Mock the _start_resync method
+        modal._start_resync = mock.MagicMock()
+
+        # Create a resync button press event
+        resync_button = Button("Re-sync Cloud Settings", id="resync_button")
+        resync_event = Button.Pressed(resync_button)
+
+        # Handle the button press
+        modal.on_button_pressed(resync_event)
+
+        # Verify _start_resync was called
+        modal._start_resync.assert_called_once()
+
+    def test_resync_button_disabled_when_in_progress(self):
+        """Test that resync button doesn't trigger when resync is in progress."""
+        modal = CloudLinkModal(is_connected=True)
+        modal._linking_in_progress = True
+
+        # Mock the _start_resync method
+        modal._start_resync = mock.MagicMock()
+
+        # Create a resync button press event
+        resync_button = Button("Re-sync Cloud Settings", id="resync_button")
+        resync_event = Button.Pressed(resync_button)
+
+        # Handle the button press
+        modal.on_button_pressed(resync_event)
+
+        # Verify _start_resync was NOT called
+        modal._start_resync.assert_not_called()
+
+    def test_on_resync_success_updates_ui(self):
+        """Test that _on_resync_success updates the UI correctly."""
+        mock_callback = mock.MagicMock()
+        modal = CloudLinkModal(is_connected=True, on_link_complete=mock_callback)
+        modal._linking_in_progress = True
+
+        # Mock the query_one method
+        mock_resync_button = mock.MagicMock()
+
+        def mock_query_one(selector, widget_type=None):
+            if selector == "#resync_button":
+                return mock_resync_button
+            raise ValueError(f"Unknown selector: {selector}")
+
+        modal.query_one = mock_query_one
+
+        # Call _on_resync_success
+        modal._on_resync_success()
+
+        # Verify the callback was called with True
+        mock_callback.assert_called_once_with(True)
+
+        # Verify linking is no longer in progress
+        assert modal._linking_in_progress is False
+
+        # Verify button was re-enabled
+        assert mock_resync_button.disabled is False
+        assert mock_resync_button.label == "Re-sync Cloud Settings"
+
+    def test_on_resync_failure_re_enables_button(self):
+        """Test that _on_resync_failure re-enables the resync button."""
+        modal = CloudLinkModal(is_connected=True)
+        modal._linking_in_progress = True
+
+        # Mock the query_one method
+        mock_resync_button = mock.MagicMock()
+
+        def mock_query_one(selector, widget_type=None):
+            if selector == "#resync_button":
+                return mock_resync_button
+            raise ValueError(f"Unknown selector: {selector}")
+
+        modal.query_one = mock_query_one
+
+        # Call _on_resync_failure
+        modal._on_resync_failure()
+
+        # Verify linking is no longer in progress
+        assert modal._linking_in_progress is False
+
+        # Verify button was re-enabled
+        assert mock_resync_button.disabled is False
+        assert mock_resync_button.label == "Re-sync Cloud Settings"

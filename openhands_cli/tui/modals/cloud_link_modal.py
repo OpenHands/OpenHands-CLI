@@ -68,25 +68,40 @@ class CloudLinkModal(ModalScreen):
                     id="description",
                 )
 
-            with Vertical(id="options_container"):
-                yield Checkbox(
-                    "Override local settings with cloud settings",
-                    id="override_settings",
-                    value=False,
-                )
+            # Only show override checkbox when not connected
+            if not self.is_connected:
+                with Vertical(id="options_container"):
+                    yield Checkbox(
+                        "Override local settings with cloud settings",
+                        id="override_settings",
+                        value=False,
+                    )
 
             with Vertical(id="button_container"):
-                if not self.is_connected:
+                if self.is_connected:
+                    # Connected: show re-sync and close buttons
+                    yield Button(
+                        "Re-sync Cloud Settings",
+                        variant="primary",
+                        id="resync_button",
+                    )
+                    yield Button(
+                        "Close",
+                        variant="default",
+                        id="cancel_button",
+                    )
+                else:
+                    # Not connected: show link and cancel buttons
                     yield Button(
                         "Link to Cloud",
                         variant="primary",
                         id="link_button",
                     )
-                yield Button(
-                    "Cancel",
-                    variant="default",
-                    id="cancel_button",
-                )
+                    yield Button(
+                        "Cancel",
+                        variant="default",
+                        id="cancel_button",
+                    )
 
             yield Static("", id="status_message")
 
@@ -98,6 +113,9 @@ class CloudLinkModal(ModalScreen):
 
         if event.button.id == "link_button" and not self._linking_in_progress:
             self._start_linking()
+
+        if event.button.id == "resync_button" and not self._linking_in_progress:
+            self._start_resync()
 
     def _start_linking(self) -> None:
         """Start the cloud linking process."""
@@ -113,6 +131,59 @@ class CloudLinkModal(ModalScreen):
 
         # Start async linking
         asyncio.create_task(self._perform_linking())
+
+    def _start_resync(self) -> None:
+        """Start the cloud settings re-sync process."""
+        self._linking_in_progress = True
+
+        # Update UI to show resync in progress
+        resync_button = self.query_one("#resync_button", Button)
+        resync_button.disabled = True
+        resync_button.label = "Syncing..."
+
+        status_message = self.query_one("#status_message", Static)
+        status_message.update("Syncing settings from cloud...")
+
+        # Start async resync
+        asyncio.create_task(self._perform_resync())
+
+    async def _perform_resync(self) -> None:
+        """Perform the cloud settings re-sync."""
+        status_message = self.query_one("#status_message", Static)
+
+        try:
+            token_storage = TokenStorage()
+            api_key = token_storage.get_api_key()
+
+            if not api_key:
+                status_message.update("Error: No API key found. Please re-link.")
+                self._on_resync_failure()
+                return
+
+            await self._sync_settings(api_key)
+            status_message.update("Settings synced successfully!")
+            self._on_resync_success()
+
+        except Exception as e:
+            status_message.update(f"Error syncing settings: {e}")
+            self._on_resync_failure()
+
+    def _on_resync_success(self) -> None:
+        """Handle successful resync."""
+        resync_button = self.query_one("#resync_button", Button)
+        resync_button.label = "Re-sync Cloud Settings"
+        resync_button.disabled = False
+        self._linking_in_progress = False
+
+        if self.on_link_complete:
+            self.on_link_complete(True)
+
+    def _on_resync_failure(self) -> None:
+        """Handle failed resync."""
+        resync_button = self.query_one("#resync_button", Button)
+        resync_button.label = "Re-sync Cloud Settings"
+        resync_button.disabled = False
+        self._linking_in_progress = False
 
     async def _perform_linking(self) -> None:
         """Perform the actual cloud linking."""
