@@ -162,6 +162,8 @@ class TestApplyLlmOverrides:
         """Should override api_key when provided."""
         overrides = LLMEnvOverrides(api_key="new-api-key")
         result = apply_llm_overrides(base_llm, overrides)
+        assert result.api_key is not None
+        assert isinstance(result.api_key, SecretStr)
         assert result.api_key.get_secret_value() == "new-api-key"
         # Other fields should remain unchanged
         assert result.model == base_llm.model
@@ -193,6 +195,8 @@ class TestApplyLlmOverrides:
             model="new-model",
         )
         result = apply_llm_overrides(base_llm, overrides)
+        assert result.api_key is not None
+        assert isinstance(result.api_key, SecretStr)
         assert result.api_key.get_secret_value() == "new-key"
         assert result.base_url == "https://new.url/"
         assert result.model == "new-model"
@@ -219,6 +223,8 @@ class TestAgentStoreEnvOverrides:
             agent = store.load()
 
             assert agent is not None
+            assert agent.llm.api_key is not None
+            assert isinstance(agent.llm.api_key, SecretStr)
             assert agent.llm.api_key.get_secret_value() == "env-api-key"
             assert agent.llm.base_url == "https://env-override.url/"
             assert agent.llm.model == "env-override-model"
@@ -247,6 +253,8 @@ class TestAgentStoreEnvOverrides:
             # Model should be overridden
             assert loaded_agent.llm.model == "partial-override-model"
             # API key should remain from stored settings
+            assert loaded_agent.llm.api_key is not None
+            assert isinstance(loaded_agent.llm.api_key, SecretStr)
             assert loaded_agent.llm.api_key.get_secret_value() == "stored-api-key"
 
     def test_env_overrides_not_persisted(self, setup_test_agent_config) -> None:
@@ -319,5 +327,7 @@ class TestAgentStoreEnvOverrides:
             assert isinstance(loaded_agent.condenser, LLMSummarizingCondenser)
 
             # Condenser LLM should have the env overrides applied
+            assert loaded_agent.condenser.llm.api_key is not None
+            assert isinstance(loaded_agent.condenser.llm.api_key, SecretStr)
             assert loaded_agent.condenser.llm.api_key.get_secret_value() == "env-key"
             assert loaded_agent.condenser.llm.model == "env-model"

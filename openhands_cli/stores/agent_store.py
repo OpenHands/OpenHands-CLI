@@ -50,7 +50,7 @@ class LLMEnvOverrides(BaseModel):
     model: str | None = None
 
     @classmethod
-    def from_env(cls) -> "LLMEnvOverrides":
+    def from_env(cls) -> LLMEnvOverrides:
         """Load LLM overrides from environment variables.
 
         Returns:
@@ -186,9 +186,7 @@ class AgentStore:
             condenser = None
             if agent.condenser and isinstance(agent.condenser, LLMSummarizingCondenser):
                 # Apply environment variable overrides to condenser LLM as well
-                condenser_llm = apply_llm_overrides(
-                    agent.condenser.llm, env_overrides
-                )
+                condenser_llm = apply_llm_overrides(agent.condenser.llm, env_overrides)
 
                 condenser_llm_update: dict[str, Any] = {}
                 if should_set_litellm_extra_body(condenser_llm.model):
