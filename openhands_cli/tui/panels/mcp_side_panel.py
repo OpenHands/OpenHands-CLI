@@ -1,10 +1,11 @@
 """MCP side panel widget for displaying MCP server information."""
 
+from __future__ import annotations
+
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
-from textual.app import App
 from textual.containers import Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.widgets import Static
@@ -17,22 +18,28 @@ from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.panels.mcp_panel_style import MCP_PANEL_STYLE
 
 
+if TYPE_CHECKING:
+    from openhands_cli.tui.textual_app import OpenHandsApp
+
+
 class MCPSidePanel(VerticalScroll):
     """Side panel widget that displays MCP server information."""
 
     DEFAULT_CSS = MCP_PANEL_STYLE
 
-    def __init__(self, agent: Agent | None = None, **kwargs):
+    def __init__(self, app: OpenHandsApp, agent: Agent | None = None, **kwargs):
         """Initialize the MCP side panel.
 
         Args:
+            app: The OpenHands app instance
             agent: The OpenHands agent instance to get MCP config from
         """
         super().__init__(**kwargs)
+        self._oh_app = app
         self.agent = agent
 
     @classmethod
-    def toggle(cls, app: App) -> None:
+    def toggle(cls, app: OpenHandsApp) -> None:
         """Toggle the MCP side panel on/off within the given app.
 
         - If a panel already exists, remove it.
@@ -62,7 +69,7 @@ class MCPSidePanel(VerticalScroll):
         except Exception:
             pass
 
-        panel = cls(agent=agent)
+        panel = cls(app=app, agent=agent)
         content_area.mount(panel)
 
     def compose(self):

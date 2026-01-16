@@ -5,8 +5,8 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
-from textual.app import App
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.widgets import Static
@@ -14,6 +14,10 @@ from textual.widgets import Static
 from openhands_cli.conversations.lister import ConversationInfo, ConversationLister
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.panels.history_panel_style import HISTORY_PANEL_STYLE
+
+
+if TYPE_CHECKING:
+    from openhands_cli.tui.textual_app import OpenHandsApp
 
 
 class HistoryItem(Static):
@@ -106,6 +110,7 @@ class HistorySidePanel(Container):
 
     def __init__(
         self,
+        app: OpenHandsApp,
         current_conversation_id: uuid.UUID | None = None,
         on_conversation_selected: Callable[[str], None] | None = None,
         **kwargs,
@@ -113,10 +118,12 @@ class HistorySidePanel(Container):
         """Initialize the history side panel.
 
         Args:
+            app: The OpenHands app instance
             current_conversation_id: The currently active conversation ID
             on_conversation_selected: Callback when a conversation is selected
         """
         super().__init__(**kwargs)
+        self._oh_app = app
         self.current_conversation_id = current_conversation_id
         self.selected_conversation_id: uuid.UUID | None = None
         self._on_conversation_selected = on_conversation_selected
@@ -125,14 +132,14 @@ class HistorySidePanel(Container):
     @classmethod
     def toggle(
         cls,
-        app: App,
+        app: OpenHandsApp,
         current_conversation_id: uuid.UUID | None = None,
         on_conversation_selected: Callable[[str], None] | None = None,
     ) -> None:
         """Toggle the history side panel on/off.
 
         Args:
-            app: The Textual app instance
+            app: The OpenHands app instance
             current_conversation_id: The currently active conversation ID
             on_conversation_selected: Callback when a conversation is selected
         """
@@ -147,6 +154,7 @@ class HistorySidePanel(Container):
 
         content_area = app.query_one("#content_area", Horizontal)
         panel = cls(
+            app=app,
             current_conversation_id=current_conversation_id,
             on_conversation_selected=on_conversation_selected,
         )
@@ -165,21 +173,17 @@ class HistorySidePanel(Container):
 
     def _subscribe_to_app_signals(self) -> None:
         """Subscribe to app signals so the panel can self-update."""
-        signals = {
-            "history_new_conversation_signal": self._on_history_new_conversation,
-            "history_current_conversation_signal": (
-                self._on_history_current_conversation
-            ),
-            "history_title_updated_signal": self._on_history_title_updated,
-            "history_select_current_signal": self._on_history_select_current,
-        }
-        try:
-            for name, handler in signals.items():
-                getattr(self.app, name).subscribe(self, handler)
-        except AttributeError:
-            # If the app doesn't have these signals, history panel updates
-            # are not supported.
-            pass
+        app = self._oh_app
+        app.history_new_conversation_signal.subscribe(
+            self, self._on_history_new_conversation
+        )
+        app.history_current_conversation_signal.subscribe(
+            self, self._on_history_current_conversation
+        )
+        app.history_title_updated_signal.subscribe(self, self._on_history_title_updated)
+        app.history_select_current_signal.subscribe(
+            self, self._on_history_select_current
+        )
 
     def _on_history_new_conversation(self, conversation_id: uuid.UUID) -> None:
         """Handle app signal: a new conversation was created and should be selected."""

@@ -35,7 +35,7 @@ class HistorySignalsTestApp(App):
     def compose(self) -> ComposeResult:
         with Horizontal(id="content_area"):
             yield Static("main", id="main")
-            yield HistorySidePanel(current_conversation_id=None)
+            yield HistorySidePanel(app=self, current_conversation_id=None)  # type: ignore
 
 
 @pytest.mark.asyncio
