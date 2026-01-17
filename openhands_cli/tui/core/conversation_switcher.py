@@ -92,6 +92,8 @@ class ConversationSwitcher:
 
     def _switch_with_pause(self, target_id: uuid.UUID) -> None:
         """Switch conversations, pausing the current run if needed."""
+        # Disable input during switch to prevent user interaction
+        self.app.input_field.disabled = True
 
         def _pause_if_running() -> None:
             runner = self.app.conversation_runner
@@ -216,6 +218,7 @@ class ConversationSwitcher:
             message=f"Resumed conversation {target_id.hex[:8]}",
             severity="information",
         )
+        self.app.input_field.disabled = False
         self.app.input_field.focus_input()
 
     def _switch_thread(

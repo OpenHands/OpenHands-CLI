@@ -442,13 +442,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         content = message.content.strip()
         if not content:
             return
-        if self._conversation_manager.is_switching:
-            self.notify(
-                title="Loading",
-                message="Please wait for the conversation switch to finish.",
-                severity="warning",
-            )
-            return
 
         # Add the user message to the main display as a Static widget
         user_message_widget = Static(
