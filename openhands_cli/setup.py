@@ -4,7 +4,14 @@ from uuid import UUID
 
 from rich.console import Console
 
-from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, Workspace
+from openhands.sdk import (
+    Agent,
+    AgentContext,
+    BaseConversation,
+    Conversation,
+    RemoteConversation,
+    Workspace,
+)
 from openhands.sdk.context import Skill
 from openhands.sdk.event.base import Event
 from openhands.sdk.security.confirmation_policy import (
@@ -86,6 +93,8 @@ def setup_conversation(
     confirmation_policy: ConfirmationPolicyBase,
     visualizer: ConversationVisualizer | None = None,
     event_callback: Callable[[Event], None] | None = None,
+    cloud: bool = False,
+    server_url: str | None = None,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
@@ -96,11 +105,24 @@ def setup_conversation(
         confirmation_policy: Confirmation policy to use.
         visualizer: Optional visualizer to use. If None, a default will be used
         event_callback: Optional callback function to handle events (e.g., JSON output)
+        cloud: If True, use OpenHands Cloud for remote execution.
+        server_url: The OpenHands Cloud server URL (used when cloud=True).
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
     """
     console = Console()
+
+    if cloud:
+        console.print("Initializing cloud conversation...", style="white")
+        return setup_cloud_conversation(
+            conversation_id=conversation_id,
+            confirmation_policy=confirmation_policy,
+            visualizer=visualizer,
+            event_callback=event_callback,
+            server_url=server_url,
+        )
+
     console.print("Initializing agent...", style="white")
 
     agent = load_agent_specs(str(conversation_id))
@@ -123,4 +145,73 @@ def setup_conversation(
     conversation.set_confirmation_policy(confirmation_policy)
 
     console.print(f"✓ Agent initialized with model: {agent.llm.model}", style="green")
+    return conversation
+
+
+def setup_cloud_conversation(
+    conversation_id: UUID,
+    confirmation_policy: ConfirmationPolicyBase,
+    visualizer: ConversationVisualizer | None = None,
+    event_callback: Callable[[Event], None] | None = None,
+    server_url: str | None = None,
+) -> BaseConversation:
+    """
+    Setup a cloud conversation using OpenHands Cloud.
+
+    Args:
+        conversation_id: conversation ID to use.
+        confirmation_policy: Confirmation policy to use.
+        visualizer: Optional visualizer to use.
+        event_callback: Optional callback function to handle events.
+        server_url: The OpenHands Cloud server URL.
+
+    Raises:
+        ValueError: If API key is not available.
+    """
+    from openhands.workspace import OpenHandsCloudWorkspace
+
+    from openhands_cli.cloud.conversation import require_api_key
+
+    console = Console()
+
+    # Get API key from token storage
+    api_key = require_api_key()
+
+    # Use default server URL if not provided
+    if not server_url:
+        import os
+
+        server_url = os.getenv("OPENHANDS_CLOUD_URL", "https://app.all-hands.dev")
+
+    # Load agent specs for the conversation
+    agent = load_agent_specs(str(conversation_id))
+
+    # Create cloud workspace
+    workspace = OpenHandsCloudWorkspace(
+        api_key=api_key,
+        server_url=server_url,
+        conversation_id=str(conversation_id),
+    )
+
+    # Prepare callbacks list
+    callbacks = [event_callback] if event_callback else None
+
+    # Create RemoteConversation
+    conversation: BaseConversation = RemoteConversation(
+        host=server_url,
+        api_key=api_key,
+        agent=agent,
+        workspace=workspace,
+        conversation_id=conversation_id,
+        visualizer=visualizer,
+        callbacks=callbacks,
+    )
+
+    conversation.set_security_analyzer(LLMSecurityAnalyzer())
+    conversation.set_confirmation_policy(confirmation_policy)
+
+    console.print(
+        f"✓ Cloud conversation initialized with model: {agent.llm.model}",
+        style="green",
+    )
     return conversation
