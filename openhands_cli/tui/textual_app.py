@@ -57,6 +57,9 @@ from openhands_cli.tui.core.state import StateManager, ConversationFinished
 from openhands_cli.user_actions.types import UserConfirmation
 from openhands_cli.utils import json_callback
 
+# Note: StateManager is imported but only used to instantiate state_manager in __init__
+# ConversationFinished is used in the on_conversation_finished message handler
+
 
 class OpenHandsApp(CollapsibleNavigationMixin, App):
     """A minimal textual app for OpenHands CLI with scrollable main display."""
@@ -168,9 +171,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
-        # Yield the StateManager (hidden widget that manages reactive state)
-        yield self.state_manager
-        
         # Content area - horizontal layout for main display and optional confirmation
         with Horizontal(id="content_area"):
             # Main scrollable display - using VerticalScroll to support Collapsible
@@ -188,25 +188,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
             # Input area - docked to bottom
             with Container(id="input_area"):
-                # WorkingStatusLine binds to StateManager for reactive updates
-                yield WorkingStatusLine().data_bind(
-                    is_running=StateManager.is_running,
-                    elapsed_seconds=StateManager.elapsed_seconds,
-                )
+                # Status widgets receive updates via StateManager messages
+                yield WorkingStatusLine()
                 yield InputField(
                     placeholder="Type your message, @mention a file, or / for commands"
                 )
-                # InfoStatusLine binds to StateManager for reactive metric updates
-                yield InfoStatusLine().data_bind(
-                    is_running=StateManager.is_running,
-                    is_multiline_mode=StateManager.is_multiline_mode,
-                    input_tokens=StateManager.input_tokens,
-                    output_tokens=StateManager.output_tokens,
-                    cache_hit_rate=StateManager.cache_hit_rate,
-                    last_request_input_tokens=StateManager.last_request_input_tokens,
-                    context_window=StateManager.context_window,
-                    accumulated_cost=StateManager.accumulated_cost,
-                )
+                yield InfoStatusLine()
 
         # Footer - shows available key bindings
         yield Footer()

@@ -1,25 +1,28 @@
 """Centralized state management for OpenHands TUI.
 
-This module provides a reactive state management system using Textual's reactive
-primitives. UI components can bind to state properties and automatically update
-when state changes, eliminating the need for manual signal subscriptions.
+This module provides a message-based state management system. The StateManager
+holds all conversation state and emits Textual messages when state changes.
+UI widgets listen for these messages and update accordingly.
 
 Usage:
     # In app:
     state_manager = StateManager()
     
-    # Bind widgets to state:
-    status_widget.data_bind(is_running=StateManager.is_running)
+    # Widgets listen for state changes via message handlers:
+    @on(StateChanged)
+    def _on_state_changed(self, event: StateChanged) -> None:
+        if event.key == "is_running":
+            self._update_display()
     
-    # Update state (triggers automatic UI updates):
-    state_manager.is_running = True
+    # Update state (triggers message emission):
+    state_manager.set_running(True)
 """
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from textual.message import Message
-from textual.reactive import reactive, var
+from textual.reactive import var
 from textual.widget import Widget
 
 if TYPE_CHECKING:
@@ -84,24 +87,24 @@ class ConfirmationRequired(Message):
 
 
 class StateManager(Widget):
-    """Centralized reactive state manager for conversation UI.
+    """Centralized state manager for conversation UI.
     
-    This widget holds all conversation state as reactive properties. UI components
-    can bind to these properties using Textual's data_bind() method, which
-    automatically propagates state changes to bound widgets.
+    This widget holds all conversation state and emits Textual messages when
+    state changes. UI widgets listen for these messages to update their display.
     
     Example:
-        # In parent widget's compose():
-        yield StatusLine().data_bind(
-            is_running=StateManager.is_running,
-            elapsed_seconds=StateManager.elapsed_seconds
-        )
+        # In widget:
+        @on(StateChanged)
+        def _on_state_changed(self, event: StateChanged) -> None:
+            if event.key == "is_running":
+                self._update_display()
         
-        # State updates automatically propagate:
-        state_manager.is_running = True  # StatusLine updates automatically
-    
-    The StateManager also emits messages for state transitions that require
-    more complex handling than simple property binding.
+        @on(ConversationStarted)
+        def _on_conversation_started(self, event: ConversationStarted) -> None:
+            self._show_running_indicator()
+        
+        # State updates trigger message emission:
+        state_manager.set_running(True)  # Emits ConversationStarted message
     """
     
     # ---- Core Running State ----
@@ -163,7 +166,11 @@ class StateManager(Widget):
         """Update elapsed seconds while running."""
         if self.is_running and self._conversation_start_time is not None:
             import time
-            self.elapsed_seconds = int(time.time() - self._conversation_start_time)
+            new_elapsed = int(time.time() - self._conversation_start_time)
+            if new_elapsed != self.elapsed_seconds:
+                old_elapsed = self.elapsed_seconds
+                self.elapsed_seconds = new_elapsed
+                self.post_message(StateChanged("elapsed_seconds", old_elapsed, new_elapsed))
     
     # ---- State Change Watchers ----
     
