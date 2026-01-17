@@ -13,6 +13,7 @@ import uuid
 from collections.abc import Iterable
 from typing import ClassVar
 
+from rich.console import Console
 from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
 from textual.containers import Container, Horizontal, VerticalScroll
@@ -30,6 +31,7 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
+from openhands_cli.cloud.utils import fetch_cloud_sandbox_id
 from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
@@ -885,57 +887,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self.exit()
 
 
-async def fetch_cloud_sandbox_id(server_url: str, conversation_id: str) -> str | None:
-    """Fetch sandbox_id for a cloud conversation.
-
-    Uses ensure_valid_auth to handle authentication.
-
-    Args:
-        server_url: The OpenHands Cloud server URL
-        conversation_id: The conversation ID to look up
-
-    Returns:
-        sandbox_id if found, None otherwise
-
-    Raises:
-        AuthenticationError: If authentication fails
-    """
-    from rich.console import Console
-
-    from openhands_cli.auth.api_client import ApiClientError, OpenHandsApiClient
-    from openhands_cli.auth.utils import AuthenticationError, ensure_valid_auth
-    from openhands_cli.theme import OPENHANDS_THEME
-
-    console = Console()
-
-    # Use ensure_valid_auth to get a valid API key (handles login if needed)
-    api_key = await ensure_valid_auth(server_url)
-
-    client = OpenHandsApiClient(server_url, api_key)
-    try:
-        conversation_info = await client.get_conversation_info(conversation_id)
-        if conversation_info:
-            sandbox_id = conversation_info.get("sandbox_id")
-            if sandbox_id:
-                console.print(
-                    f"Found sandbox for conversation: {sandbox_id[:8]}...",
-                    style=OPENHANDS_THEME.secondary,
-                )
-            return sandbox_id
-        else:
-            console.print(
-                f"Conversation {conversation_id} not found in cloud.",
-                style=OPENHANDS_THEME.warning,
-            )
-            return None
-    except ApiClientError as e:
-        console.print(
-            f"Failed to fetch conversation info: {e}",
-            style=OPENHANDS_THEME.error,
-        )
-        raise AuthenticationError(f"Failed to fetch conversation info: {e}") from e
-
-
 def main(
     resume_conversation_id: str | None = None,
     queued_inputs: list[str] | None = None,
@@ -960,13 +911,6 @@ def main(
         cloud: If True, use OpenHands Cloud for remote execution.
         server_url: The OpenHands Cloud server URL (used when cloud=True).
     """
-    import asyncio
-
-    from rich.console import Console
-
-    from openhands_cli.auth.utils import AuthenticationError
-    from openhands_cli.theme import OPENHANDS_THEME
-
     console = Console()
 
     # Determine initial confirmation policy from CLI arguments
@@ -980,12 +924,15 @@ def main(
     # Fetch sandbox_id for cloud resume
     sandbox_id = None
     if cloud and resume_conversation_id:
-        try:
-            sandbox_id = asyncio.run(
-                fetch_cloud_sandbox_id(server_url or "", resume_conversation_id)
+        sandbox_id = asyncio.run(
+            fetch_cloud_sandbox_id(server_url or "", resume_conversation_id)
+        )
+        if sandbox_id is None:
+            console.print(
+                "Failed to fetch sandbox for conversation. "
+                "Please check your authentication and try again.",
+                style=OPENHANDS_THEME.error,
             )
-        except AuthenticationError as e:
-            console.print(f"Authentication error: {e}", style=OPENHANDS_THEME.error)
             return None
 
     app = OpenHandsApp(
