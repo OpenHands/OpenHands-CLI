@@ -43,7 +43,7 @@ from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
-from openhands_cli.tui.widgets import InputField
+from openhands_cli.tui.widgets import CloudSetupIndicator, InputField
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
     CollapsibleNavigationMixin,
@@ -383,12 +383,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def _show_cloud_setup_indicator(self) -> None:
         """Show indicator that cloud conversation is being set up."""
-        setup_widget = Static(
-            f"[{OPENHANDS_THEME.warning}]☁️  Setting up cloud conversation... "
-            f"Please wait.[/{OPENHANDS_THEME.warning}]",
-            id="cloud_setup_indicator",
-            classes="cloud-setup-indicator",
-        )
+        setup_widget = CloudSetupIndicator(classes="cloud-setup-indicator")
         self.main_display.mount(setup_widget)
         self.main_display.scroll_end(animate=False)
 
@@ -436,7 +431,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Remove the setup indicator if it exists
         try:
-            setup_indicator = self.query_one("#cloud_setup_indicator", Static)
+            setup_indicator = self.query_one(
+                "#cloud_setup_indicator", CloudSetupIndicator
+            )
             setup_indicator.remove()
         except Exception:
             pass  # Indicator may not exist

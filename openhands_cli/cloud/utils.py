@@ -4,9 +4,7 @@ from openhands_cli.auth.api_client import ApiClientError, OpenHandsApiClient
 from openhands_cli.auth.utils import AuthenticationError, ensure_valid_auth
 
 
-async def fetch_cloud_sandbox_id(
-    server_url: str, conversation_id: str
-) -> str | None:
+async def fetch_cloud_sandbox_id(server_url: str, conversation_id: str) -> str | None:
     """Fetch sandbox_id for a cloud conversation.
 
     Uses ensure_valid_auth to handle authentication.
