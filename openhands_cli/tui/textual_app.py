@@ -545,7 +545,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Process message asynchronously to keep UI responsive
         self._process_message_with_runner(user_message)
 
-
     def _process_message_with_runner(self, user_message: str) -> None:
         """Process message with the conversation runner."""
         assert self.conversation_runner is not None
