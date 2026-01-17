@@ -1,6 +1,7 @@
 """Conversation runner with confirmation mode support for the refactored UI."""
 
 import asyncio
+from typing import cast
 import uuid
 from collections.abc import Callable
 
@@ -18,6 +19,7 @@ from openhands.sdk.conversation.exceptions import ConversationRunError
 from openhands.sdk.conversation.state import (
     ConversationState,
 )
+from openhands.sdk import RemoteConversation
 from openhands.sdk.event.base import Event
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
@@ -164,17 +166,12 @@ class ConversationRunner:
         if not self._cloud:
             return True
 
+        conversation = cast(RemoteConversation, self.conversation)
         # Check if workspace is alive
-        workspace = getattr(self.conversation, "_workspace", None)
-        if workspace is None:
-            # Try to get workspace from state
-            workspace = getattr(self.conversation.state, "workspace", None)
-
-        if workspace is None:
-            return True  # Can't check, assume it's fine
+        workspace = conversation.workspace
 
         # Check if workspace has alive property and is not alive
-        if hasattr(workspace, "alive") and not workspace.alive:
+        if not workspace.alive:
             self._notification_callback(
                 "Workspace Reconnecting",
                 "Cloud workspace is not responding. Attempting to reconnect...",

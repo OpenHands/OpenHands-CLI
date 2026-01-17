@@ -116,7 +116,6 @@ def setup_conversation(
     console = Console()
 
     if cloud:
-        console.print("Initializing cloud conversation...", style="white")
         return setup_cloud_conversation(
             conversation_id=conversation_id,
             confirmation_policy=confirmation_policy,
@@ -179,8 +178,6 @@ def setup_cloud_conversation(
     from openhands_cli.auth.token_storage import TokenStorage
     from openhands_cli.cloud.conversation import CloudConversationError
 
-    console = Console()
-
     # Get API key from token storage
     store = TokenStorage()
     if not store.has_api_key():
@@ -205,6 +202,7 @@ def setup_cloud_conversation(
         cloud_api_url=server_url,
         cloud_api_key=api_key,
         sandbox_id=sandbox_id,
+        keep_alive=True
     )
 
     # Prepare callbacks list
@@ -223,15 +221,4 @@ def setup_cloud_conversation(
 
     conversation.set_security_analyzer(LLMSecurityAnalyzer())
     conversation.set_confirmation_policy(confirmation_policy)
-
-    if sandbox_id:
-        console.print(
-            f"✓ Cloud conversation resumed with sandbox: {sandbox_id[:8]}...",
-            style="green",
-        )
-    else:
-        console.print(
-            f"✓ Cloud conversation initialized with model: {agent.llm.model}",
-            style="green",
-        )
     return conversation
