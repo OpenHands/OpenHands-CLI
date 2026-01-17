@@ -529,7 +529,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 message="Please wait for the cloud conversation to be ready.",
                 severity="warning",
             )
-            return
 
         # Check if conversation runner is initialized
         if self.conversation_runner is None:
