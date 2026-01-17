@@ -1,5 +1,7 @@
 """Cloud conversation creation functionality."""
 
+import os
+import subprocess
 from typing import Any
 
 from rich.console import Console
@@ -126,8 +128,6 @@ async def create_cloud_conversation(
 
 
 def _run_git(args: list[str]) -> str | None:
-    import subprocess
-
     try:
         res = subprocess.run(args, capture_output=True, text=True, check=True)
         out = res.stdout.strip()
@@ -153,7 +153,6 @@ def _parse_repo_from_remote(remote_url: str) -> str | None:
 
 def extract_repository_from_cwd() -> tuple[str | None, str | None]:
     """Extract repository name (owner/repo) and current branch from CWD."""
-    import os
 
     cwd = os.getcwd()
     remote = _run_git(["git", "-C", cwd, "remote", "get-url", "origin"])
