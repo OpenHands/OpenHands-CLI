@@ -7,8 +7,6 @@ from typing import Any
 from rich.console import Console
 
 from openhands_cli.auth.api_client import OpenHandsApiClient
-from openhands_cli.auth.token_storage import TokenStorage
-from openhands_cli.auth.utils import is_token_valid
 from openhands_cli.theme import OPENHANDS_THEME
 
 
@@ -19,46 +17,19 @@ class CloudConversationError(Exception):
     """Exception raised for cloud conversation errors."""
 
 
-async def _ensure_valid_auth(server_url: str) -> str:
-    """Ensure valid authentication, running login if needed. Returns valid API key."""
-    from openhands_cli.auth.login_command import login_command
-
-    store = TokenStorage()
-    api_key = store.get_api_key()
-
-    # If no API key or token is invalid, run login
-    if not api_key or not await is_token_valid(server_url, api_key):
-        if not api_key:
-            console.print(
-                f"[{OPENHANDS_THEME.warning}]You are not logged in to OpenHands Cloud."
-                f"[/{OPENHANDS_THEME.warning}]"
-            )
-        else:
-            console.print(
-                f"[{OPENHANDS_THEME.warning}]Your connection with OpenHands Cloud "
-                f"has expired.[/{OPENHANDS_THEME.warning}]"
-            )
-
-        console.print(
-            f"[{OPENHANDS_THEME.accent}]Starting login...[/{OPENHANDS_THEME.accent}]"
-        )
-        success = await login_command(server_url)
-        if not success:
-            raise CloudConversationError("Login failed")
-
-        # Re-read the API key after login
-        api_key = store.get_api_key()
-        if not api_key:
-            raise CloudConversationError("No API key after login")
-
-    return api_key
-
-
 async def create_cloud_conversation(
-    server_url: str, initial_user_msg: str
+    server_url: str, api_key: str, initial_user_msg: str
 ) -> dict[str, Any]:
-    """Create a new conversation in OpenHands Cloud."""
-    api_key = await _ensure_valid_auth(server_url)
+    """Create a new conversation in OpenHands Cloud.
+
+    Args:
+        server_url: OpenHands server URL
+        api_key: Valid API key for authentication
+        initial_user_msg: Initial message for the conversation
+
+    Returns:
+        Conversation data from the server
+    """
 
     client = OpenHandsApiClient(server_url, api_key)
 
