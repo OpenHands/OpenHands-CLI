@@ -6,12 +6,12 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
+from openhands_cli.auth.utils import is_token_valid
 from openhands_cli.cloud.conversation import (
     CloudConversationError,
     _ensure_valid_auth,
     create_cloud_conversation,
     extract_repository_from_cwd,
-    is_token_valid,
 )
 
 
@@ -31,9 +31,7 @@ from openhands_cli.cloud.conversation import (
 async def test_is_token_valid(side_effect, expected):
     from openhands_cli.auth.api_client import UnauthenticatedError
 
-    with patch(
-        "openhands_cli.cloud.conversation.OpenHandsApiClient"
-    ) as mock_client_cls:
+    with patch("openhands_cli.auth.api_client.OpenHandsApiClient") as mock_client_cls:
         client = Mock()
 
         if side_effect is None:
@@ -52,9 +50,7 @@ async def test_is_token_valid(side_effect, expected):
 @pytest.mark.asyncio
 async def test_is_token_valid_propagates_other_exceptions():
     """Other exceptions (e.g., network errors) should propagate naturally."""
-    with patch(
-        "openhands_cli.cloud.conversation.OpenHandsApiClient"
-    ) as mock_client_cls:
+    with patch("openhands_cli.auth.api_client.OpenHandsApiClient") as mock_client_cls:
         client = Mock()
         client.get_user_info = AsyncMock(side_effect=Exception("Network error"))
         mock_client_cls.return_value = client

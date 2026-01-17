@@ -9,8 +9,7 @@ from openhands_cli.auth.device_flow import (
     authenticate_with_device_flow,
 )
 from openhands_cli.auth.token_storage import TokenStorage
-from openhands_cli.auth.utils import _p
-from openhands_cli.cloud.conversation import is_token_valid
+from openhands_cli.auth.utils import _p, is_token_valid
 from openhands_cli.theme import OPENHANDS_THEME
 
 

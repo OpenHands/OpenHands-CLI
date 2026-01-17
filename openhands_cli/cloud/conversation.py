@@ -6,8 +6,9 @@ from typing import Any
 
 from rich.console import Console
 
-from openhands_cli.auth.api_client import OpenHandsApiClient, UnauthenticatedError
+from openhands_cli.auth.api_client import OpenHandsApiClient
 from openhands_cli.auth.token_storage import TokenStorage
+from openhands_cli.auth.utils import is_token_valid
 from openhands_cli.theme import OPENHANDS_THEME
 
 
@@ -51,16 +52,6 @@ async def _ensure_valid_auth(server_url: str) -> str:
             raise CloudConversationError("No API key after login")
 
     return api_key
-
-
-async def is_token_valid(server_url: str, api_key: str) -> bool:
-    """Validate token; return False for auth failures, raise for other errors."""
-    client = OpenHandsApiClient(server_url, api_key)
-    try:
-        await client.get_user_info()
-        return True
-    except UnauthenticatedError:
-        return False
 
 
 async def create_cloud_conversation(
