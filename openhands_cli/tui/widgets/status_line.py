@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import os
-import time
-from typing import TYPE_CHECKING
 
 from textual.reactive import var
 from textual.timer import Timer
@@ -12,10 +10,6 @@ from openhands_cli.locations import WORK_DIR
 from openhands_cli.utils import abbreviate_number, format_cost
 
 
-if TYPE_CHECKING:
-    from openhands_cli.tui.textual_app import OpenHandsApp
-
-
 class WorkingStatusLine(Static):
     """Status line showing conversation timer and working indicator (above input).
     
@@ -23,8 +17,8 @@ class WorkingStatusLine(Static):
     Bind to StateManager properties using data_bind() for automatic updates:
     
         status_line.data_bind(
-            is_running=state_manager.is_running,
-            elapsed_seconds=state_manager.elapsed_seconds
+            is_running=StateManager.is_running,
+            elapsed_seconds=StateManager.elapsed_seconds
         )
     """
 
@@ -37,44 +31,26 @@ class WorkingStatusLine(Static):
     }
     """
     
-    # Reactive properties that can be bound to StateManager
+    # Reactive properties bound to StateManager
     is_running: var[bool] = var(False)
     elapsed_seconds: var[int] = var(0)
 
-    def __init__(self, app: "OpenHandsApp | None" = None, **kwargs) -> None:
+    def __init__(self, **kwargs) -> None:
         super().__init__("", id="working_status_line", markup=False, **kwargs)
         self._timer: Timer | None = None
         self._working_frame: int = 0
-        # Keep app reference for backward compatibility during migration
-        self.main_app = app
 
     def on_mount(self) -> None:
         """Initialize the working status line and start animation timer."""
         self._update_text()
         # Start animation timer for spinner (runs continuously but only animates when working)
         self._timer = self.set_interval(0.1, self._on_tick)
-        
-        # Backward compatibility: subscribe to signal if app provided
-        if self.main_app is not None:
-            self.main_app.conversation_running_signal.subscribe(
-                self, self._on_legacy_state_changed
-            )
 
     def on_unmount(self) -> None:
         """Stop timer when widget is removed."""
         if self._timer:
             self._timer.stop()
             self._timer = None
-
-    def _on_legacy_state_changed(self, is_running: bool) -> None:
-        """Legacy callback for signal-based state updates.
-        
-        This maintains backward compatibility during migration.
-        New code should use data_bind() with StateManager instead.
-        """
-        self.is_running = is_running
-        if not is_running:
-            self.elapsed_seconds = 0
 
     # ----- Reactive Watchers -----
     
@@ -118,10 +94,9 @@ class InfoStatusLine(Static):
     Bind to StateManager properties using data_bind() for automatic updates:
     
         info_line.data_bind(
-            is_running=state_manager.is_running,
-            is_multiline_mode=state_manager.is_multiline_mode,
-            input_tokens=state_manager.input_tokens,
-            output_tokens=state_manager.output_tokens,
+            is_running=StateManager.is_running,
+            is_multiline_mode=StateManager.is_multiline_mode,
+            input_tokens=StateManager.input_tokens,
             ...
         )
     """
@@ -135,7 +110,7 @@ class InfoStatusLine(Static):
     }
     """
     
-    # Reactive properties that can be bound to StateManager
+    # Reactive properties bound to StateManager
     is_running: var[bool] = var(False)
     is_multiline_mode: var[bool] = var(False)
     input_tokens: var[int] = var(0)
@@ -145,93 +120,17 @@ class InfoStatusLine(Static):
     context_window: var[int] = var(0)
     accumulated_cost: var[float] = var(0.0)
 
-    def __init__(self, app: "OpenHandsApp | None" = None, **kwargs) -> None:
+    def __init__(self, **kwargs) -> None:
         super().__init__("", id="info_status_line", markup=True, **kwargs)
-        # Keep app reference for backward compatibility during migration
-        self.main_app = app
         self.work_dir_display = self._get_work_dir_display()
-        self._metrics_update_timer: Timer | None = None
 
     def on_mount(self) -> None:
         """Initialize the info status line."""
         self._update_text()
-        
-        # Backward compatibility: subscribe to signals if app provided
-        if self.main_app is not None:
-            self.main_app.input_field.multiline_mode_status.subscribe(
-                self, self._on_legacy_multiline_mode
-            )
-            self.main_app.conversation_running_signal.subscribe(
-                self, self._on_legacy_state_changed
-            )
-
-    def on_unmount(self) -> None:
-        """Stop timer when widget is removed."""
-        if self._metrics_update_timer:
-            self._metrics_update_timer.stop()
-            self._metrics_update_timer = None
 
     def on_resize(self) -> None:
         """Recalculate layout when widget is resized."""
         self._update_text()
-
-    def _on_legacy_state_changed(self, is_running: bool) -> None:
-        """Legacy callback for signal-based state updates.
-        
-        This maintains backward compatibility during migration.
-        New code should use data_bind() with StateManager instead.
-        """
-        self.is_running = is_running
-        if is_running:
-            # Start periodic metrics updates while conversation is running
-            if self._metrics_update_timer:
-                self._metrics_update_timer.stop()
-            self._metrics_update_timer = self.set_interval(1.0, self._poll_metrics)
-        else:
-            # Stop timer and do final metrics update
-            if self._metrics_update_timer:
-                self._metrics_update_timer.stop()
-                self._metrics_update_timer = None
-            self._poll_metrics()
-
-    def _poll_metrics(self) -> None:
-        """Poll conversation metrics from the runner (legacy method).
-        
-        This is used for backward compatibility. With the new StateManager,
-        metrics are pushed via reactive properties instead of polled.
-        """
-        if self.main_app and self.main_app.conversation_runner:
-            visualizer = self.main_app.conversation_runner.visualizer
-            stats = visualizer.conversation_stats
-            if stats:
-                combined_metrics = stats.get_combined_metrics()
-                if combined_metrics:
-                    self.accumulated_cost = combined_metrics.accumulated_cost or 0.0
-                    usage = combined_metrics.accumulated_token_usage
-                    if usage:
-                        self.input_tokens = usage.prompt_tokens or 0
-                        self.output_tokens = usage.completion_tokens or 0
-                        self.context_window = usage.context_window or 0
-                        # Calculate cache hit rate
-                        prompt = usage.prompt_tokens or 0
-                        cache_read = usage.cache_read_tokens or 0
-                        if prompt > 0:
-                            self.cache_hit_rate = f"{(cache_read / prompt * 100):.0f}%"
-                        else:
-                            self.cache_hit_rate = "N/A"
-                    # Get last request's input tokens (current context usage)
-                    token_usages = combined_metrics.token_usages
-                    if token_usages:
-                        self.last_request_input_tokens = (
-                            token_usages[-1].prompt_tokens or 0
-                        )
-                    else:
-                        self.last_request_input_tokens = 0
-        self._update_text()
-
-    def _on_legacy_multiline_mode(self, is_multiline: bool) -> None:
-        """Legacy callback for multiline mode signal."""
-        self.is_multiline_mode = is_multiline
 
     # ----- Reactive Watchers -----
     

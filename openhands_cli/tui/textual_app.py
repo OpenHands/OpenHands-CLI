@@ -18,7 +18,6 @@ from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.screen import Screen
-from textual.signal import Signal
 from textual.widgets import Footer, Input, Static, TextArea
 from textual_autocomplete import AutoComplete
 
@@ -107,7 +106,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """
         super().__init__(**kwargs)
 
-        self.conversation_running_signal = Signal(self, "conversation_running_signal")
         self.is_ui_initialized = False
 
         # Store exit confirmation setting
@@ -123,9 +121,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.cloud = cloud
         self.server_url = server_url
         self.sandbox_id = sandbox_id
-        # Track if cloud conversation is ready (set to True when we receive
-        # ConversationStateUpdateEvent)
-        self.cloud_conversation_ready = not cloud  # True if not cloud mode
 
         # Store resume conversation ID
         self.conversation_id = (
@@ -194,8 +189,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             # Input area - docked to bottom
             with Container(id="input_area"):
                 # WorkingStatusLine binds to StateManager for reactive updates
-                # Also passes self for backward compatibility with signal subscriptions
-                yield WorkingStatusLine(self).data_bind(
+                yield WorkingStatusLine().data_bind(
                     is_running=StateManager.is_running,
                     elapsed_seconds=StateManager.elapsed_seconds,
                 )
@@ -203,7 +197,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                     placeholder="Type your message, @mention a file, or / for commands"
                 )
                 # InfoStatusLine binds to StateManager for reactive metric updates
-                yield InfoStatusLine(self).data_bind(
+                yield InfoStatusLine().data_bind(
                     is_running=StateManager.is_running,
                     is_multiline_mode=StateManager.is_multiline_mode,
                     input_tokens=StateManager.input_tokens,
@@ -231,23 +225,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def on_mount(self) -> None:
         """Called when app starts."""
-        # Subscribe to conversation running signal for auto-exit in headless mode
-        # Note: This uses the legacy signal pattern. New components should listen
-        # for ConversationFinished message from StateManager instead.
-        self.conversation_running_signal.subscribe(
-            self, self._on_conversation_state_changed
-        )
-    
-    def on_conversation_finished(self, event: ConversationFinished) -> None:
-        """Handle conversation finished event from StateManager.
-        
-        This is the new reactive pattern for handling state changes.
-        Components can listen for this message instead of subscribing to signals.
-        """
-        if self.headless_mode:
-            self._print_conversation_summary()
-            self.exit()
-
         # Check if user has existing settings
         if SettingsScreen.is_initial_setup_required():
             # In headless mode we cannot open interactive settings.
@@ -273,6 +250,16 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # User has settings - proceed with normal startup
         self._initialize_main_ui()
 
+    def on_conversation_finished(self, event: ConversationFinished) -> None:
+        """Handle conversation finished event from StateManager.
+        
+        This reactive message handler is triggered when the conversation
+        stops running. Used for auto-exit in headless mode.
+        """
+        if self.headless_mode:
+            self._print_conversation_summary()
+            self.exit()
+
     def _show_initial_settings(self) -> None:
         """Show settings screen for first-time users."""
         settings_screen = SettingsScreen(
@@ -293,13 +280,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             on_exit_cancelled=self._show_initial_settings,
         )
         self.app.push_screen(exit_modal)
-
-    def _on_conversation_state_changed(self, is_running: bool) -> None:
-        """Handle conversation state changes for auto-exit in headless mode."""
-        # If conversation just finished and we're in headless mode, exit
-        if not is_running and self.headless_mode:
-            self._print_conversation_summary()
-            self.exit()
 
     def _print_conversation_summary(self) -> None:
         """Print conversation summary for headless mode."""
@@ -420,11 +400,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     def create_conversation_runner(self) -> ConversationRunner:
         """Create and configure the conversation runner.
         
-        The runner is configured with both:
-        1. StateManager for reactive state updates (new pattern)
-        2. Legacy callbacks for backward compatibility
-        
-        As migration progresses, the legacy callbacks can be removed.
+        The runner uses StateManager for reactive state updates.
+        UI components bind to StateManager properties via data_bind().
         """
         # Initialize conversation runner with visualizer that can add widgets
         # Skip user messages since we display them immediately in the UI
@@ -445,8 +422,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         runner = ConversationRunner(
             self.conversation_id,
-            # Legacy callback - still used for signal compatibility
-            running_state_callback=self.conversation_running_signal.publish,
+            state_manager=self.state_manager,
             confirmation_callback=self._handle_confirmation_request,
             notification_callback=lambda title, message, severity: (
                 self.notify(title=title, message=message, severity=severity)
@@ -457,8 +433,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             cloud=self.cloud,
             server_url=self.server_url,
             sandbox_id=self.sandbox_id,
-            # New reactive state manager
-            state_manager=self.state_manager,
         )
 
         return runner
@@ -468,7 +442,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         Triggered when ConversationStateUpdateEvent is received.
         """
-        self.cloud_conversation_ready = True
         # Update StateManager for reactive updates
         self.state_manager.set_cloud_ready(True)
 
