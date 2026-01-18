@@ -87,7 +87,7 @@ CLOUD_MODELS: list[ModelRecommendation] = [
         provider="openai",
         is_recommended=True,
         use_cases="General coding tasks, code generation",
-        notes="Latest GPT-5 model",
+        notes="GPT-5.0 model with strong performance",
     ),
     ModelRecommendation(
         name="gemini-3-pro-preview",
