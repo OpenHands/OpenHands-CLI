@@ -150,7 +150,12 @@ class TestHelperFunctions:
     def test_create_and_save_agent_configuration(self):
         """Test agent creation and saving from settings."""
         llm_api_key = "test-llm-key"
-        settings = {"llm_model": "gpt-4o", "agent": "CodeActAgent", "language": "en"}
+        settings = {
+            "llm_model": "gpt-4o",
+            "llm_base_url": "https://llm-proxy.eval.all-hands.dev/",
+            "agent": "CodeActAgent",
+            "language": "en",
+        }
 
         with patch("openhands_cli.auth.api_client.AgentStore") as mock_store_class:
             with patch("openhands_cli.auth.api_client._p") as mock_print:
@@ -173,6 +178,7 @@ class TestHelperFunctions:
                 mock_store.create_and_save_from_settings.assert_called_once_with(
                     llm_api_key=llm_api_key,
                     settings=settings,
+                    base_url="https://llm-proxy.eval.all-hands.dev/",
                 )
                 assert mock_print.call_count >= 5  # Multiple print statements
 

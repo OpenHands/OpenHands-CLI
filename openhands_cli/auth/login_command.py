@@ -9,7 +9,7 @@ from openhands_cli.auth.device_flow import (
     authenticate_with_device_flow,
 )
 from openhands_cli.auth.token_storage import TokenStorage
-from openhands_cli.auth.utils import _p
+from openhands_cli.auth.utils import _p, is_token_valid
 from openhands_cli.theme import OPENHANDS_THEME
 
 
@@ -64,16 +64,29 @@ async def login_command(server_url: str) -> bool:
     Returns:
         True if login was successful, False otherwise
     """
+    from openhands_cli.auth.logout_command import logout_command
+
+    # Check for existing token and validate it immediately
+    token_storage = TokenStorage()
+    existing_api_key = token_storage.get_api_key()
+
+    if existing_api_key and not await is_token_valid(server_url, existing_api_key):
+        _p(
+            f"[{OPENHANDS_THEME.warning}]Token is invalid or expired. "
+            f"Logging out...[/{OPENHANDS_THEME.warning}]"
+        )
+        logout_command(server_url)
+
+    # Proceed with normal login flow
     _p(
         f"[{OPENHANDS_THEME.accent}]Logging in to OpenHands Cloud..."
         f"[/{OPENHANDS_THEME.accent}]"
     )
 
-    # First, try to read any existing token
-    token_storage = TokenStorage()
+    # Re-read token (may have been cleared by logout above)
     existing_api_key = token_storage.get_api_key()
 
-    # If we already have an API key, just sync settings and exit
+    # If we already have a valid API key, just sync settings and exit
     if existing_api_key:
         await _fetch_user_data_with_context(
             server_url,

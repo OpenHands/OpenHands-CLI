@@ -29,6 +29,8 @@ class ToolCallState:
         self._valid_skeleton_cached = False
         # Kind is cached once skeleton is valid (depends only on command, not path)
         self._cached_kind: ToolKind | None = None
+        # Incrementally streamed summary (from assistant content prior to tool call)
+        self.summary: str = ""
 
     def append_args(self, args_part: str) -> None:
         """Append new arguments part to the accumulated args and lexer."""
@@ -130,8 +132,11 @@ class ToolCallState:
             return "Plan updated"
 
         args = self._parse_args()
+        clean_summary = self.summary.strip().replace("\n", " ") if self.summary else ""
+
+        # If no args yet, fall back to summary or tool name
         if not args:
-            return self.tool_name
+            return clean_summary or self.tool_name
 
         if self.tool_name == "file_editor":
             path = args.get("path")
@@ -139,15 +144,24 @@ class ToolCallState:
             if isinstance(path, str) and path:
                 # Prefix match: streaming may yield "v", "vi", etc. before full "view"
                 if isinstance(command, str) and "view".startswith(command):
-                    return f"Reading {path}"
-                return f"Editing {path}"
+                    return (
+                        f"{clean_summary}: Reading {path}"
+                        if clean_summary
+                        else f"Reading {path}"
+                    )
+                return (
+                    f"{clean_summary}: Editing {path}"
+                    if clean_summary
+                    else f"Editing {path}"
+                )
 
         if self.tool_name == "terminal":
             command = args.get("command")
             if isinstance(command, str) and command:
-                return command
+                return f"{clean_summary}: $ {command}" if clean_summary else command
 
-        return self.tool_name
+        # Other tools: prefer summary if present
+        return clean_summary or self.tool_name
 
     def _parse_args(self) -> dict | None:
         """Parse current args using lexer's best-effort completion."""

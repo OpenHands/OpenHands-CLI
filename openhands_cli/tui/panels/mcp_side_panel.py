@@ -197,10 +197,24 @@ class MCPSidePanel(VerticalScroll):
 
         return details
 
+    def _server_spec_to_dict(
+        self, server_spec: StdioMCPServer | RemoteMCPServer | dict
+    ) -> dict:
+        """Convert a server specification to a dictionary for comparison.
+
+        Handles both Pydantic model objects (StdioMCPServer, RemoteMCPServer)
+        and plain dictionaries.
+        """
+        if isinstance(server_spec, StdioMCPServer | RemoteMCPServer):
+            return server_spec.model_dump()
+        return server_spec
+
     def _check_server_specs_are_equal(
         self, first_server_spec, second_server_spec
     ) -> bool:
         """Check if two server specifications are equal."""
-        first_stringified_server_spec = json.dumps(first_server_spec, sort_keys=True)
-        second_stringified_server_spec = json.dumps(second_server_spec, sort_keys=True)
+        first_dict = self._server_spec_to_dict(first_server_spec)
+        second_dict = self._server_spec_to_dict(second_server_spec)
+        first_stringified_server_spec = json.dumps(first_dict, sort_keys=True)
+        second_stringified_server_spec = json.dumps(second_dict, sort_keys=True)
         return first_stringified_server_spec == second_stringified_server_spec
