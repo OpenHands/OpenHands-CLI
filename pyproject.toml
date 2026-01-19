@@ -139,5 +139,5 @@ typeCheckingMode = "standard"
 # USE EXACT COMMIT FROM AGENT-SDK (PR #1269 - Add API-Based Critic for Real-Time Agent Action Evaluation)
 
 [tool.uv.sources]
-openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "ed81a95ddfe26ce40b32153a216b472eb2163f02" }
-openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "ed81a95ddfe26ce40b32153a216b472eb2163f02" }
+openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "5cc2fce5f8fa1a7aed5a94b64069f1b7eed2dc16" }
+openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "5cc2fce5f8fa1a7aed5a94b64069f1b7eed2dc16" }
