@@ -225,6 +225,14 @@ class SettingsScreen(ModalScreen):
             self.basic_section.display = True
             self.advanced_section.display = False
 
+    def _has_existing_api_key(self) -> bool:
+        """Check if there's an existing API key in the agent."""
+        return bool(
+            self.current_agent
+            and self.current_agent.llm
+            and self.current_agent.llm.api_key
+        )
+
     def _update_field_dependencies(self) -> None:
         """Update field enabled/disabled state based on dependency chain."""
         try:
@@ -289,7 +297,8 @@ class SettingsScreen(ModalScreen):
                     pass
 
             # Memory Condensation: enabled when API key is provided
-            self.memory_select.disabled = not api_key
+            # or when there's an existing API key in the agent
+            self.memory_select.disabled = not (api_key or self._has_existing_api_key())
 
         except Exception:
             # Silently handle errors during initialization
