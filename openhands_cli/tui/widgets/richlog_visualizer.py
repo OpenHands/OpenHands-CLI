@@ -108,8 +108,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._cli_settings: CliSettings | None = None
         # Track pending actions by tool_call_id for action-observation pairing
         self._pending_actions: dict[str, tuple[ActionEvent, Collapsible]] = {}
-        # Track the last critic score for showing diffs
-        self._last_critic_score: float | None = None
 
     @property
     def cli_settings(self) -> CliSettings:
@@ -215,8 +213,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
             "[bold]{summary}[/bold][dim]: $ {command}[/dim]" for terminal
             "[bold]{summary}[/bold][dim]: Reading/Editing {path}[/dim]" for files
 
-        If critic result is present, adds a score indicator at the end.
-
         The detail portion (after the colon) is rendered in dim style to
         visually distinguish it from the main summary text.
         """
@@ -248,32 +244,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
             title = f"[bold]{summary}[/bold]"
         else:
             title = event.tool_name
-
-        # Add critic score indicator if present
-        if event.critic_result is not None:
-            score = event.critic_result.score
-            # Color code the score based on success threshold
-            if event.critic_result.success:
-                score_style = "green"
-            else:
-                score_style = "yellow"
-            
-            # Build critic score display with diff from previous score
-            critic_display = f"[/{score_style}]{score:.2f}[/{score_style}]"
-            
-            # Add diff if we have a previous score
-            if self._last_critic_score is not None:
-                diff = score - self._last_critic_score
-                if abs(diff) >= 0.01:  # Only show diff if meaningful (≥0.01)
-                    diff_sign = "+" if diff > 0 else ""
-                    # Color code the diff: green for positive, red for negative
-                    diff_style = "green" if diff > 0 else "red"
-                    critic_display += f", [/{diff_style}]{diff_sign}{diff:.2f}[/{diff_style}]"
-            
-            title += f" [dim]\\[Critic: {critic_display}\\][/dim]"
-            
-            # Update last critic score for next comparison
-            self._last_critic_score = score
 
         return title
 
@@ -473,13 +443,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
             action = event.action
             if isinstance(action, FinishAction):
                 # For finish action, render as markdown with padding to align
-                # User message has "padding: 0 1" and starts with "> ", so text
-                # starts at position 3 (1 padding + 2 for "> ")
-                # If critic result is present, use full event.visualize to include it
-                if event.critic_result is not None:
-                    widget = Markdown(str(content))
-                else:
-                    widget = Markdown(str(action.message))
+                # Use event.visualize which includes critic result if present
+                widget = Markdown(str(content))
                 widget.styles.padding = AGENT_MESSAGE_PADDING
                 return widget
             elif isinstance(action, ThinkAction):
@@ -495,39 +460,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 and event.llm_message.role == "user"
             ):
                 return None
-            
-            # If message has critic result, add a visual header
-            if event.critic_result is not None:
-                score = event.critic_result.score
-                # Color code the score based on success threshold
-                if event.critic_result.success:
-                    score_style = "green"
-                else:
-                    score_style = "yellow"
-                
-                # Build critic score display with diff from previous score
-                critic_display = f"[bold {score_style}]Critic Score: {score:.2f}[/bold {score_style}]"
-                
-                # Add diff if we have a previous score
-                if self._last_critic_score is not None:
-                    diff = score - self._last_critic_score
-                    if abs(diff) >= 0.01:  # Only show diff if meaningful (≥0.01)
-                        diff_sign = "+" if diff > 0 else ""
-                        # Color code the diff: green for positive, red for negative
-                        diff_style = "green" if diff > 0 else "red"
-                        critic_display += f" [bold {diff_style}]({diff_sign}{diff:.2f})[/bold {diff_style}]"
-                
-                # Update last critic score for next comparison
-                self._last_critic_score = score
-                
-                # Prepend critic score header to the message content
-                content_with_critic = f"{critic_display}\n\n{str(content)}"
-                widget = Markdown(content_with_critic)
-            else:
-                # Display messages as markdown for proper rendering
-                # The event.visualize already includes critic result if present
-                widget = Markdown(str(content))
-            
+
+            # Display messages as markdown for proper rendering
+            # The event.visualize already includes critic result if present
+            widget = Markdown(str(content))
             widget.styles.padding = AGENT_MESSAGE_PADDING
             return widget
 

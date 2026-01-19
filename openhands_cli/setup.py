@@ -123,21 +123,5 @@ def setup_conversation(
     conversation.set_confirmation_policy(confirmation_policy)
 
     console.print(f"✓ Agent initialized with model: {agent.llm.model}", style="green")
-    
-    # Display critic status if enabled
-    if agent.critic is not None:
-        from openhands.sdk.critic.impl.api import APIBasedCritic
-        if isinstance(agent.critic, APIBasedCritic):
-            console.print(
-                f"✓ [bold cyan]Critic enabled[/bold cyan] - Server: {agent.critic.server_url}, Mode: {agent.critic.mode}",
-                style="cyan"
-            )
-        else:
-            console.print(
-                "✓ [bold cyan]Critic enabled[/bold cyan] - Agent actions will be evaluated in real-time",
-                style="cyan"
-            )
-    else:
-        console.print("ℹ Critic not enabled", style="dim")
-    
+
     return conversation
