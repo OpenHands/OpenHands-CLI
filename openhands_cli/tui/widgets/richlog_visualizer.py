@@ -135,9 +135,11 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         Returns:
             A Collapsible widget showing critic score summary (collapsed)
-            and full breakdown (expanded)
+            and full breakdown (expanded), organized by taxonomy categories
         """
         import json
+
+        from openhands_cli.critic_taxonomy import CriticTaxonomy
 
         # Build title: "Critic Score: {score}" with color coding
         score_emoji = "✅" if critic_result.success else "⚠️"
@@ -159,55 +161,98 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 start_idx = critic_result.message.find("{")
                 probs_dict = json.loads(critic_result.message[start_idx:])
                 if isinstance(probs_dict, dict):
-                    # Separate sentiments from other metrics
-                    sentiments = {
-                        k: v
-                        for k, v in probs_dict.items()
-                        if k.startswith("sentiment_")
-                    }
-                    other_metrics = {
-                        k: v
-                        for k, v in probs_dict.items()
-                        if not k.startswith("sentiment_") and k != "success"
-                    }
+                    # Group features by taxonomy categories
+                    general_context = {}
+                    agent_issues = {}
+                    user_patterns = {}
+                    infra_issues = {}
+                    unknown_features = {}
 
-                    # Display sentiment breakdown
-                    if sentiments:
+                    for feature_name, prob in probs_dict.items():
+                        if feature_name == "success":
+                            # Skip 'success' as it's redundant with the score
+                            continue
+
+                        # Categorize based on taxonomy
+                        if feature_name in CriticTaxonomy.GENERAL_CONTEXT:
+                            general_context[feature_name] = prob
+                        elif feature_name in CriticTaxonomy.AGENT_BEHAVIORAL_ISSUES:
+                            agent_issues[feature_name] = prob
+                        elif feature_name in CriticTaxonomy.USER_FOLLOWUP_PATTERNS:
+                            user_patterns[feature_name] = prob
+                        elif feature_name in CriticTaxonomy.INFRASTRUCTURE_ISSUES:
+                            infra_issues[feature_name] = prob
+                        else:
+                            unknown_features[feature_name] = prob
+
+                    # Display General Context & Task Classification
+                    if general_context:
                         content_text.append(
-                            "User Sentiment Predictions:\n", style="bold"
+                            "General Context & Task Classification:\n",
+                            style="bold cyan",
                         )
-                        sorted_sentiments = sorted(
-                            sentiments.items(), key=lambda x: x[1], reverse=True
+                        sorted_features = sorted(
+                            general_context.items(), key=lambda x: x[1], reverse=True
                         )
-                        for field, prob in sorted_sentiments:
-                            short_name = field.replace("sentiment_", "").capitalize()
-                            if prob >= 0.7:
-                                style = "cyan bold"
-                            elif prob >= 0.5:
-                                style = "cyan"
-                            else:
-                                style = "dim"
-                            content_text.append(f"  • {short_name}: ", style="white")
-                            content_text.append(f"{prob:.2f}\n", style=style)
+                        for feature, prob in sorted_features:
+                            self._append_feature_with_prob(
+                                content_text, feature, prob, category="general"
+                            )
                         content_text.append("\n")
 
-                    # Display other metrics
-                    if other_metrics:
-                        content_text.append("Risk Indicators:\n", style="bold")
-                        sorted_metrics = sorted(
-                            other_metrics.items(), key=lambda x: x[1], reverse=True
+                    # Display Agent Behavioral Issues
+                    if agent_issues:
+                        content_text.append(
+                            "Agent Behavioral Issues:\n", style="bold red"
                         )
-                        for field, prob in sorted_metrics:
-                            if prob >= 0.7:
-                                prob_style = "red bold"
-                            elif prob >= 0.5:
-                                prob_style = "red"
-                            elif prob >= 0.3:
-                                prob_style = "yellow"
-                            else:
-                                prob_style = "white"
-                            content_text.append(f"  • {field}: ", style="dim")
-                            content_text.append(f"{prob:.2f}\n", style=prob_style)
+                        sorted_features = sorted(
+                            agent_issues.items(), key=lambda x: x[1], reverse=True
+                        )
+                        for feature, prob in sorted_features:
+                            self._append_feature_with_prob(
+                                content_text, feature, prob, category="agent"
+                            )
+                        content_text.append("\n")
+
+                    # Display User Follow-Up Patterns
+                    if user_patterns:
+                        content_text.append(
+                            "User Follow-Up Patterns:\n", style="bold magenta"
+                        )
+                        sorted_features = sorted(
+                            user_patterns.items(), key=lambda x: x[1], reverse=True
+                        )
+                        for feature, prob in sorted_features:
+                            self._append_feature_with_prob(
+                                content_text, feature, prob, category="user"
+                            )
+                        content_text.append("\n")
+
+                    # Display Infrastructure Issues
+                    if infra_issues:
+                        content_text.append(
+                            "Infrastructure Issues:\n", style="bold yellow"
+                        )
+                        sorted_features = sorted(
+                            infra_issues.items(), key=lambda x: x[1], reverse=True
+                        )
+                        for feature, prob in sorted_features:
+                            self._append_feature_with_prob(
+                                content_text, feature, prob, category="infra"
+                            )
+                        content_text.append("\n")
+
+                    # Display unknown features if any
+                    if unknown_features:
+                        content_text.append("Other Metrics:\n", style="bold dim")
+                        sorted_features = sorted(
+                            unknown_features.items(), key=lambda x: x[1], reverse=True
+                        )
+                        for feature, prob in sorted_features:
+                            self._append_feature_with_prob(
+                                content_text, feature, prob, category="unknown"
+                            )
+
                 else:
                     # If not a dict, display message as-is
                     content_text.append(f"\n{critic_result.message}\n")
@@ -223,6 +268,47 @@ class ConversationVisualizer(ConversationVisualizerBase):
             event=None,  # No specific event for critic
             collapsed=True,
         )
+
+    def _append_feature_with_prob(
+        self, content_text: Text, feature_name: str, prob: float, category: str
+    ) -> None:
+        """Append a feature with its probability to the content text.
+
+        Args:
+            content_text: Rich Text object to append to
+            feature_name: Name of the feature
+            prob: Probability value
+            category: Category type for color coding
+        """
+        # Format feature name: replace underscores with spaces, capitalize
+        display_name = feature_name.replace("_", " ").replace("sentiment ", "")
+        display_name = display_name.title()
+
+        # Determine color based on probability and category
+        if category == "general":
+            # General context features (sentiments, etc.)
+            if prob >= 0.7:
+                prob_style = "cyan bold"
+            elif prob >= 0.5:
+                prob_style = "cyan"
+            else:
+                prob_style = "dim"
+        elif category in ("agent", "user", "infra"):
+            # Issue indicators (higher = worse)
+            if prob >= 0.7:
+                prob_style = "red bold"
+            elif prob >= 0.5:
+                prob_style = "red"
+            elif prob >= 0.3:
+                prob_style = "yellow"
+            else:
+                prob_style = "dim"
+        else:
+            # Unknown category
+            prob_style = "white"
+
+        content_text.append(f"  • {display_name}: ", style="dim")
+        content_text.append(f"{prob:.2f}\n", style=prob_style)
 
     def _do_refresh_plan_panel(self) -> None:
         """Refresh the plan panel (must be called from main thread)."""
