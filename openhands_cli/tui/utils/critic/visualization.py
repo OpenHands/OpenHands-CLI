@@ -136,7 +136,7 @@ def _append_categorized_features_from_metadata(
     # Agent behavioral issues
     agent_issues = categorized.get("agent_behavioral_issues", [])
     if agent_issues:
-        content_text.append("Detected Agent Issues: ", style="bold yellow")
+        content_text.append("Detected Agent Issues: ", style="bold")
         _append_feature_list_inline(content_text, agent_issues)
         has_content = True
 
@@ -145,7 +145,7 @@ def _append_categorized_features_from_metadata(
     if user_patterns:
         if has_content:
             content_text.append("\n")
-        content_text.append("Predicted User Follow-Up: ", style="bold yellow")
+        content_text.append("Predicted User Follow-Up: ", style="bold")
         _append_feature_list_inline(content_text, user_patterns)
         has_content = True
 
@@ -154,7 +154,7 @@ def _append_categorized_features_from_metadata(
     if infra_issues:
         if has_content:
             content_text.append("\n")
-        content_text.append("Infra Issues: ", style="bold yellow")
+        content_text.append("Infra Issues: ", style="bold")
         _append_feature_list_inline(content_text, infra_issues)
         has_content = True
 
