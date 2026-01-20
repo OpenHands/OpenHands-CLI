@@ -7,6 +7,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
+from rich.markup import escape
 from textual import on
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.css.query import NoMatches
@@ -53,7 +54,7 @@ class HistoryItem(Static):
         # Use title if available, otherwise use ID
         has_title = bool(conversation.title)
         if conversation.title:
-            title = _truncate(conversation.title, 100)
+            title = escape(_truncate(conversation.title, 100))
             content = f"{title}\n[dim]{conv_id} • {time_str}[/dim]"
         else:
             content = f"[dim]New conversation[/dim]\n[dim]{conv_id} • {time_str}[/dim]"
@@ -94,7 +95,7 @@ class HistoryItem(Static):
     def set_title(self, title: str) -> None:
         """Update the displayed title for this history item."""
         time_str = _format_time(self._created_at)
-        title_text = _truncate(title, 100)
+        title_text = escape(_truncate(title, 100))
         self.update(f"{title_text}\n[dim]{self.conversation_id} • {time_str}[/dim]")
         self._has_title = True
 
