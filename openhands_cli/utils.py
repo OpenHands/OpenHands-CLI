@@ -140,7 +140,7 @@ def get_llm_metadata(
     metadata = {
         "trace_version": openhands_sdk_version,
         "tags": [
-            "app:openhands",
+            "app:openhands-cli",
             f"model:{model_name}",
             f"type:{llm_type}",
             f"web_host:{os.environ.get('WEB_HOST', 'unspecified')}",
