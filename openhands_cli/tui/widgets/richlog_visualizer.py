@@ -139,11 +139,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """
         import json
 
-        from openhands_cli.critic_taxonomy import CriticTaxonomy
+        from openhands_cli.critic_taxonomy import FEATURE_CATEGORIES
 
         # Build title: "Critic Score: {score}" with color coding
-        score_emoji = "✅" if critic_result.success else "⚠️"
-        title = f"{score_emoji} Critic Score: {critic_result.score:.4f}"
+        title = f"Critic Score: {critic_result.score:.4f}"
 
         # Build content: full breakdown
         content_text = Text()
@@ -174,13 +173,14 @@ class ConversationVisualizer(ConversationVisualizerBase):
                             continue
 
                         # Categorize based on taxonomy
-                        if feature_name in CriticTaxonomy.GENERAL_CONTEXT:
+                        category = FEATURE_CATEGORIES.get(feature_name)
+                        if category == "general_context":
                             general_context[feature_name] = prob
-                        elif feature_name in CriticTaxonomy.AGENT_BEHAVIORAL_ISSUES:
+                        elif category == "agent_behavioral_issues":
                             agent_issues[feature_name] = prob
-                        elif feature_name in CriticTaxonomy.USER_FOLLOWUP_PATTERNS:
+                        elif category == "user_followup_patterns":
                             user_patterns[feature_name] = prob
-                        elif feature_name in CriticTaxonomy.INFRASTRUCTURE_ISSUES:
+                        elif category == "infrastructure_issues":
                             infra_issues[feature_name] = prob
                         else:
                             unknown_features[feature_name] = prob
