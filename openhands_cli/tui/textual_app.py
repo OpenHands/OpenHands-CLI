@@ -480,6 +480,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     async def _handle_user_message(self, user_message: str) -> None:
         """Handle regular user messages with the conversation runner."""
+        # Dismiss any pending critic feedback widgets when user sends a new message
+        self._dismiss_pending_feedback_widgets()
+
         # Check if conversation runner is initialized
         if self.conversation_runner is None:
             self.conversation_runner = self.create_conversation_runner()
@@ -706,6 +709,18 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             message="Opening feedback form in your browser...",
             severity="information",
         )
+
+    def _dismiss_pending_feedback_widgets(self) -> None:
+        """Remove all pending CriticFeedbackWidget instances from the UI.
+
+        Called when user sends a new message, indicating they chose to
+        ignore the feedback prompt.
+        """
+        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
+
+        # Find and remove all CriticFeedbackWidget instances
+        for widget in self.main_display.query(CriticFeedbackWidget):
+            widget.remove()
 
     def _handle_new_command(self) -> None:
         """Handle the /new command to start a new conversation.
