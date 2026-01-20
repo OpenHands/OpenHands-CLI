@@ -157,7 +157,7 @@ class AgentStore:
 
             # Update LLM metadata with current information
             llm_update: dict[str, Any] = {}
-            if should_set_litellm_extra_body(updated_llm.model):
+            if should_set_litellm_extra_body(updated_llm.model, updated_llm.base_url):
                 llm_update["litellm_extra_body"] = {
                     "metadata": get_llm_metadata(
                         model_name=updated_llm.model,
@@ -177,7 +177,9 @@ class AgentStore:
                 condenser_llm = apply_llm_overrides(agent.condenser.llm, env_overrides)
 
                 condenser_llm_update: dict[str, Any] = {}
-                if should_set_litellm_extra_body(condenser_llm.model):
+                if should_set_litellm_extra_body(
+                    condenser_llm.model, condenser_llm.base_url
+                ):
                     condenser_llm_update["litellm_extra_body"] = {
                         "metadata": get_llm_metadata(
                             model_name=condenser_llm.model,
