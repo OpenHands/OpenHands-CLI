@@ -94,7 +94,7 @@ def get_splash_content(
             "[dim]We've detected you're using the OpenHands LLM provider. "
             "An experimental critic feature is now active (free) to predict task "
             "success. We may collect your feedback "
-            "ratings for model improvement. You can disable this in settings.[/dim]"
+            "ratings for critic improvement. You can disable this in settings.[/dim]"
         )
 
     return content
