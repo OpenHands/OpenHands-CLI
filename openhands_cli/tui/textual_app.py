@@ -31,6 +31,8 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.locations import CONVERSATIONS_DIR
+from openhands_cli.mcp.mcp_utils import list_enabled_servers
+from openhands_cli.stores import AgentStore
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
@@ -41,6 +43,7 @@ from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
+from openhands_cli.tui.panels.skills_side_panel import SkillsSidePanel
 from openhands_cli.tui.widgets import InputField
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
@@ -100,6 +103,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         self.conversation_running_signal = Signal(self, "conversation_running_signal")
         self.is_ui_initialized = False
+        agent_store = AgentStore()
+        self.agent = agent_store.load() if agent_store.load() else None
 
         # Store exit confirmation setting
         self.exit_confirmation = exit_confirmation
@@ -128,8 +133,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
-        self._reload_visualizer = (
-            lambda: self.conversation_runner.visualizer.reload_configuration()
+        self._reload_visualizer = lambda: (
+            self.conversation_runner.visualizer.reload_configuration()
             if self.conversation_runner
             else None
         )
@@ -139,6 +144,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # MCP panel tracking
         self.mcp_panel: MCPSidePanel | None = None
+
+        self.skills_panel: SkillsSidePanel = SkillsSidePanel(self, agent=self.agent)
 
         self.plan_panel: PlanSidePanel = PlanSidePanel(self)
 
@@ -161,6 +168,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 yield Static(id="splash_version", classes="splash-version")
                 yield Static(id="splash_status", classes="status-panel")
                 yield Static(id="splash_conversation", classes="conversation-panel")
+                yield Static(id="splash_skills_mcp", classes="skills-mcp-info")
                 yield Static(
                     id="splash_instructions_header", classes="splash-instruction-header"
                 )
@@ -183,6 +191,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         yield from super().get_system_commands(screen)
         yield SystemCommand(
             "MCP", "View MCP configurations", lambda: MCPSidePanel.toggle(self)
+        )
+        yield SystemCommand(
+            "SKILLS", "View loaded skills", lambda: self.skills_panel.toggle()
         )
         yield SystemCommand(
             "PLAN",
@@ -329,9 +340,27 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if self.is_ui_initialized:
             return
 
-        # Get structured splash content
+        agent_info = {"skills_count": 0, "mcp_count": 0}
+        try:
+            if self.agent:
+                skills_count = (
+                    len(self.agent.agent_context.skills)
+                    if self.agent.agent_context
+                    else 0
+                )
+                mcp_count = len(list_enabled_servers())
+                agent_info = {
+                    "skills_count": skills_count,
+                    "mcp_count": mcp_count,
+                }
+        except Exception:
+            pass  # Fail silently if agent can't be loaded
+
+        # Get structured splash content with agent info
         splash_content = get_splash_content(
-            conversation_id=self.conversation_id.hex, theme=OPENHANDS_THEME
+            conversation_id=self.conversation_id.hex,
+            theme=OPENHANDS_THEME,
+            agent_info=agent_info,
         )
 
         # Update individual splash widgets
@@ -340,6 +369,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.query_one("#splash_status", Static).update(splash_content["status_text"])
         self.query_one("#splash_conversation", Static).update(
             splash_content["conversation_text"]
+        )
+        self.query_one("#splash_skills_mcp", Static).update(
+            splash_content["skills_mcp_info"]
         )
         self.query_one("#splash_instructions_header", Static).update(
             splash_content["instructions_header"]
@@ -443,6 +475,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self._handle_confirm_command()
         elif command == "/condense":
             self._handle_condense_command()
+        elif command == "/skills":
+            self._handle_skills_command()
         elif command == "/feedback":
             self._handle_feedback_command()
         elif command == "/exit":
@@ -671,6 +705,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # This will handle all error cases and notifications
         asyncio.create_task(self.conversation_runner.condense_async())
 
+    def _handle_skills_command(self) -> None:
+        """Handle the /skills command to toggle skills panel."""
+        self.skills_panel.toggle()
+
     def _handle_feedback_command(self) -> None:
         """Handle the /feedback command to open feedback form in browser."""
         import webbrowser
@@ -839,9 +877,9 @@ def main(
 
     app = OpenHandsApp(
         exit_confirmation=not exit_without_confirmation,
-        resume_conversation_id=uuid.UUID(resume_conversation_id)
-        if resume_conversation_id
-        else None,
+        resume_conversation_id=(
+            uuid.UUID(resume_conversation_id) if resume_conversation_id else None
+        ),
         queued_inputs=queued_inputs,
         initial_confirmation_policy=initial_confirmation_policy,
         headless_mode=headless,

@@ -39,12 +39,15 @@ def get_openhands_banner() -> str:
     return "\n".join(padded_lines)
 
 
-def get_splash_content(conversation_id: str, *, theme: Theme) -> dict:
+def get_splash_content(
+    conversation_id: str, *, theme: Theme, agent_info: dict | None = None
+) -> dict:
     """Get structured splash screen content for native Textual widgets.
 
     Args:
         conversation_id: Optional conversation ID to display
         theme: Theme to use for colors
+        agent_info: Optional dict with skills_count and mcp_count
     """
     # Use theme colors
     primary_color = theme.primary
@@ -56,6 +59,10 @@ def get_splash_content(conversation_id: str, *, theme: Theme) -> dict:
 
     # Get version information
     version_info = check_for_updates()
+
+    # Get skills/MCP counts (with None check for type safety)
+    skills_count = agent_info.get("skills_count", 0) if agent_info else 0
+    mcp_count = agent_info.get("mcp_count", 0) if agent_info else 0
 
     # Create structured content as dictionary
     content = {
@@ -74,6 +81,10 @@ def get_splash_content(conversation_id: str, *, theme: Theme) -> dict:
             ),
         ],
         "update_notice": None,
+        "skills_mcp_info": (
+            f"[{primary_color}]✨ Loaded: {skills_count} skill(s), "
+            f"{mcp_count} MCP server(s)[/]"
+        ),
     }
 
     # Add update notification if needed
