@@ -19,24 +19,61 @@ def create_critic_collapsible(critic_result: CriticResult) -> Collapsible:
         A Collapsible widget showing critic score summary (collapsed)
         and full breakdown (expanded), organized by taxonomy categories
     """
-    # Extract sentiment from message if available
-    sentiment_str = _extract_predicted_sentiment(critic_result.message)
-
-    # Build title with score and predicted sentiment
-    title = f"Critic Score: {critic_result.score:.4f}"
-    if sentiment_str:
-        title += f" | Predicted Sentiment: {sentiment_str}"
+    # Build title with colored score and predicted sentiment
+    title_text = _build_critic_title(critic_result)
 
     # Build content with category grouping
     content_text = _build_critic_content(critic_result)
 
     # Create collapsible (start expanded by default)
-    return Collapsible(
+    collapsible = Collapsible(
         content_text,
-        title=title,
+        title=title_text,
         collapsed=False,
         border_color="#888888",  # Default gray border
     )
+
+    # Reduce padding for more compact display
+    collapsible.styles.padding = (0, 0, 0, 1)  # top, right, bottom, left
+
+    return collapsible
+
+
+def _build_critic_title(critic_result: CriticResult) -> Text:
+    """Build a colored Rich Text title for the critic collapsible.
+
+    Args:
+        critic_result: The critic result to visualize
+
+    Returns:
+        Rich Text object with colored score and sentiment
+    """
+    title = Text()
+
+    # Add "Critic Score:" label
+    title.append("Critic Score: ", style="bold")
+
+    # Add colored score
+    score_style = "green bold" if critic_result.success else "yellow bold"
+    title.append(f"{critic_result.score:.4f}", style=score_style)
+
+    # Add predicted sentiment if available
+    sentiment_str = _extract_predicted_sentiment(critic_result.message)
+    if sentiment_str:
+        title.append(" | ", style="dim")
+        title.append("Predicted Sentiment: ", style="bold")
+
+        # Color sentiment based on type
+        if "Positive" in sentiment_str:
+            sentiment_style = "green"
+        elif "Negative" in sentiment_str:
+            sentiment_style = "red"
+        else:  # Neutral
+            sentiment_style = "yellow"
+
+        title.append(sentiment_str, style=sentiment_style)
+
+    return title
 
 
 def _extract_predicted_sentiment(message: str | None) -> str | None:
@@ -89,11 +126,6 @@ def _build_critic_content(critic_result: CriticResult) -> Text:
         Rich Text object with formatted critic breakdown
     """
     content_text = Text()
-
-    # Main score line
-    score_style = "green" if critic_result.success else "yellow"
-    content_text.append("Score: ", style="bold")
-    content_text.append(f"{critic_result.score:.4f}\n\n", style=score_style)
 
     # Parse and display detailed probabilities if available
     if critic_result.message:
