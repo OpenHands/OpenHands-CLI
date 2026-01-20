@@ -29,11 +29,14 @@ def create_critic_collapsible(critic_result: CriticResult) -> Collapsible:
     # Build content with filtered categories (no follow-up, no other)
     content_text = _build_critic_content(critic_result)
 
-    # Create collapsible (start expanded by default)
+    # Check if there's any content to display
+    has_content = len(content_text.plain.strip()) > 0
+
+    # Create collapsible - only expand if there's content to show
     collapsible = Collapsible(
         content_text,
         title=title_text,
-        collapsed=False,
+        collapsed=not has_content,  # Collapse if no content
         border_color="#888888",  # Default gray border
     )
 
