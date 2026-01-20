@@ -1,6 +1,7 @@
 """Utility functions for LLM configuration in OpenHands CLI."""
 
 import json
+import logging
 import os
 import platform
 import re
@@ -15,6 +16,9 @@ from openhands.sdk import LLM, ImageContent, TextContent
 from openhands.sdk.event import SystemPromptEvent
 from openhands.sdk.event.base import Event
 from openhands.tools.preset import get_default_agent
+
+
+logger = logging.getLogger(__name__)
 
 
 def abbreviate_number(n: int | float) -> str:
@@ -94,11 +98,28 @@ def should_set_litellm_extra_body(model_name: str, base_url: str | None = None) 
         True if litellm_extra_body should be set, False otherwise
     """
     if "openhands/" in model_name:
+        logger.debug(
+            "should_set_litellm_extra_body=True (model has 'openhands/' prefix): "
+            "model=%s, base_url=%s",
+            model_name,
+            base_url,
+        )
         return True
 
     if base_url and _LLM_PROXY_PATTERN.match(base_url):
+        logger.debug(
+            "should_set_litellm_extra_body=True (base_url matches llm-proxy pattern): "
+            "model=%s, base_url=%s",
+            model_name,
+            base_url,
+        )
         return True
 
+    logger.debug(
+        "should_set_litellm_extra_body=False: model=%s, base_url=%s",
+        model_name,
+        base_url,
+    )
     return False
 
 
@@ -152,6 +173,11 @@ def get_llm_metadata(
         metadata["session_id"] = session_id
     if user_id is not None:
         metadata["trace_user_id"] = user_id
+
+    logger.debug(
+        "Generated LLM metadata for litellm_extra_body: %s",
+        json.dumps(metadata, indent=2),
+    )
     return metadata
 
 
