@@ -1,12 +1,10 @@
 """Critic visualization utilities for TUI."""
 
-import json
-import math
+from typing import Any
 
 from rich.text import Text
 
 from openhands.sdk.critic.result import CriticResult
-from openhands_cli.tui.utils.critic.taxonomy import FEATURE_CATEGORIES
 from openhands_cli.tui.widgets.collapsible import Collapsible
 
 
@@ -58,73 +56,44 @@ def _build_critic_title(critic_result: CriticResult) -> Text:
     score_style = "green bold" if critic_result.success else "yellow bold"
     title.append(f"{critic_result.score:.4f}", style=score_style)
 
-    # Add predicted sentiment if available
-    sentiment_str = _extract_predicted_sentiment(critic_result.message)
-    if sentiment_str:
+    # Add predicted sentiment if available from metadata
+    sentiment = _get_sentiment_from_metadata(critic_result)
+    if sentiment:
         title.append(" | ", style="dim")
         title.append("Predicted User Sentiment: ", style="bold")
 
         # Color sentiment based on type
-        if "Positive" in sentiment_str:
+        predicted = sentiment.get("predicted", "")
+        if predicted == "Positive":
             sentiment_style = "green"
-        elif "Negative" in sentiment_str:
+        elif predicted == "Negative":
             sentiment_style = "red"
         else:  # Neutral
             sentiment_style = "yellow"
 
-        title.append(sentiment_str, style=sentiment_style)
+        prob = sentiment.get("probability", 0.0)
+        title.append(f"{predicted} ({prob:.2f})", style=sentiment_style)
 
     return title
 
 
-def _extract_predicted_sentiment(message: str | None) -> str | None:
-    """Extract the predicted sentiment with highest probability from critic message.
+def _get_sentiment_from_metadata(critic_result: CriticResult) -> dict[str, Any] | None:
+    """Extract sentiment from critic result metadata.
 
     Args:
-        message: Critic result message containing JSON probabilities
+        critic_result: The critic result
 
     Returns:
-        Formatted sentiment string like "Neutral (0.77)" or None if not found
+        Sentiment dict with 'predicted' and 'probability' keys, or None
     """
-    if not message:
+    if not critic_result.metadata:
         return None
 
-    try:
-        start_idx = message.find("{")
-        if start_idx == -1:
-            return None
-
-        probs_dict = json.loads(message[start_idx:])
-        if not isinstance(probs_dict, dict):
-            return None
-
-        # Extract sentiment probabilities
-        raw_probs = {
-            "Positive": probs_dict.get("sentiment_positive", 0.0),
-            "Negative": probs_dict.get("sentiment_negative", 0.0),
-            "Neutral": probs_dict.get("sentiment_neutral", 0.0),
-        }
-
-        # Check if we have any probabilities
-        if not any(raw_probs.values()):
-            return None
-
-        # Apply softmax normalization
-        probs_list = list(raw_probs.values())
-        exp_probs = [math.exp(p) for p in probs_list]
-        exp_sum = sum(exp_probs)
-        normalized_probs = [exp_p / exp_sum for exp_p in exp_probs]
-
-        # Map normalized probabilities back to sentiment names
-        sentiments = dict(zip(raw_probs.keys(), normalized_probs))
-
-        # Find highest probability sentiment
-        max_sentiment = max(sentiments.items(), key=lambda x: x[1])
-        sentiment_name, prob = max_sentiment
-
-        return f"{sentiment_name} ({prob:.2f})"
-    except (json.JSONDecodeError, ValueError, KeyError):
+    categorized = critic_result.metadata.get("categorized_features")
+    if not categorized:
         return None
+
+    return categorized.get("sentiment")
 
 
 def _build_critic_content(critic_result: CriticResult) -> Text:
@@ -138,61 +107,31 @@ def _build_critic_content(critic_result: CriticResult) -> Text:
     """
     content_text = Text()
 
-    # Parse and display detailed probabilities if available
+    # Use pre-categorized features from metadata if available
+    if critic_result.metadata:
+        categorized = critic_result.metadata.get("categorized_features")
+        if categorized:
+            _append_categorized_features_from_metadata(content_text, categorized)
+            return content_text
+
+    # Fallback: display message as-is if no categorized features
     if critic_result.message:
-        try:
-            start_idx = critic_result.message.find("{")
-            probs_dict = json.loads(critic_result.message[start_idx:])
-            if isinstance(probs_dict, dict):
-                _append_categorized_features(content_text, probs_dict)
-            else:
-                # If not a dict, display message as-is
-                content_text.append(f"\n{critic_result.message}\n")
-        except (json.JSONDecodeError, ValueError):
-            # If parsing fails, display message as-is
-            if critic_result.message:
-                content_text.append(f"\n{critic_result.message}\n")
+        content_text.append(f"\n{critic_result.message}\n")
 
     return content_text
 
 
-def _append_categorized_features(content_text: Text, probs_dict: dict) -> None:
-    """Append features grouped by taxonomy categories.
+def _append_categorized_features_from_metadata(
+    content_text: Text, categorized: dict[str, Any]
+) -> None:
+    """Append features from pre-categorized metadata.
 
     Args:
         content_text: Rich Text object to append to
-        probs_dict: Dictionary of feature probabilities
+        categorized: Pre-categorized features from SDK metadata
     """
-    # Group features by taxonomy categories
-    agent_issues = {}
-    user_patterns = {}
-    infra_issues = {}
-    unknown_features = {}
-
-    for feature_name, prob in probs_dict.items():
-        # Skip 'success' as it's redundant with the score
-        if feature_name == "success":
-            continue
-
-        # Skip sentiment features as they're shown in the title
-        if feature_name.startswith("sentiment_"):
-            continue
-
-        # Skip general context features (only user_goal_summary would appear here)
-        # Sentiment is already in title, no need for this category
-        category = FEATURE_CATEGORIES.get(feature_name)
-        if category == "general_context":
-            continue
-        elif category == "agent_behavioral_issues":
-            agent_issues[feature_name] = prob
-        elif category == "user_followup_patterns":
-            user_patterns[feature_name] = prob
-        elif category == "infrastructure_issues":
-            infra_issues[feature_name] = prob
-        else:
-            unknown_features[feature_name] = prob
-
     # Display each category if it has features
+    agent_issues = categorized.get("agent_behavioral_issues", [])
     if agent_issues:
         _append_category_section(
             content_text,
@@ -202,6 +141,7 @@ def _append_categorized_features(content_text: Text, probs_dict: dict) -> None:
             "agent",
         )
 
+    user_patterns = categorized.get("user_followup_patterns", [])
     if user_patterns:
         _append_category_section(
             content_text,
@@ -211,6 +151,7 @@ def _append_categorized_features(content_text: Text, probs_dict: dict) -> None:
             "user",
         )
 
+    infra_issues = categorized.get("infrastructure_issues", [])
     if infra_issues:
         _append_category_section(
             content_text,
@@ -220,16 +161,17 @@ def _append_categorized_features(content_text: Text, probs_dict: dict) -> None:
             "infra",
         )
 
-    if unknown_features:
+    other = categorized.get("other", [])
+    if other:
         _append_category_section(
-            content_text, "Other Metrics", unknown_features, "bold dim", "unknown"
+            content_text, "Other Metrics", other, "bold dim", "unknown"
         )
 
 
 def _append_category_section(
     content_text: Text,
     title: str,
-    features: dict,
+    features: list[dict[str, Any]],
     title_style: str,
     category: str,
 ) -> None:
@@ -238,31 +180,29 @@ def _append_category_section(
     Args:
         content_text: Rich Text object to append to
         title: Section title
-        features: Dictionary of feature probabilities
+        features: List of feature dicts with 'display_name' and 'probability'
         title_style: Rich style for the title
         category: Category type for color coding
     """
     content_text.append(f"{title}:\n", style=title_style)
-    sorted_features = sorted(features.items(), key=lambda x: x[1], reverse=True)
-    for feature, prob in sorted_features:
-        _append_feature_with_prob(content_text, feature, prob, category)
+    for feature in features:
+        display_name = feature.get("display_name", feature.get("name", "Unknown"))
+        prob = feature.get("probability", 0.0)
+        _append_feature_with_prob(content_text, display_name, prob, category)
     content_text.append("\n")
 
 
 def _append_feature_with_prob(
-    content_text: Text, feature_name: str, prob: float, category: str
+    content_text: Text, display_name: str, prob: float, category: str
 ) -> None:
     """Append a feature with its probability to the content text.
 
     Args:
         content_text: Rich Text object to append to
-        feature_name: Name of the feature
+        display_name: Display name of the feature
         prob: Probability value
         category: Category type for color coding
     """
-    # Format feature name: replace underscores with spaces, capitalize
-    display_name = feature_name.replace("_", " ").title()
-
     # Determine color based on probability and category
     if category in ("agent", "user", "infra"):
         # Issue/prediction indicators (higher probability = more likely)

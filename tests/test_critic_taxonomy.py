@@ -1,6 +1,10 @@
-"""Tests for critic taxonomy."""
+"""Tests for critic visualization using SDK taxonomy."""
 
-from openhands_cli.tui.utils.critic import FEATURE_CATEGORIES, get_category
+from openhands.sdk.critic import (
+    FEATURE_CATEGORIES,
+    categorize_features,
+    get_category,
+)
 
 
 def test_feature_categories_count():
@@ -50,3 +54,46 @@ def test_category_counts():
     assert len(agent) == 13
     assert len(user) == 9
     assert len(infra) == 2
+
+
+def test_categorize_features():
+    """Test the categorize_features function from SDK."""
+    probs_dict = {
+        "success": 0.85,
+        "sentiment_positive": 0.1,
+        "sentiment_neutral": 0.77,
+        "sentiment_negative": 0.13,
+        "loop_behavior": 0.65,
+        "incomplete_implementation": 0.45,
+        "clarification_or_restatement": 0.30,
+        "infrastructure_external_issue": 0.15,
+        "unknown_feature": 0.50,
+    }
+
+    result = categorize_features(probs_dict)
+
+    # Check sentiment extraction
+    assert result["sentiment"] is not None
+    assert result["sentiment"]["predicted"] == "Neutral"
+    assert result["sentiment"]["probability"] == 0.77
+
+    # Check agent behavioral issues
+    agent_issues = result["agent_behavioral_issues"]
+    assert len(agent_issues) == 2
+    assert agent_issues[0]["name"] == "loop_behavior"
+    assert agent_issues[0]["probability"] == 0.65
+
+    # Check user follow-up patterns
+    user_patterns = result["user_followup_patterns"]
+    assert len(user_patterns) == 1
+    assert user_patterns[0]["name"] == "clarification_or_restatement"
+
+    # Check infrastructure issues
+    infra_issues = result["infrastructure_issues"]
+    assert len(infra_issues) == 1
+    assert infra_issues[0]["name"] == "infrastructure_external_issue"
+
+    # Check other/unknown features
+    other = result["other"]
+    assert len(other) == 1
+    assert other[0]["name"] == "unknown_feature"
