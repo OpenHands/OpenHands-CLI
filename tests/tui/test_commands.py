@@ -641,40 +641,6 @@ class TestOpenHandsAppCommands:
                 assert panels.first().display is False or initial_visible
 
     @pytest.mark.asyncio
-    async def test_ctrl_h_toggles_history_panel(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """Ctrl+H keybinding should toggle the history side panel."""
-        monkeypatch.setattr(
-            SettingsScreen,
-            "is_initial_setup_required",
-            lambda: False,
-        )
-
-        app = OpenHandsApp(exit_confirmation=False)
-
-        async with app.run_test() as pilot:
-            oh_app = cast(OpenHandsApp, pilot.app)
-
-            panels = oh_app.query(HistorySidePanel)
-            assert len(panels) == 0 or panels.first().display is False
-
-            await pilot.press("ctrl+h")
-            await pilot.pause()
-
-            panels = oh_app.query(HistorySidePanel)
-            assert len(panels) > 0
-            assert panels.first().display is True
-
-            await pilot.press("ctrl+h")
-            await pilot.pause()
-
-            panels = oh_app.query(HistorySidePanel)
-            if len(panels) > 0:
-                assert panels.first().display is False
-
-    @pytest.mark.asyncio
     async def test_new_command_updates_history_panel(
         self,
         monkeypatch: pytest.MonkeyPatch,

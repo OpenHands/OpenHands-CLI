@@ -75,7 +75,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     BINDINGS: ClassVar = [
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+o", "toggle_cells", "Toggle Cells"),
-        ("ctrl+h", "toggle_history", "Toggle history panel"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
@@ -196,6 +195,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
         yield from super().get_system_commands(screen)
+        yield SystemCommand(
+            "History",
+            "Toggle conversation history panel",
+            self.action_toggle_history,
+        )
         yield SystemCommand(
             "MCP", "View MCP configurations", lambda: MCPSidePanel.toggle(self)
         )
@@ -725,7 +729,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.action_toggle_history()
 
     def action_toggle_history(self) -> None:
-        """Toggle the history side panel (Ctrl+H binding)."""
+        """Toggle the history side panel."""
         HistorySidePanel.toggle(
             self,
             current_conversation_id=self.conversation_id,
