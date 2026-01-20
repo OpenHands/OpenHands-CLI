@@ -120,6 +120,28 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def reload_configuration(self) -> None:
         self._cli_settings = CliSettings.load()
 
+    def create_sub_visualizer(
+        self,
+        agent_id: str,  # noqa: ARG002
+    ) -> "ConversationVisualizer":
+        """Create a visualizer for a sub-agent during delegation.
+
+        Creates a new ConversationVisualizer instance for the sub-agent that
+        shares the same container and app, allowing delegate events to be
+        rendered in the same TUI.
+
+        Args:
+            agent_id: The identifier of the sub-agent being spawned
+
+        Returns:
+            A new ConversationVisualizer configured for the sub-agent
+        """
+        return ConversationVisualizer(
+            container=self._container,
+            app=self._app,
+            skip_user_messages=self._skip_user_messages,
+        )
+
     def _run_on_main_thread(self, func, *args) -> None:
         """Run a function on the main thread via call_from_thread if needed."""
         if threading.get_ident() == self._main_thread_id:
