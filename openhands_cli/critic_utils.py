@@ -19,8 +19,13 @@ def create_critic_collapsible(critic_result: CriticResult) -> Collapsible:
         A Collapsible widget showing critic score summary (collapsed)
         and full breakdown (expanded), organized by taxonomy categories
     """
-    # Build title
+    # Extract sentiment from message if available
+    sentiment_str = _extract_predicted_sentiment(critic_result.message)
+
+    # Build title with score and predicted sentiment
     title = f"Critic Score: {critic_result.score:.4f}"
+    if sentiment_str:
+        title += f" | Predicted Sentiment: {sentiment_str}"
 
     # Build content with category grouping
     content_text = _build_critic_content(critic_result)
@@ -32,6 +37,46 @@ def create_critic_collapsible(critic_result: CriticResult) -> Collapsible:
         collapsed=True,
         border_color="#888888",  # Default gray border
     )
+
+
+def _extract_predicted_sentiment(message: str | None) -> str | None:
+    """Extract the predicted sentiment with highest probability from critic message.
+
+    Args:
+        message: Critic result message containing JSON probabilities
+
+    Returns:
+        Formatted sentiment string like "Neutral (0.77)" or None if not found
+    """
+    if not message:
+        return None
+
+    try:
+        start_idx = message.find("{")
+        if start_idx == -1:
+            return None
+
+        probs_dict = json.loads(message[start_idx:])
+        if not isinstance(probs_dict, dict):
+            return None
+
+        # Extract sentiment probabilities
+        sentiments = {
+            "Positive": probs_dict.get("sentiment_positive", 0.0),
+            "Negative": probs_dict.get("sentiment_negative", 0.0),
+            "Neutral": probs_dict.get("sentiment_neutral", 0.0),
+        }
+
+        # Find highest probability sentiment
+        if not any(sentiments.values()):
+            return None
+
+        max_sentiment = max(sentiments.items(), key=lambda x: x[1])
+        sentiment_name, prob = max_sentiment
+
+        return f"{sentiment_name} ({prob:.2f})"
+    except (json.JSONDecodeError, ValueError, KeyError):
+        return None
 
 
 def _build_critic_content(critic_result: CriticResult) -> Text:
@@ -48,9 +93,7 @@ def _build_critic_content(critic_result: CriticResult) -> Text:
     # Main score line
     score_style = "green" if critic_result.success else "yellow"
     content_text.append("Score: ", style="bold")
-    content_text.append(f"{critic_result.score:.4f}", style=score_style)
-    status = "success" if critic_result.success else "needs improvement"
-    content_text.append(f" ({status})\n\n")
+    content_text.append(f"{critic_result.score:.4f}\n\n", style=score_style)
 
     # Parse and display detailed probabilities if available
     if critic_result.message:
@@ -85,8 +128,12 @@ def _append_categorized_features(content_text: Text, probs_dict: dict) -> None:
     unknown_features = {}
 
     for feature_name, prob in probs_dict.items():
+        # Skip 'success' as it's redundant with the score
         if feature_name == "success":
-            # Skip 'success' as it's redundant with the score
+            continue
+
+        # Skip sentiment features as they're shown in the title
+        if feature_name.startswith("sentiment_"):
             continue
 
         # Categorize based on taxonomy
@@ -176,8 +223,7 @@ def _append_feature_with_prob(
         category: Category type for color coding
     """
     # Format feature name: replace underscores with spaces, capitalize
-    display_name = feature_name.replace("_", " ").replace("sentiment ", "")
-    display_name = display_name.title()
+    display_name = feature_name.replace("_", " ").title()
 
     # Determine color based on probability and category
     if category == "general":
