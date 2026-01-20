@@ -4,10 +4,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from textual.app import App, ComposeResult
+from textual.widgets import Button, Static
 
 from openhands.sdk.critic.result import CriticResult
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
+from openhands_cli.tui.utils.critic.feedback import (
+    CriticFeedbackWidget,
+    send_critic_inference_event,
+)
 
 
 class CriticFeedbackTestApp(App):
@@ -25,7 +29,7 @@ class CriticFeedbackTestApp(App):
 
 @pytest.mark.asyncio
 async def test_critic_feedback_initial_render() -> None:
-    """Test that the feedback widget renders with the correct message."""
+    """Test that the feedback widget renders with buttons."""
     critic_result = CriticResult(score=0.85, message="Test message")
 
     widget = CriticFeedbackWidget(
@@ -35,14 +39,14 @@ async def test_critic_feedback_initial_render() -> None:
     app = CriticFeedbackTestApp(widget)
 
     async with app.run_test() as _pilot:
-        rendered_text = str(widget.content)
-        assert "Does the critic's prediction align" in rendered_text
-        # Check for bold-formatted option numbers
-        assert "[bold][0][/bold] Dismiss" in rendered_text
-        assert "[bold][1][/bold] Accurate" in rendered_text
-        assert "[bold][2][/bold] Too high" in rendered_text
-        assert "[bold][3][/bold] Too low" in rendered_text
-        assert "[bold][4][/bold] N/A" in rendered_text
+        # Check that all buttons are present
+        buttons = widget.query(Button)
+        button_ids = [btn.id for btn in buttons]
+        assert "btn-accurate" in button_ids
+        assert "btn-too_high" in button_ids
+        assert "btn-too_low" in button_ids
+        assert "btn-not_applicable" in button_ids
+        assert "btn-dismiss" in button_ids
 
 
 @pytest.mark.asyncio
@@ -222,3 +226,116 @@ async def test_critic_feedback_without_event_ids(
         call_args = mock_posthog.capture.call_args
         assert "event_ids" not in call_args.kwargs["properties"]
         assert call_args.kwargs["properties"]["conversation_id"] == "test-conv-id"
+
+
+@pytest.mark.asyncio
+@patch("openhands_cli.tui.utils.critic.feedback.Posthog")
+async def test_critic_feedback_includes_agent_model(
+    mock_posthog_class: MagicMock,
+) -> None:
+    """Test that agent_model is included in PostHog request when provided."""
+    mock_posthog = MagicMock()
+    mock_posthog_class.return_value = mock_posthog
+
+    critic_result = CriticResult(score=0.85, message="Test message")
+
+    widget = CriticFeedbackWidget(
+        critic_result=critic_result,
+        conversation_id="test-conv-id",
+        agent_model="claude-sonnet-4-5-20250929",
+    )
+
+    app = CriticFeedbackTestApp(widget)
+
+    async with app.run_test() as pilot:
+        widget.focus()
+        await pilot.pause()
+
+        await pilot.press("1")
+        await pilot.pause(0.1)
+
+        # Verify agent_model is included in properties
+        call_args = mock_posthog.capture.call_args
+        assert (
+            call_args.kwargs["properties"]["agent_model"]
+            == "claude-sonnet-4-5-20250929"
+        )
+
+
+@pytest.mark.asyncio
+@patch("openhands_cli.tui.utils.critic.feedback.Posthog")
+async def test_critic_feedback_button_click(mock_posthog_class: MagicMock) -> None:
+    """Test that clicking a button submits feedback."""
+    mock_posthog = MagicMock()
+    mock_posthog_class.return_value = mock_posthog
+
+    critic_result = CriticResult(score=0.85, message="Test message")
+
+    widget = CriticFeedbackWidget(
+        critic_result=critic_result, conversation_id="test-conv-id"
+    )
+
+    app = CriticFeedbackTestApp(widget)
+
+    async with app.run_test() as pilot:
+        # Click the "accurate" button
+        await pilot.click("#btn-accurate")
+        await pilot.pause(0.1)
+
+        # Verify PostHog capture was called
+        mock_posthog.capture.assert_called_once()
+        call_args = mock_posthog.capture.call_args
+        assert call_args.kwargs["properties"]["feedback_type"] == "accurate"
+
+
+@patch("openhands_cli.tui.utils.critic.feedback.Posthog")
+def test_send_critic_inference_event(mock_posthog_class: MagicMock) -> None:
+    """Test that send_critic_inference_event sends the correct event."""
+    mock_posthog = MagicMock()
+    mock_posthog_class.return_value = mock_posthog
+
+    critic_result = CriticResult(
+        score=0.85,
+        message="Test message",
+        metadata={"event_ids": ["event1", "event2"]},
+    )
+
+    send_critic_inference_event(
+        critic_result=critic_result,
+        conversation_id="test-conv-id",
+        agent_model="claude-sonnet-4-5-20250929",
+    )
+
+    # Verify PostHog capture was called with correct event
+    mock_posthog.capture.assert_called_once()
+    call_args = mock_posthog.capture.call_args
+    assert call_args.kwargs["distinct_id"] == "test-conv-id"
+    assert call_args.kwargs["event"] == "critic_inference"
+    assert call_args.kwargs["properties"]["critic_score"] == 0.85
+    assert call_args.kwargs["properties"]["critic_success"] is True
+    assert call_args.kwargs["properties"]["conversation_id"] == "test-conv-id"
+    assert call_args.kwargs["properties"]["agent_model"] == "claude-sonnet-4-5-20250929"
+    assert call_args.kwargs["properties"]["event_ids"] == ["event1", "event2"]
+
+    # Verify flush was called
+    mock_posthog.flush.assert_called_once()
+
+
+@patch("openhands_cli.tui.utils.critic.feedback.Posthog")
+def test_send_critic_inference_event_without_agent_model(
+    mock_posthog_class: MagicMock,
+) -> None:
+    """Test that send_critic_inference_event works without agent_model."""
+    mock_posthog = MagicMock()
+    mock_posthog_class.return_value = mock_posthog
+
+    critic_result = CriticResult(score=0.75, message="Test")
+
+    send_critic_inference_event(
+        critic_result=critic_result,
+        conversation_id="test-conv-id",
+    )
+
+    # Verify agent_model is NOT in properties when not provided
+    call_args = mock_posthog.capture.call_args
+    assert "agent_model" not in call_args.kwargs["properties"]

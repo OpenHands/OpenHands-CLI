@@ -144,6 +144,23 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Open the plan panel
         plan_panel.toggle()
 
+    def _get_agent_model(self) -> str | None:
+        """Get the agent's model name from the conversation runner.
+
+        Returns:
+            The agent model name or None if not available.
+        """
+        try:
+            if (
+                self._app.conversation_runner
+                and self._app.conversation_runner.conversation
+                and self._app.conversation_runner.conversation.agent
+            ):
+                return self._app.conversation_runner.conversation.agent.llm.model
+        except Exception:
+            pass
+        return None
+
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
         # Check for TaskTrackerObservation to update/open the plan panel
@@ -166,9 +183,23 @@ class ConversationVisualizer(ConversationVisualizerBase):
             # Add critic collapsible if present (for MessageEvent and ActionEvent)
             critic_result = getattr(event, "critic_result", None)
             if critic_result is not None:
-                from openhands_cli.tui.utils.critic import create_critic_collapsible
+                from openhands_cli.tui.utils.critic import (
+                    create_critic_collapsible,
+                    send_critic_inference_event,
+                )
                 from openhands_cli.tui.utils.critic.feedback import (
                     CriticFeedbackWidget,
+                )
+
+                # Get agent model for tracking
+                agent_model = self._get_agent_model()
+                conversation_id = str(self._app.conversation_id)
+
+                # Send critic inference event to PostHog
+                send_critic_inference_event(
+                    critic_result=critic_result,
+                    conversation_id=conversation_id,
+                    agent_model=agent_model,
                 )
 
                 critic_widget = create_critic_collapsible(critic_result)
@@ -177,7 +208,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 # Add feedback widget after critic collapsible
                 feedback_widget = CriticFeedbackWidget(
                     critic_result=critic_result,
-                    conversation_id=str(self._app.conversation_id),
+                    conversation_id=conversation_id,
+                    agent_model=agent_model,
                 )
                 self._run_on_main_thread(self._add_widget_to_ui, feedback_widget)
 

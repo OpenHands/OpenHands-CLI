@@ -6,12 +6,64 @@ import uuid
 from typing import TYPE_CHECKING, ClassVar
 
 from posthog import Posthog
-from textual import events
-from textual.widgets import Static
+from textual import events, on
+from textual.containers import Horizontal
+from textual.widgets import Button, Static
 
 
 if TYPE_CHECKING:
     from openhands.sdk.critic.result import CriticResult
+
+
+# PostHog configuration
+POSTHOG_API_KEY = "phc_QkAtbXVsh3Ja0Pw4IK696cxYEmr20Bx1kbnI7QtOCqg"
+POSTHOG_HOST = "https://us.i.posthog.com"
+
+
+def send_critic_inference_event(
+    critic_result: "CriticResult",
+    conversation_id: str,
+    agent_model: str | None = None,
+) -> None:
+    """Send a PostHog event when critic inference produces output.
+
+    This is called when the critic result is displayed to the user,
+    before they provide any feedback.
+
+    Args:
+        critic_result: The critic result from inference
+        conversation_id: The conversation ID for tracking
+        agent_model: The agent's model name (e.g., "claude-sonnet-4-5-20250929")
+    """
+    try:
+        posthog = Posthog(
+            project_api_key=POSTHOG_API_KEY,
+            host=POSTHOG_HOST,
+        )
+
+        properties = {
+            "critic_score": critic_result.score,
+            "critic_success": critic_result.success,
+            "conversation_id": conversation_id,
+        }
+
+        # Add agent model if available
+        if agent_model:
+            properties["agent_model"] = agent_model
+
+        # Add event_ids from metadata if available for reproducibility
+        if critic_result.metadata and "event_ids" in critic_result.metadata:
+            properties["event_ids"] = critic_result.metadata["event_ids"]
+
+        posthog.capture(
+            distinct_id=conversation_id,
+            event="critic_inference",
+            properties=properties,
+        )
+        posthog.flush()
+    except Exception:
+        # Silently fail if PostHog submission fails
+        pass
 
 
 class CriticFeedbackWidget(Static, can_focus=True):
@@ -34,6 +86,21 @@ class CriticFeedbackWidget(Static, can_focus=True):
     CriticFeedbackWidget:focus {
         border: solid $accent;
     }
+
+    CriticFeedbackWidget Horizontal {
+        height: auto;
+        width: 100%;
+        margin-top: 1;
+    }
+
+    CriticFeedbackWidget Button {
+        min-width: 12;
+        margin-right: 1;
+    }
+
+    CriticFeedbackWidget Button.dismiss {
+        background: $surface-darken-1;
+    }
     """
 
     FEEDBACK_OPTIONS: ClassVar[dict[str, str]] = {
@@ -44,10 +111,19 @@ class CriticFeedbackWidget(Static, can_focus=True):
         "4": "not_applicable",
     }
 
+    BUTTON_LABELS: ClassVar[dict[str, str]] = {
+        "accurate": "[1] Accurate",
+        "too_high": "[2] Too high",
+        "too_low": "[3] Too low",
+        "not_applicable": "[4] N/A",
+        "dismiss": "[0] Dismiss",
+    }
+
     def __init__(
         self,
         critic_result: CriticResult,
         conversation_id: str | None = None,
+        agent_model: str | None = None,
         **kwargs,
     ) -> None:
         """Initialize the critic feedback widget.
@@ -55,33 +131,64 @@ class CriticFeedbackWidget(Static, can_focus=True):
         Args:
             critic_result: The critic result this feedback is for
             conversation_id: Optional conversation ID for tracking
+            agent_model: Optional agent model name for tracking
             **kwargs: Additional arguments for Static widget
         """
         super().__init__(**kwargs)
         self.critic_result = critic_result
         self.conversation_id = conversation_id or str(uuid.uuid4())
+        self.agent_model = agent_model
         self._feedback_submitted = False
 
         # Initialize PostHog client
         self._posthog = Posthog(
-            project_api_key="phc_QkAtbXVsh3Ja0Pw4IK696cxYEmr20Bx1kbnI7QtOCqg",
-            host="https://us.i.posthog.com",
+            project_api_key=POSTHOG_API_KEY,
+            host=POSTHOG_HOST,
         )
 
-        # Set initial message
-        self.update(self._build_message())
+    def compose(self):
+        """Compose the widget with prompt and buttons."""
+        yield Static(
+            "[bold]Does the critic's prediction align with your perception?[/bold]",
+            id="feedback-prompt",
+        )
+        with Horizontal():
+            yield Button(self.BUTTON_LABELS["accurate"], id="btn-accurate")
+            yield Button(self.BUTTON_LABELS["too_high"], id="btn-too_high")
+            yield Button(self.BUTTON_LABELS["too_low"], id="btn-too_low")
+            yield Button(self.BUTTON_LABELS["not_applicable"], id="btn-not_applicable")
+            yield Button(
+                self.BUTTON_LABELS["dismiss"], id="btn-dismiss", classes="dismiss"
+            )
 
     def on_mount(self) -> None:
         """Auto-focus the widget when mounted so users can immediately press keys."""
         self.focus()
 
-    def _build_message(self) -> str:
-        """Build the feedback prompt message."""
-        return (
-            "[bold]Does the critic's prediction align with your perception?[/bold]\n"
-            "[bold][1][/bold] Accurate  [bold][2][/bold] Too high  "
-            "[bold][3][/bold] Too low  [bold][4][/bold] N/A  [bold][0][/bold] Dismiss"
-        )
+    @on(Button.Pressed, "#btn-accurate")
+    async def handle_accurate(self) -> None:
+        """Handle accurate button press."""
+        await self._submit_feedback("accurate")
+
+    @on(Button.Pressed, "#btn-too_high")
+    async def handle_too_high(self) -> None:
+        """Handle too high button press."""
+        await self._submit_feedback("too_high")
+
+    @on(Button.Pressed, "#btn-too_low")
+    async def handle_too_low(self) -> None:
+        """Handle too low button press."""
+        await self._submit_feedback("too_low")
+
+    @on(Button.Pressed, "#btn-not_applicable")
+    async def handle_not_applicable(self) -> None:
+        """Handle N/A button press."""
+        await self._submit_feedback("not_applicable")
+
+    @on(Button.Pressed, "#btn-dismiss")
+    async def handle_dismiss(self) -> None:
+        """Handle dismiss button press."""
+        await self._submit_feedback("dismiss")
 
     async def on_key(self, event: events.Key) -> None:
         """Handle key press events.
@@ -120,6 +227,10 @@ class CriticFeedbackWidget(Static, can_focus=True):
                     "conversation_id": self.conversation_id,
                 }
 
+                # Add agent model if available
+                if self.agent_model:
+                    properties["agent_model"] = self.agent_model
+
                 # Add event_ids from metadata if available for reproducibility
                 if (
                     self.critic_result.metadata
@@ -138,11 +249,18 @@ class CriticFeedbackWidget(Static, can_focus=True):
                 # Silently fail if PostHog submission fails
                 pass
 
-        # Update message to show feedback was recorded
+        # Update to show feedback was recorded or clear for dismiss
+        prompt = self.query_one("#feedback-prompt", Static)
+        buttons = self.query(Button)
+
         if feedback_type != "dismiss":
-            self.update("✓ Thank you for your feedback!")
+            prompt.update("✓ Thank you for your feedback!")
+            for btn in buttons:
+                btn.display = False
         else:
-            self.update("")
+            prompt.update("")
+            for btn in buttons:
+                btn.display = False
 
         # Remove the widget after a brief delay (or immediately for dismiss)
         if feedback_type == "dismiss":

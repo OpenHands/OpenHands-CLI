@@ -93,8 +93,8 @@ def get_splash_content(
             f"\n[{primary_color}]Experimental Critic Feature Enabled[/]\n"
             "[dim]We've detected you're using the OpenHands LLM provider. "
             "An experimental critic feature is now active (free) to predict task "
-            "success. We may collect your feedback "
-            "ratings for critic improvement. You can disable this in settings.[/dim]"
+            "success. We will collect usage metrics and your feedback "
+            "for critic improvement. You can disable this in settings.[/dim]"
         )
 
     return content
