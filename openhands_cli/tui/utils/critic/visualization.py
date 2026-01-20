@@ -54,7 +54,7 @@ def _build_critic_title(critic_result: CriticResult) -> Text:
 
     # Add colored score
     score_style = "green bold" if critic_result.success else "yellow bold"
-    title.append(f"{critic_result.score:.4f}", style=score_style)
+    title.append(f"{critic_result.score:.2f}", style=score_style)
     title.append(" (0-1, higher is better)", style="dim")
 
     # Add predicted sentiment if available from metadata
