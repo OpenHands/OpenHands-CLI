@@ -38,10 +38,10 @@ class CriticFeedbackWidget(Static, can_focus=True):
 
     FEEDBACK_OPTIONS: ClassVar[dict[str, str]] = {
         "0": "dismiss",
-        "1": "overestimation",
-        "2": "underestimation",
-        "3": "just about right",
-        "4": "doesn't make sense",
+        "1": "just_about_right",
+        "2": "overestimation",
+        "3": "underestimation",
+        "4": "not_applicable",
     }
 
     def __init__(
@@ -79,8 +79,11 @@ class CriticFeedbackWidget(Static, can_focus=True):
         """Build the feedback prompt message."""
         return (
             "Does the critic's prediction align with your perception?\n"
-            "[0] Dismiss  [1] Overestimation  [2] Underestimation  "
-            "[3] Just about right  [4] Doesn't make sense"
+            "[1] Just about right  "
+            "[2] Overestimation (agent performs better than predicted)  "
+            "[3] Underestimation (agent performs worse than predicted)  "
+            "[4] Not applicable  "
+            "[0] Dismiss"
         )
 
     async def on_key(self, event: events.Key) -> None:
