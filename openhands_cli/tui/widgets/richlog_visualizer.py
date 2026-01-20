@@ -167,9 +167,19 @@ class ConversationVisualizer(ConversationVisualizerBase):
             critic_result = getattr(event, "critic_result", None)
             if critic_result is not None:
                 from openhands_cli.tui.utils.critic import create_critic_collapsible
+                from openhands_cli.tui.utils.critic.feedback import (
+                    CriticFeedbackWidget,
+                )
 
                 critic_widget = create_critic_collapsible(critic_result)
                 self._run_on_main_thread(self._add_widget_to_ui, critic_widget)
+
+                # Add feedback widget after critic collapsible
+                feedback_widget = CriticFeedbackWidget(
+                    critic_result=critic_result,
+                    conversation_id=str(self._app.conversation_id),
+                )
+                self._run_on_main_thread(self._add_widget_to_ui, feedback_widget)
 
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""

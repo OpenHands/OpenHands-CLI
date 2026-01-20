@@ -166,6 +166,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 )
                 yield Static(id="splash_instructions", classes="splash-instruction")
                 yield Static(id="splash_update_notice", classes="splash-update-notice")
+                yield Static(id="splash_critic_notice", classes="splash-critic-notice")
 
             # Input area - docked to bottom
             with Container(id="input_area"):
@@ -329,10 +330,24 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if self.is_ui_initialized:
             return
 
+        # Check if agent has critic configured
+        has_critic = False
+        try:
+            from openhands_cli.stores import AgentStore
+
+            agent_store = AgentStore()
+            agent = agent_store.load()
+            if agent:
+                has_critic = agent.critic is not None
+        except Exception:
+            # If we can't load agent, just continue without critic notice
+            pass
+
         # Get structured splash content
         splash_content = get_splash_content(
             conversation_id=self.conversation_id.hex,
             theme=OPENHANDS_THEME,
+            has_critic=has_critic,
         )
 
         # Update individual splash widgets
@@ -357,6 +372,14 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             update_notice_widget.display = True
         else:
             update_notice_widget.display = False
+
+        # Update critic notice (hide if None)
+        critic_notice_widget = self.query_one("#splash_critic_notice", Static)
+        if splash_content["critic_notice"]:
+            critic_notice_widget.update(splash_content["critic_notice"])
+            critic_notice_widget.display = True
+        else:
+            critic_notice_widget.display = False
 
         # Process any queued inputs
         self._process_queued_inputs()

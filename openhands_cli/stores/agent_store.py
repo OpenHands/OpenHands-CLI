@@ -25,6 +25,7 @@ from openhands_cli.locations import (
     WORK_DIR,
 )
 from openhands_cli.mcp.mcp_utils import list_enabled_servers
+from openhands_cli.stores.cli_settings import CliSettings
 from openhands_cli.utils import (
     get_llm_metadata,
     get_os_description,
@@ -32,7 +33,7 @@ from openhands_cli.utils import (
 )
 
 
-def get_default_critic(llm: LLM) -> CriticBase | None:
+def get_default_critic(llm: LLM, *, enable_critic: bool = True) -> CriticBase | None:
     """Auto-configure critic for All-Hands LLM proxy.
 
     When the LLM base_url matches `llm-proxy.*.all-hands.dev`, returns an
@@ -41,8 +42,17 @@ def get_default_critic(llm: LLM) -> CriticBase | None:
     - api_key: same as LLM
     - model_name: "critic"
 
-    Returns None if base_url doesn't match or api_key is not set.
+    Returns None if base_url doesn't match, api_key is not set, or enable_critic
+    is False.
+
+    Args:
+        llm: The LLM configuration
+        enable_critic: Whether critic feature is enabled (from settings)
     """
+    # Check if critic is enabled in settings
+    if not enable_critic:
+        return None
+
     base_url = llm.base_url
     api_key = llm.api_key
     if base_url is None or api_key is None:
@@ -228,7 +238,10 @@ class AgentStore:
                 condenser = LLMSummarizingCondenser(llm=condenser_llm)
 
             # Auto-configure critic if applicable
-            critic = get_default_critic(updated_llm)
+            cli_settings = CliSettings.load()
+            critic = get_default_critic(
+                updated_llm, enable_critic=cli_settings.enable_critic
+            )
 
             # Update tools and context
             agent = agent.model_copy(
@@ -309,7 +322,8 @@ class AgentStore:
         self.save(agent)
 
         # Now add critic on-the-fly for the returned agent (not persisted)
-        critic = get_default_critic(llm)
+        cli_settings = CliSettings.load()
+        critic = get_default_critic(llm, enable_critic=cli_settings.enable_critic)
         if critic is not None:
             agent = agent.model_copy(update={"critic": critic})
 
