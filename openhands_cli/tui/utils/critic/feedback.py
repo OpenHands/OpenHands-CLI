@@ -28,7 +28,7 @@ class CriticFeedbackWidget(Static, can_focus=True):
         color: $text;
         border: solid $primary;
         padding: 1 2;
-        margin: 0 0 1 0;
+        margin: 1 0 1 0;
     }
 
     CriticFeedbackWidget:focus {
@@ -38,9 +38,9 @@ class CriticFeedbackWidget(Static, can_focus=True):
 
     FEEDBACK_OPTIONS: ClassVar[dict[str, str]] = {
         "0": "dismiss",
-        "1": "just_about_right",
-        "2": "overestimation",
-        "3": "underestimation",
+        "1": "accurate",
+        "2": "too_high",
+        "3": "too_low",
         "4": "not_applicable",
     }
 
@@ -79,11 +79,7 @@ class CriticFeedbackWidget(Static, can_focus=True):
         """Build the feedback prompt message."""
         return (
             "Does the critic's prediction align with your perception?\n"
-            "[1] Just about right  "
-            "[2] Overestimation (agent performs better than predicted)  "
-            "[3] Underestimation (agent performs worse than predicted)  "
-            "[4] Not applicable  "
-            "[0] Dismiss"
+            "[1] Accurate  [2] Too high  [3] Too low  [4] N/A  [0] Dismiss"
         )
 
     async def on_key(self, event: events.Key) -> None:

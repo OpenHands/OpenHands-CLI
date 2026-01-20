@@ -38,10 +38,10 @@ async def test_critic_feedback_initial_render() -> None:
         rendered_text = str(widget.content)
         assert "Does the critic's prediction align" in rendered_text
         assert "[0] Dismiss" in rendered_text
-        assert "[1] Just about right" in rendered_text
-        assert "[2] Overestimation" in rendered_text
-        assert "[3] Underestimation" in rendered_text
-        assert "[4] Not applicable" in rendered_text
+        assert "[1] Accurate" in rendered_text
+        assert "[2] Too high" in rendered_text
+        assert "[3] Too low" in rendered_text
+        assert "[4] N/A" in rendered_text
 
 
 @pytest.mark.asyncio
@@ -64,7 +64,7 @@ async def test_critic_feedback_submit_feedback(mock_posthog_class: MagicMock) ->
         widget.focus()
         await pilot.pause()
 
-        # Press key "1" for "just about right"
+        # Press key "1" for "accurate"
         await pilot.press("1")
         await pilot.pause(0.1)
 
@@ -73,7 +73,7 @@ async def test_critic_feedback_submit_feedback(mock_posthog_class: MagicMock) ->
         call_args = mock_posthog.capture.call_args
         assert call_args.kwargs["distinct_id"] == "test-conv-id"
         assert call_args.kwargs["event"] == "critic_feedback"
-        assert call_args.kwargs["properties"]["feedback_type"] == "just_about_right"
+        assert call_args.kwargs["properties"]["feedback_type"] == "accurate"
         assert call_args.kwargs["properties"]["critic_score"] == 0.85
         assert call_args.kwargs["properties"]["critic_success"] is True
 
@@ -119,9 +119,9 @@ async def test_critic_feedback_different_options(
 ) -> None:
     """Test that different feedback options are correctly recorded."""
     feedback_options = [
-        ("1", "just_about_right"),
-        ("2", "overestimation"),
-        ("3", "underestimation"),
+        ("1", "accurate"),
+        ("2", "too_high"),
+        ("3", "too_low"),
         ("4", "not_applicable"),
     ]
 
