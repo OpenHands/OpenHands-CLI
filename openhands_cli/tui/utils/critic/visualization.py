@@ -1,6 +1,7 @@
 """Critic visualization utilities for TUI."""
 
 import json
+import math
 
 from rich.text import Text
 
@@ -98,16 +99,26 @@ def _extract_predicted_sentiment(message: str | None) -> str | None:
             return None
 
         # Extract sentiment probabilities
-        sentiments = {
+        raw_probs = {
             "Positive": probs_dict.get("sentiment_positive", 0.0),
             "Negative": probs_dict.get("sentiment_negative", 0.0),
             "Neutral": probs_dict.get("sentiment_neutral", 0.0),
         }
 
-        # Find highest probability sentiment
-        if not any(sentiments.values()):
+        # Check if we have any probabilities
+        if not any(raw_probs.values()):
             return None
 
+        # Apply softmax normalization
+        probs_list = list(raw_probs.values())
+        exp_probs = [math.exp(p) for p in probs_list]
+        exp_sum = sum(exp_probs)
+        normalized_probs = [exp_p / exp_sum for exp_p in exp_probs]
+
+        # Map normalized probabilities back to sentiment names
+        sentiments = dict(zip(raw_probs.keys(), normalized_probs))
+
+        # Find highest probability sentiment
         max_sentiment = max(sentiments.items(), key=lambda x: x[1])
         sentiment_name, prob = max_sentiment
 
