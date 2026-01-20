@@ -1,6 +1,10 @@
-"""Tests for critic taxonomy."""
+"""Tests for critic visualization using SDK taxonomy."""
 
-from openhands_cli.tui.utils.critic import FEATURE_CATEGORIES, get_category
+from openhands.sdk.critic import (
+    FEATURE_CATEGORIES,
+    categorize_features,
+    get_category,
+)
 
 
 def test_feature_categories_count():
@@ -50,3 +54,71 @@ def test_category_counts():
     assert len(agent) == 13
     assert len(user) == 9
     assert len(infra) == 2
+
+
+def test_categorize_features():
+    """Test the categorize_features function from SDK."""
+    probs_dict = {
+        "success": 0.85,
+        "sentiment_positive": 0.1,
+        "sentiment_neutral": 0.77,
+        "sentiment_negative": 0.13,
+        "loop_behavior": 0.65,
+        "incomplete_implementation": 0.45,
+        "clarification_or_restatement": 0.30,
+        "infrastructure_external_issue": 0.15,
+        "unknown_feature": 0.50,
+    }
+
+    result = categorize_features(probs_dict)
+
+    # Check sentiment extraction with softmax normalization
+    assert result["sentiment"] is not None
+    assert result["sentiment"]["predicted"] == "Neutral"
+    # Softmax normalizes the probabilities - neutral should be highest
+    # but the exact value depends on softmax calculation
+    assert result["sentiment"]["probability"] > 0.4  # Should be normalized
+    # All sentiment probabilities should sum to ~1.0 after softmax
+    all_sentiments = result["sentiment"]["all"]
+    total = sum(all_sentiments.values())
+    assert abs(total - 1.0) < 0.01  # Should sum to 1.0
+
+    # Check agent behavioral issues (default threshold is 0.2)
+    agent_issues = result["agent_behavioral_issues"]
+    assert len(agent_issues) == 2  # loop_behavior (0.65) and incomplete_impl (0.45)
+    assert agent_issues[0]["name"] == "loop_behavior"
+    assert agent_issues[0]["probability"] == 0.65
+
+    # Check user follow-up patterns (clarification_or_restatement is 0.30 > 0.2)
+    user_patterns = result["user_followup_patterns"]
+    assert len(user_patterns) == 1
+    assert user_patterns[0]["name"] == "clarification_or_restatement"
+
+    # Check infrastructure issues (0.15 < 0.2 threshold, so empty)
+    infra_issues = result["infrastructure_issues"]
+    assert len(infra_issues) == 0
+
+    # Check other/unknown features (0.50 > 0.2)
+    other = result["other"]
+    assert len(other) == 1
+    assert other[0]["name"] == "unknown_feature"
+
+
+def test_categorize_features_custom_threshold():
+    """Test categorize_features with custom threshold."""
+    probs_dict = {
+        "loop_behavior": 0.65,
+        "incomplete_implementation": 0.15,
+        "infrastructure_external_issue": 0.10,
+    }
+
+    # With threshold 0.0, all features should be included
+    result = categorize_features(probs_dict, display_threshold=0.0)
+    assert len(result["agent_behavioral_issues"]) == 2
+    assert len(result["infrastructure_issues"]) == 1
+
+    # With threshold 0.5, only loop_behavior should be included
+    result = categorize_features(probs_dict, display_threshold=0.5)
+    assert len(result["agent_behavioral_issues"]) == 1
+    assert result["agent_behavioral_issues"][0]["name"] == "loop_behavior"
+    assert len(result["infrastructure_issues"]) == 0
