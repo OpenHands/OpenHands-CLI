@@ -99,7 +99,7 @@ class LocalOpenHandsACPAgent(ACPAgent):
         if resume_conversation_id:
             logger.info(f"Will resume conversation: {resume_conversation_id}")
 
-        self.agent_type: AgentType = "remote"
+        self.agent_type: AgentType = "local"
 
     @property
     def active_session(self) -> dict[str, LocalConversation]:

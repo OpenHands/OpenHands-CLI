@@ -43,7 +43,11 @@ from openhands_cli.acp_impl.events.event import EventSubscriber
 from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
 from openhands_cli.acp_impl.slash_commands import (
     apply_confirmation_mode_to_conversation,
+    create_help_text,
     get_confirmation_mode_from_conversation,
+    get_unknown_command_text,
+    handle_confirm_argument,
+    parse_slash_command,
 )
 from openhands_cli.acp_impl.utils import (
     RESOURCE_SKILL,
@@ -59,6 +63,7 @@ from openhands_cli.cloud.conversation import is_token_valid
 from openhands_cli.locations import MCP_CONFIG_FILE
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import load_agent_specs
+from openhands_cli.utils import extract_text_from_message_content
 
 
 logger = logging.getLogger(__name__)
@@ -115,6 +120,30 @@ class OpenHandsCloudACPAgent(ACPAgent):
     def active_session(self) -> dict[str, RemoteConversation]:
         """Return the active sessions mapping."""
         return self._active_sessions
+
+    async def _cmd_confirm(self, session_id: str, argument: str) -> str:
+        """Handle /confirm command.
+
+        Args:
+            session_id: The session ID
+            argument: Command argument (always-ask|always-approve|llm-approve)
+
+        Returns:
+            Status message
+        """
+        # Get current mode from conversation if it exists
+        if session_id in self._active_sessions:
+            current_mode = get_confirmation_mode_from_conversation(
+                self._active_sessions[session_id]
+            )
+        else:
+            current_mode = self._initial_confirmation_mode
+
+        response_text, new_mode = handle_confirm_argument(current_mode, argument)
+        if new_mode is not None:
+            await self._shared_handler.set_confirmation_mode(self, session_id, new_mode)
+
+        return response_text
 
     async def initialize(
         self,
@@ -465,6 +494,35 @@ class OpenHandsCloudACPAgent(ACPAgent):
             message_content = convert_acp_prompt_to_message_content(prompt)
 
             if not message_content:
+                return PromptResponse(stop_reason="end_turn")
+
+            # Check if this is a slash command (single text block starting with "/")
+            # multiple blocks not valid slash commands -> has_exactly_one = True
+            text = extract_text_from_message_content(
+                message_content, has_exactly_one=True
+            )
+            slash_cmd = parse_slash_command(text) if text else None
+            if slash_cmd:
+                command, argument = slash_cmd
+                logger.info(f"Executing slash command: /{command} {argument}")
+
+                # Execute the slash command
+                if command == "help":
+                    response_text = create_help_text()
+                elif command == "confirm":
+                    response_text = await self._cmd_confirm(session_id, argument)
+                else:
+                    response_text = get_unknown_command_text(command)
+
+                # Send response to client
+                await self._conn.session_update(
+                    session_id=session_id,
+                    update=AgentMessageChunk(
+                        session_update="agent_message_chunk",
+                        content=TextContentBlock(type="text", text=response_text),
+                    ),
+                )
+
                 return PromptResponse(stop_reason="end_turn")
 
             # Send the message
