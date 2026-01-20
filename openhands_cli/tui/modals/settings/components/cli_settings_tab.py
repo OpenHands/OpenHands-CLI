@@ -80,7 +80,8 @@ class CliSettingsTab(Container):
                 description=(
                     "When enabled and using OpenHands LLM provider, an experimental "
                     "critic feature will predict task success and collect feedback. "
-                    "This is free but collects telemetry for model improvement."
+                    "This is currently free but "
+                    "collects telemetry for model improvement."
                 ),
                 switch_id="enable_critic_switch",
                 value=self.cli_settings.enable_critic,
