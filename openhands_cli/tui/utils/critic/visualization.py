@@ -62,7 +62,7 @@ def _build_critic_title(critic_result: CriticResult) -> Text:
     sentiment_str = _extract_predicted_sentiment(critic_result.message)
     if sentiment_str:
         title.append(" | ", style="dim")
-        title.append("Predicted Sentiment: ", style="bold")
+        title.append("Predicted User Sentiment: ", style="bold")
 
         # Color sentiment based on type
         if "Positive" in sentiment_str:
@@ -198,7 +198,7 @@ def _append_categorized_features(content_text: Text, probs_dict: dict) -> None:
             content_text,
             "Detected Agent Behavioral Issues",
             agent_issues,
-            "bold red",
+            "bold yellow",
             "agent",
         )
 
@@ -207,7 +207,7 @@ def _append_categorized_features(content_text: Text, probs_dict: dict) -> None:
             content_text,
             "Predicted User Follow-Up Patterns",
             user_patterns,
-            "bold magenta",
+            "bold yellow",
             "user",
         )
 
