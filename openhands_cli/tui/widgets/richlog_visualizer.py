@@ -182,11 +182,15 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """Get the agent name prefix for titles when in delegation context.
 
         Returns:
-            Formatted agent name with " Agent " suffix if name is set,
-            empty string otherwise.
+            Formatted agent name with " Agent " suffix if name is set
+            and doesn't already contain "agent", empty string otherwise.
         """
         if self._name:
-            return f"{self._format_agent_name(self._name)} Agent "
+            formatted_name = self._format_agent_name(self._name)
+            # Don't add "Agent" suffix if name already contains "agent"
+            if "agent" in formatted_name.lower():
+                return f"{formatted_name} "
+            return f"{formatted_name} Agent "
         return ""
 
     def _run_on_main_thread(self, func, *args) -> None:
@@ -546,24 +550,28 @@ class ConversationVisualizer(ConversationVisualizerBase):
             ):
                 return None
             # Display messages as markdown for proper rendering
-            # In delegation context, prefix messages with agent info
+            # In delegation context, prefix messages with agent info (underlined)
             message_content = str(content)
             if self._name and event.llm_message:
                 agent_name = self._format_agent_name(self._name)
+                # Use markdown underline syntax for agent names
+                agent_underlined = f"__{agent_name}__"
                 if event.llm_message.role == "user":
                     if event.sender:
                         # Message from another agent (via delegation)
                         sender_display = self._format_agent_name(event.sender)
-                        prefix = f"**{sender_display} → {agent_name}:**\n\n"
+                        sender_underlined = f"__{sender_display}__"
+                        prefix = f"**{sender_underlined} → {agent_underlined}:**\n\n"
                     else:
-                        prefix = f"**User → {agent_name}:**\n\n"
+                        prefix = f"**User → {agent_underlined}:**\n\n"
                 else:
                     # Agent message - derive recipient from sender context
                     if event.sender:
                         recipient_display = self._format_agent_name(event.sender)
-                        prefix = f"**{agent_name} → {recipient_display}:**\n\n"
+                        recipient_underlined = f"__{recipient_display}__"
+                        prefix = f"**{agent_underlined} → {recipient_underlined}:**\n\n"
                     else:
-                        prefix = f"**{agent_name}:**\n\n"
+                        prefix = f"**{agent_underlined}:**\n\n"
                 message_content = prefix + message_content
             widget = Markdown(message_content)
             widget.styles.padding = AGENT_MESSAGE_PADDING
