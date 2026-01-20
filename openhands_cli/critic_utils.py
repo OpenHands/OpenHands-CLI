@@ -1,0 +1,206 @@
+"""Critic visualization utilities for TUI."""
+
+import json
+
+from rich.text import Text
+
+from openhands.sdk.critic.result import CriticResult
+from openhands_cli.critic_taxonomy import FEATURE_CATEGORIES
+from openhands_cli.tui.widgets.collapsible import Collapsible
+
+
+def create_critic_collapsible(critic_result: CriticResult) -> Collapsible:
+    """Create a collapsible widget for critic score visualization.
+
+    Args:
+        critic_result: The critic result to visualize
+
+    Returns:
+        A Collapsible widget showing critic score summary (collapsed)
+        and full breakdown (expanded), organized by taxonomy categories
+    """
+    # Build title
+    title = f"Critic Score: {critic_result.score:.4f}"
+
+    # Build content with category grouping
+    content_text = _build_critic_content(critic_result)
+
+    # Create collapsible (start collapsed by default)
+    return Collapsible(
+        content_text,
+        title=title,
+        collapsed=True,
+        border_color="#888888",  # Default gray border
+    )
+
+
+def _build_critic_content(critic_result: CriticResult) -> Text:
+    """Build the Rich Text content for critic score breakdown.
+
+    Args:
+        critic_result: The critic result to visualize
+
+    Returns:
+        Rich Text object with formatted critic breakdown
+    """
+    content_text = Text()
+
+    # Main score line
+    score_style = "green" if critic_result.success else "yellow"
+    content_text.append("Score: ", style="bold")
+    content_text.append(f"{critic_result.score:.4f}", style=score_style)
+    status = "success" if critic_result.success else "needs improvement"
+    content_text.append(f" ({status})\n\n")
+
+    # Parse and display detailed probabilities if available
+    if critic_result.message:
+        try:
+            start_idx = critic_result.message.find("{")
+            probs_dict = json.loads(critic_result.message[start_idx:])
+            if isinstance(probs_dict, dict):
+                _append_categorized_features(content_text, probs_dict)
+            else:
+                # If not a dict, display message as-is
+                content_text.append(f"\n{critic_result.message}\n")
+        except (json.JSONDecodeError, ValueError):
+            # If parsing fails, display message as-is
+            if critic_result.message:
+                content_text.append(f"\n{critic_result.message}\n")
+
+    return content_text
+
+
+def _append_categorized_features(content_text: Text, probs_dict: dict) -> None:
+    """Append features grouped by taxonomy categories.
+
+    Args:
+        content_text: Rich Text object to append to
+        probs_dict: Dictionary of feature probabilities
+    """
+    # Group features by taxonomy categories
+    general_context = {}
+    agent_issues = {}
+    user_patterns = {}
+    infra_issues = {}
+    unknown_features = {}
+
+    for feature_name, prob in probs_dict.items():
+        if feature_name == "success":
+            # Skip 'success' as it's redundant with the score
+            continue
+
+        # Categorize based on taxonomy
+        category = FEATURE_CATEGORIES.get(feature_name)
+        if category == "general_context":
+            general_context[feature_name] = prob
+        elif category == "agent_behavioral_issues":
+            agent_issues[feature_name] = prob
+        elif category == "user_followup_patterns":
+            user_patterns[feature_name] = prob
+        elif category == "infrastructure_issues":
+            infra_issues[feature_name] = prob
+        else:
+            unknown_features[feature_name] = prob
+
+    # Display each category if it has features
+    if general_context:
+        _append_category_section(
+            content_text,
+            "General Context & Task Classification",
+            general_context,
+            "bold cyan",
+            "general",
+        )
+
+    if agent_issues:
+        _append_category_section(
+            content_text, "Agent Behavioral Issues", agent_issues, "bold red", "agent"
+        )
+
+    if user_patterns:
+        _append_category_section(
+            content_text,
+            "User Follow-Up Patterns",
+            user_patterns,
+            "bold magenta",
+            "user",
+        )
+
+    if infra_issues:
+        _append_category_section(
+            content_text,
+            "Infrastructure Issues",
+            infra_issues,
+            "bold yellow",
+            "infra",
+        )
+
+    if unknown_features:
+        _append_category_section(
+            content_text, "Other Metrics", unknown_features, "bold dim", "unknown"
+        )
+
+
+def _append_category_section(
+    content_text: Text,
+    title: str,
+    features: dict,
+    title_style: str,
+    category: str,
+) -> None:
+    """Append a category section with features.
+
+    Args:
+        content_text: Rich Text object to append to
+        title: Section title
+        features: Dictionary of feature probabilities
+        title_style: Rich style for the title
+        category: Category type for color coding
+    """
+    content_text.append(f"{title}:\n", style=title_style)
+    sorted_features = sorted(features.items(), key=lambda x: x[1], reverse=True)
+    for feature, prob in sorted_features:
+        _append_feature_with_prob(content_text, feature, prob, category)
+    content_text.append("\n")
+
+
+def _append_feature_with_prob(
+    content_text: Text, feature_name: str, prob: float, category: str
+) -> None:
+    """Append a feature with its probability to the content text.
+
+    Args:
+        content_text: Rich Text object to append to
+        feature_name: Name of the feature
+        prob: Probability value
+        category: Category type for color coding
+    """
+    # Format feature name: replace underscores with spaces, capitalize
+    display_name = feature_name.replace("_", " ").replace("sentiment ", "")
+    display_name = display_name.title()
+
+    # Determine color based on probability and category
+    if category == "general":
+        # General context features (sentiments, etc.)
+        if prob >= 0.7:
+            prob_style = "cyan bold"
+        elif prob >= 0.5:
+            prob_style = "cyan"
+        else:
+            prob_style = "dim"
+    elif category in ("agent", "user", "infra"):
+        # Issue indicators (higher = worse)
+        if prob >= 0.7:
+            prob_style = "red bold"
+        elif prob >= 0.5:
+            prob_style = "red"
+        elif prob >= 0.3:
+            prob_style = "yellow"
+        else:
+            prob_style = "dim"
+    else:
+        # Unknown category
+        prob_style = "white"
+
+    content_text.append(f"  • {display_name}: ", style="dim")
+    content_text.append(f"{prob:.2f}\n", style=prob_style)

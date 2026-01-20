@@ -10,7 +10,6 @@ from rich.text import Text
 from textual.widgets import Markdown
 
 from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
-from openhands.sdk.critic.result import CriticResult
 from openhands.sdk.event import (
     ActionEvent,
     AgentErrorEvent,
@@ -127,189 +126,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         else:
             self._app.call_from_thread(func, *args)
 
-    def _create_critic_collapsible(self, critic_result: CriticResult) -> Collapsible:
-        """Create a compact collapsible for critic score visualization.
-
-        Args:
-            critic_result: The critic result to visualize
-
-        Returns:
-            A Collapsible widget showing critic score summary (collapsed)
-            and full breakdown (expanded), organized by taxonomy categories
-        """
-        import json
-
-        from openhands_cli.critic_taxonomy import FEATURE_CATEGORIES
-
-        # Build title: "Critic Score: {score}" with color coding
-        title = f"Critic Score: {critic_result.score:.4f}"
-
-        # Build content: full breakdown
-        content_text = Text()
-
-        # Main score line
-        score_style = "green" if critic_result.success else "yellow"
-        content_text.append("Score: ", style="bold")
-        content_text.append(f"{critic_result.score:.4f}", style=score_style)
-        status = "success" if critic_result.success else "needs improvement"
-        content_text.append(f" ({status})\n\n")
-
-        # Parse and display detailed probabilities if available
-        if critic_result.message:
-            try:
-                start_idx = critic_result.message.find("{")
-                probs_dict = json.loads(critic_result.message[start_idx:])
-                if isinstance(probs_dict, dict):
-                    # Group features by taxonomy categories
-                    general_context = {}
-                    agent_issues = {}
-                    user_patterns = {}
-                    infra_issues = {}
-                    unknown_features = {}
-
-                    for feature_name, prob in probs_dict.items():
-                        if feature_name == "success":
-                            # Skip 'success' as it's redundant with the score
-                            continue
-
-                        # Categorize based on taxonomy
-                        category = FEATURE_CATEGORIES.get(feature_name)
-                        if category == "general_context":
-                            general_context[feature_name] = prob
-                        elif category == "agent_behavioral_issues":
-                            agent_issues[feature_name] = prob
-                        elif category == "user_followup_patterns":
-                            user_patterns[feature_name] = prob
-                        elif category == "infrastructure_issues":
-                            infra_issues[feature_name] = prob
-                        else:
-                            unknown_features[feature_name] = prob
-
-                    # Display General Context & Task Classification
-                    if general_context:
-                        content_text.append(
-                            "General Context & Task Classification:\n",
-                            style="bold cyan",
-                        )
-                        sorted_features = sorted(
-                            general_context.items(), key=lambda x: x[1], reverse=True
-                        )
-                        for feature, prob in sorted_features:
-                            self._append_feature_with_prob(
-                                content_text, feature, prob, category="general"
-                            )
-                        content_text.append("\n")
-
-                    # Display Agent Behavioral Issues
-                    if agent_issues:
-                        content_text.append(
-                            "Agent Behavioral Issues:\n", style="bold red"
-                        )
-                        sorted_features = sorted(
-                            agent_issues.items(), key=lambda x: x[1], reverse=True
-                        )
-                        for feature, prob in sorted_features:
-                            self._append_feature_with_prob(
-                                content_text, feature, prob, category="agent"
-                            )
-                        content_text.append("\n")
-
-                    # Display User Follow-Up Patterns
-                    if user_patterns:
-                        content_text.append(
-                            "User Follow-Up Patterns:\n", style="bold magenta"
-                        )
-                        sorted_features = sorted(
-                            user_patterns.items(), key=lambda x: x[1], reverse=True
-                        )
-                        for feature, prob in sorted_features:
-                            self._append_feature_with_prob(
-                                content_text, feature, prob, category="user"
-                            )
-                        content_text.append("\n")
-
-                    # Display Infrastructure Issues
-                    if infra_issues:
-                        content_text.append(
-                            "Infrastructure Issues:\n", style="bold yellow"
-                        )
-                        sorted_features = sorted(
-                            infra_issues.items(), key=lambda x: x[1], reverse=True
-                        )
-                        for feature, prob in sorted_features:
-                            self._append_feature_with_prob(
-                                content_text, feature, prob, category="infra"
-                            )
-                        content_text.append("\n")
-
-                    # Display unknown features if any
-                    if unknown_features:
-                        content_text.append("Other Metrics:\n", style="bold dim")
-                        sorted_features = sorted(
-                            unknown_features.items(), key=lambda x: x[1], reverse=True
-                        )
-                        for feature, prob in sorted_features:
-                            self._append_feature_with_prob(
-                                content_text, feature, prob, category="unknown"
-                            )
-
-                else:
-                    # If not a dict, display message as-is
-                    content_text.append(f"\n{critic_result.message}\n")
-            except (json.JSONDecodeError, ValueError):
-                # If parsing fails, display message as-is
-                if critic_result.message:
-                    content_text.append(f"\n{critic_result.message}\n")
-
-        # Create a collapsible (start collapsed by default)
-        return self._make_collapsible(
-            content_text,
-            title=title,
-            event=None,  # No specific event for critic
-            collapsed=True,
-        )
-
-    def _append_feature_with_prob(
-        self, content_text: Text, feature_name: str, prob: float, category: str
-    ) -> None:
-        """Append a feature with its probability to the content text.
-
-        Args:
-            content_text: Rich Text object to append to
-            feature_name: Name of the feature
-            prob: Probability value
-            category: Category type for color coding
-        """
-        # Format feature name: replace underscores with spaces, capitalize
-        display_name = feature_name.replace("_", " ").replace("sentiment ", "")
-        display_name = display_name.title()
-
-        # Determine color based on probability and category
-        if category == "general":
-            # General context features (sentiments, etc.)
-            if prob >= 0.7:
-                prob_style = "cyan bold"
-            elif prob >= 0.5:
-                prob_style = "cyan"
-            else:
-                prob_style = "dim"
-        elif category in ("agent", "user", "infra"):
-            # Issue indicators (higher = worse)
-            if prob >= 0.7:
-                prob_style = "red bold"
-            elif prob >= 0.5:
-                prob_style = "red"
-            elif prob >= 0.3:
-                prob_style = "yellow"
-            else:
-                prob_style = "dim"
-        else:
-            # Unknown category
-            prob_style = "white"
-
-        content_text.append(f"  • {display_name}: ", style="dim")
-        content_text.append(f"{prob:.2f}\n", style=prob_style)
-
     def _do_refresh_plan_panel(self) -> None:
         """Refresh the plan panel (must be called from main thread)."""
         plan_panel = self._app.plan_panel
@@ -350,7 +166,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
             # Add critic collapsible if present (for MessageEvent and ActionEvent)
             critic_result = getattr(event, "critic_result", None)
             if critic_result is not None:
-                critic_widget = self._create_critic_collapsible(critic_result)
+                from openhands_cli.critic_utils import create_critic_collapsible
+
+                critic_widget = create_critic_collapsible(critic_result)
                 self._run_on_main_thread(self._add_widget_to_ui, critic_widget)
 
     def _add_widget_to_ui(self, widget: "Widget") -> None:
