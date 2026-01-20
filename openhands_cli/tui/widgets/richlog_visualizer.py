@@ -3,6 +3,7 @@ Textual-compatible visualizer for OpenHands conversation events.
 This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 """
 
+import re
 import threading
 from typing import TYPE_CHECKING
 
@@ -83,7 +84,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
     """Handles visualization of conversation events for Textual apps.
 
     This visualizer creates Collapsible widgets and adds them to a VerticalScroll
-    container.
+    container. Supports delegate visualization by tracking agent identity.
     """
 
     def __init__(
@@ -91,19 +92,22 @@ class ConversationVisualizer(ConversationVisualizerBase):
         container: "VerticalScroll",
         app: "OpenHandsApp",
         skip_user_messages: bool = False,
+        name: str | None = None,
     ):
         """Initialize the visualizer.
 
         Args:
             container: The Textual VerticalScroll container to add widgets to
             app: The Textual app instance for thread-safe UI updates
-            highlight_regex: Dictionary mapping regex patterns to Rich color styles
             skip_user_messages: If True, skip displaying user messages
+            name: Agent name to display in panel titles for delegation context.
+                  When set, titles will be prefixed with the agent name.
         """
         super().__init__()
         self._container = container
         self._app = app
         self._skip_user_messages = skip_user_messages
+        self._name = name
         # Store the main thread ID for thread safety checks
         self._main_thread_id = threading.get_ident()
         # Cache CLI settings to avoid repeated file system reads
@@ -120,15 +124,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def reload_configuration(self) -> None:
         self._cli_settings = CliSettings.load()
 
-    def create_sub_visualizer(
-        self,
-        agent_id: str,  # noqa: ARG002
-    ) -> "ConversationVisualizer":
+    def create_sub_visualizer(self, agent_id: str) -> "ConversationVisualizer":
         """Create a visualizer for a sub-agent during delegation.
 
         Creates a new ConversationVisualizer instance for the sub-agent that
         shares the same container and app, allowing delegate events to be
-        rendered in the same TUI.
+        rendered in the same TUI with agent-specific context.
 
         Args:
             agent_id: The identifier of the sub-agent being spawned
@@ -140,7 +141,53 @@ class ConversationVisualizer(ConversationVisualizerBase):
             container=self._container,
             app=self._app,
             skip_user_messages=self._skip_user_messages,
+            name=agent_id,
         )
+
+    @staticmethod
+    def _format_agent_name(name: str) -> str:
+        """Convert snake_case or camelCase agent name to Title Case for display.
+
+        Args:
+            name: Agent name in snake_case (e.g., "lodging_expert") or
+                  camelCase (e.g., "MainAgent") or already formatted
+                  (e.g., "Main Agent")
+
+        Returns:
+            Formatted name in Title Case (e.g., "Lodging Expert" or "Main Agent")
+
+        Examples:
+            >>> ConversationVisualizer._format_agent_name("lodging_expert")
+            'Lodging Expert'
+            >>> ConversationVisualizer._format_agent_name("MainAgent")
+            'Main Agent'
+            >>> ConversationVisualizer._format_agent_name("main_delegator")
+            'Main Delegator'
+            >>> ConversationVisualizer._format_agent_name("Main Agent")
+            'Main Agent'
+        """
+        # If already has spaces, assume it's already formatted
+        if " " in name:
+            return name
+
+        # Handle snake_case by replacing underscores with spaces
+        if "_" in name:
+            return name.replace("_", " ").title()
+
+        # Handle camelCase/PascalCase by inserting spaces before capitals
+        spaced = re.sub(r"(?<!^)(?=[A-Z])", " ", name)
+        return spaced.title()
+
+    def _get_agent_prefix(self) -> str:
+        """Get the agent name prefix for titles when in delegation context.
+
+        Returns:
+            Formatted agent name with " Agent " suffix if name is set,
+            empty string otherwise.
+        """
+        if self._name:
+            return f"{self._format_agent_name(self._name)} Agent "
+        return ""
 
     def _run_on_main_thread(self, func, *args) -> None:
         """Run a function on the main thread via call_from_thread if needed."""
@@ -233,13 +280,17 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """Build a title for an action event.
 
         Format:
-            "[bold]{summary}[/bold]" for most actions
-            "[bold]{summary}[/bold][dim]: $ {command}[/dim]" for terminal
-            "[bold]{summary}[/bold][dim]: Reading/Editing {path}[/dim]" for files
+            "[Agent Prefix][bold]{summary}[/bold]" for most actions
+            "[Agent Prefix][bold]{summary}[/bold][dim]: $ {command}[/dim]" for terminal
+            "[Agent Prefix][bold]{summary}[/bold][dim]: {op} {path}[/dim]" for files
 
         The detail portion (after the colon) is rendered in dim style to
         visually distinguish it from the main summary text.
+
+        When in delegation context (self._name is set), titles are prefixed
+        with the agent name (e.g., "Lodging Expert Agent ").
         """
+        agent_prefix = self._get_agent_prefix()
         summary = (
             self._escape_rich_markup(str(event.summary).strip().replace("\n", " "))
             if event.summary
@@ -252,16 +303,16 @@ class ConversationVisualizer(ConversationVisualizerBase):
             cmd = self._escape_rich_markup(action.command.strip().replace("\n", " "))
             cmd = self._truncate_for_display(cmd)
             if summary:
-                return f"[bold]{summary}[/bold][dim]: $ {cmd}[/dim]"
-            return f"[dim]$ {cmd}[/dim]"
+                return f"{agent_prefix}[bold]{summary}[/bold][dim]: $ {cmd}[/dim]"
+            return f"{agent_prefix}[dim]$ {cmd}[/dim]"
 
         # File operations: include path with Reading/Editing
         if isinstance(action, FileEditorAction) and action.path:
             op = "Reading" if action.command == "view" else "Editing"
             path = self._escape_rich_markup(action.path)
             if summary:
-                return f"[bold]{summary}[/bold][dim]: {op} {path}[/dim]"
-            return f"[bold]{op}[/bold][dim] {path}[/dim]"
+                return f"{agent_prefix}[bold]{summary}[/bold][dim]: {op} {path}[/dim]"
+            return f"{agent_prefix}[bold]{op}[/bold][dim] {path}[/dim]"
 
         # Delegate actions: show command and details
         if isinstance(action, DelegateAction):
@@ -273,13 +324,14 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 include_agent_types=True,
             )
             if summary:
-                return f"[bold]{summary}[/bold][dim]: {title.lower()}[/dim]"
-            return f"[bold]{title}[/bold]"
+                lower_title = title.lower()
+                return f"{agent_prefix}[bold]{summary}[/bold][dim]: {lower_title}[/dim]"
+            return f"{agent_prefix}[bold]{title}[/bold]"
 
         # All other actions: just use summary
         if summary:
-            return f"[bold]{summary}[/bold]"
-        return event.tool_name
+            return f"{agent_prefix}[bold]{summary}[/bold]"
+        return f"{agent_prefix}{event.tool_name}"
 
     def _build_observation_content(
         self, event: ObservationEvent | UserRejectObservation | AgentErrorEvent
@@ -401,8 +453,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # If we can't extract meaningful info, try to truncate the visualized content
         if hasattr(event, "visualize"):
             try:
-                import re
-
                 # Convert Rich content to plain text for title
                 content_str = str(event.visualize).strip().replace("\n", " ")
                 # Remove ANSI codes and Rich markup
@@ -496,7 +546,26 @@ class ConversationVisualizer(ConversationVisualizerBase):
             ):
                 return None
             # Display messages as markdown for proper rendering
-            widget = Markdown(str(content))
+            # In delegation context, prefix messages with agent info
+            message_content = str(content)
+            if self._name and event.llm_message:
+                agent_name = self._format_agent_name(self._name)
+                if event.llm_message.role == "user":
+                    if event.sender:
+                        # Message from another agent (via delegation)
+                        sender_display = self._format_agent_name(event.sender)
+                        prefix = f"**{sender_display} → {agent_name}:**\n\n"
+                    else:
+                        prefix = f"**User → {agent_name}:**\n\n"
+                else:
+                    # Agent message - derive recipient from sender context
+                    if event.sender:
+                        recipient_display = self._format_agent_name(event.sender)
+                        prefix = f"**{agent_name} → {recipient_display}:**\n\n"
+                    else:
+                        prefix = f"**{agent_name}:**\n\n"
+                message_content = prefix + message_content
+            widget = Markdown(message_content)
             widget.styles.padding = AGENT_MESSAGE_PADDING
             return widget
 
@@ -504,12 +573,18 @@ class ConversationVisualizer(ConversationVisualizerBase):
         return self._create_event_collapsible(event)
 
     def _create_event_collapsible(self, event: Event) -> Collapsible | None:
-        """Create a Collapsible widget for the event with appropriate styling."""
+        """Create a Collapsible widget for the event with appropriate styling.
+
+        When in delegation context (self._name is set), titles are prefixed
+        with the agent name (e.g., "Lodging Expert Agent Observation").
+        """
         # Use the event's visualize property for content
         content = event.visualize
 
         if not content.plain.strip():
             return None
+
+        agent_prefix = self._get_agent_prefix()
 
         # Don't emit system prompt in CLI
         if isinstance(event, SystemPromptEvent):
@@ -518,7 +593,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         elif isinstance(event, CondensationRequest):
             return None
         elif isinstance(event, ActionEvent):
-            # Build title using new format: "🔧 {summary}: $ {command}"
+            # Build title using new format with agent prefix
             title = self._build_action_title(event)
             content_string = self._escape_rich_markup(str(content))
 
@@ -534,30 +609,36 @@ class ConversationVisualizer(ConversationVisualizerBase):
             # (shouldn't happen normally, but handle gracefully)
             title = self._extract_meaningful_title(event, "Observation")
             return self._make_collapsible(
-                self._escape_rich_markup(str(content)), title, event
+                self._escape_rich_markup(str(content)), f"{agent_prefix}{title}", event
             )
         elif isinstance(event, UserRejectObservation):
             title = self._extract_meaningful_title(event, "User Rejected Action")
             return self._make_collapsible(
-                self._escape_rich_markup(str(content)), title, event
+                self._escape_rich_markup(str(content)), f"{agent_prefix}{title}", event
             )
         elif isinstance(event, AgentErrorEvent):
             title = self._extract_meaningful_title(event, "Agent Error")
             content_string = self._escape_rich_markup(str(content))
-            return self._make_collapsible(content_string, title, event)
+            return self._make_collapsible(
+                content_string, f"{agent_prefix}{title}", event
+            )
         elif isinstance(event, ConversationErrorEvent):
             title = self._extract_meaningful_title(event, "Conversation Error")
             content_string = self._escape_rich_markup(str(content))
-            return self._make_collapsible(content_string, title, event)
+            return self._make_collapsible(
+                content_string, f"{agent_prefix}{title}", event
+            )
         elif isinstance(event, PauseEvent):
             title = self._extract_meaningful_title(event, "User Paused")
             return self._make_collapsible(
-                self._escape_rich_markup(str(content)), title, event
+                self._escape_rich_markup(str(content)), f"{agent_prefix}{title}", event
             )
         elif isinstance(event, Condensation):
             title = self._extract_meaningful_title(event, "Condensation")
             content_string = self._escape_rich_markup(str(content))
-            return self._make_collapsible(content_string, title, event)
+            return self._make_collapsible(
+                content_string, f"{agent_prefix}{title}", event
+            )
         else:
             # Fallback for unknown event types
             title = self._extract_meaningful_title(
@@ -566,4 +647,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
             content_string = (
                 f"{self._escape_rich_markup(str(content))}\n\nSource: {event.source}"
             )
-            return self._make_collapsible(content_string, title, event)
+            return self._make_collapsible(
+                content_string, f"{agent_prefix}{title}", event
+            )
