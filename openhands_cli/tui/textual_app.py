@@ -53,12 +53,12 @@ from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
 from openhands_cli.tui.panels.history_side_panel import HistorySidePanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
+from openhands_cli.tui.widgets import InputField
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
     CollapsibleNavigationMixin,
     CollapsibleTitle,
 )
-from openhands_cli.tui.widgets.input_field import InputField
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.tui.widgets.status_line import (
     InfoStatusLine,
@@ -200,11 +200,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             "MCP", "View MCP configurations", lambda: MCPSidePanel.toggle(self)
         )
         yield SystemCommand(
-            "PLAN",
+            "Plan",
             "View agent plan",
             lambda: self.plan_panel.toggle(),
         )
-        yield SystemCommand("SETTINGS", "Configure settings", self.action_open_settings)
+        yield SystemCommand("Settings", "Configure settings", self.action_open_settings)
 
     def on_mount(self) -> None:
         """Called when app starts."""

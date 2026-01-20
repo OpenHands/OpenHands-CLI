@@ -5,6 +5,7 @@ import sys
 
 from rich.console import Console
 
+from openhands_cli.auth.utils import AuthenticationError, ensure_valid_auth
 from openhands_cli.cloud.conversation import (
     CloudConversationError,
     create_cloud_conversation,
@@ -14,6 +15,16 @@ from openhands_cli.utils import create_seeded_instructions_from_args
 
 
 console = Console()
+
+
+async def _run_cloud_conversation(server_url: str, initial_message: str) -> None:
+    """Run cloud conversation with authentication."""
+    api_key = await ensure_valid_auth(server_url)
+    await create_cloud_conversation(
+        server_url=server_url,
+        api_key=api_key,
+        initial_user_msg=initial_message,
+    )
 
 
 def handle_cloud_command(args) -> None:
@@ -42,20 +53,15 @@ def handle_cloud_command(args) -> None:
 
         initial_message = queued_inputs[0]
 
-        # Create cloud conversation
-        asyncio.run(
-            create_cloud_conversation(
-                server_url=args.server_url,
-                initial_user_msg=initial_message,
-            )
-        )
+        # Ensure authentication and create cloud conversation
+        asyncio.run(_run_cloud_conversation(args.server_url, initial_message))
 
         console.print(
             f"[{OPENHANDS_THEME.success}]Cloud conversation created "
             f"successfully! 🚀[/{OPENHANDS_THEME.success}]"
         )
 
-    except CloudConversationError:
+    except (CloudConversationError, AuthenticationError):
         # Error already printed in the function
         sys.exit(1)
     except Exception as e:

@@ -1,7 +1,7 @@
 """CLI Settings tab component for the settings modal."""
 
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal
+from textual.containers import Container, Horizontal, VerticalScroll
 from textual.widgets import Label, Static, Switch
 
 from openhands_cli.stores import CliSettings
@@ -50,7 +50,7 @@ class CliSettingsTab(Container):
 
     def compose(self) -> ComposeResult:
         """Compose the CLI settings tab content."""
-        with Container(id="cli_settings_content"):
+        with VerticalScroll(id="cli_settings_content"):
             yield Static("CLI Settings", classes="form_section_title")
 
             yield SettingsSwitch(

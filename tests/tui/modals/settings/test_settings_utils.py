@@ -42,7 +42,7 @@ def deps(monkeypatch) -> FakeAgentStore:
     monkeypatch.setattr(
         settings_utils,
         "should_set_litellm_extra_body",
-        lambda model_name: False,
+        lambda model_name, base_url=None: False,
     )
     monkeypatch.setattr(
         settings_utils,
@@ -347,7 +347,7 @@ def test_litellm_metadata_is_added_when_required(
     monkeypatch.setattr(
         settings_utils,
         "should_set_litellm_extra_body",
-        lambda model_name: True,
+        lambda model_name, base_url=None: True,
     )
 
     metadata = {"foo": "bar"}
