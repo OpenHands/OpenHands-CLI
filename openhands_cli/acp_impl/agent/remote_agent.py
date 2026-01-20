@@ -26,7 +26,7 @@ from openhands_cli.auth.api_client import (
     UnauthenticatedError,
 )
 from openhands_cli.auth.token_storage import TokenStorage
-from openhands_cli.cloud.conversation import is_token_valid
+from openhands_cli.auth.utils import is_token_valid
 from openhands_cli.locations import MCP_CONFIG_FILE
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import load_agent_specs
