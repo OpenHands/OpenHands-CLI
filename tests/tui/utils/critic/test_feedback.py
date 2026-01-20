@@ -37,11 +37,12 @@ async def test_critic_feedback_initial_render() -> None:
     async with app.run_test() as _pilot:
         rendered_text = str(widget.content)
         assert "Does the critic's prediction align" in rendered_text
-        assert "[0] Dismiss" in rendered_text
-        assert "[1] Accurate" in rendered_text
-        assert "[2] Too high" in rendered_text
-        assert "[3] Too low" in rendered_text
-        assert "[4] N/A" in rendered_text
+        # Check for bold-formatted option numbers
+        assert "[bold][0][/bold] Dismiss" in rendered_text
+        assert "[bold][1][/bold] Accurate" in rendered_text
+        assert "[bold][2][/bold] Too high" in rendered_text
+        assert "[bold][3][/bold] Too low" in rendered_text
+        assert "[bold][4][/bold] N/A" in rendered_text
 
 
 @pytest.mark.asyncio

@@ -105,6 +105,7 @@ class TestCliSettings:
         cfg = CliSettings(
             default_cells_expanded=False,
             auto_open_plan_panel=False,
+            enable_critic=False,
         )
 
         with patch.object(CliSettings, "get_config_path", return_value=config_path):
@@ -114,6 +115,7 @@ class TestCliSettings:
             {
                 "default_cells_expanded": False,
                 "auto_open_plan_panel": False,
+                "enable_critic": False,
             },
             indent=2,
         )
