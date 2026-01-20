@@ -4,6 +4,7 @@ This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 """
 
 import threading
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from textual.widgets import Markdown
@@ -21,6 +22,7 @@ from openhands.sdk.event import (
 from openhands.sdk.event.base import Event
 from openhands.sdk.event.condenser import Condensation, CondensationRequest
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
+from openhands.sdk.event.conversation_state import ConversationStateUpdateEvent
 from openhands.sdk.tool.builtins.finish import FinishAction
 from openhands.sdk.tool.builtins.think import ThinkAction
 from openhands.tools.file_editor.definition import FileEditorAction
@@ -89,6 +91,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         container: "VerticalScroll",
         app: "OpenHandsApp",
         skip_user_messages: bool = False,
+        on_conversation_ready: "Callable[[], None] | None" = None,
     ):
         """Initialize the visualizer.
 
@@ -97,6 +100,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             app: The Textual app instance for thread-safe UI updates
             highlight_regex: Dictionary mapping regex patterns to Rich color styles
             skip_user_messages: If True, skip displaying user messages
+            on_conversation_ready: Callback to invoke when cloud conversation is ready
         """
         super().__init__()
         self._container = container
@@ -108,6 +112,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._cli_settings: CliSettings | None = None
         # Track pending actions by tool_call_id for action-observation pairing
         self._pending_actions: dict[str, tuple[ActionEvent, Collapsible]] = {}
+        # Callback for when cloud conversation is ready
+        self._on_conversation_ready = on_conversation_ready
+        self._conversation_ready_notified = False
 
     @property
     def cli_settings(self) -> CliSettings:
@@ -145,6 +152,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
+        # Check for ConversationStateUpdateEvent to signal cloud conversation is ready
+        if isinstance(event, ConversationStateUpdateEvent):
+            if self._on_conversation_ready and not self._conversation_ready_notified:
+                self._conversation_ready_notified = True
+                self._run_on_main_thread(self._on_conversation_ready)
+            return  # Don't create a widget for this event
+
         # Check for TaskTrackerObservation to update/open the plan panel
         if isinstance(event, ObservationEvent) and isinstance(
             event.observation, TaskTrackerObservation
@@ -434,6 +448,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Don't emit condensation request events (internal events)
         elif isinstance(event, CondensationRequest):
             return None
+        # Don't emit conversation state update events (internal events for remote sync)
+        elif isinstance(event, ConversationStateUpdateEvent):
+            return None
 
         # Check if this is a plain text event (finish, think, or message)
         if isinstance(event, ActionEvent):
@@ -479,6 +496,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return None
         # Don't emit condensation request events (internal events)
         elif isinstance(event, CondensationRequest):
+            return None
+        # Don't emit conversation state update events (internal events for remote sync)
+        elif isinstance(event, ConversationStateUpdateEvent):
             return None
         elif isinstance(event, ActionEvent):
             # Build title using new format: "🔧 {summary}: $ {command}"

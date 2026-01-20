@@ -165,15 +165,56 @@ def main() -> None:
 
             handle_mcp_command(args)
         elif args.command == "cloud":
-            # Validate cloud mode requirements
-            if not args.task and not args.file:
-                parser.error(
-                    "cloud subcommand requires either --task or --file to be specified"
+            compat_result = check_terminal_compatibility(console=console)
+            if not compat_result.is_tty:
+                print(
+                    "OpenHands CLI terminal UI may not work correctly in this "
+                    f"environment: {compat_result.reason}"
+                )
+                print(
+                    "To override Rich's detection, you can set TTY_INTERACTIVE=1 "
+                    "(and optionally TTY_COMPATIBLE=1)."
                 )
 
-            from openhands_cli.cloud.command import handle_cloud_command
+            # Handle cloud resume logic
+            resume_id = None
+            if hasattr(args, "resume") and args.resume is not None:
+                if args.resume == "":
+                    # Show conversation list (TODO: implement cloud conversation list)
+                    console.print(
+                        "Listing cloud conversations is not yet supported.",
+                        style=OPENHANDS_THEME.warning,
+                    )
+                    return
+                else:
+                    resume_id = args.resume
 
-            handle_cloud_command(args)
+            # Use textual-based UI with cloud mode
+            from openhands_cli.tui.textual_app import main as textual_main
+
+            queued_inputs = create_seeded_instructions_from_args(args)
+            conversation_id = textual_main(
+                resume_conversation_id=resume_id,
+                queued_inputs=queued_inputs,
+                always_approve=getattr(args, "always_approve", False),
+                llm_approve=getattr(args, "llm_approve", False),
+                exit_without_confirmation=getattr(
+                    args, "exit_without_confirmation", False
+                ),
+                headless=getattr(args, "headless", False),
+                json_mode=getattr(args, "json", False)
+                and getattr(args, "headless", False),
+                cloud=True,
+                server_url=args.server_url,
+            )
+            if conversation_id is None:
+                # Authentication or other error occurred
+                sys.exit(1)
+            console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
+            console.print(
+                f"Conversation ID: {conversation_id.hex}",
+                style=OPENHANDS_THEME.accent,
+            )
 
         elif args.command == "view":
             from openhands_cli.conversations.viewer import view_conversation
@@ -212,6 +253,9 @@ def main() -> None:
                 headless=args.headless,
                 json_mode=json_mode,
             )
+            if conversation_id is None:
+                # Error occurred (shouldn't happen for non-cloud)
+                sys.exit(1)
             console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
             console.print(
                 f"Conversation ID: {conversation_id.hex}",

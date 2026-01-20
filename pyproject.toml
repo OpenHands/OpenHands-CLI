@@ -18,6 +18,7 @@ classifiers = [
 dependencies = [
   "openhands-sdk==1.8.2",
   "openhands-tools==1.8.2",
+  "openhands-workspace==1.8.2",
   "prompt-toolkit>=3",
   "textual>=0.79.0",
   "typer>=0.17.4",

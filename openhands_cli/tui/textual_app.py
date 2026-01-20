@@ -13,6 +13,7 @@ import uuid
 from collections.abc import Iterable
 from typing import ClassVar
 
+from rich.console import Console
 from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
 from textual.containers import Container, Horizontal, VerticalScroll
@@ -30,6 +31,7 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
+from openhands_cli.cloud.utils import fetch_cloud_sandbox_id
 from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
@@ -41,7 +43,7 @@ from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
-from openhands_cli.tui.widgets import InputField
+from openhands_cli.tui.widgets import CloudSetupIndicator, InputField
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
     CollapsibleNavigationMixin,
@@ -82,6 +84,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
         headless_mode: bool = False,
         json_mode: bool = False,
+        cloud: bool = False,
+        server_url: str | None = None,
+        sandbox_id: str | None = None,
         **kwargs,
     ):
         """Initialize the app with custom OpenHands theme.
@@ -95,6 +100,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                                        If None, defaults to AlwaysConfirm.
             headless_mode: If True, run in headless mode.
             json_mode: If True, enable JSON output mode.
+            cloud: If True, use OpenHands Cloud for remote execution.
+            server_url: The OpenHands Cloud server URL (used when cloud=True).
+            sandbox_id: Optional sandbox ID to reclaim an existing sandbox.
         """
         super().__init__(**kwargs)
 
@@ -109,6 +117,14 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Store JSON mode setting
         self.json_mode = json_mode
+
+        # Store cloud mode settings
+        self.cloud = cloud
+        self.server_url = server_url
+        self.sandbox_id = sandbox_id
+        # Track if cloud conversation is ready (set to True when we receive
+        # ConversationStateUpdateEvent)
+        self.cloud_conversation_ready = not cloud  # True if not cloud mode
 
         # Store resume conversation ID
         self.conversation_id = (
@@ -361,11 +377,23 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self._process_queued_inputs()
         self.is_ui_initialized = True
 
+    def _show_cloud_setup_indicator(self) -> None:
+        """Show indicator that cloud conversation is being set up."""
+        setup_widget = CloudSetupIndicator(classes="cloud-setup-indicator")
+        self.main_display.mount(setup_widget)
+        self.main_display.scroll_end(animate=False)
+
     def create_conversation_runner(self) -> ConversationRunner:
         # Initialize conversation runner with visualizer that can add widgets
         # Skip user messages since we display them immediately in the UI
+        # Pass callback for cloud conversation ready signal
         visualizer = ConversationVisualizer(
-            self.main_display, self, skip_user_messages=True
+            self.main_display,
+            self,
+            skip_user_messages=True,
+            on_conversation_ready=self._on_cloud_conversation_ready
+            if self.cloud
+            else None,
         )
 
         # Create JSON callback if in JSON mode
@@ -383,9 +411,43 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             visualizer,
             self.initial_confirmation_policy,
             event_callback,
+            cloud=self.cloud,
+            server_url=self.server_url,
+            sandbox_id=self.sandbox_id,
         )
 
         return runner
+
+    def _on_cloud_conversation_ready(self) -> None:
+        """Called when cloud conversation is ready.
+
+        Triggered when ConversationStateUpdateEvent is received.
+        """
+        self.cloud_conversation_ready = True
+
+        # Remove the setup indicator if it exists
+        try:
+            setup_indicator = self.query_one(
+                "#cloud_setup_indicator", CloudSetupIndicator
+            )
+            setup_indicator.remove()
+        except Exception:
+            pass  # Indicator may not exist
+
+        # Show ready message
+        ready_widget = Static(
+            f"[{OPENHANDS_THEME.success}]☁️  Cloud conversation ready! "
+            f"You can now send messages.[/{OPENHANDS_THEME.success}]",
+            classes="cloud-ready-indicator",
+        )
+        self.main_display.mount(ready_widget)
+        self.main_display.scroll_end(animate=False)
+
+        self.notify(
+            title="Cloud Ready",
+            message="Cloud conversation is ready. You can now send messages.",
+            severity="information",
+        )
 
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.
@@ -458,7 +520,22 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """Handle regular user messages with the conversation runner."""
         # Check if conversation runner is initialized
         if self.conversation_runner is None:
-            self.conversation_runner = self.create_conversation_runner()
+            # Show cloud setup indicator before creating runner (which sets up sandbox)
+            if self.cloud:
+                self._show_cloud_setup_indicator()
+
+            loop = asyncio.get_event_loop()
+            self.conversation_runner = await loop.run_in_executor(
+                None, self.create_conversation_runner
+            )
+
+        # Check if cloud conversation is ready (for cloud mode)
+        if self.cloud and not self.cloud_conversation_ready:
+            self.notify(
+                title="Cloud Setup in Progress",
+                message="Please wait for the cloud conversation to be ready.",
+                severity="warning",
+            )
 
         # Show that we're processing the message
         if self.conversation_runner.is_running:
@@ -466,7 +543,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             return
 
         # Process message asynchronously to keep UI responsive
-        # Only run worker if we have an active app (not in tests)
+        self._process_message_with_runner(user_message)
+
+    def _process_message_with_runner(self, user_message: str) -> None:
+        """Process message with the conversation runner."""
+        assert self.conversation_runner is not None
         try:
             self.run_worker(
                 self.conversation_runner.process_message_async(
@@ -817,6 +898,8 @@ def main(
     exit_without_confirmation: bool = False,
     headless: bool = False,
     json_mode: bool = False,
+    cloud: bool = False,
+    server_url: str | None = None,
 ):
     """Run the textual app.
 
@@ -828,7 +911,11 @@ def main(
         exit_without_confirmation: If True, exit without showing confirmation dialog.
         headless: If True, run in headless mode (no UI output, auto-approve actions).
         json_mode: If True, enable JSON output mode (implies headless).
+        cloud: If True, use OpenHands Cloud for remote execution.
+        server_url: The OpenHands Cloud server URL (used when cloud=True).
     """
+    console = Console()
+
     # Determine initial confirmation policy from CLI arguments
     # If headless mode is enabled, always use NeverConfirm (auto-approve all actions)
     initial_confirmation_policy = AlwaysConfirm()  # Default
@@ -836,6 +923,20 @@ def main(
         initial_confirmation_policy = NeverConfirm()
     elif llm_approve:
         initial_confirmation_policy = ConfirmRisky(threshold=SecurityRisk.HIGH)
+
+    # Fetch sandbox_id for cloud resume
+    sandbox_id = None
+    if cloud and resume_conversation_id:
+        sandbox_id = asyncio.run(
+            fetch_cloud_sandbox_id(server_url or "", resume_conversation_id)
+        )
+        if sandbox_id is None:
+            console.print(
+                "Failed to fetch sandbox for conversation. "
+                "Please check your authentication and try again.",
+                style=OPENHANDS_THEME.error,
+            )
+            return None
 
     app = OpenHandsApp(
         exit_confirmation=not exit_without_confirmation,
@@ -846,6 +947,9 @@ def main(
         initial_confirmation_policy=initial_confirmation_policy,
         headless_mode=headless,
         json_mode=json_mode,
+        cloud=cloud,
+        server_url=server_url,
+        sandbox_id=sandbox_id,
     )
     app.run(headless=headless)
 

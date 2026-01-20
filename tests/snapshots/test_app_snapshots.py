@@ -20,7 +20,7 @@ from unittest.mock import MagicMock
 
 from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal
+from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Footer, Static
 
 from openhands.tools.task_tracker.definition import TaskItem
@@ -31,6 +31,7 @@ from openhands_cli.tui.modals.settings.model_recommendations import (
 )
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
+from openhands_cli.tui.widgets import CloudSetupIndicator
 
 
 if TYPE_CHECKING:
@@ -381,3 +382,73 @@ class TestMCPSidePanelSnapshots:
         assert snap_compare(
             MCPPanelMixedServersApp(agent=mock_agent), terminal_size=(100, 30)
         )
+
+
+class TestCloudIndicatorSnapshots:
+    """Snapshot tests for cloud conversation indicators."""
+
+    def test_cloud_setup_indicator(self, snap_compare):
+        """Snapshot test for cloud conversation setup indicator.
+
+        Shows the 'Setting up cloud conversation...' message with animated
+        spinner that appears when a cloud conversation is being initialized.
+        """
+
+        class CloudSetupIndicatorApp(App):
+            CSS = """
+            Screen {
+                layout: vertical;
+            }
+            #main_display {
+                height: 1fr;
+            }
+            .cloud-setup-indicator {
+                padding: 1 2;
+            }
+            """
+
+            def compose(self) -> ComposeResult:
+                with VerticalScroll(id="main_display"):
+                    yield Static("OpenHands CLI - Cloud Mode", classes="banner")
+                    # Include the cloud setup indicator directly in compose
+                    yield CloudSetupIndicator(classes="cloud-setup-indicator")
+                yield Footer()
+
+        assert snap_compare(CloudSetupIndicatorApp(), terminal_size=(80, 20))
+
+    def test_cloud_ready_indicator(self, snap_compare):
+        """Snapshot test for cloud conversation ready indicator.
+
+        Shows the 'Cloud conversation ready!' message that appears
+        when a cloud conversation has been successfully set up.
+        """
+
+        class CloudReadyIndicatorApp(App):
+            CSS = """
+            Screen {
+                layout: vertical;
+            }
+            #main_display {
+                height: 1fr;
+            }
+            .cloud-ready-indicator {
+                padding: 1 2;
+            }
+            """
+
+            def compose(self) -> ComposeResult:
+                with VerticalScroll(id="main_display"):
+                    yield Static("OpenHands CLI - Cloud Mode", classes="banner")
+                yield Footer()
+
+            def on_mount(self) -> None:
+                # Simulate adding the cloud ready indicator
+                ready_widget = Static(
+                    f"[{OPENHANDS_THEME.success}]☁️  Cloud conversation ready! "
+                    f"You can now send messages.[/{OPENHANDS_THEME.success}]",
+                    classes="cloud-ready-indicator",
+                )
+                main_display = self.query_one("#main_display", VerticalScroll)
+                main_display.mount(ready_widget)
+
+        assert snap_compare(CloudReadyIndicatorApp(), terminal_size=(80, 20))
