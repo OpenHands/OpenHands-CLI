@@ -30,11 +30,11 @@ def create_critic_collapsible(critic_result: CriticResult) -> Collapsible:
     # Build content with category grouping
     content_text = _build_critic_content(critic_result)
 
-    # Create collapsible (start collapsed by default)
+    # Create collapsible (start expanded by default)
     return Collapsible(
         content_text,
         title=title,
-        collapsed=True,
+        collapsed=False,
         border_color="#888888",  # Default gray border
     )
 
@@ -121,7 +121,6 @@ def _append_categorized_features(content_text: Text, probs_dict: dict) -> None:
         probs_dict: Dictionary of feature probabilities
     """
     # Group features by taxonomy categories
-    general_context = {}
     agent_issues = {}
     user_patterns = {}
     infra_issues = {}
@@ -136,10 +135,11 @@ def _append_categorized_features(content_text: Text, probs_dict: dict) -> None:
         if feature_name.startswith("sentiment_"):
             continue
 
-        # Categorize based on taxonomy
+        # Skip general context features (only user_goal_summary would appear here)
+        # Sentiment is already in title, no need for this category
         category = FEATURE_CATEGORIES.get(feature_name)
         if category == "general_context":
-            general_context[feature_name] = prob
+            continue
         elif category == "agent_behavioral_issues":
             agent_issues[feature_name] = prob
         elif category == "user_followup_patterns":
@@ -150,24 +150,19 @@ def _append_categorized_features(content_text: Text, probs_dict: dict) -> None:
             unknown_features[feature_name] = prob
 
     # Display each category if it has features
-    if general_context:
-        _append_category_section(
-            content_text,
-            "General Context & Task Classification",
-            general_context,
-            "bold cyan",
-            "general",
-        )
-
     if agent_issues:
         _append_category_section(
-            content_text, "Agent Behavioral Issues", agent_issues, "bold red", "agent"
+            content_text,
+            "Detected Agent Behavioral Issues",
+            agent_issues,
+            "bold red",
+            "agent",
         )
 
     if user_patterns:
         _append_category_section(
             content_text,
-            "User Follow-Up Patterns",
+            "Predicted User Follow-Up Patterns",
             user_patterns,
             "bold magenta",
             "user",
@@ -176,7 +171,7 @@ def _append_categorized_features(content_text: Text, probs_dict: dict) -> None:
     if infra_issues:
         _append_category_section(
             content_text,
-            "Infrastructure Issues",
+            "Detected Infrastructure Issues",
             infra_issues,
             "bold yellow",
             "infra",
@@ -226,16 +221,8 @@ def _append_feature_with_prob(
     display_name = feature_name.replace("_", " ").title()
 
     # Determine color based on probability and category
-    if category == "general":
-        # General context features (sentiments, etc.)
-        if prob >= 0.7:
-            prob_style = "cyan bold"
-        elif prob >= 0.5:
-            prob_style = "cyan"
-        else:
-            prob_style = "dim"
-    elif category in ("agent", "user", "infra"):
-        # Issue indicators (higher = worse)
+    if category in ("agent", "user", "infra"):
+        # Issue/prediction indicators (higher probability = more likely)
         if prob >= 0.7:
             prob_style = "red bold"
         elif prob >= 0.5:
