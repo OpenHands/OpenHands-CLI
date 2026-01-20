@@ -13,9 +13,9 @@ from openhands_cli.stores.agent_store import (
     ENV_LLM_MODEL,
     LLMEnvOverrides,
     apply_llm_overrides,
-    set_env_overrides_enabled,
-    get_env_overrides_enabled,
     check_and_warn_env_vars,
+    get_env_overrides_enabled,
+    set_env_overrides_enabled,
 )
 
 
@@ -293,9 +293,7 @@ class TestApplyLlmOverrides:
 class TestAgentStoreEnvOverrides:
     """Integration tests for AgentStore.load() with environment variable overrides."""
 
-    def test_env_vars_ignored_when_flag_disabled(
-        self, setup_test_agent_config
-    ) -> None:
+    def test_env_vars_ignored_when_flag_disabled(self, setup_test_agent_config) -> None:
         """Environment variables should be ignored when flag is disabled."""
         from openhands.sdk import LLM, Agent
         from openhands_cli.stores import AgentStore
