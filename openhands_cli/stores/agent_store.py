@@ -69,6 +69,8 @@ def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
         return [Tool.model_validate(tool) for tool in tools_data]
     except (json.JSONDecodeError, KeyError, OSError):
         return None
+
+
 DEFAULT_LLM_BASE_URL = "https://llm-proxy.app.all-hands.dev/"
 
 # Environment variable names for LLM configuration

@@ -117,6 +117,7 @@ class TestGetToolTitle:
     def test_delegate_title_from_action(self, action: DelegateAction, expected: str):
         """DelegateAction title depends on command and ids/tasks."""
         assert get_tool_title("delegate", action=action) == expected
+
     def test_title_with_summary_terminal(self):
         """Test that summary is included in terminal action title."""
         action = TerminalAction(command="git status")

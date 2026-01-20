@@ -168,7 +168,11 @@ class ToolCallState:
             command = args.get("command")
             ids = args.get("ids") if isinstance(args.get("ids"), list) else None
             tasks = args.get("tasks") if isinstance(args.get("tasks"), dict) else None
-            return f"{clean_summary}" if clean_summary else format_delegate_title(command, ids=ids, tasks=tasks)
+            return (
+                f"{clean_summary}"
+                if clean_summary
+                else format_delegate_title(command, ids=ids, tasks=tasks)
+            )
 
         # Other tools: prefer summary if present
         return clean_summary or self.tool_name
