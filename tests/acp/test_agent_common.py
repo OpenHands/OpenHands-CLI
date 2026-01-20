@@ -83,10 +83,12 @@ class TestLoadSession:
         if isinstance(agent, OpenHandsCloudACPAgent):
             agent._active_workspaces[session_id] = MagicMock()
 
+        # EventSubscriber is imported in base_agent for local agent's load_session
+        # and in remote_agent for cloud agent's load_session override
         patch_path = (
             "openhands_cli.acp_impl.agent.remote_agent.EventSubscriber"
             if isinstance(agent, OpenHandsCloudACPAgent)
-            else "openhands_cli.acp_impl.agent.local_agent.EventSubscriber"
+            else "openhands_cli.acp_impl.agent.base_agent.EventSubscriber"
         )
 
         with patch(patch_path) as mock_subscriber_class:

@@ -53,7 +53,11 @@ class _ACPAgentContext(Protocol):
     _conn: Client
     _running_tasks: dict[str, asyncio.Task]
     _resume_conversation_id: str | None
-    agent_type: AgentType
+
+    @property
+    def agent_type(self) -> AgentType:
+        """Return the agent type."""
+        ...
 
     @property
     def active_session(self) -> Mapping[str, BaseConversation]:
@@ -70,7 +74,7 @@ class _ACPAgentContext(Protocol):
         working_dir: str | None = None,
         mcp_servers: dict[str, dict[str, Any]] | None = None,
         is_resuming: bool = False,
-    ) -> LocalConversation | RemoteConversation: ...
+    ) -> BaseConversation: ...
 
 
 class SharedACPAgentHandler:

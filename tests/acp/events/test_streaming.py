@@ -97,7 +97,7 @@ async def test_conversation_setup_enables_streaming(acp_agent_with_streaming, tm
         mock_conversation_class.return_value = mock_conversation
 
         # Call the method (agent has streaming_enabled=True)
-        acp_agent_with_streaming._setup_acp_conversation(
+        acp_agent_with_streaming._setup_conversation(
             session_id, working_dir=str(tmp_path)
         )
 
@@ -149,7 +149,7 @@ async def test_conversation_setup_without_streaming_flag(acp_agent, tmp_path):
         mock_conversation_class.return_value = mock_conversation
 
         # Call the method (agent has streaming_enabled=False by default)
-        acp_agent._setup_acp_conversation(session_id, working_dir=str(tmp_path))
+        acp_agent._setup_conversation(session_id, working_dir=str(tmp_path))
 
         # Verify that streaming was NOT enabled on the LLM (no model_copy call)
         mock_llm.model_copy.assert_not_called()

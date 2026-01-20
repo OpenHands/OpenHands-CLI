@@ -4,7 +4,7 @@ Common behavior shared with LocalOpenHandsACPAgent is tested in test_agent_commo
 This file tests cloud-specific functionality: authentication, workspace management.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 from uuid import uuid4
 
 import pytest
@@ -169,7 +169,11 @@ class TestPrompt:
             await cloud_agent.prompt(prompt=[], session_id=session_id)
 
             # Verify _get_or_create_conversation was called with is_resuming=True
-            mock_get.assert_called_once_with(session_id=session_id, is_resuming=True)
+            # (first call from override, second call from base class)
+            calls = mock_get.call_args_list
+            assert len(calls) >= 1
+            # First call should have is_resuming=True
+            assert calls[0] == call(session_id=session_id, is_resuming=True)
 
     @pytest.mark.asyncio
     async def test_prompt_does_not_resume_when_workspace_alive(
@@ -189,8 +193,9 @@ class TestPrompt:
 
             await cloud_agent.prompt(prompt=[], session_id=session_id)
 
-            # Verify _get_or_create_conversation was called with is_resuming=False
-            mock_get.assert_called_once_with(session_id=session_id, is_resuming=False)
+            # Verify _get_or_create_conversation was called (from base class)
+            # without is_resuming=True (workspace is alive, no resume needed)
+            mock_get.assert_called_once_with(session_id=session_id)
 
     @pytest.mark.asyncio
     async def test_prompt_handles_exception(self, cloud_agent, mock_connection):

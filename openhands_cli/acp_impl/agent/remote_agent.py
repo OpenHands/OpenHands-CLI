@@ -1,58 +1,25 @@
-"""OpenHands Cloud ACP Agent implementation.
-
-This module provides the ACP agent implementation that uses OpenHands Cloud
-for sandbox environments instead of local workspace.
-"""
+"""OpenHands Cloud ACP Agent implementation."""
 
 import asyncio
 import logging
+from collections.abc import Mapping
 from typing import Any
 from uuid import UUID
 
-from acp import (
-    Agent as ACPAgent,
-    Client,
-    InitializeResponse,
-    NewSessionResponse,
-    PromptResponse,
-    RequestError,
-)
-from acp.schema import (
-    AgentMessageChunk,
-    AuthenticateResponse,
-    ListSessionsResponse,
-    LoadSessionResponse,
-    SetSessionModelResponse,
-    SetSessionModeResponse,
-    TextContentBlock,
-)
+from acp import Client, NewSessionResponse, PromptResponse, RequestError
+from acp.schema import AuthenticateResponse, LoadSessionResponse
 
-from openhands.sdk import (
-    Conversation,
-    Event,
-    Message,
-    RemoteConversation,
-)
+from openhands.sdk import BaseConversation, Conversation, Event, RemoteConversation
 from openhands.workspace import OpenHandsCloudWorkspace
-from openhands_cli.acp_impl.agent.shared_agent_handler import SharedACPAgentHandler
+from openhands_cli.acp_impl.agent.base_agent import BaseOpenHandsACPAgent
 from openhands_cli.acp_impl.agent.util import AgentType, get_session_mode_state
-from openhands_cli.acp_impl.confirmation import (
-    ConfirmationMode,
-)
+from openhands_cli.acp_impl.confirmation import ConfirmationMode
 from openhands_cli.acp_impl.events.event import EventSubscriber
-from openhands_cli.acp_impl.runner import run_conversation_with_confirmation
 from openhands_cli.acp_impl.slash_commands import (
     apply_confirmation_mode_to_conversation,
-    create_help_text,
     get_confirmation_mode_from_conversation,
-    get_unknown_command_text,
-    handle_confirm_argument,
-    parse_slash_command,
 )
-from openhands_cli.acp_impl.utils import (
-    RESOURCE_SKILL,
-    convert_acp_prompt_to_message_content,
-)
+from openhands_cli.acp_impl.utils import RESOURCE_SKILL
 from openhands_cli.auth.api_client import (
     ApiClientError,
     OpenHandsApiClient,
@@ -63,18 +30,13 @@ from openhands_cli.cloud.conversation import is_token_valid
 from openhands_cli.locations import MCP_CONFIG_FILE
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import load_agent_specs
-from openhands_cli.utils import extract_text_from_message_content
 
 
 logger = logging.getLogger(__name__)
 
 
-class OpenHandsCloudACPAgent(ACPAgent):
-    """OpenHands Cloud ACP Agent that uses OpenHands Cloud for sandbox environments.
-
-    This agent connects to OpenHands Cloud (app.all-hands.dev) to provision
-    sandboxed environments for agent execution instead of using local workspace.
-    """
+class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
+    """OpenHands Cloud ACP Agent that uses OpenHands Cloud for sandbox environments."""
 
     def __init__(
         self,
@@ -83,129 +45,65 @@ class OpenHandsCloudACPAgent(ACPAgent):
         cloud_api_url: str = "https://app.all-hands.dev",
         resume_conversation_id: str | None = None,
     ):
-        """Initialize the OpenHands Cloud ACP agent.
+        """Initialize the cloud ACP agent.
 
         Args:
             conn: ACP connection for sending notifications
-            cloud_api_key: API key for OpenHands Cloud authentication
+            initial_confirmation_mode: Default confirmation mode for new sessions
             cloud_api_url: OpenHands Cloud API URL
             resume_conversation_id: Optional conversation ID to resume
         """
-        self._conn = conn
-        self._shared_handler = SharedACPAgentHandler(conn)
-        # Track running tasks for each session to ensure proper cleanup on cancel
-        self._running_tasks: dict[str, asyncio.Task] = {}
-        # Conversation ID to resume (from --resume flag)
-        self._resume_conversation_id: str | None = resume_conversation_id
-        if resume_conversation_id:
-            logger.info(f"Will resume conversation: {resume_conversation_id}")
+        super().__init__(conn, initial_confirmation_mode, resume_conversation_id)
 
         self.store = TokenStorage()
         self._cloud_api_key = self.store.get_api_key()
         self._cloud_api_url = cloud_api_url
 
-        # Track active cloud workspaces for cleanup
-        self._active_sessions: dict[str, RemoteConversation] = {}
         self._active_workspaces: dict[str, OpenHandsCloudWorkspace] = {}
-
-        self._initial_confirmation_mode: ConfirmationMode = initial_confirmation_mode
 
         logger.info(
             f"OpenHands Cloud ACP Agent initialized with cloud URL: {cloud_api_url}"
         )
 
-        self.agent_type: AgentType = "remote"
+    @property
+    def agent_type(self) -> AgentType:
+        """Return the agent type."""
+        return "remote"
 
     @property
-    def active_session(self) -> dict[str, RemoteConversation]:
+    def active_session(self) -> Mapping[str, BaseConversation]:
         """Return the active sessions mapping."""
         return self._active_sessions
 
-    async def _cmd_confirm(self, session_id: str, argument: str) -> str:
-        """Handle /confirm command.
+    async def _is_authenticated(self) -> bool:
+        """Check if the user is authenticated with OpenHands Cloud."""
+        if not self._cloud_api_key:
+            return False
 
-        Args:
-            session_id: The session ID
-            argument: Command argument (always-ask|always-approve|llm-approve)
-
-        Returns:
-            Status message
-        """
-        # Get current mode from conversation if it exists
-        if session_id in self._active_sessions:
-            current_mode = get_confirmation_mode_from_conversation(
-                self._active_sessions[session_id]
-            )
-        else:
-            current_mode = self._initial_confirmation_mode
-
-        response_text, new_mode = handle_confirm_argument(current_mode, argument)
-        if new_mode is not None:
-            await self._shared_handler.set_confirmation_mode(self, session_id, new_mode)
-
-        return response_text
-
-    async def initialize(
-        self,
-        protocol_version: int,
-        client_capabilities: Any | None = None,
-        client_info: Any | None = None,
-        **_kwargs: Any,
-    ) -> InitializeResponse:
-        """Initialize the ACP protocol."""
-        return await self._shared_handler.initialize(
-            protocol_version, client_capabilities, client_info, **_kwargs
+        return await is_token_valid(
+            server_url=self._cloud_api_url, api_key=self._cloud_api_key
         )
 
-    async def set_session_mode(
-        self,
-        mode_id: str,
-        session_id: str,
-        **_kwargs: Any,
-    ) -> SetSessionModeResponse | None:
-        """Set session mode by updating confirmation mode."""
-        return await self._shared_handler.set_session_mode(
-            self, mode_id, session_id, **_kwargs
-        )
+    def _cleanup_session(self, session_id: str) -> None:
+        """Clean up resources for a session."""
+        workspace = self._active_workspaces.pop(session_id, None)
+        if workspace:
+            try:
+                workspace.cleanup()
+            except Exception as e:
+                logger.warning(f"Error cleaning up workspace for {session_id}: {e}")
 
-    async def list_sessions(
-        self,
-        cursor: str | None = None,
-        cwd: str | None = None,
-        **_kwargs: Any,
-    ) -> ListSessionsResponse:
-        """List available sessions (no-op for now)."""
-        return await self._shared_handler.list_sessions(cursor, cwd, **_kwargs)
-
-    async def set_session_model(
-        self,
-        model_id: str,
-        session_id: str,
-        **_kwargs: Any,
-    ) -> SetSessionModelResponse | None:
-        """Set session model (no-op for now)."""
-        return await self._shared_handler.set_session_model(
-            model_id, session_id, **_kwargs
-        )
+        conversation = self._active_sessions.pop(session_id, None)
+        if conversation:
+            try:
+                conversation.close()
+            except Exception as e:
+                logger.warning(f"Error closing conversation for {session_id}: {e}")
 
     async def authenticate(
         self, method_id: str, **_kwargs: Any
     ) -> AuthenticateResponse | None:
-        """Authenticate the client using OAuth2 device flow.
-
-        This method performs the OAuth2 device flow to authenticate the user
-        with OpenHands Cloud. It opens a browser for the user to authorize,
-        then stores the resulting API key for future requests.
-
-        Args:
-            method_id: Authentication method ID (should be "oauth")
-
-        Returns:
-            AuthenticateResponse on success
-
-        Raises:
-            RequestError: If authentication fails
-        """
+        """Authenticate the client using OAuth2 device flow."""
         logger.info(f"Authentication requested with method: {method_id}")
 
         if method_id != "oauth":
@@ -217,7 +115,6 @@ class OpenHandsCloudACPAgent(ACPAgent):
         from openhands_cli.auth.login_command import login_command
 
         try:
-            # Perform OAuth2 device flow authentication
             await login_command(self._cloud_api_url, skip_settings_sync=True)
             self._cloud_api_key = self.store.get_api_key()
             logger.info("OAuth authentication completed successfully")
@@ -235,17 +132,7 @@ class OpenHandsCloudACPAgent(ACPAgent):
             ) from e
 
     async def _verify_and_get_sandbox_id(self, conversation_id: str) -> str:
-        """Verify a conversation exists and get its sandbox_id.
-
-        Args:
-            conversation_id: The conversation ID to verify
-
-        Returns:
-            The sandbox_id associated with the conversation
-
-        Raises:
-            RequestError: If the conversation doesn't exist or has no sandbox_id
-        """
+        """Verify a conversation exists and get its sandbox_id."""
         if not self._cloud_api_key:
             raise RequestError.auth_required(
                 {"reason": "Authentication required to verify conversation"}
@@ -303,24 +190,13 @@ class OpenHandsCloudACPAgent(ACPAgent):
         working_dir: str | None = None,  # noqa: ARG002
         mcp_servers: dict[str, dict[str, Any]] | None = None,
         is_resuming: bool = False,
-    ) -> RemoteConversation:
-        """Get an active conversation from cache or create it with cloud workspace.
-
-        Args:
-            session_id: Session/conversation ID (UUID string)
-            working_dir: Working directory (ignored for cloud workspace)
-            mcp_servers: MCP servers config (only for new sessions)
-
-        Returns:
-            Cached or newly created conversation with cloud workspace
-        """
-        # Check if we already have this conversation active
-        # Skip check when resuming
+    ) -> BaseConversation:
+        """Get an active conversation from cache or create it with cloud workspace."""
+        # Skip cache check when resuming to recreate workspace
         if session_id in self._active_sessions and not is_resuming:
             logger.debug(f"Using cached cloud conversation for session {session_id}")
             return self._active_sessions[session_id]
 
-        # Check if we're resuming a conversation
         sandbox_id: str | None = None
         if is_resuming:
             logger.info(
@@ -329,9 +205,8 @@ class OpenHandsCloudACPAgent(ACPAgent):
             )
             sandbox_id = await self._verify_and_get_sandbox_id(session_id)
 
-        # Create new conversation with cloud workspace
         logger.debug(f"Creating new cloud conversation for session {session_id}")
-        conversation, workspace = self._setup_cloud_conversation(
+        conversation, workspace = self._setup_conversation(
             session_id=session_id,
             mcp_servers=mcp_servers,
             sandbox_id=sandbox_id,
@@ -341,33 +216,18 @@ class OpenHandsCloudACPAgent(ACPAgent):
             conversation, self._initial_confirmation_mode, session_id
         )
 
-        # Cache the conversation
         self._active_sessions[session_id] = conversation
         self._active_workspaces[session_id] = workspace
 
         return conversation
 
-    def _setup_cloud_conversation(
+    def _setup_conversation(
         self,
         session_id: str,
         mcp_servers: dict[str, dict[str, Any]] | None = None,
         sandbox_id: str | None = None,
     ) -> tuple[RemoteConversation, OpenHandsCloudWorkspace]:
-        """Set up a conversation with OpenHands Cloud workspace.
-
-        Args:
-            session_id: Session/conversation ID (UUID string)
-            mcp_servers: Optional MCP servers configuration
-            sandbox_id: Optional sandbox ID to resume an existing sandbox
-
-        Returns:
-            Configured RemoteConversation with cloud workspace
-
-        Raises:
-            MissingAgentSpec: If agent configuration is missing
-            RequestError: If MCP configuration is invalid
-        """
-        # Load agent specs
+        """Set up a conversation with OpenHands Cloud workspace."""
         try:
             agent = load_agent_specs(
                 conversation_id=session_id,
@@ -387,7 +247,6 @@ class OpenHandsCloudACPAgent(ACPAgent):
                 }
             )
 
-        # Create OpenHands Cloud workspace
         if sandbox_id:
             logger.info(
                 f"Resuming OpenHands Cloud workspace with sandbox_id {sandbox_id} "
@@ -408,21 +267,14 @@ class OpenHandsCloudACPAgent(ACPAgent):
             sandbox_id=sandbox_id,
         )
 
-        # Track workspace for cleanup
         self._active_workspaces[session_id] = workspace
 
-        # Get the current event loop for the callback
         loop = asyncio.get_event_loop()
-
-        # Create event subscriber for streaming updates
         subscriber = EventSubscriber(session_id, self._conn)
 
         def sync_callback(event: Event) -> None:
-            """Synchronous wrapper that schedules async event handling."""
             asyncio.run_coroutine_threadsafe(subscriber(event), loop)
 
-        # Create RemoteConversation with cloud workspace
-        # Note: RemoteConversation doesn't support persistence_dir
         conversation = Conversation(
             agent=agent,
             workspace=workspace,
@@ -433,42 +285,16 @@ class OpenHandsCloudACPAgent(ACPAgent):
         subscriber.conversation = conversation
         return conversation, workspace
 
-    async def _is_authenticated(self) -> bool:
-        """Check if the user is authenticated with OpenHands Cloud.
-
-        Returns:
-            True if the user has a valid API key stored, False otherwise.
-        """
-
-        if not self._cloud_api_key:
-            return False
-
-        return await is_token_valid(
-            server_url=self._cloud_api_url, api_key=self._cloud_api_key
-        )
-
     async def new_session(
         self,
         cwd: str,  # noqa: ARG002
         mcp_servers: list[Any],
         **_kwargs: Any,
     ) -> NewSessionResponse:
-        """Create a new conversation session with cloud workspace.
-
-        Overrides the base implementation to handle cloud workspace creation.
-        Note: working_dir is ignored for cloud workspace as it's managed
-        by the cloud environment.
-
-        Raises:
-            RequestError.auth_required: If the user is not authenticated
-        """
-        # Check if user is authenticated before creating a session
+        """Create a new conversation session with cloud workspace."""
         is_authenticated = await self._is_authenticated()
         if not is_authenticated:
             logger.info("User not authenticated, requiring authentication")
-
-            # Clients recognize this error type and display login options
-            # Selecting the login option will trigger the authenticate method
             raise RequestError.auth_required(
                 {"reason": "Authentication required to create a cloud session"}
             )
@@ -478,92 +304,27 @@ class OpenHandsCloudACPAgent(ACPAgent):
     async def prompt(
         self, prompt: list[Any], session_id: str, **_kwargs: Any
     ) -> PromptResponse:
-        """Handle a prompt request with cloud workspace."""
-        try:
-            workspace = self._active_workspaces.get(session_id)
-            if not workspace:
-                raise Exception("Missing workspace for session")
+        """Handle a prompt request with cloud workspace.
 
-            # Resumes workspace in the event conversation
-            # has been open but workspace closed
-            conversation = await self._get_or_create_conversation(
-                session_id=session_id, is_resuming=not workspace.alive
-            )
-
-            # Convert ACP prompt format to OpenHands message content
-            message_content = convert_acp_prompt_to_message_content(prompt)
-
-            if not message_content:
-                return PromptResponse(stop_reason="end_turn")
-
-            # Check if this is a slash command (single text block starting with "/")
-            # multiple blocks not valid slash commands -> has_exactly_one = True
-            text = extract_text_from_message_content(
-                message_content, has_exactly_one=True
-            )
-            slash_cmd = parse_slash_command(text) if text else None
-            if slash_cmd:
-                command, argument = slash_cmd
-                logger.info(f"Executing slash command: /{command} {argument}")
-
-                # Execute the slash command
-                if command == "help":
-                    response_text = create_help_text()
-                elif command == "confirm":
-                    response_text = await self._cmd_confirm(session_id, argument)
-                else:
-                    response_text = get_unknown_command_text(command)
-
-                # Send response to client
-                await self._conn.session_update(
-                    session_id=session_id,
-                    update=AgentMessageChunk(
-                        session_update="agent_message_chunk",
-                        content=TextContentBlock(type="text", text=response_text),
-                    ),
-                )
-
-                return PromptResponse(stop_reason="end_turn")
-
-            # Send the message
-            message = Message(role="user", content=message_content)
-            conversation.send_message(message)
-
-            # Run the conversation with confirmation mode via runner function
-            # The runner handles the confirmation flow for all modes
-            # Track the running task so cancel() can wait for proper cleanup
-            run_task = asyncio.create_task(
-                run_conversation_with_confirmation(
-                    conversation=conversation,
-                    conn=self._conn,
-                    session_id=session_id,
-                )
-            )
-
-            self._running_tasks[session_id] = run_task
-            try:
-                await run_task
-            finally:
-                # Clean up task tracking and streaming state
-                self._running_tasks.pop(session_id, None)
-
-            # Return the final response
-            return PromptResponse(stop_reason="end_turn")
-
-        except RequestError:
-            raise
-        except Exception as e:
-            logger.error(f"Error processing prompt: {e}", exc_info=True)
-            await self._conn.session_update(
-                session_id=session_id,
-                update=AgentMessageChunk(
-                    session_update="agent_message_chunk",
-                    content=TextContentBlock(type="text", text=f"Error: {str(e)}"),
-                ),
-            )
+        Overrides base class to handle workspace resuming when workspace is not alive.
+        """
+        # Check if workspace needs to be resumed
+        workspace = self._active_workspaces.get(session_id)
+        if not workspace:
             raise RequestError.internal_error(
-                {"reason": "Failed to process prompt", "details": str(e)}
+                {"reason": "Missing workspace for session"}
             )
+
+        # Resume workspace if it's not alive
+        is_resuming = not workspace.alive
+        if is_resuming:
+            # Force recreation of conversation with resumed workspace
+            await self._get_or_create_conversation(
+                session_id=session_id, is_resuming=True
+            )
+
+        # Call base class prompt implementation
+        return await super().prompt(prompt, session_id, **_kwargs)
 
     async def load_session(
         self,
@@ -572,15 +333,10 @@ class OpenHandsCloudACPAgent(ACPAgent):
         session_id: str,
         **_kwargs: Any,
     ) -> LoadSessionResponse | None:
-        """Load an existing session.
-
-        Note: Cloud mode doesn't support persistent sessions in the same way
-        as local mode. Each cloud session creates a new sandbox.
-        """
+        """Load an existing session (cloud mode has limited support)."""
         logger.info(f"Loading session: {session_id}")
 
         try:
-            # Validate session ID format
             try:
                 UUID(session_id)
             except ValueError:
@@ -592,7 +348,6 @@ class OpenHandsCloudACPAgent(ACPAgent):
             if session_id in self._active_sessions:
                 conversation = self._active_sessions[session_id]
 
-                # Stream conversation history to client
                 if conversation.state.events:
                     logger.info(
                         f"Streaming {len(conversation.state.events)} events from "
@@ -605,7 +360,6 @@ class OpenHandsCloudACPAgent(ACPAgent):
                 current_mode = get_confirmation_mode_from_conversation(conversation)
                 return LoadSessionResponse(modes=get_session_mode_state(current_mode))
 
-            # Session not found - cloud mode doesn't support loading from disk
             raise RequestError.invalid_params(
                 {
                     "reason": "Session not found",
@@ -624,43 +378,6 @@ class OpenHandsCloudACPAgent(ACPAgent):
             raise RequestError.internal_error(
                 {"reason": "Failed to load session", "details": str(e)}
             )
-
-    def _cleanup_session(self, session_id: str) -> None:
-        """Clean up resources for a session.
-
-        Args:
-            session_id: The session ID to clean up
-        """
-        # Clean up workspace
-        workspace = self._active_workspaces.pop(session_id, None)
-        if workspace:
-            try:
-                workspace.cleanup()
-            except Exception as e:
-                logger.warning(f"Error cleaning up workspace for {session_id}: {e}")
-
-        # Clean up conversation
-        conversation = self._active_sessions.pop(session_id, None)
-        if conversation:
-            try:
-                conversation.close()
-            except Exception as e:
-                logger.warning(f"Error closing conversation for {session_id}: {e}")
-
-    async def cancel(self, session_id: str, **_kwargs: Any) -> None:
-        """Cancel the current operation."""
-        await self._shared_handler.cancel(self, session_id, **_kwargs)
-
-    async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
-        """Extension method (not supported)."""
-        return await self._shared_handler.ext_method(method, params)
-
-    async def ext_notification(self, method: str, params: dict[str, Any]) -> None:
-        """Extension notification (no-op for now)."""
-        await self._shared_handler.ext_notification(method, params)
-
-    def on_connect(self, conn: Client) -> None:
-        pass
 
     async def close_session(self, session_id: str, **_kwargs: Any) -> None:
         """Close a session and clean up resources."""
