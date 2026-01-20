@@ -24,6 +24,7 @@ from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.tool.builtins.finish import FinishAction
 from openhands.sdk.tool.builtins.think import ThinkAction
 from openhands.tools.file_editor.definition import FileEditorAction
+from openhands.tools.task_tracker.definition import TaskTrackerObservation
 from openhands.tools.terminal.definition import TerminalAction
 from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
@@ -36,6 +37,10 @@ from openhands_cli.tui.widgets.collapsible import (
 SUCCESS_ICON = "✓"
 ERROR_ICON = "✗"
 AGENT_MESSAGE_PADDING = (1, 0, 1, 1)  # top, right, bottom, left
+
+# Maximum line length for truncating titles/commands in collapsed view
+MAX_LINE_LENGTH = 70
+ELLIPSIS = "..."
 
 
 if TYPE_CHECKING:
@@ -113,8 +118,39 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def reload_configuration(self) -> None:
         self._cli_settings = CliSettings.load()
 
+    def _run_on_main_thread(self, func, *args) -> None:
+        """Run a function on the main thread via call_from_thread if needed."""
+        if threading.get_ident() == self._main_thread_id:
+            func(*args)
+        else:
+            self._app.call_from_thread(func, *args)
+
+    def _do_refresh_plan_panel(self) -> None:
+        """Refresh the plan panel (must be called from main thread)."""
+        plan_panel = self._app.plan_panel
+        auto_open = self.cli_settings.auto_open_plan_panel
+
+        # Panel is already open, refresh contents
+        if plan_panel.is_on_screen:
+            plan_panel.refresh_from_disk()
+            return
+
+        # Not mounted: only open if user opted in
+        # and hasn't dismissed it once already
+        if not auto_open or plan_panel.user_dismissed:
+            return
+
+        # Open the plan panel
+        plan_panel.toggle()
+
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
+        # Check for TaskTrackerObservation to update/open the plan panel
+        if isinstance(event, ObservationEvent) and isinstance(
+            event.observation, TaskTrackerObservation
+        ):
+            self._run_on_main_thread(self._do_refresh_plan_panel)
+
         # Handle observation events by updating existing action collapsibles
         if isinstance(
             event, ObservationEvent | UserRejectObservation | AgentErrorEvent
@@ -124,14 +160,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         widget = self._create_event_widget(event)
         if widget:
-            # Check if we're in the main thread or a background thread
-            current_thread_id = threading.get_ident()
-            if current_thread_id == self._main_thread_id:
-                # We're in the main thread, update UI directly
-                self._add_widget_to_ui(widget)
-            else:
-                # We're in a background thread, use call_from_thread
-                self._app.call_from_thread(self._add_widget_to_ui, widget)
+            self._run_on_main_thread(self._add_widget_to_ui, widget)
 
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
@@ -171,23 +200,21 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Build the new content (observation result only)
         new_content = self._build_observation_content(event)
 
-        # Update the collapsible
-        current_thread_id = threading.get_ident()
-        if current_thread_id == self._main_thread_id:
-            self._update_widget_in_ui(collapsible, new_title, new_content)
-        else:
-            self._app.call_from_thread(
-                self._update_widget_in_ui, collapsible, new_title, new_content
-            )
-
+        self._run_on_main_thread(
+            self._update_widget_in_ui, collapsible, new_title, new_content
+        )
         return True
 
     def _build_action_title(self, event: ActionEvent) -> str:
         """Build a title for an action event.
 
-        Format: "[bold]{summary}[/bold]" for most actions
-                "[bold]{summary}[/bold]: $ {command}" for terminal actions
-                "[bold]{summary}[/bold]: Reading/Editing {path}" for file operations
+        Format:
+            "[bold]{summary}[/bold]" for most actions
+            "[bold]{summary}[/bold][dim]: $ {command}[/dim]" for terminal
+            "[bold]{summary}[/bold][dim]: Reading/Editing {path}[/dim]" for files
+
+        The detail portion (after the colon) is rendered in dim style to
+        visually distinguish it from the main summary text.
         """
         summary = (
             self._escape_rich_markup(str(event.summary).strip().replace("\n", " "))
@@ -196,20 +223,21 @@ class ConversationVisualizer(ConversationVisualizerBase):
         )
         action = event.action
 
-        # Terminal actions: show summary + command
+        # Terminal actions: show summary + command (truncated for display)
         if isinstance(action, TerminalAction) and action.command:
             cmd = self._escape_rich_markup(action.command.strip().replace("\n", " "))
+            cmd = self._truncate_for_display(cmd)
             if summary:
-                return f"[bold]{summary}[/bold]: $ {cmd}"
-            return f"$ {cmd}"
+                return f"[bold]{summary}[/bold][dim]: $ {cmd}[/dim]"
+            return f"[dim]$ {cmd}[/dim]"
 
         # File operations: include path with Reading/Editing
         if isinstance(action, FileEditorAction) and action.path:
             op = "Reading" if action.command == "view" else "Editing"
             path = self._escape_rich_markup(action.path)
             if summary:
-                return f"[bold]{summary}[/bold]: {op} {path}"
-            return f"[bold]{op}[/bold] {path}"
+                return f"[bold]{summary}[/bold][dim]: {op} {path}[/dim]"
+            return f"[bold]{op}[/bold][dim] {path}[/dim]"
 
         # All other actions: just use summary
         if summary:
@@ -237,14 +265,31 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Escape square brackets which are used for Rich markup
         return text.replace("[", r"\[").replace("]", r"\]")
 
+    def _truncate_for_display(
+        self, text: str, max_length: int = MAX_LINE_LENGTH, *, from_start: bool = True
+    ) -> str:
+        """Truncate text with ellipsis if it exceeds max_length.
+
+        Args:
+            text: The text to truncate.
+            max_length: Maximum length before truncation.
+            from_start: If True, keep the start and add ellipsis at end.
+                       If False, keep the end and add ellipsis at start (for paths).
+        """
+        if len(text) > max_length:
+            if from_start:
+                return text[: max_length - len(ELLIPSIS)] + ELLIPSIS
+            else:
+                return ELLIPSIS + text[-(max_length - len(ELLIPSIS)) :]
+        return text
+
     def _extract_meaningful_title(self, event, fallback_title: str) -> str:
         """Extract a meaningful title from an event, with fallback to truncated
         content."""
         # For ActionEvents, prefer the LLM-generated summary if available
         if hasattr(event, "summary") and event.summary:
             summary = str(event.summary).strip().replace("\n", " ")
-            if len(summary) > 70:
-                summary = summary[:67] + "..."
+            summary = self._truncate_for_display(summary)
             return self._escape_rich_markup(summary)
 
         # Try to extract meaningful information from the event
@@ -257,26 +302,22 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if hasattr(action, "command") and action.command:
                 # For command actions, show the command
                 cmd = str(action.command).strip()
-                if len(cmd) > 50:
-                    cmd = cmd[:47] + "..."
+                cmd = self._truncate_for_display(cmd)
                 return f"{action_type}: {self._escape_rich_markup(cmd)}"
             elif hasattr(action, "path") and action.path:
-                # For file actions, show the path
+                # For file actions, show the path (truncate from start to show filename)
                 path = str(action.path)
-                if len(path) > 50:
-                    path = "..." + path[-47:]  # Show end of path if too long
+                path = self._truncate_for_display(path, from_start=False)
                 return f"{action_type}: {self._escape_rich_markup(path)}"
             elif hasattr(action, "content") and action.content:
                 # For content-based actions, show truncated content
                 content = str(action.content).strip().replace("\n", " ")
-                if len(content) > 50:
-                    content = content[:47] + "..."
+                content = self._truncate_for_display(content)
                 return f"{action_type}: {self._escape_rich_markup(content)}"
             elif hasattr(action, "message") and action.message:
                 # For message actions, show truncated message
                 msg = str(action.message).strip().replace("\n", " ")
-                if len(msg) > 50:
-                    msg = msg[:47] + "..."
+                msg = self._truncate_for_display(msg)
                 return f"{action_type}: {self._escape_rich_markup(msg)}"
             else:
                 return f"{action_type} Action"
@@ -288,8 +329,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
             if hasattr(obs, "content") and obs.content:
                 content = str(obs.content).strip().replace("\n", " ")
-                if len(content) > 50:
-                    content = content[:47] + "..."
+                content = self._truncate_for_display(content)
                 return f"{obs_type}: {self._escape_rich_markup(content)}"
             else:
                 return f"{obs_type} Observation"
@@ -311,16 +351,14 @@ class ConversationVisualizer(ConversationVisualizerBase):
                     content_text = str(msg.content)
 
                 content_text = content_text.strip().replace("\n", " ")
-                if len(content_text) > 60:
-                    content_text = content_text[:57] + "..."
+                content_text = self._truncate_for_display(content_text)
                 role = "User" if msg.role == "user" else "Agent"
                 return f"{role}: {self._escape_rich_markup(content_text)}"
 
         elif hasattr(event, "message") and event.message:
             # For events with direct message attribute
             content = str(event.message).strip().replace("\n", " ")
-            if len(content) > 60:
-                content = content[:57] + "..."
+            content = self._truncate_for_display(content)
             return f"{fallback_title}: {self._escape_rich_markup(content)}"
 
         # If we can't extract meaningful info, try to truncate the visualized content
@@ -338,8 +376,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
                     r"\x1b\[[0-9;]*m", "", content_str
                 )  # Remove ANSI codes
 
-                if len(content_str) > 60:
-                    content_str = content_str[:57] + "..."
+                content_str = self._truncate_for_display(content_str)
 
                 if content_str.strip():
                     return f"{fallback_title}: {self._escape_rich_markup(content_str)}"
@@ -447,9 +484,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
             # Build title using new format: "🔧 {summary}: $ {command}"
             title = self._build_action_title(event)
             content_string = self._escape_rich_markup(str(content))
-            metrics = self._format_metrics_subtitle()
-            if metrics:
-                content_string = f"{content_string}\n\n{metrics}"
 
             # Action events default to collapsed since we have summary in title
             collapsible = self._make_collapsible(content_string, title, event)
@@ -473,18 +507,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
         elif isinstance(event, AgentErrorEvent):
             title = self._extract_meaningful_title(event, "Agent Error")
             content_string = self._escape_rich_markup(str(content))
-            metrics = self._format_metrics_subtitle()
-            if metrics:
-                content_string = f"{content_string}\n\n{metrics}"
-
             return self._make_collapsible(content_string, title, event)
         elif isinstance(event, ConversationErrorEvent):
             title = self._extract_meaningful_title(event, "Conversation Error")
             content_string = self._escape_rich_markup(str(content))
-            metrics = self._format_metrics_subtitle()
-            if metrics:
-                content_string = f"{content_string}\n\n{metrics}"
-
             return self._make_collapsible(content_string, title, event)
         elif isinstance(event, PauseEvent):
             title = self._extract_meaningful_title(event, "User Paused")
@@ -494,10 +520,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         elif isinstance(event, Condensation):
             title = self._extract_meaningful_title(event, "Condensation")
             content_string = self._escape_rich_markup(str(content))
-            metrics = self._format_metrics_subtitle()
-            if metrics:
-                content_string = f"{content_string}\n\n{metrics}"
-
             return self._make_collapsible(content_string, title, event)
         else:
             # Fallback for unknown event types
@@ -508,70 +530,3 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 f"{self._escape_rich_markup(str(content))}\n\nSource: {event.source}"
             )
             return self._make_collapsible(content_string, title, event)
-
-    def _format_metrics_subtitle(self) -> str | None:
-        """Format LLM metrics as a visually appealing subtitle string."""
-        # Check CLI settings to see if metrics should be displayed
-        if not self.cli_settings.display_cost_per_action:
-            return None
-
-        stats = self.conversation_stats
-        if not stats:
-            return None
-
-        combined_metrics = stats.get_combined_metrics()
-        if not combined_metrics or not combined_metrics.accumulated_token_usage:
-            return None
-
-        usage = combined_metrics.accumulated_token_usage
-        cost = combined_metrics.accumulated_cost or 0.0
-
-        # helper: 1234 -> "1.2K", 1200000 -> "1.2M"
-        def abbr(n: int | float) -> str:
-            n = int(n or 0)
-            if n >= 1_000_000_000:
-                val, suffix = n / 1_000_000_000, "B"
-            elif n >= 1_000_000:
-                val, suffix = n / 1_000_000, "M"
-            elif n >= 1_000:
-                val, suffix = n / 1_000, "K"
-            else:
-                return str(n)
-            return f"{val:.2f}".rstrip("0").rstrip(".") + suffix
-
-        input_tokens = abbr(usage.prompt_tokens or 0)
-        output_tokens = abbr(usage.completion_tokens or 0)
-
-        # Cache hit rate (prompt + cache)
-        prompt = usage.prompt_tokens or 0
-        cache_read = usage.cache_read_tokens or 0
-        cache_rate = f"{(cache_read / prompt * 100):.2f}%" if prompt > 0 else "N/A"
-        reasoning_tokens = usage.reasoning_tokens or 0
-
-        # Cost
-        cost_str = f"{cost:.4f}" if cost > 0 else "0.00"
-
-        # Build with theme color scheme
-        parts: list[str] = []
-        parts.append(
-            f"[{OPENHANDS_THEME.accent}]↑ input {input_tokens}"
-            f"[/{OPENHANDS_THEME.accent}]"
-        )
-        parts.append(
-            f"[{OPENHANDS_THEME.primary}]cache hit {cache_rate}"
-            f"[/{OPENHANDS_THEME.primary}]"
-        )
-        if reasoning_tokens > 0:
-            parts.append(
-                f"[{OPENHANDS_THEME.warning}] reasoning {abbr(reasoning_tokens)}"
-                f"[/{OPENHANDS_THEME.warning}]"
-            )
-        parts.append(
-            f"[{OPENHANDS_THEME.accent}]↓ output {output_tokens}"
-            f"[/{OPENHANDS_THEME.accent}]"
-        )
-        parts.append(
-            f"[{OPENHANDS_THEME.success}]$ {cost_str}[/{OPENHANDS_THEME.success}]"
-        )
-
-        return "Tokens: " + " • ".join(parts)

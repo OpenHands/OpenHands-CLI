@@ -42,7 +42,7 @@ def deps(monkeypatch) -> FakeAgentStore:
     monkeypatch.setattr(
         settings_utils,
         "should_set_litellm_extra_body",
-        lambda model_name: False,
+        lambda model_name, base_url=None: False,
     )
     monkeypatch.setattr(
         settings_utils,
@@ -130,6 +130,40 @@ def test_preserves_existing_api_key_when_not_provided(
             "https://advanced.example",
             "openai/gpt-4o",  # provider/model combined
             None,  # advanced base_url cleared
+            ("custom_model", "base_url"),
+        ),
+        (
+            "basic",
+            "openrouter",
+            "google/gemini-3-flash-preview",
+            "should-be-cleared",
+            "https://advanced.example",
+            # All providers require prefix even for models with '/' in their name
+            # See: https://docs.litellm.ai/docs/providers/openrouter
+            "openrouter/google/gemini-3-flash-preview",
+            None,
+            ("custom_model", "base_url"),
+        ),
+        (
+            "basic",
+            "nvidia_nim",
+            "meta/llama3-70b-instruct",
+            "should-be-cleared",
+            "https://advanced.example",
+            # See: https://docs.litellm.ai/docs/providers/nvidia_nim
+            "nvidia_nim/meta/llama3-70b-instruct",
+            None,
+            ("custom_model", "base_url"),
+        ),
+        (
+            "basic",
+            "deepinfra",
+            "meta-llama/Meta-Llama-3.1-8B-Instruct",
+            "should-be-cleared",
+            "https://advanced.example",
+            # See: https://docs.litellm.ai/docs/providers
+            "deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct",
+            None,
             ("custom_model", "base_url"),
         ),
         (
@@ -313,7 +347,7 @@ def test_litellm_metadata_is_added_when_required(
     monkeypatch.setattr(
         settings_utils,
         "should_set_litellm_extra_body",
-        lambda model_name: True,
+        lambda model_name, base_url=None: True,
     )
 
     metadata = {"foo": "bar"}

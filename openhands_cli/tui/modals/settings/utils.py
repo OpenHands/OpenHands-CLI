@@ -79,10 +79,11 @@ class SettingsFormData(BaseModel):
             return str(self.custom_model)
 
         model_str = str(self.model)
-        full_model = (
-            f"{self.provider}/{model_str}" if "/" not in model_str else model_str
-        )
-        return full_model
+
+        # Always add provider prefix - litellm requires it for routing.
+        # Even if model contains '/' (e.g. "openai/gpt-4.1" from openrouter)
+        # See: https://docs.litellm.ai/docs/providers
+        return f"{self.provider}/{model_str}"
 
 
 class SettingsSaveResult(BaseModel):
@@ -101,13 +102,13 @@ def save_settings(
 
         full_model = data.get_full_model_name()
 
-        if should_set_litellm_extra_body(full_model):
+        if full_model.startswith("openhands/") and data.base_url is None:
+            data.base_url = "https://llm-proxy.app.all-hands.dev/"
+
+        if should_set_litellm_extra_body(full_model, data.base_url):
             extra_kwargs["litellm_extra_body"] = {
                 "metadata": get_llm_metadata(model_name=full_model, llm_type="agent")
             }
-
-        if full_model.startswith("openhands/") and data.base_url is None:
-            data.base_url = "https://llm-proxy.app.all-hands.dev/"
 
         llm = LLM(
             model=full_model,
@@ -121,7 +122,7 @@ def save_settings(
         agent = agent.model_copy(update={"llm": llm})
 
         condenser_llm = llm.model_copy(update={"usage_id": "condenser"})
-        if should_set_litellm_extra_body(full_model):
+        if should_set_litellm_extra_body(full_model, data.base_url):
             condenser_llm = condenser_llm.model_copy(
                 update={
                     "litellm_extra_body": {

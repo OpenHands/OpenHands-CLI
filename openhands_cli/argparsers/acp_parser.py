@@ -1,7 +1,11 @@
 import argparse
 import os
 
-from openhands_cli.argparsers.util import add_confirmation_mode_args, add_resume_args
+from openhands_cli.argparsers.util import (
+    add_confirmation_mode_args,
+    add_env_override_args,
+    add_resume_args,
+)
 
 
 def add_acp_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
@@ -21,13 +25,8 @@ def add_acp_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentP
     acp_confirmation_group = acp_parser.add_mutually_exclusive_group()
     add_confirmation_mode_args(acp_confirmation_group)
 
-    # Streaming mode flag
-    acp_parser.add_argument(
-        "--streaming",
-        action="store_true",
-        default=False,
-        help="Enable streaming mode for LLM outputs (token-by-token streaming)",
-    )
+    # Environment variable override option
+    add_env_override_args(acp_parser)
 
     acp_parser.add_argument(
         "--cloud",

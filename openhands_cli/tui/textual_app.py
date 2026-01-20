@@ -21,6 +21,7 @@ from textual.signal import Signal
 from textual.widgets import Footer, Input, Static, TextArea
 from textual_autocomplete import AutoComplete
 
+from openhands.sdk import BaseConversation
 from openhands.sdk.event import ActionEvent
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
@@ -29,8 +30,9 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
+from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.splash import get_splash_content
+from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.modals import SettingsScreen
@@ -38,12 +40,13 @@ from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModa
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
+from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
+from openhands_cli.tui.widgets import InputField
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
     CollapsibleNavigationMixin,
     CollapsibleTitle,
 )
-from openhands_cli.tui.widgets.input_field import InputField
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.tui.widgets.status_line import (
     InfoStatusLine,
@@ -111,6 +114,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.conversation_id = (
             resume_conversation_id if resume_conversation_id else uuid.uuid4()
         )
+        self.conversation_dir = BaseConversation.get_persistence_dir(
+            CONVERSATIONS_DIR, self.conversation_id
+        )
 
         # Store queued inputs (copy to prevent mutating caller's list)
         self.pending_inputs = list(queued_inputs) if queued_inputs else []
@@ -133,6 +139,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # MCP panel tracking
         self.mcp_panel: MCPSidePanel | None = None
+
+        self.plan_panel: PlanSidePanel = PlanSidePanel(self)
 
         # Register the custom theme
         self.register_theme(OPENHANDS_THEME)
@@ -176,7 +184,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         yield SystemCommand(
             "MCP", "View MCP configurations", lambda: MCPSidePanel.toggle(self)
         )
-        yield SystemCommand("SETTINGS", "Configure settings", self.action_open_settings)
+        yield SystemCommand(
+            "Plan",
+            "View agent plan",
+            lambda: self.plan_panel.toggle(),
+        )
+        yield SystemCommand("Settings", "Configure settings", self.action_open_settings)
 
     def on_mount(self) -> None:
         """Called when app starts."""
@@ -195,8 +208,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 console.print(
                     f"[{OPENHANDS_THEME.error}]Headless mode requires existing "
                     f"settings.[/{OPENHANDS_THEME.error}]\n"
-                    f"[bold]Please run:[/bold] [{OPENHANDS_THEME.success}]openhands "
-                    f"--exp[/{OPENHANDS_THEME.success}] to configure your settings "
+                    f"[bold]Please run:[/bold] [{OPENHANDS_THEME.success}]openhands"
+                    f"[/{OPENHANDS_THEME.success}] to configure your settings "
                     f"before using [{OPENHANDS_THEME.accent}]--headless"
                     f"[/{OPENHANDS_THEME.accent}]."
                 )
@@ -360,7 +373,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if self.json_mode:
             event_callback = json_callback
 
-        return ConversationRunner(
+        runner = ConversationRunner(
             self.conversation_id,
             self.conversation_running_signal.publish,
             self._handle_confirmation_request,
@@ -371,6 +384,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self.initial_confirmation_policy,
             event_callback,
         )
+
+        return runner
 
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.
@@ -422,6 +437,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         if command == "/help":
             show_help(self.main_display)
+        elif command == "/new":
+            self._handle_new_command()
         elif command == "/confirm":
             self._handle_confirm_command()
         elif command == "/condense":
@@ -663,6 +680,59 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.notify(
             title="Feedback",
             message="Opening feedback form in your browser...",
+            severity="information",
+        )
+
+    def _handle_new_command(self) -> None:
+        """Handle the /new command to start a new conversation.
+
+        This clears the terminal UI and starts a fresh conversation runner.
+        """
+        # Check if a conversation is currently running
+        if self.conversation_runner and self.conversation_runner.is_running:
+            self.notify(
+                title="New Conversation Error",
+                message="Cannot start a new conversation while one is running. "
+                "Please wait for the current conversation to complete or pause it.",
+                severity="error",
+            )
+            return
+
+        # Generate a new conversation ID
+        self.conversation_id = uuid.uuid4()
+
+        # Reset the conversation runner
+        self.conversation_runner = None
+
+        # Remove any existing confirmation panel
+        if self.confirmation_panel:
+            self.confirmation_panel.remove()
+            self.confirmation_panel = None
+
+        # Clear all dynamically added widgets from main_display
+        # Keep only the splash widgets (those with IDs starting with "splash_")
+        widgets_to_remove = []
+        for widget in self.main_display.children:
+            widget_id = widget.id or ""
+            if not widget_id.startswith("splash_"):
+                widgets_to_remove.append(widget)
+
+        for widget in widgets_to_remove:
+            widget.remove()
+
+        # Update the splash conversation widget with the new conversation ID
+        splash_conversation = self.query_one("#splash_conversation", Static)
+        splash_conversation.update(
+            get_conversation_text(self.conversation_id.hex, theme=OPENHANDS_THEME)
+        )
+
+        # Scroll to top to show the splash screen
+        self.main_display.scroll_home(animate=False)
+
+        # Notify user
+        self.notify(
+            title="New Conversation",
+            message="Started a new conversation",
             severity="information",
         )
 

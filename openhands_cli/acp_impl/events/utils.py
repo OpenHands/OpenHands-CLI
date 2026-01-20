@@ -11,8 +11,8 @@ from openhands.sdk import Action, BaseConversation
 from openhands.tools.file_editor.definition import (
     FileEditorAction,
 )
-from openhands.tools.task_tracker import TaskTrackerAction
 from openhands.tools.terminal import TerminalAction
+from openhands_cli.utils import abbreviate_number, format_cost
 
 
 # Shared mapping from tool names to ACP ToolKind values
@@ -37,22 +37,8 @@ def _format_status_line(usage, cost: float) -> str:
         Formatted status line string
         (e.g., "↑ input 1.2K • cache hit 50.00% • ↓ output 500 • $ 0.0050")
     """
-
-    # Helper function to abbreviate large numbers
-    def abbr(n: int | float) -> str:
-        n = int(n or 0)
-        if n >= 1_000_000_000:
-            val, suffix = n / 1_000_000_000, "B"
-        elif n >= 1_000_000:
-            val, suffix = n / 1_000_000, "M"
-        elif n >= 1_000:
-            val, suffix = n / 1_000, "K"
-        else:
-            return str(n)
-        return f"{val:.2f}".rstrip("0").rstrip(".") + suffix
-
-    input_tokens = abbr(usage.prompt_tokens or 0)
-    output_tokens = abbr(usage.completion_tokens or 0)
+    input_tokens = abbreviate_number(usage.prompt_tokens or 0)
+    output_tokens = abbreviate_number(usage.completion_tokens or 0)
 
     # Calculate cache hit rate (convert to int to handle mock objects safely)
     prompt = int(usage.prompt_tokens or 0)
@@ -60,18 +46,14 @@ def _format_status_line(usage, cost: float) -> str:
     cache_rate = f"{(cache_read / prompt * 100):.2f}%" if prompt > 0 else "N/A"
     reasoning_tokens = int(usage.reasoning_tokens or 0)
 
-    # Format cost (convert to float to handle mock objects safely)
-    cost_val = float(cost or 0)
-    cost_str = f"{cost_val:.4f}" if cost_val > 0 else "0.00"
-
     # Build status line
     parts: list[str] = []
     parts.append(f"↑ input {input_tokens}")
     parts.append(f"cache hit {cache_rate}")
     if reasoning_tokens > 0:
-        parts.append(f"reasoning {abbr(reasoning_tokens)}")
+        parts.append(f"reasoning {abbreviate_number(reasoning_tokens)}")
     parts.append(f"↓ output {output_tokens}")
-    parts.append(f"$ {cost_str}")
+    parts.append(f"$ {format_cost(float(cost or 0))}")
 
     return " • ".join(parts)
 
@@ -177,23 +159,42 @@ def get_tool_kind(tool_name: str, *, action: Action | None = None) -> ToolKind:
     return TOOL_KIND_MAPPING.get(tool_name, "other")
 
 
-def get_tool_title(tool_name: str, *, action: Action | None = None) -> str:
-    """Get tool title from tool name and optional complete action.
+def get_tool_title(
+    tool_name: str, *, action: Action | None = None, summary: str | None = None
+) -> str:
+    """Get tool title from tool name, action, and optional LLM-generated summary.
+
+    When a summary is provided, it is used as the primary title with action
+    details appended for context. This matches the TUI behavior.
 
     For streaming tool calls, use ToolCallState.title instead.
+
+    Args:
+        tool_name: The name of the tool being called
+        action: Optional complete action object for extracting details
+        summary: Optional LLM-generated summary describing the action's purpose
+
+    Returns:
+        A descriptive title for the tool call
     """
-    if tool_name == "task_tracker":
-        return "Plan updated"
+    # Clean up summary if provided
+    clean_summary = summary.strip().replace("\n", " ") if summary else ""
 
     if isinstance(action, FileEditorAction):
-        if action.command == "view":
-            return f"Reading {action.path}"
-        return f"Editing {action.path}"
+        op = "Reading" if action.command == "view" else "Editing"
+        path = action.path or ""
+        if clean_summary:
+            return f"{clean_summary}: {op} {path}"
+        return f"{op} {path}"
 
     if isinstance(action, TerminalAction):
-        return f"{action.command}"
+        cmd = action.command.strip().replace("\n", " ") if action.command else ""
+        if clean_summary:
+            return f"{clean_summary}: $ {cmd}"
+        return f"$ {cmd}" if cmd else tool_name
 
-    if isinstance(action, TaskTrackerAction):
-        return "Plan updated"
+    # For other actions, use summary if available
+    if clean_summary:
+        return clean_summary
 
     return ""

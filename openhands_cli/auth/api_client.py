@@ -9,6 +9,7 @@ from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
 from openhands_cli.auth.utils import _p
 from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
 from openhands_cli.stores import AgentStore
+from openhands_cli.stores.agent_store import resolve_llm_base_url
 from openhands_cli.theme import OPENHANDS_THEME
 
 
@@ -225,17 +226,24 @@ def create_and_save_agent_configuration(
     """
     store = AgentStore()
 
+    base_url = resolve_llm_base_url(settings)
+
     # First, check if existing configuration exists
     existing_agent = store.load()
     if existing_agent is not None:
         # Ask for user consent
-        if not _ask_user_consent_for_overwrite(existing_agent, settings):
+        if not _ask_user_consent_for_overwrite(
+            existing_agent,
+            settings,
+            base_url=base_url,
+        ):
             raise ValueError("User declined to overwrite existing configuration")
 
     # User consented or no existing config - proceed with creation
     agent = store.create_and_save_from_settings(
         llm_api_key=llm_api_key,
         settings=settings,
+        base_url=base_url,
     )
 
     _p(

@@ -5,6 +5,7 @@ proper padding alignment with user messages.
 """
 
 from typing import TYPE_CHECKING, Any, cast
+from unittest.mock import MagicMock
 
 from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
@@ -15,6 +16,7 @@ from openhands.sdk.llm import MessageToolCall
 from openhands.sdk.tool.builtins.finish import FinishAction
 from openhands.sdk.tool.builtins.think import ThinkAction
 from openhands_cli.theme import OPENHANDS_THEME
+from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
 
@@ -52,8 +54,13 @@ class VisualizerTestApp(App):
     def __init__(self, events: list[Any]) -> None:
         super().__init__()
         self.events = events
+        self.conversation_dir = ""
         self.register_theme(OPENHANDS_THEME)
         self.theme = "openhands"
+        # Create a mock plan_panel that's not on screen
+        self.plan_panel = MagicMock(spec=PlanSidePanel)
+        self.plan_panel.is_on_screen = False
+        self.plan_panel.user_dismissed = False
 
     def compose(self) -> ComposeResult:
         with VerticalScroll(id="main_display"):

@@ -57,8 +57,8 @@ def mock_tool_call():
 
 
 @pytest.mark.asyncio
-async def test_conversation_setup_enables_streaming(acp_agent_with_streaming, tmp_path):
-    """Test that conversation setup enables streaming on the LLM when appropriate."""
+async def test_conversation_setup_enables_streaming_by_default(acp_agent, tmp_path):
+    """Test that conversation setup enables streaming by default."""
     session_id = str(uuid4())
 
     with (
@@ -111,15 +111,17 @@ async def test_conversation_setup_enables_streaming(acp_agent_with_streaming, tm
         mock_event_subscriber_class.assert_called_once()
         call_args = mock_event_subscriber_class.call_args
         assert call_args[0][0] == session_id  # session_id
-        assert call_args[0][1] == acp_agent_with_streaming._conn  # conn
+        assert call_args[0][1] == acp_agent._conn  # conn
 
         # Verify that Conversation was created
         mock_conversation_class.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_conversation_setup_without_streaming_flag(acp_agent, tmp_path):
-    """Test that conversation setup does NOT enable streaming when flag is False."""
+async def test_conversation_setup_disables_streaming_for_responses_api(
+    acp_agent, tmp_path
+):
+    """Test that streaming is disabled when LLM uses responses API."""
     session_id = str(uuid4())
 
     with (
@@ -133,10 +135,10 @@ async def test_conversation_setup_without_streaming_flag(acp_agent, tmp_path):
             "openhands_cli.acp_impl.agent.local_agent.EventSubscriber"
         ) as mock_event_subscriber_class,
     ):
-        # Mock agent with LLM that doesn't use responses API (supports streaming)
+        # Mock agent with LLM that uses responses API (doesn't support streaming)
         mock_agent = MagicMock()
         mock_llm = MagicMock()
-        mock_llm.uses_responses_api.return_value = False  # Would support streaming
+        mock_llm.uses_responses_api.return_value = True  # Streaming should be disabled
         mock_agent.llm = mock_llm
         mock_load_specs.return_value = mock_agent
 

@@ -9,14 +9,24 @@ import pytest
 
 @pytest.fixture
 def temp_project_dir():
-    """Create a temporary project directory with microagents."""
+    """Create a temporary project directory with skills."""
     with tempfile.TemporaryDirectory() as temp_dir:
-        # Create microagents directory with actual files
-        microagents_dir = Path(temp_dir) / ".openhands" / "microagents"
-        microagents_dir.mkdir(parents=True)
+        skills_dir = Path(temp_dir) / ".openhands" / "skills"
+        skills_dir.mkdir(parents=True)
 
-        # Create test microagent files
-        microagent1 = microagents_dir / "test_microagent.md"
+        # Create test skill files
+        skill_file = skills_dir / "test_skill.md"
+        skill_file.write_text("""---
+name: test_skill
+triggers: ["test", "skill"]
+---
+
+This is a test skill for testing purposes.
+""")
+
+        # Create additional skill-like files (previously stored under
+        # .openhands/microagents)
+        microagent1 = skills_dir / "test_microagent.md"
         microagent1.write_text("""---
 name: test_microagent
 triggers: ["test", "microagent"]
@@ -25,26 +35,13 @@ triggers: ["test", "microagent"]
 This is a test microagent for testing purposes.
 """)
 
-        microagent2 = microagents_dir / "integration_test.md"
+        microagent2 = skills_dir / "integration_test.md"
         microagent2.write_text("""---
 name: integration_test
 triggers: ["integration", "test"]
 ---
 
 This microagent is used for integration testing.
-""")
-
-        # Also create skills directory
-        skills_dir = Path(temp_dir) / ".openhands" / "skills"
-        skills_dir.mkdir(parents=True)
-
-        skill_file = skills_dir / "test_skill.md"
-        skill_file.write_text("""---
-name: test_skill
-triggers: ["test", "skill"]
----
-
-This is a test skill for testing purposes.
 """)
 
         yield temp_dir
@@ -60,7 +57,7 @@ def agent_store(temp_project_dir):
 
 
 class TestSkillsLoading:
-    """Test skills loading functionality with actual microagents."""
+    """Test skills loading functionality with actual project skills."""
 
     def test_load_agent_with_project_skills(self, agent_store):
         """Test that loading agent includes skills from project directories."""
@@ -77,7 +74,7 @@ class TestSkillsLoading:
         assert loaded_agent.agent_context is not None
 
         # Verify that project skills were loaded into the agent context
-        # Should have exactly 3 project skills: 2 microagents + 1 skill
+        # Should have exactly 3 project skills from .openhands/skills
         # Plus any user skills that might be loaded via load_user_skills=True
         # Plus public skills from the GitHub repository
         all_skills = loaded_agent.agent_context.skills
@@ -104,9 +101,7 @@ class TestSkillsLoading:
 
         with tempfile.TemporaryDirectory() as user_temp_dir:
             user_skills_temp = Path(user_temp_dir) / ".openhands" / "skills"
-            user_microagents_temp = Path(user_temp_dir) / ".openhands" / "microagents"
             user_skills_temp.mkdir(parents=True)
-            user_microagents_temp.mkdir(parents=True)
 
             # Create user skill files
             user_skill = user_skills_temp / "user_skill.md"
@@ -118,7 +113,7 @@ triggers: ["user", "skill"]
 This is a user skill for testing.
 """)
 
-            user_microagent = user_microagents_temp / "user_microagent.md"
+            user_microagent = user_skills_temp / "user_microagent.md"
             user_microagent.write_text("""---
 name: user_microagent
 triggers: ["user", "microagent"]
@@ -127,8 +122,8 @@ triggers: ["user", "microagent"]
 This is a user microagent for testing.
 """)
 
-            # Mock the USER_SKILLS_DIRS constant to point to our temp directories
-            mock_user_dirs = [user_skills_temp, user_microagents_temp]
+            # Mock the USER_SKILLS_DIRS constant to point to our temp directory
+            mock_user_dirs = [user_skills_temp]
 
             with patch(
                 "openhands.sdk.context.skills.skill.USER_SKILLS_DIRS", mock_user_dirs
@@ -149,8 +144,8 @@ This is a user microagent for testing.
                     assert loaded_agent is not None
                     assert loaded_agent.agent_context is not None
 
-                    # Project skills: 3 (2 microagents + 1 skill)
-                    # User skills: 2 (1 skill + 1 microagent)
+                    # Project skills: 3
+                    # User skills: 2
                     # Public skills: loaded from GitHub repository (variable count)
                     all_skills = loaded_agent.agent_context.skills
                     assert isinstance(all_skills, list)

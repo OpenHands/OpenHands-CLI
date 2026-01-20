@@ -3,6 +3,7 @@
 import json
 import os
 import platform
+import re
 from argparse import Namespace
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,37 @@ from openhands.sdk import LLM, ImageContent, TextContent
 from openhands.sdk.event import SystemPromptEvent
 from openhands.sdk.event.base import Event
 from openhands.tools.preset import get_default_agent
+
+
+def abbreviate_number(n: int | float) -> str:
+    """Abbreviate large numbers with K/M/B suffixes.
+
+    Examples:
+        1234 -> '1.23K'
+        1200000 -> '1.2M'
+        2500000000 -> '2.5B'
+        999 -> '999'
+    """
+    n = int(n or 0)
+    if n >= 1_000_000_000:
+        val, suffix = n / 1_000_000_000, "B"
+    elif n >= 1_000_000:
+        val, suffix = n / 1_000_000, "M"
+    elif n >= 1_000:
+        val, suffix = n / 1_000, "K"
+    else:
+        return str(n)
+    return f"{val:.2f}".rstrip("0").rstrip(".") + suffix
+
+
+def format_cost(cost: float) -> str:
+    """Format cost value for display.
+
+    Returns '0.00' for zero or negative costs, otherwise formats to 4 decimal places.
+    """
+    if cost <= 0:
+        return "0.00"
+    return f"{cost:.4f}"
 
 
 def get_os_description() -> str:
@@ -36,23 +68,38 @@ def get_os_description() -> str:
     return platform.platform() or system
 
 
-def should_set_litellm_extra_body(model_name: str) -> bool:
-    """
-    Determine if litellm_extra_body should be set based on the model name.
+# Pattern to match OpenHands LLM proxy URLs (e.g., https://llm-proxy.app.all-hands.dev/)
+# Must match the host part of the URL, not arbitrary path components
+_LLM_PROXY_PATTERN = re.compile(r"^https?://llm-proxy\.[^.]+\.all-hands\.dev(?:/|$)")
 
-    Only set litellm_extra_body for openhands models to avoid issues
-    with providers that don't support extra_body parameters.
+
+def should_set_litellm_extra_body(model_name: str, base_url: str | None = None) -> bool:
+    """
+    Determine if litellm_extra_body should be set based on the model name or base URL.
+
+    Set litellm_extra_body for:
+    - Models with "openhands/" prefix
+    - Any model using OpenHands LLM proxy (llm-proxy.*.all-hands.dev)
+
+    This avoids issues with providers that don't support extra_body parameters.
 
     The SDK internally translates "openhands/" prefix to "litellm_proxy/"
     when making API calls.
 
     Args:
         model_name: Name of the LLM model
+        base_url: Optional base URL for the LLM service
 
     Returns:
         True if litellm_extra_body should be set, False otherwise
     """
-    return "openhands/" in model_name
+    if "openhands/" in model_name:
+        return True
+
+    if base_url and _LLM_PROXY_PATTERN.match(base_url):
+        return True
+
+    return False
 
 
 def get_llm_metadata(
@@ -93,7 +140,7 @@ def get_llm_metadata(
     metadata = {
         "trace_version": openhands_sdk_version,
         "tags": [
-            "app:openhands",
+            "app:openhands-cli",
             f"model:{model_name}",
             f"type:{llm_type}",
             f"web_host:{os.environ.get('WEB_HOST', 'unspecified')}",

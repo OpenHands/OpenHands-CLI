@@ -13,5 +13,5 @@ def launch_web_server(
         port: Port to bind the web server to
         debug: Enable debug mode for the web server
     """
-    server = Server("uv run openhands --exp", host=host, port=port)
+    server = Server("uv run openhands", host=host, port=port)
     server.serve(debug=debug)
