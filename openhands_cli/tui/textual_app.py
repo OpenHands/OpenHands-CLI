@@ -186,11 +186,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             "MCP", "View MCP configurations", lambda: MCPSidePanel.toggle(self)
         )
         yield SystemCommand(
-            "PLAN",
+            "Plan",
             "View agent plan",
             lambda: self.plan_panel.toggle(),
         )
-        yield SystemCommand("SETTINGS", "Configure settings", self.action_open_settings)
+        yield SystemCommand("Settings", "Configure settings", self.action_open_settings)
 
     def on_mount(self) -> None:
         """Called when app starts."""
