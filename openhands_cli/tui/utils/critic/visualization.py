@@ -1,4 +1,9 @@
-"""Critic visualization utilities for TUI."""
+"""Critic visualization utilities for TUI.
+
+This module provides CLI-specific visualization for critic results.
+It uses the SDK's star rating format but filters out some sections
+that are less useful for CLI users (Likely Follow-up, Other).
+"""
 
 from typing import Any
 
@@ -15,13 +20,13 @@ def create_critic_collapsible(critic_result: CriticResult) -> Collapsible:
         critic_result: The critic result to visualize
 
     Returns:
-        A Collapsible widget showing critic score summary (collapsed)
-        and full breakdown (expanded), organized by taxonomy categories
+        A Collapsible widget showing critic score with star rating
+        and potential issues (filtered for CLI)
     """
-    # Build title with colored score and predicted sentiment
+    # Build title with star rating
     title_text = _build_critic_title(critic_result)
 
-    # Build content with category grouping
+    # Build content with filtered categories (no follow-up, no other)
     content_text = _build_critic_content(critic_result)
 
     # Create collapsible (start expanded by default)
@@ -38,67 +43,52 @@ def create_critic_collapsible(critic_result: CriticResult) -> Collapsible:
     return collapsible
 
 
+def _get_star_rating(score: float) -> str:
+    """Convert score (0-1) to a 5-star rating string."""
+    filled_stars = round(score * 5)
+    empty_stars = 5 - filled_stars
+    return "★" * filled_stars + "☆" * empty_stars
+
+
+def _get_star_style(score: float) -> str:
+    """Get the style for the star rating based on score."""
+    if score >= 0.6:
+        return "green"
+    elif score >= 0.4:
+        return "yellow"
+    else:
+        return "red"
+
+
 def _build_critic_title(critic_result: CriticResult) -> Text:
-    """Build a colored Rich Text title for the critic collapsible.
+    """Build a colored Rich Text title with star rating.
 
     Args:
         critic_result: The critic result to visualize
 
     Returns:
-        Rich Text object with colored score and sentiment
+        Rich Text object with star rating and percentage
     """
     title = Text()
 
-    # Add "Critic Score:" label
-    title.append("Critic Score: ", style="bold")
+    # Add "Critic: agent success likelihood" label
+    title.append("Critic: agent success likelihood ", style="bold")
 
-    # Add colored score
-    score_style = "green bold" if critic_result.success else "yellow bold"
-    title.append(f"{critic_result.score:.2f}", style=score_style)
-    title.append(" (0-1, higher is better)", style="dim")
-
-    # Add predicted sentiment if available from metadata
-    sentiment = _get_sentiment_from_metadata(critic_result)
-    if sentiment:
-        title.append(" | ", style="dim")
-        title.append("Predicted User Sentiment: ", style="bold")
-
-        # Color sentiment based on type
-        predicted = sentiment.get("predicted", "")
-        if predicted == "Positive":
-            sentiment_style = "green"
-        elif predicted == "Negative":
-            sentiment_style = "red"
-        else:  # Neutral
-            sentiment_style = "yellow"
-
-        prob = sentiment.get("probability", 0.0)
-        title.append(f"{predicted} ({prob:.2f})", style=sentiment_style)
+    # Add star rating with color
+    stars = _get_star_rating(critic_result.score)
+    style = _get_star_style(critic_result.score)
+    percentage = critic_result.score * 100
+    title.append(stars, style=style)
+    title.append(f" ({percentage:.1f}%)", style="dim")
 
     return title
 
 
-def _get_sentiment_from_metadata(critic_result: CriticResult) -> dict[str, Any] | None:
-    """Extract sentiment from critic result metadata.
-
-    Args:
-        critic_result: The critic result
-
-    Returns:
-        Sentiment dict with 'predicted' and 'probability' keys, or None
-    """
-    if not critic_result.metadata:
-        return None
-
-    categorized = critic_result.metadata.get("categorized_features")
-    if not categorized:
-        return None
-
-    return categorized.get("sentiment")
-
-
 def _build_critic_content(critic_result: CriticResult) -> Text:
     """Build the Rich Text content for critic score breakdown.
+
+    For CLI, we only show Potential Issues and Infrastructure.
+    We filter out Likely Follow-up and Other sections.
 
     Args:
         critic_result: The critic result to visualize
@@ -112,7 +102,7 @@ def _build_critic_content(critic_result: CriticResult) -> Text:
     if critic_result.metadata:
         categorized = critic_result.metadata.get("categorized_features")
         if categorized:
-            _append_categorized_features_from_metadata(content_text, categorized)
+            _append_categorized_features_for_cli(content_text, categorized)
             return content_text
 
     # Fallback: display message as-is if no categorized features
@@ -122,10 +112,13 @@ def _build_critic_content(critic_result: CriticResult) -> Text:
     return content_text
 
 
-def _append_categorized_features_from_metadata(
+def _append_categorized_features_for_cli(
     content_text: Text, categorized: dict[str, Any]
 ) -> None:
-    """Append features from pre-categorized metadata.
+    """Append features from pre-categorized metadata (CLI-filtered).
+
+    Only shows Potential Issues and Infrastructure.
+    Filters out Likely Follow-up and Other sections for CLI.
 
     Args:
         content_text: Rich Text object to append to
@@ -133,20 +126,11 @@ def _append_categorized_features_from_metadata(
     """
     has_content = False
 
-    # Agent behavioral issues
+    # Agent behavioral issues (Potential Issues)
     agent_issues = categorized.get("agent_behavioral_issues", [])
     if agent_issues:
-        content_text.append("Detected Agent Issues: ", style="bold")
+        content_text.append("Potential Issues: ", style="bold")
         _append_feature_list_inline(content_text, agent_issues)
-        has_content = True
-
-    # User follow-up patterns
-    user_patterns = categorized.get("user_followup_patterns", [])
-    if user_patterns:
-        if has_content:
-            content_text.append("\n")
-        content_text.append("Predicted User Follow-Up: ", style="bold")
-        _append_feature_list_inline(content_text, user_patterns)
         has_content = True
 
     # Infrastructure issues
@@ -154,43 +138,32 @@ def _append_categorized_features_from_metadata(
     if infra_issues:
         if has_content:
             content_text.append("\n")
-        content_text.append("Infra Issues: ", style="bold")
+        content_text.append("Infrastructure: ", style="bold")
         _append_feature_list_inline(content_text, infra_issues)
-        has_content = True
 
-    # Other metrics
-    other = categorized.get("other", [])
-    if other:
-        if has_content:
-            content_text.append("\n")
-        content_text.append("Other: ", style="bold dim")
-        _append_feature_list_inline(content_text, other, is_other=True)
+    # NOTE: Likely Follow-up and Other sections are intentionally
+    # NOT displayed in CLI as they are less actionable for users
 
 
 def _append_feature_list_inline(
     content_text: Text,
     features: list[dict[str, Any]],
-    is_other: bool = False,
 ) -> None:
-    """Append features inline with dot separators.
+    """Append features inline with likelihood percentages.
 
     Args:
         content_text: Rich Text object to append to
         features: List of feature dicts with 'display_name' and 'probability'
-        is_other: Whether this is the "other" category
     """
     for i, feature in enumerate(features):
         display_name = feature.get("display_name", feature.get("name", "Unknown"))
         prob = feature.get("probability", 0.0)
+        percentage = prob * 100
 
         # Determine color based on probability
-        if is_other:
-            prob_style = "white"
-        elif prob >= 0.7:
+        if prob >= 0.7:
             prob_style = "red bold"
         elif prob >= 0.5:
-            prob_style = "red"
-        elif prob >= 0.3:
             prob_style = "yellow"
         else:
             prob_style = "dim"
@@ -199,5 +172,5 @@ def _append_feature_list_inline(
         if i > 0:
             content_text.append(" · ", style="dim")
 
-        content_text.append(f"{display_name} ", style="dim")
-        content_text.append(f"({prob:.2f})", style=prob_style)
+        content_text.append(f"{display_name}", style="white")
+        content_text.append(f" (likelihood {percentage:.0f}%)", style=prob_style)
