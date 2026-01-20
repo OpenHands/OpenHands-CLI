@@ -166,7 +166,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             # Add critic collapsible if present (for MessageEvent and ActionEvent)
             critic_result = getattr(event, "critic_result", None)
             if critic_result is not None:
-                from openhands_cli.critic_utils import create_critic_collapsible
+                from openhands_cli.tui.utils.critic import create_critic_collapsible
 
                 critic_widget = create_critic_collapsible(critic_result)
                 self._run_on_main_thread(self._add_widget_to_ui, critic_widget)

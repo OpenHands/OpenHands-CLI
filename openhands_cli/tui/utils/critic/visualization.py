@@ -5,7 +5,7 @@ import json
 from rich.text import Text
 
 from openhands.sdk.critic.result import CriticResult
-from openhands_cli.critic_taxonomy import FEATURE_CATEGORIES
+from openhands_cli.tui.utils.critic.taxonomy import FEATURE_CATEGORIES
 from openhands_cli.tui.widgets.collapsible import Collapsible
 
 

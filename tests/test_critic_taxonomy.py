@@ -1,6 +1,6 @@
 """Tests for critic taxonomy."""
 
-from openhands_cli.critic_taxonomy import FEATURE_CATEGORIES, get_category
+from openhands_cli.tui.utils.critic import FEATURE_CATEGORIES, get_category
 
 
 def test_feature_categories_count():
