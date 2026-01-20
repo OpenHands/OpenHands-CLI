@@ -178,19 +178,44 @@ class ConversationVisualizer(ConversationVisualizerBase):
         spaced = re.sub(r"(?<!^)(?=[A-Z])", " ", name)
         return spaced.title()
 
+    def _get_formatted_agent_name(self) -> str:
+        """Get the formatted agent name with 'Agent' suffix if needed.
+
+        Returns:
+            Formatted agent name with " Agent" suffix if name is set
+            and doesn't already contain "agent", or just the formatted name.
+            Returns empty string if no name is set.
+        """
+        if self._name:
+            return self._format_agent_name_with_suffix(self._name)
+        return ""
+
+    def _format_agent_name_with_suffix(self, name: str) -> str:
+        """Format an agent name and add 'Agent' suffix if needed.
+
+        Args:
+            name: The raw agent name to format.
+
+        Returns:
+            Formatted agent name with " Agent" suffix if name doesn't
+            already contain "agent", or just the formatted name.
+        """
+        formatted_name = self._format_agent_name(name)
+        # Don't add "Agent" suffix if name already contains "agent"
+        if "agent" in formatted_name.lower():
+            return formatted_name
+        return f"{formatted_name} Agent"
+
     def _get_agent_prefix(self) -> str:
         """Get the agent name prefix for titles when in delegation context.
 
         Returns:
-            Formatted agent name with " Agent " suffix if name is set
-            and doesn't already contain "agent", empty string otherwise.
+            Formatted agent name in parentheses like "(Agent Name) " if name is set,
+            empty string otherwise.
         """
-        if self._name:
-            formatted_name = self._format_agent_name(self._name)
-            # Don't add "Agent" suffix if name already contains "agent"
-            if "agent" in formatted_name.lower():
-                return f"{formatted_name} "
-            return f"{formatted_name} Agent "
+        agent_name = self._get_formatted_agent_name()
+        if agent_name:
+            return f"({agent_name}) "
         return ""
 
     def _run_on_main_thread(self, func, *args) -> None:
@@ -533,7 +558,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 # For finish action, render as markdown with padding to align
                 # User message has "padding: 0 1" and starts with "> ", so text
                 # starts at position 3 (1 padding + 2 for "> ")
-                widget = Markdown(str(action.message))
+                # In delegation context, add agent header with underline
+                message = str(action.message)
+                if self._name:
+                    agent_name = self._get_formatted_agent_name()
+                    message = f"**__{agent_name}__:**\n\n{message}"
+                widget = Markdown(message)
                 widget.styles.padding = AGENT_MESSAGE_PADDING
                 return widget
             elif isinstance(action, ThinkAction):
@@ -553,13 +583,15 @@ class ConversationVisualizer(ConversationVisualizerBase):
             # In delegation context, prefix messages with agent info (underlined)
             message_content = str(content)
             if self._name and event.llm_message:
-                agent_name = self._format_agent_name(self._name)
+                agent_name = self._get_formatted_agent_name()
                 # Use markdown underline syntax for agent names
                 agent_underlined = f"__{agent_name}__"
                 if event.llm_message.role == "user":
                     if event.sender:
                         # Message from another agent (via delegation)
-                        sender_display = self._format_agent_name(event.sender)
+                        sender_display = self._format_agent_name_with_suffix(
+                            event.sender
+                        )
                         sender_underlined = f"__{sender_display}__"
                         prefix = f"**{sender_underlined} → {agent_underlined}:**\n\n"
                     else:
@@ -567,7 +599,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 else:
                     # Agent message - derive recipient from sender context
                     if event.sender:
-                        recipient_display = self._format_agent_name(event.sender)
+                        recipient_display = self._format_agent_name_with_suffix(
+                            event.sender
+                        )
                         recipient_underlined = f"__{recipient_display}__"
                         prefix = f"**{agent_underlined} → {recipient_underlined}:**\n\n"
                     else:
