@@ -17,6 +17,7 @@ COMMANDS = [
     DropdownItem(main="/new - Start a new conversation"),
     DropdownItem(main="/confirm - Configure confirmation settings"),
     DropdownItem(main="/condense - Condense conversation history"),
+    DropdownItem(main="/skills - View loaded skills"),
     DropdownItem(main="/feedback - Send anonymous feedback about CLI"),
     DropdownItem(main="/exit - Exit the application"),
 ]
@@ -69,6 +70,7 @@ def show_help(main_display: VerticalScroll) -> None:
   [{secondary}]/new[/{secondary}] - Start a new conversation
   [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
   [{secondary}]/condense[/{secondary}] - Condense conversation history
+  [{secondary}]/skills[/{secondary}] - View loaded skills
   [{secondary}]/feedback[/{secondary}] - Send anonymous feedback about CLI
   [{secondary}]/exit[/{secondary}] - Exit the application
 
