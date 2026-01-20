@@ -78,8 +78,9 @@ class CriticFeedbackWidget(Static, can_focus=True):
     def _build_message(self) -> str:
         """Build the feedback prompt message."""
         return (
-            "Does the critic's prediction align with your perception?\n"
-            "[1] Accurate  [2] Too high  [3] Too low  [4] N/A  [0] Dismiss"
+            "[bold]Does the critic's prediction align with your perception?[/bold]\n"
+            "[bold][1][/bold] Accurate  [bold][2][/bold] Too high  "
+            "[bold][3][/bold] Too low  [bold][4][/bold] N/A  [bold][0][/bold] Dismiss"
         )
 
     async def on_key(self, event: events.Key) -> None:
