@@ -55,6 +55,7 @@ def _build_critic_title(critic_result: CriticResult) -> Text:
     # Add colored score
     score_style = "green bold" if critic_result.success else "yellow bold"
     title.append(f"{critic_result.score:.4f}", style=score_style)
+    title.append(" (0-1, higher is better)", style="dim")
 
     # Add predicted sentiment if available from metadata
     sentiment = _get_sentiment_from_metadata(critic_result)
@@ -130,83 +131,62 @@ def _append_categorized_features_from_metadata(
         content_text: Rich Text object to append to
         categorized: Pre-categorized features from SDK metadata
     """
-    # Display each category if it has features
+    has_content = False
+
+    # Agent behavioral issues
     agent_issues = categorized.get("agent_behavioral_issues", [])
     if agent_issues:
-        _append_category_section(
-            content_text,
-            "Detected Agent Behavioral Issues",
-            agent_issues,
-            "bold yellow",
-            "agent",
-        )
+        content_text.append("Detected Agent Issues: ", style="bold yellow")
+        _append_feature_list_inline(content_text, agent_issues)
+        has_content = True
 
+    # User follow-up patterns
     user_patterns = categorized.get("user_followup_patterns", [])
     if user_patterns:
-        _append_category_section(
-            content_text,
-            "Predicted User Follow-Up Patterns",
-            user_patterns,
-            "bold yellow",
-            "user",
-        )
+        if has_content:
+            content_text.append("\n")
+        content_text.append("Predicted User Follow-Up: ", style="bold yellow")
+        _append_feature_list_inline(content_text, user_patterns)
+        has_content = True
 
+    # Infrastructure issues
     infra_issues = categorized.get("infrastructure_issues", [])
     if infra_issues:
-        _append_category_section(
-            content_text,
-            "Detected Infrastructure Issues",
-            infra_issues,
-            "bold yellow",
-            "infra",
-        )
+        if has_content:
+            content_text.append("\n")
+        content_text.append("Infra Issues: ", style="bold yellow")
+        _append_feature_list_inline(content_text, infra_issues)
+        has_content = True
 
+    # Other metrics
     other = categorized.get("other", [])
     if other:
-        _append_category_section(
-            content_text, "Other Metrics", other, "bold dim", "unknown"
-        )
+        if has_content:
+            content_text.append("\n")
+        content_text.append("Other: ", style="bold dim")
+        _append_feature_list_inline(content_text, other, is_other=True)
 
 
-def _append_category_section(
+def _append_feature_list_inline(
     content_text: Text,
-    title: str,
     features: list[dict[str, Any]],
-    title_style: str,
-    category: str,
+    is_other: bool = False,
 ) -> None:
-    """Append a category section with features.
+    """Append features inline with dot separators.
 
     Args:
         content_text: Rich Text object to append to
-        title: Section title
         features: List of feature dicts with 'display_name' and 'probability'
-        title_style: Rich style for the title
-        category: Category type for color coding
+        is_other: Whether this is the "other" category
     """
-    content_text.append(f"{title}:\n", style=title_style)
-    for feature in features:
+    for i, feature in enumerate(features):
         display_name = feature.get("display_name", feature.get("name", "Unknown"))
         prob = feature.get("probability", 0.0)
-        _append_feature_with_prob(content_text, display_name, prob, category)
-    content_text.append("\n")
 
-
-def _append_feature_with_prob(
-    content_text: Text, display_name: str, prob: float, category: str
-) -> None:
-    """Append a feature with its probability to the content text.
-
-    Args:
-        content_text: Rich Text object to append to
-        display_name: Display name of the feature
-        prob: Probability value
-        category: Category type for color coding
-    """
-    # Determine color based on probability and category
-    if category in ("agent", "user", "infra"):
-        # Issue/prediction indicators (higher probability = more likely)
-        if prob >= 0.7:
+        # Determine color based on probability
+        if is_other:
+            prob_style = "white"
+        elif prob >= 0.7:
             prob_style = "red bold"
         elif prob >= 0.5:
             prob_style = "red"
@@ -214,9 +194,10 @@ def _append_feature_with_prob(
             prob_style = "yellow"
         else:
             prob_style = "dim"
-    else:
-        # Unknown category
-        prob_style = "white"
 
-    content_text.append(f"  • {display_name}: ", style="dim")
-    content_text.append(f"{prob:.2f}\n", style=prob_style)
+        # Add dot separator between features
+        if i > 0:
+            content_text.append(" · ", style="dim")
+
+        content_text.append(f"{display_name} ", style="dim")
+        content_text.append(f"({prob:.2f})", style=prob_style)
