@@ -6,9 +6,11 @@ This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 import threading
 from typing import TYPE_CHECKING
 
+from rich.text import Text
 from textual.widgets import Markdown
 
 from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
+from openhands.sdk.critic.result import CriticResult
 from openhands.sdk.event import (
     ActionEvent,
     AgentErrorEvent,
@@ -125,6 +127,103 @@ class ConversationVisualizer(ConversationVisualizerBase):
         else:
             self._app.call_from_thread(func, *args)
 
+    def _create_critic_collapsible(self, critic_result: CriticResult) -> Collapsible:
+        """Create a compact collapsible for critic score visualization.
+
+        Args:
+            critic_result: The critic result to visualize
+
+        Returns:
+            A Collapsible widget showing critic score summary (collapsed)
+            and full breakdown (expanded)
+        """
+        import json
+
+        # Build title: "Critic Score: {score}" with color coding
+        score_emoji = "✅" if critic_result.success else "⚠️"
+        title = f"{score_emoji} Critic Score: {critic_result.score:.4f}"
+
+        # Build content: full breakdown
+        content_text = Text()
+
+        # Main score line
+        score_style = "green" if critic_result.success else "yellow"
+        content_text.append("Score: ", style="bold")
+        content_text.append(f"{critic_result.score:.4f}", style=score_style)
+        status = "success" if critic_result.success else "needs improvement"
+        content_text.append(f" ({status})\n\n")
+
+        # Parse and display detailed probabilities if available
+        if critic_result.message:
+            try:
+                start_idx = critic_result.message.find("{")
+                probs_dict = json.loads(critic_result.message[start_idx:])
+                if isinstance(probs_dict, dict):
+                    # Separate sentiments from other metrics
+                    sentiments = {
+                        k: v
+                        for k, v in probs_dict.items()
+                        if k.startswith("sentiment_")
+                    }
+                    other_metrics = {
+                        k: v
+                        for k, v in probs_dict.items()
+                        if not k.startswith("sentiment_") and k != "success"
+                    }
+
+                    # Display sentiment breakdown
+                    if sentiments:
+                        content_text.append(
+                            "User Sentiment Predictions:\n", style="bold"
+                        )
+                        sorted_sentiments = sorted(
+                            sentiments.items(), key=lambda x: x[1], reverse=True
+                        )
+                        for field, prob in sorted_sentiments:
+                            short_name = field.replace("sentiment_", "").capitalize()
+                            if prob >= 0.7:
+                                style = "cyan bold"
+                            elif prob >= 0.5:
+                                style = "cyan"
+                            else:
+                                style = "dim"
+                            content_text.append(f"  • {short_name}: ", style="white")
+                            content_text.append(f"{prob:.2f}\n", style=style)
+                        content_text.append("\n")
+
+                    # Display other metrics
+                    if other_metrics:
+                        content_text.append("Risk Indicators:\n", style="bold")
+                        sorted_metrics = sorted(
+                            other_metrics.items(), key=lambda x: x[1], reverse=True
+                        )
+                        for field, prob in sorted_metrics:
+                            if prob >= 0.7:
+                                prob_style = "red bold"
+                            elif prob >= 0.5:
+                                prob_style = "red"
+                            elif prob >= 0.3:
+                                prob_style = "yellow"
+                            else:
+                                prob_style = "white"
+                            content_text.append(f"  • {field}: ", style="dim")
+                            content_text.append(f"{prob:.2f}\n", style=prob_style)
+                else:
+                    # If not a dict, display message as-is
+                    content_text.append(f"\n{critic_result.message}\n")
+            except (json.JSONDecodeError, ValueError):
+                # If parsing fails, display message as-is
+                if critic_result.message:
+                    content_text.append(f"\n{critic_result.message}\n")
+
+        # Create a collapsible (start collapsed by default)
+        return self._make_collapsible(
+            content_text,
+            title=title,
+            event=None,  # No specific event for critic
+            collapsed=True,
+        )
+
     def _do_refresh_plan_panel(self) -> None:
         """Refresh the plan panel (must be called from main thread)."""
         plan_panel = self._app.plan_panel
@@ -161,6 +260,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
         widget = self._create_event_widget(event)
         if widget:
             self._run_on_main_thread(self._add_widget_to_ui, widget)
+
+            # Add critic collapsible if present (for MessageEvent and ActionEvent)
+            critic_result = getattr(event, "critic_result", None)
+            if critic_result is not None:
+                critic_widget = self._create_critic_collapsible(critic_result)
+                self._run_on_main_thread(self._add_widget_to_ui, critic_widget)
 
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
@@ -399,17 +504,17 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     def _make_collapsible(
         self,
-        content: str,
+        content: str | Text,
         title: str,
-        event: Event,
+        event: Event | None,
         collapsed: bool | None = None,
     ) -> Collapsible:
         """Create a Collapsible widget with standard settings.
 
         Args:
-            content: The content string to display in the collapsible.
+            content: The content to display (string or Rich Text object).
             title: The title for the collapsible header.
-            event: The event used to determine border color.
+            event: The event used to determine border color (None for default).
             collapsed: Override the default collapsed state. If None, uses default.
 
         Returns:
@@ -417,20 +522,16 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """
         if collapsed is None:
             collapsed = self._default_collapsed
+        border_color = _get_event_border_color(event) if event else "#888888"
         return Collapsible(
             content,
             title=title,
             collapsed=collapsed,
-            border_color=_get_event_border_color(event),
+            border_color=border_color,
         )
 
     def _create_event_widget(self, event: Event) -> "Widget | None":
         """Create a widget for the event - either plain text or collapsible."""
-        content = event.visualize
-
-        if not content.plain.strip():
-            return None
-
         # Don't emit system prompt in CLI
         if isinstance(event, SystemPromptEvent):
             return None
@@ -442,9 +543,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         if isinstance(event, ActionEvent):
             action = event.action
             if isinstance(action, FinishAction):
-                # For finish action, render as markdown with padding to align
-                # Use event.visualize which includes critic result if present
-                widget = Markdown(str(content))
+                # For finish action, render message as markdown
+                widget = Markdown(action.message)
                 widget.styles.padding = AGENT_MESSAGE_PADDING
                 return widget
             elif isinstance(action, ThinkAction):
@@ -461,9 +561,14 @@ class ConversationVisualizer(ConversationVisualizerBase):
             ):
                 return None
 
-            # Display messages as markdown for proper rendering
-            # The event.visualize already includes critic result if present
-            widget = Markdown(str(content))
+            # Extract text content from llm_message
+            from openhands.sdk.llm import content_to_str
+
+            text_parts = content_to_str(event.llm_message.content)
+            message_text = "".join(text_parts) if text_parts else "[no text content]"
+
+            # Display message as markdown
+            widget = Markdown(message_text)
             widget.styles.padding = AGENT_MESSAGE_PADDING
             return widget
 
