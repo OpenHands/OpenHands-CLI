@@ -41,12 +41,12 @@ from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
+from openhands_cli.tui.widgets import InputField
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
     CollapsibleNavigationMixin,
     CollapsibleTitle,
 )
-from openhands_cli.tui.widgets.input_field import InputField
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.tui.widgets.status_line import (
     InfoStatusLine,
@@ -64,7 +64,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+o", "toggle_cells", "Toggle Cells"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
-        ("ctrl+x", "open_external_editor", "Open external editor"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
         ("ctrl+c", "request_quit", "Quit the application"),
@@ -186,11 +185,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             "MCP", "View MCP configurations", lambda: MCPSidePanel.toggle(self)
         )
         yield SystemCommand(
-            "PLAN",
+            "Plan",
             "View agent plan",
             lambda: self.plan_panel.toggle(),
         )
-        yield SystemCommand("SETTINGS", "Configure settings", self.action_open_settings)
+        yield SystemCommand("Settings", "Configure settings", self.action_open_settings)
 
     def on_mount(self) -> None:
         """Called when app starts."""
@@ -617,12 +616,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self.conversation_runner.pause_runner_without_blocking()
         else:
             self.notify(message="No running conversation to pause", severity="error")
-
-    def action_open_external_editor(self) -> None:
-        """Forward open external editor action to the input field."""
-        # Debug: notify that the main app action was triggered
-        self.notify("Main app CTRL+X action triggered", severity="information")
-        self.input_field.action_open_external_editor()
 
     def _handle_confirm_command(self) -> None:
         """Handle the /confirm command to show confirmation settings modal."""

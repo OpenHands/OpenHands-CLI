@@ -108,6 +108,40 @@ class TokenBasedEventSubscriber:
         for idx in indices_to_remove:
             del self._streaming_tool_calls[idx]
 
+    def _is_tool_call_started(self, tool_call_id: str) -> bool:
+        """Check if a tool call was already started during streaming."""
+        return any(
+            state.tool_call_id == tool_call_id and state.started
+            for state in self._streaming_tool_calls.values()
+        )
+
+    async def _update_tool_call_with_summary(self, event: ActionEvent) -> None:
+        """Update an existing tool call with the LLM-generated summary.
+
+        This is called when an ActionEvent arrives for a tool call that was
+        already started during streaming. We update the title to include
+        the summary for better context.
+        """
+        from openhands_cli.acp_impl.events.utils import get_tool_kind, get_tool_title
+
+        summary = str(event.summary) if event.summary else None
+        title = get_tool_title(
+            tool_name=event.tool_name, action=event.action, summary=summary
+        )
+        kind = get_tool_kind(tool_name=event.tool_name, action=event.action)
+
+        await self.conn.session_update(
+            session_id=self.session_id,
+            update=update_tool_call(
+                tool_call_id=event.tool_call_id,
+                title=title,
+                kind=kind,
+                status="in_progress",
+                content=format_content_blocks(str(event.visualize.plain)),
+            ),
+            field_meta=get_metadata(self.conversation),
+        )
+
     async def unstreamed_event_handler(self, event: Event):
         # Skip ConversationStateUpdateEvent (internal state management)
         if isinstance(event, ConversationStateUpdateEvent):
@@ -117,7 +151,13 @@ class TokenBasedEventSubscriber:
         self.reset_header_state()
 
         if isinstance(event, ActionEvent):
-            await self.shared_events_handler.handle_action_event(self, event)
+            # Check if this tool call was already started during streaming
+            if self._is_tool_call_started(event.tool_call_id):
+                # Update the existing tool call with the summary
+                await self._update_tool_call_with_summary(event)
+            else:
+                # Start a new tool call (non-streaming case)
+                await self.shared_events_handler.handle_action_event(self, event)
         if isinstance(event, UserRejectObservation) or isinstance(
             event, AgentErrorEvent
         ):
@@ -165,8 +205,8 @@ class TokenBasedEventSubscriber:
                 reasoning = getattr(delta, "reasoning_content", None)
                 content = getattr(delta, "content", None)
 
-                if isinstance(reasoning, str) and reasoning:
-                    # Prepend header on first reasoning chunk for consistency
+                if isinstance(reasoning, str) and reasoning.strip():
+                    # Prepend header on first non-empty reasoning chunk for consistency
                     # with non-streaming mode (EventSubscriber)
                     if not self._reasoning_header_emitted:
                         self._reasoning_header_emitted = True
@@ -257,7 +297,6 @@ class TokenBasedEventSubscriber:
             )
             self._schedule_update(tool_call_start)
 
-        # Emit progress updates after start
         if state.started and arguments_chunk:
             self._schedule_update(
                 update_tool_call(

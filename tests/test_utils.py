@@ -31,6 +31,23 @@ def test_should_set_litellm_extra_body_for_openhands():
     assert should_set_litellm_extra_body("openhands/devstral-small-2507")
 
 
+def test_should_set_litellm_extra_body_for_llm_proxy_base_url():
+    """Test that litellm_extra_body is set for models using llm-proxy base URLs."""
+    # Any model using llm-proxy.*.all-hands.dev should get metadata
+    assert should_set_litellm_extra_body(
+        "gpt-4", "https://llm-proxy.app.all-hands.dev/"
+    )
+    assert should_set_litellm_extra_body(
+        "anthropic/claude-3", "https://llm-proxy.app.all-hands.dev/v1"
+    )
+    assert should_set_litellm_extra_body(
+        "openai/gpt-4", "https://llm-proxy.staging.all-hands.dev/"
+    )
+    assert should_set_litellm_extra_body(
+        "custom-model", "https://llm-proxy.dev.all-hands.dev/api"
+    )
+
+
 def test_should_not_set_litellm_extra_body_for_other_models():
     """Test that litellm_extra_body is not set for non-openhands models."""
     assert not should_set_litellm_extra_body("gpt-4")
@@ -40,6 +57,17 @@ def test_should_not_set_litellm_extra_body_for_other_models():
     assert not should_set_litellm_extra_body("vllm/model")
     assert not should_set_litellm_extra_body("dummy-model")
     assert not should_set_litellm_extra_body("litellm_proxy/gpt-4")
+
+
+def test_should_not_set_litellm_extra_body_for_other_base_urls():
+    """Test that litellm_extra_body is not set for non-OpenHands base URLs."""
+    assert not should_set_litellm_extra_body("gpt-4", "https://api.openai.com/")
+    assert not should_set_litellm_extra_body("claude-3", "https://api.anthropic.com/v1")
+    assert not should_set_litellm_extra_body(
+        "model", "https://example.com/llm-proxy.app.all-hands.dev/"
+    )
+    assert not should_set_litellm_extra_body("model", "https://all-hands.dev/")
+    assert not should_set_litellm_extra_body("model", None)
 
 
 def test_convert_acp_mcp_servers_empty_list():

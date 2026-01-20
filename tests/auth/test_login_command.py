@@ -85,26 +85,29 @@ class TestLoginCommand:
 
     @pytest.mark.asyncio
     async def test_login_command_existing_token(self):
-        """Test login command when user already has a token."""
+        """Test login command when user already has a valid token."""
         server_url = "https://api.example.com"
 
         with patch(
             "openhands_cli.auth.login_command.TokenStorage"
         ) as mock_storage_class:
             with patch(
-                "openhands_cli.auth.login_command._fetch_user_data_with_context"
-            ) as mock_fetch:
-                with patch("openhands_cli.auth.login_command._p"):
-                    mock_storage = MagicMock()
-                    mock_storage_class.return_value = mock_storage
-                    mock_storage.get_api_key.return_value = "existing-api-key"
+                "openhands_cli.auth.login_command.is_token_valid", return_value=True
+            ):
+                with patch(
+                    "openhands_cli.auth.login_command._fetch_user_data_with_context"
+                ) as mock_fetch:
+                    with patch("openhands_cli.auth.login_command._p"):
+                        mock_storage = MagicMock()
+                        mock_storage_class.return_value = mock_storage
+                        mock_storage.get_api_key.return_value = "existing-api-key"
 
-                    result = await login_command(server_url)
+                        result = await login_command(server_url)
 
-                    assert result is True
-                    mock_fetch.assert_called_once_with(
-                        server_url, "existing-api-key", already_logged_in=True
-                    )
+                        assert result is True
+                        mock_fetch.assert_called_once_with(
+                            server_url, "existing-api-key", already_logged_in=True
+                        )
 
     @pytest.mark.asyncio
     async def test_login_command_new_login_success(self):
@@ -291,7 +294,8 @@ class TestLoginCommand:
                         assert result is True
 
                         # Verify the complete flow
-                        mock_storage.get_api_key.assert_called_once()
+                        # get_api_key called twice: at start + after re-reading
+                        assert mock_storage.get_api_key.call_count == 2
                         mock_auth.assert_called_once_with(server_url)
                         mock_storage.store_api_key.assert_called_once_with(
                             "new-api-key"

@@ -61,8 +61,8 @@ class TestGetToolKind:
 
 
 class TestGetToolTitle:
-    def test_task_tracker_title_constant(self):
-        assert get_tool_title("task_tracker") == "Plan updated"
+    def test_task_tracker_title_empty_without_action(self):
+        assert get_tool_title("task_tracker") == ""
 
     @pytest.mark.parametrize(
         "action,expected",
@@ -75,8 +75,8 @@ class TestGetToolTitle:
                 FileEditorAction(command="str_replace", path="/src/main.py"),
                 "Editing /src/main.py",
             ),
-            (TerminalAction(command="git status"), "git status"),
-            (TaskTrackerAction(command="plan", task_list=[]), "Plan updated"),
+            (TerminalAction(command="git status"), "$ git status"),
+            (TaskTrackerAction(command="plan", task_list=[]), ""),
         ],
     )
     def test_title_from_action(self, action, expected: str):
@@ -117,6 +117,36 @@ class TestGetToolTitle:
     def test_delegate_title_from_action(self, action: DelegateAction, expected: str):
         """DelegateAction title depends on command and ids/tasks."""
         assert get_tool_title("delegate", action=action) == expected
+    def test_title_with_summary_terminal(self):
+        """Test that summary is included in terminal action title."""
+        action = TerminalAction(command="git status")
+        title = get_tool_title("terminal", action=action, summary="Check git status")
+        assert title == "Check git status: $ git status"
+
+    def test_title_with_summary_file_editor_view(self):
+        """Test that summary is included in file editor view title."""
+        action = FileEditorAction(command="view", path="/src/main.py")
+        title = get_tool_title("file_editor", action=action, summary="Read main file")
+        assert title == "Read main file: Reading /src/main.py"
+
+    def test_title_with_summary_file_editor_edit(self):
+        """Test that summary is included in file editor edit title."""
+        action = FileEditorAction(command="str_replace", path="/src/main.py")
+        title = get_tool_title("file_editor", action=action, summary="Fix bug in main")
+        assert title == "Fix bug in main: Editing /src/main.py"
+
+    def test_title_with_summary_only(self):
+        """Test that summary alone is used when no action details available."""
+        title = get_tool_title("unknown_tool", summary="Do something important")
+        assert title == "Do something important"
+
+    def test_title_with_summary_newlines_stripped(self):
+        """Test that newlines in summary are replaced with spaces."""
+        action = TerminalAction(command="ls")
+        title = get_tool_title(
+            "terminal", action=action, summary="List files\nin directory"
+        )
+        assert title == "List files in directory: $ ls"
 
 
 class TestFormatContentBlocks:
