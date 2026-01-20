@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from rich.console import Console
 
 from openhands_cli.argparsers.main_parser import create_main_parser
+from openhands_cli.stores import check_and_warn_env_vars, set_env_overrides_enabled
 from openhands_cli.terminal_compat import check_terminal_compatibility
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.utils import create_seeded_instructions_from_args
@@ -100,6 +101,14 @@ def main() -> None:
     # Automatically set exit_without_confirmation when headless mode is used
     if args.headless:
         args.exit_without_confirmation = True
+
+    # Handle --override-with-envs flag
+    override_with_envs = getattr(args, "override_with_envs", False)
+    set_env_overrides_enabled(override_with_envs)
+
+    # Warn about env vars if they are set but not being used
+    if not override_with_envs:
+        check_and_warn_env_vars()
 
     try:
         if args.command == "serve":

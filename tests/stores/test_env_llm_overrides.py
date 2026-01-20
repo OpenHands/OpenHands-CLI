@@ -13,7 +13,95 @@ from openhands_cli.stores.agent_store import (
     ENV_LLM_MODEL,
     LLMEnvOverrides,
     apply_llm_overrides,
+    set_env_overrides_enabled,
+    get_env_overrides_enabled,
+    check_and_warn_env_vars,
 )
+
+
+@pytest.fixture(autouse=True)
+def reset_env_overrides_flag():
+    """Reset the env overrides flag before and after each test."""
+    original_value = get_env_overrides_enabled()
+    set_env_overrides_enabled(False)
+    yield
+    set_env_overrides_enabled(original_value)
+
+
+class TestEnvOverridesFlag:
+    """Tests for the env overrides enable/disable flag."""
+
+    def test_env_overrides_disabled_by_default(self) -> None:
+        """Env overrides should be disabled by default."""
+        set_env_overrides_enabled(False)  # Reset to default
+        assert get_env_overrides_enabled() is False
+
+    def test_set_env_overrides_enabled(self) -> None:
+        """Should be able to enable env overrides."""
+        set_env_overrides_enabled(True)
+        assert get_env_overrides_enabled() is True
+
+    def test_set_env_overrides_disabled(self) -> None:
+        """Should be able to disable env overrides."""
+        set_env_overrides_enabled(True)
+        set_env_overrides_enabled(False)
+        assert get_env_overrides_enabled() is False
+
+    def test_env_vars_ignored_when_flag_disabled(self) -> None:
+        """Env vars should be ignored when flag is disabled."""
+        set_env_overrides_enabled(False)
+        env_vars = {
+            ENV_LLM_API_KEY: "env-api-key",
+            ENV_LLM_BASE_URL: "https://env.url/",
+            ENV_LLM_MODEL: "env-model",
+        }
+        with patch.dict(os.environ, env_vars, clear=False):
+            overrides = LLMEnvOverrides()
+            assert overrides.api_key is None
+            assert overrides.base_url is None
+            assert overrides.model is None
+
+    def test_env_vars_loaded_when_flag_enabled(self) -> None:
+        """Env vars should be loaded when flag is enabled."""
+        set_env_overrides_enabled(True)
+        env_vars = {
+            ENV_LLM_API_KEY: "env-api-key",
+            ENV_LLM_BASE_URL: "https://env.url/",
+            ENV_LLM_MODEL: "env-model",
+        }
+        with patch.dict(os.environ, env_vars, clear=False):
+            overrides = LLMEnvOverrides()
+            assert overrides.api_key is not None
+            assert overrides.api_key.get_secret_value() == "env-api-key"
+            assert overrides.base_url == "https://env.url/"
+            assert overrides.model == "env-model"
+
+
+class TestCheckAndWarnEnvVars:
+    """Tests for check_and_warn_env_vars function."""
+
+    def test_no_warning_when_no_env_vars(self, capsys) -> None:
+        """Should not warn when no env vars are set."""
+        with patch.dict(os.environ, {}, clear=True):
+            for key in [ENV_LLM_API_KEY, ENV_LLM_BASE_URL, ENV_LLM_MODEL]:
+                os.environ.pop(key, None)
+            check_and_warn_env_vars()
+            captured = capsys.readouterr()
+            assert "Warning" not in captured.err
+
+    def test_warning_when_env_vars_set(self, capsys) -> None:
+        """Should warn when env vars are set but not used."""
+        env_vars = {
+            ENV_LLM_API_KEY: "test-key",
+            ENV_LLM_MODEL: "test-model",
+        }
+        with patch.dict(os.environ, env_vars, clear=False):
+            check_and_warn_env_vars()
+            captured = capsys.readouterr()
+            assert "Warning" in captured.err
+            assert "LLM_API_KEY" in captured.err
+            assert "LLM_MODEL" in captured.err
+            assert "--override-with-envs" in captured.err
 
 
 class TestLLMEnvOverrides:
@@ -78,6 +166,7 @@ class TestLLMEnvOverrides:
 
     def test_auto_loads_from_env_with_no_env_vars(self) -> None:
         """Constructor should return empty overrides when no env vars set."""
+        set_env_overrides_enabled(True)
         with patch.dict(os.environ, {}, clear=True):
             for key in [ENV_LLM_API_KEY, ENV_LLM_BASE_URL, ENV_LLM_MODEL]:
                 os.environ.pop(key, None)
@@ -87,7 +176,8 @@ class TestLLMEnvOverrides:
             assert overrides.model is None
 
     def test_auto_loads_from_env_with_all_env_vars(self) -> None:
-        """Constructor should automatically read all env vars when set."""
+        """Constructor should automatically read all env vars when enabled."""
+        set_env_overrides_enabled(True)
         env_vars = {
             ENV_LLM_API_KEY: "env-api-key",
             ENV_LLM_BASE_URL: "https://env.url/",
@@ -102,6 +192,7 @@ class TestLLMEnvOverrides:
 
     def test_auto_loads_ignores_empty_strings(self) -> None:
         """Constructor should treat empty env var strings as None."""
+        set_env_overrides_enabled(True)
         env_vars = {
             ENV_LLM_API_KEY: "",
             ENV_LLM_BASE_URL: "https://valid.url/",
@@ -115,6 +206,7 @@ class TestLLMEnvOverrides:
 
     def test_explicit_values_override_env_vars(self) -> None:
         """Explicitly provided values should take precedence over env vars."""
+        set_env_overrides_enabled(True)
         env_vars = {
             ENV_LLM_API_KEY: "env-api-key",
             ENV_LLM_BASE_URL: "https://env.url/",
@@ -201,11 +293,51 @@ class TestApplyLlmOverrides:
 class TestAgentStoreEnvOverrides:
     """Integration tests for AgentStore.load() with environment variable overrides."""
 
-    def test_env_vars_override_stored_settings(
+    def test_env_vars_ignored_when_flag_disabled(
+        self, setup_test_agent_config
+    ) -> None:
+        """Environment variables should be ignored when flag is disabled."""
+        from openhands.sdk import LLM, Agent
+        from openhands_cli.stores import AgentStore
+
+        # First, save a known agent configuration
+        store = AgentStore()
+        llm = LLM(
+            model="stored-model",
+            api_key=SecretStr("stored-api-key"),
+            base_url="https://stored.url/",
+            usage_id="agent",
+        )
+        agent = Agent(llm=llm, tools=[])
+        store.save(agent)
+
+        # Set environment variables but don't enable the flag
+        set_env_overrides_enabled(False)
+        env_vars = {
+            ENV_LLM_API_KEY: "env-api-key",
+            ENV_LLM_BASE_URL: "https://env-override.url/",
+            ENV_LLM_MODEL: "env-override-model",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=False):
+            loaded_agent = store.load()
+
+            assert loaded_agent is not None
+            # Should use stored values, not env vars
+            assert loaded_agent.llm.api_key is not None
+            assert isinstance(loaded_agent.llm.api_key, SecretStr)
+            assert loaded_agent.llm.api_key.get_secret_value() == "stored-api-key"
+            assert loaded_agent.llm.base_url == "https://stored.url/"
+            assert loaded_agent.llm.model == "stored-model"
+
+    def test_env_vars_override_stored_settings_when_enabled(
         self, setup_test_agent_config, tmp_path_factory
     ) -> None:
-        """Environment variables should override stored agent settings."""
+        """Environment variables should override stored agent settings when enabled."""
         from openhands_cli.stores import AgentStore
+
+        # Enable env overrides
+        set_env_overrides_enabled(True)
 
         # Set environment variables
         env_vars = {
@@ -230,6 +362,9 @@ class TestAgentStoreEnvOverrides:
         from openhands.sdk import LLM, Agent
         from openhands_cli.stores import AgentStore
 
+        # Enable env overrides
+        set_env_overrides_enabled(True)
+
         # First, save a known agent configuration
         store = AgentStore()
         llm = LLM(
@@ -241,8 +376,13 @@ class TestAgentStoreEnvOverrides:
         agent = Agent(llm=llm, tools=[])
         store.save(agent)
 
-        # Only set the model env var
-        with patch.dict(os.environ, {ENV_LLM_MODEL: "partial-override-model"}):
+        # Only set the model env var, clear other LLM env vars
+        env_patch = {
+            ENV_LLM_MODEL: "partial-override-model",
+            ENV_LLM_API_KEY: "",  # Clear any existing API key env var
+            ENV_LLM_BASE_URL: "",  # Clear any existing base URL env var
+        }
+        with patch.dict(os.environ, env_patch, clear=False):
             loaded_agent = store.load()
 
             assert loaded_agent is not None
@@ -269,14 +409,15 @@ class TestAgentStoreEnvOverrides:
         agent = Agent(llm=llm, tools=[])
         store.save(agent)
 
-        # Load with env override
+        # Enable env overrides and load with env override
+        set_env_overrides_enabled(True)
         with patch.dict(os.environ, {ENV_LLM_MODEL: "temp-override-model"}):
             agent_with_override = store.load()
             assert agent_with_override is not None
             assert agent_with_override.llm.model == "temp-override-model"
 
-        # Clear env vars and reload - should get original stored value
-        # Remove the env var by patching with empty dict for that key
+        # Disable env overrides and reload - should get original stored value
+        set_env_overrides_enabled(False)
         original_env = os.environ.copy()
         for key in [ENV_LLM_API_KEY, ENV_LLM_BASE_URL, ENV_LLM_MODEL]:
             original_env.pop(key, None)
@@ -291,6 +432,9 @@ class TestAgentStoreEnvOverrides:
         """Condenser LLM should also receive environment variable overrides."""
         from openhands.sdk import LLM, Agent, LLMSummarizingCondenser
         from openhands_cli.stores import AgentStore
+
+        # Enable env overrides
+        set_env_overrides_enabled(True)
 
         # Create an agent with a condenser and save it
         store = AgentStore()
