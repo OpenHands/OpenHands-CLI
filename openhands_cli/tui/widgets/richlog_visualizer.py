@@ -573,29 +573,33 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 return widget
 
         if isinstance(event, MessageEvent):
+            if not event.llm_message:
+                return None
+
+            # Skip direct user messages 
             if (
                 self._skip_user_messages
-                and event.llm_message
                 and event.llm_message.role == "user"
                 and not event.sender
             ):
                 return None
 
-            if not event.sender or event.llm_message or self._name:
+            # Only render delegation messages
+            if not (event.sender and self._name):
                 return None
 
             # Display messages as markdown for proper rendering
             # In delegation context, prefix messages with agent info
             message_content = str(content)
             agent_name = self._get_formatted_agent_name()
+            event_sender = self._format_agent_name_with_suffix(event.sender)
+            
             if event.llm_message.role == "user":
                 # Message from another agent (via delegation)
-                sender_display = self._format_agent_name_with_suffix(event.sender)
-                prefix = f"**{sender_display} → {agent_name}:**\n\n"
+                prefix = f"**{event_sender} → {agent_name}:**\n\n"
             else:
                 # Agent message - derive recipient from sender context
-                recipient_display = self._format_agent_name_with_suffix(event.sender)
-                prefix = f"**{agent_name} → {recipient_display}:**\n\n"
+                prefix = f"**{agent_name} → {event_sender}:**\n\n"
 
             message_content = prefix + message_content
             widget = Markdown(message_content)
