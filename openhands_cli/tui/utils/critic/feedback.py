@@ -79,12 +79,13 @@ class CriticFeedbackWidget(Static, can_focus=True):
         background: transparent;
         color: $foreground;
         padding: 0 1;
-        margin: 0;
+        margin: 1 0;
     }
 
     CriticFeedbackWidget Horizontal {
         height: auto;
         width: 100%;
+        margin-top: 1;
     }
 
     CriticFeedbackWidget Button {
