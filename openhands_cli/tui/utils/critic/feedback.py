@@ -77,7 +77,7 @@ class CriticFeedbackWidget(Static, can_focus=True):
     CriticFeedbackWidget {
         height: auto;
         background: $surface;
-        color: $text;
+        color: $foreground;
         border: solid $primary;
         padding: 1 2;
         margin: 1 0 1 0;
@@ -96,10 +96,12 @@ class CriticFeedbackWidget(Static, can_focus=True):
     CriticFeedbackWidget Button {
         min-width: 12;
         margin-right: 1;
+        color: $foreground;
     }
 
     CriticFeedbackWidget Button.dismiss {
         background: $surface-darken-1;
+        color: $foreground;
     }
     """
 
