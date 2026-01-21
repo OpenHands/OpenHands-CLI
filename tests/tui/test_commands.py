@@ -1,5 +1,7 @@
 """Tests for the commands module."""
 
+import uuid
+from datetime import UTC, datetime
 from typing import cast
 from unittest import mock
 
@@ -8,12 +10,16 @@ from textual.containers import VerticalScroll
 from textual_autocomplete import DropdownItem
 
 from openhands.sdk.security.confirmation_policy import AlwaysConfirm
+from openhands_cli.conversations.models import ConversationMetadata
+from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.tui.core.commands import COMMANDS, is_valid_command, show_help
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.confirmation_modal import (
     ConfirmationSettingsModal,
 )
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
+from openhands_cli.tui.modals.switch_conversation_modal import SwitchConversationModal
+from openhands_cli.tui.panels.history_side_panel import HistoryItem, HistorySidePanel
 from openhands_cli.tui.textual_app import OpenHandsApp
 
 
@@ -23,7 +29,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 6
+        assert len(COMMANDS) == 7
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -37,6 +43,7 @@ class TestCommands:
         [
             ("/help", "Display available commands"),
             ("/new", "Start a new conversation"),
+            ("/history", "Toggle conversation history"),
             ("/confirm", "Configure confirmation settings"),
             ("/condense", "Condense conversation history"),
             ("/feedback", "Send anonymous feedback about CLI"),
@@ -74,12 +81,14 @@ class TestCommands:
             "OpenHands CLI Help",
             "/help",
             "/new",
+            "/history",
             "/confirm",
             "/condense",
             "/feedback",
             "/exit",
             "Display available commands",
             "Start a new conversation",
+            "Toggle conversation history",
             "Configure confirmation settings",
             "Condense conversation history",
             "Send anonymous feedback about CLI",
@@ -149,6 +158,7 @@ class TestCommands:
         [
             ("/help", True),
             ("/new", True),
+            ("/history", True),
             ("/confirm", True),
             ("/condense", True),
             ("/feedback", True),
@@ -164,6 +174,15 @@ class TestCommands:
     def test_is_valid_command(self, cmd, expected):
         """Command validation is strict and argument-sensitive."""
         assert is_valid_command(cmd) is expected
+
+    def test_commands_contains_history(self):
+        """Test COMMANDS includes /history."""
+        command_names = [str(cmd.main).split(" - ")[0] for cmd in COMMANDS]
+
+        assert "/history" in command_names
+        assert "/help" in command_names
+        assert "/new" in command_names
+        assert len(COMMANDS) == 7
 
     def test_all_commands_included_in_help(self):
         """Test that all commands from COMMANDS list are included in help text.
@@ -581,3 +600,179 @@ class TestOpenHandsAppCommands:
             splash_conversation = oh_app.query_one("#splash_conversation", Static)
             # The content should contain the new conversation ID hex
             assert oh_app.conversation_id.hex in str(splash_conversation.content)
+
+    @pytest.mark.asyncio
+    async def test_history_command_toggles_panel(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/history` should toggle the history side panel visibility."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            # Initially panel should be hidden
+            panels = oh_app.query(HistorySidePanel)
+            initial_visible = (
+                len(panels) > 0 and panels.first().display if len(panels) > 0 else False
+            )
+
+            oh_app._handle_command("/history")
+            await pilot.pause()
+
+            # Panel should now be visible
+            panels = oh_app.query(HistorySidePanel)
+            assert len(panels) > 0
+            assert panels.first().display is True
+
+            # Toggle again - should hide
+            oh_app._handle_command("/history")
+            await pilot.pause()
+
+            panels = oh_app.query(HistorySidePanel)
+            if len(panels) > 0:
+                assert panels.first().display is False or initial_visible
+
+    @pytest.mark.asyncio
+    async def test_new_command_updates_history_panel(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/new` should add a placeholder to the history panel."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+        existing_id = uuid.uuid4().hex
+        monkeypatch.setattr(
+            LocalFileStore,
+            "list_conversations",
+            lambda self, limit=100: [
+                ConversationMetadata(
+                    id=existing_id,
+                    created_at=datetime(2025, 1, 1, tzinfo=UTC),
+                    title="old chat",
+                )
+            ],
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+            original_id = oh_app.conversation_id
+
+            oh_app._handle_command("/history")
+            await pilot.pause()
+
+            panel = oh_app.query_one(HistorySidePanel)
+            items_before = panel.query(HistoryItem)
+            count_before = len(items_before)
+
+            oh_app._handle_command("/new")
+            await pilot.pause()
+
+            assert oh_app.conversation_id != original_id
+
+            items_after = panel.query(HistoryItem)
+            assert len(items_after) == count_before + 1
+            assert panel.current_conversation_id == oh_app.conversation_id
+
+    @pytest.mark.asyncio
+    async def test_history_panel_selection_triggers_switch(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Selecting a conversation in history panel should trigger switch."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+        conv1_id = uuid.uuid4().hex
+        conv2_id = uuid.uuid4().hex
+        monkeypatch.setattr(
+            LocalFileStore,
+            "list_conversations",
+            lambda self, limit=100: [
+                ConversationMetadata(
+                    id=conv1_id,
+                    created_at=datetime(2025, 1, 2, tzinfo=UTC),
+                    title="chat 1",
+                ),
+                ConversationMetadata(
+                    id=conv2_id,
+                    created_at=datetime(2025, 1, 1, tzinfo=UTC),
+                    title="chat 2",
+                ),
+            ],
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            switch_calls: list[str] = []
+
+            def mock_switch(cid: str) -> None:
+                switch_calls.append(cid)
+
+            oh_app._conversation_manager.switch_to = mock_switch  # type: ignore[method-assign]
+
+            oh_app._handle_command("/history")
+            await pilot.pause()
+
+            panel = oh_app.query_one(HistorySidePanel)
+            panel._handle_select(conv2_id)
+            await pilot.pause()
+
+            assert len(switch_calls) == 1
+            assert switch_calls[0] == conv2_id
+
+    @pytest.mark.asyncio
+    async def test_history_switch_shows_modal_when_agent_running(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Switching conversation while agent is running should show modal."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+        target_id = uuid.uuid4().hex
+        monkeypatch.setattr(
+            LocalFileStore,
+            "list_conversations",
+            lambda self, limit=100: [
+                ConversationMetadata(
+                    id=target_id,
+                    created_at=datetime(2025, 1, 1, tzinfo=UTC),
+                    title="target chat",
+                ),
+            ],
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            dummy_runner = mock.MagicMock()
+            dummy_runner.is_running = True
+            oh_app.conversation_runner = dummy_runner
+
+            oh_app._conversation_manager.switch_to(target_id)
+            await pilot.pause()
+
+            top_screen = oh_app.screen_stack[-1]
+            assert isinstance(top_screen, SwitchConversationModal)

@@ -7,6 +7,7 @@ from typing import Any
 
 from prompt_toolkit import HTML, print_formatted_text
 from pydantic import BaseModel, SecretStr, model_validator
+from rich.console import Console
 
 from openhands.sdk import (
     LLM,
@@ -78,6 +79,54 @@ ENV_LLM_API_KEY = "LLM_API_KEY"
 ENV_LLM_BASE_URL = "LLM_BASE_URL"
 ENV_LLM_MODEL = "LLM_MODEL"
 
+# Global flag to control whether env overrides are applied
+_apply_env_overrides: bool = False
+
+
+def set_env_overrides_enabled(enabled: bool) -> None:
+    """Set whether environment variable overrides should be applied.
+
+    Args:
+        enabled: If True, environment variables will override LLM settings.
+                 If False (default), environment variables are ignored.
+    """
+    global _apply_env_overrides
+    _apply_env_overrides = enabled
+
+
+def get_env_overrides_enabled() -> bool:
+    """Get whether environment variable overrides are enabled.
+
+    Returns:
+        True if env overrides are enabled, False otherwise.
+    """
+    return _apply_env_overrides
+
+
+def check_and_warn_env_vars() -> None:
+    """Check for LLM environment variables and warn if they are set but not used.
+
+    This function should be called when env overrides are disabled to inform
+    users that their environment variables are being ignored.
+    """
+    env_vars_set = []
+    if os.environ.get(ENV_LLM_API_KEY):
+        env_vars_set.append(ENV_LLM_API_KEY)
+    if os.environ.get(ENV_LLM_BASE_URL):
+        env_vars_set.append(ENV_LLM_BASE_URL)
+    if os.environ.get(ENV_LLM_MODEL):
+        env_vars_set.append(ENV_LLM_MODEL)
+
+    if env_vars_set:
+        console = Console(stderr=True)
+        vars_str = ", ".join(env_vars_set)
+        console.print(
+            f"[yellow]Warning:[/yellow] Environment variable(s) {vars_str} detected "
+            "but will be ignored.\n"
+            "Use [bold]--override-with-envs[/bold] flag to apply them.",
+            highlight=False,
+        )
+
 
 class LLMEnvOverrides(BaseModel):
     """LLM configuration overrides from environment variables.
@@ -87,7 +136,9 @@ class LLMEnvOverrides(BaseModel):
     NOT persisted to disk (temporary override only).
 
     When instantiated without arguments, automatically loads values from
-    environment variables (LLM_API_KEY, LLM_BASE_URL, LLM_MODEL).
+    environment variables (LLM_API_KEY, LLM_BASE_URL, LLM_MODEL) ONLY if
+    env overrides are enabled via set_env_overrides_enabled(True) or
+    --override-with-envs flag.
     """
 
     api_key: SecretStr | None = None
@@ -97,21 +148,26 @@ class LLMEnvOverrides(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def load_from_env(cls, data: Any) -> dict[str, Any]:
-        """Load values from environment variables if not explicitly provided."""
+        """Load values from environment variables if not explicitly provided.
+
+        Only loads from env vars if env overrides are enabled globally.
+        """
         result: dict[str, Any] = {}
 
-        # Get values from env vars
-        api_key_str = os.environ.get(ENV_LLM_API_KEY) or None
-        if api_key_str:
-            result["api_key"] = SecretStr(api_key_str)
+        # Only load from env vars if overrides are enabled
+        if get_env_overrides_enabled():
+            # Get values from env vars
+            api_key_str = os.environ.get(ENV_LLM_API_KEY) or None
+            if api_key_str:
+                result["api_key"] = SecretStr(api_key_str)
 
-        base_url = os.environ.get(ENV_LLM_BASE_URL) or None
-        if base_url:
-            result["base_url"] = base_url
+            base_url = os.environ.get(ENV_LLM_BASE_URL) or None
+            if base_url:
+                result["base_url"] = base_url
 
-        model = os.environ.get(ENV_LLM_MODEL) or None
-        if model:
-            result["model"] = model
+            model = os.environ.get(ENV_LLM_MODEL) or None
+            if model:
+                result["model"] = model
 
         # Explicit values take precedence over env vars
         if isinstance(data, dict):

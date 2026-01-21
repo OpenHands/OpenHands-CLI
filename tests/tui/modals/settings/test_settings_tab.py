@@ -2,8 +2,9 @@
 
 import pytest
 from textual.app import App, ComposeResult
-from textual.widgets import Input, Select
+from textual.widgets import Input, Select, Static
 
+from openhands_cli.tui.modals.settings import model_recommendations
 from openhands_cli.tui.modals.settings.components.settings_tab import SettingsTab
 
 
@@ -111,3 +112,49 @@ class TestSettingsTab:
             assert "https://api.openai.com/v1" in (base_url.placeholder or "")
             assert "https://api.anthropic.com" in (base_url.placeholder or "")
             assert "Enter your API key" in (api_key.placeholder or "")
+
+    @pytest.mark.asyncio
+    async def test_model_recommendations_are_present(self):
+        """Test that model recommendations section is present in settings tab."""
+        app = _TestApp()
+
+        async with app.run_test():
+            tab = app.query_one(SettingsTab)
+            # Find all Static widgets with model-related classes
+            category_titles: list[Static] = [
+                w for w in tab.query(".model_category_title") if isinstance(w, Static)
+            ]
+            model_names: list[Static] = [
+                w for w in tab.query(".model_name") if isinstance(w, Static)
+            ]
+            # Check that category titles are present
+            widget_texts = [str(w.content) for w in category_titles]
+            assert any(
+                model_recommendations.CLOUD_CATEGORY_TITLE in text
+                for text in widget_texts
+            )
+            assert any(
+                model_recommendations.LOCAL_CATEGORY_TITLE in text
+                for text in widget_texts
+            )
+            # Check that recommended models have the indicator
+            model_name_texts = [str(w.content) for w in model_names]
+            all_models = (
+                model_recommendations.CLOUD_MODELS + model_recommendations.LOCAL_MODELS
+            )
+            for model in all_models:
+                model_display = model.format_display_name()
+                # Find the widget text that contains this model
+                matching_text = next(
+                    (text for text in model_name_texts if model_display in text), None
+                )
+                assert matching_text is not None, f"Model {model.name} not found"
+
+                if model.is_recommended:
+                    assert (
+                        model_recommendations.RECOMMENDED_INDICATOR in matching_text
+                    ), f"Recommended model {model.name} missing indicator"
+                else:
+                    assert (
+                        model_recommendations.RECOMMENDED_INDICATOR not in matching_text
+                    ), f"Non-recommended model {model.name} has indicator"
