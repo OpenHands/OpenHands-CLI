@@ -577,32 +577,27 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 self._skip_user_messages
                 and event.llm_message
                 and event.llm_message.role == "user"
+                and not event.sender
             ):
                 return None
+
+            if not event.sender or event.llm_message or self._name:
+                return None
+
             # Display messages as markdown for proper rendering
             # In delegation context, prefix messages with agent info
             message_content = str(content)
-            if self._name and event.llm_message:
-                agent_name = self._get_formatted_agent_name()
-                if event.llm_message.role == "user":
-                    if event.sender:
-                        # Message from another agent (via delegation)
-                        sender_display = self._format_agent_name_with_suffix(
-                            event.sender
-                        )
-                        prefix = f"**{sender_display} → {agent_name}:**\n\n"
-                    else:
-                        prefix = f"**User → {agent_name}:**\n\n"
-                else:
-                    # Agent message - derive recipient from sender context
-                    if event.sender:
-                        recipient_display = self._format_agent_name_with_suffix(
-                            event.sender
-                        )
-                        prefix = f"**{agent_name} → {recipient_display}:**\n\n"
-                    else:
-                        prefix = f"**{agent_name}:**\n\n"
-                message_content = prefix + message_content
+            agent_name = self._get_formatted_agent_name()
+            if event.llm_message.role == "user":
+                # Message from another agent (via delegation)
+                sender_display = self._format_agent_name_with_suffix(event.sender)
+                prefix = f"**{sender_display} → {agent_name}:**\n\n"
+            else:
+                # Agent message - derive recipient from sender context
+                recipient_display = self._format_agent_name_with_suffix(event.sender)
+                prefix = f"**{agent_name} → {recipient_display}:**\n\n"
+
+            message_content = prefix + message_content
             widget = Markdown(message_content)
             widget.styles.padding = AGENT_MESSAGE_PADDING
             return widget
