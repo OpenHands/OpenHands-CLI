@@ -287,8 +287,9 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
 
     async def new_session(
         self,
-        cwd: str,  # noqa: ARG002
+        cwd: str,
         mcp_servers: list[Any],
+        working_dir: str | None = None,
         **_kwargs: Any,
     ) -> NewSessionResponse:
         """Create a new conversation session with cloud workspace."""
@@ -299,7 +300,9 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
                 {"reason": "Authentication required to create a cloud session"}
             )
 
-        return await self._shared_handler.new_session(ctx=self, mcp_servers=mcp_servers)
+        return await super().new_session(
+            cwd=cwd, mcp_servers=mcp_servers, working_dir=working_dir, **_kwargs
+        )
 
     async def prompt(
         self, prompt: list[Any], session_id: str, **_kwargs: Any

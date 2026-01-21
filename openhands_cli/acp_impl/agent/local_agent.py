@@ -188,12 +188,16 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
         self,
         cwd: str,
         mcp_servers: list[Any],
+        working_dir: str | None = None,
         **_kwargs: Any,
     ) -> NewSessionResponse:
         """Create a new conversation session."""
-        working_dir = cwd or str(Path.cwd())
-        logger.info(f"Using working directory: {working_dir}")
+        effective_working_dir = working_dir or cwd or str(Path.cwd())
+        logger.info(f"Using working directory: {effective_working_dir}")
 
-        return await self._shared_handler.new_session(
-            ctx=self, mcp_servers=mcp_servers, working_dir=working_dir
+        return await super().new_session(
+            cwd=cwd,
+            mcp_servers=mcp_servers,
+            working_dir=effective_working_dir,
+            **_kwargs,
         )

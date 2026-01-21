@@ -1,8 +1,8 @@
 """Common tests for both LocalOpenHandsACPAgent and OpenHandsCloudACPAgent.
 
 These tests verify that both agent implementations behave consistently
-for shared functionality. More detailed unit tests for the SharedACPAgentHandler
-are in test_shared_agent_handler.py.
+for shared functionality. More detailed unit tests for the BaseOpenHandsACPAgent
+methods are in test_base_agent.py.
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch

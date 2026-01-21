@@ -63,6 +63,8 @@ class TestNewSessionAuthentication:
     @pytest.mark.asyncio
     async def test_new_session_proceeds_when_authenticated(self, cloud_agent):
         """Test that new_session proceeds when user is authenticated."""
+        from acp import NewSessionResponse
+
         with (
             patch(
                 "openhands_cli.acp_impl.agent.remote_agent.is_token_valid",
@@ -70,16 +72,18 @@ class TestNewSessionAuthentication:
                 return_value=True,
             ),
             patch.object(
-                cloud_agent._shared_handler, "new_session", new_callable=AsyncMock
-            ) as mock_new_session,
+                cloud_agent, "_get_or_create_conversation", new_callable=AsyncMock
+            ) as mock_get_conv,
         ):
-            mock_response = MagicMock()
-            mock_new_session.return_value = mock_response
+            mock_conversation = MagicMock()
+            mock_conversation.state.events = []
+            mock_get_conv.return_value = mock_conversation
 
             result = await cloud_agent.new_session(cwd="/tmp", mcp_servers=[])
 
-            mock_new_session.assert_called_once()
-            assert result == mock_response
+            mock_get_conv.assert_called_once()
+            assert isinstance(result, NewSessionResponse)
+            assert result.session_id is not None
 
 
 class TestAuthenticate:

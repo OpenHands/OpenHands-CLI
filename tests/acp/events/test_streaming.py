@@ -57,7 +57,9 @@ def mock_tool_call():
 
 
 @pytest.mark.asyncio
-async def test_conversation_setup_enables_streaming_by_default(acp_agent, tmp_path):
+async def test_conversation_setup_enables_streaming_by_default(
+    acp_agent_with_streaming, tmp_path
+):
     """Test that conversation setup enables streaming by default."""
     session_id = str(uuid4())
 
@@ -111,7 +113,7 @@ async def test_conversation_setup_enables_streaming_by_default(acp_agent, tmp_pa
         mock_event_subscriber_class.assert_called_once()
         call_args = mock_event_subscriber_class.call_args
         assert call_args[0][0] == session_id  # session_id
-        assert call_args[0][1] == acp_agent._conn  # conn
+        assert call_args[0][1] == acp_agent_with_streaming._conn  # conn
 
         # Verify that Conversation was created
         mock_conversation_class.assert_called_once()

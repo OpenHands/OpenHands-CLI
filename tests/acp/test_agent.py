@@ -31,9 +31,7 @@ def acp_agent(mock_connection):
 async def test_initialize_with_configured_agent(acp_agent):
     """Test agent initialization when agent is configured."""
     # Mock load_agent_specs to succeed (called from shared_agent_handler)
-    with patch(
-        "openhands_cli.acp_impl.agent.shared_agent_handler.load_agent_specs"
-    ) as mock_load:
+    with patch("openhands_cli.acp_impl.agent.base_agent.load_agent_specs") as mock_load:
         mock_agent = MagicMock()
         mock_load.return_value = mock_agent
 
@@ -56,9 +54,7 @@ async def test_initialize_without_configured_agent(acp_agent):
     from openhands_cli.setup import MissingAgentSpec
 
     # Mock load_agent_specs to raise MissingAgentSpec (called from shared_agent_handler)
-    with patch(
-        "openhands_cli.acp_impl.agent.shared_agent_handler.load_agent_specs"
-    ) as mock_load:
+    with patch("openhands_cli.acp_impl.agent.base_agent.load_agent_specs") as mock_load:
         mock_load.side_effect = MissingAgentSpec("Not configured")
 
         response = await acp_agent.initialize(
@@ -650,7 +646,7 @@ async def test_new_session_replays_historic_events_on_resume(mock_connection, tm
         patch("openhands_cli.acp_impl.agent.local_agent.load_agent_specs") as mock_load,
         patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
         patch(
-            "openhands_cli.acp_impl.agent.shared_agent_handler.EventSubscriber"
+            "openhands_cli.acp_impl.agent.base_agent.EventSubscriber"
         ) as mock_subscriber_class,
     ):
         mock_agent = MagicMock()
@@ -706,7 +702,7 @@ async def test_new_session_no_replay_for_new_conversation(mock_connection, tmp_p
         patch("openhands_cli.acp_impl.agent.local_agent.load_agent_specs") as mock_load,
         patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
         patch(
-            "openhands_cli.acp_impl.agent.shared_agent_handler.EventSubscriber"
+            "openhands_cli.acp_impl.agent.base_agent.EventSubscriber"
         ) as mock_subscriber_class,
     ):
         mock_agent = MagicMock()
