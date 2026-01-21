@@ -52,16 +52,18 @@ def handle_resume_logic(args) -> str | None:
             return None
 
         # Get the latest conversation ID
-        from openhands_cli.conversations.lister import ConversationLister
+        from openhands_cli.conversations.store.local import LocalFileStore
 
-        lister = ConversationLister()
-        latest_id = lister.get_latest_conversation_id()
+        store = LocalFileStore()
+        conversations = store.list_conversations(limit=1)
 
-        if latest_id is None:
+        if not conversations:
             console.print(
                 "No conversations found to resume.", style=OPENHANDS_THEME.warning
             )
             return None
+
+        latest_id = conversations[0].id
 
         console.print(
             f"Resuming latest conversation: {latest_id}",

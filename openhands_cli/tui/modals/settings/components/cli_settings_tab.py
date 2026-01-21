@@ -75,6 +75,16 @@ class CliSettingsTab(Container):
                 value=self.cli_settings.auto_open_plan_panel,
             )
 
+            yield SettingsSwitch(
+                label="Enable Critic (Experimental)",
+                description=(
+                    "When enabled and using OpenHands LLM provider, an experimental "
+                    "critic feature will predict task success and collect feedback. "
+                ),
+                switch_id="enable_critic_switch",
+                value=self.cli_settings.enable_critic,
+            )
+
     def get_cli_settings(self) -> CliSettings:
         """Get the current CLI settings from the form."""
         default_cells_expanded_switch = self.query_one(
@@ -83,8 +93,10 @@ class CliSettingsTab(Container):
         auto_open_plan_panel_switch = self.query_one(
             "#auto_open_plan_panel_switch", Switch
         )
+        enable_critic_switch = self.query_one("#enable_critic_switch", Switch)
 
         return CliSettings(
             default_cells_expanded=default_cells_expanded_switch.value,
             auto_open_plan_panel=auto_open_plan_panel_switch.value,
+            enable_critic=enable_critic_switch.value,
         )
