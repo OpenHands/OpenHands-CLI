@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any
 
 from prompt_toolkit import HTML, print_formatted_text
@@ -19,6 +20,8 @@ from openhands.sdk import (
 from openhands.sdk.context import load_project_skills
 from openhands.sdk.conversation.persistence_const import BASE_STATE
 from openhands.sdk.tool import Tool
+from openhands.sdk.critic.base import CriticBase
+from openhands.sdk.critic.impl.api import APIBasedCritic
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
     CONVERSATIONS_DIR,
@@ -26,6 +29,7 @@ from openhands_cli.locations import (
     WORK_DIR,
 )
 from openhands_cli.mcp.mcp_utils import list_enabled_servers
+from openhands_cli.stores.cli_settings import CliSettings
 from openhands_cli.utils import (
     get_default_cli_tools,
     get_llm_metadata,
@@ -69,6 +73,48 @@ def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
         # Convert tool data to Tool objects
         return [Tool.model_validate(tool) for tool in tools_data]
     except (json.JSONDecodeError, KeyError, OSError):
+        return None
+    
+    
+def get_default_critic(llm: LLM, *, enable_critic: bool = True) -> CriticBase | None:
+    """Auto-configure critic for All-Hands LLM proxy.
+
+    When the LLM base_url matches `llm-proxy.*.all-hands.dev`, returns an
+    APIBasedCritic configured with:
+    - server_url: {base_url}/vllm
+    - api_key: same as LLM
+    - model_name: "critic"
+
+    Returns None if base_url doesn't match, api_key is not set, or enable_critic
+    is False.
+
+    Args:
+        llm: The LLM configuration
+        enable_critic: Whether critic feature is enabled (from settings)
+    """
+    # Check if critic is enabled in settings
+    if not enable_critic:
+        return None
+
+    base_url = llm.base_url
+    api_key = llm.api_key
+    if base_url is None or api_key is None:
+        return None
+
+    # Match: llm-proxy.{env}.all-hands.dev (e.g., staging, prod, eval, app)
+    pattern = r"^https?://llm-proxy\.[^./]+\.all-hands\.dev"
+    if not re.match(pattern, base_url):
+        return None
+
+    try:
+        return APIBasedCritic(
+            server_url=f"{base_url.rstrip('/')}/vllm",
+            api_key=api_key,
+            model_name="critic",
+        )
+    except Exception:
+        # If critic creation fails, silently return None
+        # This allows the CLI to continue working without critic
         return None
 
 
@@ -296,6 +342,12 @@ class AgentStore:
                     )
                 condenser = LLMSummarizingCondenser(llm=condenser_llm)
 
+            # Auto-configure critic if applicable
+            cli_settings = CliSettings.load()
+            critic = get_default_critic(
+                updated_llm, enable_critic=cli_settings.enable_critic
+            )
+
             # Update tools and context
             agent = agent.model_copy(
                 update={
@@ -306,6 +358,7 @@ class AgentStore:
                     else {},
                     "agent_context": agent_context,
                     "condenser": condenser,
+                    "critic": critic,
                 }
             )
 
@@ -367,9 +420,16 @@ class AgentStore:
             tools=get_default_cli_tools(),
             mcp_config={},
             condenser=condenser,
+            # Note: critic is NOT included here - it will be derived on-the-fly
         )
 
-        # Save the agent configuration
+        # Save the agent configuration (without critic)
         self.save(agent)
+
+        # Now add critic on-the-fly for the returned agent (not persisted)
+        cli_settings = CliSettings.load()
+        critic = get_default_critic(llm, enable_critic=cli_settings.enable_critic)
+        if critic is not None:
+            agent = agent.model_copy(update={"critic": critic})
 
         return agent

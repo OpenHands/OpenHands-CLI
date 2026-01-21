@@ -180,6 +180,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 )
                 yield Static(id="splash_instructions", classes="splash-instruction")
                 yield Static(id="splash_update_notice", classes="splash-update-notice")
+                yield Static(id="splash_critic_notice", classes="splash-critic-notice")
 
             # Input area - docked to bottom
             with Container(id="input_area"):
@@ -348,9 +349,24 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if self.is_ui_initialized:
             return
 
+        # Check if agent has critic configured
+        has_critic = False
+        try:
+            from openhands_cli.stores import AgentStore
+
+            agent_store = AgentStore()
+            agent = agent_store.load()
+            if agent:
+                has_critic = agent.critic is not None
+        except Exception:
+            # If we can't load agent, just continue without critic notice
+            pass
+
         # Get structured splash content
         splash_content = get_splash_content(
-            conversation_id=self.conversation_id.hex, theme=OPENHANDS_THEME
+            conversation_id=self.conversation_id.hex,
+            theme=OPENHANDS_THEME,
+            has_critic=has_critic,
         )
 
         # Update individual splash widgets
@@ -375,6 +391,14 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             update_notice_widget.display = True
         else:
             update_notice_widget.display = False
+
+        # Update critic notice (hide if None)
+        critic_notice_widget = self.query_one("#splash_critic_notice", Static)
+        if splash_content["critic_notice"]:
+            critic_notice_widget.update(splash_content["critic_notice"])
+            critic_notice_widget.display = True
+        else:
+            critic_notice_widget.display = False
 
         # Process any queued inputs
         self._process_queued_inputs()
@@ -489,6 +513,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     async def _handle_user_message(self, user_message: str) -> None:
         """Handle regular user messages with the conversation runner."""
+        # Dismiss any pending critic feedback widgets when user sends a new message
+        self._dismiss_pending_feedback_widgets()
+
         # Check if conversation runner is initialized
         if self.conversation_runner is None:
             self.conversation_runner = self.create_conversation_runner()
@@ -719,6 +746,18 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             message="Opening feedback form in your browser...",
             severity="information",
         )
+
+    def _dismiss_pending_feedback_widgets(self) -> None:
+        """Remove all pending CriticFeedbackWidget instances from the UI.
+
+        Called when user sends a new message, indicating they chose to
+        ignore the feedback prompt.
+        """
+        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
+
+        # Find and remove all CriticFeedbackWidget instances
+        for widget in self.main_display.query(CriticFeedbackWidget):
+            widget.remove()
 
     def _handle_new_command(self) -> None:
         """Handle the /new command to start a new conversation."""

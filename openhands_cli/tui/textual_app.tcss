@@ -107,3 +107,10 @@ Footer {
     color: $primary;
     margin: 1 0 0 0;
 }
+
+.splash-critic-notice {
+    padding: 0 1;
+    background: $background;
+    color: $foreground;
+    margin: 0;
+}

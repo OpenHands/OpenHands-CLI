@@ -1,0 +1,165 @@
+---
+# Workflow to bump the project version and create a draft PR
+name: Bump Version
+
+on:
+    workflow_dispatch:
+        inputs:
+            version:
+                description: Version number to bump to (e.g., 1.10.0)
+                required: true
+                type: string
+
+permissions:
+    contents: read
+
+jobs:
+    bump-version:
+        name: Bump version and create draft PR
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  token: ${{ secrets.ALLHANDS_BOT_GITHUB_PAT }}
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v3
+              with:
+                  version: latest
+
+            - name: Validate version format
+              run: |
+                  VERSION="${{ inputs.version }}"
+                  if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                    echo "❌ Error: Invalid version format. Expected format: X.Y.Z (e.g., 1.10.0)"
+                    exit 1
+                  fi
+                  echo "✅ Version format is valid: $VERSION"
+
+            - name: Configure git
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+            - name: Create branch and bump version
+              run: |
+                  VERSION="${{ inputs.version }}"
+                  BRANCH_NAME="bump-version-${VERSION}"
+
+                  # Create new branch
+                  git checkout -b "$BRANCH_NAME"
+
+                  # Get current version
+                  CURRENT_VERSION=$(grep -E '^version = "[0-9]+\.[0-9]+\.[0-9]+"' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+                  echo "Current version: $CURRENT_VERSION"
+                  echo "New version: $VERSION"
+
+                  # Update version in pyproject.toml
+                  sed -i "s/^version = \"$CURRENT_VERSION\"/version = \"$VERSION\"/" pyproject.toml
+
+                  # Verify the change was made
+                  echo "Updated version line:"
+                  grep '^version = ' pyproject.toml
+
+                  echo "current_version=$CURRENT_VERSION" >> $GITHUB_ENV
+                  echo "branch_name=$BRANCH_NAME" >> $GITHUB_ENV
+
+            - name: Install dependencies
+              run: uv sync --group dev
+
+            - name: Run make lint to update lock file
+              run: |
+                  # Run pre-commit to ensure everything is formatted correctly
+                  # and to regenerate the lock file if needed
+                  uv run pre-commit run --all-files || true
+
+                  # Ensure lock file is up to date
+                  uv lock
+
+            - name: Commit and push changes
+              run: |
+                  VERSION="${{ inputs.version }}"
+                  BRANCH_NAME="${{ env.branch_name }}"
+
+                  # Stage all changes (pyproject.toml and uv.lock)
+                  git add pyproject.toml uv.lock
+
+                  # Check if there are changes to commit
+                  if git diff --cached --quiet; then
+                    echo "❌ No changes detected. Version might already be set to $VERSION."
+                    exit 1
+                  fi
+
+                  # Commit changes
+                  git commit -m "Bump version to $VERSION" \
+                             -m "- Updated version in pyproject.toml from ${{ env.current_version }} to $VERSION" \
+                             -m "- Regenerated uv.lock file"
+
+                  # Push branch
+                  git push origin "$BRANCH_NAME"
+
+            - name: Check for existing PR
+              run: |
+                  VERSION="${{ inputs.version }}"
+                  BRANCH_NAME="${{ env.branch_name }}"
+
+                  # Check if a PR already exists for this version
+                  EXISTING_PR=$(curl -s \
+                    -H "Authorization: token ${{ secrets.ALLHANDS_BOT_GITHUB_PAT }}" \
+                    -H "Accept: application/vnd.github.v3+json" \
+                    "https://api.github.com/repos/${{ github.repository }}/pulls?state=open&head=${{ github.repository_owner }}:${BRANCH_NAME}" \
+                    | jq -r '.[0].html_url // "null"')
+
+                  if [ "$EXISTING_PR" != "null" ]; then
+                    echo "PR already exists for version $VERSION: $EXISTING_PR"
+                    echo "pr_exists=true" >> $GITHUB_ENV
+                    echo "existing_pr_url=$EXISTING_PR" >> $GITHUB_ENV
+                  else
+                    echo "No existing PR found for version $VERSION"
+                    echo "pr_exists=false" >> $GITHUB_ENV
+                  fi
+
+            - name: Create Draft Pull Request
+              if: env.pr_exists == 'false'
+              run: |
+                  VERSION="${{ inputs.version }}"
+                  BRANCH_NAME="${{ env.branch_name }}"
+
+                  # Create draft PR using GitHub API
+                  PR_RESPONSE=$(curl -s -X POST \
+                    -H "Authorization: token ${{ secrets.ALLHANDS_BOT_GITHUB_PAT }}" \
+                    -H "Accept: application/vnd.github.v3+json" \
+                    "https://api.github.com/repos/${{ github.repository }}/pulls" \
+                    -d '{
+                      "title": "Bump version to '"$VERSION"'",
+                      "head": "'"$BRANCH_NAME"'",
+                      "base": "main",
+                      "body": "## Summary\n\nThis PR bumps the project version to **'"$VERSION"'**.\n\n## Changes\n\n- Updated `version` in `pyproject.toml` from `'"${{ env.current_version }}"'` to `'"$VERSION"'`\n- Regenerated `uv.lock` file\n\n## Triggered by\n\nManual workflow dispatch by @'"${{ github.actor }}"'",
+                      "draft": true
+                    }')
+
+                  PR_URL=$(echo "$PR_RESPONSE" | jq -r '.html_url // "null"')
+
+                  if [ "$PR_URL" != "null" ]; then
+                    echo "✅ Draft pull request created successfully: $PR_URL"
+                  else
+                    echo "❌ Failed to create pull request"
+                    echo "Response: $PR_RESPONSE"
+                    exit 1
+                  fi
+
+            - name: Summary
+              run: |
+                  VERSION="${{ inputs.version }}"
+                  if [ "${{ env.pr_exists }}" = "true" ]; then
+                    echo "ℹ️ PR already exists for version $VERSION: ${{ env.existing_pr_url }}"
+                  else
+                    echo "✅ Successfully created draft PR to bump version to $VERSION"
+                  fi
