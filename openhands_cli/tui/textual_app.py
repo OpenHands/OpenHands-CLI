@@ -16,6 +16,8 @@ from typing import ClassVar
 from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
 from textual.containers import Container, Horizontal, VerticalScroll
+from textual.css.query import NoMatches
+from textual.message import Message
 from textual.screen import Screen
 from textual.signal import Signal
 from textual.widgets import Footer, Input, Static, TextArea
@@ -30,15 +32,25 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
+from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
+from openhands_cli.tui.content.splash import get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
+from openhands_cli.tui.core.conversation_manager import ConversationManager
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
+from openhands_cli.tui.core.messages import (
+    ConversationCreated,
+    ConversationSwitched,
+    ConversationTitleUpdated,
+    RevertSelectionRequest,
+    SwitchConversationRequest,
+)
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModal
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
+from openhands_cli.tui.panels.history_side_panel import HistorySidePanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
 from openhands_cli.tui.widgets import InputField
@@ -128,6 +140,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
+        self._store = LocalFileStore()
+        self._conversation_manager = ConversationManager(self, self._store)
         self._reload_visualizer = (
             lambda: self.conversation_runner.visualizer.reload_configuration()
             if self.conversation_runner
@@ -182,6 +196,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
         yield from super().get_system_commands(screen)
+        yield SystemCommand(
+            "History",
+            "Toggle conversation history panel",
+            self.action_toggle_history,
+        )
         yield SystemCommand(
             "MCP", "View MCP configurations", lambda: MCPSidePanel.toggle(self)
         )
@@ -385,10 +404,22 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self._process_queued_inputs()
         self.is_ui_initialized = True
 
-    def create_conversation_runner(self) -> ConversationRunner:
-        # Initialize conversation runner with visualizer that can add widgets
-        # Skip user messages since we display them immediately in the UI
-        visualizer = ConversationVisualizer(
+    def create_conversation_runner(
+        self,
+        conversation_id: uuid.UUID | None = None,
+        visualizer: ConversationVisualizer | None = None,
+    ) -> ConversationRunner:
+        """Create a ConversationRunner for a given conversation id.
+
+        Args:
+            conversation_id: Conversation id to use. Defaults to current id.
+            visualizer: Optional visualizer. If not provided, a new one is created.
+        """
+        conversation_uuid = conversation_id or self.conversation_id
+
+        # Initialize conversation runner with visualizer that can add widgets.
+        # Skip user messages since we display them immediately in the UI.
+        conversation_visualizer = visualizer or ConversationVisualizer(
             self.main_display, self, skip_user_messages=True
         )
 
@@ -398,13 +429,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             event_callback = json_callback
 
         runner = ConversationRunner(
-            self.conversation_id,
+            conversation_uuid,
             self.conversation_running_signal.publish,
             self._handle_confirmation_request,
             lambda title, message, severity: (
                 self.notify(title=title, message=message, severity=severity)
             ),
-            visualizer,
+            conversation_visualizer,
             self.initial_confirmation_policy,
             event_callback,
         )
@@ -463,6 +494,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             show_help(self.main_display)
         elif command == "/new":
             self._handle_new_command()
+        elif command == "/history":
+            self._handle_history_command()
         elif command == "/confirm":
             self._handle_confirm_command()
         elif command == "/condense":
@@ -486,6 +519,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Check if conversation runner is initialized
         if self.conversation_runner is None:
             self.conversation_runner = self.create_conversation_runner()
+
+        # If History panel is open, update "New conversation" title immediately
+        # on the first message (without waiting for persistence on disk).
+        self._conversation_manager.update_title(user_message)
 
         # Show that we're processing the message
         if self.conversation_runner.is_running:
@@ -723,57 +760,55 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             widget.remove()
 
     def _handle_new_command(self) -> None:
-        """Handle the /new command to start a new conversation.
+        """Handle the /new command to start a new conversation."""
+        self._conversation_manager.create_new()
 
-        This clears the terminal UI and starts a fresh conversation runner.
+    def _handle_history_command(self) -> None:
+        """Handle the /history command to show conversation history panel."""
+        self.action_toggle_history()
+
+    def action_toggle_history(self) -> None:
+        """Toggle the history side panel."""
+        HistorySidePanel.toggle(
+            self,
+            current_conversation_id=self.conversation_id,
+        )
+
+    @on(ConversationCreated)
+    def on_conversation_created(self, event: ConversationCreated) -> None:
+        """Propagate conversation creation to history panel."""
+        self._notify_history_panel(event)
+
+    @on(ConversationTitleUpdated)
+    def on_conversation_title_updated(self, event: ConversationTitleUpdated) -> None:
+        """Propagate title update to history panel."""
+        self._notify_history_panel(event)
+
+    @on(ConversationSwitched)
+    def on_conversation_switched(self, event: ConversationSwitched) -> None:
+        """Propagate conversation switch to history panel."""
+        self._notify_history_panel(event)
+
+    @on(RevertSelectionRequest)
+    def on_revert_selection_request(self, event: RevertSelectionRequest) -> None:
+        """Propagate revert selection request to history panel."""
+        self._notify_history_panel(event)
+
+    def _notify_history_panel(self, message: Message) -> None:
+        """Helper to send message to history panel if it exists.
+
+        This decouples the sender (Manager/Switcher) from the receiver (Panel).
+        The sender just posts to App, and App forwards to Panel if present.
         """
-        # Check if a conversation is currently running
-        if self.conversation_runner and self.conversation_runner.is_running:
-            self.notify(
-                title="New Conversation Error",
-                message="Cannot start a new conversation while one is running. "
-                "Please wait for the current conversation to complete or pause it.",
-                severity="error",
-            )
-            return
+        try:
+            self.query_one(HistorySidePanel).post_message(message)
+        except NoMatches:
+            pass
 
-        # Generate a new conversation ID
-        self.conversation_id = uuid.uuid4()
-
-        # Reset the conversation runner
-        self.conversation_runner = None
-
-        # Remove any existing confirmation panel
-        if self.confirmation_panel:
-            self.confirmation_panel.remove()
-            self.confirmation_panel = None
-
-        # Clear all dynamically added widgets from main_display
-        # Keep only the splash widgets (those with IDs starting with "splash_")
-        widgets_to_remove = []
-        for widget in self.main_display.children:
-            widget_id = widget.id or ""
-            if not widget_id.startswith("splash_"):
-                widgets_to_remove.append(widget)
-
-        for widget in widgets_to_remove:
-            widget.remove()
-
-        # Update the splash conversation widget with the new conversation ID
-        splash_conversation = self.query_one("#splash_conversation", Static)
-        splash_conversation.update(
-            get_conversation_text(self.conversation_id.hex, theme=OPENHANDS_THEME)
-        )
-
-        # Scroll to top to show the splash screen
-        self.main_display.scroll_home(animate=False)
-
-        # Notify user
-        self.notify(
-            title="New Conversation",
-            message="Started a new conversation",
-            severity="information",
-        )
+    @on(SwitchConversationRequest)
+    def _on_switch_conversation_request(self, event: SwitchConversationRequest) -> None:
+        """Handle request from history panel to switch conversations."""
+        self._conversation_manager.switch_to(event.conversation_id)
 
     def _handle_confirmation_request(
         self, pending_actions: list[ActionEvent]

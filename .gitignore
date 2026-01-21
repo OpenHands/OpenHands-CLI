@@ -194,3 +194,4 @@ $RECYCLE.BIN/
 .coverage
 .pytest_cache/
 software-agent-sdk/
+snapshot_report.html

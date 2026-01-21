@@ -7,6 +7,9 @@ from textual.widgets import Input, Label, Select, Static
 from openhands_cli.tui.modals.settings.choices import (
     provider_options,
 )
+from openhands_cli.tui.modals.settings.model_recommendations import (
+    render_model_recommendations,
+)
 
 
 class SettingsTab(Container):
@@ -108,6 +111,19 @@ class SettingsTab(Container):
                         "summarizing old conversation history.",
                         classes="form_help",
                     )
+
+                # Model Recommendations Section
+                with Container(classes="form_group"):
+                    yield Static("Model Recommendations", classes="form_section_title")
+                    yield Static(
+                        "Based on OpenHands evaluations using the SWE-bench dataset. "
+                        "These models have been verified to work well with OpenHands. "
+                        "For more details, see: https://docs.openhands.dev/openhands/usage/llms/llms",
+                        classes="form_help",
+                    )
+
+                    # Render model recommendations
+                    yield from render_model_recommendations()
 
                 # Help Section
                 with Container(classes="form_group"):

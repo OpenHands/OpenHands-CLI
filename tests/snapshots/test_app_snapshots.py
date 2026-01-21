@@ -14,6 +14,7 @@ For more information:
     https://github.com/Textualize/pytest-textual-snapshot
 """
 
+import importlib.resources as resources
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
@@ -23,7 +24,11 @@ from textual.containers import Horizontal
 from textual.widgets import Footer, Static
 
 from openhands.tools.task_tracker.definition import TaskItem
+from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
+from openhands_cli.tui.modals.settings.model_recommendations import (
+    render_model_recommendations,
+)
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
 
@@ -176,6 +181,33 @@ class TestPlanSidePanelSnapshots:
 
         assert snap_compare(
             PlanPanelAllDoneApp(tasks=task_list), terminal_size=(100, 30)
+        )
+
+
+class TestModelRecommendationsSnapshots:
+    """Snapshot tests for the Model Recommendations section."""
+
+    def test_model_recommendations_display(self, snap_compare):
+        """Snapshot test for model recommendations."""
+
+        class ModelRecommendationsTestApp(App):
+            CSS_PATH = str(
+                resources.files("openhands_cli.tui.modals.settings")
+                / "settings_screen.tcss"
+            )
+
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+                self.register_theme(OPENHANDS_THEME)
+                self.theme = OPENHANDS_THEME.name
+
+            def compose(self) -> ComposeResult:
+                yield from render_model_recommendations()
+                yield Footer()
+
+        assert snap_compare(
+            ModelRecommendationsTestApp(),
+            terminal_size=(100, 50),
         )
 
 
