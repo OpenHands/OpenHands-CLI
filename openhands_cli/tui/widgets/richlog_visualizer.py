@@ -576,7 +576,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if not event.llm_message:
                 return None
 
-            # Skip direct user messages 
+            # Skip direct user messages
             if (
                 self._skip_user_messages
                 and event.llm_message.role == "user"
@@ -593,7 +593,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             message_content = str(content)
             agent_name = self._get_formatted_agent_name()
             event_sender = self._format_agent_name_with_suffix(event.sender)
-            
+
             if event.llm_message.role == "user":
                 # Message from another agent (via delegation)
                 prefix = f"**{event_sender} → {agent_name}:**\n\n"
