@@ -89,14 +89,22 @@ class CriticFeedbackWidget(Static, can_focus=True):
     }
 
     CriticFeedbackWidget Button {
-        min-width: 10;
-        margin-right: 1;
+        min-width: 8;
+        height: 1;
+        border: none;
+        padding: 0 1;
+        margin-right: 2;
+        background: transparent;
+        color: $foreground;
+    }
+
+    CriticFeedbackWidget Button:hover {
+        background: $surface-lighten-1;
         color: $foreground;
     }
 
     CriticFeedbackWidget Button.dismiss {
-        background: $surface-darken-1;
-        color: $foreground;
+        color: $text-muted;
     }
     """
 
