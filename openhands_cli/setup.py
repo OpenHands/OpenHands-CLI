@@ -123,4 +123,5 @@ def setup_conversation(
     conversation.set_confirmation_policy(confirmation_policy)
 
     console.print(f"✓ Agent initialized with model: {agent.llm.model}", style="green")
+
     return conversation

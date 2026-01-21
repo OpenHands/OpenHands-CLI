@@ -7,6 +7,7 @@ Ctrl+O to toggle all cells at once.
 
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol
 
+from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
@@ -211,7 +212,7 @@ class Collapsible(Widget):
         self,
         content: Any,
         *,
-        title: str = "Toggle",
+        title: str | Text = "Toggle",
         collapsed: bool = True,
         collapsed_symbol: str = "▶",
         expanded_symbol: str = "▼",
@@ -225,7 +226,7 @@ class Collapsible(Widget):
 
         Args:
             content: Content that will be collapsed/expanded (converted to string).
-            title: Title of the collapsed/expanded contents.
+            title: Title of the collapsed/expanded contents (str or Rich Text).
             collapsed: Default status of the contents.
             collapsed_symbol: Collapsed symbol before the title.
             expanded_symbol: Expanded symbol before the title.
@@ -253,11 +254,11 @@ class Collapsible(Widget):
             # Use "tall" for a thin vertical line, with gray color
             self.styles.border_left = ("tall", "gray")
 
-    def update_title(self, new_title: str) -> None:
+    def update_title(self, new_title: str | Text) -> None:
         """Update the title of the collapsible.
 
         Args:
-            new_title: The new title text to display.
+            new_title: The new title text to display (str or Rich Text).
         """
         self.title = new_title
         self._title.label = Content.from_text(new_title)

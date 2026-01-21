@@ -6,6 +6,7 @@ This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 import threading
 from typing import TYPE_CHECKING
 
+from rich.text import Text
 from textual.widgets import Markdown
 
 from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
@@ -143,6 +144,24 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Open the plan panel
         plan_panel.toggle()
 
+    def _get_agent_model(self) -> str | None:
+        """Get the agent's model name from the conversation runner.
+
+        Returns:
+            The agent model name or None if not available.
+        """
+        try:
+            if (
+                self._app.conversation_runner
+                and self._app.conversation_runner.conversation
+                and hasattr(self._app.conversation_runner.conversation, "agent")
+                and self._app.conversation_runner.conversation.agent  # type: ignore[union-attr]
+            ):
+                return self._app.conversation_runner.conversation.agent.llm.model  # type: ignore[union-attr]
+        except Exception:
+            pass
+        return None
+
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
         # Check for TaskTrackerObservation to update/open the plan panel
@@ -161,6 +180,39 @@ class ConversationVisualizer(ConversationVisualizerBase):
         widget = self._create_event_widget(event)
         if widget:
             self._run_on_main_thread(self._add_widget_to_ui, widget)
+
+            # Add critic collapsible if present (for MessageEvent and ActionEvent)
+            critic_result = getattr(event, "critic_result", None)
+            if critic_result is not None:
+                from openhands_cli.tui.utils.critic import (
+                    create_critic_collapsible,
+                    send_critic_inference_event,
+                )
+                from openhands_cli.tui.utils.critic.feedback import (
+                    CriticFeedbackWidget,
+                )
+
+                # Get agent model for tracking
+                agent_model = self._get_agent_model()
+                conversation_id = str(self._app.conversation_id)
+
+                # Send critic inference event to PostHog
+                send_critic_inference_event(
+                    critic_result=critic_result,
+                    conversation_id=conversation_id,
+                    agent_model=agent_model,
+                )
+
+                critic_widget = create_critic_collapsible(critic_result)
+                self._run_on_main_thread(self._add_widget_to_ui, critic_widget)
+
+                # Add feedback widget after critic collapsible
+                feedback_widget = CriticFeedbackWidget(
+                    critic_result=critic_result,
+                    conversation_id=conversation_id,
+                    agent_model=agent_model,
+                )
+                self._run_on_main_thread(self._add_widget_to_ui, feedback_widget)
 
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
@@ -228,21 +280,24 @@ class ConversationVisualizer(ConversationVisualizerBase):
             cmd = self._escape_rich_markup(action.command.strip().replace("\n", " "))
             cmd = self._truncate_for_display(cmd)
             if summary:
-                return f"[bold]{summary}[/bold][dim]: $ {cmd}[/dim]"
-            return f"[dim]$ {cmd}[/dim]"
-
+                title = f"[bold]{summary}[/bold][dim]: $ {cmd}[/dim]"
+            else:
+                title = f"[dim]$ {cmd}[/dim]"
         # File operations: include path with Reading/Editing
-        if isinstance(action, FileEditorAction) and action.path:
+        elif isinstance(action, FileEditorAction) and action.path:
             op = "Reading" if action.command == "view" else "Editing"
             path = self._escape_rich_markup(action.path)
             if summary:
-                return f"[bold]{summary}[/bold][dim]: {op} {path}[/dim]"
-            return f"[bold]{op}[/bold][dim] {path}[/dim]"
-
+                title = f"[bold]{summary}[/bold][dim]: {op} {path}[/dim]"
+            else:
+                title = f"[bold]{op}[/bold][dim] {path}[/dim]"
         # All other actions: just use summary
-        if summary:
-            return f"[bold]{summary}[/bold]"
-        return event.tool_name
+        elif summary:
+            title = f"[bold]{summary}[/bold]"
+        else:
+            title = event.tool_name
+
+        return title
 
     def _build_observation_content(
         self, event: ObservationEvent | UserRejectObservation | AgentErrorEvent
@@ -396,17 +451,17 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     def _make_collapsible(
         self,
-        content: str,
+        content: str | Text,
         title: str,
-        event: Event,
+        event: Event | None,
         collapsed: bool | None = None,
     ) -> Collapsible:
         """Create a Collapsible widget with standard settings.
 
         Args:
-            content: The content string to display in the collapsible.
+            content: The content to display (string or Rich Text object).
             title: The title for the collapsible header.
-            event: The event used to determine border color.
+            event: The event used to determine border color (None for default).
             collapsed: Override the default collapsed state. If None, uses default.
 
         Returns:
@@ -414,20 +469,16 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """
         if collapsed is None:
             collapsed = self._default_collapsed
+        border_color = _get_event_border_color(event) if event else "#888888"
         return Collapsible(
             content,
             title=title,
             collapsed=collapsed,
-            border_color=_get_event_border_color(event),
+            border_color=border_color,
         )
 
     def _create_event_widget(self, event: Event) -> "Widget | None":
         """Create a widget for the event - either plain text or collapsible."""
-        content = event.visualize
-
-        if not content.plain.strip():
-            return None
-
         # Don't emit system prompt in CLI
         if isinstance(event, SystemPromptEvent):
             return None
@@ -439,10 +490,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         if isinstance(event, ActionEvent):
             action = event.action
             if isinstance(action, FinishAction):
-                # For finish action, render as markdown with padding to align
-                # User message has "padding: 0 1" and starts with "> ", so text
-                # starts at position 3 (1 padding + 2 for "> ")
-                widget = Markdown(str(action.message))
+                # For finish action, render message as markdown
+                widget = Markdown(action.message)
                 widget.styles.padding = AGENT_MESSAGE_PADDING
                 return widget
             elif isinstance(action, ThinkAction):
@@ -458,8 +507,15 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 and event.llm_message.role == "user"
             ):
                 return None
-            # Display messages as markdown for proper rendering
-            widget = Markdown(str(content))
+
+            # Extract text content from llm_message
+            from openhands.sdk.llm import content_to_str
+
+            text_parts = content_to_str(event.llm_message.content)
+            message_text = "".join(text_parts) if text_parts else "[no text content]"
+
+            # Display message as markdown
+            widget = Markdown(message_text)
             widget.styles.padding = AGENT_MESSAGE_PADDING
             return widget
 
