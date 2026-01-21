@@ -90,14 +90,10 @@ class CriticFeedbackWidget(Static, can_focus=True):
 
     CriticFeedbackWidget Button {
         width: 12;
-        height: 1;
-        min-height: 1;
         margin-right: 1;
-        padding: 0 1;
         border: none;
         background: $surface-darken-1;
         color: $foreground;
-        text-style: none;
     }
 
     CriticFeedbackWidget Button:hover {
