@@ -76,25 +76,19 @@ class CriticFeedbackWidget(Static, can_focus=True):
     DEFAULT_CSS = """
     CriticFeedbackWidget {
         height: auto;
-        background: $surface;
+        background: transparent;
         color: $foreground;
-        border: solid $primary;
-        padding: 1 2;
-        margin: 1 0 1 0;
-    }
-
-    CriticFeedbackWidget:focus {
-        border: solid $accent;
+        padding: 0 1;
+        margin: 0;
     }
 
     CriticFeedbackWidget Horizontal {
         height: auto;
         width: 100%;
-        margin-top: 1;
     }
 
     CriticFeedbackWidget Button {
-        min-width: 12;
+        min-width: 10;
         margin-right: 1;
         color: $foreground;
     }
