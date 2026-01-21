@@ -150,9 +150,7 @@ class TestNewSession:
     async def test_new_session_uses_resume_id(self, mock_connection):
         """Test new_session uses resume_conversation_id when provided."""
         resume_id = str(uuid4())
-        agent = ConcreteTestAgent(
-            mock_connection, resume_conversation_id=resume_id
-        )
+        agent = ConcreteTestAgent(mock_connection, resume_conversation_id=resume_id)
 
         mock_conversation = MagicMock()
         mock_conversation.state.events = []
