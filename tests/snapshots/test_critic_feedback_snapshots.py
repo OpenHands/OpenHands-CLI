@@ -74,10 +74,18 @@ class MockCriticFeedbackWidget(Static, can_focus=True):
             id="feedback-prompt",
         )
         with Horizontal():
-            yield Button(self.BUTTON_LABELS["accurate"], id="btn-accurate", compact=True)
-            yield Button(self.BUTTON_LABELS["too_high"], id="btn-too_high", compact=True)
+            yield Button(
+                self.BUTTON_LABELS["accurate"], id="btn-accurate", compact=True
+            )
+            yield Button(
+                self.BUTTON_LABELS["too_high"], id="btn-too_high", compact=True
+            )
             yield Button(self.BUTTON_LABELS["too_low"], id="btn-too_low", compact=True)
-            yield Button(self.BUTTON_LABELS["not_applicable"], id="btn-not_applicable", compact=True)
+            yield Button(
+                self.BUTTON_LABELS["not_applicable"],
+                id="btn-not_applicable",
+                compact=True,
+            )
             yield Button(self.BUTTON_LABELS["dismiss"], id="btn-dismiss", compact=True)
 
 
@@ -105,7 +113,9 @@ class TestCriticFeedbackWidgetSnapshots:
                 self.theme = OPENHANDS_THEME.name
 
             def compose(self) -> ComposeResult:
-                yield Static("Sample conversation content above the widget", id="content")
+                yield Static(
+                    "Sample conversation content above the widget", id="content"
+                )
                 yield MockCriticFeedbackWidget()
                 yield Footer()
 

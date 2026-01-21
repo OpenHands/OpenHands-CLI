@@ -21,7 +21,7 @@ POSTHOG_HOST = "https://us.i.posthog.com"
 
 
 def send_critic_inference_event(
-    critic_result: "CriticResult",
+    critic_result: CriticResult,
     conversation_id: str,
     agent_model: str | None = None,
 ) -> None:
@@ -151,10 +151,18 @@ class CriticFeedbackWidget(Static, can_focus=True):
             id="feedback-prompt",
         )
         with Horizontal():
-            yield Button(self.BUTTON_LABELS["accurate"], id="btn-accurate", compact=True)
-            yield Button(self.BUTTON_LABELS["too_high"], id="btn-too_high", compact=True)
+            yield Button(
+                self.BUTTON_LABELS["accurate"], id="btn-accurate", compact=True
+            )
+            yield Button(
+                self.BUTTON_LABELS["too_high"], id="btn-too_high", compact=True
+            )
             yield Button(self.BUTTON_LABELS["too_low"], id="btn-too_low", compact=True)
-            yield Button(self.BUTTON_LABELS["not_applicable"], id="btn-not_applicable", compact=True)
+            yield Button(
+                self.BUTTON_LABELS["not_applicable"],
+                id="btn-not_applicable",
+                compact=True,
+            )
             yield Button(self.BUTTON_LABELS["dismiss"], id="btn-dismiss", compact=True)
 
     def on_mount(self) -> None:

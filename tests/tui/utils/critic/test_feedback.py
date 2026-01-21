@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from textual.app import App, ComposeResult
-from textual.widgets import Button, Static
+from textual.widgets import Button
 
 from openhands.sdk.critic.result import CriticResult
 from openhands_cli.theme import OPENHANDS_THEME

@@ -154,9 +154,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if (
                 self._app.conversation_runner
                 and self._app.conversation_runner.conversation
-                and self._app.conversation_runner.conversation.agent
+                and hasattr(self._app.conversation_runner.conversation, "agent")
+                and self._app.conversation_runner.conversation.agent  # type: ignore[union-attr]
             ):
-                return self._app.conversation_runner.conversation.agent.llm.model
+                return self._app.conversation_runner.conversation.agent.llm.model  # type: ignore[union-attr]
         except Exception:
             pass
         return None
