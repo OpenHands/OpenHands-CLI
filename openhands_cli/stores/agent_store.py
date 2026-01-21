@@ -19,9 +19,9 @@ from openhands.sdk import (
 )
 from openhands.sdk.context import load_project_skills
 from openhands.sdk.conversation.persistence_const import BASE_STATE
-from openhands.sdk.tool import Tool
 from openhands.sdk.critic.base import CriticBase
 from openhands.sdk.critic.impl.api import APIBasedCritic
+from openhands.sdk.tool import Tool
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
     CONVERSATIONS_DIR,
@@ -74,8 +74,8 @@ def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
         return [Tool.model_validate(tool) for tool in tools_data]
     except (json.JSONDecodeError, KeyError, OSError):
         return None
-    
-    
+
+
 def get_default_critic(llm: LLM, *, enable_critic: bool = True) -> CriticBase | None:
     """Auto-configure critic for All-Hands LLM proxy.
 

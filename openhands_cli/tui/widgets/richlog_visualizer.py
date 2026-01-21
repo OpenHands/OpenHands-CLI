@@ -592,6 +592,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     def _create_event_widget(self, event: Event) -> "Widget | None":
         """Create a widget for the event - either plain text or collapsible."""
+        content = event.visualize
+
         # Don't emit system prompt in CLI
         if isinstance(event, SystemPromptEvent):
             return None
