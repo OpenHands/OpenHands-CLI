@@ -151,13 +151,11 @@ class CriticFeedbackWidget(Static, can_focus=True):
             id="feedback-prompt",
         )
         with Horizontal():
-            yield Button(self.BUTTON_LABELS["accurate"], id="btn-accurate")
-            yield Button(self.BUTTON_LABELS["too_high"], id="btn-too_high")
-            yield Button(self.BUTTON_LABELS["too_low"], id="btn-too_low")
-            yield Button(self.BUTTON_LABELS["not_applicable"], id="btn-not_applicable")
-            yield Button(
-                self.BUTTON_LABELS["dismiss"], id="btn-dismiss", classes="dismiss"
-            )
+            yield Button(self.BUTTON_LABELS["accurate"], id="btn-accurate", compact=True)
+            yield Button(self.BUTTON_LABELS["too_high"], id="btn-too_high", compact=True)
+            yield Button(self.BUTTON_LABELS["too_low"], id="btn-too_low", compact=True)
+            yield Button(self.BUTTON_LABELS["not_applicable"], id="btn-not_applicable", compact=True)
+            yield Button(self.BUTTON_LABELS["dismiss"], id="btn-dismiss", compact=True)
 
     def on_mount(self) -> None:
         """Auto-focus the widget when mounted so users can immediately press keys."""
