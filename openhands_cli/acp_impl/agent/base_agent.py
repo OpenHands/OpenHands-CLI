@@ -181,11 +181,8 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         """Set confirmation mode for a session."""
         if session_id in self._active_sessions:
             conversation = self._active_sessions[session_id]
-            typed_conversation = cast(
-                LocalConversation | RemoteConversation, conversation
-            )
             apply_confirmation_mode_to_conversation(
-                typed_conversation, mode, session_id
+                conversation, mode, session_id
             )
             logger.debug(f"Confirmation mode for session {session_id}: {mode}")
         else:
