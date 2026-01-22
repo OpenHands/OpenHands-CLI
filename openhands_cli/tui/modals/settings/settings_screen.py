@@ -427,9 +427,13 @@ class SettingsScreen(ModalScreen):
         """Check if initial setup is required.
 
         Returns:
-            True if initial setup is needed (no existing settings), False otherwise
-        """
+            True if initial setup is needed (no existing settings and no valid
+            env overrides), False otherwise.
 
+        Note: AgentStore.load() now handles creating an agent from environment
+        variables when --override-with-envs is enabled and LLM_API_KEY is set,
+        so this method simply checks if load() returns a valid agent.
+        """
         agent_store = AgentStore()
         existing_agent = agent_store.load()
         return existing_agent is None
