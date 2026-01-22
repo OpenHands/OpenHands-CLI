@@ -815,7 +815,6 @@ class TestPlanPanelIntegration:
                 with patch.object(app.plan_panel, "toggle") as mock_toggle:
                     visualizer._do_refresh_plan_panel()
                     mock_toggle.assert_called_once()
-push your changes to the existing branch
 
 
 class TestSubVisualizerCreation:
