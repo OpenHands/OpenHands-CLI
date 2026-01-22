@@ -25,9 +25,12 @@ from textual.message import Message
 from textual.reactive import var
 from textual.widget import Widget
 
+from openhands_cli.tui.widgets.status_line import InfoStatusLine, WorkingStatusLine
+from openhands_cli.tui.widgets.user_input.input_field import InputField
+
 if TYPE_CHECKING:
     from openhands.sdk.event import ActionEvent
-
+from textual.containers import Container
 
 @dataclass
 class ConversationMetrics:
@@ -86,7 +89,7 @@ class ConfirmationRequired(Message):
         self.pending_actions = pending_actions
 
 
-class StateManager(Widget):
+class StateManager(Container):
     """Centralized state manager and container for conversation UI.
     
     This widget serves as a parent container for UI components that need
@@ -106,14 +109,7 @@ class StateManager(Widget):
     
     The StateManager also emits messages for complex state transitions.
     """
-    
-    DEFAULT_CSS = """
-    StateManager {
-        /* StateManager is a transparent container */
-        height: auto;
-        width: 100%;
-    }
-    """
+
     
     # ---- Core Running State ----
     is_running: var[bool] = var(False)
@@ -161,7 +157,28 @@ class StateManager(Widget):
     def on_mount(self) -> None:
         """Start the elapsed time timer."""
         self._timer = self.set_interval(1.0, self._update_elapsed)
-    
+
+    def compose(self):
+        with Container(id="input_area"):
+            yield WorkingStatusLine().data_bind(
+                is_running=StateManager.is_running,
+                elapsed_seconds=StateManager.elapsed_seconds,
+            )
+            yield InputField(
+                placeholder="Type your message, @mention a file, or / for commands"
+            )
+            # InfoStatusLine binds to StateManager reactive properties
+            yield InfoStatusLine().data_bind(
+                is_running=StateManager.is_running,
+                is_multiline_mode=StateManager.is_multiline_mode,
+                input_tokens=StateManager.input_tokens,
+                output_tokens=StateManager.output_tokens,
+                cache_hit_rate=StateManager.cache_hit_rate,
+                last_request_input_tokens=StateManager.last_request_input_tokens,
+                context_window=StateManager.context_window,
+                accumulated_cost=StateManager.accumulated_cost,
+            )
+
     def on_unmount(self) -> None:
         """Clean up timer."""
         if self._timer:
