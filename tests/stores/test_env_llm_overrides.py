@@ -469,6 +469,3 @@ class TestAgentStoreEnvOverrides:
             assert isinstance(loaded_agent.condenser.llm.api_key, SecretStr)
             assert loaded_agent.condenser.llm.api_key.get_secret_value() == "env-key"
             assert loaded_agent.condenser.llm.model == "env-model"
-
-
-

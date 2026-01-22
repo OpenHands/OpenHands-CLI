@@ -372,9 +372,7 @@ class AgentStore:
                     )
                 }
             if condenser_llm_update:
-                condenser_llm = condenser_llm.model_copy(
-                    update=condenser_llm_update
-                )
+                condenser_llm = condenser_llm.model_copy(update=condenser_llm_update)
             condenser = LLMSummarizingCondenser(llm=condenser_llm)
 
         # Auto-configure critic if applicable (disabled in headless mode)
