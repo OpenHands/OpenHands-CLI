@@ -107,7 +107,10 @@ class TestLoginCommand:
 
                         assert result is True
                         mock_fetch.assert_called_once_with(
-                            server_url, "existing-api-key", already_logged_in=True
+                            server_url,
+                            "existing-api-key",
+                            already_logged_in=True,
+                            skip_settings_sync=False,
                         )
 
     @pytest.mark.asyncio
