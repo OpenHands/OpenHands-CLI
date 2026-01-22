@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-from collections.abc import Mapping
 from typing import Any
 from uuid import UUID
 
@@ -69,11 +68,6 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
     def agent_type(self) -> AgentType:
         """Return the agent type."""
         return "remote"
-
-    @property
-    def active_session(self) -> Mapping[str, BaseConversation]:
-        """Return the active sessions mapping."""
-        return self._active_sessions
 
     async def _is_authenticated(self) -> bool:
         """Check if the user is authenticated with OpenHands Cloud."""

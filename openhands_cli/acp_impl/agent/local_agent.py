@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -63,11 +62,6 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
     def agent_type(self) -> AgentType:
         """Return the agent type."""
         return "local"
-
-    @property
-    def active_session(self) -> Mapping[str, BaseConversation]:
-        """Return the active sessions mapping."""
-        return self._active_sessions
 
     async def _is_authenticated(self) -> bool:
         """Local agent doesn't require authentication."""
