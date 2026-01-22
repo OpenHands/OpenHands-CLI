@@ -146,7 +146,6 @@ def main() -> None:
                 run_acp_server(
                     initial_confirmation_mode=confirmation_mode,
                     resume_conversation_id=resume_id,
-                    streaming_enabled=args.streaming,
                     cloud=args.cloud,
                     cloud_api_url=args.cloud_url,
                 )
