@@ -40,9 +40,7 @@ from acp.schema import (
 
 from openhands.sdk import (
     BaseConversation,
-    LocalConversation,
     Message,
-    RemoteConversation,
 )
 from openhands_cli import __version__
 from openhands_cli.acp_impl.agent.util import AgentType, get_session_mode_state
@@ -181,9 +179,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         """Set confirmation mode for a session."""
         if session_id in self._active_sessions:
             conversation = self._active_sessions[session_id]
-            apply_confirmation_mode_to_conversation(
-                conversation, mode, session_id
-            )
+            apply_confirmation_mode_to_conversation(conversation, mode, session_id)
             logger.debug(f"Confirmation mode for session {session_id}: {mode}")
         else:
             logger.warning(
@@ -259,6 +255,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
     async def authenticate(
         self, method_id: str, **_kwargs: Any
     ) -> AuthenticateResponse | None:
+        # TODO: implement authentication in local convo mode as well?
         """Authenticate the client (no-op by default, override for cloud)."""
         logger.info(f"Authentication requested with method: {method_id}")
         return AuthenticateResponse()
@@ -387,9 +384,6 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         Returns:
             NewSessionResponse with session ID and modes
         """
-        session_type_name = (
-            "cloud session" if self.agent_type == "remote" else "session"
-        )
 
         mcp_servers_dict = None
         if mcp_servers:
@@ -412,7 +406,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                 is_resuming=is_resuming,
             )
 
-            logger.info(f"Created new {session_type_name} {session_id}")
+            logger.info(f"Created new {self.agent_type} session {session_id}")
 
             await self.send_available_commands(session_id)
 
@@ -446,12 +440,12 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             raise
         except Exception as e:
             logger.error(
-                f"Failed to create new {session_type_name}: {e}", exc_info=True
+                f"Failed to create new {self.agent_type} session: {e}", exc_info=True
             )
             self._cleanup_session(session_id)
             raise RequestError.internal_error(
                 {
-                    "reason": f"Failed to create new {session_type_name}",
+                    "reason": f"Failed to create new {self.agent_type} session",
                     "details": str(e),
                 }
             )
