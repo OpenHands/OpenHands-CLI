@@ -8,10 +8,12 @@ from acp.schema import (
 )
 
 from openhands.sdk import Action, BaseConversation
+from openhands.tools.delegate.definition import DelegateAction
 from openhands.tools.file_editor.definition import (
     FileEditorAction,
 )
 from openhands.tools.terminal import TerminalAction
+from openhands_cli.shared.delegate_formatter import format_delegate_title
 from openhands_cli.utils import abbreviate_number, format_cost
 
 
@@ -156,6 +158,9 @@ def get_tool_kind(tool_name: str, *, action: Action | None = None) -> ToolKind:
             return "read"
         return "edit"
 
+    if isinstance(action, DelegateAction):
+        return "other"
+
     return TOOL_KIND_MAPPING.get(tool_name, "other")
 
 
@@ -196,5 +201,8 @@ def get_tool_title(
     # For other actions, use summary if available
     if clean_summary:
         return clean_summary
+
+    if isinstance(action, DelegateAction):
+        return format_delegate_title(action.command, ids=action.ids, tasks=action.tasks)
 
     return ""

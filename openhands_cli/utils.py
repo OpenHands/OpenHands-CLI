@@ -11,10 +11,15 @@ from typing import Any
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 
-from openhands.sdk import LLM, ImageContent, TextContent
+from openhands.sdk import LLM, Agent, ImageContent, TextContent
 from openhands.sdk.event import SystemPromptEvent
 from openhands.sdk.event.base import Event
-from openhands.tools.preset import get_default_agent
+from openhands.sdk.tool import Tool
+from openhands.tools.delegate import DelegateTool
+from openhands.tools.file_editor import FileEditorTool
+from openhands.tools.preset.default import get_default_condenser
+from openhands.tools.task_tracker import TaskTrackerTool
+from openhands.tools.terminal import TerminalTool
 
 
 def abbreviate_number(n: int | float) -> str:
@@ -155,10 +160,26 @@ def get_llm_metadata(
     return metadata
 
 
-def get_default_cli_agent(llm: LLM):
-    agent = get_default_agent(llm=llm, cli_mode=True)
+def get_default_cli_tools() -> list[Tool]:
+    """Get the default tool specifications for CLI mode (browser disabled)."""
+    return [
+        Tool(name=TerminalTool.name),
+        Tool(name=FileEditorTool.name),
+        Tool(name=TaskTrackerTool.name),
+        Tool(name=DelegateTool.name),
+    ]
 
-    return agent
+
+def get_default_cli_agent(llm: LLM) -> Agent:
+    """Create the default CLI agent with all tools (browser disabled)."""
+    return Agent(
+        llm=llm,
+        tools=get_default_cli_tools(),
+        system_prompt_kwargs={"cli_mode": True},
+        condenser=get_default_condenser(
+            llm=llm.model_copy(update={"usage_id": "condenser"})
+        ),
+    )
 
 
 def create_seeded_instructions_from_args(args: Namespace) -> list[str] | None:

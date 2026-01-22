@@ -1,6 +1,7 @@
 # openhands_cli/settings/store.py
 from __future__ import annotations
 
+import json
 import os
 import re
 from typing import Any
@@ -17,21 +18,62 @@ from openhands.sdk import (
     LocalFileStore,
 )
 from openhands.sdk.context import load_project_skills
+from openhands.sdk.conversation.persistence_const import BASE_STATE
 from openhands.sdk.critic.base import CriticBase
 from openhands.sdk.critic.impl.api import APIBasedCritic
-from openhands.tools.preset.default import get_default_tools
+from openhands.sdk.tool import Tool
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
+    CONVERSATIONS_DIR,
     PERSISTENCE_DIR,
     WORK_DIR,
 )
 from openhands_cli.mcp.mcp_utils import list_enabled_servers
 from openhands_cli.stores.cli_settings import CliSettings
 from openhands_cli.utils import (
+    get_default_cli_tools,
     get_llm_metadata,
     get_os_description,
     should_set_litellm_extra_body,
 )
+
+
+def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
+    """Get tools from a persisted conversation's base_state.json.
+
+    When resuming a conversation, we should use the tools that were available
+    when the conversation was created, not the current default tools. This
+    ensures consistency and prevents issues with tools that weren't available
+    in the original conversation (e.g., delegate tool).
+
+    Args:
+        conversation_id: The conversation ID to look up
+
+    Returns:
+        List of Tool objects from the persisted conversation, or None if
+        the conversation doesn't exist or can't be read
+    """
+    conversation_dir = os.path.join(CONVERSATIONS_DIR, conversation_id)
+    base_state_path = os.path.join(conversation_dir, BASE_STATE)
+
+    if not os.path.exists(base_state_path):
+        return None
+
+    try:
+        with open(base_state_path) as f:
+            state_data = json.load(f)
+
+        # Extract tools from the persisted agent
+        agent_data = state_data.get("agent", {})
+        tools_data = agent_data.get("tools", [])
+
+        if not tools_data:
+            return None
+
+        # Convert tool data to Tool objects
+        return [Tool.model_validate(tool) for tool in tools_data]
+    except (json.JSONDecodeError, KeyError, OSError):
+        return None
 
 
 def get_default_critic(llm: LLM, *, enable_critic: bool = True) -> CriticBase | None:
@@ -227,12 +269,17 @@ class AgentStore:
             str_spec = self.file_store.read(AGENT_SETTINGS_PATH)
             agent = Agent.model_validate_json(str_spec)
 
+            # Determine which tools to use:
+            # - If resuming a conversation, use the tools from the persisted state
+            # - If creating a new conversation, use the default CLI tools
+            updated_tools = (
+                get_persisted_conversation_tools(session_id) if session_id else None
+            )
+            updated_tools = updated_tools or get_default_cli_tools()
+
             # Get environment variable overrides (these take precedence over
             # stored settings and are NOT persisted to disk)
             env_overrides = LLMEnvOverrides()
-
-            # Update tools with most recent working directory
-            updated_tools = get_default_tools(enable_browser=False)
 
             # Load skills from user directories and project-specific directories
             skills = load_project_skills(WORK_DIR)
@@ -370,7 +417,7 @@ class AgentStore:
 
         agent = Agent(
             llm=llm,
-            tools=get_default_tools(enable_browser=False),
+            tools=get_default_cli_tools(),
             mcp_config={},
             condenser=condenser,
             # Note: critic is NOT included here - it will be derived on-the-fly

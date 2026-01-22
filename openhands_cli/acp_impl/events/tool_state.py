@@ -5,6 +5,7 @@ from streamingjson import Lexer
 
 from openhands_cli.acp_impl.events.shared_event_handler import THOUGHT_HEADER
 from openhands_cli.acp_impl.events.utils import TOOL_KIND_MAPPING
+from openhands_cli.shared.delegate_formatter import format_delegate_title
 
 
 class ToolCallState:
@@ -107,6 +108,9 @@ class ToolCallState:
                 return "read"
             return "edit"
 
+        if self.tool_name == "delegate":
+            return "other"
+
         return TOOL_KIND_MAPPING.get(self.tool_name, "other")
 
     @property
@@ -160,6 +164,16 @@ class ToolCallState:
             if isinstance(command, str) and command:
                 return f"{clean_summary}: $ {command}" if clean_summary else command
 
+        if self.tool_name == "delegate":
+            command = args.get("command")
+            ids = args.get("ids") if isinstance(args.get("ids"), list) else None
+            tasks = args.get("tasks") if isinstance(args.get("tasks"), dict) else None
+            return (
+                f"{clean_summary}"
+                if clean_summary
+                else format_delegate_title(command, ids=ids, tasks=tasks)
+            )
+
         # Other tools: prefer summary if present
         return clean_summary or self.tool_name
 
@@ -204,6 +218,12 @@ class ToolCallState:
 
         # For file_editor, require 'command' to be present to determine kind correctly
         if self.tool_name == "file_editor":
+            command = parsed.get("command")
+            if not isinstance(command, str) or not command:
+                return False
+
+        # For delegate, require 'command' to be present to determine title correctly
+        if self.tool_name == "delegate":
             command = parsed.get("command")
             if not isinstance(command, str) or not command:
                 return False

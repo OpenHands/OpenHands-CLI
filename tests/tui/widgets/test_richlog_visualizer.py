@@ -815,3 +815,137 @@ class TestPlanPanelIntegration:
                 with patch.object(app.plan_panel, "toggle") as mock_toggle:
                     visualizer._do_refresh_plan_panel()
                     mock_toggle.assert_called_once()
+
+
+class TestSubVisualizerCreation:
+    """Tests for create_sub_visualizer method used during delegation."""
+
+    def test_create_sub_visualizer_returns_new_instance_with_name(self, visualizer):
+        """Sub-visualizer is created with correct agent name set."""
+        sub_vis = visualizer.create_sub_visualizer("child_agent")
+
+        assert isinstance(sub_vis, ConversationVisualizer)
+        assert sub_vis._name == "child_agent"
+        assert sub_vis is not visualizer
+
+    def test_create_sub_visualizer_shares_container_and_app(self, visualizer):
+        """Sub-visualizer shares the same container and app as parent."""
+        sub_vis = visualizer.create_sub_visualizer("child_agent")
+
+        assert sub_vis._container is visualizer._container
+        assert sub_vis._app is visualizer._app
+
+    def test_create_sub_visualizer_preserves_skip_user_messages(self):
+        """Sub-visualizer inherits skip_user_messages setting from parent."""
+        app = App()
+        container = VerticalScroll()
+        parent = ConversationVisualizer(
+            container,
+            app,  # type: ignore[arg-type]
+            skip_user_messages=True,
+        )
+
+        sub_vis = parent.create_sub_visualizer("child_agent")
+
+        assert sub_vis._skip_user_messages is True
+
+
+class TestMessageEventDelegation:
+    """Tests for MessageEvent handling in delegation context."""
+
+    def test_message_event_skipped_without_delegation_context(self, visualizer):
+        """MessageEvent returns None when not in delegation context."""
+        from openhands.sdk import Message
+
+        message = Message(
+            role="user",
+            content=[TextContent(text="Hello from user")],
+        )
+        event = MessageEvent(llm_message=message, source="user")
+
+        widget = visualizer._create_event_widget(event)
+
+        assert widget is None
+
+    def test_message_event_skipped_when_no_sender(self):
+        """MessageEvent with name set but no sender returns None."""
+        from openhands.sdk import Message
+
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,  # type: ignore[arg-type]
+            name="child_agent",
+        )
+
+        message = Message(
+            role="user",
+            content=[TextContent(text="Hello")],
+        )
+        # No sender set - this is a direct user message, not delegation
+        event = MessageEvent(llm_message=message, source="user")
+
+        widget = visualizer._create_event_widget(event)
+
+        assert widget is None
+
+    def test_message_event_renders_delegation_user_role(self):
+        """MessageEvent from another agent (user role) shows sender->receiver."""
+        from textual.widgets import Markdown
+
+        from openhands.sdk import Message
+
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,  # type: ignore[arg-type]
+            name="child_agent",
+        )
+
+        message = Message(
+            role="user",
+            content=[TextContent(text="Do this task")],
+        )
+        event = MessageEvent(llm_message=message, source="agent", sender="parent_agent")
+
+        widget = visualizer._create_event_widget(event)
+
+        assert isinstance(widget, Markdown)
+        # The markdown should contain the formatted arrow notation
+        markdown_content = widget._initial_markdown
+        assert markdown_content is not None
+        assert "Parent Agent" in markdown_content
+        assert "Child Agent" in markdown_content
+        assert "→" in markdown_content
+
+    def test_message_event_renders_delegation_assistant_role(self):
+        """MessageEvent from this agent (assistant role) shows this->sender."""
+        from textual.widgets import Markdown
+
+        from openhands.sdk import Message
+
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,  # type: ignore[arg-type]
+            name="child_agent",
+        )
+
+        message = Message(
+            role="assistant",
+            content=[TextContent(text="Task completed")],
+        )
+        event = MessageEvent(llm_message=message, source="agent", sender="parent_agent")
+
+        widget = visualizer._create_event_widget(event)
+
+        assert isinstance(widget, Markdown)
+        # For assistant role, this agent is the source
+        markdown_content = widget._initial_markdown
+        assert markdown_content is not None
+        assert "Child Agent" in markdown_content
+        assert "Parent Agent" in markdown_content
+        assert "→" in markdown_content

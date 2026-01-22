@@ -356,3 +356,99 @@ class TestTitle:
 
         state.append_args(',"path":"/test.py"}')
         assert state.title == "Reading /test.py"  # Path arrived
+
+
+class TestDelegateToolStreaming:
+    """Tests for delegate tool streaming behavior."""
+
+    def test_delegate_requires_command_arg(self):
+        """delegate requires 'command' arg to determine title correctly."""
+        # ids only - not valid yet
+        state = ToolCallState("call-1", "delegate")
+        state.append_args('{"ids":["agent1"]}')
+        assert state.has_valid_skeleton is False
+
+        # With empty command - still not valid
+        state = ToolCallState("call-2", "delegate")
+        state.append_args('{"ids":["agent1"],"command":""}')
+        assert state.has_valid_skeleton is False
+
+        # With command - now valid
+        state = ToolCallState("call-3", "delegate")
+        state.append_args('{"ids":["agent1"],"command":"spawn"}')
+        assert state.has_valid_skeleton is True
+
+    def test_delegate_command_streaming(self):
+        """delegate waits for command during streaming."""
+        state = ToolCallState("call-1", "delegate")
+
+        # Chunk 1: ids arrive first
+        state.append_args('{"ids":["agent1","agent2"]')
+        assert state.has_valid_skeleton is False  # Still waiting for command
+
+        # Chunk 2: command key starts but no value yet
+        state.append_args(',"command":"')
+        assert state.has_valid_skeleton is False  # Empty command
+
+        # Chunk 3: command value arrives
+        state.append_args('spawn"}')
+        assert state.has_valid_skeleton is True  # Now we know it's spawn
+
+    def test_delegate_kind_is_other(self):
+        """delegate tool kind is always 'other'."""
+        state = ToolCallState("call-1", "delegate")
+        state.append_args('{"command":"spawn","ids":["agent1"]}')
+        assert state.has_valid_skeleton
+        assert state.kind == "other"
+
+        state = ToolCallState("call-2", "delegate")
+        state.append_args('{"command":"delegate","tasks":{"agent1":"task"}}')
+        assert state.has_valid_skeleton
+        assert state.kind == "other"
+
+    def test_delegate_spawn_title(self):
+        """delegate spawn command generates correct title."""
+        state = ToolCallState("call-1", "delegate")
+        state.append_args('{"command":"spawn","ids":["agent1","agent2"]}')
+        assert state.has_valid_skeleton
+        assert state.title == "Spawning 2 sub-agent(s): agent1, agent2"
+
+    def test_delegate_spawn_title_no_ids(self):
+        """delegate spawn with no ids generates fallback title."""
+        state = ToolCallState("call-1", "delegate")
+        state.append_args('{"command":"spawn"}')
+        assert state.has_valid_skeleton
+        assert state.title == "Spawning sub-agents"
+
+    def test_delegate_delegate_title(self):
+        """delegate delegate command generates correct title."""
+        state = ToolCallState("call-1", "delegate")
+        state.append_args(
+            '{"command":"delegate","tasks":{"agent1":"task1","agent2":"task2"}}'
+        )
+        assert state.has_valid_skeleton
+        assert state.title == "Delegating 2 task(s) to: agent1, agent2"
+
+    def test_delegate_delegate_title_no_tasks(self):
+        """delegate delegate with no tasks generates fallback title."""
+        state = ToolCallState("call-1", "delegate")
+        state.append_args('{"command":"delegate"}')
+        assert state.has_valid_skeleton
+        assert state.title == "Delegating tasks"
+
+    def test_delegate_unknown_command_title(self):
+        """delegate with unknown command generates fallback title."""
+        state = ToolCallState("call-1", "delegate")
+        state.append_args('{"command":"unknown"}')
+        assert state.has_valid_skeleton
+        assert state.title == "Delegate"
+
+    def test_delegate_title_updates_as_ids_arrive(self):
+        """delegate title updates as more ids stream in."""
+        state = ToolCallState("call-1", "delegate")
+        state.append_args('{"command":"spawn","ids":["agent1"')
+        assert state.has_valid_skeleton
+        assert state.title == "Spawning 1 sub-agent(s): agent1"
+
+        state.append_args(',"agent2"]}')
+        assert state.title == "Spawning 2 sub-agent(s): agent1, agent2"

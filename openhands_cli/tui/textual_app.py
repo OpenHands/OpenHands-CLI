@@ -420,7 +420,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Initialize conversation runner with visualizer that can add widgets.
         # Skip user messages since we display them immediately in the UI.
         conversation_visualizer = visualizer or ConversationVisualizer(
-            self.main_display, self, skip_user_messages=True
+            self.main_display, self, skip_user_messages=True, name="OpenHands Agent"
         )
 
         # Create JSON callback if in JSON mode

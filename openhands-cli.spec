@@ -34,6 +34,7 @@ a = Analysis(
         *collect_data_files('mcp'),
         # Include all data files from openhands.sdk (templates, configs, etc.)
         *collect_data_files('openhands.sdk'),
+        *collect_data_files('openhands.tools'),
         # Include all data files from openhands_cli package
         *collect_data_files('openhands_cli'),
         # Include package metadata for importlib.metadata
