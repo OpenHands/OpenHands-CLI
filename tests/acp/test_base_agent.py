@@ -72,47 +72,32 @@ class TestInitialize:
     """Tests for the initialize method."""
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "agent_configured",
-        [True, False],
-    )
-    async def test_initialize_auth_methods(self, test_agent, agent_configured):
-        """Test initialize always returns auth method regardless of config."""
-        with patch(
-            "openhands_cli.acp_impl.agent.base_agent.load_agent_specs"
-        ) as mock_load:
-            if agent_configured:
-                mock_load.return_value = MagicMock()
-            else:
-                from openhands_cli.setup import MissingAgentSpec
+    async def test_initialize_auth_methods(self, test_agent):
+        """Test initialize always returns auth method."""
+        response = await test_agent.initialize(
+            protocol_version=1,
+            client_info=Implementation(name="test", version="1.0"),
+        )
 
-                mock_load.side_effect = MissingAgentSpec("Not configured")
-
-            response = await test_agent.initialize(
-                protocol_version=1,
-                client_info=Implementation(name="test", version="1.0"),
-            )
-
-            assert response.protocol_version == 1
-            # Auth methods are always returned
-            assert len(response.auth_methods) == 1
-            assert response.auth_methods[0].id == "oauth"
-            assert response.auth_methods[0].field_meta == {"type": "agent"}
+        assert response.protocol_version == 1
+        # Auth methods are always returned
+        assert len(response.auth_methods) == 1
+        assert response.auth_methods[0].id == "oauth"
+        assert response.auth_methods[0].field_meta == {"type": "agent"}
 
     @pytest.mark.asyncio
     async def test_initialize_capabilities(self, test_agent):
         """Test initialize returns correct capabilities."""
-        with patch("openhands_cli.acp_impl.agent.base_agent.load_agent_specs"):
-            response = await test_agent.initialize(protocol_version=1)
+        response = await test_agent.initialize(protocol_version=1)
 
-            # Check agent capabilities
-            caps = response.agent_capabilities
-            assert caps.load_session is True
-            assert caps.mcp_capabilities.http is True
-            assert caps.mcp_capabilities.sse is True
-            assert caps.prompt_capabilities.image is True
-            assert caps.prompt_capabilities.embedded_context is True
-            assert caps.prompt_capabilities.audio is False
+        # Check agent capabilities
+        caps = response.agent_capabilities
+        assert caps.load_session is True
+        assert caps.mcp_capabilities.http is True
+        assert caps.mcp_capabilities.sse is True
+        assert caps.prompt_capabilities.image is True
+        assert caps.prompt_capabilities.embedded_context is True
+        assert caps.prompt_capabilities.audio is False
 
 
 class TestAuthenticate:

@@ -28,45 +28,20 @@ def acp_agent(mock_connection):
 
 
 @pytest.mark.asyncio
-async def test_initialize_with_configured_agent(acp_agent):
-    """Test agent initialization when agent is configured."""
-    # Mock load_agent_specs to succeed (called from shared_agent_handler)
-    with patch("openhands_cli.acp_impl.agent.base_agent.load_agent_specs") as mock_load:
-        mock_agent = MagicMock()
-        mock_load.return_value = mock_agent
+async def test_initialize(acp_agent):
+    """Test agent initialization always returns auth method."""
+    response = await acp_agent.initialize(
+        protocol_version=1,
+        client_info=Implementation(name="test-client", version="1.0.0"),
+    )
 
-        response = await acp_agent.initialize(
-            protocol_version=1,
-            client_info=Implementation(name="test-client", version="1.0.0"),
-        )
-
-        assert response.protocol_version == 1
-        assert isinstance(response.agent_capabilities, AgentCapabilities)
-        assert response.agent_capabilities.load_session is True
-        # When configured, auth method is returned for optional OAuth
-        assert len(response.auth_methods) == 1
-        assert response.auth_methods[0].id == "oauth"
-
-
-@pytest.mark.asyncio
-async def test_initialize_without_configured_agent(acp_agent):
-    """Test agent initialization when agent is not configured."""
-    from openhands_cli.setup import MissingAgentSpec
-
-    # Mock load_agent_specs to raise MissingAgentSpec (called from shared_agent_handler)
-    with patch("openhands_cli.acp_impl.agent.base_agent.load_agent_specs") as mock_load:
-        mock_load.side_effect = MissingAgentSpec("Not configured")
-
-        response = await acp_agent.initialize(
-            protocol_version=1,
-            client_info=Implementation(name="test-client", version="1.0.0"),
-        )
-
-        assert response.protocol_version == 1
-        # Auth methods are always returned for OAuth authentication
-        assert len(response.auth_methods) == 1
-        assert response.auth_methods[0].id == "oauth"
-        assert response.auth_methods[0].field_meta == {"type": "agent"}
+    assert response.protocol_version == 1
+    assert isinstance(response.agent_capabilities, AgentCapabilities)
+    assert response.agent_capabilities.load_session is True
+    # Auth method is always returned for OAuth authentication
+    assert len(response.auth_methods) == 1
+    assert response.auth_methods[0].id == "oauth"
+    assert response.auth_methods[0].field_meta == {"type": "agent"}
 
 
 @pytest.mark.asyncio

@@ -238,13 +238,6 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             ),
         ]
 
-        # Check if agent is configured
-        try:
-            load_agent_specs()
-            logger.info("Agent configured")
-        except MissingAgentSpec:
-            logger.warning("Agent not configured - users should run 'openhands' first")
-
         return InitializeResponse(
             protocol_version=protocol_version,
             auth_methods=auth_methods,
