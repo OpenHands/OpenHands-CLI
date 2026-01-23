@@ -99,9 +99,13 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
         """Return the cloud API URL for authentication."""
         return self._cloud_api_url_config
 
-    def _on_authentication_success(self) -> None:
-        """Refresh the API key after successful authentication."""
-        self._cloud_api_key = self.store.get_api_key()
+    def _on_authentication_success(self, api_key: str) -> None:
+        """Refresh the API key after successful authentication.
+
+        Args:
+            api_key: The API key/access token from authentication
+        """
+        self._cloud_api_key = api_key
 
     async def _verify_and_get_sandbox_id(self, conversation_id: str) -> str:
         """Verify a conversation exists and get its sandbox_id."""

@@ -289,18 +289,24 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         """
         return self.agent_type == "remote"
 
-    def _on_authentication_success(self) -> None:
+    def _on_authentication_success(self, api_key: str) -> None:
         """Hook called after successful authentication.
 
         Subclasses can override this to perform post-authentication actions,
         such as refreshing API keys.
+
+        Args:
+            api_key: The API key/access token from authentication
         """
         pass
 
     async def authenticate(
         self, method_id: str, **_kwargs: Any
     ) -> AuthenticateResponse | None:
-        """Authenticate the client using OAuth2 device flow.
+        """Authenticate the client using OAuth2 Authorization Code Flow with PKCE.
+
+        This method implements the ACP Registry compatible authentication flow
+        using a local HTTP server to receive OAuth callbacks.
 
         Args:
             method_id: The authentication method ID (must be "oauth")
@@ -318,18 +324,39 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                 {"reason": f"Unsupported authentication method: {method_id}"}
             )
 
-        from openhands_cli.auth.device_flow import DeviceFlowError
-        from openhands_cli.auth.login_command import login_command
+        from openhands_cli.auth.api_client import fetch_user_data_after_oauth
+        from openhands_cli.auth.authorization_code_flow import (
+            AuthorizationCodeFlowClient,
+            AuthorizationCodeFlowError,
+        )
+        from openhands_cli.auth.token_storage import TokenStorage
 
         try:
-            await login_command(
-                self._cloud_api_url, skip_settings_sync=self._skip_settings_sync
-            )
-            self._on_authentication_success()
+            # Use Authorization Code Flow with PKCE (ACP Registry compatible)
+            client = AuthorizationCodeFlowClient(self._cloud_api_url)
+            token_response = await client.authenticate()
+
+            api_key = token_response.access_token
+
+            # Store the API key securely
+            token_storage = TokenStorage()
+            token_storage.store_api_key(api_key)
+
+            # Sync settings if needed (local agent syncs, remote agent skips)
+            if not self._skip_settings_sync:
+                try:
+                    await fetch_user_data_after_oauth(self._cloud_api_url, api_key)
+                    logger.info("Settings synchronized successfully")
+                except Exception as e:
+                    logger.warning(f"Could not sync settings: {e}")
+
+            # Call hook for subclass-specific actions
+            self._on_authentication_success(api_key)
+
             logger.info("OAuth authentication completed successfully")
             return AuthenticateResponse()
 
-        except DeviceFlowError as e:
+        except AuthorizationCodeFlowError as e:
             logger.error(f"OAuth authentication failed: {e}")
             raise RequestError.internal_error(
                 {"reason": f"Authentication failed: {e}"}

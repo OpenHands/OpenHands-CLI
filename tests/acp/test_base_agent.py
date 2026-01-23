@@ -168,14 +168,32 @@ class TestAuthenticate:
     @pytest.mark.asyncio
     async def test_authenticate_returns_response(self, test_agent):
         """Test authenticate returns an AuthenticateResponse with oauth method."""
-        with patch(
-            "openhands_cli.auth.login_command.login_command", new_callable=AsyncMock
-        ) as mock_login:
-            mock_login.return_value = True
+        mock_token_response = MagicMock()
+        mock_token_response.access_token = "test_access_token"
+
+        mock_client = MagicMock()
+        mock_client.authenticate = AsyncMock(return_value=mock_token_response)
+
+        with (
+            patch(
+                "openhands_cli.auth.authorization_code_flow.AuthorizationCodeFlowClient",
+                return_value=mock_client,
+            ),
+            patch(
+                "openhands_cli.auth.token_storage.TokenStorage"
+            ) as mock_storage_class,
+            patch(
+                "openhands_cli.auth.api_client.fetch_user_data_after_oauth",
+                new_callable=AsyncMock,
+            ),
+        ):
+            mock_storage = MagicMock()
+            mock_storage_class.return_value = mock_storage
 
             response = await test_agent.authenticate(method_id="oauth")
             assert response is not None
-            mock_login.assert_called_once()
+            mock_client.authenticate.assert_called_once()
+            mock_storage.store_api_key.assert_called_once_with("test_access_token")
 
     @pytest.mark.asyncio
     async def test_authenticate_unsupported_method(self, test_agent):
