@@ -113,13 +113,37 @@ async def test_new_session_success(acp_agent, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_new_session_raises_auth_required_when_not_authenticated(
+    mock_connection, tmp_path
+):
+    """Test that new_session raises auth_required when user is not authenticated."""
+    from acp import RequestError
+
+    from openhands_cli.setup import MissingAgentSpec
+
+    # Create agent and mock _is_authenticated to return False
+    agent = LocalOpenHandsACPAgent(mock_connection, "always-ask")
+
+    with patch(
+        "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+    ) as mock_load:
+        mock_load.side_effect = MissingAgentSpec("Not configured")
+
+        with pytest.raises(RequestError) as exc_info:
+            await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+
+        assert "Authentication required" in str(exc_info.value.data)
+
+
+@pytest.mark.asyncio
 async def test_new_session_agent_not_configured(acp_agent, tmp_path):
     """Test creating a new session when agent is not configured."""
     from acp import RequestError
 
     from openhands_cli.setup import MissingAgentSpec
 
-    # Mock load_agent_specs to raise MissingAgentSpec
+    # Mock load_agent_specs to raise MissingAgentSpec - this will make
+    # _is_authenticated return False, which raises auth_required
     with patch(
         "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
     ) as mock_load:
@@ -138,13 +162,19 @@ async def test_new_session_with_malformed_mcp_json(acp_agent, tmp_path, monkeypa
 
     request = NewSessionRequest(cwd=str(tmp_path), mcp_servers=[])
 
-    # Mock load_agent_specs to raise MCPConfigurationError
+    # Mock load_agent_specs:
+    # - First call (from _is_authenticated): return success
+    # - Second call (from _setup_conversation): raise MCPConfigurationError
     with patch(
         "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
     ) as mock_load:
-        mock_load.side_effect = MCPConfigurationError(
-            "Invalid JSON: trailing characters at line 20 column 1"
-        )
+        mock_agent = MagicMock()
+        mock_load.side_effect = [
+            mock_agent,  # First call succeeds (auth check)
+            MCPConfigurationError(
+                "Invalid JSON: trailing characters at line 20 column 1"
+            ),  # Second call fails
+        ]
 
         # Should raise RequestError with helpful message
         with pytest.raises(RequestError) as exc_info:
@@ -171,13 +201,19 @@ async def test_new_session_with_malformed_mcp_json_integration(
 
     request = NewSessionRequest(cwd=str(tmp_path), mcp_servers=[])
 
-    # Mock load_agent_specs to propagate the MCPConfigurationError
+    # Mock load_agent_specs:
+    # - First call (from _is_authenticated): return success
+    # - Second call (from _setup_conversation): raise MCPConfigurationError
     with patch(
         "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
     ) as mock_load_specs:
-        mock_load_specs.side_effect = MCPConfigurationError(
-            "Invalid JSON: trailing characters at line 20 column 1"
-        )
+        mock_agent = MagicMock()
+        mock_load_specs.side_effect = [
+            mock_agent,  # First call succeeds (auth check)
+            MCPConfigurationError(
+                "Invalid JSON: trailing characters at line 20 column 1"
+            ),  # Second call fails
+        ]
 
         # RequestError raised when creating session with malformed mcp.json
         with pytest.raises(RequestError) as exc_info:
@@ -545,9 +581,13 @@ async def test_new_session_with_mcp_servers(acp_agent, tmp_path):
         # Verify session was created
         assert response.session_id is not None
 
-        # Verify load_agent_specs was called with transformed MCP servers dict
-        mock_load.assert_called_once()
-        call_kwargs = mock_load.call_args[1]
+        # Verify load_agent_specs was called twice:
+        # - First call: _is_authenticated check (no args)
+        # - Second call: _setup_conversation with mcp_servers
+        assert mock_load.call_count == 2
+
+        # Check the second call has the transformed MCP servers dict
+        call_kwargs = mock_load.call_args_list[1][1]
         assert "mcp_servers" in call_kwargs
         mcp_servers_dict = call_kwargs["mcp_servers"]
 

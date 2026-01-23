@@ -193,6 +193,13 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
         **_kwargs: Any,
     ) -> NewSessionResponse:
         """Create a new conversation session."""
+        is_authenticated = await self._is_authenticated()
+        if not is_authenticated:
+            logger.info("User not authenticated, requiring authentication")
+            raise RequestError.auth_required(
+                {"reason": "Authentication required to create a session"}
+            )
+
         effective_working_dir = working_dir or cwd or str(Path.cwd())
         logger.info(f"Using working directory: {effective_working_dir}")
 
