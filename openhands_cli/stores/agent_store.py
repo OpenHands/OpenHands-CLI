@@ -285,21 +285,6 @@ def apply_llm_overrides(llm: LLM, overrides: LLMEnvOverrides) -> LLM:
     return llm.model_copy(update=overrides.model_dump(exclude_none=True))
 
 
-def resolve_llm_base_url(
-    settings: dict[str, Any],
-    base_url: str | None = None,
-) -> str:
-    candidate = base_url if base_url is not None else settings.get("llm_base_url")
-    if candidate is None:
-        return DEFAULT_LLM_BASE_URL
-
-    if isinstance(candidate, str):
-        candidate = candidate.strip()
-    else:
-        candidate = str(candidate).strip()
-
-    return candidate or DEFAULT_LLM_BASE_URL
-
 
 class AgentStore:
     """Single source of truth for persisting/retrieving AgentSpec."""
@@ -490,7 +475,6 @@ class AgentStore:
         self,
         llm_api_key: str,
         settings: dict[str, Any],
-        base_url: str | None = None,
         default_model: str = "claude-sonnet-4-5-20250929",
     ) -> Agent:
         """Create an Agent instance from user settings and API key, then save it.
@@ -507,20 +491,19 @@ class AgentStore:
             The created Agent instance
         """
         model = settings.get("llm_model", default_model)
-
-        resolved_base_url = resolve_llm_base_url(settings, base_url=base_url)
+        base_url = settings.get("llm_base_url")
 
         llm = LLM(
             model=model,
             api_key=llm_api_key,
-            base_url=resolved_base_url,
+            base_url=base_url,
             usage_id="agent",
         )
 
         condenser_llm = LLM(
             model=model,
             api_key=llm_api_key,
-            base_url=resolved_base_url,
+            base_url=base_url,
             usage_id="condenser",
         )
 
