@@ -232,7 +232,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Check if user has existing settings
         try:
-            initial_setup_required = SettingsScreen.is_initial_setup_required()
+            initial_setup_required = SettingsScreen.is_initial_setup_required(
+                env_overrides_enabled=self.env_overrides_enabled
+            )
         except MissingEnvironmentVariablesError as e:
             # Store the error to be re-raised after clean exit
             self._missing_env_vars_error = e
