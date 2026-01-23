@@ -6,7 +6,7 @@ from typing import Any
 from uuid import UUID
 
 from acp import Client, NewSessionResponse, PromptResponse, RequestError
-from acp.schema import AuthenticateResponse, LoadSessionResponse
+from acp.schema import LoadSessionResponse
 
 from openhands.sdk import BaseConversation, Conversation, Event, RemoteConversation
 from openhands.workspace import OpenHandsCloudWorkspace
@@ -24,7 +24,6 @@ from openhands_cli.auth.api_client import (
     OpenHandsApiClient,
     UnauthenticatedError,
 )
-from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.auth.utils import is_token_valid
 from openhands_cli.locations import MCP_CONFIG_FILE
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
@@ -52,11 +51,9 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
             cloud_api_url: OpenHands Cloud API URL
             resume_conversation_id: Optional conversation ID to resume
         """
-        super().__init__(conn, initial_confirmation_mode, resume_conversation_id)
-
-        self.store = TokenStorage()
-        self._cloud_api_key = self.store.get_api_key()
-        self._cloud_api_url = cloud_api_url
+        super().__init__(
+            conn, initial_confirmation_mode, resume_conversation_id, cloud_api_url
+        )
 
         self._active_workspaces: dict[str, OpenHandsCloudWorkspace] = {}
 
@@ -93,37 +90,6 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
                 conversation.close()
             except Exception as e:
                 logger.warning(f"Error closing conversation for {session_id}: {e}")
-
-    async def authenticate(
-        self, method_id: str, **_kwargs: Any
-    ) -> AuthenticateResponse | None:
-        """Authenticate the client using OAuth2 device flow."""
-        logger.info(f"Authentication requested with method: {method_id}")
-
-        if method_id != "oauth":
-            raise RequestError.invalid_params(
-                {"reason": f"Unsupported authentication method: {method_id}"}
-            )
-
-        from openhands_cli.auth.device_flow import DeviceFlowError
-        from openhands_cli.auth.login_command import login_command
-
-        try:
-            await login_command(self._cloud_api_url, skip_settings_sync=True)
-            self._cloud_api_key = self.store.get_api_key()
-            logger.info("OAuth authentication completed successfully")
-            return AuthenticateResponse()
-
-        except DeviceFlowError as e:
-            logger.error(f"OAuth authentication failed: {e}")
-            raise RequestError.internal_error(
-                {"reason": f"Authentication failed: {e}"}
-            ) from e
-        except Exception as e:
-            logger.error(f"Unexpected error during authentication: {e}", exc_info=True)
-            raise RequestError.internal_error(
-                {"reason": f"Authentication error: {e}"}
-            ) from e
 
     async def _verify_and_get_sandbox_id(self, conversation_id: str) -> str:
         """Verify a conversation exists and get its sandbox_id."""

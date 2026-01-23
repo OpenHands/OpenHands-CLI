@@ -73,16 +73,11 @@ class TestInitialize:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "agent_configured,expected_auth_count",
-        [
-            (True, 1),  # Configured: OAuth auth method returned
-            (False, 0),  # Not configured: no auth methods
-        ],
+        "agent_configured",
+        [True, False],
     )
-    async def test_initialize_auth_methods(
-        self, test_agent, agent_configured, expected_auth_count
-    ):
-        """Test initialize returns correct auth methods based on config."""
+    async def test_initialize_auth_methods(self, test_agent, agent_configured):
+        """Test initialize always returns auth method regardless of config."""
         with patch(
             "openhands_cli.acp_impl.agent.base_agent.load_agent_specs"
         ) as mock_load:
@@ -99,9 +94,10 @@ class TestInitialize:
             )
 
             assert response.protocol_version == 1
-            assert len(response.auth_methods) == expected_auth_count
-            if expected_auth_count > 0:
-                assert response.auth_methods[0].id == "oauth"
+            # Auth methods are always returned
+            assert len(response.auth_methods) == 1
+            assert response.auth_methods[0].id == "oauth"
+            assert response.auth_methods[0].field_meta == {"type": "agent"}
 
     @pytest.mark.asyncio
     async def test_initialize_capabilities(self, test_agent):
@@ -124,9 +120,24 @@ class TestAuthenticate:
 
     @pytest.mark.asyncio
     async def test_authenticate_returns_response(self, test_agent):
-        """Test authenticate returns an AuthenticateResponse."""
-        response = await test_agent.authenticate(method_id="any-method")
-        assert response is not None
+        """Test authenticate returns an AuthenticateResponse for OAuth method."""
+        with patch(
+            "openhands_cli.auth.login_command.login_command",
+            new_callable=AsyncMock,
+        ):
+            response = await test_agent.authenticate(method_id="oauth")
+            assert response is not None
+
+    @pytest.mark.asyncio
+    async def test_authenticate_rejects_invalid_method(self, test_agent):
+        """Test authenticate rejects invalid method IDs."""
+        with pytest.raises(RequestError) as exc_info:
+            await test_agent.authenticate(method_id="invalid-method")
+
+        assert exc_info.value.data is not None
+        assert "Unsupported authentication method" in exc_info.value.data.get(
+            "reason", ""
+        )
 
 
 class TestNewSession:

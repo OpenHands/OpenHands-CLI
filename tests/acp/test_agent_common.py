@@ -27,7 +27,7 @@ def agent(request, mock_connection):
         return LocalOpenHandsACPAgent(mock_connection, "always-ask")
     else:
         with patch(
-            "openhands_cli.acp_impl.agent.remote_agent.TokenStorage"
+            "openhands_cli.acp_impl.agent.base_agent.TokenStorage"
         ) as mock_storage_class:
             mock_storage = MagicMock()
             mock_storage.get_api_key.return_value = "test-api-key"

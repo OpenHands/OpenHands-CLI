@@ -63,16 +63,22 @@ async def test_initialize_without_configured_agent(acp_agent):
         )
 
         assert response.protocol_version == 1
-        # When not configured, no auth methods are returned
-        assert len(response.auth_methods) == 0
+        # Auth methods are always returned for OAuth authentication
+        assert len(response.auth_methods) == 1
+        assert response.auth_methods[0].id == "oauth"
+        assert response.auth_methods[0].field_meta == {"type": "agent"}
 
 
 @pytest.mark.asyncio
 async def test_authenticate(acp_agent):
     """Test authentication."""
-    response = await acp_agent.authenticate(method_id="test-method")
+    with patch(
+        "openhands_cli.auth.login_command.login_command",
+        new_callable=AsyncMock,
+    ):
+        response = await acp_agent.authenticate(method_id="oauth")
 
-    assert response is not None
+        assert response is not None
 
 
 @pytest.mark.asyncio

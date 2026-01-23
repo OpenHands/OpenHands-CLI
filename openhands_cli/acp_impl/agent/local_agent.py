@@ -26,7 +26,7 @@ from openhands_cli.acp_impl.slash_commands import (
 from openhands_cli.acp_impl.utils import RESOURCE_SKILL
 from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
-from openhands_cli.setup import load_agent_specs
+from openhands_cli.setup import MissingAgentSpec, load_agent_specs
 
 
 logger = logging.getLogger(__name__)
@@ -64,8 +64,15 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
         return "local"
 
     async def _is_authenticated(self) -> bool:
-        """Local agent doesn't require authentication."""
-        return True
+        """Check if agent settings already exist for is_authenticated status.
+
+        For local agent, authentication is considered complete if agent specs exist.
+        """
+        try:
+            load_agent_specs()
+            return True
+        except MissingAgentSpec:
+            return False
 
     def _cleanup_session(self, session_id: str) -> None:
         """Clean up resources for a session (no-op for local agent)."""
