@@ -213,14 +213,23 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def on_mount(self) -> None:
         """Called when app starts."""
+        from openhands_cli.stores import MissingEnvironmentVariablesError
+
         # Subscribe to conversation running signal for auto-exit in headless mode
         self.conversation_running_signal.subscribe(
             self, self._on_conversation_state_changed
         )
 
         # Check if user has existing settings
-        # Note: MissingEnvironmentVariablesError is caught in the entrypoint
-        if SettingsScreen.is_initial_setup_required():
+        try:
+            initial_setup_required = SettingsScreen.is_initial_setup_required()
+        except MissingEnvironmentVariablesError as e:
+            # Store the error to be re-raised after clean exit
+            self._missing_env_vars_error = e
+            self.exit()
+            return
+
+        if initial_setup_required:
             # In headless mode we cannot open interactive settings.
             if self.headless_mode:
                 from rich.console import Console
@@ -906,11 +915,9 @@ def main(
 
     Raises:
         MissingEnvironmentVariablesError: If --override-with-envs is enabled but
-            required environment variables are missing. This is re-raised to be
-            handled by the entrypoint for clean error display.
+            required environment variables are missing. The app exits cleanly and
+            the error is re-raised to be handled by the entrypoint.
     """
-    from openhands_cli.stores import MissingEnvironmentVariablesError
-
     # Determine initial confirmation policy from CLI arguments
     # If headless mode is enabled, always use NeverConfirm (auto-approve all actions)
     initial_confirmation_policy = AlwaysConfirm()  # Default
@@ -930,11 +937,12 @@ def main(
         json_mode=json_mode,
     )
 
-    try:
-        app.run(headless=headless)
-    except MissingEnvironmentVariablesError:
-        # Re-raise to be handled by the entrypoint for clean error display
-        raise
+    app.run(headless=headless)
+
+    # Check if the app stored an error to be re-raised after clean exit
+    error = getattr(app, "_missing_env_vars_error", None)
+    if isinstance(error, Exception):
+        raise error
 
     return app.conversation_id
 
