@@ -34,6 +34,7 @@ from openhands.sdk.security.confirmation_policy import (
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.locations import CONVERSATIONS_DIR
+from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
@@ -66,7 +67,7 @@ from openhands_cli.tui.widgets.status_line import (
 )
 from openhands_cli.user_actions.types import UserConfirmation
 from openhands_cli.utils import json_callback
-from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
+
 
 class OpenHandsApp(CollapsibleNavigationMixin, App):
     """A minimal textual app for OpenHands CLI with scrollable main display."""
