@@ -261,8 +261,6 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
             sandbox_id=sandbox_id,
         )
 
-        self._active_workspaces[session_id] = workspace
-
         loop = asyncio.get_event_loop()
         subscriber = EventSubscriber(session_id, self._conn)
 
@@ -275,6 +273,8 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
             callbacks=[sync_callback],
             conversation_id=UUID(session_id),
         )
+
+        self._active_workspaces[session_id] = workspace
 
         subscriber.conversation = conversation
         return conversation, workspace

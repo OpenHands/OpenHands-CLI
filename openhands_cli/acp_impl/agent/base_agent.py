@@ -116,7 +116,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         ...
 
     @property
-    def active_session(self) -> Mapping[str, BaseConversation]:
+    def active_sessions(self) -> Mapping[str, BaseConversation]:
         """Return the active sessions mapping."""
         return self._active_sessions
 
