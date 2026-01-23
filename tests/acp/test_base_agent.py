@@ -75,7 +75,7 @@ class TestInitialize:
     @pytest.mark.parametrize(
         "agent_configured,expected_auth_count",
         [
-            (True, 1),  # Configured: OAuth auth method returned
+            (True, 3),  # Configured: OAuth, Terminal, and API Key auth methods
             (False, 0),  # Not configured: no auth methods
         ],
     )
@@ -102,6 +102,49 @@ class TestInitialize:
             assert len(response.auth_methods) == expected_auth_count
             if expected_auth_count > 0:
                 assert response.auth_methods[0].id == "oauth"
+
+    @pytest.mark.asyncio
+    async def test_initialize_auth_methods_acp_registry_compatibility(self, test_agent):
+        """Test initialize returns auth methods with ACP Registry field_meta."""
+        with patch(
+            "openhands_cli.acp_impl.agent.base_agent.load_agent_specs"
+        ) as mock_load:
+            mock_load.return_value = MagicMock()
+
+            response = await test_agent.initialize(
+                protocol_version=1,
+                client_info=Implementation(name="test", version="1.0"),
+            )
+
+            assert len(response.auth_methods) == 3
+
+            # Verify OAuth auth method (type: agent)
+            oauth_method = response.auth_methods[0]
+            assert oauth_method.id == "oauth"
+            assert oauth_method.name == "OAuth with OpenHands Cloud"
+            assert oauth_method.field_meta == {"type": "agent"}
+
+            # Verify Terminal auth method (type: terminal)
+            terminal_method = response.auth_methods[1]
+            assert terminal_method.id == "terminal-login"
+            assert terminal_method.name == "Login via Terminal"
+            assert terminal_method.field_meta == {
+                "type": "terminal",
+                "args": ["login"],
+                "env": {},
+            }
+
+            # Verify API Key auth method (type: env_var)
+            api_key_method = response.auth_methods[2]
+            assert api_key_method.id == "api-key"
+            assert api_key_method.name == "Use OPENHANDS_API_KEY"
+            assert api_key_method.description == (
+                "Requires setting OPENHANDS_API_KEY env variable"
+            )
+            assert api_key_method.field_meta == {
+                "type": "env_var",
+                "varName": "OPENHANDS_API_KEY",
+            }
 
     @pytest.mark.asyncio
     async def test_initialize_capabilities(self, test_agent):

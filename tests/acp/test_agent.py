@@ -43,9 +43,11 @@ async def test_initialize_with_configured_agent(acp_agent):
         assert response.protocol_version == 1
         assert isinstance(response.agent_capabilities, AgentCapabilities)
         assert response.agent_capabilities.load_session is True
-        # When configured, auth method is returned for optional OAuth
-        assert len(response.auth_methods) == 1
+        # When configured, auth methods are returned (OAuth, Terminal, API Key)
+        assert len(response.auth_methods) == 3
         assert response.auth_methods[0].id == "oauth"
+        assert response.auth_methods[1].id == "terminal-login"
+        assert response.auth_methods[2].id == "api-key"
 
 
 @pytest.mark.asyncio

@@ -224,10 +224,27 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             load_agent_specs()
             auth_methods = [
                 AuthMethod(
-                    description="OAuth with OpenHands Cloud",
+                    description="Authenticate through agent",
                     id="oauth",
                     name="OAuth with OpenHands Cloud",
-                )
+                    field_meta={"type": "agent"},
+                ),
+                AuthMethod(
+                    id="terminal-login",
+                    name="Login via Terminal",
+                    description="Interactive terminal login",
+                    field_meta={
+                        "type": "terminal",
+                        "args": ["login"],
+                        "env": {},
+                    },
+                ),
+                AuthMethod(
+                    id="api-key",
+                    name="Use OPENHANDS_API_KEY",
+                    description="Requires setting OPENHANDS_API_KEY env variable",
+                    field_meta={"type": "env_var", "varName": "OPENHANDS_API_KEY"},
+                ),
             ]
             logger.info("Agent configured, no authentication required")
         except MissingAgentSpec:
