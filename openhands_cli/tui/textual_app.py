@@ -95,6 +95,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
         headless_mode: bool = False,
         json_mode: bool = False,
+        env_overrides_enabled: bool = False,
+        critic_disabled: bool = False,
         **kwargs,
     ):
         """Initialize the app with custom OpenHands theme.
@@ -108,6 +110,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                                        If None, defaults to AlwaysConfirm.
             headless_mode: If True, run in headless mode.
             json_mode: If True, enable JSON output mode.
+            env_overrides_enabled: If True, environment variables will override
+                                   stored LLM settings.
+            critic_disabled: If True, critic functionality will be disabled.
         """
         super().__init__(**kwargs)
 
@@ -122,6 +127,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Store JSON mode setting
         self.json_mode = json_mode
+
+        # Store agent loading options
+        self.env_overrides_enabled = env_overrides_enabled
+        self.critic_disabled = critic_disabled
 
         # Store resume conversation ID
         self.conversation_id = (
@@ -364,7 +373,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         has_critic = False
         try:
             agent_store = AgentStore()
-            agent = agent_store.load()
+            agent = agent_store.load(
+                env_overrides_enabled=self.env_overrides_enabled,
+                critic_disabled=self.critic_disabled,
+            )
             if agent:
                 has_critic = agent.critic is not None
         except Exception:
@@ -900,6 +912,8 @@ def main(
     exit_without_confirmation: bool = False,
     headless: bool = False,
     json_mode: bool = False,
+    env_overrides_enabled: bool = False,
+    critic_disabled: bool = False,
 ):
     """Run the textual app.
 
@@ -911,9 +925,12 @@ def main(
         exit_without_confirmation: If True, exit without showing confirmation dialog.
         headless: If True, run in headless mode (no UI output, auto-approve actions).
         json_mode: If True, enable JSON output mode (implies headless).
+        env_overrides_enabled: If True, environment variables will override
+            stored LLM settings.
+        critic_disabled: If True, critic functionality will be disabled.
 
     Raises:
-        MissingEnvironmentVariablesError: If --override-with-envs is enabled but
+        MissingEnvironmentVariablesError: If env_overrides_enabled is True but
             required environment variables are missing. The app exits cleanly and
             the error is re-raised to be handled by the entrypoint.
     """
@@ -921,7 +938,9 @@ def main(
     # Determine if envs are required to be configured
     # Raise error before textual app is run to avoid traceback
     try:
-        SettingsScreen.is_initial_setup_required()
+        SettingsScreen.is_initial_setup_required(
+            env_overrides_enabled=env_overrides_enabled
+        )
     except MissingEnvironmentVariablesError as e:
         raise e
 
@@ -942,6 +961,8 @@ def main(
         initial_confirmation_policy=initial_confirmation_policy,
         headless_mode=headless,
         json_mode=json_mode,
+        env_overrides_enabled=env_overrides_enabled,
+        critic_disabled=critic_disabled,
     )
 
     app.run(headless=headless)

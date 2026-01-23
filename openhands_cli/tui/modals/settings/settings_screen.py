@@ -423,22 +423,26 @@ class SettingsScreen(ModalScreen):
         self.dismiss(True)
 
     @staticmethod
-    def is_initial_setup_required() -> bool:
+    def is_initial_setup_required(env_overrides_enabled: bool = False) -> bool:
         """Check if initial setup is required.
+
+        Args:
+            env_overrides_enabled: If True, environment variables will override
+                stored LLM settings.
 
         Returns:
             True if initial setup is needed (no existing settings and no valid
             env overrides), False otherwise.
 
         Raises:
-            MissingEnvironmentVariablesError: If --override-with-envs is enabled
+            MissingEnvironmentVariablesError: If env_overrides_enabled is True
                 but required environment variables (LLM_API_KEY, LLM_MODEL) are
                 missing.
 
         Note: AgentStore.load() handles creating an agent from environment
-        variables when --override-with-envs is enabled and required env vars
+        variables when env_overrides_enabled is True and required env vars
         (LLM_API_KEY and LLM_MODEL) are set.
         """
         agent_store = AgentStore()
-        existing_agent = agent_store.load()
+        existing_agent = agent_store.load(env_overrides_enabled=env_overrides_enabled)
         return existing_agent is None

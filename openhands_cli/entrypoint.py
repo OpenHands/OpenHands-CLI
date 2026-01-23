@@ -17,8 +17,6 @@ from openhands_cli.argparsers.main_parser import create_main_parser
 from openhands_cli.stores import (
     MissingEnvironmentVariablesError,
     check_and_warn_env_vars,
-    set_critic_disabled,
-    set_env_overrides_enabled,
 )
 from openhands_cli.terminal_compat import check_terminal_compatibility
 from openhands_cli.theme import OPENHANDS_THEME
@@ -106,17 +104,17 @@ def main() -> None:
         parser.error("--headless requires either --task or --file to be specified")
 
     # Automatically set exit_without_confirmation when headless mode is used
-    # Also disable critic in headless mode
     if args.headless:
         args.exit_without_confirmation = True
-        set_critic_disabled(True)
 
     # Handle --override-with-envs flag
-    override_with_envs = getattr(args, "override_with_envs", False)
-    set_env_overrides_enabled(override_with_envs)
+    env_overrides_enabled = getattr(args, "override_with_envs", False)
+
+    # Disable critic in headless mode to avoid interactive prompts
+    critic_disabled = args.headless
 
     # Warn about env vars if they are set but not being used
-    if not override_with_envs:
+    if not env_overrides_enabled:
         check_and_warn_env_vars()
 
     try:
@@ -220,6 +218,8 @@ def main() -> None:
                 exit_without_confirmation=args.exit_without_confirmation,
                 headless=args.headless,
                 json_mode=json_mode,
+                env_overrides_enabled=env_overrides_enabled,
+                critic_disabled=critic_disabled,
             )
             console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
             console.print(

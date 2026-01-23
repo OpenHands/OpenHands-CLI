@@ -7,7 +7,7 @@ import re
 from typing import Any
 
 from prompt_toolkit import HTML, print_formatted_text
-from pydantic import BaseModel, SecretStr, model_validator
+from pydantic import BaseModel, SecretStr
 from rich.console import Console
 
 from openhands.sdk import (
@@ -145,53 +145,6 @@ class MissingEnvironmentVariablesError(Exception):
         )
 
 
-# Global flag to control whether env overrides are applied
-_apply_env_overrides: bool = False
-
-# Global flag to control whether critic is disabled (e.g., in headless mode)
-_disable_critic: bool = False
-
-
-def set_env_overrides_enabled(enabled: bool) -> None:
-    """Set whether environment variable overrides should be applied.
-
-    Args:
-        enabled: If True, environment variables will override LLM settings.
-                 If False (default), environment variables are ignored.
-    """
-    global _apply_env_overrides
-    _apply_env_overrides = enabled
-
-
-def get_env_overrides_enabled() -> bool:
-    """Get whether environment variable overrides are enabled.
-
-    Returns:
-        True if env overrides are enabled, False otherwise.
-    """
-    return _apply_env_overrides
-
-
-def set_critic_disabled(disabled: bool) -> None:
-    """Set whether critic functionality should be disabled.
-
-    Args:
-        disabled: If True, critic will be disabled (e.g., for headless mode).
-                  If False (default), critic is enabled based on settings.
-    """
-    global _disable_critic
-    _disable_critic = disabled
-
-
-def get_critic_disabled() -> bool:
-    """Get whether critic functionality is disabled.
-
-    Returns:
-        True if critic is disabled, False otherwise.
-    """
-    return _disable_critic
-
-
 def check_and_warn_env_vars() -> None:
     """Check for LLM environment variables and warn if they are set but not used.
 
@@ -224,45 +177,44 @@ class LLMEnvOverrides(BaseModel):
     Environment variables take precedence over stored settings and are
     NOT persisted to disk (temporary override only).
 
-    When instantiated without arguments, automatically loads values from
-    environment variables (LLM_API_KEY, LLM_BASE_URL, LLM_MODEL) ONLY if
-    env overrides are enabled via set_env_overrides_enabled(True) or
-    --override-with-envs flag.
+    Use the `from_env()` class method to load values from environment
+    variables when env overrides are enabled.
     """
 
     api_key: SecretStr | None = None
     base_url: str | None = None
     model: str | None = None
 
-    @model_validator(mode="before")
     @classmethod
-    def load_from_env(cls, data: Any) -> dict[str, Any]:
-        """Load values from environment variables if not explicitly provided.
+    def from_env(cls, enabled: bool = False) -> LLMEnvOverrides:
+        """Create LLMEnvOverrides from environment variables.
 
-        Only loads from env vars if env overrides are enabled globally.
+        Args:
+            enabled: If True, load values from environment variables.
+                     If False, return empty overrides.
+
+        Returns:
+            LLMEnvOverrides instance with values from env vars (if enabled)
+            or empty overrides (if disabled).
         """
+        if not enabled:
+            return cls()
+
         result: dict[str, Any] = {}
 
-        # Only load from env vars if overrides are enabled
-        if get_env_overrides_enabled():
-            # Get values from env vars
-            api_key_str = os.environ.get(ENV_LLM_API_KEY) or None
-            if api_key_str:
-                result["api_key"] = SecretStr(api_key_str)
+        api_key_str = os.environ.get(ENV_LLM_API_KEY) or None
+        if api_key_str:
+            result["api_key"] = SecretStr(api_key_str)
 
-            base_url = os.environ.get(ENV_LLM_BASE_URL) or None
-            if base_url:
-                result["base_url"] = base_url
+        base_url = os.environ.get(ENV_LLM_BASE_URL) or None
+        if base_url:
+            result["base_url"] = base_url
 
-            model = os.environ.get(ENV_LLM_MODEL) or None
-            if model:
-                result["model"] = model
+        model = os.environ.get(ENV_LLM_MODEL) or None
+        if model:
+            result["model"] = model
 
-        # Explicit values take precedence over env vars
-        if isinstance(data, dict):
-            result.update(data)
-
-        return result
+        return cls(**result)
 
     def has_overrides(self) -> bool:
         """Check if any overrides are set."""
@@ -291,7 +243,29 @@ class AgentStore:
     def __init__(self) -> None:
         self.file_store = LocalFileStore(root=PERSISTENCE_DIR)
 
-    def load(self, session_id: str | None = None) -> Agent | None:
+    def load(
+        self,
+        session_id: str | None = None,
+        *,
+        env_overrides_enabled: bool = False,
+        critic_disabled: bool = False,
+    ) -> Agent | None:
+        """Load an agent configuration with runtime options.
+
+        Args:
+            session_id: Optional session ID for metadata tracking and tool restoration.
+            env_overrides_enabled: If True, environment variables (LLM_API_KEY,
+                LLM_BASE_URL, LLM_MODEL) will override stored LLM settings.
+            critic_disabled: If True, critic functionality will be disabled
+                (e.g., for headless mode).
+
+        Returns:
+            Configured Agent instance, or None if no configuration exists.
+
+        Raises:
+            MissingEnvironmentVariablesError: If env_overrides_enabled is True but
+                required environment variables are missing.
+        """
         agent: Agent | None = None
 
         try:
@@ -299,7 +273,7 @@ class AgentStore:
             agent = Agent.model_validate_json(str_spec)
         except FileNotFoundError:
             # No settings file exists - try to create from env vars if enabled
-            agent = self._create_agent_from_env_overrides()
+            agent = self._create_agent_from_env_overrides(env_overrides_enabled)
             if agent is None:
                 return None
         except Exception:
@@ -309,10 +283,20 @@ class AgentStore:
             return None
 
         # Apply runtime configuration (tools, context, MCP, condenser, critic)
-        return self._apply_runtime_config(agent, session_id)
+        return self._apply_runtime_config(
+            agent,
+            session_id,
+            env_overrides_enabled=env_overrides_enabled,
+            critic_disabled=critic_disabled,
+        )
 
     def _apply_runtime_config(
-        self, agent: Agent, session_id: str | None = None
+        self,
+        agent: Agent,
+        session_id: str | None = None,
+        *,
+        env_overrides_enabled: bool = False,
+        critic_disabled: bool = False,
     ) -> Agent:
         """Apply runtime configuration to an agent.
 
@@ -322,6 +306,8 @@ class AgentStore:
         Args:
             agent: The base agent to configure
             session_id: Optional session ID for metadata tracking
+            env_overrides_enabled: Whether to apply environment variable overrides
+            critic_disabled: Whether to disable critic functionality
 
         Returns:
             Agent with runtime configuration applied
@@ -336,7 +322,7 @@ class AgentStore:
 
         # Get environment variable overrides (these take precedence over
         # stored settings and are NOT persisted to disk)
-        env_overrides = LLMEnvOverrides()
+        env_overrides = LLMEnvOverrides.from_env(enabled=env_overrides_enabled)
 
         # Load skills from user directories and project-specific directories
         skills = load_project_skills(WORK_DIR)
@@ -400,7 +386,7 @@ class AgentStore:
         # Auto-configure critic if applicable (disabled in headless mode)
         cli_settings = CliSettings.load()
         critic = None
-        if not get_critic_disabled():
+        if not critic_disabled:
             critic = get_default_critic(
                 updated_llm, enable_critic=cli_settings.enable_critic
             )
@@ -419,12 +405,17 @@ class AgentStore:
             }
         )
 
-    def _create_agent_from_env_overrides(self) -> Agent | None:
+    def _create_agent_from_env_overrides(
+        self, env_overrides_enabled: bool
+    ) -> Agent | None:
         """Create an Agent from environment variables when no settings file exists.
 
-        This is used when --override-with-envs flag is enabled and LLM_API_KEY
+        This is used when env_overrides_enabled is True and LLM_API_KEY
         and LLM_MODEL are set, allowing headless mode to work without
         pre-configured settings.
+
+        Args:
+            env_overrides_enabled: Whether environment variable overrides are enabled.
 
         Returns:
             Agent instance if env overrides are enabled and required env vars are set,
@@ -434,10 +425,10 @@ class AgentStore:
             MissingEnvironmentVariablesError: If env overrides are enabled but
                 required environment variables (LLM_API_KEY, LLM_MODEL) are missing.
         """
-        if not get_env_overrides_enabled():
+        if not env_overrides_enabled:
             return None
 
-        env_overrides = LLMEnvOverrides()
+        env_overrides = LLMEnvOverrides.from_env(enabled=True)
 
         # Check for required environment variables
         missing_vars = []
