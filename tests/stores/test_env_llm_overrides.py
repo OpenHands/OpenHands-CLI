@@ -476,47 +476,215 @@ class TestAgentStoreEnvOverrides:
             assert loaded_agent.condenser.llm.model == "env-model"
 
 
-def test_agent_created_from_env_vars_without_settings_file_and_critic_disabled(
-    tmp_path,
-) -> None:
-    """Test that agent is created from env vars when no settings file exists.
+class TestCriticDisabledFlag:
+    """Tests for the critic disabled enable/disable flag."""
 
-    Also verifies that critic is disabled when the critic_disabled flag is set.
-    This simulates headless mode behavior.
-    """
-    import openhands_cli.stores.agent_store as agent_store_module
-    from openhands_cli.stores import AgentStore
+    def test_critic_disabled_false_by_default(self) -> None:
+        """Critic should be enabled by default (disabled=False)."""
+        set_critic_disabled(False)  # Reset to default
+        assert get_critic_disabled() is False
 
-    # Create empty temp dir (no settings file)
-    conversations_dir = tmp_path / "conversations"
-    conversations_dir.mkdir(exist_ok=True)
+    def test_set_critic_disabled_true(self) -> None:
+        """Should be able to disable critic."""
+        set_critic_disabled(True)
+        assert get_critic_disabled() is True
 
-    # Enable env overrides and disable critic (simulating headless mode)
-    set_env_overrides_enabled(True)
-    set_critic_disabled(True)
+    def test_set_critic_disabled_false(self) -> None:
+        """Should be able to enable critic (disabled=False)."""
+        set_critic_disabled(True)
+        set_critic_disabled(False)
+        assert get_critic_disabled() is False
 
-    env_vars = {
-        ENV_LLM_API_KEY: "test-api-key-from-env",
-        ENV_LLM_BASE_URL: "https://test.env.url/",
-        ENV_LLM_MODEL: "test-env-model",
-    }
 
-    # Patch the PERSISTENCE_DIR at the module level before creating AgentStore
-    with (
-        patch.object(agent_store_module, "PERSISTENCE_DIR", str(tmp_path)),
-        patch.object(agent_store_module, "CONVERSATIONS_DIR", str(conversations_dir)),
-        patch.dict(os.environ, env_vars, clear=False),
-    ):
-        store = AgentStore()
-        agent = store.load()
+class TestAgentCreationFromEnvVars:
+    """Tests for creating agents from environment variables without settings file."""
 
-        # Verify agent was created from env vars
-        assert agent is not None
-        assert agent.llm.api_key is not None
-        assert isinstance(agent.llm.api_key, SecretStr)
-        assert agent.llm.api_key.get_secret_value() == "test-api-key-from-env"
-        assert agent.llm.base_url == "https://test.env.url/"
-        assert agent.llm.model == "test-env-model"
+    def test_agent_created_with_all_env_vars(self, tmp_path) -> None:
+        """Agent should be created from env vars when all LLM env vars are set."""
+        import openhands_cli.stores.agent_store as agent_store_module
+        from openhands_cli.stores import AgentStore
 
-        # Verify critic is disabled
-        assert agent.critic is None
+        conversations_dir = tmp_path / "conversations"
+        conversations_dir.mkdir(exist_ok=True)
+
+        set_env_overrides_enabled(True)
+
+        env_vars = {
+            ENV_LLM_API_KEY: "test-api-key",
+            ENV_LLM_BASE_URL: "https://test.example.com/",
+            ENV_LLM_MODEL: "test-model",
+        }
+
+        with (
+            patch.object(agent_store_module, "PERSISTENCE_DIR", str(tmp_path)),
+            patch.object(
+                agent_store_module, "CONVERSATIONS_DIR", str(conversations_dir)
+            ),
+            patch.dict(os.environ, env_vars, clear=False),
+        ):
+            store = AgentStore()
+            agent = store.load()
+
+            assert agent is not None
+            assert agent.llm.api_key is not None
+            assert isinstance(agent.llm.api_key, SecretStr)
+            assert agent.llm.api_key.get_secret_value() == "test-api-key"
+            assert agent.llm.base_url == "https://test.example.com/"
+            assert agent.llm.model == "test-model"
+
+    def test_agent_created_with_default_model_when_not_set(self, tmp_path) -> None:
+        """Agent should use default model when LLM_MODEL env var is not set."""
+        import openhands_cli.stores.agent_store as agent_store_module
+        from openhands_cli.stores import AgentStore
+
+        conversations_dir = tmp_path / "conversations"
+        conversations_dir.mkdir(exist_ok=True)
+
+        set_env_overrides_enabled(True)
+
+        # Only set API key, not model
+        env_vars = {
+            ENV_LLM_API_KEY: "test-api-key",
+        }
+
+        with (
+            patch.object(agent_store_module, "PERSISTENCE_DIR", str(tmp_path)),
+            patch.object(
+                agent_store_module, "CONVERSATIONS_DIR", str(conversations_dir)
+            ),
+            patch.dict(os.environ, env_vars, clear=False),
+        ):
+            # Clear any existing LLM_MODEL env var
+            os.environ.pop(ENV_LLM_MODEL, None)
+            os.environ.pop(ENV_LLM_BASE_URL, None)
+
+            store = AgentStore()
+            agent = store.load()
+
+            assert agent is not None
+            # Should use default model
+            assert agent.llm.model == "claude-sonnet-4-5-20250929"
+            # Should use default base URL
+            assert agent.llm.base_url == "https://llm-proxy.app.all-hands.dev/"
+
+    def test_agent_returns_none_when_api_key_not_set(self, tmp_path) -> None:
+        """Agent creation should return None when LLM_API_KEY is not set."""
+        import openhands_cli.stores.agent_store as agent_store_module
+        from openhands_cli.stores import AgentStore
+
+        conversations_dir = tmp_path / "conversations"
+        conversations_dir.mkdir(exist_ok=True)
+
+        set_env_overrides_enabled(True)
+
+        with (
+            patch.object(agent_store_module, "PERSISTENCE_DIR", str(tmp_path)),
+            patch.object(
+                agent_store_module, "CONVERSATIONS_DIR", str(conversations_dir)
+            ),
+        ):
+            # Ensure LLM_API_KEY is not set
+            os.environ.pop(ENV_LLM_API_KEY, None)
+
+            store = AgentStore()
+            agent = store.load()
+
+            # Should return None since no API key
+            assert agent is None
+
+    def test_agent_returns_none_when_env_overrides_disabled(self, tmp_path) -> None:
+        """Agent creation should return None when env overrides are disabled."""
+        import openhands_cli.stores.agent_store as agent_store_module
+        from openhands_cli.stores import AgentStore
+
+        conversations_dir = tmp_path / "conversations"
+        conversations_dir.mkdir(exist_ok=True)
+
+        # Disable env overrides
+        set_env_overrides_enabled(False)
+
+        env_vars = {
+            ENV_LLM_API_KEY: "test-api-key",
+        }
+
+        with (
+            patch.object(agent_store_module, "PERSISTENCE_DIR", str(tmp_path)),
+            patch.object(
+                agent_store_module, "CONVERSATIONS_DIR", str(conversations_dir)
+            ),
+            patch.dict(os.environ, env_vars, clear=False),
+        ):
+            store = AgentStore()
+            agent = store.load()
+
+            # Should return None since env overrides are disabled
+            assert agent is None
+
+
+class TestCriticBehaviorInAgentCreation:
+    """Tests for critic behavior when creating agents from env vars."""
+
+    def test_critic_disabled_when_flag_is_true(self, tmp_path) -> None:
+        """Critic should be None when critic_disabled flag is True."""
+        import openhands_cli.stores.agent_store as agent_store_module
+        from openhands_cli.stores import AgentStore
+
+        conversations_dir = tmp_path / "conversations"
+        conversations_dir.mkdir(exist_ok=True)
+
+        set_env_overrides_enabled(True)
+        set_critic_disabled(True)
+
+        env_vars = {
+            ENV_LLM_API_KEY: "test-api-key",
+            ENV_LLM_MODEL: "test-model",
+        }
+
+        with (
+            patch.object(agent_store_module, "PERSISTENCE_DIR", str(tmp_path)),
+            patch.object(
+                agent_store_module, "CONVERSATIONS_DIR", str(conversations_dir)
+            ),
+            patch.dict(os.environ, env_vars, clear=False),
+        ):
+            store = AgentStore()
+            agent = store.load()
+
+            assert agent is not None
+            # Critic should be None when disabled
+            assert agent.critic is None
+
+    def test_critic_enabled_when_flag_is_false(self, tmp_path) -> None:
+        """Critic should NOT be None when critic_disabled=False and settings allow."""
+        import openhands_cli.stores.agent_store as agent_store_module
+        from openhands_cli.stores import AgentStore
+        from openhands_cli.stores.cli_settings import CliSettings
+
+        conversations_dir = tmp_path / "conversations"
+        conversations_dir.mkdir(exist_ok=True)
+
+        set_env_overrides_enabled(True)
+        set_critic_disabled(False)  # Explicitly enable critic
+
+        env_vars = {
+            ENV_LLM_API_KEY: "test-api-key",
+            ENV_LLM_MODEL: "test-model",
+        }
+
+        # Mock CliSettings to enable critic
+        mock_settings = CliSettings(enable_critic=True)
+
+        with (
+            patch.object(agent_store_module, "PERSISTENCE_DIR", str(tmp_path)),
+            patch.object(
+                agent_store_module, "CONVERSATIONS_DIR", str(conversations_dir)
+            ),
+            patch.dict(os.environ, env_vars, clear=False),
+            patch.object(CliSettings, "load", return_value=mock_settings),
+        ):
+            store = AgentStore()
+            agent = store.load()
+
+            assert agent is not None
+            # Critic should be enabled (not None) when flag is False
+            assert agent.critic is not None

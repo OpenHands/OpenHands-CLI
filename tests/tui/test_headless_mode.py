@@ -65,6 +65,96 @@ class TestSimpleMainHeadlessValidation:
         mock_textual_main.assert_not_called()
 
     @patch("openhands_cli.tui.textual_app.main")
+    def test_headless_flag_disables_critic(self, mock_textual_main):
+        """Test that --headless flag sets critic_disabled to True."""
+        from openhands_cli.stores.agent_store import (
+            get_critic_disabled,
+            set_critic_disabled,
+        )
+
+        # Reset to default state
+        set_critic_disabled(False)
+        assert get_critic_disabled() is False
+
+        # Mock textual_main to return a UUID
+        mock_textual_main.return_value = uuid.uuid4()
+
+        test_args = ["openhands", "--headless", "--task", "test task"]
+
+        with patch.object(sys, "argv", test_args):
+            simple_main()
+
+        # After running with --headless, critic should be disabled
+        assert get_critic_disabled() is True
+
+        # Clean up
+        set_critic_disabled(False)
+
+    @patch("openhands_cli.tui.textual_app.main")
+    def test_headless_with_override_envs_sets_both_flags(self, mock_textual_main):
+        """Test --headless --override-with-envs disables critic, enables env parsing."""
+        from openhands_cli.stores.agent_store import (
+            get_critic_disabled,
+            get_env_overrides_enabled,
+            set_critic_disabled,
+            set_env_overrides_enabled,
+        )
+
+        # Reset to default state
+        set_critic_disabled(False)
+        set_env_overrides_enabled(False)
+        assert get_critic_disabled() is False
+        assert get_env_overrides_enabled() is False
+
+        # Mock textual_main to return a UUID
+        mock_textual_main.return_value = uuid.uuid4()
+
+        test_args = [
+            "openhands",
+            "--headless",
+            "--override-with-envs",
+            "--task",
+            "test task",
+        ]
+
+        with patch.object(sys, "argv", test_args):
+            simple_main()
+
+        # After running with --headless --override-with-envs:
+        # - critic should be disabled (from --headless)
+        # - env overrides should be enabled (from --override-with-envs)
+        assert get_critic_disabled() is True
+        assert get_env_overrides_enabled() is True
+
+        # Clean up
+        set_critic_disabled(False)
+        set_env_overrides_enabled(False)
+
+    @patch("openhands_cli.tui.textual_app.main")
+    def test_non_headless_does_not_disable_critic(self, mock_textual_main):
+        """Test that without --headless, critic is NOT disabled."""
+        from openhands_cli.stores.agent_store import (
+            get_critic_disabled,
+            set_critic_disabled,
+        )
+
+        # Reset to default state
+        set_critic_disabled(False)
+        assert get_critic_disabled() is False
+
+        # Mock textual_main to return a UUID
+        mock_textual_main.return_value = uuid.uuid4()
+
+        # Run without --headless flag
+        test_args = ["openhands", "--task", "test task"]
+
+        with patch.object(sys, "argv", test_args):
+            simple_main()
+
+        # Critic should still be enabled (not disabled)
+        assert get_critic_disabled() is False
+
+    @patch("openhands_cli.tui.textual_app.main")
     def test_headless_with_task_calls_textual_main_with_queued_input(
         self, mock_textual_main
     ):
