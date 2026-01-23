@@ -1,4 +1,5 @@
 import argparse
+import os
 
 from openhands_cli.argparsers.util import (
     add_confirmation_mode_args,
@@ -26,5 +27,23 @@ def add_acp_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentP
 
     # Environment variable override option
     add_env_override_args(acp_parser)
+
+    acp_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        default=False,
+        help=(
+            "Use OpenHands Cloud workspace instead of local workspace. "
+            "Requires authentication via 'openhands login'."
+        ),
+    )
+
+    # Cloud API URL (optional, defaults to production)
+    acp_parser.add_argument(
+        "--cloud-url",
+        type=str,
+        default=os.getenv("OPENHANDS_CLOUD_URL", "https://app.all-hands.dev"),
+        help="OpenHands Cloud API URL",
+    )
 
     return acp_parser
