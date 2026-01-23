@@ -243,12 +243,6 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                         "env": {},
                     },
                 ),
-                AuthMethod(
-                    id="api-key",
-                    name="Use OPENHANDS_API_KEY",
-                    description="Requires setting OPENHANDS_API_KEY env variable",
-                    field_meta={"type": "env_var", "varName": "OPENHANDS_API_KEY"},
-                ),
             ]
             logger.info("Agent configured, no authentication required")
         except MissingAgentSpec:

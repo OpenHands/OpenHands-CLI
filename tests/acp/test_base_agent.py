@@ -75,7 +75,7 @@ class TestInitialize:
     @pytest.mark.parametrize(
         "agent_configured,expected_auth_count",
         [
-            (True, 3),  # Configured: OAuth, Terminal, and API Key auth methods
+            (True, 2),  # Configured: OAuth and Terminal auth methods
             (False, 0),  # Not configured: no auth methods
         ],
     )
@@ -116,7 +116,7 @@ class TestInitialize:
                 client_info=Implementation(name="test", version="1.0"),
             )
 
-            assert len(response.auth_methods) == 3
+            assert len(response.auth_methods) == 2
 
             # Verify OAuth auth method (type: agent)
             oauth_method = response.auth_methods[0]
@@ -132,18 +132,6 @@ class TestInitialize:
                 "type": "terminal",
                 "args": ["login"],
                 "env": {},
-            }
-
-            # Verify API Key auth method (type: env_var)
-            api_key_method = response.auth_methods[2]
-            assert api_key_method.id == "api-key"
-            assert api_key_method.name == "Use OPENHANDS_API_KEY"
-            assert api_key_method.description == (
-                "Requires setting OPENHANDS_API_KEY env variable"
-            )
-            assert api_key_method.field_meta == {
-                "type": "env_var",
-                "varName": "OPENHANDS_API_KEY",
             }
 
     @pytest.mark.asyncio
