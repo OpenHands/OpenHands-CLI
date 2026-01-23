@@ -260,7 +260,7 @@ class TestApplyLlmOverrides:
 
 
 class TestAgentStoreEnvOverrides:
-    """Integration tests for AgentStore.load_or_create() with environment variable overrides."""
+    """Integration tests for AgentStore.load_or_create() with env var overrides."""
 
     def test_env_vars_ignored_when_disabled(self, setup_test_agent_config) -> None:
         """Environment variables should be ignored when env_overrides_enabled=False."""
@@ -603,7 +603,9 @@ class TestCriticBehaviorInAgentCreation:
             patch.dict(os.environ, env_vars, clear=False),
         ):
             store = AgentStore()
-            agent = store.load_or_create(env_overrides_enabled=True, critic_disabled=True)
+            agent = store.load_or_create(
+                env_overrides_enabled=True, critic_disabled=True
+            )
 
             assert agent is not None
             # Critic should be None when disabled
@@ -637,7 +639,9 @@ class TestCriticBehaviorInAgentCreation:
             patch.object(CliSettings, "load", return_value=mock_settings),
         ):
             store = AgentStore()
-            agent = store.load_or_create(env_overrides_enabled=True, critic_disabled=False)
+            agent = store.load_or_create(
+                env_overrides_enabled=True, critic_disabled=False
+            )
 
             assert agent is not None
             # Critic should be enabled (not None) when disabled=False

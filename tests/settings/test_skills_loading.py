@@ -140,7 +140,7 @@ This is a user microagent for testing.
                     test_agent = Agent(llm=LLM(model="gpt-4o-mini"))
                     agent_store.save(test_agent)
 
-                    loaded_agent = agent_store.load()
+                    loaded_agent = agent_store.load_or_create()
                     assert loaded_agent is not None
                     assert loaded_agent.agent_context is not None
 
@@ -196,7 +196,7 @@ This is a user microagent for testing.
             agent_store.save(test_agent)
 
             # Load agent - this should include public skills
-            loaded_agent = agent_store.load()
+            loaded_agent = agent_store.load_or_create()
 
             assert loaded_agent is not None
             assert loaded_agent.agent_context is not None
