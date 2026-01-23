@@ -903,7 +903,14 @@ def main(
         exit_without_confirmation: If True, exit without showing confirmation dialog.
         headless: If True, run in headless mode (no UI output, auto-approve actions).
         json_mode: If True, enable JSON output mode (implies headless).
+
+    Raises:
+        MissingEnvironmentVariablesError: If --override-with-envs is enabled but
+            required environment variables are missing. This is re-raised to be
+            handled by the entrypoint for clean error display.
     """
+    from openhands_cli.stores import MissingEnvironmentVariablesError
+
     # Determine initial confirmation policy from CLI arguments
     # If headless mode is enabled, always use NeverConfirm (auto-approve all actions)
     initial_confirmation_policy = AlwaysConfirm()  # Default
@@ -922,7 +929,12 @@ def main(
         headless_mode=headless,
         json_mode=json_mode,
     )
-    app.run(headless=headless)
+
+    try:
+        app.run(headless=headless)
+    except MissingEnvironmentVariablesError:
+        # Re-raise to be handled by the entrypoint for clean error display
+        raise
 
     return app.conversation_id
 

@@ -119,19 +119,6 @@ def main() -> None:
     if not override_with_envs:
         check_and_warn_env_vars()
 
-    # Validate environment variables early if --override-with-envs is enabled
-    # This ensures a clean error message before any UI starts
-    if override_with_envs:
-        from openhands_cli.stores import AgentStore
-
-        try:
-            AgentStore().load()
-        except MissingEnvironmentVariablesError as e:
-            console.print(
-                f"[{OPENHANDS_THEME.error}]Error:[/{OPENHANDS_THEME.error}] {e}"
-            )
-            sys.exit(1)
-
     try:
         if args.command == "serve":
             # Import gui_launcher only when needed
@@ -248,6 +235,10 @@ def main() -> None:
         console.print("\nGoodbye! 👋", style=OPENHANDS_THEME.warning)
     except EOFError:
         console.print("\nGoodbye! 👋", style=OPENHANDS_THEME.warning)
+    except MissingEnvironmentVariablesError as e:
+        # Display clean error message for missing env vars
+        console.print(f"[{OPENHANDS_THEME.error}]Error:[/{OPENHANDS_THEME.error}] {e}")
+        sys.exit(1)
     except Exception as e:
         console.print(f"Error: {str(e)}", style=OPENHANDS_THEME.error, markup=False)
         import traceback

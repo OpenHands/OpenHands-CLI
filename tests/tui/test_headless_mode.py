@@ -547,9 +547,9 @@ class TestMissingEnvVarsErrorHandling:
     def test_missing_env_vars_error_prints_message_and_exits(self, capsys) -> None:
         """When MissingEnvironmentVariablesError is raised, entrypoint should print error and exit."""
         from openhands_cli.stores import MissingEnvironmentVariablesError
-        from openhands_cli.stores.agent_store import AgentStore
 
-        # Mock AgentStore.load to raise MissingEnvironmentVariablesError
+        # Mock textual_main to raise MissingEnvironmentVariablesError
+        # (simulating what happens when the app runs and AgentStore.load() fails)
         def raise_missing_env_vars(*args, **kwargs):
             raise MissingEnvironmentVariablesError(["LLM_API_KEY", "LLM_MODEL"])
 
@@ -557,7 +557,9 @@ class TestMissingEnvVarsErrorHandling:
 
         with (
             patch.object(sys, "argv", test_args),
-            patch.object(AgentStore, "load", side_effect=raise_missing_env_vars),
+            patch(
+                "openhands_cli.tui.textual_app.main", side_effect=raise_missing_env_vars
+            ),
         ):
             with pytest.raises(SystemExit) as exc_info:
                 simple_main()
