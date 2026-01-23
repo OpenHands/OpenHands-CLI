@@ -63,7 +63,7 @@ from openhands_cli.acp_impl.utils import (
     convert_acp_prompt_to_message_content,
 )
 from openhands_cli.auth.token_storage import TokenStorage
-from openhands_cli.setup import MissingAgentSpec, load_agent_specs
+from openhands_cli.setup import MissingAgentSpec
 from openhands_cli.utils import extract_text_from_message_content
 
 
