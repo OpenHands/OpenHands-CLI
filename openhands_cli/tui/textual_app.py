@@ -213,28 +213,14 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def on_mount(self) -> None:
         """Called when app starts."""
-        from openhands_cli.stores import MissingEnvironmentVariablesError
-
         # Subscribe to conversation running signal for auto-exit in headless mode
         self.conversation_running_signal.subscribe(
             self, self._on_conversation_state_changed
         )
 
         # Check if user has existing settings
-        try:
-            initial_setup_required = SettingsScreen.is_initial_setup_required()
-        except MissingEnvironmentVariablesError as e:
-            # Missing required environment variables when using --override-with-envs
-            from rich.console import Console
-
-            console = Console()
-            console.print(
-                f"[{OPENHANDS_THEME.error}]{e}[/{OPENHANDS_THEME.error}]"
-            )
-            self.exit()
-            return
-
-        if initial_setup_required:
+        # Note: MissingEnvironmentVariablesError is caught in the entrypoint
+        if SettingsScreen.is_initial_setup_required():
             # In headless mode we cannot open interactive settings.
             if self.headless_mode:
                 from rich.console import Console

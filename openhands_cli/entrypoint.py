@@ -15,6 +15,7 @@ from rich.console import Console
 
 from openhands_cli.argparsers.main_parser import create_main_parser
 from openhands_cli.stores import (
+    MissingEnvironmentVariablesError,
     check_and_warn_env_vars,
     set_critic_disabled,
     set_env_overrides_enabled,
@@ -234,6 +235,9 @@ def main() -> None:
         console.print("\nGoodbye! 👋", style=OPENHANDS_THEME.warning)
     except EOFError:
         console.print("\nGoodbye! 👋", style=OPENHANDS_THEME.warning)
+    except MissingEnvironmentVariablesError as e:
+        console.print(f"[{OPENHANDS_THEME.error}]Error:[/{OPENHANDS_THEME.error}] {e}")
+        sys.exit(1)
     except Exception as e:
         console.print(f"Error: {str(e)}", style=OPENHANDS_THEME.error, markup=False)
         import traceback
