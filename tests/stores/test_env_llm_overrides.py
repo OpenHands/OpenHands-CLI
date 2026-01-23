@@ -707,6 +707,8 @@ class TestCriticBehaviorInAgentCreation:
         env_vars = {
             ENV_LLM_API_KEY: "test-api-key",
             ENV_LLM_MODEL: "test-model",
+            # Critic requires a matching base_url pattern (llm-proxy.*.all-hands.dev)
+            ENV_LLM_BASE_URL: "https://llm-proxy.app.all-hands.dev/",
         }
 
         # Mock CliSettings to enable critic
