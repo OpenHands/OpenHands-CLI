@@ -98,6 +98,7 @@ class TestGetSplashContent:
                 "conversation_id",
                 "instructions_header",
                 "instructions",
+                "skills_mcp_info",
             ]
 
             for key in expected_keys:
@@ -111,6 +112,7 @@ class TestGetSplashContent:
             assert isinstance(content["conversation_id"], str)
             assert isinstance(content["instructions_header"], str)
             assert isinstance(content["instructions"], list)
+            assert isinstance(content["skills_mcp_info"], str)
 
     def test_splash_content_includes_banner(self):
         """Test that splash content includes the OpenHands banner."""
@@ -155,3 +157,32 @@ class TestGetSplashContent:
                 "[" in content["conversation_text"]
                 and "]" in content["conversation_text"]
             )
+            # skills_mcp_info should always be present (defaults to 0 counts)
+            assert "skills_mcp_info" in content
+            assert "0 skill(s)" in content["skills_mcp_info"]
+            assert "0 MCP server(s)" in content["skills_mcp_info"]
+            assert "Loaded:" in content["skills_mcp_info"]
+
+    def test_splash_content_with_agent_info(self):
+        """Test splash content generation with agent info (skills/MCP counts)."""
+        with mock.patch(
+            "openhands_cli.tui.content.splash.check_for_updates"
+        ) as mock_check:
+            mock_check.return_value = VersionInfo(
+                current_version="1.0.0",
+                latest_version="1.0.0",
+                needs_update=False,
+                error=None,
+            )
+
+            # Test with agent info
+            agent_info = {"skills_count": 5, "mcp_count": 2}
+            content = get_splash_content(
+                "test-123", theme=OPENHANDS_THEME, agent_info=agent_info
+            )
+
+            # Check that skills_mcp_info is present with correct counts
+            assert "skills_mcp_info" in content
+            assert "5 skill(s)" in content["skills_mcp_info"]
+            assert "2 MCP server(s)" in content["skills_mcp_info"]
+            assert "Loaded:" in content["skills_mcp_info"]

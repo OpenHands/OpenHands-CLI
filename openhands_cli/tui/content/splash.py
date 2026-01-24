@@ -82,7 +82,7 @@ def get_splash_content(
         ],
         "update_notice": None,
         "skills_mcp_info": (
-            f"[{primary_color}]✨ Loaded: {skills_count} skill(s), "
+            f"[{primary_color}] Loaded: {skills_count} skill(s), "
             f"{mcp_count} MCP server(s)[/]"
         ),
     }
