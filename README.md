@@ -123,6 +123,28 @@ openhands --headless -t "Write unit tests for auth.py"
 openhands --headless --json -t "Create a Flask app"
 ```
 
+### [Hooks](https://docs.openhands.dev/sdk/guides/hooks)
+
+You may want to prevent the agent from stopping until certain criteria is met, or implement other behavior at various stages of the agent lifecycle. To make use of [hooks](https://github.com/OpenHands/software-agent-sdk/tree/main/examples/01_standalone_sdk/33_hooks), create a file `~/.openhands/hooks.json` with your desired hooks, e.g.:
+
+```
+{
+    "hooks": {
+        "Stop": [
+            {
+                "matcher": "*",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "~/.openhands/hook_scripts/require_summary.sh"
+                    }
+                ]
+            }
+        ]
+    }
+}
+```
+
 ## Documentation
 
 For complete documentation, visit [docs.openhands.dev/openhands/usage/cli]().

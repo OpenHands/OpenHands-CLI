@@ -5,6 +5,7 @@ from uuid import UUID
 from rich.console import Console
 
 from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, Workspace
+from openhands.sdk.hooks import HookConfig
 from openhands.sdk.context import Skill
 from openhands.sdk.event.base import Event
 from openhands.sdk.security.confirmation_policy import (
@@ -105,6 +106,9 @@ def setup_conversation(
     # Prepare callbacks list
     callbacks = [event_callback] if event_callback else None
 
+    # Load hooks
+    hook_config = HookConfig.load()
+
     # Create conversation - agent context is now set in AgentStore.load()
     conversation: BaseConversation = Conversation(
         agent=agent,
@@ -114,6 +118,7 @@ def setup_conversation(
         conversation_id=conversation_id,
         visualizer=visualizer,
         callbacks=callbacks,
+        hook_config=hook_config
     )
 
     conversation.set_security_analyzer(LLMSecurityAnalyzer())
