@@ -29,7 +29,6 @@ If these tests pass, it may indicate:
 """
 
 from typing import cast
-from unittest import mock
 
 import pytest
 from textual.app import App, ComposeResult
@@ -40,13 +39,6 @@ from textual.widgets.option_list import Option
 
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.textual_app import OpenHandsApp
-from openhands_cli.tui.widgets.user_input.autocomplete_dropdown import (
-    AutoCompleteDropdown,
-)
-from openhands_cli.tui.widgets.user_input.models import CompletionItem, CompletionType
-from openhands_cli.tui.widgets.user_input.single_line_input import (
-    SingleLineInputWithWrapping,
-)
 
 
 # Marker for tests related to GitHub issues #397 and #401
@@ -96,8 +88,10 @@ class TestAutocompleteShutdownCrash:
             
             # Verify autocomplete dropdown is visible
             autocomplete = oh_app.input_field.autocomplete
-            assert autocomplete.is_visible, "Autocomplete dropdown should be visible after typing '/'"
-            
+            assert autocomplete.is_visible, (
+                "Autocomplete dropdown should be visible after typing '/'"
+            )
+
             # App should exit cleanly - if the bug exists, this will crash with:
             # ValueError: range() arg 3 must not be zero
             # The crash happens during _shutdown → _reset_focus → focus_chain sorting
@@ -124,8 +118,6 @@ class TestAutocompleteShutdownCrash:
 
         # Use a narrow terminal to trigger potential zero-width conditions
         async with app.run_test(size=Size(20, 10)) as pilot:
-            oh_app = cast(OpenHandsApp, pilot.app)
-            
             # Type "/" to trigger autocomplete dropdown
             await pilot.press("/")
             await pilot.pause()
@@ -304,10 +296,10 @@ class TestOptionListZeroWidthMinimal:
                 container.display = True
 
         app = ZeroWidthContainerApp()
-        
+
         # This test may crash with: ValueError: range() arg 3 must not be zero
-        # The crash happens during layout calculations when OptionList.get_content_height
-        # is called with width=0
+        # The crash happens during layout calculations when
+        # OptionList.get_content_height is called with width=0
         async with app.run_test() as pilot:
             await pilot.pause()
             
@@ -492,13 +484,13 @@ class TestShutdownFocusChainCrash:
             await pilot.pause()
             
             option_list = pilot.app.query_one(OptionList)
-            
+
             # Try to get content height with zero width
             # This is what causes the crash in the real scenario
             try:
                 # Note: get_content_height expects a width parameter
                 # We're testing with width=0 to see if it crashes
-                height = option_list.get_content_height(
+                option_list.get_content_height(
                     container=Size(0, 100),
                     viewport=Size(0, 100),
                     width=0,
