@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from openhands_cli.shared.telemetry import TelemetryClient, get_telemetry_client
 
 
@@ -131,7 +129,10 @@ class TestTelemetryClient:
         assert call_args.kwargs["distinct_id"] == "conv-123"
         assert call_args.kwargs["event"] == "conversation_start"
         assert "timestamp" in call_args.kwargs["properties"]
-        assert call_args.kwargs["properties"]["agent_model"] == "claude-sonnet-4-5-20250929"
+        assert (
+            call_args.kwargs["properties"]["agent_model"]
+            == "claude-sonnet-4-5-20250929"
+        )
 
     @patch("openhands_cli.shared.telemetry.Posthog")
     @patch("openhands_cli.stores.cli_settings.CliSettings.load")
@@ -301,6 +302,7 @@ class TestGetTelemetryClient:
         TelemetryClient._posthog = None
         # Also reset the global client
         import openhands_cli.shared.telemetry as telemetry_module
+
         telemetry_module._telemetry_client = None
 
     @patch("openhands_cli.shared.telemetry.Posthog")

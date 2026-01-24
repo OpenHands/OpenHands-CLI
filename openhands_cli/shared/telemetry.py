@@ -14,7 +14,9 @@ from posthog import Posthog
 
 
 if TYPE_CHECKING:
-    from openhands.sdk.conversation.stats import CombinedMetrics
+    from openhands.sdk.conversation.stats import (  # pyright: ignore[reportMissingImports]
+        CombinedMetrics,
+    )
 
 
 # PostHog configuration
@@ -80,6 +82,9 @@ class TelemetryClient:
             properties: Optional dictionary of event properties
         """
         if not self.is_telemetry_enabled():
+            return
+
+        if self._posthog is None:
             return
 
         try:
@@ -285,7 +290,8 @@ class TelemetryClient:
 
         Args:
             conversation_id: Unique identifier for the conversation
-            feedback_type: Type of feedback (accurate, too_high, too_low, not_applicable)
+            feedback_type: Type of feedback (accurate, too_high, too_low,
+                not_applicable)
             critic_score: The critic's score prediction
             critic_success: Whether the critic predicts success
             agent_model: The agent's model name

@@ -120,7 +120,7 @@ class CliSettingsTab(Container):
         self._update_telemetry_switch_state()
 
     @on(Switch.Changed, "#enable_critic_switch")
-    def _on_critic_changed(self, event: Switch.Changed) -> None:
+    def _on_critic_changed(self, _event: Switch.Changed) -> None:
         """Handle critic switch changes to update telemetry switch state."""
         self._update_telemetry_switch_state()
 

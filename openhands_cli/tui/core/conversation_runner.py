@@ -329,7 +329,9 @@ class ConversationRunner:
             # Get combined metrics from conversation stats
             combined_metrics = None
             if self.visualizer and self.visualizer.conversation_stats:
-                combined_metrics = self.visualizer.conversation_stats.get_combined_metrics()
+                combined_metrics = (
+                    self.visualizer.conversation_stats.get_combined_metrics()
+                )
 
             get_telemetry_client().track_llm_metrics(
                 conversation_id=conversation_id,

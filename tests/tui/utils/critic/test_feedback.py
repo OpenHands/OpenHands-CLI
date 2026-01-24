@@ -146,9 +146,9 @@ async def test_critic_feedback_different_options(
 
             # Verify the correct feedback type was sent
             call_args = mock_client.track_critic_feedback.call_args
-            assert (
-                call_args.kwargs["feedback_type"] == expected_feedback
-            ), f"Failed for key {key}"
+            assert call_args.kwargs["feedback_type"] == expected_feedback, (
+                f"Failed for key {key}"
+            )
 
 
 @pytest.mark.asyncio
