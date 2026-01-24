@@ -76,12 +76,6 @@ class AgentStore:
                 system_message_suffix=f"You current working directory is: {WORK_DIR}",
                 load_user_skills=load_user_skills,
             )
-            
-            mcp_config: dict = self.load_mcp_configuration()
-                system_message_suffix=f"You current working directory is: {WORK_DIR}",
-                load_user_skills=load_user_skills,
-                load_public_skills=True,
-            )
 
             # Get only enabled MCP servers
             enabled_servers = list_enabled_servers()
