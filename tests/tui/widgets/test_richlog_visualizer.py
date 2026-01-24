@@ -979,7 +979,6 @@ class TestAgentMessageEventDisplay:
         from textual.widgets import Markdown
 
         from openhands.sdk import Message
-
         from openhands_cli.tui.widgets.collapsible import Collapsible
 
         app = App()
@@ -1007,7 +1006,7 @@ class TestAgentMessageEventDisplay:
             "Agent MessageEvent without sender should still display when "
             "visualizer has name set. This is the normal case for CLI usage."
         )
-        assert isinstance(widget, (Markdown, Collapsible))
+        assert isinstance(widget, Markdown | Collapsible)
 
     def test_agent_message_event_with_critic_result_displays(self):
         """Agent MessageEvent with critic_result should display.
@@ -1032,7 +1031,7 @@ class TestAgentMessageEventDisplay:
 
         message = Message(
             role="assistant",
-            content=[TextContent(text="Based on my analysis, here are the findings...")],
+            content=[TextContent(text="Based on my analysis, here are the findings")],
         )
         # Create event with critic_result (simulating what the SDK does)
         event = MessageEvent(llm_message=message, source="agent")
