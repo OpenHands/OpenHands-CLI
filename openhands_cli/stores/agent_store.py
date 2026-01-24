@@ -314,17 +314,20 @@ class AgentStore:
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
     ) -> Agent | None:
-        """Load agent from disk, or create from env vars if disk load fails.
+        """Load agent from disk, or create from env vars if enabled.
 
         This is the main entry point for the CLI to get a configured agent.
-        It orchestrates the policy of falling back to environment variables
-        when no persisted configuration exists.
+        It orchestrates the policy of preferring environment variables when
+        env_overrides_enabled is True.
 
         Args:
             session_id: Optional session ID for metadata tracking and tool restoration.
-            env_overrides_enabled: If True and no disk config exists, create agent
-                from environment variables. Also applies env var overrides to
-                LLM settings when loading from disk.
+            env_overrides_enabled: If True, prefer creating agent from environment
+                variables over loading from disk. This ensures env vars take
+                precedence when the user explicitly requests it. If all required
+                env vars (LLM_API_KEY, LLM_MODEL) are set, creates agent entirely
+                from env vars. Otherwise, loads from disk and applies partial
+                env var overrides.
             critic_disabled: If True, critic functionality will be disabled
                 (e.g., for headless mode).
 
@@ -336,13 +339,39 @@ class AgentStore:
             MissingEnvironmentVariablesError: If env_overrides_enabled is True,
                 no disk config exists, and required environment variables are missing.
         """
-        agent = self.load_from_disk()
+        agent = None
+
+        if env_overrides_enabled:
+            # Check if all required env vars are set
+            env_overrides = LLMEnvOverrides.from_env(enabled=True)
+            has_all_required = (
+                env_overrides.api_key is not None and env_overrides.model is not None
+            )
+
+            if has_all_required:
+                # All required env vars set - create agent entirely from env vars
+                agent = self.create_from_env_overrides()
+            else:
+                # Partial env vars - load from disk, apply overrides in runtime
+                agent = self.load_from_disk()
+                if agent is None:
+                    # No disk config and missing required env vars
+                    raise MissingEnvironmentVariablesError(
+                        [
+                            var
+                            for var, val in [
+                                (ENV_LLM_API_KEY, env_overrides.api_key),
+                                (ENV_LLM_MODEL, env_overrides.model),
+                            ]
+                            if val is None
+                        ]
+                    )
+        else:
+            # Normal mode - load from disk
+            agent = self.load_from_disk()
 
         if agent is None:
-            # No disk config - try env vars if enabled
-            if not env_overrides_enabled:
-                return None
-            agent = self.create_from_env_overrides()
+            return None
 
         # Apply runtime configuration (tools, context, MCP, condenser, critic)
         return self._apply_runtime_config(
