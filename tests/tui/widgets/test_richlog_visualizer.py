@@ -1019,7 +1019,7 @@ class TestAgentMessageEventDisplay:
         Relates to: https://github.com/OpenHands/OpenHands-CLI/issues/399
         """
         from openhands.sdk import Message
-        from openhands.sdk.critic.base import CriticResult
+        from openhands.sdk.critic.result import CriticResult
 
         app = App()
         container = VerticalScroll()
@@ -1110,5 +1110,6 @@ class TestAgentMessageEventDisplay:
         assert widget is not None
         assert isinstance(widget, Markdown)
         markdown_content = widget._initial_markdown
+        assert markdown_content is not None
         assert "Child Agent" in markdown_content
         assert "Parent Agent" in markdown_content
