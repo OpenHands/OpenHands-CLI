@@ -23,7 +23,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 6
+        assert len(COMMANDS) == 7
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -41,6 +41,7 @@ class TestCommands:
             ("/condense", "Condense conversation history"),
             ("/feedback", "Send anonymous feedback about CLI"),
             ("/exit", "Exit the application"),
+            ("/skills", "View loaded skills"),
         ],
     )
     def test_commands_content(self, expected_command, expected_description):
@@ -78,6 +79,7 @@ class TestCommands:
             "/condense",
             "/feedback",
             "/exit",
+            "/skills",
             "Display available commands",
             "Start a new conversation",
             "Configure confirmation settings",
@@ -88,6 +90,7 @@ class TestCommands:
             "Type / and press Tab",
             "Use arrow keys to navigate",
             "Press Enter to select",
+            "View loaded skills",
         ],
     )
     def test_show_help_content_elements(self, expected_content):
@@ -153,6 +156,7 @@ class TestCommands:
             ("/condense", True),
             ("/feedback", True),
             ("/exit", True),
+            ("/skills", True),
             ("/help extra", False),
             ("/exit now", False),
             ("/unknown", False),
@@ -581,3 +585,32 @@ class TestOpenHandsAppCommands:
             splash_conversation = oh_app.query_one("#splash_conversation", Static)
             # The content should contain the new conversation ID hex
             assert oh_app.conversation_id.hex in str(splash_conversation.content)
+
+    @pytest.mark.asyncio
+    async def test_skills_command_toggles_panel(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/skills` should toggle the skills side panel."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+            # Verify panel is not on screen initially
+            assert not oh_app.skills_panel.is_on_screen
+            # Execute /skills command
+            oh_app._handle_command("/skills")
+            await pilot.pause()
+            # Verify panel is now on screen
+            assert oh_app.skills_panel.is_on_screen
+            # Execute /skills again to toggle off
+            oh_app._handle_command("/skills")
+            await pilot.pause()
+            # Verify panel is off screen
+            assert not oh_app.skills_panel.is_on_screen
