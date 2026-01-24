@@ -342,30 +342,9 @@ class AgentStore:
         agent = None
 
         if env_overrides_enabled:
-            # Check if all required env vars are set
-            env_overrides = LLMEnvOverrides.from_env(enabled=True)
-            has_all_required = (
-                env_overrides.api_key is not None and env_overrides.model is not None
-            )
-
-            if has_all_required:
-                # All required env vars set - create agent entirely from env vars
-                agent = self.create_from_env_overrides()
-            else:
-                # Partial env vars - load from disk, apply overrides in runtime
-                agent = self.load_from_disk()
-                if agent is None:
-                    # No disk config and missing required env vars
-                    raise MissingEnvironmentVariablesError(
-                        [
-                            var
-                            for var, val in [
-                                (ENV_LLM_API_KEY, env_overrides.api_key),
-                                (ENV_LLM_MODEL, env_overrides.model),
-                            ]
-                            if val is None
-                        ]
-                    )
+            # All required env vars set
+            # create agent entirely from env vars
+            agent = self.create_from_env_overrides()
         else:
             # Normal mode - load from disk
             agent = self.load_from_disk()
