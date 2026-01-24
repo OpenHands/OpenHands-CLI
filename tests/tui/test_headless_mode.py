@@ -244,7 +244,11 @@ class TestHeadlessAppBehavior:
         self, monkeypatch: pytest.MonkeyPatch
     ):
         """When headless and conversation finishes, we should print summary & exit."""
-        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda env_overrides_enabled=False: False)
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
 
         app = OpenHandsApp(exit_confirmation=False, headless_mode=True)
 
@@ -260,7 +264,11 @@ class TestHeadlessAppBehavior:
     async def test_conversation_state_change_no_exit_when_running(
         self, monkeypatch: pytest.MonkeyPatch
     ):
-        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda env_overrides_enabled=False: False)
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
 
         app = OpenHandsApp(exit_confirmation=False)
         app.headless_mode = True
@@ -273,7 +281,11 @@ class TestHeadlessAppBehavior:
     async def test_conversation_state_change_no_exit_in_non_headless(
         self, monkeypatch: pytest.MonkeyPatch
     ):
-        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda env_overrides_enabled=False: False)
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
 
         app = OpenHandsApp(exit_confirmation=False)
         app.exit = MagicMock()
@@ -287,7 +299,11 @@ class TestPrintConversationSummary:
 
     def test_print_conversation_summary_no_runner_is_noop(self, monkeypatch):
         """If no conversation_runner is set, method should be a no-op (no crash)."""
-        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda env_overrides_enabled=False: False)
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
         app = OpenHandsApp(exit_confirmation=False)
         app.conversation_runner = None
 
@@ -298,7 +314,11 @@ class TestPrintConversationSummary:
         """Ensure we call get_conversation_summary and rich.Console.print."""
         from rich.text import Text
 
-        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda env_overrides_enabled=False: False)
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
 
         app = OpenHandsApp(exit_confirmation=False)
 
