@@ -110,6 +110,8 @@ addopts = "-v --tb=short"
 asyncio_mode = "auto"
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "issue_397: marks tests related to GitHub issue #397 (autocomplete shutdown crash)",
+    "issue_401: marks tests related to GitHub issue #401 (zero-width OptionList crash)",
 ]
 
 [tool.coverage.run]
