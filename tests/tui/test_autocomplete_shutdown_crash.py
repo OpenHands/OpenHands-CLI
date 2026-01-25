@@ -41,16 +41,9 @@ from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.textual_app import OpenHandsApp
 
 
-# Marker for tests related to GitHub issues #397 and #401
-pytestmark = [
-    pytest.mark.issue_397,
-    pytest.mark.issue_401,
-]
-
-
 class TestAutocompleteShutdownCrash:
     """Tests for the autocomplete dropdown zero-width crash during shutdown.
-    
+
     These tests verify that the application can shut down cleanly when the
     autocomplete dropdown is visible, without crashing due to zero-width
     OptionList layout calculations.
@@ -62,9 +55,9 @@ class TestAutocompleteShutdownCrash:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """App should shut down cleanly when autocomplete dropdown is visible.
-        
+
         This test reproduces the crash from issues #397 and #401.
-        
+
         Steps to reproduce:
         1. Start the app
         2. Type "/" to trigger autocomplete
@@ -81,11 +74,11 @@ class TestAutocompleteShutdownCrash:
 
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
-            
+
             # Type "/" to trigger autocomplete dropdown
             await pilot.press("/")
             await pilot.pause()
-            
+
             # Verify autocomplete dropdown is visible
             autocomplete = oh_app.input_field.autocomplete
             assert autocomplete.is_visible, (
@@ -103,7 +96,7 @@ class TestAutocompleteShutdownCrash:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """App should shut down cleanly even with a narrow terminal.
-        
+
         The crash in issues #397 and #401 may be related to terminal width.
         This test uses a very narrow terminal (20 columns) to stress test the
         OptionList width handling during shutdown.
@@ -121,7 +114,7 @@ class TestAutocompleteShutdownCrash:
             # Type "/" to trigger autocomplete dropdown
             await pilot.press("/")
             await pilot.pause()
-            
+
             # The dropdown may or may not be visible in a narrow terminal
             # The key test is that shutdown doesn't crash
 
@@ -131,7 +124,7 @@ class TestAutocompleteShutdownCrash:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Using /exit command while autocomplete is showing should not crash.
-        
+
         This is a variation of issue #401 where using a slash command triggers
         the crash.
         """
@@ -145,19 +138,19 @@ class TestAutocompleteShutdownCrash:
 
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
-            
+
             # Type "/" to trigger autocomplete
             await pilot.press("/")
             await pilot.pause()
-            
+
             # Type "exit" to complete the command
             await pilot.press("e", "x", "i", "t")
             await pilot.pause()
-            
+
             # Execute the exit command
             oh_app._handle_command("/exit")
             await pilot.pause()
-            
+
             # Should exit cleanly without crash
 
     @pytest.mark.asyncio
@@ -166,7 +159,7 @@ class TestAutocompleteShutdownCrash:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Ctrl+C exit while autocomplete is showing should not crash.
-        
+
         This is the primary trigger for issue #397.
         """
         monkeypatch.setattr(
@@ -179,15 +172,15 @@ class TestAutocompleteShutdownCrash:
 
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
-            
+
             # Type "/" to trigger autocomplete dropdown
             await pilot.press("/")
             await pilot.pause()
-            
+
             # Verify autocomplete dropdown is visible
             autocomplete = oh_app.input_field.autocomplete
             assert autocomplete.is_visible, "Autocomplete dropdown should be visible"
-            
+
             # Simulate Ctrl+C exit
             await pilot.press("ctrl+c")
             await pilot.pause()
@@ -195,7 +188,7 @@ class TestAutocompleteShutdownCrash:
 
 class TestOptionListZeroWidthMinimal:
     """Minimal reproduction of the OptionList zero-width crash.
-    
+
     This test isolates the issue to verify it's specifically about OptionList
     receiving zero width during layout calculations.
     """
@@ -203,14 +196,14 @@ class TestOptionListZeroWidthMinimal:
     @pytest.mark.asyncio
     async def test_option_list_with_auto_width_on_shutdown(self) -> None:
         """OptionList with auto width should not crash during shutdown.
-        
+
         This test creates a minimal app with an OptionList that has auto width,
         similar to the autocomplete dropdown configuration.
         """
-        
+
         class MinimalAutocompleteApp(App):
             """Minimal app to reproduce the OptionList zero-width crash."""
-            
+
             CSS = """
             #dropdown {
                 layer: autocomplete;
@@ -228,45 +221,45 @@ class TestOptionListZeroWidthMinimal:
                 max-height: 10;
             }
             """
-            
+
             def compose(self) -> ComposeResult:
                 yield Static("Main content")
                 with Container(id="dropdown"):
                     yield OptionList()
-            
+
             def on_mount(self) -> None:
                 # Populate and show the dropdown
                 option_list = self.query_one(OptionList)
                 option_list.add_option(Option("/help - Display available commands"))
                 option_list.add_option(Option("/exit - Exit the application"))
                 option_list.highlighted = 0
-                
+
                 # Make the dropdown visible (simulating typing "/")
                 dropdown = self.query_one("#dropdown")
                 dropdown.display = True
 
         app = MinimalAutocompleteApp()
-        
+
         async with app.run_test() as pilot:
             await pilot.pause()
-            
+
             # Verify dropdown is visible
             dropdown = pilot.app.query_one("#dropdown")
             assert dropdown.display is True
-            
+
             # App should exit cleanly - crash happens here if bug exists
 
     @pytest.mark.asyncio
     async def test_option_list_with_zero_width_container(self) -> None:
         """OptionList inside a zero-width container should handle gracefully.
-        
+
         This test directly creates the condition that causes the crash:
         an OptionList inside a container with zero width.
         """
-        
+
         class ZeroWidthContainerApp(App):
             """App with OptionList in a zero-width container."""
-            
+
             CSS = """
             #zero_width_container {
                 width: 0;
@@ -278,19 +271,19 @@ class TestOptionListZeroWidthMinimal:
                 height: auto;
             }
             """
-            
+
             def compose(self) -> ComposeResult:
                 yield Static("Main content")
                 with Container(id="zero_width_container"):
                     yield OptionList()
-            
+
             def on_mount(self) -> None:
                 # Populate the option list
                 option_list = self.query_one(OptionList)
                 option_list.add_option(Option("/help - Display available commands"))
                 option_list.add_option(Option("/exit - Exit the application"))
                 option_list.highlighted = 0
-                
+
                 # Make the container visible
                 container = self.query_one("#zero_width_container")
                 container.display = True
@@ -302,20 +295,20 @@ class TestOptionListZeroWidthMinimal:
         # OptionList.get_content_height is called with width=0
         async with app.run_test() as pilot:
             await pilot.pause()
-            
+
             # Even if the app runs, the shutdown might crash
             # The test passes if no exception is raised during the entire lifecycle
 
     @pytest.mark.asyncio
     async def test_option_list_narrow_terminal_shutdown(self) -> None:
         """OptionList in very narrow terminal should not crash on shutdown.
-        
+
         This test uses a 1-column terminal to force zero-width conditions.
         """
-        
+
         class NarrowTerminalApp(App):
             """App to test OptionList in extremely narrow terminal."""
-            
+
             CSS = """
             #dropdown {
                 width: auto;
@@ -327,18 +320,18 @@ class TestOptionListZeroWidthMinimal:
                 height: auto;
             }
             """
-            
+
             def compose(self) -> ComposeResult:
                 with Container(id="dropdown"):
                     yield OptionList()
-            
+
             def on_mount(self) -> None:
                 option_list = self.query_one(OptionList)
                 option_list.add_option(Option("/help - Display available commands"))
                 option_list.highlighted = 0
 
         app = NarrowTerminalApp()
-        
+
         # Use an extremely narrow terminal
         async with app.run_test(size=Size(1, 10)) as pilot:
             await pilot.pause()
@@ -354,7 +347,7 @@ class TestAutoCompleteDropdownWidget:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Hiding autocomplete dropdown before shutdown should prevent crash.
-        
+
         This test verifies that the workaround of hiding the dropdown before
         shutdown works correctly.
         """
@@ -368,28 +361,28 @@ class TestAutoCompleteDropdownWidget:
 
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
-            
+
             # Type "/" to trigger autocomplete dropdown
             await pilot.press("/")
             await pilot.pause()
-            
+
             # Verify autocomplete dropdown is visible
             autocomplete = oh_app.input_field.autocomplete
             assert autocomplete.is_visible, "Autocomplete should be visible"
-            
+
             # Hide the dropdown before exit (potential workaround)
             autocomplete.hide_dropdown()
             await pilot.pause()
-            
+
             # Verify it's hidden
             assert not autocomplete.is_visible, "Autocomplete should be hidden"
-            
+
             # Now exit should work cleanly
 
 
 class TestShutdownFocusChainCrash:
     """Tests that directly exercise the focus chain path during shutdown.
-    
+
     The crash in issues #397 and #401 occurs specifically during:
     1. App shutdown calls `screen._reset_focus()`
     2. `_reset_focus` accesses `focus_chain` property
@@ -398,21 +391,21 @@ class TestShutdownFocusChainCrash:
     5. `virtual_region` triggers compositor's `find_widget`
     6. `find_widget` accesses `full_map` which calls `_arrange_root`
     7. Layout calculation for OptionList with zero width crashes
-    
+
     These tests directly exercise this code path.
     """
 
     @pytest.mark.asyncio
     async def test_focus_chain_with_visible_option_list_overlay(self) -> None:
         """Accessing focus_chain with a visible OptionList overlay should not crash.
-        
+
         This test explicitly accesses the focus_chain property to trigger the
         layout calculation that causes the crash.
         """
-        
+
         class OverlayApp(App):
             """App with an OptionList overlay similar to autocomplete."""
-            
+
             CSS = """
             Screen {
                 layers: base overlay;
@@ -430,12 +423,12 @@ class TestShutdownFocusChainCrash:
                 height: auto;
             }
             """
-            
+
             def compose(self) -> ComposeResult:
                 yield Static("Main content", id="main")
                 with Container(id="overlay_container"):
                     yield OptionList()
-            
+
             def on_mount(self) -> None:
                 option_list = self.query_one(OptionList)
                 option_list.add_option(Option("/help - Help command"))
@@ -443,10 +436,10 @@ class TestShutdownFocusChainCrash:
                 option_list.highlighted = 0
 
         app = OverlayApp()
-        
+
         async with app.run_test() as pilot:
             await pilot.pause()
-            
+
             # Explicitly access focus_chain to trigger layout calculation
             # This is what happens during shutdown
             try:
@@ -462,27 +455,27 @@ class TestShutdownFocusChainCrash:
     @pytest.mark.asyncio
     async def test_option_list_get_content_height_with_zero_width(self) -> None:
         """OptionList.get_content_height should handle zero width gracefully.
-        
+
         This test directly calls get_content_height with width=0 to verify
         the behavior.
         """
-        
+
         class SimpleOptionListApp(App):
             """Simple app with OptionList."""
-            
+
             def compose(self) -> ComposeResult:
                 yield OptionList()
-            
+
             def on_mount(self) -> None:
                 option_list = self.query_one(OptionList)
                 option_list.add_option(Option("/help - Help command"))
                 option_list.add_option(Option("/exit - Exit command"))
 
         app = SimpleOptionListApp()
-        
+
         async with app.run_test() as pilot:
             await pilot.pause()
-            
+
             option_list = pilot.app.query_one(OptionList)
 
             # Try to get content height with zero width
@@ -513,7 +506,7 @@ class TestShutdownFocusChainCrash:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Screen._reset_focus with visible autocomplete should not crash.
-        
+
         This test directly calls _reset_focus while the autocomplete dropdown
         is visible, simulating what happens during shutdown.
         """
@@ -527,15 +520,15 @@ class TestShutdownFocusChainCrash:
 
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
-            
+
             # Type "/" to trigger autocomplete dropdown
             await pilot.press("/")
             await pilot.pause()
-            
+
             # Verify autocomplete is visible
             autocomplete = oh_app.input_field.autocomplete
             assert autocomplete.is_visible, "Autocomplete should be visible"
-            
+
             # Directly call _reset_focus, which is what happens during shutdown
             # This should trigger the crash if the bug exists
             try:
