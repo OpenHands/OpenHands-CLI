@@ -48,7 +48,7 @@ ELLIPSIS = "..."
 
 
 if TYPE_CHECKING:
-    from textual.containers import VerticalScroll
+    from textual.containers import Container, VerticalScroll
     from textual.widget import Widget
 
     from openhands_cli.tui.textual_app import OpenHandsApp
@@ -84,13 +84,14 @@ def _get_event_border_color(event: Event) -> str:
 class ConversationVisualizer(ConversationVisualizerBase):
     """Handles visualization of conversation events for Textual apps.
 
-    This visualizer creates Collapsible widgets and adds them to a VerticalScroll
-    container. Supports delegate visualization by tracking agent identity.
+    This visualizer creates Collapsible widgets and adds them to a Container
+    (typically VerticalScroll or ConversationPane). Supports delegate
+    visualization by tracking agent identity.
     """
 
     def __init__(
         self,
-        container: "VerticalScroll",
+        container: "VerticalScroll | Container",
         app: "OpenHandsApp",
         skip_user_messages: bool = False,
         name: str | None = None,
@@ -98,7 +99,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """Initialize the visualizer.
 
         Args:
-            container: The Textual VerticalScroll container to add widgets to
+            container: The Textual container to add widgets to (VerticalScroll
+                       or any Container that supports mount())
             app: The Textual app instance for thread-safe UI updates
             skip_user_messages: If True, skip displaying user messages
             name: Agent name to display in panel titles for delegation context.
@@ -318,7 +320,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """Add a widget to the UI (must be called from main thread)."""
         self._container.mount(widget)
         # Automatically scroll to the bottom to show the newly added widget
-        self._container.scroll_end(animate=False)
+        # (only if container supports scrolling, e.g., VerticalScroll)
+        if hasattr(self._container, "scroll_end"):
+            self._container.scroll_end(animate=False)
 
     def _update_widget_in_ui(
         self, collapsible: Collapsible, new_title: str, new_content: str
@@ -326,7 +330,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """Update an existing widget in the UI (must be called from main thread)."""
         collapsible.update_title(new_title)
         collapsible.update_content(new_content)
-        self._container.scroll_end(animate=False)
+        if hasattr(self._container, "scroll_end"):
+            self._container.scroll_end(animate=False)
 
     def _handle_observation_event(
         self, event: ObservationEvent | UserRejectObservation | AgentErrorEvent
@@ -626,7 +631,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if not event.llm_message:
                 return None
 
-            # Skip direct user messages
+            # Skip direct user messages (we render them separately in the UI)
             if (
                 self._skip_user_messages
                 and event.llm_message.role == "user"
@@ -634,27 +639,36 @@ class ConversationVisualizer(ConversationVisualizerBase):
             ):
                 return None
 
-            # Only render delegation messages
-            if not (event.sender and self._name):
-                return None
-
-            # Display messages as markdown for proper rendering
-            # In delegation context, prefix messages with agent info
             message_content = str(content)
-            agent_name = self._get_formatted_agent_name()
-            event_sender = self._format_agent_name_with_suffix(event.sender)
 
-            if event.llm_message.role == "user":
-                # Message from another agent (via delegation)
-                prefix = f"**{event_sender} → {agent_name}:**\n\n"
-            else:
-                # Agent message - derive recipient from sender context
-                prefix = f"**{agent_name} → {event_sender}:**\n\n"
+            # Check if this is a delegation message (has sender AND visualizer has name)
+            if event.sender and self._name:
+                # Delegation context: prefix messages with agent info
+                agent_name = self._get_formatted_agent_name()
+                event_sender = self._format_agent_name_with_suffix(event.sender)
 
-            message_content = prefix + message_content
-            widget = Markdown(message_content)
-            widget.styles.padding = AGENT_MESSAGE_PADDING
-            return widget
+                if event.llm_message.role == "user":
+                    # Message from another agent (via delegation)
+                    prefix = f"**{event_sender} → {agent_name}:**\n\n"
+                else:
+                    # Agent message - derive recipient from sender context
+                    prefix = f"**{agent_name} → {event_sender}:**\n\n"
+
+                message_content = prefix + message_content
+
+                # Render delegation messages (both user and assistant)
+                widget = Markdown(message_content)
+                widget.styles.padding = AGENT_MESSAGE_PADDING
+                return widget
+
+            # Render non-delegation assistant messages
+            if event.llm_message.role == "assistant":
+                widget = Markdown(message_content)
+                widget.styles.padding = AGENT_MESSAGE_PADDING
+                return widget
+
+            # Skip non-delegation user messages that reach here
+            return None
 
         # For other events, use collapsible
         return self._create_event_collapsible(event)
