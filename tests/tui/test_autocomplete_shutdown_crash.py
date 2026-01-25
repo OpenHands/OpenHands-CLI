@@ -213,7 +213,7 @@ class TestOptionListZeroWidthMinimal:
                 height: auto;
                 max-height: 12;
             }
-            
+
             OptionList {
                 width: 100%;
                 height: auto;
@@ -265,7 +265,7 @@ class TestOptionListZeroWidthMinimal:
                 width: 0;
                 height: auto;
             }
-            
+
             OptionList {
                 width: 100%;
                 height: auto;
@@ -314,7 +314,7 @@ class TestOptionListZeroWidthMinimal:
                 width: auto;
                 height: auto;
             }
-            
+
             OptionList {
                 width: 100%;
                 height: auto;
@@ -410,14 +410,14 @@ class TestShutdownFocusChainCrash:
             Screen {
                 layers: base overlay;
             }
-            
+
             #overlay_container {
                 layer: overlay;
                 width: auto;
                 height: auto;
                 min-width: 10;
             }
-            
+
             OptionList {
                 width: 100%;
                 height: auto;
@@ -531,8 +531,10 @@ class TestShutdownFocusChainCrash:
 
             # Directly call _reset_focus, which is what happens during shutdown
             # This should trigger the crash if the bug exists
+            focused = oh_app.screen.focused
             try:
-                oh_app.screen._reset_focus(oh_app.screen.focused, [])
+                if focused is not None:
+                    oh_app.screen._reset_focus(focused, [])
             except ValueError as e:
                 if "range() arg 3 must not be zero" in str(e):
                     pytest.fail(
