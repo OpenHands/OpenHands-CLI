@@ -216,6 +216,15 @@ class LLMEnvOverrides(BaseModel):
 
         return cls(**result)
 
+    def require_for_headless(self) -> None:
+        missing: list[str] = []
+        if self.api_key is None:
+            missing.append(ENV_LLM_API_KEY)
+        if self.model is None:
+            missing.append(ENV_LLM_MODEL)
+        if missing:
+            raise MissingEnvironmentVariablesError(missing)
+
     def has_overrides(self) -> bool:
         """Check if any overrides are set."""
         return any([self.api_key, self.base_url, self.model])
@@ -264,48 +273,35 @@ class AgentStore:
             )
             return None
 
-    def create_from_env_overrides(self) -> Agent:
-        """Create an Agent from environment variables.
+    def _ensure_agent(self, agent: Agent | None, overrides: LLMEnvOverrides) -> Agent:
+        if agent is not None:
+            return agent
 
-        This method creates a new agent configuration from environment variables
-        (LLM_API_KEY, LLM_MODEL, LLM_BASE_URL). Use this when no persisted
-        configuration exists and the CLI is running in headless/env-override mode.
-
-        Returns:
-            Agent instance configured from environment variables.
-
-        Raises:
-            MissingEnvironmentVariablesError: If required environment variables
-                (LLM_API_KEY, LLM_MODEL) are not set.
-        """
-        env_overrides = LLMEnvOverrides.from_env(enabled=True)
-
-        # Check for required environment variables
-        missing_vars = []
-        if env_overrides.api_key is None:
-            missing_vars.append(ENV_LLM_API_KEY)
-        if env_overrides.model is None:
-            missing_vars.append(ENV_LLM_MODEL)
-
-        if missing_vars:
-            raise MissingEnvironmentVariablesError(missing_vars)
-
-        # At this point, api_key and model are guaranteed to be non-None
-        assert env_overrides.api_key is not None
-        assert env_overrides.model is not None
-
-        api_key = env_overrides.api_key.get_secret_value()
-        model = env_overrides.model
-        base_url = env_overrides.base_url
+        # In env override mode, require enough info to create an agent.
+        overrides.require_for_headless()
+        assert overrides.api_key is not None
+        assert overrides.model is not None
 
         llm = LLM(
-            model=model,
-            api_key=api_key,
-            base_url=base_url,
+            model=overrides.model,
+            api_key=overrides.api_key.get_secret_value(),
+            base_url=overrides.base_url,
             usage_id="agent",
         )
-
         return get_default_cli_agent(llm)
+
+    def _apply_env_overrides(self, agent: Agent, overrides: LLMEnvOverrides) -> Agent:
+        if not overrides.has_overrides():
+            return agent
+
+        updated_llm = apply_llm_overrides(agent.llm, overrides)
+
+        condenser = None
+        if agent.condenser and isinstance(agent.condenser, LLMSummarizingCondenser):
+            updated_condenser_llm = apply_llm_overrides(agent.condenser.llm, overrides)
+            condenser = LLMSummarizingCondenser(llm=updated_condenser_llm)
+
+        return agent.model_copy(update={"llm": updated_llm, "condenser": condenser})
 
     def load_or_create(
         self,
@@ -339,15 +335,12 @@ class AgentStore:
             MissingEnvironmentVariablesError: If env_overrides_enabled is True,
                 no disk config exists, and required environment variables are missing.
         """
-        agent = None
+        agent = self.load_from_disk()
+        overrides = LLMEnvOverrides.from_env(enabled=env_overrides_enabled)
 
         if env_overrides_enabled:
-            # All required env vars set
-            # create agent entirely from env vars
-            agent = self.create_from_env_overrides()
-        else:
-            # Normal mode - load from disk
-            agent = self.load_from_disk()
+            agent = self._ensure_agent(agent, overrides)
+            agent = self._apply_env_overrides(agent, overrides)
 
         if agent is None:
             return None
@@ -356,119 +349,89 @@ class AgentStore:
         return self._apply_runtime_config(
             agent,
             session_id,
-            env_overrides_enabled=env_overrides_enabled,
             critic_disabled=critic_disabled,
         )
 
-    def _apply_runtime_config(
-        self,
-        agent: Agent,
-        session_id: str | None = None,
-        *,
-        env_overrides_enabled: bool = False,
-        critic_disabled: bool = False,
-    ) -> Agent:
-        """Apply runtime configuration to an agent.
+    def _resolve_tools(self, session_id: str | None) -> list[Tool]:
+        tools = get_persisted_conversation_tools(session_id) if session_id else None
+        return tools or get_default_cli_tools()
 
-        This includes tools, agent context, MCP servers, env var overrides,
-        condenser updates, and critic configuration.
-
-        Args:
-            agent: The base agent to configure
-            session_id: Optional session ID for metadata tracking
-            env_overrides_enabled: Whether to apply environment variable overrides
-            critic_disabled: Whether to disable critic functionality
-
-        Returns:
-            Agent with runtime configuration applied
-        """
-        # Determine which tools to use:
-        # - If resuming a conversation, use the tools from the persisted state
-        # - If creating a new conversation, use the default CLI tools
-        updated_tools = (
-            get_persisted_conversation_tools(session_id) if session_id else None
+    def _with_llm_metadata(
+        self, llm: LLM, *, session_id: str | None, llm_type: str
+    ) -> LLM:
+        if not should_set_litellm_extra_body(llm.model, llm.base_url):
+            return llm
+        return llm.model_copy(
+            update={
+                "litellm_extra_body": {
+                    "metadata": get_llm_metadata(
+                        model_name=llm.model,
+                        llm_type=llm_type,
+                        session_id=session_id,
+                    )
+                }
+            }
         )
-        updated_tools = updated_tools or get_default_cli_tools()
 
-        # Get environment variable overrides (these take precedence over
-        # stored settings and are NOT persisted to disk)
-        env_overrides = LLMEnvOverrides.from_env(enabled=env_overrides_enabled)
-
-        # Load skills from user directories and project-specific directories
+    def _build_agent_context(self) -> AgentContext:
         skills = load_project_skills(WORK_DIR)
-
         system_suffix = "\n".join(
             [
                 f"Your current working directory is: {WORK_DIR}",
                 f"User operating system: {get_os_description()}",
             ]
         )
-
-        agent_context = AgentContext(
+        return AgentContext(
             skills=skills,
             system_message_suffix=system_suffix,
             load_user_skills=True,
             load_public_skills=True,
         )
 
-        # Get only enabled MCP servers
+    def _maybe_build_condenser(
+        self, agent: Agent, *, session_id: str | None
+    ) -> LLMSummarizingCondenser | None:
+        if not (
+            agent.condenser and isinstance(agent.condenser, LLMSummarizingCondenser)
+        ):
+            return None
+
+        condenser_llm = self._with_llm_metadata(
+            agent.condenser.llm, session_id=session_id, llm_type="condenser"
+        )
+        return LLMSummarizingCondenser(llm=condenser_llm)
+
+    def _apply_runtime_config(
+        self,
+        agent: Agent,
+        session_id: str | None = None,
+        *,
+        critic_disabled: bool = False,
+    ) -> Agent:
+        updated_tools = self._resolve_tools(session_id)
+        updated_llm = self._with_llm_metadata(
+            agent.llm, session_id=session_id, llm_type="agent"
+        )
+
+        agent_context = self._build_agent_context()
+
         enabled_servers = list_enabled_servers()
+        mcp_config = {"mcpServers": enabled_servers} if enabled_servers else {}
 
-        # Apply environment variable overrides first, then update metadata
-        updated_llm = apply_llm_overrides(agent.llm, env_overrides)
+        condenser = self._maybe_build_condenser(agent, session_id=session_id)
 
-        # Update LLM metadata with current information
-        llm_update: dict[str, Any] = {}
-        if should_set_litellm_extra_body(updated_llm.model, updated_llm.base_url):
-            llm_update["litellm_extra_body"] = {
-                "metadata": get_llm_metadata(
-                    model_name=updated_llm.model,
-                    llm_type="agent",
-                    session_id=session_id,
-                )
-            }
-        if llm_update:
-            updated_llm = updated_llm.model_copy(update=llm_update)
-
-        # Always create a fresh condenser with current defaults if condensation
-        # is enabled. This ensures users get the latest condenser settings
-        # (e.g., max_size, keep_first) without needing to reconfigure.
-        condenser = None
-        if agent.condenser and isinstance(agent.condenser, LLMSummarizingCondenser):
-            # Apply environment variable overrides to condenser LLM as well
-            condenser_llm = apply_llm_overrides(agent.condenser.llm, env_overrides)
-
-            condenser_llm_update: dict[str, Any] = {}
-            if should_set_litellm_extra_body(
-                condenser_llm.model, condenser_llm.base_url
-            ):
-                condenser_llm_update["litellm_extra_body"] = {
-                    "metadata": get_llm_metadata(
-                        model_name=condenser_llm.model,
-                        llm_type="condenser",
-                        session_id=session_id,
-                    )
-                }
-            if condenser_llm_update:
-                condenser_llm = condenser_llm.model_copy(update=condenser_llm_update)
-            condenser = LLMSummarizingCondenser(llm=condenser_llm)
-
-        # Auto-configure critic if applicable (disabled in headless mode)
-        cli_settings = CliSettings.load()
         critic = None
         if not critic_disabled:
+            cli_settings = CliSettings.load()
             critic = get_default_critic(
                 updated_llm, enable_critic=cli_settings.enable_critic
             )
 
-        # Update tools and context
         return agent.model_copy(
             update={
                 "llm": updated_llm,
                 "tools": updated_tools,
-                "mcp_config": {"mcpServers": enabled_servers}
-                if enabled_servers
-                else {},
+                "mcp_config": mcp_config,
                 "agent_context": agent_context,
                 "condenser": condenser,
                 "critic": critic,
