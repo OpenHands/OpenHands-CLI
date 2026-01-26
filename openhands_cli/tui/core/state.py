@@ -1,26 +1,7 @@
-"""Centralized state management for OpenHands TUI.
-
-This module provides a message-based state management system. The StateManager
-holds all conversation state and emits Textual messages when state changes.
-UI widgets listen for these messages and update accordingly.
-
-Usage:
-    # In app:
-    state_manager = StateManager()
-
-    # Widgets listen for state changes via message handlers:
-    @on(StateChanged)
-    def _on_state_changed(self, event: StateChanged) -> None:
-        if event.key == "is_running":
-            self._update_display()
-
-    # Update state (triggers message emission):
-    state_manager.set_running(True)
-"""
+"""Centralized state management for OpenHands TUI."""
 
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, ConfigDict
 from textual.containers import Container
 from textual.message import Message
 from textual.reactive import var
@@ -30,24 +11,6 @@ from openhands.sdk.llm.utils.metrics import Metrics
 
 if TYPE_CHECKING:
     from openhands.sdk.event import ActionEvent
-
-
-class ConversationStateSnapshot(BaseModel):
-    """Immutable snapshot of conversation state.
-
-    This model holds the complete state of a conversation at a point in time.
-    Used for state transitions and history tracking.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    is_running: bool = False
-    is_confirmation_mode: bool = True
-    cloud_ready: bool = True
-    cloud_mode: bool = False
-    elapsed_seconds: int = 0
-    pending_actions_count: int = 0
-    metrics: Metrics | None = None
 
 
 class StateChanged(Message):
@@ -246,12 +209,7 @@ class StateManager(Container):
         except Exception:
             # We're in a background thread, need to schedule on main thread
             # Use app.call_from_thread which is thread-safe
-            try:
-                self.app.call_from_thread(do_update)
-            except Exception:
-                # Fallback: just set the attribute without posting messages
-                # This happens during startup before app is fully initialized
-                object.__setattr__(self, attr, value)
+            self.app.call_from_thread(do_update)
 
     def set_cloud_ready(self, ready: bool = True) -> None:
         """Set cloud workspace ready state. Thread-safe."""
@@ -267,18 +225,6 @@ class StateManager(Container):
         Called by ConversationRunner to update metrics from conversation stats.
         """
         self._schedule_update("metrics", metrics)
-
-    def get_snapshot(self) -> ConversationStateSnapshot:
-        """Get an immutable snapshot of current state."""
-        return ConversationStateSnapshot(
-            is_running=self.running,
-            is_confirmation_mode=self.is_confirmation_mode,
-            cloud_ready=self.cloud_ready,
-            cloud_mode=self.cloud_mode,
-            elapsed_seconds=self.elapsed_seconds,
-            pending_actions_count=self.pending_actions_count,
-            metrics=self.metrics,
-        )
 
     def reset(self) -> None:
         """Reset state for a new conversation."""

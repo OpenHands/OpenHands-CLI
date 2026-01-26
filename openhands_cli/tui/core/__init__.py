@@ -4,7 +4,6 @@ from openhands_cli.tui.core.state import (
     ConfirmationRequired,
     ConversationFinished,
     ConversationStarted,
-    ConversationStateSnapshot,
     StateChanged,
     StateManager,
 )
@@ -13,7 +12,6 @@ from openhands_cli.tui.core.state import (
 __all__ = [
     "ConversationFinished",
     "ConversationStarted",
-    "ConversationStateSnapshot",
     "ConfirmationRequired",
     "StateChanged",
     "StateManager",
