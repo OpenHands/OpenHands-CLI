@@ -298,9 +298,9 @@ class AgentStore:
 
         condenser = None
         if agent.condenser and isinstance(agent.condenser, LLMSummarizingCondenser):
-            updated_condenser_llm = apply_llm_overrides(agent.condenser.llm, overrides)
-            condenser = LLMSummarizingCondenser(llm=updated_condenser_llm)
-
+            condenser = agent.condenser
+            updated_condenser_llm = apply_llm_overrides(condenser.llm, overrides)
+            condenser = condenser.model_copy(update={"llm": updated_condenser_llm})
         return agent.model_copy(update={"llm": updated_llm, "condenser": condenser})
 
     def load_or_create(
@@ -399,7 +399,8 @@ class AgentStore:
         condenser_llm = self._with_llm_metadata(
             agent.condenser.llm, session_id=session_id, llm_type="condenser"
         )
-        return LLMSummarizingCondenser(llm=condenser_llm)
+
+        return agent.condenser.model_copy(update={"llm": condenser_llm})
 
     def _apply_runtime_config(
         self,
