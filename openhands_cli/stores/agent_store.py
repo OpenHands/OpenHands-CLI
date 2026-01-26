@@ -291,7 +291,9 @@ class AgentStore:
         return get_default_cli_agent(llm)
 
     def _apply_env_overrides(self, agent: Agent, overrides: LLMEnvOverrides) -> Agent:
-        overrides.require_for_headless()
+        if not overrides.has_overrides():
+            return agent
+
         updated_llm = apply_llm_overrides(agent.llm, overrides)
 
         condenser = None
