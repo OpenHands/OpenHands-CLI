@@ -186,10 +186,34 @@ def handle_plugin_command(args: argparse.Namespace) -> None:
     Args:
         args: Parsed command line arguments
     """
+    from openhands_cli.plugins.plugin_commands import (
+        handle_plugin_disable,
+        handle_plugin_enable,
+        handle_plugin_info,
+        handle_plugin_install,
+        handle_plugin_list,
+        handle_plugin_search,
+        handle_plugin_uninstall,
+    )
+
     plugin_cmd = getattr(args, "plugin_command", None)
 
     if plugin_cmd == "marketplace":
         handle_marketplace_command(args)
+    elif plugin_cmd == "install":
+        handle_plugin_install(args)
+    elif plugin_cmd == "uninstall":
+        handle_plugin_uninstall(args)
+    elif plugin_cmd == "list":
+        handle_plugin_list(args)
+    elif plugin_cmd == "enable":
+        handle_plugin_enable(args)
+    elif plugin_cmd == "disable":
+        handle_plugin_disable(args)
+    elif plugin_cmd == "info":
+        handle_plugin_info(args)
+    elif plugin_cmd == "search":
+        handle_plugin_search(args)
     else:
         console.print(
             "Unknown plugin command. Use --help for usage.",
