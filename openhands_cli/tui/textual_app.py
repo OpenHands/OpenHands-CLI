@@ -112,7 +112,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """
         super().__init__(**kwargs)
 
-        self.state_manager = StateManager()
+        # StateManager owns the confirmation policy - pass initial policy to it
+        self.state_manager = StateManager(
+            initial_confirmation_policy=initial_confirmation_policy or AlwaysConfirm()
+        )
         self.is_ui_initialized = False
 
         # Store exit confirmation setting
@@ -138,11 +141,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Store queued inputs (copy to prevent mutating caller's list)
         self.pending_inputs = list(queued_inputs) if queued_inputs else []
-
-        # Store initial confirmation policy
-        self.initial_confirmation_policy = (
-            initial_confirmation_policy or AlwaysConfirm()
-        )
 
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
@@ -422,6 +420,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     ) -> ConversationRunner:
         """Create a ConversationRunner for a given conversation id.
 
+        StateManager owns the confirmation policy, so we don't pass it here.
+        The runner will attach the conversation to StateManager, which syncs the policy.
+
         Args:
             conversation_id: Conversation id to use. Defaults to current id.
             visualizer: Optional visualizer. If not provided, a new one is created.
@@ -439,6 +440,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if self.json_mode:
             event_callback = json_callback
 
+        # StateManager owns the confirmation policy - runner will attach conversation
         runner = ConversationRunner(
             conversation_uuid,
             state_manager=self.state_manager,
@@ -447,7 +449,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 self.notify(title=title, message=message, severity=severity)
             ),
             visualizer=conversation_visualizer,
-            initial_confirmation_policy=self.initial_confirmation_policy,
             event_callback=event_callback,
             env_overrides_enabled=self.env_overrides_enabled,
             critic_disabled=self.critic_disabled,
@@ -696,43 +697,16 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def _handle_confirm_command(self) -> None:
         """Handle the /confirm command to show confirmation settings modal."""
-        if not self.conversation_runner:
-            # If no conversation runner, create one to get the current policy
-            self.conversation_runner = self.create_conversation_runner()
-
-        # Get current confirmation policy
-        current_policy = self.conversation_runner.get_confirmation_policy()
+        # Get current confirmation policy from StateManager (it owns the policy)
+        current_policy = self.state_manager.confirmation_policy
 
         # Show the confirmation settings modal
+        # Pass StateManager's set_confirmation_policy directly - modal handles notification
         confirmation_modal = ConfirmationSettingsModal(
             current_policy=current_policy,
-            on_policy_selected=self._on_confirmation_policy_selected,
+            on_policy_selected=self.state_manager.set_confirmation_policy,
         )
         self.push_screen(confirmation_modal)
-
-    def _on_confirmation_policy_selected(self, policy: ConfirmationPolicyBase) -> None:
-        """Handle when a confirmation policy is selected from the modal.
-
-        Args:
-            policy: The selected confirmation policy
-        """
-        if not self.conversation_runner:
-            return
-
-        # Set the new confirmation policy
-        self.conversation_runner.set_confirmation_policy(policy)
-
-        # Show status message based on the policy type
-        if isinstance(policy, NeverConfirm):
-            policy_name = "Always approve actions (no confirmation)"
-        elif isinstance(policy, AlwaysConfirm):
-            policy_name = "Confirm every action"
-        elif isinstance(policy, ConfirmRisky):
-            policy_name = "Confirm high-risk actions only"
-        else:
-            policy_name = "Custom policy"
-
-        self.notify(f"Confirmation policy set to: {policy_name}")
 
     def _handle_condense_command(self) -> None:
         """Handle the /condense command to condense conversation history."""

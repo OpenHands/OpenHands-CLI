@@ -2,6 +2,9 @@
 
 This module uses the reactive StateManager pattern for state management.
 UI components bind to StateManager properties via data_bind() for automatic updates.
+
+StateManager OWNS the confirmation policy. ConversationRunner delegates all policy
+operations to StateManager, which automatically syncs to the conversation.
 """
 
 import asyncio
@@ -25,7 +28,6 @@ from openhands.sdk.conversation.state import (
 )
 from openhands.sdk.event.base import Event
 from openhands.sdk.security.confirmation_policy import (
-    AlwaysConfirm,
     ConfirmationPolicyBase,
     ConfirmRisky,
     NeverConfirm,
@@ -40,7 +42,11 @@ if TYPE_CHECKING:
 
 
 class ConversationRunner:
-    """Conversation runner with confirmation mode support"""
+    """Conversation runner with confirmation mode support.
+
+    StateManager owns the confirmation policy. This class delegates policy
+    operations to StateManager rather than managing policy state internally.
+    """
 
     def __init__(
         self,
@@ -49,7 +55,6 @@ class ConversationRunner:
         confirmation_callback: Callable,
         notification_callback: Callable[[str, str, SeverityLevel], None],
         visualizer: ConversationVisualizer,
-        initial_confirmation_policy: ConfirmationPolicyBase | None = None,
         event_callback: Callable[[Event], None] | None = None,
         *,
         env_overrides_enabled: bool = False,
@@ -59,22 +64,21 @@ class ConversationRunner:
 
         Args:
             conversation_id: UUID for the conversation.
-            state_manager: StateManager for reactive state updates.
+            state_manager: StateManager for reactive state updates. StateManager
+                          owns the confirmation policy and syncs it to conversation.
             confirmation_callback: Callback for handling action confirmations.
             notification_callback: Callback for notifications.
             visualizer: Visualizer for output display.
-            initial_confirmation_policy: Initial confirmation policy to use.
-                                        If None, defaults to AlwaysConfirm.
             event_callback: Optional callback for each event.
             env_overrides_enabled: If True, environment variables will override
                                    stored LLM settings.
             critic_disabled: If True, critic functionality will be disabled.
         """
-        starting_confirmation_policy = initial_confirmation_policy or AlwaysConfirm()
         self.visualizer = visualizer
+
+        # Create conversation WITHOUT setting policy - StateManager will do it
         self.conversation: BaseConversation = setup_conversation(
             conversation_id,
-            confirmation_policy=starting_confirmation_policy,
             visualizer=visualizer,
             event_callback=event_callback,
             env_overrides_enabled=env_overrides_enabled,
@@ -83,52 +87,22 @@ class ConversationRunner:
 
         self._running = False
 
-        # Set confirmation mode state based on initial policy
-        self._confirmation_mode_active = not isinstance(
-            starting_confirmation_policy, NeverConfirm
-        )
-
-        # State management via StateManager
+        # State management via StateManager (which owns the confirmation policy)
         self._state_manager = state_manager
         self._confirmation_callback = confirmation_callback
         self._notification_callback = notification_callback
 
-        # Initialize StateManager state
-        self._state_manager.set_confirmation_mode(self._confirmation_mode_active)
+        # Attach conversation to StateManager - this syncs the policy
+        self._state_manager.attach_conversation(self.conversation)
 
     @property
     def is_confirmation_mode_active(self) -> bool:
-        """Check if confirmation mode is currently active."""
-        return self._confirmation_mode_active
+        """Check if confirmation mode is currently active (delegates to StateManager)."""
+        return self._state_manager.is_confirmation_active
 
     def get_confirmation_policy(self) -> ConfirmationPolicyBase:
-        """Get the current confirmation policy."""
-        return self.conversation.state.confirmation_policy
-
-    def toggle_confirmation_mode(self) -> None:
-        """Toggle confirmation mode on/off."""
-        new_confirmation_mode_state = not self._confirmation_mode_active
-
-        # Choose confirmation policy based on new state
-        if new_confirmation_mode_state:
-            confirmation_policy = AlwaysConfirm()
-        else:
-            confirmation_policy = NeverConfirm()
-
-        # Use the centralized method to change policy and update state
-        self._change_confirmation_policy(confirmation_policy)
-
-    def set_confirmation_policy(
-        self, confirmation_policy: ConfirmationPolicyBase
-    ) -> None:
-        """Set the confirmation policy for the conversation."""
-        if self.conversation:
-            self.conversation.set_confirmation_policy(confirmation_policy)
-
-            if self._state_manager:
-                self._state_manager.set_confirmation_mode(
-                    self._confirmation_mode_active
-                )
+        """Get the current confirmation policy (from StateManager)."""
+        return self._state_manager.confirmation_policy
 
     async def queue_message(self, user_input: str) -> None:
         """Queue a message for a running conversation"""
@@ -191,7 +165,7 @@ class ConversationRunner:
         try:
             # Send message and run conversation
             self.conversation.send_message(message)
-            if self._confirmation_mode_active:
+            if self.is_confirmation_mode_active:
                 self._run_with_confirmation()
             elif headless:
                 console = Console()
@@ -281,29 +255,14 @@ class ConversationRunner:
             # Pause the conversation for later resumption
             self.conversation.pause()
         elif decision == UserConfirmation.ALWAYS_PROCEED:
-            # Accept actions and change policy to NeverConfirm
-            self._change_confirmation_policy(NeverConfirm())
+            # Accept actions and change policy to NeverConfirm via StateManager
+            self._state_manager.set_confirmation_policy(NeverConfirm())
         elif decision == UserConfirmation.CONFIRM_RISKY:
-            # Accept actions and change policy to ConfirmRisky
-            self._change_confirmation_policy(ConfirmRisky())
+            # Accept actions and change policy to ConfirmRisky via StateManager
+            self._state_manager.set_confirmation_policy(ConfirmRisky())
 
         # For ACCEPT and policy-changing decisions, we continue normally
         return decision
-
-    def _change_confirmation_policy(self, new_policy: ConfirmationPolicyBase) -> None:
-        """Change the confirmation policy and update internal state.
-
-        Args:
-            new_policy: The new confirmation policy to set
-        """
-
-        self.conversation.set_confirmation_policy(new_policy)
-
-        # Update internal state based on the policy type
-        if isinstance(new_policy, NeverConfirm):
-            self._confirmation_mode_active = False
-        else:
-            self._confirmation_mode_active = True
 
     @property
     def is_running(self) -> bool:

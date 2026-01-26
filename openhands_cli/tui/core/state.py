@@ -1,5 +1,6 @@
 """Centralized state management for OpenHands TUI."""
 
+import logging
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -8,10 +9,19 @@ from textual.message import Message
 from textual.reactive import var
 
 from openhands.sdk.llm.utils.metrics import Metrics
+from openhands.sdk.security.confirmation_policy import (
+    AlwaysConfirm,
+    ConfirmationPolicyBase,
+    NeverConfirm,
+)
+from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 
 
 if TYPE_CHECKING:
+    from openhands.sdk import BaseConversation
     from openhands.sdk.event import ActionEvent
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationFinished(Message):
@@ -35,6 +45,10 @@ class StateManager(Container):
     reactive state. Child widgets can use data_bind() to bind to StateManager's
     reactive properties, which automatically updates them when state changes.
 
+    StateManager OWNS the confirmation policy. All policy changes should go through
+    StateManager.set_confirmation_policy(), which automatically syncs to the
+    attached conversation.
+
     Example:
         # In compose(), yield widgets as children of StateManager:
         with state_manager:
@@ -46,6 +60,9 @@ class StateManager(Container):
         # State updates automatically propagate to bound children:
         state_manager.set_running(True)  # WorkingStatusLine updates automatically
 
+        # Confirmation policy changes:
+        state_manager.set_confirmation_policy(NeverConfirm())  # Auto-syncs to conversation
+
     The StateManager also emits messages for complex state transitions.
     """
 
@@ -54,9 +71,9 @@ class StateManager(Container):
     running: var[bool] = var(False)
     """Whether the conversation is currently running/processing."""
 
-    # ---- Confirmation Mode ----
-    is_confirmation_mode: var[bool] = var(True)
-    """Whether confirmation mode is active (user must approve actions)."""
+    # ---- Confirmation Policy (StateManager owns this) ----
+    confirmation_policy: var[ConfirmationPolicyBase] = var(AlwaysConfirm())
+    """The confirmation policy. StateManager owns this and syncs to conversation."""
 
     pending_actions_count: var[int] = var(0)
     """Number of actions pending user confirmation."""
@@ -77,10 +94,22 @@ class StateManager(Container):
     # Internal state
     _conversation_start_time: float | None = None
     _timer = None
+    _conversation: "BaseConversation | None" = None
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(
+        self,
+        initial_confirmation_policy: ConfirmationPolicyBase | None = None,
+        **kwargs,
+    ) -> None:
         # Set id to "input_area" so CSS styling applies correctly
         super().__init__(id="input_area", **kwargs)
+        if initial_confirmation_policy is not None:
+            self.confirmation_policy = initial_confirmation_policy
+
+    @property
+    def is_confirmation_active(self) -> bool:
+        """Check if confirmation is required (not NeverConfirm)."""
+        return not isinstance(self.confirmation_policy, NeverConfirm)
 
     def on_mount(self) -> None:
         """Start the elapsed time timer."""
@@ -150,9 +179,52 @@ class StateManager(Container):
         """Set the running state. Thread-safe."""
         self._schedule_update("running", value)
 
-    def set_confirmation_mode(self, is_active: bool) -> None:
-        """Set confirmation mode state. Thread-safe."""
-        self._schedule_update("is_confirmation_mode", is_active)
+    def set_confirmation_policy(self, policy: ConfirmationPolicyBase) -> None:
+        """Set the confirmation policy. Thread-safe.
+
+        This is the single entry point for all confirmation policy changes.
+        The policy is automatically synced to the attached conversation.
+
+        Args:
+            policy: The new confirmation policy to set.
+        """
+        self._schedule_update("confirmation_policy", policy)
+
+    def watch_confirmation_policy(
+        self,
+        old_value: ConfirmationPolicyBase,
+        new_value: ConfirmationPolicyBase,
+    ) -> None:
+        """React to confirmation policy changes - sync to attached conversation."""
+        self._sync_policy_to_conversation()
+
+    def attach_conversation(self, conversation: "BaseConversation") -> None:
+        """Attach a conversation and sync the current policy to it.
+
+        Args:
+            conversation: The conversation to attach.
+        """
+        self._conversation = conversation
+        self._sync_policy_to_conversation()
+
+    def detach_conversation(self) -> None:
+        """Detach the current conversation."""
+        self._conversation = None
+
+    def _sync_policy_to_conversation(self) -> None:
+        """Sync the current confirmation policy to the attached conversation.
+
+        Note: The security analyzer is set once during conversation creation
+        (in setup.py). This method only syncs the confirmation policy.
+        """
+        if self._conversation is None:
+            return
+
+        try:
+            self._conversation.set_confirmation_policy(self.confirmation_policy)
+            logger.debug(f"Synced confirmation policy: {type(self.confirmation_policy).__name__}")
+        except Exception as e:
+            logger.error(f"Failed to sync confirmation policy: {e}")
 
     def _schedule_update(self, attr: str, value: Any) -> None:
         """Schedule a state update, handling cross-thread calls.
@@ -196,3 +268,5 @@ class StateManager(Container):
         self.pending_actions_count = 0
         self.metrics = None
         self._conversation_start_time = None
+        self._conversation = None
+        # Note: confirmation_policy is NOT reset - it persists across conversations

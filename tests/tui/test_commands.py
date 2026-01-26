@@ -223,6 +223,11 @@ class TestOpenHandsAppCommands:
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
+        """`/confirm` should open ConfirmationSettingsModal.
+
+        Note: The app now reads the policy from state_manager.confirmation_policy
+        (StateManager owns the policy), not from conversation_runner.
+        """
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
@@ -231,18 +236,16 @@ class TestOpenHandsAppCommands:
 
         app = OpenHandsApp(exit_confirmation=True)
 
-        dummy_runner = mock.MagicMock()
-        dummy_runner.get_confirmation_policy.return_value = AlwaysConfirm()
-        app.conversation_runner = dummy_runner
-
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
+
+            # Verify state_manager has the default policy
+            assert isinstance(oh_app.state_manager.confirmation_policy, AlwaysConfirm)
 
             oh_app._handle_command("/confirm")
 
             top_screen = oh_app.screen_stack[-1]
             assert isinstance(top_screen, ConfirmationSettingsModal)
-            dummy_runner.get_confirmation_policy.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_exit_command_opens_exit_confirmation_modal_when_enabled(

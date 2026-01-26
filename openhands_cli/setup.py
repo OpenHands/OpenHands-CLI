@@ -7,9 +7,6 @@ from rich.console import Console
 from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, Workspace
 from openhands.sdk.context import Skill
 from openhands.sdk.event.base import Event
-from openhands.sdk.security.confirmation_policy import (
-    ConfirmationPolicyBase,
-)
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 
 # Register tools on import
@@ -91,7 +88,6 @@ def load_agent_specs(
 
 def setup_conversation(
     conversation_id: UUID,
-    confirmation_policy: ConfirmationPolicyBase,
     visualizer: ConversationVisualizer | None = None,
     event_callback: Callable[[Event], None] | None = None,
     *,
@@ -101,10 +97,13 @@ def setup_conversation(
     """
     Setup the conversation with agent.
 
+    Note: This function does NOT set the confirmation policy. The caller
+    (ConversationRunner) should attach the conversation to StateManager,
+    which owns and syncs the confirmation policy.
+
     Args:
         conversation_id: conversation ID to use. If not provided, a random UUID
             will be generated.
-        confirmation_policy: Confirmation policy to use.
         visualizer: Optional visualizer to use. If None, a default will be used
         event_callback: Optional callback function to handle events (e.g., JSON output)
         env_overrides_enabled: If True, environment variables will override
@@ -138,8 +137,10 @@ def setup_conversation(
         callbacks=callbacks,
     )
 
+    # Set up security analyzer once at conversation creation
+    # Note: Confirmation policy is NOT set here - StateManager owns it and will
+    # apply the initial policy when the conversation is attached
     conversation.set_security_analyzer(LLMSecurityAnalyzer())
-    conversation.set_confirmation_policy(confirmation_policy)
 
     console.print(f"✓ Agent initialized with model: {agent.llm.model}", style="green")
 
