@@ -12,3 +12,6 @@ AGENT_SETTINGS_PATH = "agent_settings.json"
 
 # MCP configuration file (relative to PERSISTENCE_DIR)
 MCP_CONFIG_FILE = "mcp.json"
+
+# Plugin cache directory for storing fetched plugins
+PLUGINS_CACHE_DIR = os.path.join(PERSISTENCE_DIR, "plugins_cache")

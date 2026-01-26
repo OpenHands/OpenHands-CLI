@@ -40,6 +40,8 @@ def create_main_parser() -> argparse.ArgumentParser:
                 openhands --resume conversation-id  # Resume conversation
                 openhands --always-approve          # Auto-approve all actions
                 openhands --llm-approve             # LLM-based approval mode
+                openhands --plugin ./my-plugin      # Load a local plugin
+                openhands --plugin github:org/repo  # Load plugin from GitHub
                 openhands cloud -t "Fix bug"        # Create cloud conversation
                 openhands serve                     # Launch GUI server
                 openhands serve --gpu               # Launch with GPU support
@@ -73,6 +75,19 @@ def create_main_parser() -> argparse.ArgumentParser:
         "--file",
         type=str,
         help="Path to a file whose contents will seed the initial conversation",
+    )
+
+    parser.add_argument(
+        "-p",
+        "--plugin",
+        action="append",
+        dest="plugins",
+        metavar="PATH_OR_URL",
+        help=(
+            "Load a plugin from a local path or GitHub URL. "
+            "Can be specified multiple times to load multiple plugins. "
+            "Example: --plugin ./my-plugin or --plugin github:owner/repo"
+        ),
     )
 
     # CLI arguments at top level (default mode)
