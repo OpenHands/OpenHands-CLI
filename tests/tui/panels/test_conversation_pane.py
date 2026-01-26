@@ -1,4 +1,4 @@
-"""Tests for ConversationPane."""
+"""Tests for ConversationPane and LoadMoreButton."""
 
 import uuid
 from unittest.mock import Mock
@@ -7,7 +7,10 @@ import pytest
 from textual.app import App
 from textual.widgets import Static
 
-from openhands_cli.tui.panels.conversation_pane import ConversationPane
+from openhands_cli.tui.panels.conversation_pane import (
+    ConversationPane,
+    LoadMoreButton,
+)
 
 
 def make_test_app(widget):
@@ -228,3 +231,99 @@ class TestConversationPaneCSS:
         assert ConversationPane.CLASS_PANE_HEADER == "pane-header"
         assert ConversationPane.CLASS_VISIBLE == "visible"
         assert ConversationPane.ID_HEADER == "pane_conversation_header"
+        assert ConversationPane.ID_LOAD_MORE == "load_more_button"
+
+
+class TestLoadMoreButton:
+    """Tests for LoadMoreButton widget."""
+
+    def test_format_label_with_remaining(self):
+        """Button label should include remaining count."""
+        button = LoadMoreButton(remaining=10)
+        assert "10 remaining" in str(button.label)
+
+    def test_format_label_without_remaining(self):
+        """Button label should work without remaining count."""
+        button = LoadMoreButton(remaining=0)
+        assert "Load more history" in str(button.label)
+        assert "remaining" not in str(button.label)
+
+    def test_update_remaining_updates_label(self):
+        """update_remaining should update the label."""
+        button = LoadMoreButton(remaining=5)
+        button.update_remaining(15)
+        assert "15 remaining" in str(button.label)
+
+    @pytest.mark.asyncio
+    async def test_button_hidden_when_no_remaining(self):
+        """Button should be hidden when remaining is 0."""
+        button = LoadMoreButton(remaining=5, id="test_btn")
+
+        class TestApp(App):
+            def compose(self):
+                yield button
+
+        app = TestApp()
+        async with app.run_test():
+            button.update_remaining(0)
+            assert "-hidden" in button.classes
+
+    @pytest.mark.asyncio
+    async def test_button_visible_when_has_remaining(self):
+        """Button should be visible when remaining > 0."""
+        button = LoadMoreButton(remaining=0, id="test_btn", classes="-hidden")
+
+        class TestApp(App):
+            def compose(self):
+                yield button
+
+        app = TestApp()
+        async with app.run_test():
+            button.update_remaining(10)
+            assert "-hidden" not in button.classes
+
+
+class TestConversationPaneLoadMore:
+    """Tests for Load More button in ConversationPane."""
+
+    @pytest.mark.asyncio
+    async def test_compose_creates_load_more_button(self):
+        """compose should create a Load More button widget."""
+        pane = ConversationPane(uuid.uuid4())
+        app = make_test_app(pane)
+
+        async with app.run_test() as pilot:
+            button = pilot.app.query_one(
+                f"#{ConversationPane.ID_LOAD_MORE}", LoadMoreButton
+            )
+            assert button is not None
+
+    @pytest.mark.asyncio
+    async def test_load_more_button_hidden_by_default(self):
+        """Load More button should be hidden by default."""
+        pane = ConversationPane(uuid.uuid4())
+        app = make_test_app(pane)
+
+        async with app.run_test() as pilot:
+            button = pilot.app.query_one(
+                f"#{ConversationPane.ID_LOAD_MORE}", LoadMoreButton
+            )
+            assert "-hidden" in button.classes
+
+    @pytest.mark.asyncio
+    async def test_render_history_updates_load_more_visibility(self):
+        """render_history should update Load More button visibility."""
+        pane = ConversationPane(uuid.uuid4())
+        app = make_test_app(pane)
+
+        async with app.run_test() as pilot:
+            # Provide enough events to have more history (page_size=5 by default)
+            mock_visualizer = Mock()
+            events = [Mock() for _ in range(10)]
+            pane.render_history(events, mock_visualizer)
+
+            button = pilot.app.query_one(
+                f"#{ConversationPane.ID_LOAD_MORE}", LoadMoreButton
+            )
+            # Should be visible because there are remaining events
+            assert "-hidden" not in button.classes

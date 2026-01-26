@@ -4,11 +4,14 @@ This pane handles:
 - Rendering conversation history events (user messages, actions, observations)
 - Scrolling to latest content
 - Caching rendered content (for fast switching between conversations)
+- Pagination with "Load More" button for older history
 
 Note: This is for events within ONE conversation, not the list of all
 conversations (which is handled by HistorySidePanel). The conversation ID
 is shown in SystemSplashPane, not here.
 """
+
+from __future__ import annotations
 
 import logging
 import uuid
@@ -18,8 +21,9 @@ from typing import TYPE_CHECKING
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, VerticalScroll
+from textual.message import Message
 from textual.widget import Widget
-from textual.widgets import Static
+from textual.widgets import Button, Static
 
 from openhands.sdk.event import MessageEvent
 from openhands.sdk.event.base import Event
@@ -34,6 +38,66 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from openhands_cli.tui.textual_app import OpenHandsApp
     from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
+
+
+class LoadMoreButton(Button):
+    """Button to load more conversation history.
+
+    Shows at the top of a conversation pane when there are older events
+    to load. Displays remaining count and handles click to trigger loading.
+    """
+
+    DEFAULT_CSS = """
+    LoadMoreButton {
+        width: 100%;
+        height: auto;
+        min-height: 1;
+        background: $surface;
+        color: $text-muted;
+        border: none;
+        text-style: italic;
+        padding: 0 1;
+        margin: 0 0 1 0;
+    }
+    LoadMoreButton:hover {
+        background: $surface-lighten-1;
+        color: $text;
+    }
+    LoadMoreButton:focus {
+        background: $surface-lighten-1;
+    }
+    LoadMoreButton.-hidden {
+        display: none;
+    }
+    """
+
+    class Clicked(Message):
+        """Message emitted when Load More button is clicked."""
+
+        def __init__(self, pane: ConversationPane) -> None:
+            super().__init__()
+            self.pane = pane
+
+    def __init__(self, remaining: int = 0, **kwargs) -> None:
+        label = self._format_label(remaining)
+        super().__init__(label, **kwargs)
+        self._remaining = remaining
+
+    def _format_label(self, remaining: int) -> str:
+        """Format button label with remaining count."""
+        if remaining <= 0:
+            return "⬆ Load more history"
+        return f"⬆ Load more history ({remaining} remaining)"
+
+    def update_remaining(self, remaining: int) -> None:
+        """Update the remaining count and refresh label."""
+        self._remaining = remaining
+        self.label = self._format_label(remaining)
+        # Hide if no more to load
+        if remaining <= 0:
+            self.add_class("-hidden")
+        else:
+            self.remove_class("-hidden")
 
 
 class ConversationPane(Container):
@@ -55,6 +119,7 @@ class ConversationPane(Container):
     CLASS_PANE_HEADER = "pane-header"
     CLASS_VISIBLE = "visible"
     ID_HEADER = "pane_conversation_header"
+    ID_LOAD_MORE = "load_more_button"
 
     DEFAULT_CSS = """
     ConversationPane {
@@ -84,6 +149,8 @@ class ConversationPane(Container):
         self._conversation_history_manager = ConversationHistoryManager()
         self._is_rendered = False  # Track if history has been rendered
         self._show_header = show_header
+        self._visualizer: ConversationVisualizer | None = None
+        self._is_loading_more = False  # Prevent concurrent loads
 
         # Content container is the pane itself (not a nested scroll).
         # Messages mount directly to this Container, which flows in main_display.
@@ -110,6 +177,8 @@ class ConversationPane(Container):
             id=self.ID_HEADER,
             classes=header_classes,
         )
+        # Load More button (hidden by default, shown when there's more history).
+        yield LoadMoreButton(remaining=0, id=self.ID_LOAD_MORE, classes="-hidden")
 
     def set_header_visible(self, visible: bool) -> None:
         """Show or hide the conversation ID header dynamically.
@@ -159,8 +228,8 @@ class ConversationPane(Container):
     def render_history(
         self,
         events: Sequence[Event],
-        visualizer: "ConversationVisualizer | None" = None,
-    ) -> "ConversationVisualizer":
+        visualizer: ConversationVisualizer | None = None,
+    ) -> ConversationVisualizer:
         """Render conversation history events.
 
         Called directly by ConversationSwitcher after pane is mounted.
@@ -178,6 +247,9 @@ class ConversationPane(Container):
                 self.content_container, app, skip_user_messages=True
             )
 
+        # Store visualizer for Load More functionality
+        self._visualizer = visualizer
+
         # Skip if already rendered (use cached content).
         if self._is_rendered:
             return visualizer
@@ -186,6 +258,9 @@ class ConversationPane(Container):
         if initial_events:
             self._render_events(initial_events, visualizer)
             self.scroll_to_end()
+
+        # Update Load More button visibility
+        self._update_load_more_button()
 
         self._is_rendered = True
         return visualizer
@@ -204,7 +279,7 @@ class ConversationPane(Container):
     def _render_events(
         self,
         events: Sequence[Event],
-        visualizer: "ConversationVisualizer",
+        visualizer: ConversationVisualizer,
     ) -> None:
         """Render conversation history events to this pane's content container.
 
@@ -254,11 +329,90 @@ class ConversationPane(Container):
 
         return None
 
-    def load_more_history(self, visualizer: "ConversationVisualizer") -> None:
+    def load_more_history(self, visualizer: ConversationVisualizer) -> None:
         """Load and render the next page of older events (for pagination)."""
         next_events = self._conversation_history_manager.next_page()
         if next_events:
             self._render_events(next_events, visualizer)
+
+    def _update_load_more_button(self) -> None:
+        """Update Load More button state based on remaining history."""
+        try:
+            button = self.query_one(f"#{self.ID_LOAD_MORE}", LoadMoreButton)
+            remaining = (
+                self._conversation_history_manager._state.remaining_count
+                if (self._conversation_history_manager._state)
+                else 0
+            )
+            button.update_remaining(remaining)
+        except Exception as e:
+            logger.debug("Failed to update load more button: %s", e)
+
+    @on(Button.Pressed, f"#{ID_LOAD_MORE}")
+    async def _on_load_more_pressed(self, event: Button.Pressed) -> None:
+        """Handle Load More button click: load older events and prepend them."""
+        event.stop()
+
+        if self._is_loading_more:
+            return  # Prevent concurrent loads
+        if not self.has_more_history:
+            return
+        if not self._visualizer:
+            logger.warning("No visualizer available for loading more history")
+            return
+
+        self._is_loading_more = True
+
+        try:
+            # Get the main_display for scroll position management
+            main_display = self.app.query_one("#main_display", VerticalScroll)
+
+            # 1. Save current scroll position and content height
+            old_scroll_y = main_display.scroll_y
+            old_virtual_height = main_display.virtual_size.height
+
+            # 2. Get next page of events
+            next_events = self._conversation_history_manager.next_page()
+            if not next_events:
+                return
+
+            # 3. Render events and collect the widgets to prepend
+            widgets_to_prepend: list[Widget] = []
+            for evt in next_events:
+                widget = self._create_message_widget(evt)
+                if widget is not None:
+                    widgets_to_prepend.append(widget)
+                else:
+                    # Action/observation events go through visualizer
+                    # But we need to prepend, not append
+                    self._visualizer.on_event(evt)
+
+            # 4. Mount widgets at the correct position (after load more button)
+            load_more_btn = self.query_one(f"#{self.ID_LOAD_MORE}", LoadMoreButton)
+            for widget in widgets_to_prepend:
+                self.mount(widget, after=load_more_btn)
+
+            # 5. Update Load More button
+            self._update_load_more_button()
+
+            # 6. Force layout refresh
+            self.refresh(layout=True)
+            main_display.refresh(layout=True)
+
+            # 7. Wait for layout to complete
+            await self.app.animator.wait_for_idle()
+
+            # 8. Adjust scroll position to maintain view
+            new_virtual_height = main_display.virtual_size.height
+            height_added = new_virtual_height - old_virtual_height
+            if height_added > 0:
+                new_scroll_y = old_scroll_y + height_added
+                main_display.scroll_to(y=new_scroll_y, animate=False, immediate=True)
+
+        except Exception as e:
+            logger.error("Failed to load more history: %s", e)
+        finally:
+            self._is_loading_more = False
 
     def scroll_to_end(self) -> None:
         """Scroll main_display to show the latest content."""
