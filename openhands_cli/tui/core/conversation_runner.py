@@ -40,22 +40,7 @@ if TYPE_CHECKING:
 
 
 class ConversationRunner:
-    """Conversation runner with confirmation mode support for the refactored UI.
-
-    This class manages the lifecycle of a conversation, including:
-    - Processing user messages
-    - Handling confirmation mode for actions
-    - Updating state via StateManager
-
-    State Management:
-        The runner uses StateManager for reactive state updates:
-
-            runner = ConversationRunner(
-                state_manager=app.state_manager,
-                ...
-            )
-            # State changes automatically propagate to bound widgets
-    """
+    """Conversation runner with confirmation mode support"""
 
     def __init__(
         self,
@@ -141,8 +126,9 @@ class ConversationRunner:
             self.conversation.set_confirmation_policy(confirmation_policy)
 
             if self._state_manager:
-                self._state_manager.set_confirmation_mode(self._confirmation_mode_active)
-
+                self._state_manager.set_confirmation_mode(
+                    self._confirmation_mode_active
+                )
 
     async def queue_message(self, user_input: str) -> None:
         """Queue a message for a running conversation"""
