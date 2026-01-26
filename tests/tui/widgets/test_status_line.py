@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
 import openhands_cli.tui.widgets.status_line as status_line_module
+from openhands.sdk.llm.utils.metrics import Metrics, TokenUsage
 
 # Adjust the import path to wherever this file actually lives
 from openhands_cli.tui.widgets.status_line import (
@@ -8,6 +9,28 @@ from openhands_cli.tui.widgets.status_line import (
     WorkingStatusLine,
 )
 from openhands_cli.utils import abbreviate_number, format_cost
+
+
+def create_mock_metrics(
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    cache_read_tokens: int = 0,
+    context_window: int = 0,
+    accumulated_cost: float = 0.0,
+    last_request_prompt_tokens: int = 0,
+) -> Metrics:
+    """Create a Metrics object for testing."""
+    metrics = Metrics()
+    metrics.accumulated_cost = accumulated_cost
+    metrics.accumulated_token_usage = TokenUsage(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        cache_read_tokens=cache_read_tokens,
+        context_window=context_window,
+    )
+    if last_request_prompt_tokens > 0:
+        metrics.token_usages = [TokenUsage(prompt_tokens=last_request_prompt_tokens)]
+    return metrics
 
 
 # ----- WorkingStatusLine tests -----
@@ -142,12 +165,7 @@ def test_update_text_uses_work_dir_and_metrics(monkeypatch):
     widget = InfoStatusLine()
 
     widget.work_dir_display = "~/my-dir"
-    widget.input_tokens = 0
-    widget.output_tokens = 0
-    widget.cache_hit_rate = "N/A"
-    widget.last_request_input_tokens = 0
-    widget.context_window = 0
-    widget.accumulated_cost = 0.0
+    widget.metrics = None  # No metrics yet
 
     update_mock = MagicMock()
     monkeypatch.setattr(widget, "update", update_mock)
@@ -172,12 +190,15 @@ def test_update_text_shows_all_metrics(monkeypatch):
     widget = InfoStatusLine()
 
     widget.work_dir_display = "~/my-dir"
-    widget.input_tokens = 5220000  # 5.22M accumulated
-    widget.output_tokens = 42010  # 42.01K
-    widget.cache_hit_rate = "77%"
-    widget.last_request_input_tokens = 50000  # 50K current context
-    widget.context_window = 128000  # 128K total
-    widget.accumulated_cost = 10.5507
+    # Create metrics: 5.22M input, 42.01K output, 77% cache, 50K ctx, 128K win
+    widget.metrics = create_mock_metrics(
+        prompt_tokens=5220000,
+        completion_tokens=42010,
+        cache_read_tokens=int(5220000 * 0.77),  # 77% cache hit
+        context_window=128000,
+        accumulated_cost=10.5507,
+        last_request_prompt_tokens=50000,
+    )
 
     update_mock = MagicMock()
     monkeypatch.setattr(widget, "update", update_mock)
@@ -204,12 +225,14 @@ def test_format_metrics_display_with_context_current_and_total():
     """_format_metrics_display shows current context / total context window."""
     widget = InfoStatusLine()
 
-    widget.input_tokens = 1000
-    widget.output_tokens = 500
-    widget.cache_hit_rate = "50%"
-    widget.last_request_input_tokens = 50000  # 50K current
-    widget.context_window = 200000  # 200K total
-    widget.accumulated_cost = 0.05
+    widget.metrics = create_mock_metrics(
+        prompt_tokens=1000,
+        completion_tokens=500,
+        cache_read_tokens=500,  # 50% cache hit
+        context_window=200000,
+        accumulated_cost=0.05,
+        last_request_prompt_tokens=50000,
+    )
 
     result = widget._format_metrics_display()
 
@@ -224,12 +247,14 @@ def test_format_metrics_display_with_context_current_only():
     """_format_metrics_display shows only current context when total is unavailable."""
     widget = InfoStatusLine()
 
-    widget.input_tokens = 1000
-    widget.output_tokens = 500
-    widget.cache_hit_rate = "50%"
-    widget.last_request_input_tokens = 50000  # 50K current
-    widget.context_window = 0  # No total available
-    widget.accumulated_cost = 0.05
+    widget.metrics = create_mock_metrics(
+        prompt_tokens=1000,
+        completion_tokens=500,
+        cache_read_tokens=500,
+        context_window=0,  # No total available
+        accumulated_cost=0.05,
+        last_request_prompt_tokens=50000,
+    )
 
     result = widget._format_metrics_display()
 
@@ -242,12 +267,14 @@ def test_format_metrics_display_without_context():
     """_format_metrics_display shows N/A when no context info available."""
     widget = InfoStatusLine()
 
-    widget.input_tokens = 1000
-    widget.output_tokens = 500
-    widget.cache_hit_rate = "50%"
-    widget.last_request_input_tokens = 0
-    widget.context_window = 0
-    widget.accumulated_cost = 0.05
+    widget.metrics = create_mock_metrics(
+        prompt_tokens=1000,
+        completion_tokens=500,
+        cache_read_tokens=500,
+        context_window=0,
+        accumulated_cost=0.05,
+        last_request_prompt_tokens=0,  # No last request
+    )
 
     result = widget._format_metrics_display()
 
@@ -310,73 +337,26 @@ def test_format_cost_positive():
 # ----- InfoStatusLine reactive watcher tests -----
 
 
-def test_watch_input_tokens_updates_text(monkeypatch):
-    """Changing input_tokens triggers text update."""
+def test_watch_metrics_updates_text(monkeypatch):
+    """Changing metrics triggers text update."""
     widget = InfoStatusLine()
 
     update_text_mock = MagicMock()
     monkeypatch.setattr(widget, "_update_text", update_text_mock)
 
-    widget.watch_input_tokens(1000)
+    metrics = create_mock_metrics(prompt_tokens=1000, accumulated_cost=0.5)
+    widget.watch_metrics(metrics)
 
     update_text_mock.assert_called_once()
 
 
-def test_watch_output_tokens_updates_text(monkeypatch):
-    """Changing output_tokens triggers text update."""
+def test_watch_metrics_with_none_updates_text(monkeypatch):
+    """Changing metrics to None triggers text update."""
     widget = InfoStatusLine()
 
     update_text_mock = MagicMock()
     monkeypatch.setattr(widget, "_update_text", update_text_mock)
 
-    widget.watch_output_tokens(500)
-
-    update_text_mock.assert_called_once()
-
-
-def test_watch_accumulated_cost_updates_text(monkeypatch):
-    """Changing accumulated_cost triggers text update."""
-    widget = InfoStatusLine()
-
-    update_text_mock = MagicMock()
-    monkeypatch.setattr(widget, "_update_text", update_text_mock)
-
-    widget.watch_accumulated_cost(0.5)
-
-    update_text_mock.assert_called_once()
-
-
-def test_watch_cache_hit_rate_updates_text(monkeypatch):
-    """Changing cache_hit_rate triggers text update."""
-    widget = InfoStatusLine()
-
-    update_text_mock = MagicMock()
-    monkeypatch.setattr(widget, "_update_text", update_text_mock)
-
-    widget.watch_cache_hit_rate("50%")
-
-    update_text_mock.assert_called_once()
-
-
-def test_watch_context_window_updates_text(monkeypatch):
-    """Changing context_window triggers text update."""
-    widget = InfoStatusLine()
-
-    update_text_mock = MagicMock()
-    monkeypatch.setattr(widget, "_update_text", update_text_mock)
-
-    widget.watch_context_window(128000)
-
-    update_text_mock.assert_called_once()
-
-
-def test_watch_last_request_input_tokens_updates_text(monkeypatch):
-    """Changing last_request_input_tokens triggers text update."""
-    widget = InfoStatusLine()
-
-    update_text_mock = MagicMock()
-    monkeypatch.setattr(widget, "_update_text", update_text_mock)
-
-    widget.watch_last_request_input_tokens(50000)
+    widget.watch_metrics(None)
 
     update_text_mock.assert_called_once()

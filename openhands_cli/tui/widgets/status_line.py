@@ -6,6 +6,7 @@ from textual.reactive import var
 from textual.timer import Timer
 from textual.widgets import Static
 
+from openhands.sdk.llm.utils.metrics import Metrics
 from openhands_cli.locations import WORK_DIR
 from openhands_cli.utils import abbreviate_number, format_cost
 
@@ -104,12 +105,8 @@ class InfoStatusLine(Static):
     # Note: Named 'running' to avoid conflict with MessagePump.is_running
     running: var[bool] = var(False)
     is_multiline_mode: var[bool] = var(False)
-    input_tokens: var[int] = var(0)
-    output_tokens: var[int] = var(0)
-    cache_hit_rate: var[str] = var("N/A")
-    last_request_input_tokens: var[int] = var(0)
-    context_window: var[int] = var(0)
-    accumulated_cost: var[float] = var(0.0)
+    # Metrics object from conversation stats (bound from StateManager)
+    metrics: var[Metrics | None] = var(None)
 
     def __init__(self, **kwargs) -> None:
         super().__init__("", id="info_status_line", markup=True, **kwargs)
@@ -129,28 +126,8 @@ class InfoStatusLine(Static):
         """React to multiline mode changes from StateManager."""
         self._update_text()
 
-    def watch_input_tokens(self, _value: int) -> None:
-        """React to input token changes from StateManager."""
-        self._update_text()
-
-    def watch_output_tokens(self, _value: int) -> None:
-        """React to output token changes from StateManager."""
-        self._update_text()
-
-    def watch_cache_hit_rate(self, _value: str) -> None:
-        """React to cache hit rate changes from StateManager."""
-        self._update_text()
-
-    def watch_last_request_input_tokens(self, _value: int) -> None:
-        """React to context usage changes from StateManager."""
-        self._update_text()
-
-    def watch_context_window(self, _value: int) -> None:
-        """React to context window changes from StateManager."""
-        self._update_text()
-
-    def watch_accumulated_cost(self, _value: float) -> None:
-        """React to cost changes from StateManager."""
+    def watch_metrics(self, _value: Metrics | None) -> None:
+        """React to metrics changes from StateManager."""
         self._update_text()
 
     # ----- Internal helpers -----
@@ -175,22 +152,44 @@ class InfoStatusLine(Static):
 
         Shows: context (current / total) • cost (input tokens • output tokens • cache)
         """
+        # Extract values from metrics object
+        if self.metrics is None:
+            return "ctx N/A • $ 0.00 (↑ 0 ↓ 0 cache N/A)"
+
+        usage = self.metrics.accumulated_token_usage
+        input_tokens = usage.prompt_tokens if usage else 0
+        output_tokens = usage.completion_tokens if usage else 0
+        context_window = usage.context_window if usage else 0
+        cache_read_tokens = usage.cache_read_tokens if usage else 0
+        accumulated_cost = self.metrics.accumulated_cost or 0.0
+
+        # Get last request input tokens from token_usages list
+        last_request_input_tokens = 0
+        if self.metrics.token_usages:
+            last_request_input_tokens = self.metrics.token_usages[-1].prompt_tokens or 0
+
+        # Calculate cache hit rate
+        if input_tokens > 0:
+            cache_hit_rate = f"{(cache_read_tokens / input_tokens * 100):.0f}%"
+        else:
+            cache_hit_rate = "N/A"
+
         # Context display: show current context usage / total context window
-        if self.last_request_input_tokens > 0:
-            ctx_current = abbreviate_number(self.last_request_input_tokens)
-            if self.context_window > 0:
-                ctx_total = abbreviate_number(self.context_window)
+        if last_request_input_tokens > 0:
+            ctx_current = abbreviate_number(last_request_input_tokens)
+            if context_window > 0:
+                ctx_total = abbreviate_number(context_window)
                 ctx_display = f"ctx {ctx_current} / {ctx_total}"
             else:
                 ctx_display = f"ctx {ctx_current}"
         else:
             ctx_display = "ctx N/A"
 
-        cost_display = f"$ {format_cost(self.accumulated_cost)}"
+        cost_display = f"$ {format_cost(accumulated_cost)}"
         token_details = (
-            f"↑ {abbreviate_number(self.input_tokens)} "
-            f"↓ {abbreviate_number(self.output_tokens)} "
-            f"cache {self.cache_hit_rate}"
+            f"↑ {abbreviate_number(input_tokens)} "
+            f"↓ {abbreviate_number(output_tokens)} "
+            f"cache {cache_hit_rate}"
         )
         return f"{ctx_display} • {cost_display} ({token_details})"
 

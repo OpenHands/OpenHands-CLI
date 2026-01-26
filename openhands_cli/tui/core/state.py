@@ -18,28 +18,18 @@ Usage:
     state_manager.set_running(True)
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from textual.containers import Container
 from textual.message import Message
 from textual.reactive import var
 
+from openhands.sdk.llm.utils.metrics import Metrics
+
 
 if TYPE_CHECKING:
     from openhands.sdk.event import ActionEvent
-
-
-@dataclass
-class ConversationMetrics:
-    """Metrics for the current conversation."""
-
-    input_tokens: int = 0
-    output_tokens: int = 0
-    cache_hit_rate: str = "N/A"
-    last_request_input_tokens: int = 0
-    context_window: int = 0
-    accumulated_cost: float = 0.0
 
 
 @dataclass
@@ -56,7 +46,7 @@ class ConversationStateSnapshot:
     cloud_mode: bool = False
     elapsed_seconds: int = 0
     pending_actions_count: int = 0
-    metrics: ConversationMetrics = field(default_factory=ConversationMetrics)
+    metrics: Metrics | None = None
 
 
 class StateChanged(Message):
@@ -138,12 +128,9 @@ class StateManager(Container):
     """Seconds elapsed since conversation started."""
 
     # ---- Metrics ----
-    input_tokens: var[int] = var(0)
-    output_tokens: var[int] = var(0)
-    cache_hit_rate: var[str] = var("N/A")
-    last_request_input_tokens: var[int] = var(0)
-    context_window: var[int] = var(0)
-    accumulated_cost: var[float] = var(0.0)
+    # Store the Metrics object directly from conversation stats
+    metrics: var[Metrics | None] = var(None)
+    """Combined metrics from conversation stats (updated by ConversationRunner)."""
 
     # ---- UI State ----
     is_multiline_mode: var[bool] = var(False)
@@ -179,15 +166,11 @@ class StateManager(Container):
             placeholder="Type your message, @mention a file, or / for commands"
         )
         # InfoStatusLine binds to StateManager reactive properties
+        # metrics is the Metrics object from conversation stats
         yield InfoStatusLine().data_bind(
             running=StateManager.running,
             is_multiline_mode=StateManager.is_multiline_mode,
-            input_tokens=StateManager.input_tokens,
-            output_tokens=StateManager.output_tokens,
-            cache_hit_rate=StateManager.cache_hit_rate,
-            last_request_input_tokens=StateManager.last_request_input_tokens,
-            context_window=StateManager.context_window,
-            accumulated_cost=StateManager.accumulated_cost,
+            metrics=StateManager.metrics,
         )
 
     def on_unmount(self) -> None:
@@ -277,44 +260,12 @@ class StateManager(Container):
         """Set the number of pending actions. Thread-safe."""
         self._schedule_update("pending_actions_count", count)
 
-    def update_metrics(
-        self,
-        input_tokens: int | None = None,
-        output_tokens: int | None = None,
-        cache_hit_rate: str | None = None,
-        last_request_input_tokens: int | None = None,
-        context_window: int | None = None,
-        accumulated_cost: float | None = None,
-    ) -> None:
-        """Update conversation metrics. Thread-safe.
+    def set_metrics(self, metrics: Metrics) -> None:
+        """Set the metrics object. Thread-safe.
 
-        Only updates provided values, leaving others unchanged.
+        Called by ConversationRunner to update metrics from conversation stats.
         """
-
-        def do_update() -> None:
-            if input_tokens is not None:
-                self.input_tokens = input_tokens
-            if output_tokens is not None:
-                self.output_tokens = output_tokens
-            if cache_hit_rate is not None:
-                self.cache_hit_rate = cache_hit_rate
-            if last_request_input_tokens is not None:
-                self.last_request_input_tokens = last_request_input_tokens
-            if context_window is not None:
-                self.context_window = context_window
-            if accumulated_cost is not None:
-                self.accumulated_cost = accumulated_cost
-
-        # Check if we're in the main thread
-        try:
-            _ = self.app
-            do_update()
-        except Exception:
-            try:
-                self.app.call_from_thread(do_update)
-            except Exception:
-                # Fallback during startup
-                do_update()
+        self._schedule_update("metrics", metrics)
 
     def get_snapshot(self) -> ConversationStateSnapshot:
         """Get an immutable snapshot of current state."""
@@ -325,14 +276,7 @@ class StateManager(Container):
             cloud_mode=self.cloud_mode,
             elapsed_seconds=self.elapsed_seconds,
             pending_actions_count=self.pending_actions_count,
-            metrics=ConversationMetrics(
-                input_tokens=self.input_tokens,
-                output_tokens=self.output_tokens,
-                cache_hit_rate=self.cache_hit_rate,
-                last_request_input_tokens=self.last_request_input_tokens,
-                context_window=self.context_window,
-                accumulated_cost=self.accumulated_cost,
-            ),
+            metrics=self.metrics,
         )
 
     def reset(self) -> None:
@@ -340,10 +284,5 @@ class StateManager(Container):
         self.running = False
         self.elapsed_seconds = 0
         self.pending_actions_count = 0
-        self.input_tokens = 0
-        self.output_tokens = 0
-        self.cache_hit_rate = "N/A"
-        self.last_request_input_tokens = 0
-        self.context_window = 0
-        self.accumulated_cost = 0.0
+        self.metrics = None
         self._conversation_start_time = None

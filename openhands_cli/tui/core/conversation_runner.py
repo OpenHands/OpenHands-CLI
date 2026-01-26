@@ -180,7 +180,24 @@ class ConversationRunner:
         Args:
             message: The message to process
         """
+        import threading
+        import time
+
         self._update_run_status(True)
+
+        # Start a background thread to periodically update metrics
+        metrics_stop_event = threading.Event()
+
+        def update_metrics_periodically():
+            while not metrics_stop_event.is_set():
+                self._update_metrics()
+                time.sleep(1.0)
+
+        metrics_thread = threading.Thread(
+            target=update_metrics_periodically, daemon=True
+        )
+        metrics_thread.start()
+
         try:
             # Send message and run conversation
             self.conversation.send_message(message)
@@ -203,6 +220,9 @@ class ConversationRunner:
                 "Unexpected Error", f"{type(e).__name__}: {e}", "error"
             )
         finally:
+            # Stop metrics update thread
+            metrics_stop_event.set()
+            metrics_thread.join(timeout=2.0)
             self._update_run_status(False)
 
     def _run_with_confirmation(self) -> None:
@@ -357,6 +377,18 @@ class ConversationRunner:
         """Update the running status via StateManager."""
         self._running = is_running
         self._state_manager.set_running(is_running)
+        # Update metrics when status changes
+        self._update_metrics()
+
+    def _update_metrics(self) -> None:
+        """Update metrics in StateManager from conversation stats."""
+        if not self.conversation:
+            return
+
+        stats = self.visualizer.conversation_stats
+        if stats:
+            combined_metrics = stats.get_combined_metrics()
+            self._state_manager.set_metrics(combined_metrics)
 
     def pause_runner_without_blocking(self):
         if self.is_running:
