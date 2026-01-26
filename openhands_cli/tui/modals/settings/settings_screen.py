@@ -62,21 +62,26 @@ class SettingsScreen(ModalScreen):
         self,
         on_settings_saved: Callable[[], None] | list[Callable[[], None]] | None = None,
         on_first_time_settings_cancelled: Callable[[], None] | None = None,
+        env_overrides_enabled: bool = False,
         **kwargs,
     ):
         """Initialize the settings screen.
 
         Args:
-            is_initial_setup: True if this is the initial setup for a new user
             on_settings_saved: Callback(s) to invoke when settings are saved
-            on_settings_cancelled: Callback to invoke when settings are cancelled
+            on_first_time_settings_cancelled: Callback to invoke when settings are
+                cancelled during first-time setup
+            env_overrides_enabled: If True, environment variables will override
+                stored LLM settings when checking for initial setup
         """
         super().__init__(**kwargs)
         self.agent_store = AgentStore()
         self.current_agent = self.agent_store.load_from_disk()
         self.is_advanced_mode = False
         self.message_widget = None
-        self.is_initial_setup = SettingsScreen.is_initial_setup_required()
+        self.is_initial_setup = SettingsScreen.is_initial_setup_required(
+            env_overrides_enabled=env_overrides_enabled
+        )
 
         # Convert single callback to list for uniform handling
         if on_settings_saved is None:

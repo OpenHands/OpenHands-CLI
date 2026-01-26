@@ -273,6 +273,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 self._reload_visualizer,
             ],
             on_first_time_settings_cancelled=self._handle_initial_setup_cancelled,
+            env_overrides_enabled=self.env_overrides_enabled,
         )
         self.push_screen(settings_screen)
 
@@ -344,6 +345,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 self._reload_visualizer,
                 self._notify_restart_required,
             ],
+            env_overrides_enabled=self.env_overrides_enabled,
         )
         self.push_screen(settings_screen)
 
