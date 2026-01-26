@@ -14,28 +14,8 @@ if TYPE_CHECKING:
     from openhands.sdk.event import ActionEvent
 
 
-class StateChanged(Message):
-    """Message emitted when conversation state changes.
-
-    Widgets can listen to this message for complex state change reactions
-    that can't be handled by simple reactive bindings.
-    """
-
-    def __init__(self, key: str, old_value: Any, new_value: Any) -> None:
-        super().__init__()
-        self.key = key
-        self.old_value = old_value
-        self.new_value = new_value
-
-
 class ConversationFinished(Message):
     """Message emitted when conversation finishes running."""
-
-    pass
-
-
-class ConversationStarted(Message):
-    """Message emitted when conversation starts running."""
 
     pass
 
@@ -81,13 +61,6 @@ class StateManager(Container):
     pending_actions_count: var[int] = var(0)
     """Number of actions pending user confirmation."""
 
-    # ---- Cloud State ----
-    cloud_mode: var[bool] = var(False)
-    """Whether running in cloud mode."""
-
-    cloud_ready: var[bool] = var(True)
-    """Whether cloud workspace is ready (always True if not cloud mode)."""
-
     # ---- Timing ----
     elapsed_seconds: var[int] = var(0)
     """Seconds elapsed since conversation started."""
@@ -105,11 +78,9 @@ class StateManager(Container):
     _conversation_start_time: float | None = None
     _timer = None
 
-    def __init__(self, cloud_mode: bool = False, **kwargs) -> None:
+    def __init__(self, **kwargs) -> None:
         # Set id to "input_area" so CSS styling applies correctly
         super().__init__(id="input_area", **kwargs)
-        self.set_reactive(StateManager.cloud_mode, cloud_mode)
-        self.set_reactive(StateManager.cloud_ready, not cloud_mode)
 
     def on_mount(self) -> None:
         """Start the elapsed time timer."""
@@ -167,19 +138,10 @@ class StateManager(Container):
             # Started running
             self._conversation_start_time = time.time()
             self.elapsed_seconds = 0
-            self.post_message(ConversationStarted())
         elif not new_value and old_value:
             # Stopped running
             self._conversation_start_time = None
             self.post_message(ConversationFinished())
-
-        # Emit generic state changed message
-        self.post_message(StateChanged("running", old_value, new_value))
-
-    def watch_cloud_ready(self, old_value: bool, new_value: bool) -> None:
-        """Handle cloud ready state transitions."""
-        if new_value and not old_value:
-            self.post_message(StateChanged("cloud_ready", old_value, new_value))
 
     # ---- State Update Methods ----
     # These methods are thread-safe and can be called from background threads.

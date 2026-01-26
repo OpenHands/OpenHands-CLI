@@ -275,8 +275,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     @on(ConversationFinished)
     def on_conversation_finished(self, _event: ConversationFinished) -> None:
-        """Handle conversation finished message from StateManager."""
-        # Publish to legacy signal for backward compatibility
+        """Handle conversation finished."""
         if self.headless_mode:
             self._print_conversation_summary()
             self.exit()
