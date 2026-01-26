@@ -50,11 +50,11 @@ async def test_critic_feedback_initial_render() -> None:
 
 
 @pytest.mark.asyncio
-@patch("openhands_cli.tui.utils.critic.feedback.Posthog")
-async def test_critic_feedback_submit_feedback(mock_posthog_class: MagicMock) -> None:
+@patch("openhands_cli.tui.utils.critic.feedback.get_telemetry_client")
+async def test_critic_feedback_submit_feedback(mock_get_client: MagicMock) -> None:
     """Test that feedback is sent to PostHog when user presses a key."""
-    mock_posthog = MagicMock()
-    mock_posthog_class.return_value = mock_posthog
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
 
     critic_result = CriticResult(score=0.85, message="Test message")
 
@@ -73,27 +73,23 @@ async def test_critic_feedback_submit_feedback(mock_posthog_class: MagicMock) ->
         await pilot.press("1")
         await pilot.pause(0.1)
 
-        # Verify PostHog capture was called
-        mock_posthog.capture.assert_called_once()
-        call_args = mock_posthog.capture.call_args
-        assert call_args.kwargs["distinct_id"] == "test-conv-id"
-        assert call_args.kwargs["event"] == "critic_feedback"
-        assert call_args.kwargs["properties"]["feedback_type"] == "accurate"
-        assert call_args.kwargs["properties"]["critic_score"] == 0.85
-        assert call_args.kwargs["properties"]["critic_success"] is True
-
-        # Verify flush was called
-        mock_posthog.flush.assert_called_once()
+        # Verify telemetry client was called
+        mock_client.track_critic_feedback.assert_called_once()
+        call_args = mock_client.track_critic_feedback.call_args
+        assert call_args.kwargs["conversation_id"] == "test-conv-id"
+        assert call_args.kwargs["feedback_type"] == "accurate"
+        assert call_args.kwargs["critic_score"] == 0.85
+        assert call_args.kwargs["critic_success"] is True
 
 
 @pytest.mark.asyncio
-@patch("openhands_cli.tui.utils.critic.feedback.Posthog")
+@patch("openhands_cli.tui.utils.critic.feedback.get_telemetry_client")
 async def test_critic_feedback_dismiss_no_analytics(
-    mock_posthog_class: MagicMock,
+    mock_get_client: MagicMock,
 ) -> None:
     """Test that dismissing (key 0) doesn't send analytics."""
-    mock_posthog = MagicMock()
-    mock_posthog_class.return_value = mock_posthog
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
 
     critic_result = CriticResult(score=0.85, message="Test message")
 
@@ -112,15 +108,14 @@ async def test_critic_feedback_dismiss_no_analytics(
         await pilot.press("0")
         await pilot.pause(0.1)
 
-        # Verify PostHog capture was NOT called
-        mock_posthog.capture.assert_not_called()
-        mock_posthog.flush.assert_not_called()
+        # Verify telemetry client was NOT called
+        mock_client.track_critic_feedback.assert_not_called()
 
 
 @pytest.mark.asyncio
-@patch("openhands_cli.tui.utils.critic.feedback.Posthog")
+@patch("openhands_cli.tui.utils.critic.feedback.get_telemetry_client")
 async def test_critic_feedback_different_options(
-    mock_posthog_class: MagicMock,
+    mock_get_client: MagicMock,
 ) -> None:
     """Test that different feedback options are correctly recorded."""
     feedback_options = [
@@ -131,8 +126,8 @@ async def test_critic_feedback_different_options(
     ]
 
     for key, expected_feedback in feedback_options:
-        mock_posthog = MagicMock()
-        mock_posthog_class.return_value = mock_posthog
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
 
         critic_result = CriticResult(score=0.75, message="Test")
 
@@ -150,20 +145,20 @@ async def test_critic_feedback_different_options(
             await pilot.pause(0.1)
 
             # Verify the correct feedback type was sent
-            call_args = mock_posthog.capture.call_args
-            assert (
-                call_args.kwargs["properties"]["feedback_type"] == expected_feedback
-            ), f"Failed for key {key}"
+            call_args = mock_client.track_critic_feedback.call_args
+            assert call_args.kwargs["feedback_type"] == expected_feedback, (
+                f"Failed for key {key}"
+            )
 
 
 @pytest.mark.asyncio
-@patch("openhands_cli.tui.utils.critic.feedback.Posthog")
+@patch("openhands_cli.tui.utils.critic.feedback.get_telemetry_client")
 async def test_critic_feedback_includes_event_ids(
-    mock_posthog_class: MagicMock,
+    mock_get_client: MagicMock,
 ) -> None:
     """Test that event_ids from metadata are included in PostHog request."""
-    mock_posthog = MagicMock()
-    mock_posthog_class.return_value = mock_posthog
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
 
     # Create critic result with event_ids in metadata
     critic_result = CriticResult(
@@ -187,23 +182,23 @@ async def test_critic_feedback_includes_event_ids(
         await pilot.pause(0.1)
 
         # Verify event_ids are included in properties
-        call_args = mock_posthog.capture.call_args
-        assert call_args.kwargs["properties"]["event_ids"] == [
+        call_args = mock_client.track_critic_feedback.call_args
+        assert call_args.kwargs["event_ids"] == [
             "event1",
             "event2",
             "event3",
         ]
-        assert call_args.kwargs["properties"]["conversation_id"] == "test-conv-id"
+        assert call_args.kwargs["conversation_id"] == "test-conv-id"
 
 
 @pytest.mark.asyncio
-@patch("openhands_cli.tui.utils.critic.feedback.Posthog")
+@patch("openhands_cli.tui.utils.critic.feedback.get_telemetry_client")
 async def test_critic_feedback_without_event_ids(
-    mock_posthog_class: MagicMock,
+    mock_get_client: MagicMock,
 ) -> None:
     """Test that feedback works correctly when event_ids are not present."""
-    mock_posthog = MagicMock()
-    mock_posthog_class.return_value = mock_posthog
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
 
     # Create critic result without metadata
     critic_result = CriticResult(score=0.85, message="Test message")
@@ -222,20 +217,20 @@ async def test_critic_feedback_without_event_ids(
         await pilot.press("1")
         await pilot.pause(0.1)
 
-        # Verify event_ids are NOT in properties when not provided
-        call_args = mock_posthog.capture.call_args
-        assert "event_ids" not in call_args.kwargs["properties"]
-        assert call_args.kwargs["properties"]["conversation_id"] == "test-conv-id"
+        # Verify event_ids are None when not provided
+        call_args = mock_client.track_critic_feedback.call_args
+        assert call_args.kwargs["event_ids"] is None
+        assert call_args.kwargs["conversation_id"] == "test-conv-id"
 
 
 @pytest.mark.asyncio
-@patch("openhands_cli.tui.utils.critic.feedback.Posthog")
+@patch("openhands_cli.tui.utils.critic.feedback.get_telemetry_client")
 async def test_critic_feedback_includes_agent_model(
-    mock_posthog_class: MagicMock,
+    mock_get_client: MagicMock,
 ) -> None:
     """Test that agent_model is included in PostHog request when provided."""
-    mock_posthog = MagicMock()
-    mock_posthog_class.return_value = mock_posthog
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
 
     critic_result = CriticResult(score=0.85, message="Test message")
 
@@ -255,19 +250,16 @@ async def test_critic_feedback_includes_agent_model(
         await pilot.pause(0.1)
 
         # Verify agent_model is included in properties
-        call_args = mock_posthog.capture.call_args
-        assert (
-            call_args.kwargs["properties"]["agent_model"]
-            == "claude-sonnet-4-5-20250929"
-        )
+        call_args = mock_client.track_critic_feedback.call_args
+        assert call_args.kwargs["agent_model"] == "claude-sonnet-4-5-20250929"
 
 
 @pytest.mark.asyncio
-@patch("openhands_cli.tui.utils.critic.feedback.Posthog")
-async def test_critic_feedback_button_click(mock_posthog_class: MagicMock) -> None:
+@patch("openhands_cli.tui.utils.critic.feedback.get_telemetry_client")
+async def test_critic_feedback_button_click(mock_get_client: MagicMock) -> None:
     """Test that clicking a button submits feedback."""
-    mock_posthog = MagicMock()
-    mock_posthog_class.return_value = mock_posthog
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
 
     critic_result = CriticResult(score=0.85, message="Test message")
 
@@ -282,17 +274,17 @@ async def test_critic_feedback_button_click(mock_posthog_class: MagicMock) -> No
         await pilot.click("#btn-accurate")
         await pilot.pause(0.1)
 
-        # Verify PostHog capture was called
-        mock_posthog.capture.assert_called_once()
-        call_args = mock_posthog.capture.call_args
-        assert call_args.kwargs["properties"]["feedback_type"] == "accurate"
+        # Verify telemetry client was called
+        mock_client.track_critic_feedback.assert_called_once()
+        call_args = mock_client.track_critic_feedback.call_args
+        assert call_args.kwargs["feedback_type"] == "accurate"
 
 
-@patch("openhands_cli.tui.utils.critic.feedback.Posthog")
-def test_send_critic_inference_event(mock_posthog_class: MagicMock) -> None:
+@patch("openhands_cli.tui.utils.critic.feedback.get_telemetry_client")
+def test_send_critic_inference_event(mock_get_client: MagicMock) -> None:
     """Test that send_critic_inference_event sends the correct event."""
-    mock_posthog = MagicMock()
-    mock_posthog_class.return_value = mock_posthog
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
 
     critic_result = CriticResult(
         score=0.85,
@@ -306,28 +298,23 @@ def test_send_critic_inference_event(mock_posthog_class: MagicMock) -> None:
         agent_model="claude-sonnet-4-5-20250929",
     )
 
-    # Verify PostHog capture was called with correct event
-    mock_posthog.capture.assert_called_once()
-    call_args = mock_posthog.capture.call_args
-    assert call_args.kwargs["distinct_id"] == "test-conv-id"
-    assert call_args.kwargs["event"] == "critic_inference"
-    assert call_args.kwargs["properties"]["critic_score"] == 0.85
-    assert call_args.kwargs["properties"]["critic_success"] is True
-    assert call_args.kwargs["properties"]["conversation_id"] == "test-conv-id"
-    assert call_args.kwargs["properties"]["agent_model"] == "claude-sonnet-4-5-20250929"
-    assert call_args.kwargs["properties"]["event_ids"] == ["event1", "event2"]
-
-    # Verify flush was called
-    mock_posthog.flush.assert_called_once()
+    # Verify telemetry client was called with correct event
+    mock_client.track_critic_inference.assert_called_once()
+    call_args = mock_client.track_critic_inference.call_args
+    assert call_args.kwargs["conversation_id"] == "test-conv-id"
+    assert call_args.kwargs["critic_score"] == 0.85
+    assert call_args.kwargs["critic_success"] is True
+    assert call_args.kwargs["agent_model"] == "claude-sonnet-4-5-20250929"
+    assert call_args.kwargs["event_ids"] == ["event1", "event2"]
 
 
-@patch("openhands_cli.tui.utils.critic.feedback.Posthog")
+@patch("openhands_cli.tui.utils.critic.feedback.get_telemetry_client")
 def test_send_critic_inference_event_without_agent_model(
-    mock_posthog_class: MagicMock,
+    mock_get_client: MagicMock,
 ) -> None:
     """Test that send_critic_inference_event works without agent_model."""
-    mock_posthog = MagicMock()
-    mock_posthog_class.return_value = mock_posthog
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
 
     critic_result = CriticResult(score=0.75, message="Test")
 
@@ -336,6 +323,6 @@ def test_send_critic_inference_event_without_agent_model(
         conversation_id="test-conv-id",
     )
 
-    # Verify agent_model is NOT in properties when not provided
-    call_args = mock_posthog.capture.call_args
-    assert "agent_model" not in call_args.kwargs["properties"]
+    # Verify agent_model is None when not provided
+    call_args = mock_client.track_critic_inference.call_args
+    assert call_args.kwargs["agent_model"] is None

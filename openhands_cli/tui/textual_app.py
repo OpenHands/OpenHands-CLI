@@ -34,6 +34,7 @@ from openhands.sdk.security.confirmation_policy import (
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.locations import CONVERSATIONS_DIR
+from openhands_cli.shared.telemetry import get_telemetry_client
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
@@ -155,6 +156,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.mcp_panel: MCPSidePanel | None = None
 
         self.plan_panel: PlanSidePanel = PlanSidePanel(self)
+
+        # Telemetry tracking
+        self._user_message_count = 0
+        self._conversation_started = False
 
         # Register the custom theme
         self.register_theme(OPENHANDS_THEME)
@@ -520,6 +525,24 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if self.conversation_runner is None:
             self.conversation_runner = self.create_conversation_runner()
 
+        # Track conversation start (first message)
+        if not self._conversation_started:
+            self._conversation_started = True
+            agent_model = self._get_agent_model()
+            get_telemetry_client().track_conversation_start(
+                conversation_id=str(self.conversation_id),
+                agent_model=agent_model,
+            )
+
+        # Track user message
+        self._user_message_count += 1
+        agent_model = self._get_agent_model()
+        get_telemetry_client().track_user_message(
+            conversation_id=str(self.conversation_id),
+            message_index=self._user_message_count,
+            agent_model=agent_model,
+        )
+
         # If History panel is open, update "New conversation" title immediately
         # on the first message (without waiting for persistence on disk).
         self._conversation_manager.update_title(user_message)
@@ -547,6 +570,24 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             )
             self.main_display.mount(placeholder_widget)
             self.main_display.scroll_end(animate=False)
+
+    def _get_agent_model(self) -> str | None:
+        """Get the agent's model name from the conversation runner.
+
+        Returns:
+            The agent model name or None if not available.
+        """
+        try:
+            if (
+                self.conversation_runner
+                and self.conversation_runner.conversation
+                and hasattr(self.conversation_runner.conversation, "agent")
+                and self.conversation_runner.conversation.agent  # type: ignore[union-attr]
+            ):
+                return self.conversation_runner.conversation.agent.llm.model  # type: ignore[union-attr]
+        except Exception:
+            pass
+        return None
 
     def action_request_quit(self) -> None:
         """Action to handle Ctrl+Q key binding."""
