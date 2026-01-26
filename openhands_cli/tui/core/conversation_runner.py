@@ -42,6 +42,9 @@ class ConversationRunner:
         visualizer: ConversationVisualizer,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
         event_callback: Callable[[Event], None] | None = None,
+        *,
+        env_overrides_enabled: bool = False,
+        critic_disabled: bool = False,
     ):
         """Initialize the conversation runner.
 
@@ -52,6 +55,9 @@ class ConversationRunner:
             visualizer: Optional visualizer for output display.
             initial_confirmation_policy: Initial confirmation policy to use.
                                         If None, defaults to AlwaysConfirm.
+            env_overrides_enabled: If True, environment variables will override
+                                   stored LLM settings.
+            critic_disabled: If True, critic functionality will be disabled.
         """
         starting_confirmation_policy = initial_confirmation_policy or AlwaysConfirm()
         self.visualizer = visualizer
@@ -60,6 +66,8 @@ class ConversationRunner:
             confirmation_policy=starting_confirmation_policy,
             visualizer=visualizer,
             event_callback=event_callback,
+            env_overrides_enabled=env_overrides_enabled,
+            critic_disabled=critic_disabled,
         )
 
         self._running = False

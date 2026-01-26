@@ -75,7 +75,7 @@ def test_load_overrides_persisted_mcp_with_mcp_json_file(
         },
     )
 
-    loaded = agent_store.load()
+    loaded = agent_store.load_or_create()
     assert loaded is not None
     # Expect ONLY the MCP json file's config
     assert "mcpServers" in loaded.mcp_config
@@ -108,7 +108,7 @@ def test_load_when_mcp_file_missing_ignores_persisted_mcp(
 
     # No mcp.json created
 
-    loaded = agent_store.load()
+    loaded = agent_store.load_or_create()
     assert loaded is not None
     assert loaded.mcp_config == {}  # persisted MCP is ignored if file is missing
 
@@ -150,7 +150,7 @@ def test_load_mcp_configuration_filters_disabled_servers(
         },
     )
 
-    loaded = agent_store.load()
+    loaded = agent_store.load_or_create()
     assert loaded is not None
 
     # Should only load enabled servers (enabled_server and default_enabled_server)
@@ -196,7 +196,7 @@ def test_load_mcp_configuration_all_disabled(
         },
     )
 
-    loaded = agent_store.load()
+    loaded = agent_store.load_or_create()
     assert loaded is not None
     # When all servers are disabled, mcp_config becomes empty dict
     assert loaded.mcp_config == {}

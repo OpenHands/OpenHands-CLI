@@ -54,7 +54,7 @@ class TestToolFix:
             mock_store_instance.read.return_value = mock_agent.model_dump_json()
 
             agent_store = AgentStore()
-            loaded_agent = agent_store.load()
+            loaded_agent = agent_store.load_or_create()
 
             # Verify the agent was loaded
             assert loaded_agent is not None

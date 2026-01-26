@@ -114,7 +114,7 @@ class TestGetPersistedConversationTools:
 
 
 class TestAgentStoreLoadWithConversationTools:
-    """Tests for AgentStore.load() preserving conversation tools."""
+    """Tests for AgentStore.load_or_create() preserving conversation tools."""
 
     @patch("openhands_cli.stores.agent_store.get_llm_metadata", return_value={})
     def test_load_uses_default_tools_for_new_conversation(
@@ -129,7 +129,7 @@ class TestAgentStoreLoadWithConversationTools:
         write_agent(persistence_dir, persisted_agent)
 
         # Load without session_id (new conversation)
-        loaded = agent_store.load()
+        loaded = agent_store.load_or_create()
         assert loaded is not None
 
         # Should have default CLI tools including delegate
@@ -152,7 +152,7 @@ class TestAgentStoreLoadWithConversationTools:
         write_agent(persistence_dir, persisted_agent)
 
         # Load with session_id for non-existent conversation
-        loaded = agent_store.load(session_id="nonexistent-conversation-id")
+        loaded = agent_store.load_or_create(session_id="nonexistent-conversation-id")
         assert loaded is not None
 
         # Should have default CLI tools including delegate
@@ -186,7 +186,7 @@ class TestAgentStoreLoadWithConversationTools:
         )
 
         # Load with session_id for existing conversation
-        loaded = agent_store.load(session_id=convo_id)
+        loaded = agent_store.load_or_create(session_id=convo_id)
         assert loaded is not None
 
         # Should have tools from persisted conversation (NO delegate)
@@ -222,7 +222,7 @@ class TestAgentStoreLoadWithConversationTools:
         )
 
         # Load with session_id for existing conversation
-        loaded = agent_store.load(session_id=convo_id)
+        loaded = agent_store.load_or_create(session_id=convo_id)
         assert loaded is not None
 
         # Should have tools from persisted conversation (INCLUDING delegate)

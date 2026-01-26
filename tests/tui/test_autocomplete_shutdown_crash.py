@@ -67,7 +67,7 @@ class TestAutocompleteShutdownCrash:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda **kwargs: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -104,7 +104,7 @@ class TestAutocompleteShutdownCrash:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda **kwargs: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -131,7 +131,7 @@ class TestAutocompleteShutdownCrash:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda **kwargs: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -165,7 +165,7 @@ class TestAutocompleteShutdownCrash:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda **kwargs: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -354,7 +354,7 @@ class TestAutoCompleteDropdownWidget:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda **kwargs: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -513,7 +513,7 @@ class TestShutdownFocusChainCrash:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda **kwargs: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
