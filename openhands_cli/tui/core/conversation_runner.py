@@ -140,6 +140,10 @@ class ConversationRunner:
         if self.conversation:
             self.conversation.set_confirmation_policy(confirmation_policy)
 
+            if self._state_manager:
+                self._state_manager.set_confirmation_mode(self._confirmation_mode_active)
+
+
     async def queue_message(self, user_input: str) -> None:
         """Queue a message for a running conversation"""
         assert self.conversation is not None, "Conversation should be running"
@@ -314,10 +318,6 @@ class ConversationRunner:
             self._confirmation_mode_active = False
         else:
             self._confirmation_mode_active = True
-
-        # Update StateManager if available
-        if self._state_manager:
-            self._state_manager.set_confirmation_mode(self._confirmation_mode_active)
 
     @property
     def is_running(self) -> bool:
