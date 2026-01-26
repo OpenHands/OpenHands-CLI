@@ -18,9 +18,9 @@ Usage:
     state_manager.set_running(True)
 """
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from pydantic import BaseModel, ConfigDict
 from textual.containers import Container
 from textual.message import Message
 from textual.reactive import var
@@ -32,13 +32,14 @@ if TYPE_CHECKING:
     from openhands.sdk.event import ActionEvent
 
 
-@dataclass
-class ConversationStateSnapshot:
+class ConversationStateSnapshot(BaseModel):
     """Immutable snapshot of conversation state.
 
-    This dataclass holds the complete state of a conversation at a point in time.
+    This model holds the complete state of a conversation at a point in time.
     Used for state transitions and history tracking.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     is_running: bool = False
     is_confirmation_mode: bool = True
