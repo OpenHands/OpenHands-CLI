@@ -16,8 +16,8 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-  "openhands-sdk==1.9.0",
-  "openhands-tools==1.9.0",
+  "openhands-sdk==1.10.0",
+  "openhands-tools==1.10.0",
   "openhands-workspace==1.9.0",
   "prompt-toolkit>=3",
   "rich<14.3.0",
