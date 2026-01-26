@@ -154,7 +154,8 @@ class StateManager(Container):
     _timer = None
 
     def __init__(self, cloud_mode: bool = False, **kwargs) -> None:
-        super().__init__(**kwargs)
+        # Set id to "input_area" so CSS styling applies correctly
+        super().__init__(id="input_area", **kwargs)
         self.set_reactive(StateManager.cloud_mode, cloud_mode)
         self.set_reactive(StateManager.cloud_ready, not cloud_mode)
 
@@ -170,25 +171,24 @@ class StateManager(Container):
         )
         from openhands_cli.tui.widgets.user_input.input_field import InputField
 
-        with Container(id="input_area"):
-            yield WorkingStatusLine().data_bind(
-                running=StateManager.running,
-                elapsed_seconds=StateManager.elapsed_seconds,
-            )
-            yield InputField(
-                placeholder="Type your message, @mention a file, or / for commands"
-            )
-            # InfoStatusLine binds to StateManager reactive properties
-            yield InfoStatusLine().data_bind(
-                running=StateManager.running,
-                is_multiline_mode=StateManager.is_multiline_mode,
-                input_tokens=StateManager.input_tokens,
-                output_tokens=StateManager.output_tokens,
-                cache_hit_rate=StateManager.cache_hit_rate,
-                last_request_input_tokens=StateManager.last_request_input_tokens,
-                context_window=StateManager.context_window,
-                accumulated_cost=StateManager.accumulated_cost,
-            )
+        yield WorkingStatusLine().data_bind(
+            running=StateManager.running,
+            elapsed_seconds=StateManager.elapsed_seconds,
+        )
+        yield InputField(
+            placeholder="Type your message, @mention a file, or / for commands"
+        )
+        # InfoStatusLine binds to StateManager reactive properties
+        yield InfoStatusLine().data_bind(
+            running=StateManager.running,
+            is_multiline_mode=StateManager.is_multiline_mode,
+            input_tokens=StateManager.input_tokens,
+            output_tokens=StateManager.output_tokens,
+            cache_hit_rate=StateManager.cache_hit_rate,
+            last_request_input_tokens=StateManager.last_request_input_tokens,
+            context_window=StateManager.context_window,
+            accumulated_cost=StateManager.accumulated_cost,
+        )
 
     def on_unmount(self) -> None:
         """Clean up timer."""

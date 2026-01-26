@@ -190,7 +190,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 yield Static(id="splash_update_notice", classes="splash-update-notice")
                 yield Static(id="splash_critic_notice", classes="splash-critic-notice")
 
-            # StateManager contains the input area with reactive status lines
+            # StateManager (id="input_area") contains reactive status lines
+            # CSS dock: bottom makes it span full width at bottom
             yield self.state_manager
 
         # Footer - shows available key bindings
