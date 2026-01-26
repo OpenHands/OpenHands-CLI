@@ -310,31 +310,35 @@ class AgentStore:
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
     ) -> Agent | None:
-        """Load agent from disk, or create from env vars if enabled.
+        """Load an Agent and apply runtime configuration.
 
-        This is the main entry point for the CLI to get a configured agent.
-        It orchestrates the policy of preferring environment variables when
-        env_overrides_enabled is True.
+        Invariant:
+        - If a persisted agent exists:
+            * Load it from disk.
+            * Apply any env overrides that are present (even partial).
+        - If no persisted agent exists:
+            * Require a full env spec (LLM_API_KEY + LLM_MODEL) to create
+                a default Agent.
+            * Otherwise, raise an error.
+
+        Runtime configuration (tools, context, MCP, metadata, critic) is
+        always applied last.
 
         Args:
-            session_id: Optional session ID for metadata tracking and tool restoration.
-            env_overrides_enabled: If True, prefer creating agent from environment
-                variables over loading from disk. This ensures env vars take
-                precedence when the user explicitly requests it. If all required
-                env vars (LLM_API_KEY, LLM_MODEL) are set, creates agent entirely
-                from env vars. Otherwise, loads from disk and applies partial
-                env var overrides.
-            critic_disabled: If True, critic functionality will be disabled
-                (e.g., for headless mode).
+            session_id: Optional session ID used for tool restoration and
+                LLM metadata tagging.
+            env_overrides_enabled: Whether env overrides are enabled.
+            critic_disabled: If True, do not configure a critic.
 
         Returns:
-            Configured Agent instance, or None if no configuration exists and
-            env_overrides_enabled is False.
+            A fully configured Agent, or None if no persisted agent exists and
+            env overrides are disabled.
 
         Raises:
-            MissingEnvironmentVariablesError: If env_overrides_enabled is True,
-                no disk config exists, and required environment variables are missing.
+            MissingEnvironmentVariablesError: If no persisted agent exists and
+                required env variables are missing.
         """
+
         agent = self.load_from_disk()
         overrides = LLMEnvOverrides.from_env(enabled=env_overrides_enabled)
 
