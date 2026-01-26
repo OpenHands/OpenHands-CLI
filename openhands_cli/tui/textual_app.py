@@ -94,6 +94,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
         headless_mode: bool = False,
         json_mode: bool = False,
+        plugin_sources: list[str] | None = None,
         **kwargs,
     ):
         """Initialize the app with custom OpenHands theme.
@@ -107,6 +108,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                                        If None, defaults to AlwaysConfirm.
             headless_mode: If True, run in headless mode.
             json_mode: If True, enable JSON output mode.
+            plugin_sources: Optional list of plugin paths or URLs to load.
         """
         super().__init__(**kwargs)
 
@@ -121,6 +123,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Store JSON mode setting
         self.json_mode = json_mode
+
+        # Store plugin sources for loading when conversation starts
+        self.plugin_sources = plugin_sources
 
         # Store resume conversation ID
         self.conversation_id = (
@@ -438,6 +443,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             conversation_visualizer,
             self.initial_confirmation_policy,
             event_callback,
+            plugin_sources=self.plugin_sources,
         )
 
         return runner
@@ -891,6 +897,7 @@ def main(
     exit_without_confirmation: bool = False,
     headless: bool = False,
     json_mode: bool = False,
+    plugin_sources: list[str] | None = None,
 ):
     """Run the textual app.
 
@@ -902,6 +909,7 @@ def main(
         exit_without_confirmation: If True, exit without showing confirmation dialog.
         headless: If True, run in headless mode (no UI output, auto-approve actions).
         json_mode: If True, enable JSON output mode (implies headless).
+        plugin_sources: Optional list of plugin paths or URLs to load.
     """
     # Determine initial confirmation policy from CLI arguments
     # If headless mode is enabled, always use NeverConfirm (auto-approve all actions)
@@ -920,6 +928,7 @@ def main(
         initial_confirmation_policy=initial_confirmation_policy,
         headless_mode=headless,
         json_mode=json_mode,
+        plugin_sources=plugin_sources,
     )
     app.run(headless=headless)
 

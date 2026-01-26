@@ -215,6 +215,7 @@ def main() -> None:
                 exit_without_confirmation=args.exit_without_confirmation,
                 headless=args.headless,
                 json_mode=json_mode,
+                plugin_sources=args.plugins,
             )
             console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
             console.print(

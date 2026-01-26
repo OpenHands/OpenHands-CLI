@@ -42,6 +42,7 @@ class ConversationRunner:
         visualizer: ConversationVisualizer,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
         event_callback: Callable[[Event], None] | None = None,
+        plugin_sources: list[str] | None = None,
     ):
         """Initialize the conversation runner.
 
@@ -52,6 +53,7 @@ class ConversationRunner:
             visualizer: Optional visualizer for output display.
             initial_confirmation_policy: Initial confirmation policy to use.
                                         If None, defaults to AlwaysConfirm.
+            plugin_sources: Optional list of plugin paths or URLs to load.
         """
         starting_confirmation_policy = initial_confirmation_policy or AlwaysConfirm()
         self.visualizer = visualizer
@@ -60,6 +62,7 @@ class ConversationRunner:
             confirmation_policy=starting_confirmation_policy,
             visualizer=visualizer,
             event_callback=event_callback,
+            plugin_sources=plugin_sources,
         )
 
         self._running = False
