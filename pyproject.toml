@@ -20,6 +20,7 @@ dependencies = [
   "openhands-tools==1.9.0",
   "openhands-workspace==1.9.0",
   "prompt-toolkit>=3",
+  "rich<14.3.0",
   "textual>=0.79.0",
   "typer>=0.17.4",
   "agent-client-protocol>=0.7.0,<0.8.0",
