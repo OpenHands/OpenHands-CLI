@@ -24,7 +24,7 @@ def mock_connection():
 def cloud_agent(mock_connection):
     """Create an OpenHands Cloud ACP agent instance."""
     with patch(
-        "openhands_cli.acp_impl.agent.remote_agent.TokenStorage"
+        "openhands_cli.acp_impl.agent.base_agent.TokenStorage"
     ) as mock_storage_class:
         mock_storage = MagicMock()
         mock_storage.get_api_key.return_value = "test-api-key"
@@ -45,7 +45,7 @@ class TestNewSessionAuthentication:
     ):
         """Test that new_session raises auth_required when user is not authenticated."""
         with patch(
-            "openhands_cli.acp_impl.agent.remote_agent.TokenStorage"
+            "openhands_cli.acp_impl.agent.base_agent.TokenStorage"
         ) as mock_storage_class:
             mock_storage = MagicMock()
             mock_storage.get_api_key.return_value = None

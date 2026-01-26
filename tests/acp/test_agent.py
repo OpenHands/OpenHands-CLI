@@ -28,51 +28,32 @@ def acp_agent(mock_connection):
 
 
 @pytest.mark.asyncio
-async def test_initialize_with_configured_agent(acp_agent):
-    """Test agent initialization when agent is configured."""
-    # Mock load_agent_specs to succeed (called from shared_agent_handler)
-    with patch("openhands_cli.acp_impl.agent.base_agent.load_agent_specs") as mock_load:
-        mock_agent = MagicMock()
-        mock_load.return_value = mock_agent
+async def test_initialize(acp_agent):
+    """Test agent initialization always returns auth method."""
+    response = await acp_agent.initialize(
+        protocol_version=1,
+        client_info=Implementation(name="test-client", version="1.0.0"),
+    )
 
-        response = await acp_agent.initialize(
-            protocol_version=1,
-            client_info=Implementation(name="test-client", version="1.0.0"),
-        )
-
-        assert response.protocol_version == 1
-        assert isinstance(response.agent_capabilities, AgentCapabilities)
-        assert response.agent_capabilities.load_session is True
-        # When configured, auth method is returned for optional OAuth
-        assert len(response.auth_methods) == 1
-        assert response.auth_methods[0].id == "oauth"
-
-
-@pytest.mark.asyncio
-async def test_initialize_without_configured_agent(acp_agent):
-    """Test agent initialization when agent is not configured."""
-    from openhands_cli.setup import MissingAgentSpec
-
-    # Mock load_agent_specs to raise MissingAgentSpec (called from shared_agent_handler)
-    with patch("openhands_cli.acp_impl.agent.base_agent.load_agent_specs") as mock_load:
-        mock_load.side_effect = MissingAgentSpec("Not configured")
-
-        response = await acp_agent.initialize(
-            protocol_version=1,
-            client_info=Implementation(name="test-client", version="1.0.0"),
-        )
-
-        assert response.protocol_version == 1
-        # When not configured, no auth methods are returned
-        assert len(response.auth_methods) == 0
+    assert response.protocol_version == 1
+    assert isinstance(response.agent_capabilities, AgentCapabilities)
+    assert response.agent_capabilities.load_session is True
+    # Auth method is always returned for OAuth authentication
+    assert len(response.auth_methods) == 1
+    assert response.auth_methods[0].id == "oauth"
+    assert response.auth_methods[0].field_meta == {"type": "agent"}
 
 
 @pytest.mark.asyncio
 async def test_authenticate(acp_agent):
     """Test authentication."""
-    response = await acp_agent.authenticate(method_id="test-method")
+    with patch(
+        "openhands_cli.auth.login_command.login_command",
+        new_callable=AsyncMock,
+    ):
+        response = await acp_agent.authenticate(method_id="oauth")
 
-    assert response is not None
+        assert response is not None
 
 
 @pytest.mark.asyncio
@@ -107,13 +88,37 @@ async def test_new_session_success(acp_agent, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_new_session_raises_auth_required_when_not_authenticated(
+    mock_connection, tmp_path
+):
+    """Test that new_session raises auth_required when user is not authenticated."""
+    from acp import RequestError
+
+    from openhands_cli.setup import MissingAgentSpec
+
+    # Create agent and mock _is_authenticated to return False
+    agent = LocalOpenHandsACPAgent(mock_connection, "always-ask")
+
+    with patch(
+        "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+    ) as mock_load:
+        mock_load.side_effect = MissingAgentSpec("Not configured")
+
+        with pytest.raises(RequestError) as exc_info:
+            await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+
+        assert "Authentication required" in str(exc_info.value.data)
+
+
+@pytest.mark.asyncio
 async def test_new_session_agent_not_configured(acp_agent, tmp_path):
     """Test creating a new session when agent is not configured."""
     from acp import RequestError
 
     from openhands_cli.setup import MissingAgentSpec
 
-    # Mock load_agent_specs to raise MissingAgentSpec
+    # Mock load_agent_specs to raise MissingAgentSpec - this will make
+    # _is_authenticated return False, which raises auth_required
     with patch(
         "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
     ) as mock_load:
@@ -132,13 +137,19 @@ async def test_new_session_with_malformed_mcp_json(acp_agent, tmp_path, monkeypa
 
     request = NewSessionRequest(cwd=str(tmp_path), mcp_servers=[])
 
-    # Mock load_agent_specs to raise MCPConfigurationError
+    # Mock load_agent_specs:
+    # - First call (from _is_authenticated): return success
+    # - Second call (from _setup_conversation): raise MCPConfigurationError
     with patch(
         "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
     ) as mock_load:
-        mock_load.side_effect = MCPConfigurationError(
-            "Invalid JSON: trailing characters at line 20 column 1"
-        )
+        mock_agent = MagicMock()
+        mock_load.side_effect = [
+            mock_agent,  # First call succeeds (auth check)
+            MCPConfigurationError(
+                "Invalid JSON: trailing characters at line 20 column 1"
+            ),  # Second call fails
+        ]
 
         # Should raise RequestError with helpful message
         with pytest.raises(RequestError) as exc_info:
@@ -165,13 +176,19 @@ async def test_new_session_with_malformed_mcp_json_integration(
 
     request = NewSessionRequest(cwd=str(tmp_path), mcp_servers=[])
 
-    # Mock load_agent_specs to propagate the MCPConfigurationError
+    # Mock load_agent_specs:
+    # - First call (from _is_authenticated): return success
+    # - Second call (from _setup_conversation): raise MCPConfigurationError
     with patch(
         "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
     ) as mock_load_specs:
-        mock_load_specs.side_effect = MCPConfigurationError(
-            "Invalid JSON: trailing characters at line 20 column 1"
-        )
+        mock_agent = MagicMock()
+        mock_load_specs.side_effect = [
+            mock_agent,  # First call succeeds (auth check)
+            MCPConfigurationError(
+                "Invalid JSON: trailing characters at line 20 column 1"
+            ),  # Second call fails
+        ]
 
         # RequestError raised when creating session with malformed mcp.json
         with pytest.raises(RequestError) as exc_info:
@@ -539,9 +556,13 @@ async def test_new_session_with_mcp_servers(acp_agent, tmp_path):
         # Verify session was created
         assert response.session_id is not None
 
-        # Verify load_agent_specs was called with transformed MCP servers dict
-        mock_load.assert_called_once()
-        call_kwargs = mock_load.call_args[1]
+        # Verify load_agent_specs was called twice:
+        # - First call: _is_authenticated check (no args)
+        # - Second call: _setup_conversation with mcp_servers
+        assert mock_load.call_count == 2
+
+        # Check the second call has the transformed MCP servers dict
+        call_kwargs = mock_load.call_args_list[1][1]
         assert "mcp_servers" in call_kwargs
         mcp_servers_dict = call_kwargs["mcp_servers"]
 

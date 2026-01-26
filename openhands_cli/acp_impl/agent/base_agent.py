@@ -62,7 +62,8 @@ from openhands_cli.acp_impl.utils import (
     convert_acp_mcp_servers_to_agent_format,
     convert_acp_prompt_to_message_content,
 )
-from openhands_cli.setup import MissingAgentSpec, load_agent_specs
+from openhands_cli.auth.token_storage import TokenStorage
+from openhands_cli.setup import MissingAgentSpec
 from openhands_cli.utils import extract_text_from_message_content
 
 
@@ -92,6 +93,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         conn: Client,
         initial_confirmation_mode: ConfirmationMode,
         resume_conversation_id: str | None = None,
+        cloud_api_url: str = "https://app.all-hands.dev",
     ):
         """Initialize the base ACP agent.
 
@@ -99,12 +101,18 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             conn: ACP connection for sending notifications
             initial_confirmation_mode: Default confirmation mode for new sessions
             resume_conversation_id: Optional conversation ID to resume
+            cloud_api_url: OpenHands Cloud API URL for authentication
         """
         self._conn = conn
         self._active_sessions: dict[str, BaseConversation] = {}
         self._running_tasks: dict[str, asyncio.Task] = {}
         self._initial_confirmation_mode: ConfirmationMode = initial_confirmation_mode
         self._resume_conversation_id: str | None = resume_conversation_id
+
+        # Auth-related state
+        self._store = TokenStorage()
+        self._cloud_api_url = cloud_api_url
+        self._cloud_api_key: str | None = self._store.get_api_key()
 
         if resume_conversation_id:
             logger.info(f"Will resume conversation: {resume_conversation_id}")
@@ -220,19 +228,15 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         """Initialize the ACP protocol."""
         logger.info(f"Initializing ACP with protocol version: {protocol_version}")
 
-        try:
-            load_agent_specs()
-            auth_methods = [
-                AuthMethod(
-                    description="OAuth with OpenHands Cloud",
-                    id="oauth",
-                    name="OAuth with OpenHands Cloud",
-                )
-            ]
-            logger.info("Agent configured, no authentication required")
-        except MissingAgentSpec:
-            auth_methods = []
-            logger.warning("Agent not configured - users should run 'openhands' first")
+        # Always configure auth method
+        auth_methods = [
+            AuthMethod(
+                description="Authenticate through agent",
+                id="oauth",
+                name="OAuth with OpenHands Cloud",
+                field_meta={"type": "agent"},
+            ),
+        ]
 
         return InitializeResponse(
             protocol_version=protocol_version,
@@ -255,10 +259,33 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
     async def authenticate(
         self, method_id: str, **_kwargs: Any
     ) -> AuthenticateResponse | None:
-        # TODO: implement authentication in local convo mode as well?
-        """Authenticate the client (no-op by default, override for cloud)."""
+        """Authenticate the client using OAuth2 device flow."""
         logger.info(f"Authentication requested with method: {method_id}")
-        return AuthenticateResponse()
+
+        if method_id != "oauth":
+            raise RequestError.invalid_params(
+                {"reason": f"Unsupported authentication method: {method_id}"}
+            )
+
+        from openhands_cli.auth.device_flow import DeviceFlowError
+        from openhands_cli.auth.login_command import login_command
+
+        try:
+            await login_command(self._cloud_api_url, skip_settings_sync=True)
+            self._cloud_api_key = self._store.get_api_key()
+            logger.info("OAuth authentication completed successfully")
+            return AuthenticateResponse()
+
+        except DeviceFlowError as e:
+            logger.error(f"OAuth authentication failed: {e}")
+            raise RequestError.internal_error(
+                {"reason": f"Authentication failed: {e}"}
+            ) from e
+        except Exception as e:
+            logger.error(f"Unexpected error during authentication: {e}", exc_info=True)
+            raise RequestError.internal_error(
+                {"reason": f"Authentication error: {e}"}
+            ) from e
 
     async def list_sessions(
         self,

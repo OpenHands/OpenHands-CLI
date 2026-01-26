@@ -949,3 +949,166 @@ class TestMessageEventDelegation:
         assert "Child Agent" in markdown_content
         assert "Parent Agent" in markdown_content
         assert "→" in markdown_content
+
+
+class TestAgentMessageEventDisplay:
+    """Tests for agent MessageEvent display in non-delegation context.
+
+    This test class addresses GitHub issue #399:
+    Agent MessageEvents (including those with critic_result) should be displayed
+    in the TUI, but were being silently dropped due to a bug in the delegation
+    filtering logic.
+
+    The bug was in _create_event_widget() where the condition:
+        if not (event.sender and self._name):
+            return None
+    would filter out ALL MessageEvents without a sender, even when the visualizer
+    has a name set (which is the normal case for the main conversation).
+    """
+
+    def test_agent_message_event_displays_when_name_set_no_sender(self):
+        """Agent MessageEvent without sender should display when visualizer has name.
+
+        This is the primary bug reproduction test. In normal CLI usage:
+        - visualizer._name is set to "OpenHands Agent"
+        - Agent MessageEvents do NOT have a sender field
+        - These should still be displayed (not filtered out)
+
+        Relates to: https://github.com/OpenHands/OpenHands-CLI/issues/399
+        """
+        from textual.widgets import Markdown
+
+        from openhands.sdk import Message
+        from openhands_cli.tui.widgets.collapsible import Collapsible
+
+        app = App()
+        container = VerticalScroll()
+        # Normal CLI usage: name is set to "OpenHands Agent"
+        visualizer = ConversationVisualizer(
+            container,
+            app,  # type: ignore[arg-type]
+            skip_user_messages=True,
+            name="OpenHands Agent",
+        )
+
+        # Create an agent message (no sender - this is NOT delegation)
+        message = Message(
+            role="assistant",
+            content=[TextContent(text="Here is my analysis of the data...")],
+        )
+        event = MessageEvent(llm_message=message, source="agent")
+        # Note: event.sender is None (not set) - this is normal for non-delegation
+
+        widget = visualizer._create_event_widget(event)
+
+        # BUG: Currently returns None, should return a widget
+        assert widget is not None, (
+            "Agent MessageEvent without sender should still display when "
+            "visualizer has name set. This is the normal case for CLI usage."
+        )
+        assert isinstance(widget, Markdown | Collapsible)
+
+    def test_agent_message_event_with_critic_result_displays(self):
+        """Agent MessageEvent with critic_result should display.
+
+        This test ensures that MessageEvents enriched with critic evaluation
+        results are displayed. The critic_result is added to the event after
+        critic evaluation completes.
+
+        Relates to: https://github.com/OpenHands/OpenHands-CLI/issues/399
+        """
+        from openhands.sdk import Message
+        from openhands.sdk.critic.result import CriticResult
+
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,  # type: ignore[arg-type]
+            skip_user_messages=True,
+            name="OpenHands Agent",
+        )
+
+        message = Message(
+            role="assistant",
+            content=[TextContent(text="Based on my analysis, here are the findings")],
+        )
+        # Create event with critic_result (simulating what the SDK does)
+        event = MessageEvent(llm_message=message, source="agent")
+        # Add critic_result like the SDK does
+        event = event.model_copy(
+            update={
+                "critic_result": CriticResult(
+                    score=0.78,
+                    message="Success: 0.78",
+                )
+            }
+        )
+
+        widget = visualizer._create_event_widget(event)
+
+        assert widget is not None, (
+            "Agent MessageEvent with critic_result should display. "
+            "Users wait for critic feedback that never appears due to this bug."
+        )
+
+    def test_user_message_still_skipped_when_skip_user_messages_true(self):
+        """User MessageEvents should still be skipped when skip_user_messages=True.
+
+        This test ensures the fix doesn't break the existing behavior of
+        skipping user messages (which are displayed separately in the UI).
+        """
+        from openhands.sdk import Message
+
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,  # type: ignore[arg-type]
+            skip_user_messages=True,
+            name="OpenHands Agent",
+        )
+
+        message = Message(
+            role="user",
+            content=[TextContent(text="Please analyze this data")],
+        )
+        event = MessageEvent(llm_message=message, source="user")
+
+        widget = visualizer._create_event_widget(event)
+
+        # User messages should still be skipped
+        assert widget is None, "User messages should still be skipped"
+
+    def test_delegation_message_still_works_with_sender(self):
+        """Delegation MessageEvents with sender should still display correctly.
+
+        This test ensures the fix doesn't break delegation message handling.
+        """
+        from textual.widgets import Markdown
+
+        from openhands.sdk import Message
+
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,  # type: ignore[arg-type]
+            name="child_agent",
+        )
+
+        message = Message(
+            role="assistant",
+            content=[TextContent(text="Task completed")],
+        )
+        # Delegation message HAS a sender
+        event = MessageEvent(llm_message=message, source="agent", sender="parent_agent")
+
+        widget = visualizer._create_event_widget(event)
+
+        assert widget is not None
+        assert isinstance(widget, Markdown)
+        markdown_content = widget._initial_markdown
+        assert markdown_content is not None
+        assert "Child Agent" in markdown_content
+        assert "Parent Agent" in markdown_content
