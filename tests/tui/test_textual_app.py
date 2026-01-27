@@ -105,7 +105,7 @@ class TestConversationSwitcher:
         app.notify = Mock()
         app.input_field = Mock()
         app.input_field.focus_input = Mock()
-        app.post_message = Mock()  # Mock post_message on app
+        app.state_manager = Mock()  # StateManager is now used instead of post_message
 
         switcher = ConversationSwitcher(app)
         switcher._dismiss_loading = Mock()
@@ -116,8 +116,9 @@ class TestConversationSwitcher:
         switcher._finish_switch(runner, target_id)
 
         app.input_field.focus_input.assert_called_once()
-        # Verify that ConversationSwitched message was posted to app
-        app.post_message.assert_called_once()
+        # Verify that StateManager was updated with the new conversation ID
+        app.state_manager.set_conversation_id.assert_called_once_with(target_id)
+        app.state_manager.reset.assert_called_once()
 
     def test_switch_to_invalid_uuid_shows_error(self):
         """Switching with an invalid UUID shows an error notification."""
@@ -154,7 +155,7 @@ class TestConversationManager:
     """Tests for ConversationManager."""
 
     def test_create_new_resets_conversation(self):
-        """create_new resets conversation state and posts creation message."""
+        """create_new resets conversation state and updates StateManager."""
         app = Mock()
         app.conversation_runner = None
         app.confirmation_panel = None
@@ -162,16 +163,19 @@ class TestConversationManager:
         app.main_display.children = []
         app.query_one = Mock(return_value=Mock())
         app.notify = Mock()
-        app.post_message = Mock()  # Mock post_message on app
+        app.state_manager = Mock()  # StateManager is now used instead of post_message
 
         manager = ConversationManager(app, Mock())
-        manager.store.create.return_value = uuid.uuid4().hex  # type: ignore
+        new_id = uuid.uuid4().hex
+        manager.store.create.return_value = new_id  # type: ignore
 
         result = manager.create_new()
 
         assert result is not None
         assert app.conversation_id == result
-        app.post_message.assert_called_once()  # Expect ConversationCreated message
+        # Verify StateManager was updated instead of posting message
+        app.state_manager.set_conversation_id.assert_called_once()
+        app.state_manager.reset.assert_called_once()
         app.notify.assert_called_once()
 
     def test_create_new_blocked_when_running(self):
@@ -190,14 +194,14 @@ class TestConversationManager:
         call_kwargs = app.notify.call_args[1]
         assert call_kwargs["severity"] == "error"
 
-    def test_update_title_posts_message(self):
-        """update_title posts ConversationTitleUpdated message."""
+    def test_update_title_updates_state_manager(self):
+        """update_title updates StateManager instead of posting message."""
         app = Mock()
         app.conversation_id = uuid.uuid4()
-        app.post_message = Mock()  # Mock post_message on app
+        app.state_manager = Mock()  # StateManager is now used
 
         manager = ConversationManager(app, Mock())
 
         manager.update_title("Test title")
 
-        app.post_message.assert_called_once()
+        app.state_manager.set_conversation_title.assert_called_once_with("Test title")

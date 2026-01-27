@@ -40,13 +40,7 @@ from openhands_cli.tui.core import ConversationFinished, StateManager
 from openhands_cli.tui.core.commands import is_valid_command, show_help
 from openhands_cli.tui.core.conversation_manager import ConversationManager
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
-from openhands_cli.tui.core.messages import (
-    ConversationCreated,
-    ConversationSwitched,
-    ConversationTitleUpdated,
-    RevertSelectionRequest,
-    SwitchConversationRequest,
-)
+from openhands_cli.tui.core.messages import SwitchConversationRequest
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModal
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
@@ -138,6 +132,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.conversation_dir = BaseConversation.get_persistence_dir(
             CONVERSATIONS_DIR, self.conversation_id
         )
+
+        # Initialize StateManager's conversation_id
+        self.state_manager.conversation_id = self.conversation_id
 
         # Store queued inputs (copy to prevent mutating caller's list)
         self.pending_inputs = list(queued_inputs) if queued_inputs else []
@@ -760,37 +757,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self,
             current_conversation_id=self.conversation_id,
         )
-
-    @on(ConversationCreated)
-    def on_conversation_created(self, event: ConversationCreated) -> None:
-        """Propagate conversation creation to history panel."""
-        self._notify_history_panel(event)
-
-    @on(ConversationTitleUpdated)
-    def on_conversation_title_updated(self, event: ConversationTitleUpdated) -> None:
-        """Propagate title update to history panel."""
-        self._notify_history_panel(event)
-
-    @on(ConversationSwitched)
-    def on_conversation_switched(self, event: ConversationSwitched) -> None:
-        """Propagate conversation switch to history panel."""
-        self._notify_history_panel(event)
-
-    @on(RevertSelectionRequest)
-    def on_revert_selection_request(self, event: RevertSelectionRequest) -> None:
-        """Propagate revert selection request to history panel."""
-        self._notify_history_panel(event)
-
-    def _notify_history_panel(self, message: Message) -> None:
-        """Helper to send message to history panel if it exists.
-
-        This decouples the sender (Manager/Switcher) from the receiver (Panel).
-        The sender just posts to App, and App forwards to Panel if present.
-        """
-        try:
-            self.query_one(HistorySidePanel).post_message(message)
-        except NoMatches:
-            pass
 
     @on(SwitchConversationRequest)
     def _on_switch_conversation_request(self, event: SwitchConversationRequest) -> None:

@@ -4,7 +4,8 @@ This class coordinates conversation operations:
 - Creating new conversations
 - Switching between conversations
 - Updating conversation metadata
-- Posting messages to history panel
+
+State changes are made via StateManager, which UI components watch for updates.
 """
 
 from __future__ import annotations
@@ -19,10 +20,6 @@ from openhands_cli.conversations.protocols import ConversationStore
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text
 from openhands_cli.tui.core.conversation_switcher import ConversationSwitcher
-from openhands_cli.tui.core.messages import (
-    ConversationCreated,
-    ConversationTitleUpdated,
-)
 
 
 if TYPE_CHECKING:
@@ -34,6 +31,9 @@ class ConversationManager:
 
     This class provides a single point of control for all conversation
     operations, delegating switching logic to ConversationSwitcher.
+
+    State changes are made via StateManager rather than posting messages.
+    UI components (like HistorySidePanel) watch StateManager for updates.
     """
 
     def __init__(self, app: OpenHandsApp, store: ConversationStore):
@@ -44,7 +44,7 @@ class ConversationManager:
     @property
     def is_switching(self) -> bool:
         """Check if a conversation switch is in progress."""
-        return self._switcher.is_switching
+        return self.app.state_manager.is_switching
 
     def switch_to(self, conversation_id: str) -> None:
         """Switch to an existing conversation.
@@ -75,7 +75,14 @@ class ConversationManager:
 
         # Create a new conversation via store
         new_id_str = self.store.create()
-        app.conversation_id = uuid.UUID(new_id_str)
+        new_id = uuid.UUID(new_id_str)
+
+        # Update app's conversation_id (for backwards compatibility)
+        app.conversation_id = new_id
+
+        # Update StateManager - UI components will react automatically
+        app.state_manager.set_conversation_id(new_id)
+        app.state_manager.reset()  # Reset running state, metrics, etc.
 
         # Reset the conversation runner
         app.conversation_runner = None
@@ -98,11 +105,8 @@ class ConversationManager:
         # Update the splash conversation widget with the new conversation ID
         splash_conversation = app.query_one("#splash_conversation", Static)
         splash_conversation.update(
-            get_conversation_text(app.conversation_id.hex, theme=OPENHANDS_THEME)
+            get_conversation_text(new_id.hex, theme=OPENHANDS_THEME)
         )
-
-        # Notify app about creation (App will propagate to history panel)
-        app.post_message(ConversationCreated(app.conversation_id))
 
         # Scroll to top to show the splash screen
         app.main_display.scroll_home(animate=False)
@@ -114,15 +118,16 @@ class ConversationManager:
             severity="information",
         )
 
-        return app.conversation_id
+        return new_id
 
     def update_title(self, title: str) -> None:
-        """Update the current conversation's title in the history panel.
+        """Update the current conversation's title.
 
         Args:
             title: The new title (typically the first user message)
         """
-        self.app.post_message(ConversationTitleUpdated(self.app.conversation_id, title))
+        # Update StateManager - UI components watching conversation_title will react
+        self.app.state_manager.set_conversation_title(title)
 
     def list_conversations(self, limit: int = 100) -> list[ConversationMetadata]:
         """List conversations from the store."""

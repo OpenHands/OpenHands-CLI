@@ -237,61 +237,14 @@ class TestHeadlessConfirmationPolicy:
 
 
 class TestHeadlessAppBehavior:
-    """Tests focused on headless flag and auto-exit behavior in OpenHandsApp."""
+    """Tests focused on headless flag and auto-exit behavior in OpenHandsApp.
 
-    @pytest.mark.asyncio
-    async def test_conversation_state_change_triggers_summary_and_exit_in_headless(
-        self, monkeypatch: pytest.MonkeyPatch
-    ):
-        """When headless and conversation finishes, we should print summary & exit."""
-        monkeypatch.setattr(
-            SettingsScreen,
-            "is_initial_setup_required",
-            lambda env_overrides_enabled=False: False,
-        )
+    Note: Tests for _on_conversation_state_changed were removed as that method
+    no longer exists. The headless exit behavior is now handled through
+    StateManager's watch_running and ConversationFinished message handling.
+    """
 
-        app = OpenHandsApp(exit_confirmation=False, headless_mode=True)
-
-        app._print_conversation_summary = MagicMock()
-        app.exit = MagicMock()
-
-        app._on_conversation_state_changed(is_running=False)
-
-        app._print_conversation_summary.assert_called_once()
-        app.exit.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_conversation_state_change_no_exit_when_running(
-        self, monkeypatch: pytest.MonkeyPatch
-    ):
-        monkeypatch.setattr(
-            SettingsScreen,
-            "is_initial_setup_required",
-            lambda env_overrides_enabled=False: False,
-        )
-
-        app = OpenHandsApp(exit_confirmation=False)
-        app.headless_mode = True
-        app.exit = MagicMock()
-
-        app._on_conversation_state_changed(is_running=True)
-        app.exit.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_conversation_state_change_no_exit_in_non_headless(
-        self, monkeypatch: pytest.MonkeyPatch
-    ):
-        monkeypatch.setattr(
-            SettingsScreen,
-            "is_initial_setup_required",
-            lambda env_overrides_enabled=False: False,
-        )
-
-        app = OpenHandsApp(exit_confirmation=False)
-        app.exit = MagicMock()
-
-        app._on_conversation_state_changed(is_running=False)
-        app.exit.assert_not_called()
+    pass  # Placeholder - add new tests for StateManager-based headless behavior if needed
 
 
 class TestPrintConversationSummary:
@@ -444,13 +397,6 @@ class TestHeadlessInitialSetupGuard:
             exit_confirmation=False,
             headless_mode=True,
             resume_conversation_id=uuid.uuid4(),
-        )
-
-        # Avoid Textual's "node must be running" restriction in this unit test
-        monkeypatch.setattr(
-            app.conversation_running_signal,
-            "subscribe",
-            MagicMock(),
         )
 
         # We don't want to actually exit the process in the test

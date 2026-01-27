@@ -91,16 +91,15 @@ def test_watch_running_updates_text(monkeypatch):
     update_text_mock.assert_called_once()
 
 
-def test_watch_elapsed_seconds_updates_text(monkeypatch):
-    """Changing elapsed_seconds triggers text update."""
+def test_elapsed_seconds_shown_in_working_text(monkeypatch):
+    """elapsed_seconds value is included in the working status text."""
     widget = WorkingStatusLine()
+    widget.running = True  # Must be running to show timer
+    widget.elapsed_seconds = 42
 
-    update_text_mock = MagicMock()
-    monkeypatch.setattr(widget, "_update_text", update_text_mock)
-
-    widget.watch_elapsed_seconds(10)
-
-    update_text_mock.assert_called_once()
+    # The working text should include the elapsed seconds
+    working_text = widget._get_working_text()
+    assert "42s" in working_text
 
 
 # ----- InfoStatusLine tests -----

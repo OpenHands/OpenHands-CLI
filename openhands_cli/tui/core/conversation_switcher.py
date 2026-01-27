@@ -5,6 +5,8 @@ This class encapsulates all the complexity of switching between conversations:
 - Thread coordination
 - UI preparation and finalization
 - Error handling
+
+State changes are made via StateManager, which UI components watch for updates.
 """
 
 from __future__ import annotations
@@ -18,7 +20,6 @@ from textual.widgets import Static
 
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text
-from openhands_cli.tui.core.messages import ConversationSwitched, RevertSelectionRequest
 from openhands_cli.tui.modals import SwitchConversationModal
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
@@ -32,17 +33,14 @@ class ConversationSwitcher:
 
     This class extracts ~180 lines of switching logic from OpenHandsApp,
     providing a single responsibility for all conversation switching concerns.
+
+    State changes are made via StateManager rather than posting messages.
+    UI components (like HistorySidePanel) watch StateManager for updates.
     """
 
     def __init__(self, app: OpenHandsApp):
         self.app = app
         self._loading_notification: Notification | None = None
-        self._is_switching: bool = False
-
-    @property
-    def is_switching(self) -> bool:
-        """Check if a conversation switch is in progress."""
-        return self._is_switching
 
     def switch_to(self, conversation_id: str) -> None:
         """Switch to an existing local conversation.
@@ -86,8 +84,8 @@ class ConversationSwitcher:
         if confirmed:
             self._switch_with_pause(target_id)
         else:
-            # Revert selection highlight back to current conversation.
-            self.app.post_message(RevertSelectionRequest())
+            # Revert selection - set is_switching to False triggers UI update
+            self.app.state_manager.finish_switching()
             self.app.input_field.focus_input()
 
     def _switch_with_pause(self, target_id: uuid.UUID) -> None:
@@ -122,7 +120,7 @@ class ConversationSwitcher:
             )
             return
 
-        # Show a persistent loading notification
+        # Show a persistent loading notification and mark switching in progress
         self._show_loading()
 
         # Create visualizer on UI thread (captures correct main thread id)
@@ -149,7 +147,8 @@ class ConversationSwitcher:
 
     def _show_loading(self) -> None:
         """Show a loading notification that can be dismissed after the switch."""
-        self._is_switching = True
+        # Mark switching in progress via StateManager
+        self.app.state_manager.start_switching()
 
         # Dismiss any previous loading notification
         if self._loading_notification is not None:
@@ -177,13 +176,14 @@ class ConversationSwitcher:
             self.app._unnotify(self._loading_notification)
         finally:
             self._loading_notification = None
-            self._is_switching = False
+            # Mark switching complete via StateManager
+            self.app.state_manager.finish_switching()
 
     def _prepare_ui(self, conversation_id: uuid.UUID) -> None:
         """Prepare UI for switching conversations (runs on the UI thread)."""
         app = self.app
 
-        # Set the conversation ID immediately
+        # Set the conversation ID immediately (both app and StateManager)
         app.conversation_id = conversation_id
         app.conversation_runner = None
 
@@ -204,7 +204,7 @@ class ConversationSwitcher:
         # Update splash conversation widget
         splash_conversation = app.query_one("#splash_conversation", Static)
         splash_conversation.update(
-            get_conversation_text(app.conversation_id.hex, theme=OPENHANDS_THEME)
+            get_conversation_text(conversation_id.hex, theme=OPENHANDS_THEME)
         )
 
     def _finish_switch(self, runner, target_id: uuid.UUID) -> None:
@@ -212,7 +212,11 @@ class ConversationSwitcher:
         self.app.conversation_runner = runner
         self.app.main_display.scroll_end(animate=False)
         self._dismiss_loading()
-        self.app.post_message(ConversationSwitched(target_id))
+
+        # Update StateManager - UI components will react automatically
+        self.app.state_manager.set_conversation_id(target_id)
+        self.app.state_manager.reset()  # Reset running state, metrics, title, etc.
+
         self.app.notify(
             title="Switched",
             message=f"Resumed conversation {target_id.hex[:8]}",

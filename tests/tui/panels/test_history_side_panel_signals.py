@@ -1,4 +1,9 @@
-"""Tests for HistorySidePanel and conversation switching."""
+"""Tests for HistorySidePanel and conversation switching.
+
+The HistorySidePanel uses the StateManager pattern for state updates.
+It watches StateManager's reactive properties (conversation_id, conversation_title,
+is_switching) instead of receiving forwarded messages.
+"""
 
 from __future__ import annotations
 
@@ -13,24 +18,22 @@ from textual.widgets import Button, Static
 from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.tui.core.conversation_manager import ConversationManager
-from openhands_cli.tui.core.messages import (
-    ConversationCreated,
-    ConversationTitleUpdated,
-    RevertSelectionRequest,
-    SwitchConversationRequest,
-)
+from openhands_cli.tui.core.messages import SwitchConversationRequest
+from openhands_cli.tui.core.state import StateManager
 from openhands_cli.tui.modals.switch_conversation_modal import SwitchConversationModal
 from openhands_cli.tui.panels.history_side_panel import HistoryItem, HistorySidePanel
 
 
 class HistoryMessagesTestApp(App):
-    """Minimal app for testing HistorySidePanel with Textual messages."""
+    """Minimal app for testing HistorySidePanel with StateManager."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Track messages received by the app
         self.received_switch_requests: list[str] = []
         self._store = LocalFileStore()
+        # StateManager for reactive state
+        self.state_manager = StateManager()
         # Mock the store for tests if needed,
         # but we rely on monkeypatching LocalFileStore in tests
         self._conversation_manager = ConversationManager(
@@ -41,6 +44,7 @@ class HistoryMessagesTestApp(App):
     def compose(self) -> ComposeResult:
         with Horizontal(id="content_area"):
             yield Static("main", id="main")
+            yield self.state_manager
             yield HistorySidePanel(app=self, current_conversation_id=None)  # type: ignore
 
     def on_switch_conversation_request(self, event: SwitchConversationRequest) -> None:
@@ -49,10 +53,10 @@ class HistoryMessagesTestApp(App):
 
 
 @pytest.mark.asyncio
-async def test_history_panel_updates_from_messages(
+async def test_history_panel_updates_from_state_manager(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test that the history panel responds to Textual messages."""
+    """Test that the history panel responds to StateManager state changes."""
     # Stub local conversations list.
     base_id = uuid.uuid4().hex
     conversations = [
@@ -70,19 +74,19 @@ async def test_history_panel_updates_from_messages(
     async with app.run_test() as pilot:
         panel = app.query_one(HistorySidePanel)
 
-        # Initial render contains the single lister conversation.
+        # Initial render contains the single listed conversation.
         list_container = panel.query_one("#history-list", VerticalScroll)
         assert len(list_container.query(HistoryItem)) == 1
 
-        # Post "ConversationCreated" message directly to the panel.
+        # Update conversation_id via StateManager (simulating new conversation)
         new_id = uuid.uuid4()
-        panel.post_message(ConversationCreated(new_id))
+        app.state_manager.conversation_id = new_id
         await pilot.pause()
 
         assert panel.current_conversation_id == new_id
         assert panel.selected_conversation_id == new_id
 
-        # Should now have 2 items (existing + placeholder).
+        # Should now have 2 items (existing + placeholder for new).
         assert len(list_container.query(HistoryItem)) == 2
         placeholder_items = [
             item
@@ -91,20 +95,27 @@ async def test_history_panel_updates_from_messages(
         ]
         assert len(placeholder_items) == 1
 
-        # Post title update message directly to the panel.
-        panel.post_message(ConversationTitleUpdated(new_id, "first message"))
+        # Update title via StateManager
+        app.state_manager.conversation_title = "first message"
         await pilot.pause()
 
         placeholder = placeholder_items[0]
         assert "first message" in str(placeholder.content)
 
-        # Move selection away and then revert via RevertSelectionRequest.
+        # Test is_switching revert behavior:
+        # Move selection away
         panel._handle_select(base_id)
         assert panel.selected_conversation_id is not None
         assert panel.selected_conversation_id.hex == base_id
 
-        panel.post_message(RevertSelectionRequest())
+        # Simulate a cancelled switch (is_switching goes True then False without
+        # conversation_id changing)
+        app.state_manager.is_switching = True
         await pilot.pause()
+        app.state_manager.is_switching = False
+        await pilot.pause()
+
+        # Selection should revert to current conversation
         assert panel.selected_conversation_id == panel.current_conversation_id
 
 

@@ -2,6 +2,7 @@
 
 import logging
 import time
+import uuid
 from typing import TYPE_CHECKING, Any
 
 from textual.containers import Container
@@ -45,31 +46,47 @@ class StateManager(Container):
     reactive state. Child widgets can use data_bind() to bind to StateManager's
     reactive properties, which automatically updates them when state changes.
 
-    StateManager OWNS the confirmation policy. All policy changes should go through
-    StateManager.set_confirmation_policy(), which automatically syncs to the
-    attached conversation.
+    For dynamically mounted widgets (like HistorySidePanel), use self.watch()
+    to subscribe to StateManager's reactive properties.
+
+    StateManager OWNS:
+    - Confirmation policy (synced to attached conversation)
+    - Conversation identity (conversation_id, conversation_title)
+    - Running state and metrics
 
     Example:
-        # In compose(), yield widgets as children of StateManager:
+        # Child widgets use data_bind():
         with state_manager:
             yield WorkingStatusLine().data_bind(
                 running=StateManager.running,
                 elapsed_seconds=StateManager.elapsed_seconds,
             )
 
-        # State updates automatically propagate to bound children:
-        state_manager.set_running(True)  # WorkingStatusLine updates automatically
+        # Dynamically mounted widgets use self.watch():
+        class HistorySidePanel(Container):
+            def on_mount(self):
+                self.watch(self.app.state_manager, "conversation_id", self._on_change)
 
-        # Confirmation policy changes:
-        state_manager.set_confirmation_policy(NeverConfirm())  # Auto-syncs to conversation
+        # State updates automatically propagate:
+        state_manager.set_running(True)
+        state_manager.set_conversation_id(new_id)
 
     The StateManager also emits messages for complex state transitions.
     """
 
     # ---- Core Running State ----
-    # Note: Named 'running' to avoid conflict with MessagePump.is_running property
     running: var[bool] = var(False)
     """Whether the conversation is currently running/processing."""
+
+    # ---- Conversation Identity ----
+    conversation_id: var[uuid.UUID | None] = var(None)
+    """The currently active conversation ID."""
+
+    conversation_title: var[str | None] = var(None)
+    """The title of the current conversation (first user message)."""
+
+    is_switching: var[bool] = var(False)
+    """Whether a conversation switch is in progress."""
 
     # ---- Confirmation Policy (StateManager owns this) ----
     confirmation_policy: var[ConfirmationPolicyBase] = var(AlwaysConfirm())
@@ -83,9 +100,8 @@ class StateManager(Container):
     """Seconds elapsed since conversation started."""
 
     # ---- Metrics ----
-    # Store the Metrics object directly from conversation stats
     metrics: var[Metrics | None] = var(None)
-    """Combined metrics from conversation stats (updated by ConversationRunner)."""
+    """Combined metrics from conversation stats."""
 
     # ---- UI State ----
     is_multiline_mode: var[bool] = var(False)
@@ -271,12 +287,32 @@ class StateManager(Container):
             combined_metrics = stats.get_combined_metrics()
             self.metrics = combined_metrics
 
+    # ---- Conversation Identity Methods ----
+
+    def set_conversation_id(self, conversation_id: uuid.UUID) -> None:
+        """Set the current conversation ID. Thread-safe."""
+        self._schedule_update("conversation_id", conversation_id)
+
+    def set_conversation_title(self, title: str) -> None:
+        """Set the conversation title. Thread-safe."""
+        self._schedule_update("conversation_title", title)
+
+    def start_switching(self) -> None:
+        """Mark that a conversation switch is in progress. Thread-safe."""
+        self._schedule_update("is_switching", True)
+
+    def finish_switching(self) -> None:
+        """Mark that a conversation switch has completed. Thread-safe."""
+        self._schedule_update("is_switching", False)
+
     def reset(self) -> None:
         """Reset state for a new conversation."""
         self.running = False
         self.elapsed_seconds = 0
         self.pending_actions_count = 0
         self.metrics = None
+        self.conversation_title = None
         self._conversation_start_time = None
         self._conversation = None
         # Note: confirmation_policy is NOT reset - it persists across conversations
+        # Note: conversation_id is NOT reset here - set explicitly when switching
