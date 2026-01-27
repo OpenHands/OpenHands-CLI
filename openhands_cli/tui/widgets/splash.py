@@ -114,7 +114,10 @@ class SplashContent(Container):
         via the history panel or /new command.
         """
         if self._is_initialized:
-            self._update_conversation_text()
+            conversation_text = get_conversation_text(
+                self.conversation_id.hex, theme=OPENHANDS_THEME
+            )
+            self.query_one("#splash_conversation", Static).update(conversation_text)
 
     def _hide_content(self) -> None:
         """Hide all splash content widgets."""
@@ -128,13 +131,6 @@ class SplashContent(Container):
                 # These are shown conditionally based on content
                 continue
             widget.display = True
-
-    def _update_conversation_text(self) -> None:
-        """Update the conversation ID display."""
-        conversation_text = get_conversation_text(
-            self.conversation_id.hex, theme=OPENHANDS_THEME
-        )
-        self.query_one("#splash_conversation", Static).update(conversation_text)
 
     def _populate_content(self) -> None:
         """Populate splash content widgets with actual content."""

@@ -74,7 +74,7 @@ from openhands_cli.tui.widgets.collapsible import (
     CollapsibleTitle,
 )
 from openhands_cli.user_actions.types import UserConfirmation
-
+from openhands_cli.tui.widgets.splash import SplashContent
 
 class OpenHandsApp(CollapsibleNavigationMixin, App):
     """A minimal textual app for OpenHands CLI with scrollable main display."""
@@ -405,13 +405,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         content initialization is a direct method call, not a reactive
         state change, because it's a one-time operation.
         """
-        from openhands_cli.tui.widgets.splash import SplashContent
+        
 
         splash_content = self.query_one("#splash_content", SplashContent)
-
-        # Check if already initialized
-        if splash_content.is_initialized:
-            return
 
         # Check if agent has critic configured
         has_critic = False
@@ -487,20 +483,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Process message asynchronously to keep UI responsive
         # Only run worker if we have an active app (not in tests)
-        try:
-            self.run_worker(
-                runner.process_message_async(user_message, self.headless_mode),
-                name="process_message",
-            )
-        except RuntimeError:
-            # In test environment, just show a placeholder message
-            placeholder_widget = Static(
-                f"[{OPENHANDS_THEME.success}]Message would be processed by "
-                f"conversation runner[/{OPENHANDS_THEME.success}]",
-                classes="status-message",
-            )
-            self.main_display.mount(placeholder_widget)
-            self.main_display.scroll_end(animate=False)
+        self.run_worker(
+            runner.process_message_async(user_message, self.headless_mode),
+            name="process_message",
+        )
 
     def action_request_quit(self) -> None:
         """Action to handle Ctrl+Q key binding.
