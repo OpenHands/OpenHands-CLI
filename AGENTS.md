@@ -18,8 +18,10 @@ This repo contains the current CLI UX, including the Textual TUI and a browser-s
 - `.openhands/skills/`: agent guidance for this repo.
 
 ## Setup, Build, and Development Commands
-- install dependencies: `make install`
-- install dev dependencies: `make install-dev`
+This repository uses **uv** for dependency management and running tooling (see `Makefile`, CI workflows, and `uv.lock`). Avoid using `pip install ...` directly.
+
+- install dependencies: `make install` (runs `uv sync`)
+- install dev dependencies: `make install-dev` (runs `uv sync --group dev`)
 - install pre-commit hooks: `uv run pre-commit install` (included in `make build`)
 - build (sync + install hooks): `make build`
 - lint (all pre-commit hooks): `make lint`
