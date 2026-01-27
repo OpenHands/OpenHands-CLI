@@ -1,0 +1,1 @@
+{"id":"0df665dd-b023-4473-9c48-80d35edbb4f5","timestamp":"2026-01-27T03:56:17.815138","source":"user","llm_message":{"role":"user","content":[{"cache_prompt":false,"type":"text","text":"echo hello world","enable_truncation":true}],"thinking_blocks":[]},"activated_skills":[],"extended_content":[],"kind":"MessageEvent"}
