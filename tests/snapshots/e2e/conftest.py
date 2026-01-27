@@ -28,9 +28,16 @@ def mock_llm_setup(tmp_path, monkeypatch):
     import uuid as uuid_module
     from pathlib import Path
 
-    # Use a fixed UUID for deterministic snapshots
-    fixed_uuid = uuid_module.UUID("00000000-0000-0000-0000-000000000001")
-    monkeypatch.setattr(uuid_module, "uuid4", lambda: fixed_uuid)
+    # Create a deterministic UUID generator that returns sequential UUIDs
+    # This ensures reproducible snapshots while avoiding duplicate ID errors
+    uuid_counter = [0]
+
+    def deterministic_uuid4():
+        uuid_counter[0] += 1
+        # Format: 00000000-0000-0000-0000-000000000001, 000000...002, etc.
+        return uuid_module.UUID(f"00000000-0000-0000-0000-{uuid_counter[0]:012d}")
+
+    monkeypatch.setattr(uuid_module, "uuid4", deterministic_uuid4)
 
     # Create directories with fixed names for deterministic paths in snapshots
     # We still use tmp_path as base but create predictable subdirectory names
@@ -129,9 +136,14 @@ def mock_llm_with_trajectory(tmp_path, monkeypatch, request):
 
     trajectory_name = getattr(request, "param", "simple_echo_hello_world")
 
-    # Use a fixed UUID for deterministic snapshots
-    fixed_uuid = uuid_module.UUID("00000000-0000-0000-0000-000000000001")
-    monkeypatch.setattr(uuid_module, "uuid4", lambda: fixed_uuid)
+    # Create a deterministic UUID generator that returns sequential UUIDs
+    uuid_counter = [0]
+
+    def deterministic_uuid4():
+        uuid_counter[0] += 1
+        return uuid_module.UUID(f"00000000-0000-0000-0000-{uuid_counter[0]:012d}")
+
+    monkeypatch.setattr(uuid_module, "uuid4", deterministic_uuid4)
 
     # Create directories
     conversations_dir = tmp_path / "conversations"
