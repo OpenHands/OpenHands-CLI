@@ -178,12 +178,17 @@ class TestRefreshContentWithServerObjects:
     """Tests for MCPSidePanel.refresh_content with server objects."""
 
     @pytest.mark.asyncio
-    async def test_refresh_content_with_remote_mcp_servers(self, tmp_path: Path):
+    async def test_refresh_content_with_remote_mcp_servers(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
         """Test refresh_content handles RemoteMCPServer objects in agent config.
 
         This test reproduces the bug from issue #362 where opening the MCP menu
         crashed with: TypeError: Object of type RemoteMCPServer is not JSON serializable
         """
+        # Set environment variable for persistence dir
+        monkeypatch.setenv("OPENHANDS_PERSISTENCE_DIR", str(tmp_path))
+
         # Create MCP config file with servers
         mcp_config_data = {
             "mcpServers": {
@@ -218,26 +223,28 @@ class TestRefreshContentWithServerObjects:
 
         app = TestApp()
 
-        with patch(
-            "openhands_cli.locations.get_persistence_dir", return_value=str(tmp_path)
-        ):
-            async with app.run_test() as pilot:
-                await pilot.pause()
+        async with app.run_test() as pilot:
+            await pilot.pause()
 
-                panel = MCPSidePanel(agent=mock_agent)
-                content_area = app.query_one("#content_area", Horizontal)
-                content_area.mount(panel)
-                await pilot.pause()
+            panel = MCPSidePanel(agent=mock_agent)
+            content_area = app.query_one("#content_area", Horizontal)
+            content_area.mount(panel)
+            await pilot.pause()
 
-                # This should NOT raise TypeError
-                panel.refresh_content()
+            # This should NOT raise TypeError
+            panel.refresh_content()
 
     @pytest.mark.asyncio
-    async def test_refresh_content_with_disabled_servers(self, tmp_path: Path):
+    async def test_refresh_content_with_disabled_servers(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
         """Test refresh_content handles disabled servers (issue #362 scenario).
 
         The user mentioned having some MCP servers explicitly disabled.
         """
+        # Set environment variable for persistence dir
+        monkeypatch.setenv("OPENHANDS_PERSISTENCE_DIR", str(tmp_path))
+
         # Create MCP config file with enabled and disabled servers
         mcp_config_data = {
             "mcpServers": {
@@ -282,19 +289,16 @@ class TestRefreshContentWithServerObjects:
 
         app = TestApp()
 
-        with patch(
-            "openhands_cli.locations.get_persistence_dir", return_value=str(tmp_path)
-        ):
-            async with app.run_test() as pilot:
-                await pilot.pause()
+        async with app.run_test() as pilot:
+            await pilot.pause()
 
-                panel = MCPSidePanel(agent=mock_agent)
-                content_area = app.query_one("#content_area", Horizontal)
-                content_area.mount(panel)
-                await pilot.pause()
+            panel = MCPSidePanel(agent=mock_agent)
+            content_area = app.query_one("#content_area", Horizontal)
+            content_area.mount(panel)
+            await pilot.pause()
 
-                # This should NOT raise TypeError
-                panel.refresh_content()
+            # This should NOT raise TypeError
+            panel.refresh_content()
 
 
 # ============================================================================
@@ -306,53 +310,62 @@ class TestToggle:
     """Tests for MCPSidePanel.toggle class method."""
 
     @pytest.mark.asyncio
-    async def test_toggle_mounts_panel(self, tmp_path: Path):
+    async def test_toggle_mounts_panel(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
         """Verify toggle() mounts the panel."""
+        # Set environment variable for persistence dir
+        monkeypatch.setenv("OPENHANDS_PERSISTENCE_DIR", str(tmp_path))
+
         app = MCPPanelTestApp()
 
-        with patch(
-            "openhands_cli.locations.get_persistence_dir", return_value=str(tmp_path)
-        ):
-            async with app.run_test() as pilot:
-                await pilot.pause()
+        async with app.run_test() as pilot:
+            await pilot.pause()
 
-                # Toggle to mount
-                MCPSidePanel.toggle(app)
-                await pilot.pause()
+            # Toggle to mount
+            MCPSidePanel.toggle(app)
+            await pilot.pause()
 
-                # Verify panel is mounted
-                panels = app.query(MCPSidePanel)
-                assert len(panels) == 1
+            # Verify panel is mounted
+            panels = app.query(MCPSidePanel)
+            assert len(panels) == 1
 
     @pytest.mark.asyncio
-    async def test_toggle_removes_panel(self, tmp_path: Path):
+    async def test_toggle_removes_panel(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
         """Verify toggle() removes an existing panel."""
+        # Set environment variable for persistence dir
+        monkeypatch.setenv("OPENHANDS_PERSISTENCE_DIR", str(tmp_path))
+
         app = MCPPanelTestApp()
 
-        with patch(
-            "openhands_cli.locations.get_persistence_dir", return_value=str(tmp_path)
-        ):
-            async with app.run_test() as pilot:
-                await pilot.pause()
+        async with app.run_test() as pilot:
+            await pilot.pause()
 
-                # Toggle to mount
-                MCPSidePanel.toggle(app)
-                await pilot.pause()
+            # Toggle to mount
+            MCPSidePanel.toggle(app)
+            await pilot.pause()
 
-                # Toggle to remove
-                MCPSidePanel.toggle(app)
-                await pilot.pause()
+            # Toggle to remove
+            MCPSidePanel.toggle(app)
+            await pilot.pause()
 
-                # Verify panel is removed
-                panels = app.query(MCPSidePanel)
-                assert len(panels) == 0
+            # Verify panel is removed
+            panels = app.query(MCPSidePanel)
+            assert len(panels) == 0
 
     @pytest.mark.asyncio
-    async def test_toggle_with_remote_mcp_servers_in_agent(self, tmp_path: Path):
+    async def test_toggle_with_remote_mcp_servers_in_agent(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
         """Test toggle works when agent has RemoteMCPServer objects.
 
         This is the main reproduction test for issue #362.
         """
+        # Set environment variable for persistence dir
+        monkeypatch.setenv("OPENHANDS_PERSISTENCE_DIR", str(tmp_path))
+
         # Create MCP config file
         mcp_config_data = {
             "mcpServers": {
@@ -382,13 +395,7 @@ class TestToggle:
 
         app = MCPPanelTestApp()
 
-        with (
-            patch(
-                "openhands_cli.locations.get_persistence_dir",
-                return_value=str(tmp_path),
-            ),
-            patch("openhands_cli.stores.AgentStore") as mock_agent_store_class,
-        ):
+        with patch("openhands_cli.stores.AgentStore") as mock_agent_store_class:
             mock_agent_store = MagicMock()
             mock_agent_store.load.return_value = mock_agent
             mock_agent_store_class.return_value = mock_agent_store

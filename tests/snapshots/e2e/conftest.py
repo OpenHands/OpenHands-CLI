@@ -44,7 +44,7 @@ def setup_test_directories(tmp_path: Path) -> tuple[Path, Path]:
     return conversations_dir, WORK_DIR
 
 
-def patch_location_modules(
+def patch_location_env_vars(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     conversations_dir: Path,
@@ -55,11 +55,17 @@ def patch_location_modules(
     Using environment variables ensures all modules that call the getter functions
     will get the test paths, regardless of when they're imported.
     """
-    # Set environment variables - the getter functions will read these
     monkeypatch.setenv("OPENHANDS_PERSISTENCE_DIR", str(tmp_path))
     monkeypatch.setenv("OPENHANDS_CONVERSATIONS_DIR", str(conversations_dir))
     monkeypatch.setenv("OPENHANDS_WORK_DIR", str(work_dir))
 
+
+def patch_deterministic_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Patch paths for deterministic snapshot testing.
+
+    This ensures that sys.executable and Python interpreter paths are fixed
+    to produce consistent snapshots across different environments.
+    """
     # Mock sys.executable to return a fixed path for deterministic snapshots
     monkeypatch.setattr(sys, "executable", FIXED_PYTHON_PATH)
 
@@ -98,7 +104,8 @@ def mock_llm_setup(
     Returns a dict including 'conversation_id' that should be passed to OpenHandsApp.
     """
     conversations_dir, work_dir = setup_test_directories(tmp_path)
-    patch_location_modules(monkeypatch, tmp_path, conversations_dir, work_dir)
+    patch_location_env_vars(monkeypatch, tmp_path, conversations_dir, work_dir)
+    patch_deterministic_paths(monkeypatch)
 
     trajectory = load_trajectory(get_trajectories_dir() / "simple_echo_hello_world")
     server = MockLLMServer(trajectory=trajectory)
@@ -138,7 +145,8 @@ def mock_llm_with_trajectory(
     trajectory_name = getattr(request, "param", "simple_echo_hello_world")
 
     conversations_dir, work_dir = setup_test_directories(tmp_path)
-    patch_location_modules(monkeypatch, tmp_path, conversations_dir, work_dir)
+    patch_location_env_vars(monkeypatch, tmp_path, conversations_dir, work_dir)
+    patch_deterministic_paths(monkeypatch)
 
     trajectory = load_trajectory(get_trajectories_dir() / trajectory_name)
     server = MockLLMServer(trajectory=trajectory)
