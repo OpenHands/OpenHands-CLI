@@ -13,7 +13,9 @@ from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
 from openhands_cli.stores import AgentStore
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
-
+from openhands.sdk.security.confirmation_policy import (
+    ConfirmationPolicyBase,
+)
 
 class MissingAgentSpec(Exception):
     """Raised when agent specification is not found or invalid."""
@@ -88,6 +90,7 @@ def load_agent_specs(
 
 def setup_conversation(
     conversation_id: UUID,
+    confirmation_policy: ConfirmationPolicyBase,
     visualizer: ConversationVisualizer | None = None,
     event_callback: Callable[[Event], None] | None = None,
     *,
@@ -141,6 +144,7 @@ def setup_conversation(
     # Note: Confirmation policy is NOT set here - StateManager owns it and will
     # apply the initial policy when the conversation is attached
     conversation.set_security_analyzer(LLMSecurityAnalyzer())
+    conversation.set_confirmation_policy(confirmation_policy)
 
     console.print(f"✓ Agent initialized with model: {agent.llm.model}", style="green")
 

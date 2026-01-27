@@ -79,6 +79,7 @@ class ConversationRunner:
         # Create conversation WITHOUT setting policy - StateManager will do it
         self.conversation: BaseConversation = setup_conversation(
             conversation_id,
+            confirmation_policy=state_manager.confirmation_policy,
             visualizer=visualizer,
             event_callback=event_callback,
             env_overrides_enabled=env_overrides_enabled,
