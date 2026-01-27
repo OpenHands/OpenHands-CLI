@@ -5,13 +5,12 @@ repeated pilot.pause() calls.
 """
 
 import asyncio
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
+
 
 if TYPE_CHECKING:
     from textual.pilot import Pilot
     from textual.widget import Widget
-
-_W = TypeVar("_W", bound="Widget")
 
 
 async def wait_for_app_ready(pilot: "Pilot") -> None:
@@ -26,11 +25,11 @@ async def wait_for_app_ready(pilot: "Pilot") -> None:
     await pilot.wait_for_scheduled_animations()
 
 
-async def wait_for_widget(
+async def wait_for_widget[W: "Widget"](
     pilot: "Pilot",
-    widget_type: type[_W],
+    widget_type: type[W],
     timeout: float = 5.0,
-) -> _W:
+) -> W:
     """Wait for a specific widget type to be available in the app.
 
     Args:
@@ -79,7 +78,7 @@ async def wait_for_idle(pilot: "Pilot", timeout: float = 30.0) -> None:
             pilot.app.workers.wait_for_complete(),
             timeout=timeout,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         pass
 
     # Then wait for any animations triggered by worker completion

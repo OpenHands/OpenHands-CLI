@@ -24,7 +24,9 @@ def mock_llm_setup(tmp_path, monkeypatch):
     6. Yields the config paths
     7. Cleans up the server on teardown
     """
+    import shutil
     import uuid as uuid_module
+    from pathlib import Path
 
     # Use a fixed UUID for deterministic snapshots
     fixed_uuid = uuid_module.UUID("00000000-0000-0000-0000-000000000001")
@@ -34,8 +36,15 @@ def mock_llm_setup(tmp_path, monkeypatch):
     # We still use tmp_path as base but create predictable subdirectory names
     conversations_dir = tmp_path / "conversations"
     conversations_dir.mkdir(exist_ok=True)
-    work_dir = tmp_path / "workspace"
-    work_dir.mkdir(exist_ok=True)
+
+    # Use a fixed path for work_dir that:
+    # 1. Is writable on most systems (/tmp is typically writable)
+    # 2. Is deterministic for snapshot comparison
+    # We clean it up at the end of each test
+    work_dir = Path("/tmp/openhands-e2e-test-workspace")
+    if work_dir.exists():
+        shutil.rmtree(work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
 
     # CRITICAL: Patch the locations module DIRECTLY before any imports
     # This must happen before any module that imports from locations
@@ -45,7 +54,8 @@ def mock_llm_setup(tmp_path, monkeypatch):
     monkeypatch.setattr(locations_module, "CONVERSATIONS_DIR", str(conversations_dir))
     monkeypatch.setattr(locations_module, "AGENT_SETTINGS_PATH", "agent_settings.json")
     # Use a fixed work directory path for deterministic snapshots
-    monkeypatch.setattr(locations_module, "WORK_DIR", "/workspace")
+    # This path is writable on most systems (unlike /workspace)
+    monkeypatch.setattr(locations_module, "WORK_DIR", str(work_dir))
 
     # Also patch the stores module which may have cached the values
     from openhands_cli.stores import agent_store as agent_store_module
@@ -55,7 +65,7 @@ def mock_llm_setup(tmp_path, monkeypatch):
     monkeypatch.setattr(
         agent_store_module, "AGENT_SETTINGS_PATH", "agent_settings.json"
     )
-    monkeypatch.setattr(agent_store_module, "WORK_DIR", "/workspace")
+    monkeypatch.setattr(agent_store_module, "WORK_DIR", str(work_dir))
 
     # Load trajectory for deterministic replay
     trajectory = load_trajectory(get_trajectories_dir() / "simple_echo_hello_world")
@@ -95,6 +105,9 @@ def mock_llm_setup(tmp_path, monkeypatch):
 
     # Cleanup
     server.stop()
+    # Clean up the fixed work directory
+    if work_dir.exists():
+        shutil.rmtree(work_dir)
 
 
 @pytest.fixture
@@ -110,7 +123,9 @@ def mock_llm_with_trajectory(tmp_path, monkeypatch, request):
         def test_something(self, mock_llm_with_trajectory):
             ...
     """
+    import shutil
     import uuid as uuid_module
+    from pathlib import Path
 
     trajectory_name = getattr(request, "param", "simple_echo_hello_world")
 
@@ -121,8 +136,12 @@ def mock_llm_with_trajectory(tmp_path, monkeypatch, request):
     # Create directories
     conversations_dir = tmp_path / "conversations"
     conversations_dir.mkdir(exist_ok=True)
-    work_dir = tmp_path / "workspace"
-    work_dir.mkdir(exist_ok=True)
+
+    # Use a fixed path for work_dir that is writable and deterministic
+    work_dir = Path("/tmp/openhands-e2e-test-workspace")
+    if work_dir.exists():
+        shutil.rmtree(work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
 
     # Patch locations module
     import openhands_cli.locations as locations_module
@@ -130,7 +149,7 @@ def mock_llm_with_trajectory(tmp_path, monkeypatch, request):
     monkeypatch.setattr(locations_module, "PERSISTENCE_DIR", str(tmp_path))
     monkeypatch.setattr(locations_module, "CONVERSATIONS_DIR", str(conversations_dir))
     monkeypatch.setattr(locations_module, "AGENT_SETTINGS_PATH", "agent_settings.json")
-    monkeypatch.setattr(locations_module, "WORK_DIR", "/workspace")
+    monkeypatch.setattr(locations_module, "WORK_DIR", str(work_dir))
 
     from openhands_cli.stores import agent_store as agent_store_module
 
@@ -139,7 +158,7 @@ def mock_llm_with_trajectory(tmp_path, monkeypatch, request):
     monkeypatch.setattr(
         agent_store_module, "AGENT_SETTINGS_PATH", "agent_settings.json"
     )
-    monkeypatch.setattr(agent_store_module, "WORK_DIR", "/workspace")
+    monkeypatch.setattr(agent_store_module, "WORK_DIR", str(work_dir))
 
     # Load specified trajectory
     trajectory = load_trajectory(get_trajectories_dir() / trajectory_name)
@@ -173,4 +192,7 @@ def mock_llm_with_trajectory(tmp_path, monkeypatch, request):
         "trajectory_name": trajectory_name,
     }
 
+    # Cleanup
     server.stop()
+    if work_dir.exists():
+        shutil.rmtree(work_dir)
