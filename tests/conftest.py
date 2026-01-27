@@ -62,28 +62,19 @@ def mock_cli_interactions():
 
 
 # Fixture: setup_test_agent_config
-# Automatically set up agent configuration for all tests
-@pytest.fixture(autouse=True, scope="function")
-def setup_test_agent_config(tmp_path_factory, request):
+# Set up agent configuration for tests that need it
+@pytest.fixture(scope="function")
+def setup_test_agent_config(tmp_path_factory):
     """
-    Automatically set up a minimal agent configuration for all tests.
+    Set up a minimal agent configuration for tests that need it.
 
     This fixture:
     - Creates a temporary directory for agent settings
     - Creates a minimal agent_settings.json file
     - Patches AgentStore to use the temporary directory
-    - Runs for every test automatically (autouse=True)
 
-    Note: This fixture is skipped for e2e tests that use mock_llm_setup or
-    mock_llm_with_trajectory fixtures, as those tests have their own setup.
+    Tests that need agent configuration should explicitly request this fixture.
     """
-    # Skip this fixture for e2e tests that have their own mock LLM setup
-    # These tests use mock_llm_setup or mock_llm_with_trajectory fixtures
-    fixture_names = request.fixturenames
-    if "mock_llm_setup" in fixture_names or "mock_llm_with_trajectory" in fixture_names:
-        yield None
-        return
-
     # Create a temporary directory for this test session
     temp_persistence_dir = tmp_path_factory.mktemp("openhands_test")
     conversations_dir = temp_persistence_dir / "conversations"
@@ -104,17 +95,6 @@ def setup_test_agent_config(tmp_path_factory, request):
     agent_settings_path = temp_persistence_dir / "agent_settings.json"
     agent_settings_json = agent.model_dump_json()
     agent_settings_path.write_text(agent_settings_json)
-
-    #  Also create the agent settings in the default location as a fallback
-    # This ensures tests work even if the patch isn't applied early enough
-    from openhands_cli import locations
-
-    default_persistence_dir = Path(locations.get_persistence_dir())
-    if not default_persistence_dir.exists():
-        default_persistence_dir.mkdir(parents=True, exist_ok=True)
-    default_agent_settings = default_persistence_dir / "agent_settings.json"
-    if not default_agent_settings.exists():
-        default_agent_settings.write_text(agent_settings_json)
 
     # Patch locations module getter functions
     with patch.multiple(
