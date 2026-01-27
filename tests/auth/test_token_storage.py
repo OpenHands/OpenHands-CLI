@@ -4,7 +4,6 @@ import os
 import stat
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 from openhands_cli.auth.token_storage import TokenStorage
 
@@ -153,20 +152,18 @@ class TestTokenStorage:
             storage.store_api_key(second_key)
             assert storage.get_api_key() == second_key
 
-    def test_default_config_dir(self):
+    def test_default_config_dir(self, monkeypatch):
         """Test that TokenStorage uses default config dir when none provided."""
         with tempfile.TemporaryDirectory() as temp_dir:
             test_persistence_dir = str(Path(temp_dir) / "persistence")
-            # Patch where the function is used (in token_storage module)
-            with patch(
-                "openhands_cli.auth.token_storage.get_persistence_dir",
-                return_value=test_persistence_dir,
-            ):
-                storage = TokenStorage()
+            # Set environment variable - works regardless of import order
+            monkeypatch.setenv("OPENHANDS_PERSISTENCE_DIR", test_persistence_dir)
 
-                # Should use the patched get_persistence_dir()/cloud
-                expected_path = str(Path(test_persistence_dir) / "cloud")
-                assert str(storage.config_dir) == expected_path
+            storage = TokenStorage()
+
+            # Should use the env var's get_persistence_dir()/cloud
+            expected_path = str(Path(test_persistence_dir) / "cloud")
+            assert str(storage.config_dir) == expected_path
 
     def test_api_key_file_permissions(self):
         """Test that API key file is created with secure permissions (600)."""

@@ -2,7 +2,6 @@
 
 import argparse
 import tempfile
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -20,16 +19,7 @@ from openhands_cli.mcp.mcp_commands import (
 from openhands_cli.mcp.mcp_display_utils import mask_sensitive_value
 
 
-@pytest.fixture
-def temp_config_path():
-    """Fixture that provides a temporary config path and patches get_persistence_dir."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        config_path = Path(temp_dir) / "mcp.json"
-        # Patch get_persistence_dir so that _get_mcp_config_path() returns our temp path
-        with patch(
-            "openhands_cli.locations.get_persistence_dir", return_value=str(temp_dir)
-        ):
-            yield config_path
+# temp_config_path fixture is provided by tests/conftest.py
 
 
 class TestMCPCommands:

@@ -1,9 +1,6 @@
 """Unit tests for MCP configuration management."""
 
 import json
-import tempfile
-from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
@@ -26,16 +23,7 @@ from openhands_cli.mcp.mcp_utils import (
 )
 
 
-@pytest.fixture
-def temp_config_path():
-    """Fixture that provides a temporary config path and patches get_persistence_dir."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        config_path = Path(temp_dir) / "mcp.json"
-        # Patch get_persistence_dir so that _get_mcp_config_path() returns our temp path
-        with patch(
-            "openhands_cli.locations.get_persistence_dir", return_value=str(temp_dir)
-        ):
-            yield config_path
+# temp_config_path fixture is provided by tests/conftest.py
 
 
 class TestMCPFunctions:
