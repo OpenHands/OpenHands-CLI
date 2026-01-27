@@ -344,6 +344,46 @@ class TestPrintConversationSummary:
 # ---------------------------------------------------------------------------
 
 
+class TestHeadlessRunnerOutput:
+    """Tests for headless mode output without spinner."""
+
+    def test_headless_mode_prints_status_without_spinner(self):
+        """Test that headless mode prints status messages without spinner."""
+        from openhands_cli.tui.core.conversation_runner import ConversationRunner
+
+        mock_conversation = Mock()
+        mock_conversation.send_message = Mock()
+        mock_conversation.run = Mock()
+
+        runner = ConversationRunner(
+            conversation_id=uuid.uuid4(),
+            running_state_callback=Mock(),
+            confirmation_callback=Mock(),
+            notification_callback=Mock(),
+            visualizer=Mock(),
+        )
+        runner.conversation = mock_conversation
+        runner._confirmation_mode_active = False
+
+        message = Mock()
+
+        with patch(
+            "openhands_cli.tui.core.conversation_runner.Console"
+        ) as mock_console_cls:
+            mock_console = MagicMock()
+            mock_console_cls.return_value = mock_console
+
+            runner._run_conversation_sync(message, headless=True)
+
+            # Verify console.print was called with the expected messages
+            print_calls = [call[0][0] for call in mock_console.print.call_args_list]
+            assert "Agent is working" in print_calls
+            assert "Agent finished" in print_calls
+
+            # Verify console.status was NOT called (no spinner)
+            mock_console.status.assert_not_called()
+
+
 class TestConversationSummary:
     """Tests for ConversationRunner.get_conversation_summary itself."""
 
