@@ -10,6 +10,7 @@ from pydantic import SecretStr
 from openhands.sdk import LLM, Agent
 from openhands_cli.locations import AGENT_SETTINGS_PATH, MCP_CONFIG_FILE
 from openhands_cli.stores import AgentStore
+from tests.conftest import MockLocations
 
 
 # ---------------------- tiny helpers ----------------------
@@ -29,18 +30,9 @@ def write_agent(root: Path, agent: Agent) -> None:
 
 
 @pytest.fixture
-def persistence_dir(tmp_path, monkeypatch) -> Path:
-    # Create root dir and point AgentStore at it
-    root = tmp_path / "openhands"
-    root.mkdir()
-    # Patch get_persistence_dir at both locations - where defined and where imported
-    monkeypatch.setattr(
-        "openhands_cli.locations.get_persistence_dir", lambda: str(root)
-    )
-    monkeypatch.setattr(
-        "openhands_cli.stores.agent_store.get_persistence_dir", lambda: str(root)
-    )
-    return root
+def persistence_dir(mock_locations: MockLocations) -> Path:
+    """Return the persistence directory from mock_locations."""
+    return mock_locations.persistence_dir
 
 
 @pytest.fixture

@@ -13,6 +13,7 @@ from openhands.sdk.tool import Tool
 from openhands_cli.locations import AGENT_SETTINGS_PATH
 from openhands_cli.stores import AgentStore
 from openhands_cli.stores.agent_store import get_persisted_conversation_tools
+from tests.conftest import MockLocations
 
 
 def write_json(path: Path, obj: dict) -> None:
@@ -26,33 +27,15 @@ def write_agent(root: Path, agent: Agent) -> None:
 
 
 @pytest.fixture
-def persistence_dir(tmp_path, monkeypatch) -> Path:
-    """Create a temporary persistence directory."""
-    root = tmp_path / "openhands"
-    root.mkdir()
-    # Patch at both locations - where defined and where imported
-    monkeypatch.setattr(
-        "openhands_cli.locations.get_persistence_dir", lambda: str(root)
-    )
-    monkeypatch.setattr(
-        "openhands_cli.stores.agent_store.get_persistence_dir", lambda: str(root)
-    )
-    return root
+def persistence_dir(mock_locations: MockLocations) -> Path:
+    """Return the persistence directory from mock_locations."""
+    return mock_locations.persistence_dir
 
 
 @pytest.fixture
-def conversations_dir(persistence_dir, monkeypatch) -> Path:
-    """Create a temporary conversations directory."""
-    convos = persistence_dir / "conversations"
-    convos.mkdir()
-    # Patch at both locations - where defined and where imported
-    monkeypatch.setattr(
-        "openhands_cli.locations.get_conversations_dir", lambda: str(convos)
-    )
-    monkeypatch.setattr(
-        "openhands_cli.stores.agent_store.get_conversations_dir", lambda: str(convos)
-    )
-    return convos
+def conversations_dir(mock_locations: MockLocations) -> Path:
+    """Return the conversations directory from mock_locations."""
+    return mock_locations.conversations_dir
 
 
 @pytest.fixture

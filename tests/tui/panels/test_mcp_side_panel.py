@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
@@ -14,6 +13,7 @@ from textual.containers import Horizontal
 from textual.widgets import Static
 
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
+from tests.conftest import MockLocations
 
 
 if TYPE_CHECKING:
@@ -179,16 +179,13 @@ class TestRefreshContentWithServerObjects:
 
     @pytest.mark.asyncio
     async def test_refresh_content_with_remote_mcp_servers(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, mock_locations: MockLocations
     ):
         """Test refresh_content handles RemoteMCPServer objects in agent config.
 
         This test reproduces the bug from issue #362 where opening the MCP menu
         crashed with: TypeError: Object of type RemoteMCPServer is not JSON serializable
         """
-        # Set environment variable for persistence dir
-        monkeypatch.setenv("OPENHANDS_PERSISTENCE_DIR", str(tmp_path))
-
         # Create MCP config file with servers
         mcp_config_data = {
             "mcpServers": {
@@ -198,7 +195,7 @@ class TestRefreshContentWithServerObjects:
                 }
             }
         }
-        mcp_config_file = tmp_path / "mcp.json"
+        mcp_config_file = mock_locations.persistence_dir / "mcp.json"
         mcp_config_file.write_text(json.dumps(mcp_config_data))
 
         # Create agent with RemoteMCPServer objects (as they would be loaded)
@@ -236,15 +233,12 @@ class TestRefreshContentWithServerObjects:
 
     @pytest.mark.asyncio
     async def test_refresh_content_with_disabled_servers(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, mock_locations: MockLocations
     ):
         """Test refresh_content handles disabled servers (issue #362 scenario).
 
         The user mentioned having some MCP servers explicitly disabled.
         """
-        # Set environment variable for persistence dir
-        monkeypatch.setenv("OPENHANDS_PERSISTENCE_DIR", str(tmp_path))
-
         # Create MCP config file with enabled and disabled servers
         mcp_config_data = {
             "mcpServers": {
@@ -260,7 +254,7 @@ class TestRefreshContentWithServerObjects:
                 },
             }
         }
-        mcp_config_file = tmp_path / "mcp.json"
+        mcp_config_file = mock_locations.persistence_dir / "mcp.json"
         mcp_config_file.write_text(json.dumps(mcp_config_data))
 
         # Create agent with RemoteMCPServer objects
@@ -310,13 +304,8 @@ class TestToggle:
     """Tests for MCPSidePanel.toggle class method."""
 
     @pytest.mark.asyncio
-    async def test_toggle_mounts_panel(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    async def test_toggle_mounts_panel(self, mock_locations: MockLocations):
         """Verify toggle() mounts the panel."""
-        # Set environment variable for persistence dir
-        monkeypatch.setenv("OPENHANDS_PERSISTENCE_DIR", str(tmp_path))
-
         app = MCPPanelTestApp()
 
         async with app.run_test() as pilot:
@@ -331,13 +320,8 @@ class TestToggle:
             assert len(panels) == 1
 
     @pytest.mark.asyncio
-    async def test_toggle_removes_panel(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    async def test_toggle_removes_panel(self, mock_locations: MockLocations):
         """Verify toggle() removes an existing panel."""
-        # Set environment variable for persistence dir
-        monkeypatch.setenv("OPENHANDS_PERSISTENCE_DIR", str(tmp_path))
-
         app = MCPPanelTestApp()
 
         async with app.run_test() as pilot:
@@ -357,15 +341,12 @@ class TestToggle:
 
     @pytest.mark.asyncio
     async def test_toggle_with_remote_mcp_servers_in_agent(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, mock_locations: MockLocations
     ):
         """Test toggle works when agent has RemoteMCPServer objects.
 
         This is the main reproduction test for issue #362.
         """
-        # Set environment variable for persistence dir
-        monkeypatch.setenv("OPENHANDS_PERSISTENCE_DIR", str(tmp_path))
-
         # Create MCP config file
         mcp_config_data = {
             "mcpServers": {
@@ -376,7 +357,7 @@ class TestToggle:
                 }
             }
         }
-        mcp_config_file = tmp_path / "mcp.json"
+        mcp_config_file = mock_locations.persistence_dir / "mcp.json"
         mcp_config_file.write_text(json.dumps(mcp_config_data))
 
         # Create agent settings with RemoteMCPServer objects
