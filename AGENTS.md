@@ -1,23 +1,66 @@
-# Repository Guidelines
+# Contributing to OpenHands CLI
+
+## Table of Contents
+
+- [Repository Purpose](#repository-purpose)
+- [Getting Started](#getting-started)
+  - [Fork and Clone](#fork-and-clone)
+  - [Setup, Build, and Development Commands](#setup-build-and-development-commands)
+- [Project Structure & Module Organization](#project-structure--module-organization)
+- [Development Guidelines](#development-guidelines)
+  - [Linting Requirements](#linting-requirements)
+  - [Typing Requirements](#typing-requirements)
+  - [Documentation Guidelines](#documentation-guidelines)
+- [Coding Style & Naming Conventions](#coding-style--naming-conventions)
+- [Testing Guidelines](#testing-guidelines)
+  - [Snapshot Testing with pytest-textual-snapshot](#snapshot-testing-with-pytest-textual-snapshot)
+- [How to Contribute](#how-to-contribute)
+- [Commit & Pull Request Guidelines](#commit--pull-request-guidelines)
+- [Security & Configuration Tips](#security--configuration-tips)
+
+---
 
 ## Repository Purpose
+
 OpenHands CLI is a standalone terminal interface (Textual TUI) for interacting with the OpenHands agent.
 
 This repo contains the current CLI UX, including the Textual TUI and a browser-served view via `openhands web`.
 
-
 ### References
+
 - Agent-sdk example: https://github.com/All-Hands-AI/agent-sdk/blob/main/examples/hello_world.py
 - If you need to compare with upstream OpenHands code, use `$GITHUB_TOKEN` for access.
 
-## Project Structure & Module Organization
-- `openhands_cli/`: Core CLI/TUI code (`openhands_cli/entrypoint.py`, `openhands_cli/tui/`, `openhands_cli/auth/`, `openhands_cli/mcp/`, `openhands_cli/cloud/`, `openhands_cli/user_actions/`, `openhands_cli/conversations/`, `openhands_cli/theme.py`, helpers in `openhands_cli/utils.py`). Keep new modules snake_case and colocate tests.
-- `tests/`: Pytest suite covering units, integration, and snapshot tests; mirrors source layout. `e2e_tests/`: end-to-end ACP/UI flows.
-- `scripts/acp/`: JSON-RPC and debug helpers for ACP development; `hooks/`: PyInstaller/runtime hooks.
-- Tooling & packaging: `Makefile` for common tasks, `build.sh`/`build.py` for PyInstaller artifacts, `openhands-cli.spec` for the frozen binary, `uv.lock` for resolved deps.
-- `.openhands/skills/`: agent guidance for this repo.
+---
 
-## Setup, Build, and Development Commands
+## Getting Started
+
+### Fork and Clone
+
+1. **Fork the repository** on GitHub to your own account.
+
+2. **Clone your fork** to your local machine:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/OpenHands-CLI.git
+   cd OpenHands-CLI
+   ```
+
+3. **Add the upstream remote** (the original repository):
+   ```bash
+   git remote add upstream https://github.com/All-Hands-AI/OpenHands-CLI.git
+   ```
+
+4. **Verify your remotes** are set up correctly:
+   ```bash
+   git remote -v
+   ```
+   
+   You should see:
+   - `origin` pointing to your fork
+   - `upstream` pointing to the original repository
+
+### Setup, Build, and Development Commands
+
 - install dependencies: `make install`
 - install dev dependencies: `make install-dev`
 - install pre-commit hooks: `uv run pre-commit install` (included in `make build`)
@@ -33,32 +76,54 @@ This repo contains the current CLI UX, including the Textual TUI and a browser-s
 - run tests: `make test` (for faster runs: `uv run pytest -m "not integration"`; end-to-end: `uv run pytest e2e_tests`)
 - build PyInstaller binaries: `./build.sh --install-pyinstaller`
 
+---
+
+## Project Structure & Module Organization
+
+- `openhands_cli/`: Core CLI/TUI code (`openhands_cli/entrypoint.py`, `openhands_cli/tui/`, `openhands_cli/auth/`, `openhands_cli/mcp/`, `openhands_cli/cloud/`, `openhands_cli/user_actions/`, `openhands_cli/conversations/`, `openhands_cli/theme.py`, helpers in `openhands_cli/utils.py`). Keep new modules snake_case and colocate tests.
+- `tests/`: Pytest suite covering units, integration, and snapshot tests; mirrors source layout. `e2e_tests/`: end-to-end ACP/UI flows.
+- `scripts/acp/`: JSON-RPC and debug helpers for ACP development; `hooks/`: PyInstaller/runtime hooks.
+- Tooling & packaging: `Makefile` for common tasks, `build.sh`/`build.py` for PyInstaller artifacts, `openhands-cli.spec` for the frozen binary, `uv.lock` for resolved deps.
+- `.openhands/skills/`: agent guidance for this repo.
+
+---
+
 ## Development Guidelines
 
 ### Linting Requirements
+
 **Always run lint before committing changes.** Use `make lint` to run all pre-commit hooks on all files.
 
 ### Typing Requirements
+
 Prefer modern typing syntax (`X | None` over `Optional[X]`) in new code.
 
 ### Documentation Guidelines
-- Don’t add new root-level `.md` files or “summary updates” to `README.md` unless explicitly requested (use this `AGENTS.md` for repo guidance).
+
+- Don't add new root-level `.md` files or "summary updates" to `README.md` unless explicitly requested (use this `AGENTS.md` for repo guidance).
+
+---
 
 ## Coding Style & Naming Conventions
+
 - Python 3.12, ruff formatting (88-char line limit, double quotes).
 - Ruff enforced rules: pycodestyle, pyflakes, isort, pyupgrade, unused-arg checks (tests allow fixture-style args), and guards against mutable defaults.
 - Keep modules/dirs snake_case; classes in CapWords; user-facing commands/flags kebab-case as in existing entrypoints.
 - Type checking via `pyright` (`uv run pyright`); prefer type hints on new functions and public interfaces.
 
+---
+
 ## Testing Guidelines
+
 - Pytest discovery: files `test_*.py`, classes `Test*`, functions `test_*`. Use `@pytest.mark.integration` for costly flows.
 - Match test locations to implementation (`tests/` mirrors `openhands_cli/`); add fixtures in `tests/conftest.py` when shared.
 - Run `make test` before PRs.
 
-## Snapshot Testing with pytest-textual-snapshot
+### Snapshot Testing with pytest-textual-snapshot
+
 The CLI uses [pytest-textual-snapshot](https://github.com/Textualize/pytest-textual-snapshot) for visual regression testing of Textual UI components. Snapshots are SVG screenshots that capture the exact visual state of the application.
 
-### Running Snapshot Tests
+#### Running Snapshot Tests
 
 ```bash
 # Run all snapshot tests
@@ -68,11 +133,13 @@ uv run pytest tests/snapshots/ -v
 uv run pytest tests/snapshots/ --snapshot-update
 ```
 
-### Snapshot Test Location
+#### Snapshot Test Location
+
 - **Test files**: `tests/snapshots/test_app_snapshots.py`, `tests/snapshots/test_visualizer_snapshots.py`
 - **Generated snapshots**: `tests/snapshots/__snapshots__/test_app_snapshots/*.svg`, `tests/snapshots/__snapshots__/test_visualizer_snapshots/*.svg`
 
-### Writing Snapshot Tests
+#### Writing Snapshot Tests
+
 Snapshot tests must be **synchronous** (not async). The `snap_compare` fixture handles async internally:
 
 ```python
@@ -91,7 +158,8 @@ def test_my_widget(snap_compare):
     assert snap_compare(MyTestApp(), terminal_size=(80, 24))
 ```
 
-#### Using `run_before` for Setup
+##### Using `run_before` for Setup
+
 To interact with the app before taking a screenshot:
 
 ```python
@@ -108,7 +176,7 @@ def test_with_interaction(snap_compare):
     assert snap_compare(MyApp(), terminal_size=(80, 24), run_before=setup)
 ```
 
-#### Using `press` for Key Simulation
+##### Using `press` for Key Simulation
 
 ```python
 def test_with_focus(snap_compare):
@@ -119,7 +187,8 @@ def test_with_focus(snap_compare):
     )
 ```
 
-### Viewing Snapshots Visually
+#### Viewing Snapshots Visually
+
 To view the generated SVG snapshots in a browser:
 
 1. **Start a local HTTP server** in the snapshots directory:
@@ -142,23 +211,64 @@ To view the generated SVG snapshots in a browser:
    pkill -f "python -m http.server 12000"
    ```
 
+#### Snapshot Best Practices
 
-### Snapshot Best Practices
 - Mock external dependencies so snapshots are deterministic.
 - Always pass a fixed `terminal_size=(width, height)`.
 - Commit SVG snapshots.
 - Review snapshot diffs carefully.
 
+---
 
-## Commit & Pull Request Guidelines
-- Follow the repo’s pattern: `<scope>: <concise message> (#NNN)` (see `git log`), where scope is the touched area (e.g., `auth`, `tui`, `fix`).
-- Keep commits focused; include tests and formatting in the same change when practical.
-- PRs should describe behavior changes, list key commands run (e.g., tests/build), link related issues, and include before/after notes or screenshots for UI/TUI updates.
-- Check in `uv.lock` changes when dependency versions move; avoid committing secrets or local config.
+## How to Contribute
 
-### Contribution standards (agents-first)
+### Workflow
+
+1. **Sync with upstream** before starting new work:
+   ```bash
+   git fetch upstream
+   git checkout main
+   git merge upstream/main
+   git push origin main
+   ```
+
+2. **Create a feature branch** from `upstream/main`:
+   ```bash
+   git checkout -b feat/your-feature-name upstream/main
+   ```
+   
+   Or if you prefer to branch from your local main (after syncing):
+   ```bash
+   git checkout main
+   git pull upstream main
+   git checkout -b feat/your-feature-name
+   ```
+
+3. **Make your changes** and commit them following the [Commit & Pull Request Guidelines](#commit--pull-request-guidelines).
+
+4. **Push to your fork**:
+   ```bash
+   git push origin feat/your-feature-name
+   ```
+
+5. **Create a Pull Request** on GitHub:
+   - Go to your fork on GitHub
+   - Click "New Pull Request"
+   - Select your feature branch
+   - Ensure the base branch is `upstream/main` (or the original repository's main branch)
+   - Fill out the PR template and include all required information
+
+6. **Keep your branch up to date** if the PR needs updates:
+   ```bash
+   git fetch upstream
+   git rebase upstream/main
+   git push origin feat/your-feature-name --force-with-lease
+   ```
+
+### Contribution Standards (agents-first)
+
 - Keep PRs minimally scoped; prefer multiple PRs over one large PR when it reduces risk and review load.
-- Include tests for behavior changes (unit/integration/e2e as appropriate). If you can’t add tests, explain why and what manual verification you performed.
+- Include tests for behavior changes (unit/integration/e2e as appropriate). If you can't add tests, explain why and what manual verification you performed.
 - For UI/TUI changes, snapshot tests are the preferred evidence. If snapshots aren't available/appropriate, include screenshots (and note the terminal size used).
 - Before opening a PR, run this verification flow (and include the exact commands run in the PR description):
   1. `make lint`
@@ -166,7 +276,8 @@ To view the generated SVG snapshots in a browser:
   3. If you touched ACP / end-to-end UI flow code (e.g., `e2e_tests/`, `openhands_cli/acp_impl/`, `openhands_cli/mcp/`, auth/connection flow): `uv run pytest e2e_tests`
   4. If you touched TUI code (e.g., `openhands_cli/tui/`, widgets, styles, layout): `uv run pytest tests/snapshots -v` (use `--snapshot-update` only for intentional UI changes)
 
-#### PR submission checklist
+#### PR Submission Checklist
+
 - [ ] Scope is minimal and focused on one change
 - [ ] Tests added/updated for behavior changes (or PR explains why not)
 - [ ] `make lint`
@@ -175,6 +286,18 @@ To view the generated SVG snapshots in a browser:
 - [ ] (If TUI touched) snapshot tests run and snapshots updated/reviewed
 - [ ] PR description includes: what changed, why, commands run, and UI evidence (snapshots/screenshots)
 
+---
+
+## Commit & Pull Request Guidelines
+
+- Follow the repo's pattern: `<scope>: <concise message> (#NNN)` (see `git log`), where scope is the touched area (e.g., `auth`, `tui`, `fix`).
+- Keep commits focused; include tests and formatting in the same change when practical.
+- PRs should describe behavior changes, list key commands run (e.g., tests/build), link related issues, and include before/after notes or screenshots for UI/TUI updates.
+- Check in `uv.lock` changes when dependency versions move; avoid committing secrets or local config.
+
+---
+
 ## Security & Configuration Tips
+
 - Do not embed API keys or endpoints in code; rely on runtime configuration/env vars when integrating new services.
 - When packaging, verify no sensitive files are included in `dist/`; adjust `openhands-cli.spec` if new assets are added.
