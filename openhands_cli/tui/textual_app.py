@@ -7,11 +7,14 @@ Widget Hierarchy::
 
     OpenHandsApp
     └── Horizontal(#content_area)
-        └── MainDisplay(#main_display)  ← Handles commands + renders content
-            ├── Static (splash widgets)
-            ├── ... conversation widgets
-            └── AppState(#input_area)
-                └── InputField          ← Posts messages
+        └── AppState(#app_state)           ← Composes MainDisplay + input area
+            └── MainDisplay(#main_display)  ← Handles commands + renders content
+                ├── SplashContent(#splash_content) ← data_bind to is_ui_ready, conversation_id
+                ├── ... conversation widgets (dynamically added)
+                └── InputAreaContainer(#input_area)
+                    ├── WorkingStatusLine (data_bind)
+                    ├── InputField          ← Posts messages
+                    └── InfoStatusLine (data_bind)
     └── Footer
 
 Message Flow:
@@ -23,6 +26,7 @@ Responsibilities:
     - MainDisplay: Command execution, content rendering, scrolling
     - OpenHandsApp: Screen/modal management, agent lifecycle, side panels
     - AppState: Reactive state, input widgets, data binding
+    - SplashContent: Displays splash screen, auto-updates via is_ui_ready binding
 """
 
 import asyncio
@@ -34,7 +38,7 @@ from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
 from textual.containers import Horizontal
 from textual.screen import Screen
-from textual.widgets import Footer, Input, Static, TextArea
+from textual.widgets import Footer, Input, TextArea
 from textual_autocomplete import AutoComplete
 
 from openhands.sdk import BaseConversation
@@ -50,7 +54,6 @@ from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.splash import get_splash_content
 from openhands_cli.tui.core import AppState, ConversationFinished
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.core.conversation_switcher import ConversationSwitcher
@@ -150,8 +153,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         )
         # Backwards compatibility alias
         self.state_manager = self.app_state
-
-        self.is_ui_initialized = False
 
         # Store exit confirmation setting
         self.exit_confirmation = exit_confirmation
@@ -393,9 +394,23 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             )
 
     def _initialize_main_ui(self) -> None:
-        """Initialize the main UI components."""
+        """Initialize the main UI components.
 
-        if self.is_ui_initialized:
+        This method is responsible for:
+        1. Checking if the agent has a critic configured
+        2. Initializing the splash content (one-time setup)
+        3. Processing any queued inputs
+
+        UI lifecycle is owned by OpenHandsApp, not AppState. The splash
+        content initialization is a direct method call, not a reactive
+        state change, because it's a one-time operation.
+        """
+        from openhands_cli.tui.widgets.splash import SplashContent
+
+        splash_content = self.query_one("#splash_content", SplashContent)
+
+        # Check if already initialized
+        if splash_content.is_initialized:
             return
 
         # Check if agent has critic configured
@@ -412,46 +427,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             # If we can't load agent, just continue without critic notice
             pass
 
-        # Get structured splash content
-        # conversation_id is always set during app initialization
-        splash_content = get_splash_content(
-            conversation_id=self.conversation_id.hex,
-            theme=OPENHANDS_THEME,
-            has_critic=has_critic,
-        )
-
-        # Update individual splash widgets
-        # Note: splash_conversation is data-bound to conversation_id
-        self.query_one("#splash_banner", Static).update(splash_content["banner"])
-        self.query_one("#splash_version", Static).update(splash_content["version"])
-        self.query_one("#splash_status", Static).update(splash_content["status_text"])
-        self.query_one("#splash_instructions_header", Static).update(
-            splash_content["instructions_header"]
-        )
-
-        # Join instructions into a single string
-        instructions_text = "\n".join(splash_content["instructions"])
-        self.query_one("#splash_instructions", Static).update(instructions_text)
-
-        # Update notice (hide if None)
-        update_notice_widget = self.query_one("#splash_update_notice", Static)
-        if splash_content["update_notice"]:
-            update_notice_widget.update(splash_content["update_notice"])
-            update_notice_widget.display = True
-        else:
-            update_notice_widget.display = False
-
-        # Update critic notice (hide if None)
-        critic_notice_widget = self.query_one("#splash_critic_notice", Static)
-        if splash_content["critic_notice"]:
-            critic_notice_widget.update(splash_content["critic_notice"])
-            critic_notice_widget.display = True
-        else:
-            critic_notice_widget.display = False
+        # Initialize splash content - direct call for UI lifecycle
+        splash_content.initialize(has_critic=has_critic)
 
         # Process any queued inputs
         self._process_queued_inputs()
-        self.is_ui_initialized = True
 
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.

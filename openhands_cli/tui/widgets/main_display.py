@@ -8,13 +8,17 @@ This widget is the main conversation view that:
 
 Widget Hierarchy:
     MainDisplay(VerticalScroll)
-    ├── SplashBanner (data bound to conversation_id)
-    ├── SplashVersion
-    ├── SplashStatus
-    ├── SplashConversation (data bound to conversation_id)
-    ├── SplashInstructions
+    ├── SplashContent(#splash_content)   ← data_bind to is_ui_ready, conversation_id
+    │   ├── Static(#splash_banner)
+    │   ├── Static(#splash_version)
+    │   ├── Static(#splash_status)
+    │   ├── Static(#splash_conversation)
+    │   ├── Static(#splash_instructions_header)
+    │   ├── Static(#splash_instructions)
+    │   ├── Static(#splash_update_notice)
+    │   └── Static(#splash_critic_notice)
     ├── ... dynamically added conversation widgets
-    └── AppState(#input_area)
+    └── InputAreaContainer(#input_area)
         ├── WorkingStatusLine
         ├── InputField
         └── InfoStatusLine

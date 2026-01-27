@@ -150,11 +150,9 @@ class AppState(Container):
         By yielding widgets here, data_bind(AppState.xxx) works because
         the active message pump during compose is AppState itself.
         """
-        from textual.widgets import Static
-
         from openhands_cli.tui.widgets.input_area import InputAreaContainer
         from openhands_cli.tui.widgets.main_display import MainDisplay
-        from openhands_cli.tui.widgets.splash import SplashConversation
+        from openhands_cli.tui.widgets.splash import SplashContent
         from openhands_cli.tui.widgets.status_line import (
             InfoStatusLine,
             WorkingStatusLine,
@@ -163,21 +161,12 @@ class AppState(Container):
 
         # MainDisplay handles UserInputSubmitted to render user messages
         with MainDisplay(id="main_display"):
-            # Splash content widgets
-            yield Static(id="splash_banner", classes="splash-banner")
-            yield Static(id="splash_version", classes="splash-version")
-            yield Static(id="splash_status", classes="status-panel")
-            # SplashConversation auto-updates via data_bind
-            yield SplashConversation(id="splash_conversation").data_bind(
-                conversation_id=AppState.conversation_id
+            # SplashContent contains all splash widgets
+            # - conversation_id is bound reactively for conversation switching
+            # - initialize() is called by OpenHandsApp for one-time setup
+            yield SplashContent(id="splash_content").data_bind(
+                conversation_id=AppState.conversation_id,
             )
-            yield Static(
-                id="splash_instructions_header",
-                classes="splash-instruction-header",
-            )
-            yield Static(id="splash_instructions", classes="splash-instruction")
-            yield Static(id="splash_update_notice", classes="splash-update-notice")
-            yield Static(id="splash_critic_notice", classes="splash-critic-notice")
 
             # Input area docked to bottom of MainDisplay viewport
             with InputAreaContainer(id="input_area"):
