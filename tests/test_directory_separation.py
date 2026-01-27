@@ -4,7 +4,7 @@ import os
 from unittest.mock import MagicMock, patch
 
 from openhands.sdk import LLM, Agent, Tool
-from openhands_cli.locations import PERSISTENCE_DIR, WORK_DIR
+from openhands_cli.locations import get_persistence_dir, get_work_dir
 from openhands_cli.stores import AgentStore
 
 
@@ -12,21 +12,21 @@ class TestDirectorySeparation:
     """Test that WORK_DIR and PERSISTENCE_DIR are properly separated."""
 
     def test_work_dir_and_persistence_dir_are_different(self):
-        """Test that WORK_DIR and PERSISTENCE_DIR are separate directories."""
-        # WORK_DIR should be the current working directory
-        assert WORK_DIR == os.getcwd()
+        """Test that get_work_dir() and get_persistence_dir() are separate directories."""
+        # get_work_dir() should be the current working directory
+        assert get_work_dir() == os.getcwd()
 
-        # PERSISTENCE_DIR should be ~/.openhands
+        # get_persistence_dir() should be ~/.openhands
         expected_config_dir = os.path.expanduser("~/.openhands")
-        assert PERSISTENCE_DIR == expected_config_dir
+        assert get_persistence_dir() == expected_config_dir
 
         # They should be different
-        assert WORK_DIR != PERSISTENCE_DIR
+        assert get_work_dir() != get_persistence_dir()
 
     def test_agent_store_uses_persistence_dir(self):
-        """Test that AgentStore uses PERSISTENCE_DIR for file storage."""
+        """Test that AgentStore uses get_persistence_dir() for file storage."""
         agent_store = AgentStore()
-        assert agent_store.file_store.root == PERSISTENCE_DIR
+        assert agent_store.file_store.root == get_persistence_dir()
 
 
 class TestToolFix:

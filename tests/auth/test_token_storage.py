@@ -158,11 +158,11 @@ class TestTokenStorage:
         with tempfile.TemporaryDirectory() as temp_dir:
             test_persistence_dir = str(Path(temp_dir) / "persistence")
             with patch(
-                "openhands_cli.auth.token_storage.PERSISTENCE_DIR", test_persistence_dir
+                "openhands_cli.locations.get_persistence_dir", return_value=test_persistence_dir
             ):
                 storage = TokenStorage()
 
-                # Should use the patched PERSISTENCE_DIR/cloud
+                # Should use the patched get_persistence_dir()/cloud
                 expected_path = str(Path(test_persistence_dir) / "cloud")
                 assert str(storage.config_dir) == expected_path
 

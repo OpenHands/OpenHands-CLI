@@ -7,6 +7,7 @@ import pytest
 from pydantic import SecretStr
 
 from openhands.sdk import LLM
+import openhands_cli.locations as locations_module
 from openhands_cli.stores.agent_store import (
     ENV_LLM_API_KEY,
     ENV_LLM_BASE_URL,
@@ -446,9 +447,9 @@ class TestAgentCreationFromEnvVars:
         }
 
         with (
-            patch.object(agent_store_module, "PERSISTENCE_DIR", str(tmp_path)),
+            patch.object(locations_module, "get_persistence_dir", return_value=str(tmp_path)),
             patch.object(
-                agent_store_module, "CONVERSATIONS_DIR", str(conversations_dir)
+                locations_module, "get_conversations_dir", return_value=str(conversations_dir)
             ),
             patch.dict(os.environ, env_vars, clear=False),
         ):
@@ -476,9 +477,9 @@ class TestAgentCreationFromEnvVars:
         }
 
         with (
-            patch.object(agent_store_module, "PERSISTENCE_DIR", str(tmp_path)),
+            patch.object(locations_module, "get_persistence_dir", return_value=str(tmp_path)),
             patch.object(
-                agent_store_module, "CONVERSATIONS_DIR", str(conversations_dir)
+                locations_module, "get_conversations_dir", return_value=str(conversations_dir)
             ),
             patch.dict(os.environ, env_vars, clear=False),
         ):
@@ -508,9 +509,9 @@ class TestAgentCreationFromEnvVars:
         }
 
         with (
-            patch.object(agent_store_module, "PERSISTENCE_DIR", str(tmp_path)),
+            patch.object(locations_module, "get_persistence_dir", return_value=str(tmp_path)),
             patch.object(
-                agent_store_module, "CONVERSATIONS_DIR", str(conversations_dir)
+                locations_module, "get_conversations_dir", return_value=str(conversations_dir)
             ),
             patch.dict(os.environ, env_vars, clear=False),
         ):
@@ -536,9 +537,9 @@ class TestAgentCreationFromEnvVars:
         conversations_dir.mkdir(exist_ok=True)
 
         with (
-            patch.object(agent_store_module, "PERSISTENCE_DIR", str(tmp_path)),
+            patch.object(locations_module, "get_persistence_dir", return_value=str(tmp_path)),
             patch.object(
-                agent_store_module, "CONVERSATIONS_DIR", str(conversations_dir)
+                locations_module, "get_conversations_dir", return_value=str(conversations_dir)
             ),
         ):
             # Ensure both env vars are not set
@@ -566,9 +567,9 @@ class TestAgentCreationFromEnvVars:
         }
 
         with (
-            patch.object(agent_store_module, "PERSISTENCE_DIR", str(tmp_path)),
+            patch.object(locations_module, "get_persistence_dir", return_value=str(tmp_path)),
             patch.object(
-                agent_store_module, "CONVERSATIONS_DIR", str(conversations_dir)
+                locations_module, "get_conversations_dir", return_value=str(conversations_dir)
             ),
             patch.dict(os.environ, env_vars, clear=False),
         ):
@@ -596,9 +597,9 @@ class TestCriticBehaviorInAgentCreation:
         }
 
         with (
-            patch.object(agent_store_module, "PERSISTENCE_DIR", str(tmp_path)),
+            patch.object(locations_module, "get_persistence_dir", return_value=str(tmp_path)),
             patch.object(
-                agent_store_module, "CONVERSATIONS_DIR", str(conversations_dir)
+                locations_module, "get_conversations_dir", return_value=str(conversations_dir)
             ),
             patch.dict(os.environ, env_vars, clear=False),
         ):
@@ -631,9 +632,9 @@ class TestCriticBehaviorInAgentCreation:
         mock_settings = CliSettings(enable_critic=True)
 
         with (
-            patch.object(agent_store_module, "PERSISTENCE_DIR", str(tmp_path)),
+            patch.object(locations_module, "get_persistence_dir", return_value=str(tmp_path)),
             patch.object(
-                agent_store_module, "CONVERSATIONS_DIR", str(conversations_dir)
+                locations_module, "get_conversations_dir", return_value=str(conversations_dir)
             ),
             patch.dict(os.environ, env_vars, clear=False),
             patch.object(CliSettings, "load", return_value=mock_settings),

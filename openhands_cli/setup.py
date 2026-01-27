@@ -13,7 +13,7 @@ from openhands.sdk.security.confirmation_policy import (
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 
 # Register tools on import
-from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
+from openhands_cli.locations import get_conversations_dir, get_work_dir
 from openhands_cli.stores import AgentStore
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
@@ -130,9 +130,9 @@ def setup_conversation(
     # Create conversation - agent context is now set in AgentStore.load()
     conversation: BaseConversation = Conversation(
         agent=agent,
-        workspace=Workspace(working_dir=WORK_DIR),
+        workspace=Workspace(working_dir=get_work_dir()),
         # Conversation will add /<conversation_id> to this path
-        persistence_dir=CONVERSATIONS_DIR,
+        persistence_dir=get_conversations_dir(),
         conversation_id=conversation_id,
         visualizer=visualizer,
         callbacks=callbacks,

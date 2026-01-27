@@ -7,7 +7,7 @@ from openhands.sdk import Agent
 from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
 from openhands_cli.auth.utils import _p
-from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
+from openhands_cli.locations import AGENT_SETTINGS_PATH, get_persistence_dir
 from openhands_cli.stores import AgentStore
 from openhands_cli.theme import OPENHANDS_THEME
 
@@ -24,7 +24,9 @@ class UnauthenticatedError(ApiClientError):
     pass
 
 
-SETTINGS_PATH = f"{PERSISTENCE_DIR}/{AGENT_SETTINGS_PATH}"
+def get_settings_path() -> str:
+    """Get the full path to the agent settings file."""
+    return f"{get_persistence_dir()}/{AGENT_SETTINGS_PATH}"
 
 
 class OpenHandsApiClient(BaseHttpClient):
@@ -280,7 +282,7 @@ def create_and_save_agent_configuration(
         )
 
     _p(
-        f"  • Saved to: [{OPENHANDS_THEME.accent}]{SETTINGS_PATH}"
+        f"  • Saved to: [{OPENHANDS_THEME.accent}]{get_settings_path()}"
         f"[/{OPENHANDS_THEME.accent}]"
     )
 

@@ -30,8 +30,7 @@ def persistence_dir(tmp_path, monkeypatch) -> Path:
     """Create a temporary persistence directory."""
     root = tmp_path / "openhands"
     root.mkdir()
-    monkeypatch.setattr("openhands_cli.locations.PERSISTENCE_DIR", str(root))
-    monkeypatch.setattr("openhands_cli.stores.agent_store.PERSISTENCE_DIR", str(root))
+    monkeypatch.setattr("openhands_cli.locations.get_persistence_dir", lambda: str(root))
     return root
 
 
@@ -40,10 +39,7 @@ def conversations_dir(persistence_dir, monkeypatch) -> Path:
     """Create a temporary conversations directory."""
     convos = persistence_dir / "conversations"
     convos.mkdir()
-    monkeypatch.setattr("openhands_cli.locations.CONVERSATIONS_DIR", str(convos))
-    monkeypatch.setattr(
-        "openhands_cli.stores.agent_store.CONVERSATIONS_DIR", str(convos)
-    )
+    monkeypatch.setattr("openhands_cli.locations.get_conversations_dir", lambda: str(convos))
     return convos
 
 

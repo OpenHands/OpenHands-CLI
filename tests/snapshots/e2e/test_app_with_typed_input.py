@@ -29,10 +29,11 @@ class TestAppWithTypedInput:
             # Type the command
             await type_text(pilot, "echo hello world")
 
-        # Locations are already patched by the fixture via monkeypatch
+        # Use fixed conversation ID from fixture for deterministic snapshots
         app = OpenHandsApp(
             exit_confirmation=False,
             initial_confirmation_policy=NeverConfirm(),
+            resume_conversation_id=mock_llm_setup["conversation_id"],
         )
 
         assert snap_compare(

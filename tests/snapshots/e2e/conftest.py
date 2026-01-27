@@ -20,20 +20,8 @@ from e2e_tests.trajectory import get_trajectories_dir, load_trajectory
 # Fixed work directory path - writable on most systems and deterministic for snapshots
 WORK_DIR = Path("/tmp/openhands-e2e-test-workspace")
 
-
-def create_deterministic_uuid_generator(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Set up deterministic sequential UUID generation.
-
-    Creates UUIDs in format: 00000000-0000-0000-0000-000000000001, ...002, etc.
-    This ensures reproducible snapshots while avoiding duplicate ID errors.
-    """
-    uuid_counter = [0]
-
-    def deterministic_uuid4():
-        uuid_counter[0] += 1
-        return uuid_module.UUID(f"00000000-0000-0000-0000-{uuid_counter[0]:012d}")
-
-    monkeypatch.setattr(uuid_module, "uuid4", deterministic_uuid4)
+# Fixed conversation ID for deterministic snapshots
+FIXED_CONVERSATION_ID = uuid_module.UUID("00000000-0000-0000-0000-000000000001")
 
 
 def setup_test_directories(tmp_path: Path) -> tuple[Path, Path]:
@@ -58,26 +46,15 @@ def patch_location_modules(
     conversations_dir: Path,
     work_dir: Path,
 ) -> None:
-    """Patch location modules with test paths.
+    """Set environment variables for test paths.
 
-    CRITICAL: This must happen before any module that imports from locations.
+    Using environment variables ensures all modules that call the getter functions
+    will get the test paths, regardless of when they're imported.
     """
-    import openhands_cli.locations as locations_module
-    from openhands_cli.stores import agent_store as agent_store_module
-
-    # Patch locations module
-    monkeypatch.setattr(locations_module, "PERSISTENCE_DIR", str(tmp_path))
-    monkeypatch.setattr(locations_module, "CONVERSATIONS_DIR", str(conversations_dir))
-    monkeypatch.setattr(locations_module, "AGENT_SETTINGS_PATH", "agent_settings.json")
-    monkeypatch.setattr(locations_module, "WORK_DIR", str(work_dir))
-
-    # Patch agent_store module (may have cached values)
-    monkeypatch.setattr(agent_store_module, "PERSISTENCE_DIR", str(tmp_path))
-    monkeypatch.setattr(agent_store_module, "CONVERSATIONS_DIR", str(conversations_dir))
-    monkeypatch.setattr(
-        agent_store_module, "AGENT_SETTINGS_PATH", "agent_settings.json"
-    )
-    monkeypatch.setattr(agent_store_module, "WORK_DIR", str(work_dir))
+    # Set environment variables - the getter functions will read these
+    monkeypatch.setenv("OPENHANDS_PERSISTENCE_DIR", str(tmp_path))
+    monkeypatch.setenv("OPENHANDS_CONVERSATIONS_DIR", str(conversations_dir))
+    monkeypatch.setenv("OPENHANDS_WORK_DIR", str(work_dir))
 
 
 def create_mock_agent(base_url: str, tmp_path: Path) -> None:
@@ -111,8 +88,8 @@ def mock_llm_setup(
     """Fixture that sets up mock LLM server with default trajectory.
 
     Uses 'simple_echo_hello_world' trajectory for deterministic replay.
+    Returns a dict including 'conversation_id' that should be passed to OpenHandsApp.
     """
-    create_deterministic_uuid_generator(monkeypatch)
     conversations_dir, work_dir = setup_test_directories(tmp_path)
     patch_location_modules(monkeypatch, tmp_path, conversations_dir, work_dir)
 
@@ -128,6 +105,7 @@ def mock_llm_setup(
         "mock_server_url": base_url,
         "work_dir": work_dir,
         "trajectory": trajectory,
+        "conversation_id": FIXED_CONVERSATION_ID,
     }
 
     server.stop()
@@ -145,10 +123,11 @@ def mock_llm_with_trajectory(
                                  ["simple_echo_hello_world"], indirect=True)
         def test_something(self, mock_llm_with_trajectory):
             ...
+
+    Returns a dict including 'conversation_id' that should be passed to OpenHandsApp.
     """
     trajectory_name = getattr(request, "param", "simple_echo_hello_world")
 
-    create_deterministic_uuid_generator(monkeypatch)
     conversations_dir, work_dir = setup_test_directories(tmp_path)
     patch_location_modules(monkeypatch, tmp_path, conversations_dir, work_dir)
 
@@ -165,6 +144,7 @@ def mock_llm_with_trajectory(
         "work_dir": work_dir,
         "trajectory": trajectory,
         "trajectory_name": trajectory_name,
+        "conversation_id": FIXED_CONVERSATION_ID,
     }
 
     server.stop()

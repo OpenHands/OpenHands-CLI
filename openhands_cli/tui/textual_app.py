@@ -33,7 +33,7 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.conversations.store.local import LocalFileStore
-from openhands_cli.locations import CONVERSATIONS_DIR
+from openhands_cli.locations import get_conversations_dir
 from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_splash_content
@@ -137,7 +137,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             resume_conversation_id if resume_conversation_id else uuid.uuid4()
         )
         self.conversation_dir = BaseConversation.get_persistence_dir(
-            CONVERSATIONS_DIR, self.conversation_id
+            get_conversations_dir(), self.conversation_id
         )
 
         # Store queued inputs (copy to prevent mutating caller's list)

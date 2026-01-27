@@ -24,9 +24,9 @@ from openhands.sdk.critic.impl.api import APIBasedCritic
 from openhands.sdk.tool import Tool
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
-    CONVERSATIONS_DIR,
-    PERSISTENCE_DIR,
-    WORK_DIR,
+    get_conversations_dir,
+    get_persistence_dir,
+    get_work_dir,
 )
 from openhands_cli.mcp.mcp_utils import list_enabled_servers
 from openhands_cli.stores.cli_settings import CliSettings
@@ -54,7 +54,7 @@ def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
         List of Tool objects from the persisted conversation, or None if
         the conversation doesn't exist or can't be read
     """
-    conversation_dir = os.path.join(CONVERSATIONS_DIR, conversation_id)
+    conversation_dir = os.path.join(get_conversations_dir(), conversation_id)
     base_state_path = os.path.join(conversation_dir, BASE_STATE)
 
     if not os.path.exists(base_state_path):
@@ -250,7 +250,7 @@ class AgentStore:
     """Single source of truth for persisting/retrieving AgentSpec."""
 
     def __init__(self) -> None:
-        self.file_store = LocalFileStore(root=PERSISTENCE_DIR)
+        self.file_store = LocalFileStore(root=get_persistence_dir())
 
     def load_from_disk(self) -> Agent | None:
         """Load an agent configuration from disk storage.
@@ -379,10 +379,10 @@ class AgentStore:
         )
 
     def _build_agent_context(self) -> AgentContext:
-        skills = load_project_skills(WORK_DIR)
+        skills = load_project_skills(get_work_dir())
         system_suffix = "\n".join(
             [
-                f"Your current working directory is: {WORK_DIR}",
+                f"Your current working directory is: {get_work_dir()}",
                 f"User operating system: {get_os_description()}",
             ]
         )

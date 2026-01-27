@@ -43,10 +43,11 @@ class TestEchoHelloWorld:
             # Wait for all animations to complete (indicates processing finished)
             await wait_for_idle(pilot)
 
-        # Locations are already patched by the fixture via monkeypatch
+        # Use fixed conversation ID from fixture for deterministic snapshots
         app = OpenHandsApp(
             exit_confirmation=False,
             initial_confirmation_policy=NeverConfirm(),
+            resume_conversation_id=mock_llm_setup["conversation_id"],
         )
 
         assert snap_compare(

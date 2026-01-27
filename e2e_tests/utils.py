@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any
 
 from openhands.sdk import LLM
-from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
+from openhands_cli.locations import AGENT_SETTINGS_PATH, get_persistence_dir
 from openhands_cli.utils import (
     get_default_cli_agent,
     get_llm_metadata,
@@ -21,7 +21,7 @@ def seed_dummy_settings():
     llm = LLM(model=model_name, api_key="dummy-key", **extra_kwargs)
     dummy_agent = get_default_cli_agent(llm=llm)
 
-    spec_path = os.path.join(PERSISTENCE_DIR, AGENT_SETTINGS_PATH)
+    spec_path = os.path.join(get_persistence_dir(), AGENT_SETTINGS_PATH)
     specs_path = Path(os.path.expanduser(spec_path))
 
     if not specs_path.exists():

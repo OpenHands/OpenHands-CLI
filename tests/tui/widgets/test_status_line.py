@@ -130,11 +130,10 @@ def test_get_work_dir_display_shortens_home_to_tilde(dummy_app, monkeypatch):
         "expanduser",
         lambda path: "/home/testuser" if path == "~" else path,
     )
-    # Set WORK_DIR to be inside that home directory
+    # Set get_work_dir to return a path inside that home directory
     monkeypatch.setattr(
-        status_line_module,
-        "WORK_DIR",
-        "/home/testuser/projects/openhands",
+        "openhands_cli.locations.get_work_dir",
+        lambda: "/home/testuser/projects/openhands",
     )
 
     widget = InfoStatusLine(app=dummy_app)

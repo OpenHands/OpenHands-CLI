@@ -64,7 +64,7 @@ def mock_cli_interactions():
 # Fixture: setup_test_agent_config
 # Automatically set up agent configuration for all tests
 @pytest.fixture(autouse=True, scope="function")
-def setup_test_agent_config(tmp_path_factory):
+def setup_test_agent_config(tmp_path_factory, request):
     """
     Automatically set up a minimal agent configuration for all tests.
 
@@ -73,7 +73,17 @@ def setup_test_agent_config(tmp_path_factory):
     - Creates a minimal agent_settings.json file
     - Patches AgentStore to use the temporary directory
     - Runs for every test automatically (autouse=True)
+
+    Note: This fixture is skipped for e2e tests that use mock_llm_setup or
+    mock_llm_with_trajectory fixtures, as those tests have their own setup.
     """
+    # Skip this fixture for e2e tests that have their own mock LLM setup
+    # These tests use mock_llm_setup or mock_llm_with_trajectory fixtures
+    fixture_names = request.fixturenames
+    if "mock_llm_setup" in fixture_names or "mock_llm_with_trajectory" in fixture_names:
+        yield None
+        return
+
     # Create a temporary directory for this test session
     temp_persistence_dir = tmp_path_factory.mktemp("openhands_test")
     conversations_dir = temp_persistence_dir / "conversations"
@@ -99,17 +109,17 @@ def setup_test_agent_config(tmp_path_factory):
     # This ensures tests work even if the patch isn't applied early enough
     from openhands_cli import locations
 
-    default_persistence_dir = Path(locations.PERSISTENCE_DIR)
+    default_persistence_dir = Path(locations.get_persistence_dir())
     if not default_persistence_dir.exists():
         default_persistence_dir.mkdir(parents=True, exist_ok=True)
     default_agent_settings = default_persistence_dir / "agent_settings.json"
     if not default_agent_settings.exists():
         default_agent_settings.write_text(agent_settings_json)
 
-    # Patch locations module
+    # Patch locations module getter functions
     with patch.multiple(
         "openhands_cli.locations",
-        PERSISTENCE_DIR=str(temp_persistence_dir),
-        CONVERSATIONS_DIR=str(conversations_dir),
+        get_persistence_dir=lambda: str(temp_persistence_dir),
+        get_conversations_dir=lambda: str(conversations_dir),
     ):
         yield temp_persistence_dir
