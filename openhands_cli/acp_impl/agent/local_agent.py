@@ -15,6 +15,7 @@ from openhands.sdk import (
     LocalConversation,
     Workspace,
 )
+from openhands.sdk.hooks import HookConfig
 from openhands_cli.acp_impl.agent.base_agent import BaseOpenHandsACPAgent
 from openhands_cli.acp_impl.agent.util import AgentType
 from openhands_cli.acp_impl.confirmation import ConfirmationMode
@@ -170,6 +171,11 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
             else:
                 asyncio.run_coroutine_threadsafe(subscriber(event), loop)
 
+        # Load hooks from ~/.openhands/hooks.json or {working_dir}/.openhands/hooks.json
+        hook_config = HookConfig.load(working_dir=str(working_path))
+        if not hook_config.is_empty():
+            logger.info("Hooks loaded from hooks.json")
+
         conversation = Conversation(
             agent=agent,
             workspace=workspace,
@@ -178,6 +184,7 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
             callbacks=[sync_callback],
             token_callbacks=[token_subscriber.on_token] if streaming_enabled else None,
             visualizer=None,
+            hook_config=hook_config,
         )
 
         subscriber.conversation = conversation
