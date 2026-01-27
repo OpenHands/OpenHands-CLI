@@ -218,7 +218,9 @@ class TestRefreshContentWithServerObjects:
 
         app = TestApp()
 
-        with patch("openhands_cli.locations.get_persistence_dir", return_value=str(tmp_path)):
+        with patch(
+            "openhands_cli.locations.get_persistence_dir", return_value=str(tmp_path)
+        ):
             async with app.run_test() as pilot:
                 await pilot.pause()
 
@@ -280,7 +282,9 @@ class TestRefreshContentWithServerObjects:
 
         app = TestApp()
 
-        with patch("openhands_cli.locations.get_persistence_dir", return_value=str(tmp_path)):
+        with patch(
+            "openhands_cli.locations.get_persistence_dir", return_value=str(tmp_path)
+        ):
             async with app.run_test() as pilot:
                 await pilot.pause()
 
@@ -306,7 +310,9 @@ class TestToggle:
         """Verify toggle() mounts the panel."""
         app = MCPPanelTestApp()
 
-        with patch("openhands_cli.locations.get_persistence_dir", return_value=str(tmp_path)):
+        with patch(
+            "openhands_cli.locations.get_persistence_dir", return_value=str(tmp_path)
+        ):
             async with app.run_test() as pilot:
                 await pilot.pause()
 
@@ -323,7 +329,9 @@ class TestToggle:
         """Verify toggle() removes an existing panel."""
         app = MCPPanelTestApp()
 
-        with patch("openhands_cli.locations.get_persistence_dir", return_value=str(tmp_path)):
+        with patch(
+            "openhands_cli.locations.get_persistence_dir", return_value=str(tmp_path)
+        ):
             async with app.run_test() as pilot:
                 await pilot.pause()
 
@@ -375,7 +383,10 @@ class TestToggle:
         app = MCPPanelTestApp()
 
         with (
-            patch("openhands_cli.locations.get_persistence_dir", return_value=str(tmp_path)),
+            patch(
+                "openhands_cli.locations.get_persistence_dir",
+                return_value=str(tmp_path),
+            ),
             patch("openhands_cli.stores.AgentStore") as mock_agent_store_class,
         ):
             mock_agent_store = MagicMock()

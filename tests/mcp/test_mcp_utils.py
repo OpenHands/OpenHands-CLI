@@ -32,7 +32,9 @@ def temp_config_path():
     with tempfile.TemporaryDirectory() as temp_dir:
         config_path = Path(temp_dir) / "mcp.json"
         # Patch get_persistence_dir so that _get_mcp_config_path() returns our temp path
-        with patch("openhands_cli.locations.get_persistence_dir", return_value=str(temp_dir)):
+        with patch(
+            "openhands_cli.locations.get_persistence_dir", return_value=str(temp_dir)
+        ):
             yield config_path
 
 

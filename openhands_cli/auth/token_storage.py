@@ -13,7 +13,8 @@ class TokenStorage:
         """Initialize token storage.
 
         Args:
-            config_dir: Directory to store API keys (defaults to get_persistence_dir()/cloud)
+            config_dir: Directory to store API keys.
+                Defaults to get_persistence_dir()/cloud.
         """
         if config_dir is None:
             config_dir = Path(get_persistence_dir()) / "cloud"

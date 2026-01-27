@@ -433,7 +433,6 @@ class TestAgentCreationFromEnvVars:
 
     def test_agent_created_with_all_env_vars(self, tmp_path) -> None:
         """Agent should be created from env vars when all LLM env vars are set."""
-        import openhands_cli.stores.agent_store as agent_store_module
         from openhands_cli.stores import AgentStore
 
         conversations_dir = tmp_path / "conversations"
@@ -446,8 +445,14 @@ class TestAgentCreationFromEnvVars:
         }
 
         with (
-            patch("openhands_cli.stores.agent_store.get_persistence_dir", return_value=str(tmp_path)),
-            patch("openhands_cli.stores.agent_store.get_conversations_dir", return_value=str(conversations_dir)),
+            patch(
+                "openhands_cli.stores.agent_store.get_persistence_dir",
+                return_value=str(tmp_path),
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_conversations_dir",
+                return_value=str(conversations_dir),
+            ),
             patch.dict(os.environ, env_vars, clear=False),
         ):
             store = AgentStore()
@@ -462,7 +467,6 @@ class TestAgentCreationFromEnvVars:
 
     def test_agent_raises_error_when_model_not_set(self, tmp_path) -> None:
         """Agent creation should raise error when LLM_MODEL env var is not set."""
-        import openhands_cli.stores.agent_store as agent_store_module
         from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 
         conversations_dir = tmp_path / "conversations"
@@ -474,8 +478,14 @@ class TestAgentCreationFromEnvVars:
         }
 
         with (
-            patch("openhands_cli.stores.agent_store.get_persistence_dir", return_value=str(tmp_path)),
-            patch("openhands_cli.stores.agent_store.get_conversations_dir", return_value=str(conversations_dir)),
+            patch(
+                "openhands_cli.stores.agent_store.get_persistence_dir",
+                return_value=str(tmp_path),
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_conversations_dir",
+                return_value=str(conversations_dir),
+            ),
             patch.dict(os.environ, env_vars, clear=False),
         ):
             # Clear any existing LLM_MODEL env var
@@ -492,7 +502,6 @@ class TestAgentCreationFromEnvVars:
 
     def test_agent_raises_error_when_api_key_not_set(self, tmp_path) -> None:
         """Agent creation should raise error when LLM_API_KEY is not set."""
-        import openhands_cli.stores.agent_store as agent_store_module
         from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 
         conversations_dir = tmp_path / "conversations"
@@ -504,8 +513,14 @@ class TestAgentCreationFromEnvVars:
         }
 
         with (
-            patch("openhands_cli.stores.agent_store.get_persistence_dir", return_value=str(tmp_path)),
-            patch("openhands_cli.stores.agent_store.get_conversations_dir", return_value=str(conversations_dir)),
+            patch(
+                "openhands_cli.stores.agent_store.get_persistence_dir",
+                return_value=str(tmp_path),
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_conversations_dir",
+                return_value=str(conversations_dir),
+            ),
             patch.dict(os.environ, env_vars, clear=False),
         ):
             # Ensure LLM_API_KEY is not set
@@ -523,15 +538,20 @@ class TestAgentCreationFromEnvVars:
         self, tmp_path
     ) -> None:
         """Agent creation should raise error listing both missing vars."""
-        import openhands_cli.stores.agent_store as agent_store_module
         from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 
         conversations_dir = tmp_path / "conversations"
         conversations_dir.mkdir(exist_ok=True)
 
         with (
-            patch("openhands_cli.stores.agent_store.get_persistence_dir", return_value=str(tmp_path)),
-            patch("openhands_cli.stores.agent_store.get_conversations_dir", return_value=str(conversations_dir)),
+            patch(
+                "openhands_cli.stores.agent_store.get_persistence_dir",
+                return_value=str(tmp_path),
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_conversations_dir",
+                return_value=str(conversations_dir),
+            ),
         ):
             # Ensure both env vars are not set
             os.environ.pop(ENV_LLM_API_KEY, None)
@@ -547,7 +567,6 @@ class TestAgentCreationFromEnvVars:
 
     def test_agent_returns_none_when_env_overrides_disabled(self, tmp_path) -> None:
         """Agent creation should return None when env_overrides_enabled=False."""
-        import openhands_cli.stores.agent_store as agent_store_module
         from openhands_cli.stores import AgentStore
 
         conversations_dir = tmp_path / "conversations"
@@ -558,8 +577,14 @@ class TestAgentCreationFromEnvVars:
         }
 
         with (
-            patch("openhands_cli.stores.agent_store.get_persistence_dir", return_value=str(tmp_path)),
-            patch("openhands_cli.stores.agent_store.get_conversations_dir", return_value=str(conversations_dir)),
+            patch(
+                "openhands_cli.stores.agent_store.get_persistence_dir",
+                return_value=str(tmp_path),
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_conversations_dir",
+                return_value=str(conversations_dir),
+            ),
             patch.dict(os.environ, env_vars, clear=False),
         ):
             store = AgentStore()
@@ -574,7 +599,6 @@ class TestCriticBehaviorInAgentCreation:
 
     def test_critic_disabled_when_param_is_true(self, tmp_path) -> None:
         """Critic should be None when critic_disabled=True."""
-        import openhands_cli.stores.agent_store as agent_store_module
         from openhands_cli.stores import AgentStore
 
         conversations_dir = tmp_path / "conversations"
@@ -586,8 +610,14 @@ class TestCriticBehaviorInAgentCreation:
         }
 
         with (
-            patch("openhands_cli.stores.agent_store.get_persistence_dir", return_value=str(tmp_path)),
-            patch("openhands_cli.stores.agent_store.get_conversations_dir", return_value=str(conversations_dir)),
+            patch(
+                "openhands_cli.stores.agent_store.get_persistence_dir",
+                return_value=str(tmp_path),
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_conversations_dir",
+                return_value=str(conversations_dir),
+            ),
             patch.dict(os.environ, env_vars, clear=False),
         ):
             store = AgentStore()
@@ -601,7 +631,6 @@ class TestCriticBehaviorInAgentCreation:
 
     def test_critic_enabled_when_param_is_false(self, tmp_path) -> None:
         """Critic should NOT be None when critic_disabled=False and settings allow."""
-        import openhands_cli.stores.agent_store as agent_store_module
         from openhands_cli.stores import AgentStore
         from openhands_cli.stores.cli_settings import CliSettings
 
@@ -619,8 +648,14 @@ class TestCriticBehaviorInAgentCreation:
         mock_settings = CliSettings(enable_critic=True)
 
         with (
-            patch("openhands_cli.stores.agent_store.get_persistence_dir", return_value=str(tmp_path)),
-            patch("openhands_cli.stores.agent_store.get_conversations_dir", return_value=str(conversations_dir)),
+            patch(
+                "openhands_cli.stores.agent_store.get_persistence_dir",
+                return_value=str(tmp_path),
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_conversations_dir",
+                return_value=str(conversations_dir),
+            ),
             patch.dict(os.environ, env_vars, clear=False),
             patch.object(CliSettings, "load", return_value=mock_settings),
         ):

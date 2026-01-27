@@ -34,7 +34,9 @@ def persistence_dir(tmp_path, monkeypatch) -> Path:
     root = tmp_path / "openhands"
     root.mkdir()
     # Patch get_persistence_dir to return our test directory
-    monkeypatch.setattr("openhands_cli.locations.get_persistence_dir", lambda: str(root))
+    monkeypatch.setattr(
+        "openhands_cli.locations.get_persistence_dir", lambda: str(root)
+    )
     return root
 
 

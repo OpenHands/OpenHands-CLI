@@ -12,7 +12,7 @@ class TestDirectorySeparation:
     """Test that WORK_DIR and PERSISTENCE_DIR are properly separated."""
 
     def test_work_dir_and_persistence_dir_are_different(self):
-        """Test that get_work_dir() and get_persistence_dir() are separate directories."""
+        """Test that get_work_dir() and get_persistence_dir() are separate."""
         # get_work_dir() should be the current working directory
         assert get_work_dir() == os.getcwd()
 

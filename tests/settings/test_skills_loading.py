@@ -184,7 +184,9 @@ This is a user microagent for testing.
         )
 
         with (
-            patch("openhands_cli.locations.get_work_dir", return_value=temp_project_dir),
+            patch(
+                "openhands_cli.locations.get_work_dir", return_value=temp_project_dir
+            ),
             patch(
                 "openhands.sdk.context.agent_context.load_public_skills"
             ) as mock_load_public,

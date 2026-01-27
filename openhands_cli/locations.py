@@ -6,7 +6,9 @@ def get_persistence_dir() -> str:
 
     Can be overridden via OPENHANDS_PERSISTENCE_DIR environment variable.
     """
-    return os.environ.get("OPENHANDS_PERSISTENCE_DIR", os.path.expanduser("~/.openhands"))
+    return os.environ.get(
+        "OPENHANDS_PERSISTENCE_DIR", os.path.expanduser("~/.openhands")
+    )
 
 
 def get_conversations_dir() -> str:
@@ -15,7 +17,8 @@ def get_conversations_dir() -> str:
     Can be overridden via OPENHANDS_CONVERSATIONS_DIR environment variable.
     """
     return os.environ.get(
-        "OPENHANDS_CONVERSATIONS_DIR", os.path.join(get_persistence_dir(), "conversations")
+        "OPENHANDS_CONVERSATIONS_DIR",
+        os.path.join(get_persistence_dir(), "conversations"),
     )
 
 

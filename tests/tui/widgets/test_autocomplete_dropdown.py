@@ -167,7 +167,10 @@ class TestAutoCompleteDropdown:
 
     def test_file_candidates_for_nonexistent_directory(self, tmp_path, monkeypatch):
         """Non-existent directories produce no file candidates."""
-        monkeypatch.setattr("openhands_cli.tui.widgets.user_input.autocomplete_dropdown.get_work_dir", lambda: str(tmp_path))
+        monkeypatch.setattr(
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.get_work_dir",
+            lambda: str(tmp_path),
+        )
 
         mock_widget = create_mock_single_line_widget()
         autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
@@ -181,7 +184,10 @@ class TestAutoCompleteDropdown:
         (tmp_path / "requirements.txt").write_text("test")
         (tmp_path / "setup.py").write_text("test")
 
-        monkeypatch.setattr("openhands_cli.tui.widgets.user_input.autocomplete_dropdown.get_work_dir", lambda: str(tmp_path))
+        monkeypatch.setattr(
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.get_work_dir",
+            lambda: str(tmp_path),
+        )
 
         mock_widget = create_mock_single_line_widget()
         autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
@@ -200,7 +206,10 @@ class TestAutoCompleteDropdown:
         (src_dir / "main.py").write_text("test")
         (src_dir / "utils.py").write_text("test")
 
-        monkeypatch.setattr("openhands_cli.tui.widgets.user_input.autocomplete_dropdown.get_work_dir", lambda: str(tmp_path))
+        monkeypatch.setattr(
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.get_work_dir",
+            lambda: str(tmp_path),
+        )
 
         mock_widget = create_mock_single_line_widget()
         autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
@@ -215,7 +224,10 @@ class TestAutoCompleteDropdown:
         (tmp_path / ".hidden").write_text("test")
         (tmp_path / "visible.txt").write_text("test")
 
-        monkeypatch.setattr("openhands_cli.tui.widgets.user_input.autocomplete_dropdown.get_work_dir", lambda: str(tmp_path))
+        monkeypatch.setattr(
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.get_work_dir",
+            lambda: str(tmp_path),
+        )
 
         mock_widget = create_mock_single_line_widget()
         autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
@@ -232,7 +244,10 @@ class TestAutoCompleteDropdown:
         (tmp_path / ".hidden").write_text("test")
         (tmp_path / "visible.txt").write_text("test")
 
-        monkeypatch.setattr("openhands_cli.tui.widgets.user_input.autocomplete_dropdown.get_work_dir", lambda: str(tmp_path))
+        monkeypatch.setattr(
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.get_work_dir",
+            lambda: str(tmp_path),
+        )
 
         mock_widget = create_mock_single_line_widget()
         autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
@@ -243,7 +258,10 @@ class TestAutoCompleteDropdown:
 
     def test_file_candidates_handles_permission_error(self, tmp_path, monkeypatch):
         """File candidates gracefully handle permission errors."""
-        monkeypatch.setattr("openhands_cli.tui.widgets.user_input.autocomplete_dropdown.get_work_dir", lambda: str(tmp_path))
+        monkeypatch.setattr(
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.get_work_dir",
+            lambda: str(tmp_path),
+        )
 
         mock_widget = create_mock_single_line_widget()
         autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
@@ -478,7 +496,10 @@ class TestAutoCompleteDropdown:
         """update_candidates shows dropdown when candidates are found."""
         (tmp_path / "test.txt").write_text("test")
 
-        monkeypatch.setattr("openhands_cli.tui.widgets.user_input.autocomplete_dropdown.get_work_dir", lambda: str(tmp_path))
+        monkeypatch.setattr(
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.get_work_dir",
+            lambda: str(tmp_path),
+        )
 
         mock_widget = create_mock_single_line_widget("@t")
         autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
