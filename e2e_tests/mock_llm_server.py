@@ -28,21 +28,28 @@ import json
 import threading
 import time
 import uuid
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
+
+from pytest_httpserver import HTTPServer
+from werkzeug import Request, Response
 
 
 if TYPE_CHECKING:
     from .trajectory import Trajectory, TrajectoryEvent
 
 
+# Default mock token usage for all responses
+DEFAULT_USAGE = {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
+
+
+@dataclass
 class TrajectoryReplayState:
     """Tracks the state of trajectory replay across requests."""
 
-    def __init__(self, responses: list[TrajectoryEvent]):
-        self.responses = responses
-        self.current_index = 0
-        self._lock = threading.Lock()
+    responses: list[TrajectoryEvent] = field(default_factory=list)
+    current_index: int = 0
+    _lock: threading.Lock = field(default_factory=threading.Lock)
 
     def get_next_response(self) -> TrajectoryEvent | None:
         """Get the next response to replay, advancing the index."""
@@ -66,370 +73,257 @@ class TrajectoryReplayState:
             self.current_index = 0
 
 
-def create_handler_class(replay_state: TrajectoryReplayState) -> type:
-    """Create a handler class with access to the replay state."""
+class OpenAIResponseBuilder:
+    """Builds OpenAI-compatible response formats from trajectory events."""
 
-    class MockLLMHandler(BaseHTTPRequestHandler):
-        """HTTP handler for mock LLM requests with trajectory replay."""
+    @staticmethod
+    def build_completion(
+        completion_id: str,
+        message: dict[str, Any],
+        finish_reason: str = "stop",
+    ) -> dict[str, Any]:
+        """Build a chat completion response."""
+        return {
+            "id": completion_id,
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": "mock-llm",
+            "choices": [
+                {"index": 0, "message": message, "finish_reason": finish_reason}
+            ],
+            "usage": DEFAULT_USAGE,
+        }
 
-        def log_message(self, format: str, *args) -> None:
-            """Suppress default logging."""
-            pass
+    @staticmethod
+    def build_stream_chunk(
+        completion_id: str,
+        delta: dict[str, Any],
+        finish_reason: str | None = None,
+    ) -> dict[str, Any]:
+        """Build a single streaming chunk."""
+        return {
+            "id": completion_id,
+            "object": "chat.completion.chunk",
+            "created": int(time.time()),
+            "model": "mock-llm",
+            "choices": [{"index": 0, "delta": delta, "finish_reason": finish_reason}],
+        }
 
-        def _send_json_response(self, data: dict, status: int = 200) -> None:
-            """Send a JSON response."""
-            response_body = json.dumps(data).encode("utf-8")
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(response_body)))
-            self.end_headers()
-            self.wfile.write(response_body)
+    @classmethod
+    def build_message_chunks(
+        cls, completion_id: str, content: str, finish_reason: str = "stop"
+    ) -> list[dict[str, Any]]:
+        """Build streaming chunks for a text message response."""
+        return [
+            cls.build_stream_chunk(completion_id, {"role": "assistant", "content": ""}),
+            cls.build_stream_chunk(completion_id, {"content": content}),
+            cls.build_stream_chunk(completion_id, {}, finish_reason),
+        ]
 
-        def _send_streaming_response(self, chunks: list[dict]) -> None:
-            """Send a streaming SSE response."""
-            self.send_response(200)
-            self.send_header("Content-Type", "text/event-stream")
-            self.send_header("Cache-Control", "no-cache")
-            self.send_header("Connection", "keep-alive")
-            self.end_headers()
+    @classmethod
+    def build_tool_call_chunks(
+        cls, completion_id: str, tool_call_id: str, tool_name: str, arguments: str
+    ) -> list[dict[str, Any]]:
+        """Build streaming chunks for a tool call response."""
+        return [
+            cls.build_stream_chunk(
+                completion_id,
+                {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "index": 0,
+                            "id": tool_call_id,
+                            "type": "function",
+                            "function": {"name": tool_name, "arguments": ""},
+                        }
+                    ],
+                },
+            ),
+            cls.build_stream_chunk(
+                completion_id,
+                {"tool_calls": [{"index": 0, "function": {"arguments": arguments}}]},
+            ),
+            cls.build_stream_chunk(completion_id, {}, "tool_calls"),
+        ]
 
-            for chunk in chunks:
-                chunk_data = f"data: {json.dumps(chunk)}\n\n"
-                self.wfile.write(chunk_data.encode("utf-8"))
-                self.wfile.flush()
 
-            self.wfile.write(b"data: [DONE]\n\n")
-            self.wfile.flush()
+class TrajectoryResponseConverter:
+    """Converts trajectory events to OpenAI response format."""
 
-        def do_GET(self) -> None:
-            """Handle GET requests - health check and status."""
-            if self.path == "/health" or self.path == "/":
-                self._send_json_response(
+    def convert_event(self, event: TrajectoryEvent) -> dict[str, Any]:
+        """Convert a trajectory event to OpenAI response format."""
+        if event.kind == "ActionEvent" and event.tool_call:
+            return self._create_tool_call_response(event)
+        elif event.kind == "MessageEvent" and event.llm_message:
+            return self._create_message_response(event)
+        return self._create_default_response()
+
+    def _create_tool_call_response(self, event: TrajectoryEvent) -> dict[str, Any]:
+        """Create a tool call response from an ActionEvent."""
+        tool_call = event.tool_call
+        if not tool_call:
+            return self._create_default_response()
+
+        tool_call_id = tool_call.get("id", f"call_{uuid.uuid4().hex[:24]}")
+        tool_name = tool_call.get("name", event.tool_name or "unknown")
+        arguments = tool_call.get("arguments", "{}")
+        completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
+
+        message: dict[str, Any] = {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": tool_call_id,
+                    "type": "function",
+                    "function": {"name": tool_name, "arguments": arguments},
+                }
+            ],
+        }
+
+        return {
+            "completion": OpenAIResponseBuilder.build_completion(
+                completion_id, message, "tool_calls"
+            ),
+            "stream_chunks": OpenAIResponseBuilder.build_tool_call_chunks(
+                completion_id, tool_call_id, tool_name, arguments
+            ),
+        }
+
+    def _create_message_response(self, event: TrajectoryEvent) -> dict[str, Any]:
+        """Create a message response from a MessageEvent."""
+        llm_message = event.llm_message
+        if not llm_message:
+            return self._create_default_response()
+
+        completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
+        content = self._extract_content(llm_message)
+
+        return {
+            "completion": OpenAIResponseBuilder.build_completion(
+                completion_id, {"role": "assistant", "content": content}
+            ),
+            "stream_chunks": OpenAIResponseBuilder.build_message_chunks(
+                completion_id, content
+            ),
+        }
+
+    def _create_default_response(
+        self, content: str = "Task completed."
+    ) -> dict[str, Any]:
+        """Create a default finish response."""
+        completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
+        return {
+            "completion": OpenAIResponseBuilder.build_completion(
+                completion_id, {"role": "assistant", "content": content}
+            ),
+            "stream_chunks": OpenAIResponseBuilder.build_message_chunks(
+                completion_id, content
+            ),
+        }
+
+    @staticmethod
+    def _extract_content(llm_message: dict[str, Any]) -> str:
+        """Extract text content from an LLM message."""
+        content = llm_message.get("content", "")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            return "".join(
+                item.get("text", "")
+                for item in content
+                if isinstance(item, dict) and item.get("type") == "text"
+            )
+        return ""
+
+
+def _format_sse_response(chunks: list[dict[str, Any]]) -> str:
+    """Format chunks as Server-Sent Events response."""
+    lines = [f"data: {json.dumps(chunk)}\n\n" for chunk in chunks]
+    lines.append("data: [DONE]\n\n")
+    return "".join(lines)
+
+
+def create_request_handler(
+    replay_state: TrajectoryReplayState,
+    converter: TrajectoryResponseConverter,
+):
+    """Create a request handler function for pytest-httpserver."""
+
+    def handler(request: Request) -> Response:
+        """Handle all incoming requests."""
+        path = request.path
+
+        # Health check
+        if path in ("/health", "/") and request.method == "GET":
+            remaining = len(replay_state.responses) - replay_state.current_index
+            return Response(
+                json.dumps(
                     {
                         "status": "ok",
                         "server": "mock-llm-trajectory",
-                        "responses_remaining": (
-                            len(replay_state.responses) - replay_state.current_index
-                        ),
+                        "responses_remaining": remaining,
                     }
-                )
-            elif self.path == "/reset":
-                replay_state.reset()
-                self._send_json_response({"status": "reset"})
-            else:
-                self._send_json_response({"error": "Not found"}, 404)
+                ),
+                content_type="application/json",
+            )
 
-        def do_POST(self) -> None:
-            """Handle POST requests - chat completions."""
-            if self.path in ("/chat/completions", "/v1/chat/completions"):
-                self._handle_chat_completions()
-            else:
-                self._send_json_response({"error": "Not found"}, 404)
+        # Reset endpoint
+        if path == "/reset" and request.method == "GET":
+            replay_state.reset()
+            return Response(
+                json.dumps({"status": "reset"}),
+                content_type="application/json",
+            )
 
-        def _handle_chat_completions(self) -> None:
-            """Handle chat completion requests by replaying trajectory."""
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
-
+        # Chat completions
+        chat_paths = ("/chat/completions", "/v1/chat/completions")
+        if path in chat_paths and request.method == "POST":
             try:
-                request_data = json.loads(body)
+                request_data = json.loads(request.data)
             except json.JSONDecodeError:
-                self._send_json_response({"error": "Invalid JSON"}, 400)
-                return
+                return Response(
+                    json.dumps({"error": "Invalid JSON"}),
+                    status=400,
+                    content_type="application/json",
+                )
 
             stream = request_data.get("stream", False)
-
-            # Get the next response from the trajectory
             event = replay_state.get_next_response()
             if event is None:
-                # No more responses - return a default finish
-                response = self._create_default_finish_response()
+                response = converter._create_default_response()
             else:
-                response = self._convert_event_to_response(event)
+                response = converter.convert_event(event)
 
             if stream:
-                self._send_streaming_response(response["stream_chunks"])
-            else:
-                self._send_json_response(response["completion"])
+                return Response(
+                    _format_sse_response(response["stream_chunks"]),
+                    content_type="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+                )
+            return Response(
+                json.dumps(response["completion"]),
+                content_type="application/json",
+            )
 
-        def _convert_event_to_response(self, event: TrajectoryEvent) -> dict:
-            """Convert a trajectory event to OpenAI response format."""
-            if event.kind == "ActionEvent" and event.tool_call:
-                return self._create_tool_call_response(event)
-            elif event.kind == "MessageEvent" and event.llm_message:
-                return self._create_message_response(event)
-            else:
-                return self._create_default_finish_response()
+        # Not found
+        return Response(
+            json.dumps({"error": "Not found"}),
+            status=404,
+            content_type="application/json",
+        )
 
-        def _create_tool_call_response(self, event: TrajectoryEvent) -> dict:
-            """Create a tool call response from an ActionEvent."""
-            tool_call = event.tool_call
-            if not tool_call:
-                return self._create_default_finish_response()
-
-            tool_call_id = tool_call.get("id", f"call_{uuid.uuid4().hex[:24]}")
-            tool_name = tool_call.get("name", event.tool_name or "unknown")
-            arguments = tool_call.get("arguments", "{}")
-
-            completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
-
-            # Build thinking content if present
-            thinking_content: list[dict[str, Any]] = []
-            if event.thinking_blocks:
-                for block in event.thinking_blocks:
-                    if block.get("type") == "thinking":
-                        thinking_content.append(
-                            {
-                                "type": "thinking",
-                                "thinking": block.get("thinking", ""),
-                            }
-                        )
-
-            # Build the message content
-            message: dict[str, Any] = {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": tool_call_id,
-                        "type": "function",
-                        "function": {
-                            "name": tool_name,
-                            "arguments": arguments,
-                        },
-                    }
-                ],
-            }
-
-            completion_response = {
-                "id": completion_id,
-                "object": "chat.completion",
-                "created": int(time.time()),
-                "model": "mock-llm",
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": message,
-                        "finish_reason": "tool_calls",
-                    }
-                ],
-                "usage": {
-                    "prompt_tokens": 100,
-                    "completion_tokens": 50,
-                    "total_tokens": 150,
-                },
-            }
-
-            # Create streaming chunks
-            stream_chunks = [
-                {
-                    "id": completion_id,
-                    "object": "chat.completion.chunk",
-                    "created": int(time.time()),
-                    "model": "mock-llm",
-                    "choices": [
-                        {
-                            "index": 0,
-                            "delta": {
-                                "role": "assistant",
-                                "content": None,
-                                "tool_calls": [
-                                    {
-                                        "index": 0,
-                                        "id": tool_call_id,
-                                        "type": "function",
-                                        "function": {
-                                            "name": tool_name,
-                                            "arguments": "",
-                                        },
-                                    }
-                                ],
-                            },
-                            "finish_reason": None,
-                        }
-                    ],
-                },
-                {
-                    "id": completion_id,
-                    "object": "chat.completion.chunk",
-                    "created": int(time.time()),
-                    "model": "mock-llm",
-                    "choices": [
-                        {
-                            "index": 0,
-                            "delta": {
-                                "tool_calls": [
-                                    {
-                                        "index": 0,
-                                        "function": {"arguments": arguments},
-                                    }
-                                ]
-                            },
-                            "finish_reason": None,
-                        }
-                    ],
-                },
-                {
-                    "id": completion_id,
-                    "object": "chat.completion.chunk",
-                    "created": int(time.time()),
-                    "model": "mock-llm",
-                    "choices": [
-                        {"index": 0, "delta": {}, "finish_reason": "tool_calls"}
-                    ],
-                },
-            ]
-
-            return {"completion": completion_response, "stream_chunks": stream_chunks}
-
-        def _create_message_response(self, event: TrajectoryEvent) -> dict:
-            """Create a message response from a MessageEvent."""
-            llm_message = event.llm_message
-            if not llm_message:
-                return self._create_default_finish_response()
-
-            completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
-
-            # Extract content from llm_message
-            content = llm_message.get("content", "")
-            if isinstance(content, list):
-                # Extract text from content array
-                text_parts = []
-                for item in content:
-                    if isinstance(item, dict) and item.get("type") == "text":
-                        text_parts.append(item.get("text", ""))
-                content = "".join(text_parts)
-
-            completion_response = {
-                "id": completion_id,
-                "object": "chat.completion",
-                "created": int(time.time()),
-                "model": "mock-llm",
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {
-                            "role": "assistant",
-                            "content": content,
-                        },
-                        "finish_reason": "stop",
-                    }
-                ],
-                "usage": {
-                    "prompt_tokens": 100,
-                    "completion_tokens": 50,
-                    "total_tokens": 150,
-                },
-            }
-
-            stream_chunks = [
-                {
-                    "id": completion_id,
-                    "object": "chat.completion.chunk",
-                    "created": int(time.time()),
-                    "model": "mock-llm",
-                    "choices": [
-                        {
-                            "index": 0,
-                            "delta": {"role": "assistant", "content": ""},
-                            "finish_reason": None,
-                        }
-                    ],
-                },
-                {
-                    "id": completion_id,
-                    "object": "chat.completion.chunk",
-                    "created": int(time.time()),
-                    "model": "mock-llm",
-                    "choices": [
-                        {
-                            "index": 0,
-                            "delta": {"content": content},
-                            "finish_reason": None,
-                        }
-                    ],
-                },
-                {
-                    "id": completion_id,
-                    "object": "chat.completion.chunk",
-                    "created": int(time.time()),
-                    "model": "mock-llm",
-                    "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
-                },
-            ]
-
-            return {"completion": completion_response, "stream_chunks": stream_chunks}
-
-        def _create_default_finish_response(self) -> dict:
-            """Create a default finish response when no trajectory events remain."""
-            completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
-            content = "Task completed."
-
-            completion_response = {
-                "id": completion_id,
-                "object": "chat.completion",
-                "created": int(time.time()),
-                "model": "mock-llm",
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {
-                            "role": "assistant",
-                            "content": content,
-                        },
-                        "finish_reason": "stop",
-                    }
-                ],
-                "usage": {
-                    "prompt_tokens": 100,
-                    "completion_tokens": 50,
-                    "total_tokens": 150,
-                },
-            }
-
-            stream_chunks = [
-                {
-                    "id": completion_id,
-                    "object": "chat.completion.chunk",
-                    "created": int(time.time()),
-                    "model": "mock-llm",
-                    "choices": [
-                        {
-                            "index": 0,
-                            "delta": {"role": "assistant", "content": ""},
-                            "finish_reason": None,
-                        }
-                    ],
-                },
-                {
-                    "id": completion_id,
-                    "object": "chat.completion.chunk",
-                    "created": int(time.time()),
-                    "model": "mock-llm",
-                    "choices": [
-                        {
-                            "index": 0,
-                            "delta": {"content": content},
-                            "finish_reason": None,
-                        }
-                    ],
-                },
-                {
-                    "id": completion_id,
-                    "object": "chat.completion.chunk",
-                    "created": int(time.time()),
-                    "model": "mock-llm",
-                    "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
-                },
-            ]
-
-            return {"completion": completion_response, "stream_chunks": stream_chunks}
-
-    return MockLLMHandler
+    return handler
 
 
 class MockLLMServer:
-    """Mock LLM server for e2e testing with trajectory replay."""
+    """Mock LLM server for e2e testing with trajectory replay.
+
+    Uses pytest-httpserver for simplified HTTP handling while preserving
+    the trajectory replay logic for deterministic testing.
+    """
 
     def __init__(
         self,
@@ -448,44 +342,36 @@ class MockLLMServer:
         self.host = host
         self.port = port
         self.trajectory = trajectory
-        self.server: HTTPServer | None = None
-        self._thread: threading.Thread | None = None
+        self._server: HTTPServer | None = None
         self._replay_state: TrajectoryReplayState | None = None
+        self._converter = TrajectoryResponseConverter()
 
     def start(self) -> str:
-        """Start the mock server in a background thread.
+        """Start the mock server.
 
         Returns:
             The base URL of the server (e.g., http://127.0.0.1:8123)
         """
         # Create replay state from trajectory
-        if self.trajectory:
-            responses = self.trajectory.get_llm_responses()
-        else:
-            responses = []
-        self._replay_state = TrajectoryReplayState(responses)
+        responses = self.trajectory.get_llm_responses() if self.trajectory else []
+        self._replay_state = TrajectoryReplayState(responses=responses)
 
-        # Create handler class with replay state
-        handler_class = create_handler_class(self._replay_state)
+        # Create and configure server
+        self._server = HTTPServer(host=self.host, port=self.port)
+        handler = create_request_handler(self._replay_state, self._converter)
+        self._server.expect_request("").respond_with_handler(handler)
+        self._server.start()
 
-        self.server = HTTPServer((self.host, self.port), handler_class)
-        actual_port = self.server.server_address[1]
-        self.port = actual_port
-
-        self._thread = threading.Thread(target=self.server.serve_forever, daemon=True)
-        self._thread.start()
-
-        base_url = f"http://{self.host}:{self.port}"
-        return base_url
+        self.port = self._server.port
+        return f"http://{self.host}:{self.port}"
 
     def stop(self) -> None:
         """Stop the mock server."""
-        if self.server:
-            self.server.shutdown()
-            self.server = None
-        if self._thread:
-            self._thread.join(timeout=5)
-            self._thread = None
+        if self._server:
+            self._server.clear()
+            if self._server.is_running():
+                self._server.stop()
+            self._server = None
 
     def reset(self) -> None:
         """Reset trajectory replay to the beginning."""
