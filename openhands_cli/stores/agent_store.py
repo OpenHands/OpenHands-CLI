@@ -264,6 +264,7 @@ class AgentStore:
         """
         try:
             str_spec = self.file_store.read(AGENT_SETTINGS_PATH)
+            # Respect user choices: load condenser configuration exactly as persisted on disk.
             return Agent.model_validate_json(str_spec)
         except FileNotFoundError:
             return None
