@@ -30,14 +30,6 @@ class ConversationFinished(Message):
     pass
 
 
-class ConfirmationRequired(Message):
-    """Message emitted when actions require user confirmation."""
-
-    def __init__(self, pending_actions: list["ActionEvent"]) -> None:
-        super().__init__()
-        self.pending_actions = pending_actions
-
-
 class StateManager(Container):
     """Centralized state manager and container for conversation UI.
 
