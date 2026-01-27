@@ -34,7 +34,7 @@ from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_splash_content
-from openhands_cli.tui.core import ConversationFinished, StateManager
+from openhands_cli.tui.core import AppState, ConversationFinished
 from openhands_cli.tui.core.commands import CommandHandler, is_valid_command
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.core.conversation_switcher import ConversationSwitcher
@@ -76,6 +76,16 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     main_display: getters.query_one[VerticalScroll] = getters.query_one("#main_display")
     content_area: getters.query_one[Horizontal] = getters.query_one("#content_area")
 
+    @property
+    def conversation_id(self) -> uuid.UUID | None:
+        """Get the current conversation ID from AppState (single source of truth)."""
+        return self.app_state.conversation_id
+
+    @conversation_id.setter
+    def conversation_id(self, value: uuid.UUID) -> None:
+        """Set the conversation ID in AppState (single source of truth)."""
+        self.app_state.conversation_id = value
+
     def __init__(
         self,
         exit_confirmation: bool = True,
@@ -105,9 +115,14 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """
         super().__init__(**kwargs)
 
-        self.state_manager = StateManager(
+        # AppState is the single source of truth for application state
+        # It's a pure state object with no UI composition responsibilities
+        self.app_state = AppState(
             initial_confirmation_policy=initial_confirmation_policy or AlwaysConfirm()
         )
+        # Backwards compatibility alias
+        self.state_manager = self.app_state
+
         self.is_ui_initialized = False
 
         # Store exit confirmation setting
@@ -123,15 +138,15 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.env_overrides_enabled = env_overrides_enabled
         self.critic_disabled = critic_disabled
 
-        # Store resume conversation ID
-        self.conversation_id = (
+        # conversation_id is owned by AppState - we just initialize it here
+        initial_conversation_id = (
             resume_conversation_id if resume_conversation_id else uuid.uuid4()
         )
-        self.conversation_dir = BaseConversation.get_persistence_dir(
-            CONVERSATIONS_DIR, self.conversation_id
-        )
+        self.app_state.conversation_id = initial_conversation_id
 
-        self.state_manager.conversation_id = self.conversation_id
+        self.conversation_dir = BaseConversation.get_persistence_dir(
+            CONVERSATIONS_DIR, initial_conversation_id
+        )
 
         # Store queued inputs (copy to prevent mutating caller's list)
         self.pending_inputs = list(queued_inputs) if queued_inputs else []
@@ -183,9 +198,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 yield Static(id="splash_update_notice", classes="splash-update-notice")
                 yield Static(id="splash_critic_notice", classes="splash-critic-notice")
 
-            # StateManager (id="input_area") contains reactive status lines
+            # AppState holds reactive state and composes InputAreaContainer
             # CSS dock: bottom makes it span full width at bottom
-            yield self.state_manager
+            yield self.app_state
 
         # Footer - shows available key bindings
         yield Footer()
@@ -437,10 +452,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if self.json_mode:
             event_callback = json_callback
 
-        # StateManager owns the confirmation policy - runner will attach conversation
+        # AppState owns the confirmation policy - runner will attach conversation
         runner = ConversationRunner(
             conversation_uuid,
-            state_manager=self.state_manager,
+            app_state=self.app_state,
             confirmation_callback=self._handle_confirmation_request,
             notification_callback=lambda title, message, severity: (
                 self.notify(title=title, message=message, severity=severity)
@@ -509,7 +524,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # If History panel is open, update "New conversation" title immediately
         # on the first message (without waiting for persistence on disk).
-        self.state_manager.set_conversation_title(user_message)
+        self.app_state.set_conversation_title(user_message)
 
         # Show that we're processing the message
         if self.conversation_runner.is_running:

@@ -1,7 +1,7 @@
 """Tests for HistorySidePanel and conversation switching.
 
-The HistorySidePanel uses the StateManager pattern for state updates.
-It watches StateManager's reactive properties (conversation_id, conversation_title,
+The HistorySidePanel uses the AppState pattern for state updates.
+It watches AppState's reactive properties (conversation_id, conversation_title,
 is_switching) instead of receiving forwarded messages.
 """
 
@@ -17,34 +17,31 @@ from textual.widgets import Button, Static
 
 from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.conversations.store.local import LocalFileStore
-from openhands_cli.tui.core.conversation_manager import ConversationManager
-from openhands_cli.tui.core.messages import SwitchConversationRequest
-from openhands_cli.tui.core.state import StateManager
+from openhands_cli.tui.core.state import AppState
 from openhands_cli.tui.modals.switch_conversation_modal import SwitchConversationModal
-from openhands_cli.tui.panels.history_side_panel import HistoryItem, HistorySidePanel
+from openhands_cli.tui.panels.history_side_panel import (
+    HistoryItem,
+    HistorySidePanel,
+    SwitchConversationRequest,
+)
 
 
 class HistoryMessagesTestApp(App):
-    """Minimal app for testing HistorySidePanel with StateManager."""
+    """Minimal app for testing HistorySidePanel with AppState."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Track messages received by the app
         self.received_switch_requests: list[str] = []
         self._store = LocalFileStore()
-        # StateManager for reactive state
-        self.state_manager = StateManager()
-        # Mock the store for tests if needed,
-        # but we rely on monkeypatching LocalFileStore in tests
-        self._conversation_manager = ConversationManager(
-            self,  # type: ignore[arg-type]
-            self._store,
-        )
+        # AppState for reactive state (backwards compatible alias: state_manager)
+        self.app_state = AppState()
+        self.state_manager = self.app_state  # Backwards compatibility
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="content_area"):
             yield Static("main", id="main")
-            yield self.state_manager
+            yield self.app_state
             yield HistorySidePanel(app=self, current_conversation_id=None)  # type: ignore
 
     def on_switch_conversation_request(self, event: SwitchConversationRequest) -> None:

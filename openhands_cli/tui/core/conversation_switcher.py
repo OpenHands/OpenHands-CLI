@@ -82,7 +82,7 @@ class ConversationSwitcher:
             self._switch_with_pause(target_id)
         else:
             # Revert selection - set is_switching to False triggers UI update
-            self.app.state_manager.finish_switching()
+            self.app.app_state.finish_switching()
             self.app.input_field.focus_input()
 
     def _switch_with_pause(self, target_id: uuid.UUID) -> None:
@@ -145,7 +145,7 @@ class ConversationSwitcher:
     def _show_loading(self) -> None:
         """Show a loading notification that can be dismissed after the switch."""
         # Mark switching in progress via StateManager
-        self.app.state_manager.start_switching()
+        self.app.app_state.start_switching()
 
         # Dismiss any previous loading notification
         if self._loading_notification is not None:
@@ -174,7 +174,7 @@ class ConversationSwitcher:
         finally:
             self._loading_notification = None
             # Mark switching complete via StateManager
-            self.app.state_manager.finish_switching()
+            self.app.app_state.finish_switching()
 
     def _prepare_ui(self, conversation_id: uuid.UUID) -> None:
         """Prepare UI for switching conversations (runs on the UI thread)."""
@@ -210,9 +210,10 @@ class ConversationSwitcher:
         self.app.main_display.scroll_end(animate=False)
         self._dismiss_loading()
 
-        # Update StateManager - UI components will react automatically
-        self.app.state_manager.set_conversation_id(target_id)
-        self.app.state_manager.reset()  # Reset running state, metrics, title, etc.
+        # Update AppState - UI components will react automatically
+        # conversation_id property delegates to app_state
+        self.app.conversation_id = target_id
+        self.app.app_state.reset_conversation_state()  # Reset running state, metrics, etc.
 
         self.app.notify(
             title="Switched",

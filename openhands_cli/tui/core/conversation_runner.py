@@ -30,20 +30,20 @@ from openhands_cli.user_actions.types import UserConfirmation
 
 
 if TYPE_CHECKING:
-    from openhands_cli.tui.core.state import StateManager
+    from openhands_cli.tui.core.state import AppState
 
 
 class ConversationRunner:
     """Conversation runner with confirmation mode support.
 
-    StateManager owns the confirmation policy. This class delegates policy
-    operations to StateManager rather than managing policy state internally.
+    AppState owns the confirmation policy. This class delegates policy
+    operations to AppState rather than managing policy state internally.
     """
 
     def __init__(
         self,
         conversation_id: uuid.UUID,
-        state_manager: "StateManager",
+        app_state: "AppState",
         confirmation_callback: Callable,
         notification_callback: Callable[[str, str, SeverityLevel], None],
         visualizer: ConversationVisualizer,
@@ -56,8 +56,8 @@ class ConversationRunner:
 
         Args:
             conversation_id: UUID for the conversation.
-            state_manager: StateManager for reactive state updates. StateManager
-                          owns the confirmation policy and syncs it to conversation.
+            app_state: AppState for reactive state updates. AppState owns the
+                      confirmation policy and syncs it to conversation.
             confirmation_callback: Callback for handling action confirmations.
             notification_callback: Callback for notifications.
             visualizer: Visualizer for output display.
@@ -68,10 +68,10 @@ class ConversationRunner:
         """
         self.visualizer = visualizer
 
-        # Create conversation WITHOUT setting policy - StateManager will do it
+        # Create conversation with policy from AppState
         self.conversation: BaseConversation = setup_conversation(
             conversation_id,
-            confirmation_policy=state_manager.confirmation_policy,
+            confirmation_policy=app_state.confirmation_policy,
             visualizer=visualizer,
             event_callback=event_callback,
             env_overrides_enabled=env_overrides_enabled,
@@ -80,17 +80,17 @@ class ConversationRunner:
 
         self._running = False
 
-        # State management via StateManager (which owns the confirmation policy)
-        self._state_manager = state_manager
+        # State management via AppState (which owns the confirmation policy)
+        self._app_state = app_state
         self._confirmation_callback = confirmation_callback
         self._notification_callback = notification_callback
 
-        # Attach conversation to StateManager - this syncs the policy
-        self._state_manager.attach_conversation(self.conversation)
+        # Attach conversation to AppState - this syncs the policy
+        self._app_state.attach_conversation(self.conversation)
 
     @property
     def is_confirmation_mode_active(self) -> bool:
-        return self._state_manager.is_confirmation_active
+        return self._app_state.is_confirmation_active
 
     async def queue_message(self, user_input: str) -> None:
         """Queue a message for a running conversation"""
@@ -225,10 +225,10 @@ class ConversationRunner:
             self.conversation.pause()
         elif decision == UserConfirmation.ALWAYS_PROCEED:
             # Accept actions and change policy to NeverConfirm via StateManager
-            self._state_manager.set_confirmation_policy(NeverConfirm())
+            self._app_state.set_confirmation_policy(NeverConfirm())
         elif decision == UserConfirmation.CONFIRM_RISKY:
             # Accept actions and change policy to ConfirmRisky via StateManager
-            self._state_manager.set_confirmation_policy(ConfirmRisky())
+            self._app_state.set_confirmation_policy(ConfirmRisky())
 
         # For ACCEPT and policy-changing decisions, we continue normally
         return decision
@@ -290,7 +290,7 @@ class ConversationRunner:
     def _update_run_status(self, is_running: bool) -> None:
         """Update the running status via StateManager."""
         self._running = is_running
-        self._state_manager.set_running(is_running)
+        self._app_state.set_running(is_running)
 
     def pause_runner_without_blocking(self):
         if self.is_running:

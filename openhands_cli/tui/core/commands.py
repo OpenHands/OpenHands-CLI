@@ -158,12 +158,10 @@ class CommandHandler:
         new_id_str = app._store.create()
         new_id = uuid.UUID(new_id_str)
 
-        # Update app's conversation_id (for backwards compatibility)
+        # Update AppState (single source of truth) - UI components react automatically
+        # conversation_id property delegates to app_state
         app.conversation_id = new_id
-
-        # Update StateManager - UI components will react automatically
-        app.state_manager.set_conversation_id(new_id)
-        app.state_manager.reset()  # Reset running state, metrics, etc.
+        app.app_state.reset_conversation_state()  # Reset running state, metrics, etc.
 
         # Reset the conversation runner
         app.conversation_runner = None
@@ -210,13 +208,13 @@ class CommandHandler:
         )
 
         # Get current confirmation policy from StateManager (it owns the policy)
-        current_policy = self._app.state_manager.confirmation_policy
+        current_policy = self._app.app_state.confirmation_policy
 
         # Show the confirmation settings modal
         # Pass StateManager's set_confirmation_policy directly - modal handles notification
         confirmation_modal = ConfirmationSettingsModal(
             current_policy=current_policy,
-            on_policy_selected=self._app.state_manager.set_confirmation_policy,
+            on_policy_selected=self._app.app_state.set_confirmation_policy,
         )
         self._app.push_screen(confirmation_modal)
 

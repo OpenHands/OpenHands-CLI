@@ -333,13 +333,14 @@ class TestConversationSummary:
             agent_event,
         ]
 
-        # Create a mock StateManager
-        mock_state_manager = Mock()
-        mock_state_manager.set_confirmation_mode = Mock()
+        # Create a mock AppState
+        mock_app_state = Mock()
+        mock_app_state.confirmation_policy = AlwaysConfirm()
+        mock_app_state.attach_conversation = Mock()
 
         runner = ConversationRunner(
             conversation_id=uuid.uuid4(),
-            state_manager=mock_state_manager,
+            app_state=mock_app_state,
             confirmation_callback=Mock(),
             notification_callback=Mock(),
             visualizer=Mock(),
@@ -356,9 +357,10 @@ class TestConversationSummary:
         """With no conversation / events, we should get a safe default."""
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
 
-        # Create a mock StateManager
-        mock_state_manager = Mock()
-        mock_state_manager.set_confirmation_mode = Mock()
+        # Create a mock AppState
+        mock_app_state = Mock()
+        mock_app_state.confirmation_policy = AlwaysConfirm()
+        mock_app_state.attach_conversation = Mock()
 
         with patch(
             "openhands_cli.tui.core.conversation_runner.setup_conversation",
@@ -366,7 +368,7 @@ class TestConversationSummary:
         ):
             runner = ConversationRunner(
                 conversation_id=uuid.uuid4(),
-                state_manager=mock_state_manager,
+                app_state=mock_app_state,
                 confirmation_callback=Mock(),
                 notification_callback=Mock(),
                 visualizer=Mock(),

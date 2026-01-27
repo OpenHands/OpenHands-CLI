@@ -3,7 +3,6 @@
 import uuid
 from unittest.mock import Mock
 
-from openhands_cli.tui.core.conversation_manager import ConversationManager
 from openhands_cli.tui.core.conversation_switcher import ConversationSwitcher
 from openhands_cli.tui.panels.history_side_panel import HistorySidePanel
 from openhands_cli.tui.textual_app import OpenHandsApp
@@ -69,17 +68,24 @@ class TestHistoryIntegration:
 
     def test_history_command_calls_toggle(self):
         """`/history` command handler delegates to action_toggle_history."""
-        app = OpenHandsApp.__new__(OpenHandsApp)
+        from openhands_cli.tui.core.commands import CommandHandler
+
+        app = Mock()
         app.action_toggle_history = Mock()
 
-        app._handle_history_command()
+        handler = CommandHandler(app)
+        handler._handle_history()
 
         app.action_toggle_history.assert_called_once()
 
     def test_action_toggle_history_calls_panel_toggle(self, monkeypatch):
         """action_toggle_history calls HistorySidePanel.toggle with correct args."""
         app = OpenHandsApp.__new__(OpenHandsApp)
-        app.conversation_id = uuid.uuid4()
+        # Initialize app_state to avoid AttributeError
+        from openhands_cli.tui.core.state import AppState
+
+        app.app_state = Mock(spec=AppState)
+        app.app_state.conversation_id = uuid.uuid4()
 
         toggle_mock = Mock()
         monkeypatch.setattr(HistorySidePanel, "toggle", toggle_mock)
@@ -90,7 +96,8 @@ class TestHistoryIntegration:
         _app_arg = toggle_mock.call_args[0][0]
         assert _app_arg is app
         assert (
-            toggle_mock.call_args[1]["current_conversation_id"] == app.conversation_id
+            toggle_mock.call_args[1]["current_conversation_id"]
+            == app.app_state.conversation_id
         )
 
 
@@ -105,7 +112,12 @@ class TestConversationSwitcher:
         app.notify = Mock()
         app.input_field = Mock()
         app.input_field.focus_input = Mock()
-        app.state_manager = Mock()  # StateManager is now used instead of post_message
+        app.app_state = Mock()  # AppState is now used instead of post_message
+        # conversation_id property delegates to app_state
+        type(app).conversation_id = property(
+            lambda self: self.app_state.conversation_id,
+            lambda self, v: setattr(self.app_state, "conversation_id", v),
+        )
 
         switcher = ConversationSwitcher(app)
         switcher._dismiss_loading = Mock()
@@ -116,9 +128,9 @@ class TestConversationSwitcher:
         switcher._finish_switch(runner, target_id)
 
         app.input_field.focus_input.assert_called_once()
-        # Verify that StateManager was updated with the new conversation ID
-        app.state_manager.set_conversation_id.assert_called_once_with(target_id)
-        app.state_manager.reset.assert_called_once()
+        # Verify that AppState was updated with the new conversation ID
+        assert app.app_state.conversation_id == target_id
+        app.app_state.reset_conversation_state.assert_called_once()
 
     def test_switch_to_invalid_uuid_shows_error(self):
         """Switching with an invalid UUID shows an error notification."""
@@ -151,11 +163,13 @@ class TestConversationSwitcher:
         assert "already active" in call_kwargs["message"].lower()
 
 
-class TestConversationManager:
-    """Tests for ConversationManager."""
+class TestCommandHandler:
+    """Tests for CommandHandler (replaces ConversationManager tests)."""
 
-    def test_create_new_resets_conversation(self):
-        """create_new resets conversation state and updates StateManager."""
+    def test_handle_new_resets_conversation(self):
+        """_handle_new resets conversation state and updates AppState."""
+        from openhands_cli.tui.core.commands import CommandHandler
+
         app = Mock()
         app.conversation_runner = None
         app.confirmation_panel = None
@@ -163,45 +177,37 @@ class TestConversationManager:
         app.main_display.children = []
         app.query_one = Mock(return_value=Mock())
         app.notify = Mock()
-        app.state_manager = Mock()  # StateManager is now used instead of post_message
-
-        manager = ConversationManager(app, Mock())
+        app.app_state = Mock()  # AppState is now used
+        app._store = Mock()
         new_id = uuid.uuid4().hex
-        manager.store.create.return_value = new_id  # type: ignore
+        app._store.create.return_value = new_id
 
-        result = manager.create_new()
+        # conversation_id property delegates to app_state
+        type(app).conversation_id = property(
+            lambda self: self.app_state.conversation_id,
+            lambda self, v: setattr(self.app_state, "conversation_id", v),
+        )
 
-        assert result is not None
-        assert app.conversation_id == result
-        # Verify StateManager was updated instead of posting message
-        app.state_manager.set_conversation_id.assert_called_once()
-        app.state_manager.reset.assert_called_once()
+        handler = CommandHandler(app)
+        handler._handle_new()
+
+        # Verify AppState was updated
+        assert app.app_state.conversation_id == uuid.UUID(new_id)
+        app.app_state.reset_conversation_state.assert_called_once()
         app.notify.assert_called_once()
 
-    def test_create_new_blocked_when_running(self):
-        """create_new returns None when a conversation is running."""
+    def test_handle_new_blocked_when_running(self):
+        """_handle_new shows error when a conversation is running."""
+        from openhands_cli.tui.core.commands import CommandHandler
+
         app = Mock()
         app.conversation_runner = Mock()
         app.conversation_runner.is_running = True
         app.notify = Mock()
 
-        manager = ConversationManager(app, Mock())
+        handler = CommandHandler(app)
+        handler._handle_new()
 
-        result = manager.create_new()
-
-        assert result is None
         app.notify.assert_called_once()
         call_kwargs = app.notify.call_args[1]
         assert call_kwargs["severity"] == "error"
-
-    def test_update_title_updates_state_manager(self):
-        """update_title updates StateManager instead of posting message."""
-        app = Mock()
-        app.conversation_id = uuid.uuid4()
-        app.state_manager = Mock()  # StateManager is now used
-
-        manager = ConversationManager(app, Mock())
-
-        manager.update_title("Test title")
-
-        app.state_manager.set_conversation_title.assert_called_once_with("Test title")
