@@ -1,15 +1,16 @@
 """OpenHands CLI TUI application.
 
 This is the main Textual application for the OpenHands CLI. The architecture
-separates concerns between App (shell/navigation) and MainDisplay (content/commands).
+separates concerns between App (shell/navigation), ConversationView (state/lifecycle),
+and MainDisplay (content/commands).
 
 Widget Hierarchy::
 
     OpenHandsApp
     └── Horizontal(#content_area)
-        └── ConversationView(#conversation_view)  ← Composes MainDisplay + input area
+        └── ConversationView(#conversation_view)  ← Owns state + ConversationRunner
             └── MainDisplay(#main_display)  ← Handles commands + renders content
-                ├── SplashContent(#splash_content) ← data_bind to is_ui_ready, conversation_id
+                ├── SplashContent(#splash_content) ← data_bind to conversation_id
                 ├── ... conversation widgets (dynamically added)
                 └── InputAreaContainer(#input_area)
                     ├── WorkingStatusLine (data_bind)
@@ -18,18 +19,19 @@ Widget Hierarchy::
     └── Footer
 
 Message Flow:
-    InputField → ConversationView → MainDisplay
-        - UserInputSubmitted: MainDisplay renders, App sends to agent
+    InputField → MainDisplay → ConversationView
+        - UserInputSubmitted: MainDisplay renders, posts ProcessUserInput
+        - ProcessUserInput: ConversationView processes with runner
         - SlashCommandSubmitted: MainDisplay executes command (stops bubbling)
+        - NewConversationRequested: ConversationView handles /new command
 
 Responsibilities:
-    - MainDisplay: Command execution, content rendering, scrolling
-    - OpenHandsApp: Screen/modal management, agent lifecycle, side panels
-    - ConversationView: Reactive state, input widgets, data binding
-    - SplashContent: Displays splash screen, auto-updates via is_ui_ready binding
+    - MainDisplay: Content rendering, command routing, user message display
+    - ConversationView: Reactive state, ConversationRunner lifecycle, input processing
+    - OpenHandsApp: Screen/modal management, side panels, global key bindings
+    - SplashContent: Displays splash screen, auto-updates via conversation_id binding
 """
 
-import asyncio
 import uuid
 from collections.abc import Iterable
 from typing import ClassVar
@@ -57,7 +59,7 @@ from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.core import ConversationFinished, ConversationView
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.core.conversation_switcher import ConversationSwitcher
-from openhands_cli.tui.messages import UserInputSubmitted
+
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
@@ -436,58 +438,22 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         Currently processes only the first queued input immediately.
         In the future, this could be extended to process multiple instructions
         from the queue one by one as the agent completes each task.
+
+        Posts UserInputSubmitted to MainDisplay, which flows through the same
+        path as typed inputs:
+        1. MainDisplay.on_user_input_submitted() - renders + posts ProcessUserInput
+        2. ConversationView._on_process_user_input() - processes with runner
         """
+        from openhands_cli.tui.messages import UserInputSubmitted
+
         if not self.pending_inputs:
             return
 
         # Process the first queued input immediately
         user_input = self.pending_inputs.pop(0)
 
-        # Add the user message to the main display as a Static widget
-        user_message_widget = Static(
-            f"> {user_input}", classes="user-message", markup=False
-        )
-        self.main_display.mount(user_message_widget)
-        self.main_display.scroll_end(animate=False)
-
-        # Handle the message asynchronously
-        asyncio.create_task(self._handle_user_message(user_input))
-
-    @on(UserInputSubmitted)
-    async def on_user_input_submitted(self, event: UserInputSubmitted) -> None:
-        """Handle user input - send to agent.
-
-        Note: MainDisplay already rendered the message, so we just need to
-        send it to the agent here.
-        """
-        # Force immediate refresh to show the message without delay
-        self.refresh()
-        # Handle regular messages with conversation runner
-        await self._handle_user_message(event.content)
-
-    async def _handle_user_message(self, user_message: str) -> None:
-        """Handle regular user messages with the conversation runner."""
-        # Dismiss any pending critic feedback widgets when user sends a new message
-        self._dismiss_pending_feedback_widgets()
-
-        # Get or create conversation runner (lazy initialization via ConversationView)
-        runner = self.conversation_view.get_or_create_runner()
-
-        # If History panel is open, update "New conversation" title immediately
-        # on the first message (without waiting for persistence on disk).
-        self.conversation_view.set_conversation_title(user_message)
-
-        # Show that we're processing the message
-        if runner.is_running:
-            await runner.queue_message(user_message)
-            return
-
-        # Process message asynchronously to keep UI responsive
-        # Only run worker if we have an active app (not in tests)
-        self.run_worker(
-            runner.process_message_async(user_message, self.headless_mode),
-            name="process_message",
-        )
+        # Post to MainDisplay - reuses the same flow as typed inputs
+        self.main_display.post_message(UserInputSubmitted(content=user_input))
 
     def action_request_quit(self) -> None:
         """Action to handle Ctrl+Q key binding.
@@ -624,18 +590,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self.conversation_runner.pause_runner_without_blocking()
         else:
             self.notify(message="No running conversation to pause", severity="error")
-
-    def _dismiss_pending_feedback_widgets(self) -> None:
-        """Remove all pending CriticFeedbackWidget instances from the UI.
-
-        Called when user sends a new message, indicating they chose to
-        ignore the feedback prompt.
-        """
-        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
-
-        # Find and remove all CriticFeedbackWidget instances
-        for widget in self.main_display.query(CriticFeedbackWidget):
-            widget.remove()
 
     def action_toggle_history(self) -> None:
         """Toggle the history side panel."""

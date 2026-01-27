@@ -55,3 +55,17 @@ class NewConversationRequested(Message):
     """
 
     pass
+
+
+@dataclass
+class ProcessUserInput(Message):
+    """Message sent when user input needs to be processed by the agent.
+
+    This message is posted by MainDisplay after rendering the user message,
+    and handled by ConversationView which owns the ConversationRunner.
+
+    Flow:
+        UserInputSubmitted → MainDisplay (renders) → ProcessUserInput → ConversationView (processes)
+    """
+
+    content: str

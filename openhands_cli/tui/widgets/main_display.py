@@ -35,6 +35,7 @@ from textual.widgets import Static
 from openhands_cli.tui.core.commands import show_help
 from openhands_cli.tui.messages import (
     NewConversationRequested,
+    ProcessUserInput,
     SlashCommandSubmitted,
     UserInputSubmitted,
 )
@@ -92,20 +93,27 @@ class MainDisplay(VerticalScroll):
 
     @on(UserInputSubmitted)
     async def on_user_input_submitted(self, event: UserInputSubmitted) -> None:
-        """Handle user input by rendering it and sending to agent.
+        """Handle user input by rendering it and posting for processing.
 
-        1. Render the user message in the conversation view
-        2. Delegate to App for agent processing
+        This handles both typed inputs (from InputField) and queued inputs
+        (from --task/--file via App._process_queued_inputs).
 
-        We don't call event.stop() so the App can also handle it for
-        agent processing.
+        Flow:
+        1. Stop event propagation (MainDisplay fully handles this)
+        2. Render the user message in the display
+        3. Post ProcessUserInput to ConversationView for agent processing
         """
+        event.stop()
+
         # Render the user message
         user_message_widget = Static(
             f"> {event.content}", classes="user-message", markup=False
         )
         await self.mount(user_message_widget)
         self.scroll_end(animate=False)
+
+        # Post to ConversationView for processing with the runner
+        self.post_message(ProcessUserInput(content=event.content))
 
     @on(SlashCommandSubmitted)
     def on_slash_command_submitted(self, event: SlashCommandSubmitted) -> None:

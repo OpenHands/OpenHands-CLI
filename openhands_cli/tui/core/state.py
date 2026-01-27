@@ -27,7 +27,7 @@ from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
     NeverConfirm,
 )
-from openhands_cli.tui.messages import NewConversationRequested
+from openhands_cli.tui.messages import NewConversationRequested, ProcessUserInput
 
 
 if TYPE_CHECKING:
@@ -468,3 +468,62 @@ class ConversationView(Container):
             message="Started a new conversation",
             severity="information",
         )
+
+    @on(ProcessUserInput)
+    async def _on_process_user_input(self, event: ProcessUserInput) -> None:
+        """Handle user input processing request.
+
+        This is triggered by MainDisplay after rendering the user message.
+        ConversationView owns the ConversationRunner, so it handles processing.
+        """
+        event.stop()
+        await self.process_user_input(event.content)
+
+    async def process_user_input(self, content: str) -> None:
+        """Process user input with the conversation runner.
+
+        This method can be called:
+        - Via ProcessUserInput message (from MainDisplay for typed inputs)
+        - Directly by App (for queued inputs from --task/--file)
+
+        Args:
+            content: The user's message content
+        """
+        from openhands_cli.tui.textual_app import OpenHandsApp
+
+        app: OpenHandsApp = self.app  # type: ignore[assignment]
+
+        # Dismiss any pending critic feedback widgets
+        self._dismiss_pending_feedback_widgets()
+
+        # Get or create conversation runner (lazy initialization)
+        runner = self.get_or_create_runner()
+
+        # Update conversation title (for history panel)
+        self.set_conversation_title(content)
+
+        # If already running, queue the message
+        if runner.is_running:
+            await runner.queue_message(content)
+            return
+
+        # Process message asynchronously to keep UI responsive
+        app.run_worker(
+            runner.process_message_async(content, app.headless_mode),
+            name="process_message",
+        )
+
+    def _dismiss_pending_feedback_widgets(self) -> None:
+        """Remove all pending CriticFeedbackWidget instances from the UI.
+
+        Called when user sends a new message, indicating they chose to
+        ignore the feedback prompt.
+        """
+        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
+        from openhands_cli.tui.widgets.main_display import MainDisplay
+
+        main_display = self.query_one("#main_display", MainDisplay)
+
+        # Find and remove all CriticFeedbackWidget instances
+        for widget in main_display.query(CriticFeedbackWidget):
+            widget.remove()
