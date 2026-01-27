@@ -21,7 +21,7 @@ def test_agent_context_includes_os_info() -> None:
         mock_file_store.return_value = mock_store_instance
         mock_store_instance.read.return_value = mock_agent.model_dump_json()
 
-        loaded_agent = AgentStore().load()
+        loaded_agent = AgentStore().load_or_create()
         assert loaded_agent is not None
         assert loaded_agent.agent_context is not None
 

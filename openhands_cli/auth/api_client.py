@@ -9,7 +9,6 @@ from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
 from openhands_cli.auth.utils import _p
 from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
 from openhands_cli.stores import AgentStore
-from openhands_cli.stores.agent_store import resolve_llm_base_url
 from openhands_cli.theme import OPENHANDS_THEME
 
 
@@ -74,6 +73,36 @@ class OpenHandsApiClient(BaseHttpClient):
     async def create_conversation(self, json_data=None):
         return await self.post("/api/conversations", self._headers, json_data)
 
+    async def get_conversation_info(
+        self, conversation_id: str
+    ) -> dict[str, Any] | None:
+        """Get conversation information including sandbox_id.
+
+        Args:
+            conversation_id: The conversation ID to look up
+
+        Returns:
+            Conversation info dict if found, None if not found
+
+        Raises:
+            UnauthenticatedError: If the user is not authenticated (401 response)
+            ApiClientError: For other API errors
+        """
+        path = f"/api/v1/app-conversations?ids={conversation_id}"
+        try:
+            response = await self.get(path, headers=self._headers)
+        except AuthHttpError as e:
+            if "HTTP 401" in str(e):
+                raise UnauthenticatedError(
+                    f"Authentication failed for {path!r}: {e}"
+                ) from e
+            raise ApiClientError(f"Request to {path!r} failed: {e}") from e
+
+        data: list[dict[str, Any]] = response.json()
+        if len(data) > 0:
+            return data[0]
+        return None
+
 
 def _print_settings_summary(settings: dict[str, Any]) -> None:
     _p(
@@ -113,8 +142,7 @@ def _print_settings_summary(settings: dict[str, Any]) -> None:
 
 def _ask_user_consent_for_overwrite(
     existing_agent: Agent,
-    new_settings: dict[str, Any],
-    base_url: str = "https://llm-proxy.app.all-hands.dev/",
+    new_settings: dict[str, str],
     default_model: str = "claude-sonnet-4-5-20250929",
 ) -> bool:
     """Ask user for consent to overwrite existing agent configuration.
@@ -140,6 +168,7 @@ def _ask_user_consent_for_overwrite(
     # Show current vs new settings comparison
     current_model = existing_agent.llm.model
     new_model = new_settings.get("llm_model", default_model)
+    base_url = new_settings.get("llm_base_url", None)
 
     _p(
         f"[{OPENHANDS_THEME.secondary}]Current "
@@ -164,10 +193,12 @@ def _ask_user_consent_for_overwrite(
         f"  • Model: [{OPENHANDS_THEME.accent}]{html.escape(new_model)}"
         f"[/{OPENHANDS_THEME.accent}]"
     )
-    _p(
-        f"  • Base URL: [{OPENHANDS_THEME.accent}]{html.escape(base_url)}"
-        f"[/{OPENHANDS_THEME.accent}]"
-    )
+
+    if base_url:
+        _p(
+            f"  • Base URL: [{OPENHANDS_THEME.accent}]{html.escape(base_url)}"
+            f"[/{OPENHANDS_THEME.accent}]"
+        )
 
     try:
         response = (
@@ -196,16 +227,13 @@ def create_and_save_agent_configuration(
     """
     store = AgentStore()
 
-    base_url = resolve_llm_base_url(settings)
-
-    # First, check if existing configuration exists
-    existing_agent = store.load()
+    # First, check if existing configuration exists on disk
+    existing_agent = store.load_from_disk()
     if existing_agent is not None:
         # Ask for user consent
         if not _ask_user_consent_for_overwrite(
             existing_agent,
             settings,
-            base_url=base_url,
         ):
             raise ValueError("User declined to overwrite existing configuration")
 
@@ -213,7 +241,6 @@ def create_and_save_agent_configuration(
     agent = store.create_and_save_from_settings(
         llm_api_key=llm_api_key,
         settings=settings,
-        base_url=base_url,
     )
 
     _p(

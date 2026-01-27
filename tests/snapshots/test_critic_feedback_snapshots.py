@@ -70,7 +70,8 @@ class MockCriticFeedbackWidget(Static, can_focus=True):
     def compose(self):
         """Compose the widget with prompt and buttons."""
         yield Static(
-            "[bold]Does the critic's prediction align with your perception?[/bold]",
+            "[bold]Does the critic's success prediction align with your "
+            "perception?[/bold]",
             id="feedback-prompt",
         )
         with Horizontal():

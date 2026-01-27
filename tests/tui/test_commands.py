@@ -226,7 +226,7 @@ class TestOpenHandsAppCommands:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
 
         app = OpenHandsApp(exit_confirmation=True)
@@ -253,7 +253,7 @@ class TestOpenHandsAppCommands:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
 
         app = OpenHandsApp(exit_confirmation=True)
@@ -275,7 +275,7 @@ class TestOpenHandsAppCommands:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -311,7 +311,7 @@ class TestOpenHandsAppCommands:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -355,7 +355,7 @@ class TestOpenHandsAppCommands:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -389,7 +389,7 @@ class TestOpenHandsAppCommands:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -422,7 +422,7 @@ class TestOpenHandsAppCommands:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -459,7 +459,7 @@ class TestOpenHandsAppCommands:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -498,7 +498,7 @@ class TestOpenHandsAppCommands:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -540,7 +540,7 @@ class TestOpenHandsAppCommands:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -581,7 +581,7 @@ class TestOpenHandsAppCommands:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -610,7 +610,7 @@ class TestOpenHandsAppCommands:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -649,7 +649,7 @@ class TestOpenHandsAppCommands:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
         existing_id = uuid.uuid4().hex
         monkeypatch.setattr(
@@ -695,7 +695,7 @@ class TestOpenHandsAppCommands:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
         conv1_id = uuid.uuid4().hex
         conv2_id = uuid.uuid4().hex
@@ -747,7 +747,7 @@ class TestOpenHandsAppCommands:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
         target_id = uuid.uuid4().hex
         monkeypatch.setattr(
