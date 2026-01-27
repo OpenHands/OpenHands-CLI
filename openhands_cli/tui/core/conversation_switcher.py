@@ -33,9 +33,6 @@ class ConversationSwitcher:
 
     This class extracts ~180 lines of switching logic from OpenHandsApp,
     providing a single responsibility for all conversation switching concerns.
-
-    State changes are made via StateManager rather than posting messages.
-    UI components (like HistorySidePanel) watch StateManager for updates.
     """
 
     def __init__(self, app: OpenHandsApp):

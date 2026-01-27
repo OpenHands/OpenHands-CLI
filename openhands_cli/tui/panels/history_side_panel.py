@@ -16,12 +16,12 @@ from typing import TYPE_CHECKING
 
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.css.query import NoMatches
+from textual.message import Message
 from textual.widgets import Static
 
 from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.core.messages import SwitchConversationRequest
 from openhands_cli.tui.panels.history_panel_style import HISTORY_PANEL_STYLE
 
 
@@ -32,6 +32,19 @@ if TYPE_CHECKING:
 def _escape_rich_markup(text: str) -> str:
     """Escape Rich markup characters in text to prevent markup errors."""
     return text.replace("[", r"\[").replace("]", r"\]")
+
+
+class SwitchConversationRequest(Message):
+    """Sent by UI components (like HistorySidePanel) to request a conversation switch.
+
+    This represents user intent, not state change. The app handles this by
+    calling ConversationManager.switch_to(), which updates StateManager.
+    """
+
+    conversation_id: str
+
+    def __init__(self, conversation_id):
+        self.conversation_id = conversation_id
 
 
 class HistoryItem(Static):

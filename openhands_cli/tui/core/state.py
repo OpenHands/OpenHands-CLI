@@ -91,9 +91,6 @@ class StateManager(Container):
     confirmation_policy: var[ConfirmationPolicyBase] = var(AlwaysConfirm())
     """The confirmation policy. StateManager owns this and syncs to conversation."""
 
-    pending_actions_count: var[int] = var(0)
-    """Number of actions pending user confirmation."""
-
     # ---- Timing ----
     elapsed_seconds: var[int] = var(0)
     """Seconds elapsed since conversation started."""
@@ -225,10 +222,6 @@ class StateManager(Container):
         self._conversation = conversation
         self._sync_policy_to_conversation()
 
-    def detach_conversation(self) -> None:
-        """Detach the current conversation."""
-        self._conversation = None
-
     def _sync_policy_to_conversation(self) -> None:
         """Sync the current confirmation policy to the attached conversation.
 
@@ -266,14 +259,6 @@ class StateManager(Container):
             # Use app.call_from_thread which is thread-safe
             self.app.call_from_thread(do_update)
 
-    def set_cloud_ready(self, ready: bool = True) -> None:
-        """Set cloud workspace ready state. Thread-safe."""
-        self._schedule_update("cloud_ready", ready)
-
-    def set_pending_actions(self, count: int) -> None:
-        """Set the number of pending actions. Thread-safe."""
-        self._schedule_update("pending_actions_count", count)
-
     def set_metrics(self, metrics: Metrics) -> None:
         """Set the metrics object. Thread-safe."""
         self._schedule_update("metrics", metrics)
@@ -310,7 +295,6 @@ class StateManager(Container):
         """Reset state for a new conversation."""
         self.running = False
         self.elapsed_seconds = 0
-        self.pending_actions_count = 0
         self.metrics = None
         self.conversation_title = None
         self._conversation_start_time = None

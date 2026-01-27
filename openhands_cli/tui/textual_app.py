@@ -38,11 +38,13 @@ from openhands_cli.tui.core import ConversationFinished, StateManager
 from openhands_cli.tui.core.commands import CommandHandler, is_valid_command
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.core.conversation_switcher import ConversationSwitcher
-from openhands_cli.tui.core.messages import SwitchConversationRequest
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
-from openhands_cli.tui.panels.history_side_panel import HistorySidePanel
+from openhands_cli.tui.panels.history_side_panel import (
+    HistorySidePanel,
+    SwitchConversationRequest,
+)
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
 from openhands_cli.tui.widgets import InputField
@@ -137,7 +139,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
         self._store = LocalFileStore()
-        self._conversation_manager = ConversationSwitcher(self)
+        self._conversation_switcher = ConversationSwitcher(self)
         self._reload_visualizer = (
             lambda: self.conversation_runner.visualizer.reload_configuration()
             if self.conversation_runner
@@ -688,7 +690,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     @on(SwitchConversationRequest)
     def _on_switch_conversation_request(self, event: SwitchConversationRequest) -> None:
         """Handle request from history panel to switch conversations."""
-        self._conversation_manager.switch_to(event.conversation_id)
+        self._conversation_switcher.switch_to(event.conversation_id)
 
     def _handle_confirmation_request(
         self, pending_actions: list[ActionEvent]
