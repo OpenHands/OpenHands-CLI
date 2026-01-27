@@ -30,20 +30,20 @@ from openhands_cli.user_actions.types import UserConfirmation
 
 
 if TYPE_CHECKING:
-    from openhands_cli.tui.core.state import AppState
+    from openhands_cli.tui.core.state import ConversationView
 
 
 class ConversationRunner:
     """Conversation runner with confirmation mode support.
 
-    AppState owns the confirmation policy. This class delegates policy
-    operations to AppState rather than managing policy state internally.
+    ConversationView owns the confirmation policy. This class delegates policy
+    operations to ConversationView rather than managing policy state internally.
     """
 
     def __init__(
         self,
         conversation_id: uuid.UUID,
-        app_state: "AppState",
+        conversation_view: "ConversationView",
         confirmation_callback: Callable,
         notification_callback: Callable[[str, str, SeverityLevel], None],
         visualizer: ConversationVisualizer,
@@ -56,7 +56,7 @@ class ConversationRunner:
 
         Args:
             conversation_id: UUID for the conversation.
-            app_state: AppState for reactive state updates. AppState owns the
+            conversation_view: ConversationView for reactive state updates. ConversationView owns the
                       confirmation policy and syncs it to conversation.
             confirmation_callback: Callback for handling action confirmations.
             notification_callback: Callback for notifications.
@@ -68,10 +68,10 @@ class ConversationRunner:
         """
         self.visualizer = visualizer
 
-        # Create conversation with policy from AppState
+        # Create conversation with policy from ConversationView
         self.conversation: BaseConversation = setup_conversation(
             conversation_id,
-            confirmation_policy=app_state.confirmation_policy,
+            confirmation_policy=conversation_view.confirmation_policy,
             visualizer=visualizer,
             event_callback=event_callback,
             env_overrides_enabled=env_overrides_enabled,
@@ -80,17 +80,17 @@ class ConversationRunner:
 
         self._running = False
 
-        # State management via AppState (which owns the confirmation policy)
-        self._app_state = app_state
+        # State management via ConversationView (which owns the confirmation policy)
+        self._conversation_view = conversation_view
         self._confirmation_callback = confirmation_callback
         self._notification_callback = notification_callback
 
-        # Attach conversation to AppState - this syncs the policy
-        self._app_state.attach_conversation(self.conversation)
+        # Attach conversation to ConversationView - this syncs the policy
+        self._conversation_view.attach_conversation(self.conversation)
 
     @property
     def is_confirmation_mode_active(self) -> bool:
-        return self._app_state.is_confirmation_active
+        return self._conversation_view.is_confirmation_active
 
     async def queue_message(self, user_input: str) -> None:
         """Queue a message for a running conversation"""
@@ -224,11 +224,11 @@ class ConversationRunner:
             # Pause the conversation for later resumption
             self.conversation.pause()
         elif decision == UserConfirmation.ALWAYS_PROCEED:
-            # Accept actions and change policy to NeverConfirm via AppState
-            self._app_state.set_confirmation_policy(NeverConfirm())
+            # Accept actions and change policy to NeverConfirm via ConversationView
+            self._conversation_view.set_confirmation_policy(NeverConfirm())
         elif decision == UserConfirmation.CONFIRM_RISKY:
-            # Accept actions and change policy to ConfirmRisky via AppState
-            self._app_state.set_confirmation_policy(ConfirmRisky())
+            # Accept actions and change policy to ConfirmRisky via ConversationView
+            self._conversation_view.set_confirmation_policy(ConfirmRisky())
 
         # For ACCEPT and policy-changing decisions, we continue normally
         return decision
@@ -288,9 +288,9 @@ class ConversationRunner:
             )
 
     def _update_run_status(self, is_running: bool) -> None:
-        """Update the running status via AppState."""
+        """Update the running status via ConversationView."""
         self._running = is_running
-        self._app_state.set_running(is_running)
+        self._conversation_view.set_running(is_running)
 
     def pause_runner_without_blocking(self):
         if self.is_running:

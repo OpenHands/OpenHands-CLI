@@ -7,7 +7,7 @@ Widget Hierarchy::
 
     OpenHandsApp
     └── Horizontal(#content_area)
-        └── AppState(#app_state)           ← Composes MainDisplay + input area
+        └── ConversationView(#conversation_view)  ← Composes MainDisplay + input area
             └── MainDisplay(#main_display)  ← Handles commands + renders content
                 ├── SplashContent(#splash_content) ← data_bind to is_ui_ready, conversation_id
                 ├── ... conversation widgets (dynamically added)
@@ -18,14 +18,14 @@ Widget Hierarchy::
     └── Footer
 
 Message Flow:
-    InputField → AppState → MainDisplay
+    InputField → ConversationView → MainDisplay
         - UserInputSubmitted: MainDisplay renders, App sends to agent
         - SlashCommandSubmitted: MainDisplay executes command (stops bubbling)
 
 Responsibilities:
     - MainDisplay: Command execution, content rendering, scrolling
     - OpenHandsApp: Screen/modal management, agent lifecycle, side panels
-    - AppState: Reactive state, input widgets, data binding
+    - ConversationView: Reactive state, input widgets, data binding
     - SplashContent: Displays splash screen, auto-updates via is_ui_ready binding
 """
 
@@ -54,7 +54,7 @@ from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.core import AppState, ConversationFinished
+from openhands_cli.tui.core import ConversationFinished, ConversationView
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.core.conversation_switcher import ConversationSwitcher
 from openhands_cli.tui.messages import UserInputSubmitted
@@ -96,23 +96,23 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     @property
     def conversation_id(self) -> uuid.UUID:
-        """Get the current conversation ID from AppState (single source of truth)."""
-        return self.app_state.conversation_id
+        """Get the current conversation ID from ConversationView (single source of truth)."""
+        return self.conversation_view.conversation_id
 
     @conversation_id.setter
     def conversation_id(self, value: uuid.UUID) -> None:
-        """Set the conversation ID in AppState (single source of truth)."""
-        self.app_state.conversation_id = value
+        """Set the conversation ID in ConversationView (single source of truth)."""
+        self.conversation_view.conversation_id = value
 
     @property
     def conversation_runner(self) -> ConversationRunner | None:
-        """Get the conversation runner from AppState (single source of truth)."""
-        return self.app_state.conversation_runner
+        """Get the conversation runner from ConversationView (single source of truth)."""
+        return self.conversation_view.conversation_runner
 
     @conversation_runner.setter
     def conversation_runner(self, value: ConversationRunner | None) -> None:
-        """Set the conversation runner in AppState (single source of truth)."""
-        self.app_state.conversation_runner = value
+        """Set the conversation runner in ConversationView (single source of truth)."""
+        self.conversation_view.conversation_runner = value
 
     def __init__(
         self,
@@ -143,16 +143,17 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """
         super().__init__(**kwargs)
 
-        # AppState is the single source of truth for application state
+        # ConversationView is the single source of truth for application state
         # It owns the ConversationRunner and all reactive state
-        self.app_state = AppState(
+        self.conversation_view = ConversationView(
             initial_confirmation_policy=initial_confirmation_policy or AlwaysConfirm(),
             env_overrides_enabled=env_overrides_enabled,
             critic_disabled=critic_disabled,
             json_mode=json_mode,
         )
         # Backwards compatibility alias
-        self.state_manager = self.app_state
+        self.app_state = self.conversation_view
+        self.state_manager = self.conversation_view
 
         # Store exit confirmation setting
         self.exit_confirmation = exit_confirmation
@@ -163,11 +164,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Store these for _reload_visualizer (still need App-level access)
         self.env_overrides_enabled = env_overrides_enabled
 
-        # conversation_id is owned by AppState - we just initialize it here
+        # conversation_id is owned by ConversationView - we just initialize it here
         initial_conversation_id = (
             resume_conversation_id if resume_conversation_id else uuid.uuid4()
         )
-        self.app_state.conversation_id = initial_conversation_id
+        self.conversation_view.conversation_id = initial_conversation_id
 
         self.conversation_dir = BaseConversation.get_persistence_dir(
             CONVERSATIONS_DIR, initial_conversation_id
@@ -176,12 +177,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Store queued inputs (copy to prevent mutating caller's list)
         self.pending_inputs = list(queued_inputs) if queued_inputs else []
 
-        # ConversationRunner is now owned by AppState
+        # ConversationRunner is now owned by ConversationView
         self._store = LocalFileStore()
         self._conversation_switcher = ConversationSwitcher(self)
         self._reload_visualizer = (
-            lambda: self.app_state.conversation_runner.visualizer.reload_configuration()
-            if self.app_state.conversation_runner
+            lambda: self.conversation_view.conversation_runner.visualizer.reload_configuration()
+            if self.conversation_view.conversation_runner
             else None
         )
 
@@ -208,7 +209,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
             OpenHandsApp
             └── Horizontal(#content_area)
-                └── AppState(#app_state)        ← Composes MainDisplay + input area
+                └── ConversationView(#conversation_view)  ← Composes MainDisplay + input area
                     └── MainDisplay(#main_display)  ← Handles commands + content
                         ├── Static (splash widgets)
                         ├── SplashConversation  ← data_bind to conversation_id
@@ -220,17 +221,17 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             └── Footer
 
         Message Flow:
-            InputField → MainDisplay → AppState → OpenHandsApp
+            InputField → MainDisplay → ConversationView → OpenHandsApp
 
         Data Binding:
-            All widgets are composed from AppState.compose(), so data_bind() works
-            because the active message pump is AppState (the reactive owner).
+            All widgets are composed from ConversationView.compose(), so data_bind() works
+            because the active message pump is ConversationView (the reactive owner).
         """
         # Content area - horizontal layout for main display and optional confirmation
         with Horizontal(id="content_area"):
-            # AppState composes MainDisplay and all child widgets
+            # ConversationView composes MainDisplay and all child widgets
             # This enables data_bind() to work (requires owner as active pump)
-            yield self.app_state
+            yield self.conversation_view
 
         # Footer - shows available key bindings
         yield Footer()
@@ -401,7 +402,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         2. Initializing the splash content (one-time setup)
         3. Processing any queued inputs
 
-        UI lifecycle is owned by OpenHandsApp, not AppState. The splash
+        UI lifecycle is owned by OpenHandsApp, not ConversationView. The splash
         content initialization is a direct method call, not a reactive
         state change, because it's a one-time operation.
         """
@@ -415,7 +416,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             agent_store = AgentStore()
             agent = agent_store.load_or_create(
                 env_overrides_enabled=self.env_overrides_enabled,
-                critic_disabled=self.app_state._critic_disabled,
+                critic_disabled=self.conversation_view._critic_disabled,
             )
             if agent:
                 has_critic = agent.critic is not None
@@ -469,12 +470,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Dismiss any pending critic feedback widgets when user sends a new message
         self._dismiss_pending_feedback_widgets()
 
-        # Get or create conversation runner (lazy initialization via AppState)
-        runner = self.app_state.get_or_create_runner()
+        # Get or create conversation runner (lazy initialization via ConversationView)
+        runner = self.conversation_view.get_or_create_runner()
 
         # If History panel is open, update "New conversation" title immediately
         # on the first message (without waiting for persistence on disk).
-        self.app_state.set_conversation_title(user_message)
+        self.conversation_view.set_conversation_title(user_message)
 
         # Show that we're processing the message
         if runner.is_running:

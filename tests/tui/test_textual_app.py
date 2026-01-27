@@ -14,9 +14,10 @@ class TestSettingsRestartNotification:
     def test_saving_settings_without_conversation_runner_no_notification(self):
         """Saving settings without conversation_runner does not show notification."""
         app = OpenHandsApp.__new__(OpenHandsApp)
-        # Mock app_state for the conversation_runner property
-        app.app_state = Mock()
-        app.app_state.conversation_runner = None
+        # Mock conversation_view for the conversation_runner property
+        app.conversation_view = Mock()
+        app.conversation_view.conversation_runner = None
+        app.app_state = app.conversation_view  # Backwards compatibility alias
         app.notify = Mock()
 
         app._notify_restart_required()
@@ -26,9 +27,10 @@ class TestSettingsRestartNotification:
     def test_saving_settings_with_conversation_runner_shows_notification(self):
         """Saving settings with conversation_runner shows restart notification."""
         app = OpenHandsApp.__new__(OpenHandsApp)
-        # Mock app_state for the conversation_runner property
-        app.app_state = Mock()
-        app.app_state.conversation_runner = Mock()
+        # Mock conversation_view for the conversation_runner property
+        app.conversation_view = Mock()
+        app.conversation_view.conversation_runner = Mock()
+        app.app_state = app.conversation_view  # Backwards compatibility alias
         app.notify = Mock()
 
         app._notify_restart_required()
@@ -52,10 +54,11 @@ class TestSettingsRestartNotification:
         monkeypatch.setattr(ta, "SettingsScreen", MockSettingsScreen)
 
         app = OpenHandsApp.__new__(OpenHandsApp)
-        # Mock app_state for the conversation_runner property
-        app.app_state = Mock()
-        app.app_state.conversation_runner = Mock()
-        app.app_state.conversation_runner.is_running = False
+        # Mock conversation_view for the conversation_runner property
+        app.conversation_view = Mock()
+        app.conversation_view.conversation_runner = Mock()
+        app.conversation_view.conversation_runner.is_running = False
+        app.app_state = app.conversation_view  # Backwards compatibility alias
         app.push_screen = Mock()
         app._reload_visualizer = Mock()
         app.notify = Mock()
@@ -88,11 +91,12 @@ class TestHistoryIntegration:
     def test_action_toggle_history_calls_panel_toggle(self, monkeypatch):
         """action_toggle_history calls HistorySidePanel.toggle with correct args."""
         app = OpenHandsApp.__new__(OpenHandsApp)
-        # Initialize app_state to avoid AttributeError
-        from openhands_cli.tui.core.state import AppState
+        # Initialize conversation_view to avoid AttributeError
+        from openhands_cli.tui.core.state import ConversationView
 
-        app.app_state = Mock(spec=AppState)
-        app.app_state.conversation_id = uuid.uuid4()
+        app.conversation_view = Mock(spec=ConversationView)
+        app.conversation_view.conversation_id = uuid.uuid4()
+        app.app_state = app.conversation_view  # Backwards compatibility alias
 
         toggle_mock = Mock()
         monkeypatch.setattr(HistorySidePanel, "toggle", toggle_mock)
@@ -104,7 +108,7 @@ class TestHistoryIntegration:
         assert _app_arg is app
         assert (
             toggle_mock.call_args[1]["current_conversation_id"]
-            == app.app_state.conversation_id
+            == app.conversation_view.conversation_id
         )
 
 
@@ -119,7 +123,7 @@ class TestConversationSwitcher:
         app.notify = Mock()
         app.input_field = Mock()
         app.input_field.focus_input = Mock()
-        app.app_state = Mock()  # AppState is now used instead of post_message
+        app.app_state = Mock()  # ConversationView is now used instead of post_message
         # conversation_id property delegates to app_state
         type(app).conversation_id = property(
             lambda self: self.app_state.conversation_id,
@@ -135,7 +139,7 @@ class TestConversationSwitcher:
         switcher._finish_switch(runner, target_id)
 
         app.input_field.focus_input.assert_called_once()
-        # Verify that AppState was updated with the new conversation ID
+        # Verify that ConversationView was updated with the new conversation ID
         assert app.app_state.conversation_id == target_id
         app.app_state.reset_conversation_state.assert_called_once()
 
@@ -174,7 +178,7 @@ class TestMainDisplayCommands:
     """Tests for MainDisplay command methods."""
 
     def test_command_new_resets_conversation(self):
-        """_command_new resets conversation state and updates AppState."""
+        """_command_new resets conversation state and updates ConversationView."""
         from openhands_cli.tui.widgets import MainDisplay
 
         main_display = Mock(spec=MainDisplay)
@@ -203,7 +207,7 @@ class TestMainDisplayCommands:
         # Call the real implementation
         MainDisplay._command_new(main_display)
 
-        # Verify AppState was updated
+        # Verify ConversationView was updated
         assert mock_app.app_state.conversation_id == uuid.UUID(new_id)
         mock_app.app_state.reset_conversation_state.assert_called_once()
         mock_app.notify.assert_called_once()

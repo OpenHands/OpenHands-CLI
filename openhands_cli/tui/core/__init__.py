@@ -1,14 +1,14 @@
 """Core TUI components including state management and conversation running."""
 
 from openhands_cli.tui.core.state import (
-    AppState,
     ConfirmationRequired,
     ConversationFinished,
+    ConversationView,
 )
 
 
 __all__ = [
-    "AppState",
+    "ConversationView",
     "ConversationFinished",
     "ConfirmationRequired",
 ]

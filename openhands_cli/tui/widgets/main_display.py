@@ -51,7 +51,7 @@ class MainDisplay(VerticalScroll):
     - Notifications
 
     Message Flow:
-        InputField → AppState → MainDisplay
+        InputField → ConversationView → MainDisplay
         - UserInputSubmitted: Render message, then send to agent via App
         - SlashCommandSubmitted: Execute command (stop bubbling)
     """
@@ -130,7 +130,7 @@ class MainDisplay(VerticalScroll):
         new_id_str = app._store.create()
         new_id = uuid.UUID(new_id_str)
 
-        # Update AppState (single source of truth)
+        # Update ConversationView (single source of truth)
         app.conversation_id = new_id
         app.app_state.reset_conversation_state()
 
@@ -179,7 +179,7 @@ class MainDisplay(VerticalScroll):
 
         app: OpenHandsApp = self.app  # type: ignore[assignment]
 
-        # Get current confirmation policy from AppState
+        # Get current confirmation policy from ConversationView
         current_policy = app.app_state.confirmation_policy
 
         # Show the confirmation settings modal

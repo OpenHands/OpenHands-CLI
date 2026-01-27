@@ -14,8 +14,8 @@ from openhands_cli.utils import abbreviate_number, format_cost
 class WorkingStatusLine(Static):
     """Status line showing conversation timer and working indicator (above input).
 
-    This widget uses data_bind() to bind to AppState reactive properties.
-    When AppState.running or AppState.elapsed_seconds change,
+    This widget uses data_bind() to bind to ConversationView reactive properties.
+    When ConversationView.running or ConversationView.elapsed_seconds change,
     this widget's corresponding properties are automatically updated.
     """
 
@@ -51,7 +51,7 @@ class WorkingStatusLine(Static):
     # ----- Reactive Watchers -----
 
     def watch_running(self, _running: bool) -> None:
-        """React to running state changes from AppState."""
+        """React to running state changes from ConversationView."""
         self._update_text()
 
     # ----- Internal helpers -----
@@ -82,8 +82,8 @@ class WorkingStatusLine(Static):
 class InfoStatusLine(Static):
     """Status line showing work directory, input mode, and conversation metrics.
 
-    This widget uses data_bind() to bind to AppState reactive properties.
-    When AppState metrics change, this widget automatically updates.
+    This widget uses data_bind() to bind to ConversationView reactive properties.
+    When ConversationView metrics change, this widget automatically updates.
     """
 
     DEFAULT_CSS = """
@@ -95,11 +95,11 @@ class InfoStatusLine(Static):
     }
     """
 
-    # Reactive properties bound via data_bind() to AppState
+    # Reactive properties bound via data_bind() to ConversationView
     # Note: Named 'running' to avoid conflict with MessagePump.is_running
     running: var[bool] = var(False)
     is_multiline_mode: var[bool] = var(False)
-    # Metrics object from conversation stats (bound from AppState)
+    # Metrics object from conversation stats (bound from ConversationView)
     metrics: var[Metrics | None] = var(None)
 
     def __init__(self, **kwargs) -> None:
@@ -117,11 +117,11 @@ class InfoStatusLine(Static):
     # ----- Reactive Watchers -----
 
     def watch_is_multiline_mode(self, _value: bool) -> None:
-        """React to multiline mode changes from AppState."""
+        """React to multiline mode changes from ConversationView."""
         self._update_text()
 
     def watch_metrics(self, _value: Metrics | None) -> None:
-        """React to metrics changes from AppState."""
+        """React to metrics changes from ConversationView."""
         self._update_text()
 
     # ----- Internal helpers -----

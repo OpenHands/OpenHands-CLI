@@ -241,10 +241,10 @@ class TestHeadlessAppBehavior:
 
     Note: Tests for _on_conversation_state_changed were removed as that method
     no longer exists. The headless exit behavior is now handled through
-    AppState's watch_running and ConversationFinished message handling.
+    ConversationView's watch_running and ConversationFinished message handling.
     """
 
-    pass  # Placeholder - add new tests for AppState-based headless behavior if needed
+    pass  # Placeholder - add new tests for ConversationView-based headless behavior if needed
 
 
 class TestPrintConversationSummary:
@@ -373,7 +373,7 @@ class TestConversationSummary:
             agent_event,
         ]
 
-        # Create a mock AppState
+        # Create a mock ConversationView
         mock_app_state = Mock()
         mock_app_state.confirmation_policy = AlwaysConfirm()
         mock_app_state.attach_conversation = Mock()
@@ -397,7 +397,7 @@ class TestConversationSummary:
         """With no conversation / events, we should get a safe default."""
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
 
-        # Create a mock AppState
+        # Create a mock ConversationView
         mock_app_state = Mock()
         mock_app_state.confirmation_policy = AlwaysConfirm()
         mock_app_state.attach_conversation = Mock()

@@ -1,6 +1,6 @@
 """Centralized state management for OpenHands TUI.
 
-This module provides AppState, a centralized state container that:
+This module provides ConversationView, a centralized state container that:
 - Holds all reactive state properties for the TUI
 - Owns the ConversationRunner (lazy initialization)
 - Composes the input area widgets (required for Textual's data_bind)
@@ -50,33 +50,33 @@ class ConfirmationRequired(Message):
         self.pending_actions = pending_actions
 
 
-class AppState(Container):
+class ConversationView(Container):
     """Centralized state container for the TUI with reactive properties.
 
-    AppState is responsible for:
+    ConversationView is responsible for:
     - Managing all reactive state (running, conversation_id, metrics, etc.)
-    - Composing the input area widgets (required for data_bind to work)
+    - Composing the conversation-related widgets (required for data_bind to work)
     - Providing thread-safe state update methods
     - Syncing confirmation policy to attached conversations
 
-    Widgets can bind to AppState's reactive properties using data_bind()
+    Widgets can bind to ConversationView's reactive properties using data_bind()
     or watch() for automatic updates when state changes.
 
     Example:
         # In OpenHandsApp:
-        self.app_state = AppState(initial_confirmation_policy=AlwaysConfirm())
+        self.conversation_view = ConversationView(initial_confirmation_policy=AlwaysConfirm())
 
         # Child widgets bind to state via data_bind():
         WorkingStatusLine().data_bind(
-            running=AppState.running,
-            elapsed_seconds=AppState.elapsed_seconds,
+            running=ConversationView.running,
+            elapsed_seconds=ConversationView.elapsed_seconds,
         )
 
         # Dynamically mounted widgets use watch():
-        self.watch(app.app_state, "conversation_id", self._on_change)
+        self.watch(app.conversation_view, "conversation_id", self._on_change)
 
         # State updates propagate automatically:
-        app_state.set_running(True)
+        conversation_view.set_running(True)
     """
 
     # ---- Core Running State ----
@@ -95,7 +95,7 @@ class AppState(Container):
 
     # ---- Confirmation Policy ----
     confirmation_policy: var[ConfirmationPolicyBase] = var(AlwaysConfirm())
-    """The confirmation policy. AppState owns this and syncs to conversation."""
+    """The confirmation policy. ConversationView owns this and syncs to conversation."""
 
     # ---- Timing ----
     elapsed_seconds: var[int] = var(0)
@@ -133,9 +133,9 @@ class AppState(Container):
         self._critic_disabled = critic_disabled
         self._json_mode = json_mode
 
-        # AppState is a Container that wraps MainDisplay
-        # This allows all child widgets to use data_bind() with AppState properties
-        super().__init__(id="app_state", **kwargs)
+        # ConversationView is a Container that wraps MainDisplay
+        # This allows all child widgets to use data_bind() with ConversationView properties
+        super().__init__(id="conversation_view", **kwargs)
 
         if initial_confirmation_policy is not None:
             self.confirmation_policy = initial_confirmation_policy
@@ -143,12 +143,12 @@ class AppState(Container):
     def compose(self):
         """Compose MainDisplay and input area widgets.
 
-        AppState composes all widgets that need to bind to its reactive properties.
+        ConversationView composes all widgets that need to bind to its reactive properties.
         This is required because data_bind() checks that the active message pump
         (the compose caller) is an instance of the reactive owner class.
 
-        By yielding widgets here, data_bind(AppState.xxx) works because
-        the active message pump during compose is AppState itself.
+        By yielding widgets here, data_bind(ConversationView.xxx) works because
+        the active message pump during compose is ConversationView itself.
         """
         from openhands_cli.tui.widgets.input_area import InputAreaContainer
         from openhands_cli.tui.widgets.main_display import MainDisplay
@@ -165,23 +165,23 @@ class AppState(Container):
             # - conversation_id is bound reactively for conversation switching
             # - initialize() is called by OpenHandsApp for one-time setup
             yield SplashContent(id="splash_content").data_bind(
-                conversation_id=AppState.conversation_id,
+                conversation_id=ConversationView.conversation_id,
             )
 
             # Input area docked to bottom of MainDisplay viewport
             with InputAreaContainer(id="input_area"):
                 # Status lines and input field with data_bind
                 yield WorkingStatusLine().data_bind(
-                    running=AppState.running,
-                    elapsed_seconds=AppState.elapsed_seconds,
+                    running=ConversationView.running,
+                    elapsed_seconds=ConversationView.elapsed_seconds,
                 )
                 yield InputField(
                     placeholder="Type your message, @mention a file, or / for commands"
                 )
                 yield InfoStatusLine().data_bind(
-                    running=AppState.running,
-                    is_multiline_mode=AppState.is_multiline_mode,
-                    metrics=AppState.metrics,
+                    running=ConversationView.running,
+                    is_multiline_mode=ConversationView.is_multiline_mode,
+                    metrics=ConversationView.metrics,
                 )
 
     @property
@@ -374,7 +374,7 @@ class AppState(Container):
         from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
         from openhands_cli.utils import json_callback
 
-        # Get app reference - available since AppState is a mounted widget
+        # Get app reference - available since ConversationView is a mounted widget
         app: OpenHandsApp = self.app  # type: ignore[assignment]
 
         # Get main_display from app
@@ -391,7 +391,7 @@ class AppState(Container):
         # Create runner with callbacks that use self.app
         runner = ConversationRunner(
             self.conversation_id,
-            app_state=self,
+            conversation_view=self,
             confirmation_callback=app._handle_confirmation_request,
             notification_callback=lambda title, message, severity: (
                 app.notify(title=title, message=message, severity=severity)

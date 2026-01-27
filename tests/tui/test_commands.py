@@ -226,7 +226,7 @@ class TestOpenHandsAppCommands:
         """`/confirm` should open ConfirmationSettingsModal.
 
         Note: The app now reads the policy from state_manager.confirmation_policy
-        (AppState owns the policy), not from conversation_runner.
+        (ConversationView owns the policy), not from conversation_runner.
         """
         monkeypatch.setattr(
             SettingsScreen,

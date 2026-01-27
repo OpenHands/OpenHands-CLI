@@ -1,7 +1,7 @@
 """Tests for HistorySidePanel and conversation switching.
 
-The HistorySidePanel uses the AppState pattern for state updates.
-It watches AppState's reactive properties (conversation_id, conversation_title,
+The HistorySidePanel uses the ConversationView pattern for state updates.
+It watches ConversationView's reactive properties (conversation_id, conversation_title,
 is_switching) instead of receiving forwarded messages.
 """
 
@@ -17,7 +17,7 @@ from textual.widgets import Button, Static
 
 from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.conversations.store.local import LocalFileStore
-from openhands_cli.tui.core.state import AppState
+from openhands_cli.tui.core.state import ConversationView
 from openhands_cli.tui.modals.switch_conversation_modal import SwitchConversationModal
 from openhands_cli.tui.panels.history_side_panel import (
     HistoryItem,
@@ -27,15 +27,15 @@ from openhands_cli.tui.panels.history_side_panel import (
 
 
 class HistoryMessagesTestApp(App):
-    """Minimal app for testing HistorySidePanel with AppState."""
+    """Minimal app for testing HistorySidePanel with ConversationView."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Track messages received by the app
         self.received_switch_requests: list[str] = []
         self._store = LocalFileStore()
-        # AppState for reactive state (backwards compatible alias: state_manager)
-        self.app_state = AppState()
+        # ConversationView for reactive state (backwards compatible alias: state_manager)
+        self.app_state = ConversationView()
         self.state_manager = self.app_state  # Backwards compatibility
 
     def compose(self) -> ComposeResult:
@@ -53,7 +53,7 @@ class HistoryMessagesTestApp(App):
 async def test_history_panel_updates_from_state_manager(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test that the history panel responds to AppState state changes."""
+    """Test that the history panel responds to ConversationView state changes."""
     # Stub local conversations list.
     base_id = uuid.uuid4().hex
     conversations = [
@@ -75,7 +75,7 @@ async def test_history_panel_updates_from_state_manager(
         list_container = panel.query_one("#history-list", VerticalScroll)
         assert len(list_container.query(HistoryItem)) == 1
 
-        # Update conversation_id via AppState (simulating new conversation)
+        # Update conversation_id via ConversationView (simulating new conversation)
         new_id = uuid.uuid4()
         app.state_manager.conversation_id = new_id
         await pilot.pause()
@@ -92,7 +92,7 @@ async def test_history_panel_updates_from_state_manager(
         ]
         assert len(placeholder_items) == 1
 
-        # Update title via AppState
+        # Update title via ConversationView
         app.state_manager.conversation_title = "first message"
         await pilot.pause()
 

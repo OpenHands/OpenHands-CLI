@@ -6,7 +6,7 @@ This class encapsulates all the complexity of switching between conversations:
 - UI preparation and finalization
 - Error handling
 
-State changes are made via AppState, which UI components watch for updates.
+State changes are made via ConversationView, which UI components watch for updates.
 """
 
 from __future__ import annotations
@@ -135,7 +135,7 @@ class ConversationSwitcher:
 
     def _show_loading(self) -> None:
         """Show a loading notification that can be dismissed after the switch."""
-        # Mark switching in progress via AppState
+        # Mark switching in progress via ConversationView
         self.app.app_state.start_switching()
 
         # Dismiss any previous loading notification
@@ -164,14 +164,14 @@ class ConversationSwitcher:
             self.app._unnotify(self._loading_notification)
         finally:
             self._loading_notification = None
-            # Mark switching complete via AppState
+            # Mark switching complete via ConversationView
             self.app.app_state.finish_switching()
 
     def _prepare_ui(self, conversation_id: uuid.UUID) -> None:
         """Prepare UI for switching conversations (runs on the UI thread)."""
         app = self.app
 
-        # Set the conversation ID immediately (both app and AppState)
+        # Set the conversation ID immediately (both app and ConversationView)
         app.conversation_id = conversation_id
         app.conversation_runner = None
 
@@ -197,7 +197,7 @@ class ConversationSwitcher:
         self.app.main_display.scroll_end(animate=False)
         self._dismiss_loading()
 
-        # Update AppState - UI components will react automatically
+        # Update ConversationView - UI components will react automatically
         # conversation_id property delegates to app_state
         self.app.conversation_id = target_id
         # Reset running state, metrics, etc.
@@ -217,7 +217,7 @@ class ConversationSwitcher:
             # Prepare UI first (on main thread)
             self.app.call_from_thread(self._prepare_ui, target_id)
 
-            # Set the new conversation_id on AppState and create runner
+            # Set the new conversation_id on ConversationView and create runner
             # This needs to be done on the main thread since it modifies state
             def _create_runner_for_conversation() -> None:
                 self.app.app_state.conversation_id = target_id

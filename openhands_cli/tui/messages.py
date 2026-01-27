@@ -7,7 +7,7 @@ from child to parent, allowing ancestor widgets to handle them.
 Message Flow:
     InputField
         ↓
-    AppState(#input_area)
+    ConversationView(#input_area)
         ↓
     MainDisplay(#main_display)  ← Handles UserInputSubmitted (renders message)
         ↓
