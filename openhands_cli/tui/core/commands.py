@@ -7,6 +7,7 @@ and the logic for handling command execution.
 from __future__ import annotations
 
 import asyncio
+import uuid
 from typing import TYPE_CHECKING
 
 from textual.containers import VerticalScroll
@@ -14,6 +15,7 @@ from textual.widgets import Static
 from textual_autocomplete import DropdownItem
 
 from openhands_cli.theme import OPENHANDS_THEME
+from openhands_cli.tui.content.splash import get_conversation_text
 
 
 if TYPE_CHECKING:
@@ -140,7 +142,62 @@ class CommandHandler:
 
     def _handle_new(self) -> None:
         """Handle the /new command to start a new conversation."""
-        self._app._conversation_manager.create_new()
+        app = self._app
+
+        # Check if a conversation is currently running
+        if app.conversation_runner and app.conversation_runner.is_running:
+            app.notify(
+                title="New Conversation Error",
+                message="Cannot start a new conversation while one is running. "
+                "Please wait for the current conversation to complete or pause it.",
+                severity="error",
+            )
+            return None
+
+        # Create a new conversation via store
+        new_id_str = app._store.create()
+        new_id = uuid.UUID(new_id_str)
+
+        # Update app's conversation_id (for backwards compatibility)
+        app.conversation_id = new_id
+
+        # Update StateManager - UI components will react automatically
+        app.state_manager.set_conversation_id(new_id)
+        app.state_manager.reset()  # Reset running state, metrics, etc.
+
+        # Reset the conversation runner
+        app.conversation_runner = None
+
+        # Remove any existing confirmation panel
+        if app.confirmation_panel:
+            app.confirmation_panel.remove()
+            app.confirmation_panel = None
+
+        # Clear all dynamically added widgets from main_display
+        # Keep only the splash widgets (those with IDs starting with "splash_")
+        widgets_to_remove = [
+            w
+            for w in app.main_display.children
+            if not (w.id or "").startswith("splash_")
+        ]
+        for widget in widgets_to_remove:
+            widget.remove()
+
+        # Update the splash conversation widget with the new conversation ID
+        splash_conversation = app.query_one("#splash_conversation", Static)
+        splash_conversation.update(
+            get_conversation_text(new_id.hex, theme=OPENHANDS_THEME)
+        )
+
+        # Scroll to top to show the splash screen
+        app.main_display.scroll_home(animate=False)
+
+        # Notify user
+        app.notify(
+            title="New Conversation",
+            message="Started a new conversation",
+            severity="information",
+        )
 
     def _handle_history(self) -> None:
         """Handle the /history command to show conversation history panel."""

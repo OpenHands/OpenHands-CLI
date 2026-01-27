@@ -36,8 +36,8 @@ from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_splash_content
 from openhands_cli.tui.core import ConversationFinished, StateManager
 from openhands_cli.tui.core.commands import CommandHandler, is_valid_command
-from openhands_cli.tui.core.conversation_manager import ConversationManager
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
+from openhands_cli.tui.core.conversation_switcher import ConversationSwitcher
 from openhands_cli.tui.core.messages import SwitchConversationRequest
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
@@ -137,7 +137,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Initialize conversation runner (updated with write callback in on_mount)
         self.conversation_runner = None
         self._store = LocalFileStore()
-        self._conversation_manager = ConversationManager(self, self._store)
+        self._conversation_manager = ConversationSwitcher(self)
         self._reload_visualizer = (
             lambda: self.conversation_runner.visualizer.reload_configuration()
             if self.conversation_runner
@@ -507,7 +507,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # If History panel is open, update "New conversation" title immediately
         # on the first message (without waiting for persistence on disk).
-        self._conversation_manager.update_title(user_message)
+        self.state_manager.set_conversation_title(user_message)
 
         # Show that we're processing the message
         if self.conversation_runner.is_running:
