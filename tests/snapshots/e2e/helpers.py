@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from textual.pilot import Pilot
-    from textual.widget import Widget
 
 
 async def wait_for_app_ready(pilot: "Pilot") -> None:
@@ -23,39 +22,6 @@ async def wait_for_app_ready(pilot: "Pilot") -> None:
         pilot: The Textual pilot instance
     """
     await pilot.wait_for_scheduled_animations()
-
-
-async def wait_for_widget[W: "Widget"](
-    pilot: "Pilot",
-    widget_type: type[W],
-    timeout: float = 5.0,
-) -> W:
-    """Wait for a specific widget type to be available in the app.
-
-    Args:
-        pilot: The Textual pilot instance
-        widget_type: The widget class to look for
-        timeout: Maximum time to wait in seconds
-
-    Returns:
-        The widget instance
-
-    Raises:
-        TimeoutError: If widget is not found within timeout
-    """
-    start = asyncio.get_event_loop().time()
-    while True:
-        await pilot.wait_for_scheduled_animations()
-        try:
-            widget = pilot.app.query_one(widget_type)
-            return widget
-        except Exception:
-            elapsed = asyncio.get_event_loop().time() - start
-            if elapsed >= timeout:
-                raise TimeoutError(
-                    f"Widget {widget_type.__name__} not found after {timeout}s"
-                )
-            await pilot.pause()
 
 
 async def wait_for_idle(pilot: "Pilot", timeout: float = 30.0) -> None:

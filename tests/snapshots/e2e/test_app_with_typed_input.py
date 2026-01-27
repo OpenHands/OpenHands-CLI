@@ -6,7 +6,7 @@ their command, before submitting.
 
 from textual.pilot import Pilot
 
-from .helpers import type_text, wait_for_app_ready, wait_for_idle, wait_for_widget
+from .helpers import type_text, wait_for_app_ready
 
 
 class TestAppWithTypedInput:
@@ -20,17 +20,11 @@ class TestAppWithTypedInput:
         # Lazy import AFTER fixture has patched locations
         from openhands.sdk.security.confirmation_policy import NeverConfirm
         from openhands_cli.tui.textual_app import OpenHandsApp
-        from openhands_cli.tui.widgets import InputField
 
         async def type_command(pilot: Pilot):
             """Type command without submitting."""
             # Wait for app to fully initialize
             await wait_for_app_ready(pilot)
-
-            # Find and focus the input field
-            input_field = await wait_for_widget(pilot, InputField)
-            input_field.focus_input()
-            await wait_for_idle(pilot)
 
             # Type the command
             await type_text(pilot, "echo hello world")

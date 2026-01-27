@@ -9,7 +9,7 @@ This test validates the complete conversation flow:
 
 from textual.pilot import Pilot
 
-from .helpers import type_text, wait_for_app_ready, wait_for_idle, wait_for_widget
+from .helpers import type_text, wait_for_app_ready, wait_for_idle
 
 
 class TestEchoHelloWorld:
@@ -28,17 +28,11 @@ class TestEchoHelloWorld:
         # Lazy import AFTER fixture has patched locations
         from openhands.sdk.security.confirmation_policy import NeverConfirm
         from openhands_cli.tui.textual_app import OpenHandsApp
-        from openhands_cli.tui.widgets import InputField
 
         async def run_conversation(pilot: Pilot):
             """Simulate user typing and submitting a command."""
             # Wait for app to fully initialize
             await wait_for_app_ready(pilot)
-
-            # Find and focus the input field
-            input_field = await wait_for_widget(pilot, InputField)
-            input_field.focus_input()
-            await wait_for_idle(pilot)
 
             # Type the command
             await type_text(pilot, "echo hello world")
