@@ -58,13 +58,8 @@ def agent_store(temp_project_dir):
 class TestSkillsLoading:
     """Test skills loading functionality with actual project skills."""
 
-    def test_load_agent_with_project_skills(self, agent_store):
+    def test_load_agent_with_project_skills(self, agent_store, persisted_agent):
         """Test that loading agent includes skills from project directories."""
-        from openhands.sdk import LLM, Agent
-
-        # Create a test agent to save first
-        test_agent = Agent(llm=LLM(model="gpt-4o-mini"))
-        agent_store.save(test_agent)
 
         # Load agent - this should include skills from project directories
         loaded_agent = agent_store.load_or_create()
@@ -88,15 +83,13 @@ class TestSkillsLoading:
         assert "integration_test" in skill_names  # project microagent
 
     def test_load_agent_with_user_and_project_skills_combined(
-        self, temp_project_dir, mock_locations
+        self, temp_project_dir, mock_locations, persisted_agent
     ):
         """Test that user and project skills are properly combined.
 
         This test verifies that when loading an agent, both user and project skills
         are properly loaded and combined.
         """
-        from openhands.sdk import LLM, Agent
-
         # Create user skills in mock_locations.home_dir
         user_skills_temp = mock_locations.home_dir / ".openhands" / "skills"
         user_skills_temp.mkdir(parents=True)
@@ -130,10 +123,6 @@ This is a user microagent for testing.
 
             agent_store = AgentStore()
 
-            # Create a test agent to save first
-            test_agent = Agent(llm=LLM(model="gpt-4o-mini"))
-            agent_store.save(test_agent)
-
             loaded_agent = agent_store.load_or_create()
             assert loaded_agent is not None
             assert loaded_agent.agent_context is not None
@@ -154,13 +143,12 @@ This is a user microagent for testing.
             assert "user_skill" in skill_names  # user skill
             assert "user_microagent" in skill_names  # user microagent
 
-    def test_load_agent_with_public_skills(self, temp_project_dir):
+    def test_load_agent_with_public_skills(self, temp_project_dir, persisted_agent):
         """Test that loading agent includes public skills from the OpenHands repository.
 
         This test verifies that when an agent is loaded with load_public_skills=True,
         public skills from https://github.com/OpenHands/skills are loaded.
         """
-        from openhands.sdk import LLM, Agent
         from openhands.sdk.context.skills import Skill
 
         # Mock public skills - simulate loading from GitHub repo
@@ -179,10 +167,6 @@ This is a user microagent for testing.
             from openhands_cli.stores import AgentStore
 
             agent_store = AgentStore()
-
-            # Create a test agent to save first
-            test_agent = Agent(llm=LLM(model="gpt-4o-mini"))
-            agent_store.save(test_agent)
 
             # Load agent - this should include public skills
             loaded_agent = agent_store.load_or_create()

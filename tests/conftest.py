@@ -4,7 +4,8 @@ from pathlib import Path
 import pytest
 from pydantic import SecretStr
 
-from openhands.sdk import LLM
+from openhands.sdk import LLM, Agent
+from openhands_cli.locations import AGENT_SETTINGS_PATH
 from openhands_cli.utils import get_default_cli_agent
 
 
@@ -21,6 +22,41 @@ class MockLocations:
 # =============================================================================
 # Shared helper functions for agent configuration setup
 # =============================================================================
+
+
+def save_test_agent(
+    persistence_dir: Path,
+    *,
+    model: str = "gpt-4",
+    api_key: str = "test-key",
+    tools: list | None = None,
+    mcp_config: dict | None = None,
+) -> Agent:
+    """Create and save a test agent to persistence_dir.
+
+    This helper creates a minimal Agent and writes it to agent_settings.json.
+    Use this when tests need to pre-populate an agent configuration before
+    testing AgentStore.load_or_create() behavior.
+
+    Args:
+        persistence_dir: Directory where agent_settings.json will be saved
+        model: LLM model identifier (default: gpt-4)
+        api_key: Mock API key (default: test-key)
+        tools: List of tools (default: empty list)
+        mcp_config: MCP configuration dict (default: empty dict)
+
+    Returns:
+        The created Agent instance
+    """
+    agent = Agent(
+        llm=LLM(model=model, api_key=SecretStr(api_key), usage_id="test"),
+        tools=tools if tools is not None else [],
+        mcp_config=mcp_config if mcp_config is not None else {},
+    )
+    (persistence_dir / AGENT_SETTINGS_PATH).write_text(
+        agent.model_dump_json(context={"expose_secrets": True})
+    )
+    return agent
 
 
 def create_test_agent_config(
@@ -175,3 +211,19 @@ def setup_test_agent_config(tmp_path_factory, monkeypatch):
     create_test_agent_config(persistence_dir)
 
     yield persistence_dir
+
+
+@pytest.fixture
+def persisted_agent(mock_locations: MockLocations) -> Agent:
+    """Fixture that creates and persists a basic test agent.
+
+    This fixture:
+    - Uses mock_locations for the persistence directory
+    - Creates a minimal agent with default settings
+    - Saves it to agent_settings.json
+
+    Use this when tests need a pre-existing agent configuration.
+    For tests needing custom agent settings (mcp_config, specific model),
+    use save_test_agent() helper directly.
+    """
+    return save_test_agent(mock_locations.persistence_dir)

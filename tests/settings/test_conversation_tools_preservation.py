@@ -5,12 +5,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from pydantic import SecretStr
 
-from openhands.sdk import LLM, Agent
+from openhands.sdk import Agent
 from openhands.sdk.conversation.persistence_const import BASE_STATE
 from openhands.sdk.tool import Tool
-from openhands_cli.locations import AGENT_SETTINGS_PATH
 from openhands_cli.stores import AgentStore
 from openhands_cli.stores.agent_store import get_persisted_conversation_tools
 from tests.conftest import MockLocations
@@ -18,12 +16,6 @@ from tests.conftest import MockLocations
 
 def write_json(path: Path, obj: dict) -> None:
     path.write_text(json.dumps(obj))
-
-
-def write_agent(root: Path, agent: Agent) -> None:
-    (root / AGENT_SETTINGS_PATH).write_text(
-        agent.model_dump_json(context={"expose_secrets": True})
-    )
 
 
 @pytest.fixture
@@ -109,16 +101,13 @@ class TestAgentStoreLoadWithConversationTools:
 
     @patch("openhands_cli.stores.agent_store.get_llm_metadata", return_value={})
     def test_load_uses_default_tools_for_new_conversation(
-        self, mock_meta, persistence_dir, conversations_dir, agent_store
+        self,
+        mock_meta,
+        persisted_agent: Agent,
+        conversations_dir,
+        agent_store,
     ):
         """When no conversation exists, should use default CLI tools."""
-        # Create a basic agent config
-        persisted_agent = Agent(
-            llm=LLM(model="gpt-4", api_key=SecretStr("k"), usage_id="svc"),
-            tools=[],
-        )
-        write_agent(persistence_dir, persisted_agent)
-
         # Load without session_id (new conversation)
         loaded = agent_store.load_or_create()
         assert loaded is not None
@@ -132,16 +121,13 @@ class TestAgentStoreLoadWithConversationTools:
 
     @patch("openhands_cli.stores.agent_store.get_llm_metadata", return_value={})
     def test_load_uses_default_tools_for_nonexistent_conversation(
-        self, mock_meta, persistence_dir, conversations_dir, agent_store
+        self,
+        mock_meta,
+        persisted_agent: Agent,
+        conversations_dir,
+        agent_store,
     ):
         """When session_id is provided but conversation doesn't exist, use defaults."""
-        # Create a basic agent config
-        persisted_agent = Agent(
-            llm=LLM(model="gpt-4", api_key=SecretStr("k"), usage_id="svc"),
-            tools=[],
-        )
-        write_agent(persistence_dir, persisted_agent)
-
         # Load with session_id for non-existent conversation
         loaded = agent_store.load_or_create(session_id="nonexistent-conversation-id")
         assert loaded is not None
@@ -152,16 +138,13 @@ class TestAgentStoreLoadWithConversationTools:
 
     @patch("openhands_cli.stores.agent_store.get_llm_metadata", return_value={})
     def test_load_preserves_tools_from_existing_conversation(
-        self, mock_meta, persistence_dir, conversations_dir, agent_store
+        self,
+        mock_meta,
+        persisted_agent: Agent,
+        conversations_dir,
+        agent_store,
     ):
         """When resuming a conversation, should use tools from persisted state."""
-        # Create a basic agent config
-        persisted_agent = Agent(
-            llm=LLM(model="gpt-4", api_key=SecretStr("k"), usage_id="svc"),
-            tools=[],
-        )
-        write_agent(persistence_dir, persisted_agent)
-
         # Create a conversation with tools that DON'T include delegate
         convo_id = "existing-conversation-id"
         convo_dir = conversations_dir / convo_id
@@ -187,16 +170,13 @@ class TestAgentStoreLoadWithConversationTools:
 
     @patch("openhands_cli.stores.agent_store.get_llm_metadata", return_value={})
     def test_load_preserves_delegate_if_conversation_had_it(
-        self, mock_meta, persistence_dir, conversations_dir, agent_store
+        self,
+        mock_meta,
+        persisted_agent: Agent,
+        conversations_dir,
+        agent_store,
     ):
         """When resuming a conversation that had delegate, should preserve it."""
-        # Create a basic agent config
-        persisted_agent = Agent(
-            llm=LLM(model="gpt-4", api_key=SecretStr("k"), usage_id="svc"),
-            tools=[],
-        )
-        write_agent(persistence_dir, persisted_agent)
-
         # Create a conversation with tools that INCLUDE delegate
         convo_id = "conversation-with-delegate"
         convo_dir = conversations_dir / convo_id

@@ -5,12 +5,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from pydantic import SecretStr
 
-from openhands.sdk import LLM, Agent
-from openhands_cli.locations import AGENT_SETTINGS_PATH, MCP_CONFIG_FILE
+from openhands_cli.locations import MCP_CONFIG_FILE
 from openhands_cli.stores import AgentStore
-from tests.conftest import MockLocations
+from tests.conftest import MockLocations, save_test_agent
 
 
 # ---------------------- tiny helpers ----------------------
@@ -18,12 +16,6 @@ from tests.conftest import MockLocations
 
 def write_json(path: Path, obj: dict) -> None:
     path.write_text(json.dumps(obj))
-
-
-def write_agent(root: Path, agent: Agent) -> None:
-    (root / AGENT_SETTINGS_PATH).write_text(
-        agent.model_dump_json(context={"expose_secrets": True})
-    )
 
 
 # ---------------------- fixtures ----------------------
@@ -50,16 +42,14 @@ def test_load_overrides_persisted_mcp_with_mcp_json_file(
 ):
     """If agent has MCP servers, mcp.json must replace them entirely."""
     # Persist an agent that already contains MCP servers
-    persisted_agent = Agent(
-        llm=LLM(model="gpt-4", api_key=SecretStr("k"), usage_id="svc"),
-        tools=[],
+    save_test_agent(
+        persistence_dir,
         mcp_config={
             "mcpServers": {
                 "persistent_server": {"command": "python", "args": ["-m", "old_server"]}
             }
         },
     )
-    write_agent(persistence_dir, persisted_agent)
 
     # Create mcp.json with different servers (this must fully override)
     write_json(
@@ -91,16 +81,14 @@ def test_load_when_mcp_file_missing_ignores_persisted_mcp(
 ):
     """If mcp.json is absent, loaded agent.mcp_config should be empty
     (persisted MCP ignored)."""
-    persisted_agent = Agent(
-        llm=LLM(model="gpt-4", api_key=SecretStr("k"), usage_id="svc"),
-        tools=[],
+    save_test_agent(
+        persistence_dir,
         mcp_config={
             "mcpServers": {
                 "persistent_server": {"command": "python", "args": ["-m", "old_server"]}
             }
         },
     )
-    write_agent(persistence_dir, persisted_agent)
 
     # No mcp.json created
 
@@ -112,16 +100,9 @@ def test_load_when_mcp_file_missing_ignores_persisted_mcp(
 @patch("openhands_cli.stores.agent_store.get_default_cli_tools", return_value=[])
 @patch("openhands_cli.stores.agent_store.get_llm_metadata", return_value={})
 def test_load_mcp_configuration_filters_disabled_servers(
-    mock_meta, mock_tools, persistence_dir, agent_store
+    mock_meta, mock_tools, persisted_agent, persistence_dir, agent_store
 ):
     """Test that load_mcp_configuration filters out disabled servers."""
-    # Persist a basic agent first
-    persisted_agent = Agent(
-        llm=LLM(model="gpt-4", api_key=SecretStr("k"), usage_id="svc"),
-        tools=[],
-    )
-    write_agent(persistence_dir, persisted_agent)
-
     # Create mcp.json with enabled and disabled servers
     write_json(
         persistence_dir / MCP_CONFIG_FILE,
@@ -163,16 +144,9 @@ def test_load_mcp_configuration_filters_disabled_servers(
 @patch("openhands_cli.stores.agent_store.get_default_cli_tools", return_value=[])
 @patch("openhands_cli.stores.agent_store.get_llm_metadata", return_value={})
 def test_load_mcp_configuration_all_disabled(
-    mock_meta, mock_tools, persistence_dir, agent_store
+    mock_meta, mock_tools, persisted_agent, persistence_dir, agent_store
 ):
     """Test load_mcp_configuration returns empty dict when all servers disabled."""
-    # Persist a basic agent first
-    persisted_agent = Agent(
-        llm=LLM(model="gpt-4", api_key=SecretStr("k"), usage_id="svc"),
-        tools=[],
-    )
-    write_agent(persistence_dir, persisted_agent)
-
     # Create mcp.json with all disabled servers
     write_json(
         persistence_dir / MCP_CONFIG_FILE,
