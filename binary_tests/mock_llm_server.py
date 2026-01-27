@@ -13,7 +13,7 @@ Key Features:
 
 Usage:
     # Load a trajectory and create server
-    from e2e_tests.trajectory import load_trajectory
+    from binary_tests.trajectory import load_trajectory
     trajectory = load_trajectory("tests/trajectories/simple_echo_hello_world")
 
     server = MockLLMServer(trajectory=trajectory)

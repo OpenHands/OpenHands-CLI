@@ -1,6 +1,6 @@
-# E2E Tests for OpenHands CLI
+# Binary Tests for OpenHands CLI
 
-This directory contains end-to-end tests for the OpenHands CLI executable built by PyInstaller.
+This directory contains tests for the OpenHands CLI executable built by PyInstaller.
 
 ## Structure
 
@@ -62,8 +62,8 @@ The `mock_llm_server.py` module provides a mock OpenAI-compatible LLM server tha
 ### Usage Example
 
 ```python
-from e2e_tests.trajectory import load_trajectory
-from e2e_tests.mock_llm_server import MockLLMServer
+from binary_tests.trajectory import load_trajectory
+from binary_tests.mock_llm_server import MockLLMServer
 
 # Load trajectory
 trajectory = load_trajectory("tests/trajectories/simple_echo_hello_world")
@@ -95,10 +95,10 @@ server.stop()
 
 ```bash
 # Without trajectory (returns default responses)
-python -m e2e_tests.mock_llm_server
+python -m binary_tests.mock_llm_server
 
 # With trajectory
-python -m e2e_tests.mock_llm_server tests/trajectories/simple_echo_hello_world
+python -m binary_tests.mock_llm_server tests/trajectories/simple_echo_hello_world
 ```
 
 ## Usage
@@ -117,9 +117,9 @@ The tests are automatically run by `build.py` after building the executable. Eac
 ## Running Tests Manually
 
 ```python
-from e2e_tests.runner import run_all_e2e_tests, print_detailed_results
+from binary_tests.runner import run_all_binary_tests, print_detailed_results
 
-summary = run_all_e2e_tests()
+summary = run_all_binary_tests()
 print_detailed_results(summary)
 ```
 

@@ -13,8 +13,8 @@ from typing import Any
 
 import pytest
 
-from e2e_tests.mock_llm_server import MockLLMServer
-from e2e_tests.trajectory import get_trajectories_dir, load_trajectory
+from binary_tests.mock_llm_server import MockLLMServer
+from binary_tests.trajectory import get_trajectories_dir, load_trajectory
 from tests.conftest import create_test_agent_config
 
 
