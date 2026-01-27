@@ -25,6 +25,7 @@ from textual.pilot import Pilot
 # Add e2e_tests to path to import mock server
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "e2e_tests"))
 from mock_llm_server import MockLLMServer
+from trajectory import load_trajectory, get_trajectories_dir
 
 
 @pytest.fixture
@@ -33,7 +34,7 @@ def mock_llm_setup(tmp_path, monkeypatch):
 
     This fixture:
     1. Patches locations module FIRST (before any imports that use it)
-    2. Starts the mock LLM server
+    2. Starts the mock LLM server with trajectory replay
     3. Creates agent config pointing to the mock server
     4. Yields the config paths
     5. Cleans up the server on teardown
@@ -59,8 +60,11 @@ def mock_llm_setup(tmp_path, monkeypatch):
     monkeypatch.setattr(agent_store_module, "AGENT_SETTINGS_PATH", "agent_settings.json")
     monkeypatch.setattr(agent_store_module, "WORK_DIR", str(work_dir))
 
-    # Start mock server
-    server = MockLLMServer()
+    # Load trajectory for deterministic replay
+    trajectory = load_trajectory(get_trajectories_dir() / "simple_echo_hello_world")
+    
+    # Start mock server with trajectory
+    server = MockLLMServer(trajectory=trajectory)
     base_url = server.start()
 
     # Import SDK modules AFTER patching
