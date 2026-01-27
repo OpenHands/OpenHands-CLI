@@ -5,6 +5,7 @@ for deterministic e2e testing with trajectory replay.
 """
 
 import shutil
+import sys
 import uuid as uuid_module
 from collections.abc import Generator
 from pathlib import Path
@@ -22,6 +23,9 @@ WORK_DIR = Path("/tmp/openhands-e2e-test-workspace")
 
 # Fixed conversation ID for deterministic snapshots
 FIXED_CONVERSATION_ID = uuid_module.UUID("00000000-0000-0000-0000-000000000001")
+
+# Fixed Python interpreter path for deterministic snapshots
+FIXED_PYTHON_PATH = "/openhands/micromamba/envs/openhands/bin/python"
 
 
 def setup_test_directories(tmp_path: Path) -> tuple[Path, Path]:
@@ -55,6 +59,10 @@ def patch_location_modules(
     monkeypatch.setenv("OPENHANDS_PERSISTENCE_DIR", str(tmp_path))
     monkeypatch.setenv("OPENHANDS_CONVERSATIONS_DIR", str(conversations_dir))
     monkeypatch.setenv("OPENHANDS_WORK_DIR", str(work_dir))
+
+    # Mock sys.executable to return a fixed path for deterministic snapshots
+    # This ensures the Python interpreter path shown in terminal output is consistent
+    monkeypatch.setattr(sys, "executable", FIXED_PYTHON_PATH)
 
 
 def create_mock_agent(base_url: str, tmp_path: Path) -> None:
