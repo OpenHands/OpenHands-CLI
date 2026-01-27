@@ -61,22 +61,23 @@ def patch_location_modules(
     monkeypatch.setenv("OPENHANDS_WORK_DIR", str(work_dir))
 
     # Mock sys.executable to return a fixed path for deterministic snapshots
-    # This ensures the Python interpreter path shown in terminal output is consistent
     monkeypatch.setattr(sys, "executable", FIXED_PYTHON_PATH)
 
-    # Also patch the terminal metadata to use the fixed Python path
-    # The terminal tool runs `command -v python` to get the path, so we need to
-    # patch the metadata class to return our fixed path
+    # Patch the terminal metadata to use the fixed Python path
+    # The terminal tool runs `command -v python` in the shell to get the path,
+    # so we need to patch the from_ps1_match method to override the result
     try:
-        from openhands.tools.terminal.metadata import TerminalMetadata
+        from openhands.tools.terminal.metadata import CmdOutputMetadata
 
-        original_init = TerminalMetadata.__init__
+        original_from_ps1_match = CmdOutputMetadata.from_ps1_match
 
-        def patched_init(self, *args, **kwargs):
-            original_init(self, *args, **kwargs)
-            self.py_interpreter_path = FIXED_PYTHON_PATH
+        @classmethod
+        def patched_from_ps1_match(cls, match):
+            result = original_from_ps1_match.__func__(cls, match)
+            result.py_interpreter_path = FIXED_PYTHON_PATH
+            return result
 
-        monkeypatch.setattr(TerminalMetadata, "__init__", patched_init)
+        monkeypatch.setattr(CmdOutputMetadata, "from_ps1_match", patched_from_ps1_match)
     except ImportError:
         pass  # If the module doesn't exist, skip patching
 
