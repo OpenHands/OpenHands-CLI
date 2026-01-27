@@ -131,8 +131,9 @@ def test_get_work_dir_display_shortens_home_to_tilde(dummy_app, monkeypatch):
         lambda path: "/home/testuser" if path == "~" else path,
     )
     # Set get_work_dir to return a path inside that home directory
+    # Patch where the function is used (in status_line module)
     monkeypatch.setattr(
-        "openhands_cli.locations.get_work_dir",
+        "openhands_cli.tui.widgets.status_line.get_work_dir",
         lambda: "/home/testuser/projects/openhands",
     )
 

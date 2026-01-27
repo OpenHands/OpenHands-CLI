@@ -157,8 +157,10 @@ class TestTokenStorage:
         """Test that TokenStorage uses default config dir when none provided."""
         with tempfile.TemporaryDirectory() as temp_dir:
             test_persistence_dir = str(Path(temp_dir) / "persistence")
+            # Patch where the function is used (in token_storage module)
             with patch(
-                "openhands_cli.locations.get_persistence_dir", return_value=test_persistence_dir
+                "openhands_cli.auth.token_storage.get_persistence_dir",
+                return_value=test_persistence_dir,
             ):
                 storage = TokenStorage()
 

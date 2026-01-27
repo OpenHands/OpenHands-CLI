@@ -50,7 +50,10 @@ This microagent is used for integration testing.
 @pytest.fixture
 def agent_store(temp_project_dir):
     """Create an AgentStore with the temporary project directory."""
-    with patch("openhands_cli.locations.get_work_dir", return_value=temp_project_dir):
+    # Patch where the function is used (in agent_store module)
+    with patch(
+        "openhands_cli.stores.agent_store.get_work_dir", return_value=temp_project_dir
+    ):
         from openhands_cli.stores import AgentStore
 
         yield AgentStore()
@@ -128,8 +131,10 @@ This is a user microagent for testing.
             with patch(
                 "openhands.sdk.context.skills.skill.USER_SKILLS_DIRS", mock_user_dirs
             ):
+                # Patch where the function is used (in agent_store module)
                 with patch(
-                    "openhands_cli.locations.get_work_dir", return_value=temp_project_dir
+                    "openhands_cli.stores.agent_store.get_work_dir",
+                    return_value=temp_project_dir,
                 ):
                     # Create a minimal agent configuration for testing
                     from openhands_cli.stores import AgentStore

@@ -7,7 +7,6 @@ import pytest
 from pydantic import SecretStr
 
 from openhands.sdk import LLM
-import openhands_cli.locations as locations_module
 from openhands_cli.stores.agent_store import (
     ENV_LLM_API_KEY,
     ENV_LLM_BASE_URL,
@@ -447,10 +446,8 @@ class TestAgentCreationFromEnvVars:
         }
 
         with (
-            patch.object(locations_module, "get_persistence_dir", return_value=str(tmp_path)),
-            patch.object(
-                locations_module, "get_conversations_dir", return_value=str(conversations_dir)
-            ),
+            patch("openhands_cli.stores.agent_store.get_persistence_dir", return_value=str(tmp_path)),
+            patch("openhands_cli.stores.agent_store.get_conversations_dir", return_value=str(conversations_dir)),
             patch.dict(os.environ, env_vars, clear=False),
         ):
             store = AgentStore()
@@ -477,10 +474,8 @@ class TestAgentCreationFromEnvVars:
         }
 
         with (
-            patch.object(locations_module, "get_persistence_dir", return_value=str(tmp_path)),
-            patch.object(
-                locations_module, "get_conversations_dir", return_value=str(conversations_dir)
-            ),
+            patch("openhands_cli.stores.agent_store.get_persistence_dir", return_value=str(tmp_path)),
+            patch("openhands_cli.stores.agent_store.get_conversations_dir", return_value=str(conversations_dir)),
             patch.dict(os.environ, env_vars, clear=False),
         ):
             # Clear any existing LLM_MODEL env var
@@ -509,10 +504,8 @@ class TestAgentCreationFromEnvVars:
         }
 
         with (
-            patch.object(locations_module, "get_persistence_dir", return_value=str(tmp_path)),
-            patch.object(
-                locations_module, "get_conversations_dir", return_value=str(conversations_dir)
-            ),
+            patch("openhands_cli.stores.agent_store.get_persistence_dir", return_value=str(tmp_path)),
+            patch("openhands_cli.stores.agent_store.get_conversations_dir", return_value=str(conversations_dir)),
             patch.dict(os.environ, env_vars, clear=False),
         ):
             # Ensure LLM_API_KEY is not set
@@ -537,10 +530,8 @@ class TestAgentCreationFromEnvVars:
         conversations_dir.mkdir(exist_ok=True)
 
         with (
-            patch.object(locations_module, "get_persistence_dir", return_value=str(tmp_path)),
-            patch.object(
-                locations_module, "get_conversations_dir", return_value=str(conversations_dir)
-            ),
+            patch("openhands_cli.stores.agent_store.get_persistence_dir", return_value=str(tmp_path)),
+            patch("openhands_cli.stores.agent_store.get_conversations_dir", return_value=str(conversations_dir)),
         ):
             # Ensure both env vars are not set
             os.environ.pop(ENV_LLM_API_KEY, None)
@@ -567,10 +558,8 @@ class TestAgentCreationFromEnvVars:
         }
 
         with (
-            patch.object(locations_module, "get_persistence_dir", return_value=str(tmp_path)),
-            patch.object(
-                locations_module, "get_conversations_dir", return_value=str(conversations_dir)
-            ),
+            patch("openhands_cli.stores.agent_store.get_persistence_dir", return_value=str(tmp_path)),
+            patch("openhands_cli.stores.agent_store.get_conversations_dir", return_value=str(conversations_dir)),
             patch.dict(os.environ, env_vars, clear=False),
         ):
             store = AgentStore()
@@ -597,10 +586,8 @@ class TestCriticBehaviorInAgentCreation:
         }
 
         with (
-            patch.object(locations_module, "get_persistence_dir", return_value=str(tmp_path)),
-            patch.object(
-                locations_module, "get_conversations_dir", return_value=str(conversations_dir)
-            ),
+            patch("openhands_cli.stores.agent_store.get_persistence_dir", return_value=str(tmp_path)),
+            patch("openhands_cli.stores.agent_store.get_conversations_dir", return_value=str(conversations_dir)),
             patch.dict(os.environ, env_vars, clear=False),
         ):
             store = AgentStore()
@@ -632,10 +619,8 @@ class TestCriticBehaviorInAgentCreation:
         mock_settings = CliSettings(enable_critic=True)
 
         with (
-            patch.object(locations_module, "get_persistence_dir", return_value=str(tmp_path)),
-            patch.object(
-                locations_module, "get_conversations_dir", return_value=str(conversations_dir)
-            ),
+            patch("openhands_cli.stores.agent_store.get_persistence_dir", return_value=str(tmp_path)),
+            patch("openhands_cli.stores.agent_store.get_conversations_dir", return_value=str(conversations_dir)),
             patch.dict(os.environ, env_vars, clear=False),
             patch.object(CliSettings, "load", return_value=mock_settings),
         ):
