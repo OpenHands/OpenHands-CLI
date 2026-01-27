@@ -131,7 +131,7 @@ def setup_conversation(
     # Load hooks from ~/.openhands/hooks.json or {WORK_DIR}/.openhands/hooks.json
     hook_config = HookConfig.load(working_dir=WORK_DIR)
     if not hook_config.is_empty():
-        console.print(f"✓ Hooks loaded", style="green")
+        console.print("✓ Hooks loaded", style="green")
 
     # Create conversation - agent context is now set in AgentStore.load()
     conversation: BaseConversation = Conversation(
