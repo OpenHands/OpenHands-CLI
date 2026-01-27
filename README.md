@@ -55,6 +55,17 @@ The first time you run the CLI, it will guide you through configuring your LLM s
 openhands
 ```
 
+
+### Configuration
+
+OpenHands CLI stores configuration under `~/.openhands/` (created on first run):
+
+- `agent_settings.json`: persisted agent settings (including condenser config)
+- `cli_config.json`: CLI/TUI preferences (e.g., critic enabled)
+- `mcp.json`: MCP server configuration
+
+By default, environment variables like `LLM_API_KEY`, `LLM_MODEL`, and `LLM_BASE_URL` are ignored; pass `--override-with-envs` to apply them (not persisted).
+
 ### Running Modes
 
 | Mode | Command | Best For |
@@ -125,7 +136,7 @@ openhands --headless --json -t "Create a Flask app"
 
 ## Documentation
 
-For complete documentation, visit [docs.openhands.dev/openhands/usage/cli]().
+For complete documentation, visit https://docs.openhands.dev/openhands/usage/cli.
 
 ## License
 

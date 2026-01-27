@@ -1,4 +1,4 @@
-# openhands_cli/settings/store.py
+# openhands_cli/stores/agent_store.py
 from __future__ import annotations
 
 import json
@@ -264,6 +264,7 @@ class AgentStore:
         """
         try:
             str_spec = self.file_store.read(AGENT_SETTINGS_PATH)
+            # Respects user choices persisted in agent_settings.json on disk.
             return Agent.model_validate_json(str_spec)
         except FileNotFoundError:
             return None
@@ -457,10 +458,7 @@ class AgentStore:
 
         Args:
             llm_api_key: The LLM API key to use
-            settings: User settings dictionary containing model and other config
-            base_url: Base URL for the LLM service (defaults to
-                `settings['llm_base_url']`
-            )
+            settings: User settings dictionary (e.g., "llm_model", "llm_base_url")
             default_model: Default model to use if not specified in settings
 
         Returns:
