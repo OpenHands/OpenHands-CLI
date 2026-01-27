@@ -14,7 +14,9 @@ class TestSettingsRestartNotification:
     def test_saving_settings_without_conversation_runner_no_notification(self):
         """Saving settings without conversation_runner does not show notification."""
         app = OpenHandsApp.__new__(OpenHandsApp)
-        app.conversation_runner = None
+        # Mock app_state for the conversation_runner property
+        app.app_state = Mock()
+        app.app_state.conversation_runner = None
         app.notify = Mock()
 
         app._notify_restart_required()
@@ -24,7 +26,9 @@ class TestSettingsRestartNotification:
     def test_saving_settings_with_conversation_runner_shows_notification(self):
         """Saving settings with conversation_runner shows restart notification."""
         app = OpenHandsApp.__new__(OpenHandsApp)
-        app.conversation_runner = Mock()
+        # Mock app_state for the conversation_runner property
+        app.app_state = Mock()
+        app.app_state.conversation_runner = Mock()
         app.notify = Mock()
 
         app._notify_restart_required()
@@ -48,9 +52,10 @@ class TestSettingsRestartNotification:
         monkeypatch.setattr(ta, "SettingsScreen", MockSettingsScreen)
 
         app = OpenHandsApp.__new__(OpenHandsApp)
-        # conversation_runner exists but is not running (so settings can be opened)
-        app.conversation_runner = Mock()
-        app.conversation_runner.is_running = False
+        # Mock app_state for the conversation_runner property
+        app.app_state = Mock()
+        app.app_state.conversation_runner = Mock()
+        app.app_state.conversation_runner.is_running = False
         app.push_screen = Mock()
         app._reload_visualizer = Mock()
         app.notify = Mock()

@@ -15,7 +15,7 @@ class WorkingStatusLine(Static):
     """Status line showing conversation timer and working indicator (above input).
 
     This widget uses data_bind() to bind to AppState reactive properties.
-    When AppState.is_running or AppState.elapsed_seconds change,
+    When AppState.running or AppState.elapsed_seconds change,
     this widget's corresponding properties are automatically updated.
     """
 
@@ -160,7 +160,8 @@ class InfoStatusLine(Static):
         # Get last request input tokens from token_usages list
         last_request_input_tokens = 0
         if self.metrics.token_usages:
-            last_request_input_tokens = self.metrics.token_usages[-1].prompt_tokens or 0
+            last_usage = self.metrics.token_usages[-1]
+            last_request_input_tokens = last_usage.prompt_tokens or 0
 
         # Calculate cache hit rate
         if input_tokens > 0:

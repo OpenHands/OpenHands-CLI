@@ -2,6 +2,7 @@
 
 This module provides AppState, a centralized state container that:
 - Holds all reactive state properties for the TUI
+- Owns the ConversationRunner (lazy initialization)
 - Composes the input area widgets (required for Textual's data_bind)
 - Provides thread-safe state update methods
 
@@ -30,6 +31,7 @@ from openhands.sdk.security.confirmation_policy import (
 if TYPE_CHECKING:
     from openhands.sdk import BaseConversation
     from openhands.sdk.event import ActionEvent
+    from openhands_cli.tui.core.conversation_runner import ConversationRunner
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +112,10 @@ class AppState(Container):
     def __init__(
         self,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
+        *,
+        env_overrides_enabled: bool = False,
+        critic_disabled: bool = False,
+        json_mode: bool = False,
         **kwargs,
     ) -> None:
         # Initialize internal state BEFORE calling super().__init__
@@ -119,40 +125,75 @@ class AppState(Container):
         self._timer = None
         self._main_thread_id = threading.current_thread().ident
 
-        # AppState is a Container that holds state and composes InputAreaContainer
-        # The id="input_area" is for CSS styling compatibility
-        super().__init__(id="input_area", **kwargs)
+        # ConversationRunner - lazy initialized on first use
+        self._conversation_runner: ConversationRunner | None = None
+
+        # Runner configuration (stored for lazy init)
+        self._env_overrides_enabled = env_overrides_enabled
+        self._critic_disabled = critic_disabled
+        self._json_mode = json_mode
+
+        # AppState is a Container that wraps MainDisplay
+        # This allows all child widgets to use data_bind() with AppState properties
+        super().__init__(id="app_state", **kwargs)
 
         if initial_confirmation_policy is not None:
             self.confirmation_policy = initial_confirmation_policy
 
     def compose(self):
-        """Compose the input area with status lines and input field.
+        """Compose MainDisplay and input area widgets.
 
-        While AppState is primarily a state holder, it also composes the input
-        area widgets. This is necessary because Textual's data_bind() requires
-        the reactive source to be an ancestor of the bound widget.
+        AppState composes all widgets that need to bind to its reactive properties.
+        This is required because data_bind() checks that the active message pump
+        (the compose caller) is an instance of the reactive owner class.
+
+        By yielding widgets here, data_bind(AppState.xxx) works because
+        the active message pump during compose is AppState itself.
         """
-        # Import here to avoid circular imports
+        from textual.widgets import Static
+
+        from openhands_cli.tui.widgets.input_area import InputAreaContainer
+        from openhands_cli.tui.widgets.main_display import MainDisplay
+        from openhands_cli.tui.widgets.splash import SplashConversation
         from openhands_cli.tui.widgets.status_line import (
             InfoStatusLine,
             WorkingStatusLine,
         )
         from openhands_cli.tui.widgets.user_input.input_field import InputField
 
-        # Bind child widgets to AppState's reactive properties
-        yield WorkingStatusLine().data_bind(
-            running=AppState.running,
-            elapsed_seconds=AppState.elapsed_seconds,
-        )
-        yield InputField(
-            placeholder="Type your message, @mention a file, or / for commands"
-        )
-        yield InfoStatusLine().data_bind(
-            running=AppState.running,
-            is_multiline_mode=AppState.is_multiline_mode,
-            metrics=AppState.metrics,
-        )
+        # MainDisplay handles UserInputSubmitted to render user messages
+        with MainDisplay(id="main_display"):
+            # Splash content widgets
+            yield Static(id="splash_banner", classes="splash-banner")
+            yield Static(id="splash_version", classes="splash-version")
+            yield Static(id="splash_status", classes="status-panel")
+            # SplashConversation auto-updates via data_bind
+            yield SplashConversation(id="splash_conversation").data_bind(
+                conversation_id=AppState.conversation_id
+            )
+            yield Static(
+                id="splash_instructions_header",
+                classes="splash-instruction-header",
+            )
+            yield Static(id="splash_instructions", classes="splash-instruction")
+            yield Static(id="splash_update_notice", classes="splash-update-notice")
+            yield Static(id="splash_critic_notice", classes="splash-critic-notice")
+
+            # Input area docked to bottom of MainDisplay viewport
+            with InputAreaContainer(id="input_area"):
+                # Status lines and input field with data_bind
+                yield WorkingStatusLine().data_bind(
+                    running=AppState.running,
+                    elapsed_seconds=AppState.elapsed_seconds,
+                )
+                yield InputField(
+                    placeholder="Type your message, @mention a file, or / for commands"
+                )
+                yield InfoStatusLine().data_bind(
+                    running=AppState.running,
+                    is_multiline_mode=AppState.is_multiline_mode,
+                    metrics=AppState.metrics,
+                )
 
     @property
     def is_confirmation_active(self) -> bool:
@@ -290,7 +331,8 @@ class AppState(Container):
     def reset_conversation_state(self) -> None:
         """Reset state for a new conversation.
 
-        Resets: running, elapsed_seconds, metrics, conversation_title, internal state.
+        Resets: running, elapsed_seconds, metrics, conversation_title,
+                conversation_runner, internal state.
         Preserves: confirmation_policy (persists across conversations),
                    conversation_id (set explicitly when switching).
         """
@@ -300,3 +342,78 @@ class AppState(Container):
         self.conversation_title = None
         self._conversation_start_time = None
         self._conversation = None
+        self._conversation_runner = None
+
+    # ---- ConversationRunner Management ----
+
+    @property
+    def conversation_runner(self) -> "ConversationRunner | None":
+        """Get the conversation runner (may be None if not yet initialized)."""
+        return self._conversation_runner
+
+    @conversation_runner.setter
+    def conversation_runner(self, value: "ConversationRunner | None") -> None:
+        """Set the conversation runner."""
+        self._conversation_runner = value
+
+    def get_or_create_runner(self) -> "ConversationRunner":
+        """Get existing runner or create a new one (lazy initialization).
+
+        This is the preferred way to get the runner when you need to ensure
+        one exists. Uses self.app to access App-level resources.
+
+        Returns:
+            The ConversationRunner instance.
+        """
+        if self._conversation_runner is None:
+            self._conversation_runner = self._create_conversation_runner()
+        return self._conversation_runner
+
+    def _create_conversation_runner(self) -> "ConversationRunner":
+        """Create a new ConversationRunner.
+
+        Uses self.app to access:
+        - main_display for visualizer
+        - notify() for notifications
+        - _handle_confirmation_request for confirmations
+        """
+        from openhands_cli.tui.core.conversation_runner import ConversationRunner
+
+        # Import for type checking
+        from openhands_cli.tui.textual_app import OpenHandsApp
+        from openhands_cli.tui.widgets.main_display import MainDisplay
+        from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
+        from openhands_cli.utils import json_callback
+
+        # Get app reference - available since AppState is a mounted widget
+        app: OpenHandsApp = self.app  # type: ignore[assignment]
+
+        # Get main_display from app
+        main_display = app.query_one("#main_display", MainDisplay)
+
+        # Create visualizer that renders to main_display
+        conversation_visualizer = ConversationVisualizer(
+            main_display, app, skip_user_messages=True, name="OpenHands Agent"
+        )
+
+        # Create JSON callback if in JSON mode
+        event_callback = json_callback if self._json_mode else None
+
+        # conversation_id is always set before this is called
+        assert self.conversation_id is not None
+
+        # Create runner with callbacks that use self.app
+        runner = ConversationRunner(
+            self.conversation_id,
+            app_state=self,
+            confirmation_callback=app._handle_confirmation_request,
+            notification_callback=lambda title, message, severity: (
+                app.notify(title=title, message=message, severity=severity)
+            ),
+            visualizer=conversation_visualizer,
+            event_callback=event_callback,
+            env_overrides_enabled=self._env_overrides_enabled,
+            critic_disabled=self._critic_disabled,
+        )
+
+        return runner

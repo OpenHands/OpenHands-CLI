@@ -8,6 +8,12 @@ Screen {
     layout: horizontal;
 }
 
+#app_state {
+    /* AppState wraps MainDisplay to enable data_bind() */
+    height: 1fr;
+    width: 1fr;
+}
+
 #main_display {
     height: 1fr;
     margin: 1 1 0 1;

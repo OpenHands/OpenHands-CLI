@@ -27,8 +27,6 @@ from textual import on
 from textual.containers import VerticalScroll
 from textual.widgets import Static
 
-from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.splash import get_conversation_text
 from openhands_cli.tui.core.commands import show_help
 from openhands_cli.tui.messages import SlashCommandSubmitted, UserInputSubmitted
 
@@ -150,12 +148,7 @@ class MainDisplay(VerticalScroll):
         for widget in widgets_to_remove:
             widget.remove()
 
-        # Update the splash conversation widget with the new conversation ID
-        splash_conversation = self.query_one("#splash_conversation", Static)
-        splash_conversation.update(
-            get_conversation_text(new_id.hex, theme=OPENHANDS_THEME)
-        )
-
+        # Note: splash_conversation auto-updates via data binding to conversation_id
         # Scroll to top to show the splash screen
         self.scroll_home(animate=False)
 

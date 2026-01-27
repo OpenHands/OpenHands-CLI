@@ -16,10 +16,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from textual.notifications import Notification, Notify
-from textual.widgets import Static
 
-from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.splash import get_conversation_text
 from openhands_cli.tui.modals import SwitchConversationModal
 
 
@@ -192,11 +189,7 @@ class ConversationSwitcher:
         for widget in widgets_to_remove:
             widget.remove()
 
-        # Update splash conversation widget
-        splash_conversation = app.query_one("#splash_conversation", Static)
-        splash_conversation.update(
-            get_conversation_text(conversation_id.hex, theme=OPENHANDS_THEME)
-        )
+        # Note: splash_conversation auto-updates via data binding to conversation_id
 
     def _finish_switch(self, runner, target_id: uuid.UUID) -> None:
         """Finalize conversation switch (runs on the UI thread)."""
@@ -224,11 +217,16 @@ class ConversationSwitcher:
             # Prepare UI first (on main thread)
             self.app.call_from_thread(self._prepare_ui, target_id)
 
-            # Create conversation runner (loads from disk)
-            runner = self.app.create_conversation_runner(conversation_id=target_id)
+            # Set the new conversation_id on AppState and create runner
+            # This needs to be done on the main thread since it modifies state
+            def _create_runner_for_conversation() -> None:
+                self.app.app_state.conversation_id = target_id
+                # Force creation of new runner for this conversation
+                self.app.app_state.conversation_runner = None
+                runner = self.app.app_state.get_or_create_runner()
+                self._finish_switch(runner, target_id)
 
-            # Finalize on UI thread
-            self.app.call_from_thread(self._finish_switch, runner, target_id)
+            self.app.call_from_thread(_create_runner_for_conversation)
         except Exception as e:
             error_message = f"{type(e).__name__}: {e}"
 
