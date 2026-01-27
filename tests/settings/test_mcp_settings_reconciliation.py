@@ -33,9 +33,12 @@ def persistence_dir(tmp_path, monkeypatch) -> Path:
     # Create root dir and point AgentStore at it
     root = tmp_path / "openhands"
     root.mkdir()
-    # Patch get_persistence_dir to return our test directory
+    # Patch get_persistence_dir at both locations - where defined and where imported
     monkeypatch.setattr(
         "openhands_cli.locations.get_persistence_dir", lambda: str(root)
+    )
+    monkeypatch.setattr(
+        "openhands_cli.stores.agent_store.get_persistence_dir", lambda: str(root)
     )
     return root
 
