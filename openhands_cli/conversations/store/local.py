@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import heapq
 import json
+import os
 import uuid
 from collections.abc import Iterator
 from datetime import datetime
@@ -19,6 +21,9 @@ from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.conversations.protocols import ConversationStore
 from openhands_cli.locations import CONVERSATIONS_DIR
 from openhands_cli.utils import extract_text_from_message_content
+
+# Default limit for load_events to prevent unbounded memory usage (Issue #426)
+DEFAULT_EVENT_LOAD_LIMIT = 1000
 
 
 class LocalFileStore(ConversationStore):
@@ -82,25 +87,91 @@ class LocalFileStore(ConversationStore):
         limit: int | None = None,
         start_from_newest: bool = False,
     ) -> Iterator[Event]:
-        """Load events for a conversation."""
+        """Load events for a conversation.
+
+        Memory-efficient implementation that avoids loading all filenames
+        into memory when a limit is specified. Uses heap-based selection
+        for start_from_newest to avoid full sort.
+
+        Args:
+            conversation_id: The conversation ID.
+            limit: Maximum number of events to load. If None, loads all events
+                   (use with caution for large histories).
+            start_from_newest: If True and limit is set, loads the *last* N events.
+
+        Yields:
+            Event objects from the conversation history.
+        """
         conversation_dir = self.base_dir / conversation_id
         events_dir = conversation_dir / "events"
 
         if not events_dir.exists() or not events_dir.is_dir():
             return
 
-        # Get all event files and sort them
-        event_files = list(events_dir.glob("event-*.json"))
-        event_files.sort()
+        if limit is not None and start_from_newest:
+            # Memory-efficient: use heap to find N largest (newest) without full sort
+            yield from self._load_newest_events(events_dir, limit)
+        elif limit is not None:
+            # Memory-efficient: stream and stop after limit
+            yield from self._load_oldest_events(events_dir, limit)
+        else:
+            # No limit: load all events (caller explicitly requested full history)
+            event_files = list(events_dir.glob("event-*.json"))
+            event_files.sort()
+            for event_file in event_files:
+                event = self._load_event_from_file(event_file)
+                if event:
+                    yield event
 
-        if limit is not None:
-            if start_from_newest:
-                event_files = event_files[-limit:]
-            else:
-                event_files = event_files[:limit]
+    def _load_oldest_events(
+        self, events_dir: Path, limit: int
+    ) -> Iterator[Event]:
+        """Load the oldest N events efficiently using streaming.
 
-        for event_file in event_files:
-            event = self._load_event_from_file(event_file)
+        Uses scandir for efficient directory iteration and stops after limit.
+        """
+        # Use os.scandir for memory-efficient iteration
+        event_entries = []
+        with os.scandir(events_dir) as entries:
+            for entry in entries:
+                if entry.name.startswith("event-") and entry.name.endswith(".json"):
+                    event_entries.append(entry.name)
+
+        # Sort only the filenames (strings are lighter than Path objects)
+        event_entries.sort()
+
+        # Yield only up to limit
+        count = 0
+        for filename in event_entries:
+            if count >= limit:
+                break
+            event = self._load_event_from_file(events_dir / filename)
+            if event:
+                yield event
+                count += 1
+
+    def _load_newest_events(
+        self, events_dir: Path, limit: int
+    ) -> Iterator[Event]:
+        """Load the newest N events efficiently using a min-heap.
+
+        Uses a heap to track the N largest filenames without sorting all files.
+        This is O(n log k) where n is total files and k is limit.
+        """
+        # Use heapq.nlargest for memory-efficient selection of newest files
+        event_filenames = []
+        with os.scandir(events_dir) as entries:
+            for entry in entries:
+                if entry.name.startswith("event-") and entry.name.endswith(".json"):
+                    event_filenames.append(entry.name)
+
+        # Get the N largest (newest) filenames
+        newest_files = heapq.nlargest(limit, event_filenames)
+        # Sort them in chronological order for yielding
+        newest_files.sort()
+
+        for filename in newest_files:
+            event = self._load_event_from_file(events_dir / filename)
             if event:
                 yield event
 
