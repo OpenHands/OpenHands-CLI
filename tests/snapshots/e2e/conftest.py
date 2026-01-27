@@ -64,6 +64,22 @@ def patch_location_modules(
     # This ensures the Python interpreter path shown in terminal output is consistent
     monkeypatch.setattr(sys, "executable", FIXED_PYTHON_PATH)
 
+    # Also patch the terminal metadata to use the fixed Python path
+    # The terminal tool runs `command -v python` to get the path, so we need to
+    # patch the metadata class to return our fixed path
+    try:
+        from openhands.tools.terminal.metadata import TerminalMetadata
+
+        original_init = TerminalMetadata.__init__
+
+        def patched_init(self, *args, **kwargs):
+            original_init(self, *args, **kwargs)
+            self.py_interpreter_path = FIXED_PYTHON_PATH
+
+        monkeypatch.setattr(TerminalMetadata, "__init__", patched_init)
+    except ImportError:
+        pass  # If the module doesn't exist, skip patching
+
 
 def create_mock_agent(base_url: str, tmp_path: Path) -> None:
     """Create and save agent config pointing to mock server."""
