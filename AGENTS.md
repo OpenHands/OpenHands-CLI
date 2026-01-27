@@ -55,6 +55,12 @@ Prefer modern typing syntax (`X | None` over `Optional[X]`) in new code.
 - Match test locations to implementation (`tests/` mirrors `openhands_cli/`); add fixtures in `tests/conftest.py` when shared.
 - Run `make test` before PRs.
 
+### E2E Tests with Mock LLM
+- E2E tests in `e2e_tests/` can use `mock_llm_server.py` for deterministic testing without real LLM calls.
+- The mock LLM server provides OpenAI-compatible endpoints with proper tool call format.
+- Use `openai/gpt-4o-mock` as the model name (litellm requires a provider prefix).
+- Note: [llm-mock](https://github.com/piyook/llm-mock) is **not suitable** for OpenHands e2e testing because it doesn't support the `tool_calls` format required by OpenHands agents.
+
 ## Snapshot Testing with pytest-textual-snapshot
 The CLI uses [pytest-textual-snapshot](https://github.com/Textualize/pytest-textual-snapshot) for visual regression testing of Textual UI components. Snapshots are SVG screenshots that capture the exact visual state of the application.
 
