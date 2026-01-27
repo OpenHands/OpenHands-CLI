@@ -8,7 +8,7 @@ import pytest
 from pydantic import SecretStr
 
 from e2e_tests.mock_llm_server import MockLLMServer
-from e2e_tests.trajectory import Trajectory, get_trajectories_dir, load_trajectory
+from e2e_tests.trajectory import get_trajectories_dir, load_trajectory
 
 
 @pytest.fixture

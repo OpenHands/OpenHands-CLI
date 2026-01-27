@@ -6,6 +6,8 @@ their command, before submitting.
 
 from textual.pilot import Pilot
 
+from .helpers import type_text, wait_for_app_ready, wait_for_idle, wait_for_widget
+
 
 class TestAppWithTypedInput:
     """Test app state with typed input."""
@@ -22,24 +24,16 @@ class TestAppWithTypedInput:
 
         async def type_command(pilot: Pilot):
             """Type command without submitting."""
-            await pilot.pause()
-            await pilot.pause()
-            await pilot.pause()
+            # Wait for app to fully initialize
+            await wait_for_app_ready(pilot)
 
-            try:
-                input_field = pilot.app.query_one(InputField)
-                input_field.focus_input()
-                await pilot.pause()
-            except Exception:
-                await pilot.pause()
-                input_field = pilot.app.query_one(InputField)
-                input_field.focus_input()
-                await pilot.pause()
+            # Find and focus the input field
+            input_field = await wait_for_widget(pilot, InputField)
+            input_field.focus_input()
+            await wait_for_idle(pilot)
 
             # Type the command
-            for char in "echo hello world":
-                await pilot.press(char)
-            await pilot.pause()
+            await type_text(pilot, "echo hello world")
 
         # Locations are already patched by the fixture via monkeypatch
         app = OpenHandsApp(

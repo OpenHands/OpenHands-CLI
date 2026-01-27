@@ -6,6 +6,8 @@ before any user interaction.
 
 from textual.pilot import Pilot
 
+from .helpers import wait_for_app_ready
+
 
 class TestAppInitialState:
     """Test app initial state."""
@@ -21,9 +23,7 @@ class TestAppInitialState:
 
         async def wait_for_init(pilot: Pilot):
             """Wait for app to initialize."""
-            await pilot.pause()
-            await pilot.pause()
-            await pilot.pause()
+            await wait_for_app_ready(pilot)
 
         # Locations are already patched by the fixture via monkeypatch
         app = OpenHandsApp(

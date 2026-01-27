@@ -9,6 +9,8 @@ This test validates the complete conversation flow:
 
 from textual.pilot import Pilot
 
+from .helpers import type_text, wait_for_app_ready, wait_for_idle, wait_for_widget
+
 
 class TestEchoHelloWorld:
     """Test echo hello world conversation."""
@@ -30,46 +32,22 @@ class TestEchoHelloWorld:
 
         async def run_conversation(pilot: Pilot):
             """Simulate user typing and submitting a command."""
-            app = pilot.app
-
             # Wait for app to fully initialize
-            await pilot.pause()
-            await pilot.pause()
-            await pilot.pause()
+            await wait_for_app_ready(pilot)
 
             # Find and focus the input field
-            try:
-                input_field = app.query_one(InputField)
-                input_field.focus_input()
-                await pilot.pause()
-            except Exception:
-                # App might not be fully initialized
-                await pilot.pause()
-                await pilot.pause()
-                input_field = app.query_one(InputField)
-                input_field.focus_input()
-                await pilot.pause()
+            input_field = await wait_for_widget(pilot, InputField)
+            input_field.focus_input()
+            await wait_for_idle(pilot)
 
             # Type the command
-            for char in "echo hello world":
-                await pilot.press(char)
-            await pilot.pause()
+            await type_text(pilot, "echo hello world")
 
             # Press Enter to submit
             await pilot.press("enter")
 
-            # Wait for agent to process (give it time to call mock LLM and execute)
-            for _ in range(50):
-                await pilot.pause()
-                # Check if conversation is still running
-                runner = getattr(app, "conversation_runner", None)
-                if runner is not None and not runner.is_running:
-                    break
-
-            # Final pause to let UI update
-            await pilot.pause()
-            await pilot.pause()
-            await pilot.pause()
+            # Wait for all animations to complete (indicates processing finished)
+            await wait_for_idle(pilot)
 
         # Locations are already patched by the fixture via monkeypatch
         app = OpenHandsApp(
