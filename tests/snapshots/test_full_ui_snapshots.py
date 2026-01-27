@@ -14,18 +14,12 @@ The test flow:
 This is a true end-to-end test - no mocking of services except the LLM endpoint.
 """
 
-import sys
-from pathlib import Path
-
 import pytest
 from pydantic import SecretStr
 from textual.pilot import Pilot
 
-
-# Add e2e_tests to path to import mock server
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "e2e_tests"))
-from mock_llm_server import MockLLMServer
-from trajectory import load_trajectory, get_trajectories_dir
+from e2e_tests.mock_llm_server import MockLLMServer
+from e2e_tests.trajectory import get_trajectories_dir, load_trajectory
 
 
 @pytest.fixture
@@ -42,11 +36,11 @@ def mock_llm_setup(tmp_path, monkeypatch):
     7. Cleans up the server on teardown
     """
     import uuid as uuid_module
-    
+
     # Use a fixed UUID for deterministic snapshots
     fixed_uuid = uuid_module.UUID("00000000-0000-0000-0000-000000000001")
     monkeypatch.setattr(uuid_module, "uuid4", lambda: fixed_uuid)
-    
+
     # Create directories with fixed names for deterministic paths in snapshots
     # We still use tmp_path as base but create predictable subdirectory names
     conversations_dir = tmp_path / "conversations"
@@ -57,6 +51,7 @@ def mock_llm_setup(tmp_path, monkeypatch):
     # CRITICAL: Patch the locations module DIRECTLY before any imports
     # This must happen before any module that imports from locations
     import openhands_cli.locations as locations_module
+
     monkeypatch.setattr(locations_module, "PERSISTENCE_DIR", str(tmp_path))
     monkeypatch.setattr(locations_module, "CONVERSATIONS_DIR", str(conversations_dir))
     monkeypatch.setattr(locations_module, "AGENT_SETTINGS_PATH", "agent_settings.json")
@@ -65,14 +60,17 @@ def mock_llm_setup(tmp_path, monkeypatch):
 
     # Also patch the stores module which may have cached the values
     from openhands_cli.stores import agent_store as agent_store_module
+
     monkeypatch.setattr(agent_store_module, "PERSISTENCE_DIR", str(tmp_path))
     monkeypatch.setattr(agent_store_module, "CONVERSATIONS_DIR", str(conversations_dir))
-    monkeypatch.setattr(agent_store_module, "AGENT_SETTINGS_PATH", "agent_settings.json")
+    monkeypatch.setattr(
+        agent_store_module, "AGENT_SETTINGS_PATH", "agent_settings.json"
+    )
     monkeypatch.setattr(agent_store_module, "WORK_DIR", "/workspace")
 
     # Load trajectory for deterministic replay
     trajectory = load_trajectory(get_trajectories_dir() / "simple_echo_hello_world")
-    
+
     # Start mock server with trajectory
     server = MockLLMServer(trajectory=trajectory)
     base_url = server.start()
@@ -165,10 +163,9 @@ class TestFullUIWithMockLLM:
             for _ in range(50):
                 await pilot.pause()
                 # Check if conversation is still running
-                if hasattr(app, "conversation_runner"):
-                    runner = app.conversation_runner
-                    if runner and not runner.is_running:
-                        break
+                runner = getattr(app, "conversation_runner", None)
+                if runner is not None and not runner.is_running:
+                    break
 
             # Final pause to let UI update
             await pilot.pause()

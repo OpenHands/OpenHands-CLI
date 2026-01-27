@@ -15,10 +15,10 @@ Usage:
     # Load a trajectory and create server
     from e2e_tests.trajectory import load_trajectory
     trajectory = load_trajectory("tests/trajectories/simple_echo_hello_world")
-    
+
     server = MockLLMServer(trajectory=trajectory)
     base_url = server.start()
-    
+
     # Server will replay LLM responses from the trajectory
 """
 
@@ -28,10 +28,9 @@ import json
 import threading
 import time
 import uuid
-from functools import partial
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
 
 if TYPE_CHECKING:
     from .trajectory import Trajectory, TrajectoryEvent
@@ -39,12 +38,12 @@ if TYPE_CHECKING:
 
 class TrajectoryReplayState:
     """Tracks the state of trajectory replay across requests."""
-    
+
     def __init__(self, responses: list[TrajectoryEvent]):
         self.responses = responses
         self.current_index = 0
         self._lock = threading.Lock()
-    
+
     def get_next_response(self) -> TrajectoryEvent | None:
         """Get the next response to replay, advancing the index."""
         with self._lock:
@@ -53,14 +52,14 @@ class TrajectoryReplayState:
             response = self.responses[self.current_index]
             self.current_index += 1
             return response
-    
+
     def peek_next_response(self) -> TrajectoryEvent | None:
         """Peek at the next response without advancing."""
         with self._lock:
             if self.current_index >= len(self.responses):
                 return None
             return self.responses[self.current_index]
-    
+
     def reset(self) -> None:
         """Reset replay to the beginning."""
         with self._lock:
@@ -69,7 +68,7 @@ class TrajectoryReplayState:
 
 def create_handler_class(replay_state: TrajectoryReplayState) -> type:
     """Create a handler class with access to the replay state."""
-    
+
     class MockLLMHandler(BaseHTTPRequestHandler):
         """HTTP handler for mock LLM requests with trajectory replay."""
 
@@ -105,13 +104,15 @@ def create_handler_class(replay_state: TrajectoryReplayState) -> type:
         def do_GET(self) -> None:
             """Handle GET requests - health check and status."""
             if self.path == "/health" or self.path == "/":
-                self._send_json_response({
-                    "status": "ok",
-                    "server": "mock-llm-trajectory",
-                    "responses_remaining": (
-                        len(replay_state.responses) - replay_state.current_index
-                    ),
-                })
+                self._send_json_response(
+                    {
+                        "status": "ok",
+                        "server": "mock-llm-trajectory",
+                        "responses_remaining": (
+                            len(replay_state.responses) - replay_state.current_index
+                        ),
+                    }
+                )
             elif self.path == "/reset":
                 replay_state.reset()
                 self._send_json_response({"status": "reset"})
@@ -165,23 +166,25 @@ def create_handler_class(replay_state: TrajectoryReplayState) -> type:
             tool_call = event.tool_call
             if not tool_call:
                 return self._create_default_finish_response()
-            
+
             tool_call_id = tool_call.get("id", f"call_{uuid.uuid4().hex[:24]}")
             tool_name = tool_call.get("name", event.tool_name or "unknown")
             arguments = tool_call.get("arguments", "{}")
-            
+
             completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
-            
+
             # Build thinking content if present
             thinking_content: list[dict[str, Any]] = []
             if event.thinking_blocks:
                 for block in event.thinking_blocks:
                     if block.get("type") == "thinking":
-                        thinking_content.append({
-                            "type": "thinking",
-                            "thinking": block.get("thinking", ""),
-                        })
-            
+                        thinking_content.append(
+                            {
+                                "type": "thinking",
+                                "thinking": block.get("thinking", ""),
+                            }
+                        )
+
             # Build the message content
             message: dict[str, Any] = {
                 "role": "assistant",
@@ -197,7 +200,7 @@ def create_handler_class(replay_state: TrajectoryReplayState) -> type:
                     }
                 ],
             }
-            
+
             completion_response = {
                 "id": completion_id,
                 "object": "chat.completion",
@@ -284,9 +287,9 @@ def create_handler_class(replay_state: TrajectoryReplayState) -> type:
             llm_message = event.llm_message
             if not llm_message:
                 return self._create_default_finish_response()
-            
+
             completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
-            
+
             # Extract content from llm_message
             content = llm_message.get("content", "")
             if isinstance(content, list):
@@ -296,7 +299,7 @@ def create_handler_class(replay_state: TrajectoryReplayState) -> type:
                     if isinstance(item, dict) and item.get("type") == "text":
                         text_parts.append(item.get("text", ""))
                 content = "".join(text_parts)
-            
+
             completion_response = {
                 "id": completion_id,
                 "object": "chat.completion",
@@ -421,7 +424,7 @@ def create_handler_class(replay_state: TrajectoryReplayState) -> type:
             ]
 
             return {"completion": completion_response, "stream_chunks": stream_chunks}
-    
+
     return MockLLMHandler
 
 
@@ -461,10 +464,10 @@ class MockLLMServer:
         else:
             responses = []
         self._replay_state = TrajectoryReplayState(responses)
-        
+
         # Create handler class with replay state
         handler_class = create_handler_class(self._replay_state)
-        
+
         self.server = HTTPServer((self.host, self.port), handler_class)
         actual_port = self.server.server_address[1]
         self.port = actual_port
@@ -489,7 +492,7 @@ class MockLLMServer:
         if self._replay_state:
             self._replay_state.reset()
 
-    def __enter__(self) -> "MockLLMServer":
+    def __enter__(self) -> MockLLMServer:
         self.start()
         return self
 
@@ -500,8 +503,8 @@ class MockLLMServer:
     def base_url(self) -> str:
         """Get the base URL of the server."""
         return f"http://{self.host}:{self.port}"
-    
-    @property  
+
+    @property
     def replay_state(self) -> TrajectoryReplayState | None:
         """Get the replay state for inspection."""
         return self._replay_state
@@ -509,7 +512,7 @@ class MockLLMServer:
 
 def run_mock_server(trajectory_path: str | None = None, port: int = 8765) -> None:
     """Run the mock server standalone for testing.
-    
+
     Args:
         trajectory_path: Path to trajectory directory (optional)
         port: Port to run on
@@ -517,11 +520,12 @@ def run_mock_server(trajectory_path: str | None = None, port: int = 8765) -> Non
     trajectory = None
     if trajectory_path:
         from .trajectory import load_trajectory
+
         trajectory = load_trajectory(trajectory_path)
         print(f"Loaded trajectory: {trajectory.name}")
         print(f"  - {len(trajectory.get_user_inputs())} user inputs")
         print(f"  - {len(trajectory.get_llm_responses())} LLM responses to replay")
-    
+
     server = MockLLMServer(trajectory=trajectory, port=port)
     base_url = server.start()
     print(f"\nMock LLM server running at {base_url}")
@@ -541,5 +545,6 @@ def run_mock_server(trajectory_path: str | None = None, port: int = 8765) -> Non
 
 if __name__ == "__main__":
     import sys
+
     trajectory_path = sys.argv[1] if len(sys.argv) > 1 else None
     run_mock_server(trajectory_path)
