@@ -84,7 +84,7 @@ class AppState(Container):
     """Whether the conversation is currently running/processing."""
 
     # ---- Conversation Identity ----
-    conversation_id: var[uuid.UUID | None] = var(None)
+    conversation_id: var[uuid.UUID] = var(uuid.uuid4)
     """The currently active conversation ID."""
 
     conversation_title: var[str | None] = var(None)
@@ -398,9 +398,6 @@ class AppState(Container):
 
         # Create JSON callback if in JSON mode
         event_callback = json_callback if self._json_mode else None
-
-        # conversation_id is always set before this is called
-        assert self.conversation_id is not None
 
         # Create runner with callbacks that use self.app
         runner = ConversationRunner(

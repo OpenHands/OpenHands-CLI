@@ -92,7 +92,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     content_area: getters.query_one[Horizontal] = getters.query_one("#content_area")
 
     @property
-    def conversation_id(self) -> uuid.UUID | None:
+    def conversation_id(self) -> uuid.UUID:
         """Get the current conversation ID from AppState (single source of truth)."""
         return self.app_state.conversation_id
 
@@ -414,7 +414,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Get structured splash content
         # conversation_id is always set during app initialization
-        assert self.conversation_id is not None
         splash_content = get_splash_content(
             conversation_id=self.conversation_id.hex,
             theme=OPENHANDS_THEME,

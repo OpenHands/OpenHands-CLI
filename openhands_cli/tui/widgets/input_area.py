@@ -15,7 +15,7 @@ from textual.containers import Container
 
 class InputAreaContainer(Container):
     """Container for the input area with status lines and input field.
-    
+
     This is a simple container widget - children are yielded by AppState.compose()
     using `with InputAreaContainer(...):` context manager syntax.
     """

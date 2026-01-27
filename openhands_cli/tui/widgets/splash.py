@@ -12,7 +12,7 @@ Example:
     yield SplashConversation(id="splash_conversation").data_bind(
         conversation_id=AppState.conversation_id
     )
-    
+
     # When app_state.conversation_id changes, the widget auto-updates
 """
 
@@ -27,13 +27,13 @@ from openhands_cli.tui.content.splash import get_conversation_text
 
 class SplashConversation(Static):
     """Displays the current conversation ID with reactive updates.
-    
+
     Uses data_bind() to bind to AppState.conversation_id. The binding works
     because this widget is yielded from AppState.compose(), where the
     active message pump is AppState itself.
     """
 
-    conversation_id: var[uuid.UUID | None] = var(None)
+    conversation_id: var[uuid.UUID] = var(uuid.uuid4)
 
     def __init__(self, **kwargs) -> None:
         # Set default classes if not provided
@@ -42,10 +42,7 @@ class SplashConversation(Static):
         super().__init__(**kwargs)
 
     def watch_conversation_id(
-        self, _old_value: uuid.UUID | None, new_value: uuid.UUID | None
+        self, _old_value: uuid.UUID, new_value: uuid.UUID
     ) -> None:
         """Update display when conversation_id changes."""
-        if new_value is not None:
-            self.update(get_conversation_text(new_value.hex, theme=OPENHANDS_THEME))
-        else:
-            self.update("")
+        self.update(get_conversation_text(new_value.hex, theme=OPENHANDS_THEME))

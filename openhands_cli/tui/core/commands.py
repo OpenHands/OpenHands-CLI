@@ -4,19 +4,11 @@ This module contains all available commands, their descriptions,
 and the logic for handling command execution.
 """
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
 from textual.containers import VerticalScroll
 from textual.widgets import Static
 from textual_autocomplete import DropdownItem
 
 from openhands_cli.theme import OPENHANDS_THEME
-
-
-if TYPE_CHECKING:
-    pass
 
 
 # Available commands with descriptions after the command
