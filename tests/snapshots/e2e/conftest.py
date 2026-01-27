@@ -12,10 +12,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from pydantic import SecretStr
 
 from e2e_tests.mock_llm_server import MockLLMServer
 from e2e_tests.trajectory import get_trajectories_dir, load_trajectory
+from tests.conftest import create_test_agent_config
 
 
 # Fixed work directory path - writable on most systems and deterministic for snapshots
@@ -82,24 +82,6 @@ def patch_location_modules(
         pass  # If the module doesn't exist, skip patching
 
 
-def create_mock_agent(base_url: str, tmp_path: Path) -> None:
-    """Create and save agent config pointing to mock server."""
-    from openhands.sdk import LLM
-    from openhands_cli.utils import get_default_cli_agent
-
-    llm = LLM(
-        model="openai/gpt-4o",
-        api_key=SecretStr("sk-test-mock-key"),
-        base_url=base_url,
-        usage_id="test-agent",
-    )
-    agent = get_default_cli_agent(llm=llm)
-
-    agent_settings_path = tmp_path / "agent_settings.json"
-    config_json = agent.model_dump_json(context={"expose_secrets": True})
-    agent_settings_path.write_text(config_json)
-
-
 def cleanup_work_dir() -> None:
     """Clean up the fixed work directory."""
     if WORK_DIR.exists():
@@ -122,7 +104,9 @@ def mock_llm_setup(
     server = MockLLMServer(trajectory=trajectory)
     base_url = server.start()
 
-    create_mock_agent(base_url, tmp_path)
+    create_test_agent_config(
+        tmp_path, model="openai/gpt-4o", base_url=base_url, expose_secrets=True
+    )
 
     yield {
         "persistence_dir": tmp_path,
@@ -160,7 +144,9 @@ def mock_llm_with_trajectory(
     server = MockLLMServer(trajectory=trajectory)
     base_url = server.start()
 
-    create_mock_agent(base_url, tmp_path)
+    create_test_agent_config(
+        tmp_path, model="openai/gpt-4o", base_url=base_url, expose_secrets=True
+    )
 
     yield {
         "persistence_dir": tmp_path,

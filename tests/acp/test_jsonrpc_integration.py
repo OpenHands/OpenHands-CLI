@@ -9,10 +9,8 @@ import os
 import subprocess
 
 import pytest
-from pydantic import SecretStr
 
-from openhands.sdk import LLM
-from openhands_cli.utils import get_default_cli_agent
+from tests.conftest import create_test_agent_config, setup_test_persistence_dir
 
 
 @pytest.fixture
@@ -25,20 +23,10 @@ def acp_test_env(tmp_path):
     # Create temporary persistence directory
     persistence_dir = tmp_path / "openhands"
     persistence_dir.mkdir()
-    conversations_dir = persistence_dir / "conversations"
-    conversations_dir.mkdir()
+    persistence_dir, conversations_dir = setup_test_persistence_dir(persistence_dir)
 
-    # Create minimal agent configuration
-    llm = LLM(
-        model="openai/gpt-4o-mini",
-        api_key=SecretStr("sk-test-mock-key"),
-        usage_id="test-agent",
-    )
-    agent = get_default_cli_agent(llm=llm)
-
-    # Save agent configuration
-    agent_settings_path = persistence_dir / "agent_settings.json"
-    agent_settings_path.write_text(agent.model_dump_json())
+    # Create agent configuration using shared helper
+    create_test_agent_config(persistence_dir)
 
     # Return environment with OPENHANDS_PERSISTENCE_DIR set
     env = os.environ.copy()

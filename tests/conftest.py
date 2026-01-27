@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -5,6 +6,76 @@ from pydantic import SecretStr
 
 from openhands.sdk import LLM
 from openhands_cli.utils import get_default_cli_agent
+
+
+# =============================================================================
+# Shared helper functions for agent configuration setup
+# =============================================================================
+
+
+def create_test_agent_config(
+    persistence_dir: Path,
+    *,
+    model: str = "openai/gpt-4o-mini",
+    api_key: str = "sk-test-mock-key",
+    base_url: str | None = None,
+    expose_secrets: bool = False,
+) -> Path:
+    """Create and save a test agent configuration.
+
+    This is a shared helper function used by multiple test fixtures to avoid
+    code duplication. It creates a minimal agent configuration and saves it
+    to the specified persistence directory.
+
+    Args:
+        persistence_dir: Directory where agent_settings.json will be saved
+        model: LLM model identifier (default: openai/gpt-4o-mini)
+        api_key: Mock API key (default: sk-test-mock-key)
+        base_url: Optional base URL for mock LLM server
+        expose_secrets: Whether to expose secrets in JSON output (default: False)
+
+    Returns:
+        Path to the created agent_settings.json file
+    """
+    llm_kwargs = {
+        "model": model,
+        "api_key": SecretStr(api_key),
+        "usage_id": "test-agent",
+    }
+    if base_url:
+        llm_kwargs["base_url"] = base_url
+
+    llm = LLM(**llm_kwargs)
+    agent = get_default_cli_agent(llm=llm)
+
+    agent_settings_path = persistence_dir / "agent_settings.json"
+    if expose_secrets:
+        config_json = agent.model_dump_json(context={"expose_secrets": True})
+    else:
+        config_json = agent.model_dump_json()
+    agent_settings_path.write_text(config_json)
+
+    return agent_settings_path
+
+
+def setup_test_persistence_dir(base_path: Path) -> tuple[Path, Path]:
+    """Create persistence and conversations directories for testing.
+
+    Args:
+        base_path: Base path where directories will be created
+
+    Returns:
+        Tuple of (persistence_dir, conversations_dir)
+    """
+    persistence_dir = base_path
+    conversations_dir = persistence_dir / "conversations"
+    conversations_dir.mkdir(exist_ok=True)
+    return persistence_dir, conversations_dir
+
+
+# =============================================================================
+# Fixtures
+# =============================================================================
 
 
 # Fixture: temp_config_path - Shared MCP config path for tests
@@ -113,27 +184,15 @@ def setup_test_agent_config(tmp_path_factory, monkeypatch):
     """
     # Create a temporary directory for this test session
     temp_persistence_dir = tmp_path_factory.mktemp("openhands_test")
-    conversations_dir = temp_persistence_dir / "conversations"
-    conversations_dir.mkdir(exist_ok=True)
-
-    # Set environment variables - works regardless of import order
-    monkeypatch.setenv("OPENHANDS_PERSISTENCE_DIR", str(temp_persistence_dir))
-    monkeypatch.setenv("OPENHANDS_CONVERSATIONS_DIR", str(conversations_dir))
-
-    # Create minimal agent configuration
-    # Use a mock LLM configuration that doesn't require real API keys
-    llm = LLM(
-        model="openai/gpt-4o-mini",
-        api_key=SecretStr("sk-test-mock-key"),
-        usage_id="test-agent",
+    persistence_dir, conversations_dir = setup_test_persistence_dir(
+        temp_persistence_dir
     )
 
-    # Get default agent configuration
-    agent = get_default_cli_agent(llm=llm)
+    # Set environment variables - works regardless of import order
+    monkeypatch.setenv("OPENHANDS_PERSISTENCE_DIR", str(persistence_dir))
+    monkeypatch.setenv("OPENHANDS_CONVERSATIONS_DIR", str(conversations_dir))
 
-    # Save agent configuration to temporary directory
-    agent_settings_path = temp_persistence_dir / "agent_settings.json"
-    agent_settings_json = agent.model_dump_json()
-    agent_settings_path.write_text(agent_settings_json)
+    # Create agent configuration using shared helper
+    create_test_agent_config(persistence_dir)
 
-    yield temp_persistence_dir
+    yield persistence_dir
