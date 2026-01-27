@@ -28,8 +28,6 @@ class WorkingStatusLine(Static):
     }
     """
 
-    # Reactive properties bound via data_bind() to StateManager
-    # Note: Named with underscore prefix to avoid conflict with MessagePump.is_running
     running: var[bool] = var(False)
     elapsed_seconds: var[int] = var(0)
 

@@ -105,7 +105,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """
         super().__init__(**kwargs)
 
-        # StateManager owns the confirmation policy - pass initial policy to it
         self.state_manager = StateManager(
             initial_confirmation_policy=initial_confirmation_policy or AlwaysConfirm()
         )
@@ -132,7 +131,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             CONVERSATIONS_DIR, self.conversation_id
         )
 
-        # Initialize StateManager's conversation_id
         self.state_manager.conversation_id = self.conversation_id
 
         # Store queued inputs (copy to prevent mutating caller's list)
@@ -495,14 +493,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Handle commands - only exact matches
         if is_valid_command(content):
-            self._handle_command(content)
+            self._command_handler.handle_command(content)
         else:
             # Handle regular messages with conversation runner
             await self._handle_user_message(content)
-
-    def _handle_command(self, command: str) -> None:
-        """Handle command execution by delegating to the CommandHandler."""
-        self._command_handler.handle_command(command)
+                    
 
     async def _handle_user_message(self, user_message: str) -> None:
         """Handle regular user messages with the conversation runner."""
