@@ -9,7 +9,7 @@ from .test_experimental_ui import test_experimental_ui
 from .test_version import test_version
 
 
-def run_all_binary_tests() -> TestSummary:
+def run_all_tui_e2e() -> TestSummary:
     """Run all binary tests and return a summary."""
     print("🧪 Running binary tests...")
     print("=" * 60)

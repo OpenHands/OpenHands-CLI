@@ -13,7 +13,7 @@ Key Features:
 
 Usage:
     # Load a trajectory and create server
-    from binary_tests.trajectory import load_trajectory
+    from tui_e2e.trajectory import load_trajectory
     trajectory = load_trajectory("tests/trajectories/simple_echo_hello_world")
 
     server = MockLLMServer(trajectory=trajectory)
@@ -158,13 +158,31 @@ class TrajectoryResponseConverter:
             return self._create_tool_call_response(event)
         elif event.kind == "MessageEvent" and event.llm_message:
             return self._create_message_response(event)
-        return self._create_default_response()
+        return self.create_default_response()
+
+    def create_default_response(
+        self, content: str = "Task completed."
+    ) -> dict[str, Any]:
+        """Create a default response when no event is available or event is unhandled.
+
+        This is intentionally public as it's used by external handlers when
+        the trajectory replay state has no more events to replay.
+        """
+        completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
+        return {
+            "completion": OpenAIResponseBuilder.build_completion(
+                completion_id, {"role": "assistant", "content": content}
+            ),
+            "stream_chunks": OpenAIResponseBuilder.build_message_chunks(
+                completion_id, content
+            ),
+        }
 
     def _create_tool_call_response(self, event: TrajectoryEvent) -> dict[str, Any]:
         """Create a tool call response from an ActionEvent."""
         tool_call = event.tool_call
         if not tool_call:
-            return self._create_default_response()
+            return self.create_default_response()
 
         tool_call_id = tool_call.get("id", f"call_{uuid.uuid4().hex[:24]}")
         tool_name = tool_call.get("name", event.tool_name or "unknown")
@@ -196,25 +214,11 @@ class TrajectoryResponseConverter:
         """Create a message response from a MessageEvent."""
         llm_message = event.llm_message
         if not llm_message:
-            return self._create_default_response()
+            return self.create_default_response()
 
         completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
         content = self._extract_content(llm_message)
 
-        return {
-            "completion": OpenAIResponseBuilder.build_completion(
-                completion_id, {"role": "assistant", "content": content}
-            ),
-            "stream_chunks": OpenAIResponseBuilder.build_message_chunks(
-                completion_id, content
-            ),
-        }
-
-    def _create_default_response(
-        self, content: str = "Task completed."
-    ) -> dict[str, Any]:
-        """Create a default finish response."""
-        completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
         return {
             "completion": OpenAIResponseBuilder.build_completion(
                 completion_id, {"role": "assistant", "content": content}
@@ -293,7 +297,7 @@ def create_request_handler(
             stream = request_data.get("stream", False)
             event = replay_state.get_next_response()
             if event is None:
-                response = converter._create_default_response()
+                response = converter.create_default_response()
             else:
                 response = converter.convert_event(event)
 

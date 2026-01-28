@@ -13,9 +13,9 @@ from typing import Any
 
 import pytest
 
-from binary_tests.mock_llm_server import MockLLMServer
-from binary_tests.trajectory import get_trajectories_dir, load_trajectory
 from tests.conftest import create_test_agent_config
+from tui_e2e.mock_llm_server import MockLLMServer
+from tui_e2e.trajectory import get_trajectories_dir, load_trajectory
 
 
 # Fixed work directory path - writable on most systems and deterministic for snapshots
