@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 
 from .helpers import wait_for_app_ready
 
+
 if TYPE_CHECKING:
     from textual.pilot import Pilot
 
@@ -95,16 +96,12 @@ class TestInitialSetupCancelThenExit:
     def test_phase2_exit_page(self, snap_compare, first_time_user_setup):
         """Phase 2: User cancels and is shown the exit page."""
         app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
-        assert snap_compare(
-            app, terminal_size=(120, 40), run_before=_cancel_settings
-        )
+        assert snap_compare(app, terminal_size=(120, 40), run_before=_cancel_settings)
 
     def test_phase3_exit_confirmed(self, snap_compare, first_time_user_setup):
         """Phase 3: User presses the exit button and quits the app."""
         app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
-        assert snap_compare(
-            app, terminal_size=(120, 40), run_before=_confirm_exit
-        )
+        assert snap_compare(app, terminal_size=(120, 40), run_before=_confirm_exit)
 
 
 # =============================================================================
@@ -132,9 +129,7 @@ class TestInitialSetupCancelThenReturn:
     def test_phase2_exit_page(self, snap_compare, first_time_user_setup):
         """Phase 2: User cancels and is shown the exit page."""
         app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
-        assert snap_compare(
-            app, terminal_size=(120, 40), run_before=_cancel_settings
-        )
+        assert snap_compare(app, terminal_size=(120, 40), run_before=_cancel_settings)
 
     def test_phase3_cancel_exit(self, snap_compare, first_time_user_setup):
         """Phase 3: User cancels on the exit screen."""
