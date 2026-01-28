@@ -9,6 +9,7 @@ from acp import Client, NewSessionResponse, PromptResponse, RequestError
 from acp.schema import LoadSessionResponse
 
 from openhands.sdk import BaseConversation, Conversation, Event, RemoteConversation
+from openhands.sdk.hooks import HookConfig
 from openhands.workspace import OpenHandsCloudWorkspace
 from openhands_cli.acp_impl.agent.base_agent import BaseOpenHandsACPAgent
 from openhands_cli.acp_impl.agent.util import AgentType, get_session_mode_state
@@ -233,11 +234,17 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
         def sync_callback(event: Event) -> None:
             asyncio.run_coroutine_threadsafe(subscriber(event), loop)
 
+        # Load hooks from ~/.openhands/hooks.json (global hooks for remote)
+        hook_config = HookConfig.load()
+        if not hook_config.is_empty():
+            logger.info("Hooks loaded from hooks.json")
+
         conversation = Conversation(
             agent=agent,
             workspace=workspace,
             callbacks=[sync_callback],
             conversation_id=UUID(session_id),
+            hook_config=hook_config,
         )
 
         self._active_workspaces[session_id] = workspace

@@ -308,14 +308,18 @@ class TestHeadlessRunnerOutput:
         mock_conversation.send_message = Mock()
         mock_conversation.run = Mock()
 
-        runner = ConversationRunner(
-            conversation_id=uuid.uuid4(),
-            running_state_callback=Mock(),
-            confirmation_callback=Mock(),
-            notification_callback=Mock(),
-            visualizer=Mock(),
-        )
-        runner.conversation = mock_conversation
+        with patch(
+            "openhands_cli.tui.core.conversation_runner.setup_conversation",
+            return_value=mock_conversation,
+        ):
+            runner = ConversationRunner(
+                conversation_id=uuid.uuid4(),
+                running_state_callback=Mock(),
+                confirmation_callback=Mock(),
+                notification_callback=Mock(),
+                visualizer=Mock(),
+            )
+
         runner._confirmation_mode_active = False
 
         message = Mock()
@@ -373,20 +377,17 @@ class TestConversationSummary:
             agent_event,
         ]
 
-        # Create a mock ConversationView
-        mock_app_state = Mock()
-        mock_app_state.confirmation_policy = AlwaysConfirm()
-        mock_app_state.attach_conversation = Mock()
-
-        runner = ConversationRunner(
-            conversation_id=uuid.uuid4(),
-            app_state=mock_app_state,
-            confirmation_callback=Mock(),
-            notification_callback=Mock(),
-            visualizer=Mock(),
-        )
-
-        runner.conversation = mock_conversation
+        with patch(
+            "openhands_cli.tui.core.conversation_runner.setup_conversation",
+            return_value=mock_conversation,
+        ):
+            runner = ConversationRunner(
+                conversation_id=uuid.uuid4(),
+                running_state_callback=Mock(),
+                confirmation_callback=Mock(),
+                notification_callback=Mock(),
+                visualizer=Mock(),
+            )
 
         agent_count, last_agent_message = runner.get_conversation_summary()
         assert agent_count == 2

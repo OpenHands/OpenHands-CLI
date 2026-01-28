@@ -11,6 +11,7 @@ def add_confirmation_mode_args(
     """
     parser_or_group.add_argument(
         "--always-approve",
+        "--yolo",
         action="store_true",
         help="Auto-approve all actions without asking for confirmation",
     )

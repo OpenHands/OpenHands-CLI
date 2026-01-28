@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-from openhands_cli.locations import PERSISTENCE_DIR
+from openhands_cli.locations import get_persistence_dir
 
 
 class TokenStorage:
@@ -13,10 +13,11 @@ class TokenStorage:
         """Initialize token storage.
 
         Args:
-            config_dir: Directory to store API keys (defaults to PERSISTENCE_DIR/cloud)
+            config_dir: Directory to store API keys.
+                Defaults to get_persistence_dir()/cloud.
         """
         if config_dir is None:
-            config_dir = Path(PERSISTENCE_DIR) / "cloud"
+            config_dir = Path(get_persistence_dir()) / "cloud"
 
         self.config_dir = config_dir
         self.config_dir.mkdir(parents=True, exist_ok=True)
