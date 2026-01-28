@@ -27,7 +27,8 @@ FIXED_CONVERSATION_ID = uuid_module.UUID("00000000-0000-0000-0000-000000000001")
 # Fixed Python interpreter path for deterministic snapshots
 FIXED_PYTHON_PATH = "/openhands/micromamba/envs/openhands/bin/python"
 
-# Fixed OS description for deterministic snapshots (kernel version varies between environments)
+# Fixed OS description for deterministic snapshots
+# (kernel version varies between environments)
 FIXED_OS_DESCRIPTION = "Linux (kernel 6.0.0-test)"
 
 

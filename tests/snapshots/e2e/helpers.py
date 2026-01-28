@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from textual.widgets import TextArea
 
+
 if TYPE_CHECKING:
     from textual.pilot import Pilot
 
