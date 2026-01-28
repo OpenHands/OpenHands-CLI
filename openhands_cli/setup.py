@@ -15,6 +15,7 @@ from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 
 # Register tools on import
 from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
+from openhands_cli.plugins.plugin_loader import load_enabled_plugins
 from openhands_cli.stores import AgentStore
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
@@ -32,6 +33,7 @@ def load_agent_specs(
     *,
     env_overrides_enabled: bool = False,
     critic_disabled: bool = False,
+    load_plugins: bool = True,
 ) -> Agent:
     """Load agent specifications.
 
@@ -43,6 +45,7 @@ def load_agent_specs(
             stored LLM settings, and agent can be created from env vars if no
             disk config exists.
         critic_disabled: If True, critic functionality will be disabled.
+        load_plugins: If True, load enabled plugins as skills. Defaults to True.
 
     Returns:
         Configured Agent instance
@@ -71,10 +74,18 @@ def load_agent_specs(
             update={"mcp_config": {"mcpServers": existing_servers}}
         )
 
-    if skills:
+    # Combine provided skills with plugin skills
+    all_skills = list(skills) if skills else []
+
+    # Load enabled plugins as skills if enabled
+    if load_plugins:
+        plugin_skills = load_enabled_plugins()
+        all_skills.extend(plugin_skills)
+
+    if all_skills:
         if agent.agent_context is not None:
             existing_skills = agent.agent_context.skills
-            existing_skills.extend(skills)
+            existing_skills.extend(all_skills)
             agent = agent.model_copy(
                 update={
                     "agent_context": agent.agent_context.model_copy(
@@ -84,7 +95,7 @@ def load_agent_specs(
             )
         else:
             agent = agent.model_copy(
-                update={"agent_context": AgentContext(skills=skills)}
+                update={"agent_context": AgentContext(skills=all_skills)}
             )
 
     return agent
@@ -98,6 +109,7 @@ def setup_conversation(
     *,
     env_overrides_enabled: bool = False,
     critic_disabled: bool = False,
+    load_plugins: bool = True,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
@@ -112,6 +124,7 @@ def setup_conversation(
             stored LLM settings, and agent can be created from env vars if no
             disk config exists.
         critic_disabled: If True, critic functionality will be disabled.
+        load_plugins: If True, load enabled plugins. Defaults to True.
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
@@ -123,6 +136,7 @@ def setup_conversation(
         str(conversation_id),
         env_overrides_enabled=env_overrides_enabled,
         critic_disabled=critic_disabled,
+        load_plugins=load_plugins,
     )
 
     # Prepare callbacks list
@@ -149,5 +163,17 @@ def setup_conversation(
     conversation.set_confirmation_policy(confirmation_policy)
 
     console.print(f"✓ Agent initialized with model: {agent.llm.model}", style="green")
+
+    # Show loaded plugins if any
+    if load_plugins and agent.agent_context:
+        plugin_skills = [
+            s for s in agent.agent_context.skills
+            if s.name.startswith("plugin:")
+        ]
+        if plugin_skills:
+            plugin_names = [s.name.replace("plugin:", "") for s in plugin_skills]
+            console.print(
+                f"✓ Loaded plugins: {', '.join(plugin_names)}", style="green"
+            )
 
     return conversation
