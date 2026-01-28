@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 
 from .helpers import type_text, wait_for_app_ready
 
+
 if TYPE_CHECKING:
     from textual.pilot import Pilot
 
@@ -88,6 +89,11 @@ async def _fill_settings_form(pilot: "Pilot") -> None:
     await wait_for_app_ready(pilot)
     await type_text(pilot, "gpt-4o-mini")
     await pilot.press("enter")
+    await wait_for_app_ready(pilot)
+
+    # Scroll down to see the API key field (it's in a modal screen)
+    api_key_input = pilot.app.screen.query_one("#api_key_input")
+    api_key_input.scroll_visible(animate=False)
     await wait_for_app_ready(pilot)
 
     # Enter API key
