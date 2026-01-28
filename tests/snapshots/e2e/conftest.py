@@ -102,16 +102,6 @@ def patch_deterministic_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     except ImportError:
         pass  # If the module doesn't exist, skip patching
 
-    # Disable cursor blinking for deterministic snapshots
-    # The cursor blink state varies depending on timing, causing flaky tests
-    try:
-        from textual.widgets import TextArea
-
-        # Set the default cursor_blink to False for all TextArea instances
-        monkeypatch.setattr(TextArea, "_default_cursor_blink", False)
-    except ImportError:
-        pass  # If the module doesn't exist, skip patching
-
 
 def cleanup_work_dir() -> None:
     """Clean up the fixed work directory."""
