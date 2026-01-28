@@ -8,6 +8,7 @@ import shutil
 import sys
 import uuid as uuid_module
 from collections.abc import Generator
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,16 @@ FIXED_CONVERSATION_ID = uuid_module.UUID("00000000-0000-0000-0000-000000000001")
 
 # Fixed Python interpreter path for deterministic snapshots
 FIXED_PYTHON_PATH = "/openhands/micromamba/envs/openhands/bin/python"
+
+
+@dataclass
+class E2ETestEnvironment:
+    """Container for e2e test environment paths."""
+
+    persistence_dir: Path
+    conversations_dir: Path
+    work_dir: Path
+    conversation_id: uuid_module.UUID
 
 
 def setup_test_directories(tmp_path: Path) -> tuple[Path, Path]:
@@ -94,43 +105,80 @@ def cleanup_work_dir() -> None:
         shutil.rmtree(WORK_DIR)
 
 
+# =============================================================================
+# Base fixture - autouse for all e2e tests
+# =============================================================================
+
+
+@pytest.fixture(autouse=True)
+def e2e_test_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Generator[E2ETestEnvironment, None, None]:
+    """Base fixture that sets up the test environment for all e2e tests.
+
+    This fixture is autouse=True, so it runs automatically for every test
+    in the tests/snapshots/e2e/ directory. It:
+    - Creates test directories (conversations, work)
+    - Sets environment variables for test paths
+    - Patches paths for deterministic snapshots
+
+    Note: This only affects tests in tests/snapshots/e2e/ since conftest.py
+    is scoped to this directory.
+    """
+    conversations_dir, work_dir = setup_test_directories(tmp_path)
+    patch_location_env_vars(monkeypatch, tmp_path, conversations_dir, work_dir)
+    patch_deterministic_paths(monkeypatch)
+
+    yield E2ETestEnvironment(
+        persistence_dir=tmp_path,
+        conversations_dir=conversations_dir,
+        work_dir=work_dir,
+        conversation_id=FIXED_CONVERSATION_ID,
+    )
+
+    cleanup_work_dir()
+
+
+# =============================================================================
+# Specialized fixtures that build on the base environment
+# =============================================================================
+
+
 @pytest.fixture
 def mock_llm_setup(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    e2e_test_environment: E2ETestEnvironment,
 ) -> Generator[dict[str, Any], None, None]:
     """Fixture that sets up mock LLM server with default trajectory.
 
     Uses 'simple_echo_hello_world' trajectory for deterministic replay.
     Returns a dict including 'conversation_id' that should be passed to OpenHandsApp.
     """
-    conversations_dir, work_dir = setup_test_directories(tmp_path)
-    patch_location_env_vars(monkeypatch, tmp_path, conversations_dir, work_dir)
-    patch_deterministic_paths(monkeypatch)
-
     trajectory = load_trajectory(get_trajectories_dir() / "simple_echo_hello_world")
     server = MockLLMServer(trajectory=trajectory)
     base_url = server.start()
 
     create_test_agent_config(
-        tmp_path, model="openai/gpt-4o", base_url=base_url, expose_secrets=True
+        e2e_test_environment.persistence_dir,
+        model="openai/gpt-4o",
+        base_url=base_url,
+        expose_secrets=True,
     )
 
     yield {
-        "persistence_dir": tmp_path,
-        "conversations_dir": conversations_dir,
+        "persistence_dir": e2e_test_environment.persistence_dir,
+        "conversations_dir": e2e_test_environment.conversations_dir,
         "mock_server_url": base_url,
-        "work_dir": work_dir,
+        "work_dir": e2e_test_environment.work_dir,
         "trajectory": trajectory,
-        "conversation_id": FIXED_CONVERSATION_ID,
+        "conversation_id": e2e_test_environment.conversation_id,
     }
 
     server.stop()
-    cleanup_work_dir()
 
 
 @pytest.fixture
 def mock_llm_with_trajectory(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+    e2e_test_environment: E2ETestEnvironment, request: pytest.FixtureRequest
 ) -> Generator[dict[str, Any], None, None]:
     """Fixture that sets up mock LLM server with a specified trajectory.
 
@@ -144,27 +192,45 @@ def mock_llm_with_trajectory(
     """
     trajectory_name = getattr(request, "param", "simple_echo_hello_world")
 
-    conversations_dir, work_dir = setup_test_directories(tmp_path)
-    patch_location_env_vars(monkeypatch, tmp_path, conversations_dir, work_dir)
-    patch_deterministic_paths(monkeypatch)
-
     trajectory = load_trajectory(get_trajectories_dir() / trajectory_name)
     server = MockLLMServer(trajectory=trajectory)
     base_url = server.start()
 
     create_test_agent_config(
-        tmp_path, model="openai/gpt-4o", base_url=base_url, expose_secrets=True
+        e2e_test_environment.persistence_dir,
+        model="openai/gpt-4o",
+        base_url=base_url,
+        expose_secrets=True,
     )
 
     yield {
-        "persistence_dir": tmp_path,
-        "conversations_dir": conversations_dir,
+        "persistence_dir": e2e_test_environment.persistence_dir,
+        "conversations_dir": e2e_test_environment.conversations_dir,
         "mock_server_url": base_url,
-        "work_dir": work_dir,
+        "work_dir": e2e_test_environment.work_dir,
         "trajectory": trajectory,
         "trajectory_name": trajectory_name,
-        "conversation_id": FIXED_CONVERSATION_ID,
+        "conversation_id": e2e_test_environment.conversation_id,
     }
 
     server.stop()
-    cleanup_work_dir()
+
+
+@pytest.fixture
+def first_time_user_setup(
+    e2e_test_environment: E2ETestEnvironment,
+) -> dict[str, Any]:
+    """Fixture for testing first-time user experience (no agent configured).
+
+    Unlike mock_llm_setup, this does NOT create agent_settings.json,
+    simulating a user who has never configured the CLI before.
+    """
+    # NOTE: We intentionally do NOT call create_test_agent_config() here
+    # to simulate a first-time user with no agent configured
+
+    return {
+        "persistence_dir": e2e_test_environment.persistence_dir,
+        "conversations_dir": e2e_test_environment.conversations_dir,
+        "work_dir": e2e_test_environment.work_dir,
+        "conversation_id": e2e_test_environment.conversation_id,
+    }

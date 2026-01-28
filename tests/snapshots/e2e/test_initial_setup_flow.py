@@ -1,0 +1,151 @@
+"""E2E snapshot tests for the initial setup flow.
+
+These tests capture the user experience for first-time users who have
+not yet configured their agent settings.
+
+Test 1: First-time user cancels settings, then exits
+  - Phase 1: User is shown settings page
+  - Phase 2: User cancels and is shown the exit page
+  - Phase 3: User presses the exit button and quits the app
+
+Test 2: First-time user cancels settings, cancels exit, returns to settings
+  - Phase 1: User is shown the settings page
+  - Phase 2: User cancels and is shown the exit page
+  - Phase 3: User cancels on the exit screen and is returned to settings page
+  - Phase 4: User is back at the settings page
+"""
+
+from typing import TYPE_CHECKING
+
+from .helpers import wait_for_app_ready
+
+if TYPE_CHECKING:
+    from textual.pilot import Pilot
+
+
+def _create_first_time_user_app(conversation_id):
+    """Create an OpenHandsApp instance for a first-time user."""
+    from openhands.sdk.security.confirmation_policy import NeverConfirm
+    from openhands_cli.tui.textual_app import OpenHandsApp
+
+    return OpenHandsApp(
+        exit_confirmation=False,
+        initial_confirmation_policy=NeverConfirm(),
+        resume_conversation_id=conversation_id,
+    )
+
+
+# =============================================================================
+# Shared pilot action helpers for reuse across tests
+# =============================================================================
+
+
+async def _wait_for_settings_page(pilot: "Pilot") -> None:
+    """Wait for app to initialize and show settings screen."""
+    await wait_for_app_ready(pilot)
+
+
+async def _cancel_settings(pilot: "Pilot") -> None:
+    """Press Escape to cancel settings and show exit modal."""
+    await wait_for_app_ready(pilot)
+    await pilot.press("escape")
+    await wait_for_app_ready(pilot)
+
+
+async def _confirm_exit(pilot: "Pilot") -> None:
+    """Click 'Yes, proceed' to confirm exit."""
+    await wait_for_app_ready(pilot)
+    await pilot.press("escape")
+    await wait_for_app_ready(pilot)
+    await pilot.click("#yes")
+    await wait_for_app_ready(pilot)
+
+
+async def _cancel_exit_return_to_settings(pilot: "Pilot") -> None:
+    """Cancel settings, then cancel exit to return to settings."""
+    await wait_for_app_ready(pilot)
+    await pilot.press("escape")
+    await wait_for_app_ready(pilot)
+    await pilot.click("#no")
+    await wait_for_app_ready(pilot)
+
+
+# =============================================================================
+# Test 1: First-time user cancels settings, then exits
+# =============================================================================
+
+
+class TestInitialSetupCancelThenExit:
+    """Test 1: First-time user cancels settings, then exits.
+
+    Flow:
+    1. User is a first time user (no agent configured yet)
+    2. User is shown settings page
+    3. User cancels and is shown the exit page
+    4. User presses the exit button and quits the app
+    """
+
+    def test_phase1_settings_page(self, snap_compare, first_time_user_setup):
+        """Phase 1: First-time user sees the settings page."""
+        app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
+        assert snap_compare(
+            app, terminal_size=(120, 40), run_before=_wait_for_settings_page
+        )
+
+    def test_phase2_exit_page(self, snap_compare, first_time_user_setup):
+        """Phase 2: User cancels and is shown the exit page."""
+        app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
+        assert snap_compare(
+            app, terminal_size=(120, 40), run_before=_cancel_settings
+        )
+
+    def test_phase3_exit_confirmed(self, snap_compare, first_time_user_setup):
+        """Phase 3: User presses the exit button and quits the app."""
+        app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
+        assert snap_compare(
+            app, terminal_size=(120, 40), run_before=_confirm_exit
+        )
+
+
+# =============================================================================
+# Test 2: First-time user cancels settings, cancels exit, returns to settings
+# =============================================================================
+
+
+class TestInitialSetupCancelThenReturn:
+    """Test 2: First-time user cancels settings, cancels exit, returns to settings.
+
+    Flow:
+    1. User is a first time user (no agent configured yet)
+    2. User is shown the settings page
+    3. User cancels and is shown the exit page
+    4. User cancels on the exit screen and is returned back to the settings page
+    """
+
+    def test_phase1_settings_page(self, snap_compare, first_time_user_setup):
+        """Phase 1: First-time user sees the settings page."""
+        app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
+        assert snap_compare(
+            app, terminal_size=(120, 40), run_before=_wait_for_settings_page
+        )
+
+    def test_phase2_exit_page(self, snap_compare, first_time_user_setup):
+        """Phase 2: User cancels and is shown the exit page."""
+        app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
+        assert snap_compare(
+            app, terminal_size=(120, 40), run_before=_cancel_settings
+        )
+
+    def test_phase3_cancel_exit(self, snap_compare, first_time_user_setup):
+        """Phase 3: User cancels on the exit screen."""
+        app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
+        assert snap_compare(
+            app, terminal_size=(120, 40), run_before=_cancel_exit_return_to_settings
+        )
+
+    def test_phase4_returned_to_settings(self, snap_compare, first_time_user_setup):
+        """Phase 4: User is returned back to the settings page."""
+        app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
+        assert snap_compare(
+            app, terminal_size=(120, 40), run_before=_cancel_exit_return_to_settings
+        )
