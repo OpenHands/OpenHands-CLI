@@ -12,7 +12,6 @@ Test 2: First-time user cancels settings, cancels exit, returns to settings
   - Phase 1: User is shown the settings page
   - Phase 2: User cancels and is shown the exit page
   - Phase 3: User cancels on the exit screen and is returned to settings page
-  - Phase 4: User is back at the settings page
 """
 
 from typing import TYPE_CHECKING
@@ -116,7 +115,7 @@ class TestInitialSetupCancelThenReturn:
     1. User is a first time user (no agent configured yet)
     2. User is shown the settings page
     3. User cancels and is shown the exit page
-    4. User cancels on the exit screen and is returned back to the settings page
+    4. User cancels on the exit screen and is returned to the settings page
     """
 
     def test_phase1_settings_page(self, snap_compare, first_time_user_setup):
@@ -131,15 +130,8 @@ class TestInitialSetupCancelThenReturn:
         app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
         assert snap_compare(app, terminal_size=(120, 40), run_before=_cancel_settings)
 
-    def test_phase3_cancel_exit(self, snap_compare, first_time_user_setup):
-        """Phase 3: User cancels on the exit screen."""
-        app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
-        assert snap_compare(
-            app, terminal_size=(120, 40), run_before=_cancel_exit_return_to_settings
-        )
-
-    def test_phase4_returned_to_settings(self, snap_compare, first_time_user_setup):
-        """Phase 4: User is returned back to the settings page."""
+    def test_phase3_returned_to_settings(self, snap_compare, first_time_user_setup):
+        """Phase 3: User cancels on exit screen and is returned to settings."""
         app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
         assert snap_compare(
             app, terminal_size=(120, 40), run_before=_cancel_exit_return_to_settings
