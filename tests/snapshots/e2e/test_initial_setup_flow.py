@@ -18,8 +18,7 @@ Test 2: First-time user cancels settings, cancels exit, fills form, saves
 
 from typing import TYPE_CHECKING
 
-from .helpers import wait_for_app_ready
-
+from .helpers import type_text, wait_for_app_ready
 
 if TYPE_CHECKING:
     from textual.pilot import Pilot
@@ -80,21 +79,21 @@ async def _fill_settings_form(pilot: "Pilot") -> None:
     # Select provider (openai)
     await pilot.click("#provider_select")
     await wait_for_app_ready(pilot)
-    await pilot.press("o", "p", "e", "n", "a", "i")  # Type to search
+    await type_text(pilot, "openai")  # Type to search
     await pilot.press("enter")
     await wait_for_app_ready(pilot)
 
     # Select model (gpt-4o-mini)
     await pilot.click("#model_select")
     await wait_for_app_ready(pilot)
-    await pilot.press("g", "p", "t", "-", "4", "o", "-", "m", "i", "n", "i")
+    await type_text(pilot, "gpt-4o-mini")
     await pilot.press("enter")
     await wait_for_app_ready(pilot)
 
     # Enter API key
     await pilot.click("#api_key_input")
     await wait_for_app_ready(pilot)
-    await pilot.press(*"sk-test-key-12345")
+    await type_text(pilot, "sk-test-key-12345")
     await wait_for_app_ready(pilot)
 
 
