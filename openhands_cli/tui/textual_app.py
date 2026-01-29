@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, ClassVar
+from typing import ClassVar
 
 from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
@@ -74,10 +74,6 @@ from openhands_cli.tui.widgets.status_line import (
 )
 from openhands_cli.user_actions.types import UserConfirmation
 from openhands_cli.utils import json_callback
-
-
-if TYPE_CHECKING:
-    pass
 
 
 class OpenHandsApp(CollapsibleNavigationMixin, App):
