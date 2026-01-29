@@ -20,7 +20,6 @@ from openhands_cli.tui.core.messages import (
     RevertSelectionRequest,
 )
 from openhands_cli.tui.modals import SwitchConversationModal
-from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
 
 if TYPE_CHECKING:
@@ -239,13 +238,8 @@ class ConversationSwitcher:
                 return
 
             # Cache miss - need to load and render.
-            # Create visualizer targeting pane's content_container.
-            def _create_visualizer():
-                return ConversationVisualizer(
-                    pane.content_container, self.app, skip_user_messages=True
-                )
-
-            visualizer = self.app.call_from_thread(_create_visualizer)
+            # Get visualizer from pane (bound to pane's container).
+            visualizer = self.app.call_from_thread(pane.get_visualizer)
 
             # Create runner (loads events from disk)
             runner = self.app.create_conversation_runner(

@@ -8,10 +8,12 @@ It creates a basic app with:
 - The splash screen content scrolls off as new messages are added
 """
 
+from __future__ import annotations
+
 import asyncio
 import uuid
 from collections.abc import Iterable
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
@@ -64,13 +66,16 @@ from openhands_cli.tui.widgets.collapsible import (
     CollapsibleNavigationMixin,
     CollapsibleTitle,
 )
-from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.tui.widgets.status_line import (
     InfoStatusLine,
     WorkingStatusLine,
 )
 from openhands_cli.user_actions.types import UserConfirmation
 from openhands_cli.utils import json_callback
+
+
+if TYPE_CHECKING:
+    from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
 
 class OpenHandsApp(CollapsibleNavigationMixin, App):
@@ -537,13 +542,15 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """
         conversation_uuid = conversation_id or self.conversation_id
 
-        # Initialize conversation runner with visualizer that can add widgets.
-        # Visualizer targets the active pane's content container (for caching).
-        # Skip user messages since we display them immediately in the UI.
-        content_container = self.get_active_content_container()
-        conversation_visualizer = visualizer or ConversationVisualizer(
-            content_container, self, skip_user_messages=True, name="OpenHands Agent"
-        )
+        # Get or create pane for this conversation.
+        # IMPORTANT: Visualizer is bound to the correct pane's container,
+        # ensuring rendered events always go to the right chat in multi-chat mode.
+        pane = self.get_or_create_pane(conversation_uuid, show_header=False)
+        if conversation_uuid != self.conversation_id:
+            # If creating a runner for a background thread, keep pane hidden.
+            pane.display = False
+
+        conversation_visualizer = visualizer or pane.get_visualizer()
 
         # Create JSON callback if in JSON mode
         event_callback = None
@@ -577,6 +584,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Process the first queued input immediately
         user_input = self.pending_inputs.pop(0)
+
+        # Ensure the active conversation pane exists so live + history rendering
+        # routes to the same container (important for future multi-session support).
+        pane = self.get_active_pane()
+        if pane is None:
+            pane = self.get_or_create_pane(self.conversation_id)
+        pane.mark_as_active()
 
         # Add the user message to the active pane's content container
         user_message_widget = Static(

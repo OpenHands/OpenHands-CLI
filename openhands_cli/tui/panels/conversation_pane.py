@@ -36,7 +36,6 @@ from openhands_cli.tui.core.messages import RenderConversationHistory
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from openhands_cli.tui.textual_app import OpenHandsApp
     from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
 
@@ -210,6 +209,24 @@ class ConversationPane(Container):
         """Check if this pane has already rendered its history."""
         return self._is_rendered
 
+    def get_visualizer(self) -> ConversationVisualizer:
+        """Get or create the visualizer for this pane.
+
+        The visualizer is bound to this pane's content container.
+        """
+        from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
+
+        if self._visualizer is None:
+            # Create visualizer targeting this pane's content container.
+            # skip_user_messages=True because we render them live in the app.
+            from openhands_cli.tui.textual_app import OpenHandsApp
+
+            app: OpenHandsApp = self.app  # type: ignore[assignment]
+            self._visualizer = ConversationVisualizer(
+                self.content_container, app, skip_user_messages=True
+            )
+        return self._visualizer
+
     def mark_as_active(self) -> None:
         """Mark pane as having active content (from live input).
 
@@ -237,18 +254,8 @@ class ConversationPane(Container):
 
         Returns the visualizer (created if not provided).
         """
-        # Create visualizer here to ensure pane is fully composed.
-        # Importing here to avoid circular imports.
-        from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
-
-        app: OpenHandsApp = self.app  # type: ignore[assignment]
-        if visualizer is None:
-            visualizer = ConversationVisualizer(
-                self.content_container, app, skip_user_messages=True
-            )
-
-        # Store visualizer for Load More functionality
-        self._visualizer = visualizer
+        # Get visualizer (use provided one or get/create our own)
+        visualizer = visualizer or self.get_visualizer()
 
         # Skip if already rendered (use cached content).
         if self._is_rendered:
