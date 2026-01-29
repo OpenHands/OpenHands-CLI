@@ -636,7 +636,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         this method checks if there's selected text and copies it to clipboard.
         """
         # Get selected text from the screen
-        selected_text = self.screen.get_selected_text()
+        # Wrap in try-except to handle edge cases where widget rendering fails
+        # during selection (e.g., concurrent widget removal, invalid screen state)
+        try:
+            selected_text = self.screen.get_selected_text()
+        except (IndexError, AttributeError, KeyError):
+            # Selection failed due to screen/widget state issues - silently ignore
+            return
         if not selected_text:
             return
 
