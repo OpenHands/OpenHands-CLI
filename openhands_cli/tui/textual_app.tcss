@@ -27,7 +27,6 @@ Screen {
 
 #splash_content {
     height: auto;
-    padding: 1;
     background: $background;
     color: $foreground;
 }

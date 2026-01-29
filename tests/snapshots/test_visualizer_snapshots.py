@@ -63,7 +63,7 @@ class VisualizerTestApp(App):
         self.plan_panel.user_dismissed = False
 
     def compose(self) -> ComposeResult:
-        with VerticalScroll(id="main_display"):
+        with VerticalScroll(id="scroll_view"):
             # User message with same styling as real CLI
             yield Static("> hi how are you", classes="user-message")
 

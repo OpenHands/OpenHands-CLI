@@ -273,6 +273,7 @@ class ConversationView(Container):
             self.elapsed_seconds = 0
         elif not new_value and old_value:
             # Stopped running
+            self._update_metrics()
             self._conversation_start_time = None
             self.post_message(ConversationFinished())
 
