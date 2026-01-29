@@ -177,6 +177,9 @@ class HistorySidePanel(Container):
         """Called when the panel is mounted."""
         self.selected_conversation_id = self.current_conversation_id
         self.refresh_content()
+        # Ensure current conversation is visible even if not yet persisted
+        if self.current_conversation_id is not None:
+            self.ensure_conversation_visible(self.current_conversation_id)
 
     # --- Message Handlers (using Textual's native message system) ---
 

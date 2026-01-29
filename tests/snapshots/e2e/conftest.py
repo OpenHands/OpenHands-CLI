@@ -33,6 +33,22 @@ FIXED_PYTHON_PATH = "/openhands/micromamba/envs/openhands/bin/python"
 FIXED_OS_DESCRIPTION = "Linux (kernel 6.0.0-test)"
 
 
+class DeterministicUUIDGenerator:
+    """Generator that returns sequential UUIDs for deterministic testing.
+
+    Starts at 2 since conversation 1 is the initial FIXED_CONVERSATION_ID.
+    """
+
+    def __init__(self, start: int = 2):
+        self._counter = start
+
+    def __call__(self) -> uuid_module.UUID:
+        """Return the next UUID in the sequence."""
+        result = uuid_module.UUID(f"00000000-0000-0000-0000-{self._counter:012d}")
+        self._counter += 1
+        return result
+
+
 @dataclass
 class E2ETestEnvironment:
     """Container for e2e test environment paths."""
@@ -112,6 +128,25 @@ def patch_deterministic_paths(monkeypatch: pytest.MonkeyPatch) -> None:
             openhands_cli.utils, "get_os_description", lambda: FIXED_OS_DESCRIPTION
         )
     except ImportError:
+        pass  # If the module doesn't exist, skip patching
+
+    # Patch the LocalFileStore.create method to use deterministic conversation IDs
+    # This ensures new conversations created via /new have predictable IDs
+    # We patch the method directly rather than uuid.uuid4 to avoid affecting
+    # other code that uses UUIDs (like event IDs)
+    try:
+        from openhands_cli.conversations.store.local import LocalFileStore
+
+        original_create = LocalFileStore.create
+        uuid_generator = DeterministicUUIDGenerator()
+
+        def patched_create(self, conversation_id: str | None = None) -> str:
+            if not conversation_id:
+                conversation_id = uuid_generator().hex
+            return original_create(self, conversation_id)
+
+        monkeypatch.setattr(LocalFileStore, "create", patched_create)
+    except (ImportError, AttributeError):
         pass  # If the module doesn't exist, skip patching
 
 
