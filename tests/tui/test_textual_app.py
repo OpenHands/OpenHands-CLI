@@ -15,7 +15,8 @@ class TestSettingsRestartNotification:
     def test_saving_settings_without_conversation_runner_no_notification(self):
         """Saving settings without conversation_runner does not show notification."""
         app = OpenHandsApp.__new__(OpenHandsApp)
-        app.conversation_runner = None
+        app.conversation_id = uuid.uuid4()
+        app.conversation_runner = None  # No runner means no notification
         app.notify = Mock()
 
         app._notify_restart_required()
@@ -25,7 +26,8 @@ class TestSettingsRestartNotification:
     def test_saving_settings_with_conversation_runner_shows_notification(self):
         """Saving settings with conversation_runner shows restart notification."""
         app = OpenHandsApp.__new__(OpenHandsApp)
-        app.conversation_runner = Mock()
+        app.conversation_id = uuid.uuid4()
+        app.conversation_runner = Mock()  # Runner exists, so notification should show
         app.notify = Mock()
 
         app._notify_restart_required()
@@ -49,9 +51,14 @@ class TestSettingsRestartNotification:
         monkeypatch.setattr(ta, "SettingsScreen", MockSettingsScreen)
 
         app = OpenHandsApp.__new__(OpenHandsApp)
+        app.conversation_id = uuid.uuid4()
         # conversation_runner exists but is not running (so settings can be opened)
-        app.conversation_runner = Mock()
-        app.conversation_runner.is_running = False
+        runner_mock = Mock()
+        runner_mock.is_running = False
+        app.conversation_runner = (
+            runner_mock  # Use direct attribute for is_running check
+        )
+
         app.push_screen = Mock()
         app._reload_visualizer = Mock()
         app.notify = Mock()
@@ -109,11 +116,10 @@ class TestConversationSwitcher:
         switcher = ConversationSwitcher(app)
         switcher._dismiss_loading = Mock()
 
-        runner = Mock()
         target_id = uuid.uuid4()
         pane = Mock()
 
-        switcher._finish_switch(runner, target_id, pane)
+        switcher._finish_switch(target_id, pane)
 
         app.input_field.focus_input.assert_called_once()
         # Verify that ConversationSwitched message was posted to app
@@ -138,7 +144,10 @@ class TestConversationSwitcher:
 
         app = Mock()
         app.conversation_id = current_id
-        app.conversation_runner = None  # No runner, so we skip the "is_running" check
+        # app.conversation_runner = None  # No runner, so we skip the "is_running" check
+        # We don't check runner state for "already active" check in switch_to
+        # Ensure get_runner returns None or not running so we reach _perform_switch
+        app.conversation_session_manager.get_runner.return_value = None
         app.notify = Mock()
 
         switcher = ConversationSwitcher(app)
@@ -156,7 +165,8 @@ class TestConversationManager:
     def test_create_new_resets_conversation(self):
         """create_new resets conversation state and posts creation message."""
         app = Mock()
-        app.conversation_runner = None
+        # app.conversation_runner = None
+        app.conversation_session_manager.get_runner.return_value = None
         app.confirmation_panel = None
         app.main_display = Mock()
         app.main_display.children = []
@@ -174,21 +184,32 @@ class TestConversationManager:
         app.post_message.assert_called_once()  # Expect ConversationCreated message
         app.notify.assert_called_once()
 
-    def test_create_new_blocked_when_running(self):
-        """create_new returns None when a conversation is running."""
+    def test_create_new_succeeds_when_running(self):
+        """create_new succeeds even when a conversation is running (multi-chat)."""
         app = Mock()
-        app.conversation_runner = Mock()
-        app.conversation_runner.is_running = True
+        # app.conversation_runner = Mock()
+        # app.conversation_runner.is_running = True
+        runner_mock = Mock()
+        runner_mock.is_running = True
+        app.conversation_session_manager.get_runner.return_value = runner_mock
         app.notify = Mock()
+        app.main_display = Mock()
+        app.main_display.children = []
+        app.query_one = Mock(return_value=Mock())
+        app.post_message = Mock()
 
         manager = ConversationManager(app, Mock())
+        # Return a valid UUID hex string
+        new_uuid = uuid.uuid4()
+        manager.store.create.return_value = new_uuid.hex  # type: ignore
 
         result = manager.create_new()
 
-        assert result is None
+        assert result == new_uuid
+        # Should notify success, not error
         app.notify.assert_called_once()
         call_kwargs = app.notify.call_args[1]
-        assert call_kwargs["severity"] == "error"
+        assert call_kwargs["severity"] == "information"
 
     def test_update_title_posts_message(self):
         """update_title posts ConversationTitleUpdated message."""

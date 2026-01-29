@@ -120,7 +120,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """
         super().__init__(**kwargs)
 
-        self.conversation_running_signal = Signal(self, "conversation_running_signal")
+        self.runner_state_signal = Signal(self, "runner_state_signal")
         self.is_ui_initialized = False
 
         # Store exit confirmation setting
@@ -221,10 +221,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def on_mount(self) -> None:
         """Called when app starts."""
-        # Subscribe to conversation running signal for auto-exit in headless mode
-        self.conversation_running_signal.subscribe(
-            self, self._on_conversation_state_changed
-        )
+        # Subscribe to runner state signal for auto-exit in headless mode
+        self.runner_state_signal.subscribe(self, self._on_runner_state_changed_signal)
 
         # Check if user has existing settings
         if SettingsScreen.is_initial_setup_required():
@@ -271,6 +269,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             on_exit_cancelled=self._show_initial_settings,
         )
         self.app.push_screen(exit_modal)
+
+    def _on_runner_state_changed_signal(self, payload: tuple[uuid.UUID, bool]) -> None:
+        """Handle runner state changes from signal."""
+        conversation_id, is_running = payload
+        # Only care about the active conversation for auto-exit/summary
+        if conversation_id == self.conversation_id:
+            self._on_conversation_state_changed(is_running)
 
     def _on_conversation_state_changed(self, is_running: bool) -> None:
         """Handle conversation state changes for auto-exit in headless mode."""
@@ -497,6 +502,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         new_pane.set_header_visible(True)
         new_pane.display = True
 
+        # Sync running state for the new conversation
+        runner = self.conversation_session_manager.get_runner(new_conversation_id)
+        is_running = runner.is_running if runner else False
+        self.runner_state_signal.publish((new_conversation_id, is_running))
+
         return new_pane
 
     def _restore_resumed_conversation(self) -> None:
@@ -559,7 +569,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         runner = ConversationRunner(
             conversation_uuid,
-            self.conversation_running_signal.publish,
+            lambda is_running: self._on_runner_state_changed(
+                conversation_uuid, is_running
+            ),
             self._handle_confirmation_request,
             lambda title, message, severity: (
                 self.notify(title=title, message=message, severity=severity)
@@ -571,6 +583,29 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self._conversation_session_manager.set_runner(conversation_uuid, runner)
 
         return runner
+
+    def _on_runner_state_changed(
+        self, conversation_id: uuid.UUID, is_running: bool
+    ) -> None:
+        """Handle state change from any runner.
+
+        Implements the Observer pattern:
+        1. Worker (Runner) notifies App about state change.
+        2. Dispatcher (App) schedules UI update on main thread via Command pattern.
+        3. Bus (Signal) publishes event to all subscribers (History, StatusLine).
+        """
+
+        # Wrap the logic in a function to be called on the main thread
+        def _update_ui():
+            # Notify observers via signal (robust observer pattern)
+            # Textual Signal.publish takes a single argument (the payload).
+            self.runner_state_signal.publish((conversation_id, is_running))
+
+            # For headless mode, check auto-exit
+            self._on_conversation_state_changed(is_running)
+
+        # Ensure all UI updates happen on the main thread
+        self.call_from_thread(_update_ui)
 
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.

@@ -19,7 +19,6 @@ from openhands_cli.tui.core.messages import (
     ConversationSwitched,
     RevertSelectionRequest,
 )
-from openhands_cli.tui.modals import SwitchConversationModal
 
 
 if TYPE_CHECKING:
@@ -63,20 +62,8 @@ class ConversationSwitcher:
             )
             return
 
-        # If an agent is currently running, confirm before switching.
-        if self.app.conversation_runner and self.app.conversation_runner.is_running:
-            self.app.push_screen(
-                SwitchConversationModal(
-                    prompt=(
-                        "The agent is still running.\n\n"
-                        "Switching conversations will pause the current run.\n"
-                        "Do you want to switch anyway?"
-                    )
-                ),
-                lambda confirmed: self._handle_confirmation(confirmed, target_id),
-            )
-            return
-
+        # With multi-chat runners, we can switch freely without pausing.
+        # The background runner will continue its work.
         self._perform_switch(target_id)
 
     def _handle_confirmation(
@@ -96,7 +83,9 @@ class ConversationSwitcher:
         self.app.input_field.disabled = True
 
         def _pause_if_running() -> None:
-            runner = self.app.conversation_runner
+            runner = self.app.conversation_session_manager.get_runner(
+                self.app.conversation_id
+            )
             if runner and runner.is_running:
                 runner.conversation.pause()
 
@@ -184,7 +173,12 @@ class ConversationSwitcher:
         # Set the conversation ID immediately
         app.conversation_id = conversation_id
         app.conversation_session_manager.set_active_conversation(conversation_id)
-        app.conversation_runner = None
+
+        # Sync conversation_runner with the session manager's cached runner.
+        # Can be None if switching to a conversation without cached runner yet.
+        app.conversation_runner = app.conversation_session_manager.get_runner(
+            conversation_id
+        )
 
         # Remove any existing confirmation panel
         if app.confirmation_panel:
@@ -196,9 +190,8 @@ class ConversationSwitcher:
 
         return pane
 
-    def _finish_switch(self, runner, target_id: uuid.UUID, pane) -> None:
+    def _finish_switch(self, target_id: uuid.UUID, pane) -> None:
         """Finalize conversation switch (runs on the UI thread)."""
-        self.app.conversation_runner = runner
         pane.scroll_to_end()
         self._dismiss_loading()
         self.app.post_message(ConversationSwitched(target_id))
@@ -232,9 +225,7 @@ class ConversationSwitcher:
             if has_full_cache and pane.is_rendered:
                 # Full cache hit! Instant switch - no disk loading.
                 # Just reuse cached runner.
-                self.app.call_from_thread(
-                    self._finish_switch, cached_runner, target_id, pane
-                )
+                self.app.call_from_thread(self._finish_switch, target_id, pane)
                 return
 
             # Cache miss - need to load and render.
@@ -244,6 +235,11 @@ class ConversationSwitcher:
             # Create runner (loads events from disk)
             runner = self.app.create_conversation_runner(
                 conversation_id=target_id, visualizer=visualizer
+            )
+
+            # Update app.conversation_runner on the main thread
+            self.app.call_from_thread(
+                lambda: setattr(self.app, "conversation_runner", runner)
             )
 
             # Get events and render (only if pane not already rendered)
@@ -257,7 +253,7 @@ class ConversationSwitcher:
                     self.app.call_from_thread(pane.render_history, events, visualizer)
 
             # Finalize on UI thread
-            self.app.call_from_thread(self._finish_switch, runner, target_id, pane)
+            self.app.call_from_thread(self._finish_switch, target_id, pane)
         except Exception as e:
             error_message = f"{type(e).__name__}: {e}"
 

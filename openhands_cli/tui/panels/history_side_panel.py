@@ -13,7 +13,7 @@ from textual.css.query import NoMatches
 from textual.widgets import Static
 
 from openhands_cli.conversations.models import ConversationMetadata
-from openhands_cli.theme import OPENHANDS_THEME
+from openhands_cli.theme import OPENHANDS_THEME, SPINNER_FRAMES, SPINNER_INTERVAL
 from openhands_cli.tui.core.messages import (
     ConversationCreated,
     ConversationSwitched,
@@ -41,6 +41,7 @@ class HistoryItem(Static):
         conversation: ConversationMetadata,
         is_current: bool,
         is_selected: bool,
+        is_running: bool,
         on_select: Callable[[str], None],
         **kwargs,
     ):
@@ -49,31 +50,69 @@ class HistoryItem(Static):
         Args:
             conversation: The conversation metadata to display
             is_current: Whether this is the currently active conversation
+            is_selected: Whether this item is selected
+            is_running: Whether the agent is currently running for this conversation
             on_select: Callback when this item is selected
         """
-        # Build the content string - show title, id as secondary
-        time_str = _format_time(conversation.created_at)
-        conv_id = _escape_rich_markup(conversation.id)
-
-        # Use title if available, otherwise use ID
-        has_title = bool(conversation.title)
-        if conversation.title:
-            title = _escape_rich_markup(_truncate(conversation.title, 100))
-            content = f"{title}\n[dim]{conv_id} • {time_str}[/dim]"
-        else:
-            content = f"[dim]New conversation[/dim]\n[dim]{conv_id} • {time_str}[/dim]"
-
-        super().__init__(content, markup=True, **kwargs)
+        super().__init__("", markup=True, **kwargs)
         self.conversation_id = conversation.id
         self._created_at = conversation.created_at
-        self._has_title = has_title
+        self._has_title = bool(conversation.title)
         self.is_current = is_current
         self.is_selected = is_selected
+        self._is_running = is_running
+        self._is_unread = False
+        self._title = conversation.title
         self._on_select = on_select
 
         # Add appropriate class for styling
         self.add_class("history-item")
         self._apply_state_classes()
+        self._update_content()
+
+    def _update_content(self) -> None:
+        """Update the displayed content."""
+        time_str = _format_time(self._created_at)
+        conv_id = _escape_rich_markup(self.conversation_id)
+
+        # Status indicator (fixed width to prevent title shift)
+        # We use a fixed width of 2 characters (symbol + space)
+        if self._is_running:
+            # Use the current spinner frame if running
+            # If no frame set yet, default to first one
+            symbol = getattr(self, "_spinner_frame", "⠋")
+            status_indicator = f"[bold white]{symbol}[/bold white] "
+        elif self._is_unread:
+            # Blue dot for unread/completed in background (using theme accent)
+            status_indicator = (
+                f"[{OPENHANDS_THEME.accent}]●[/{OPENHANDS_THEME.accent}] "
+            )
+        else:
+            # Empty space for alignment
+            status_indicator = "  "
+
+        # Padding for the second line to align with title
+        indent = "  "
+
+        # Use title if available, otherwise use ID
+        if self._title:
+            title = _escape_rich_markup(_truncate(self._title, 100))
+            content = (
+                f"{status_indicator}{title}\n{indent}[dim]{conv_id} • {time_str}[/dim]"
+            )
+        else:
+            content = (
+                f"{status_indicator}[dim]New conversation[/dim]\n"
+                f"{indent}[dim]{conv_id} • {time_str}[/dim]"
+            )
+
+        self.update(content)
+
+    def set_spinner_frame(self, frame: str) -> None:
+        """Update the spinner frame for animation."""
+        self._spinner_frame = frame
+        if self._is_running:
+            self._update_content()
 
     def _apply_state_classes(self) -> None:
         """Apply CSS classes based on current/selected state."""
@@ -98,11 +137,21 @@ class HistoryItem(Static):
 
     def set_title(self, title: str) -> None:
         """Update the displayed title for this history item."""
-        time_str = _format_time(self._created_at)
-        title_text = _escape_rich_markup(_truncate(title, 100))
-        conv_id = _escape_rich_markup(self.conversation_id)
-        self.update(f"{title_text}\n[dim]{conv_id} • {time_str}[/dim]")
+        self._title = title
         self._has_title = True
+        self._update_content()
+
+    def set_running(self, is_running: bool) -> None:
+        """Update running status."""
+        if self._is_running != is_running:
+            self._is_running = is_running
+            self._update_content()
+
+    def set_unread(self, is_unread: bool) -> None:
+        """Update unread status."""
+        if self._is_unread != is_unread:
+            self._is_unread = is_unread
+            self._update_content()
 
     def set_current(self, is_current: bool) -> None:
         """Set current flag and update styles."""
@@ -139,6 +188,16 @@ class HistorySidePanel(Container):
         self.current_conversation_id = current_conversation_id
         self.selected_conversation_id: uuid.UUID | None = None
         self._local_rows: list[ConversationMetadata] = []
+        self._unread_conversations: set[str] = set()
+
+        # Spinner state
+        self._spinner_frames = SPINNER_FRAMES
+        self._spinner_index = 0
+        self._spinner_timer = None
+
+        # Track which conversations we've seen as "running"
+        # (only these can become "unread" when they stop)
+        self._seen_running: set[str] = set()
 
     @classmethod
     def toggle(
@@ -177,8 +236,69 @@ class HistorySidePanel(Container):
         """Called when the panel is mounted."""
         self.selected_conversation_id = self.current_conversation_id
         self.refresh_content()
+        # Start spinner animation timer
+        self._spinner_timer = self.set_interval(
+            SPINNER_INTERVAL, self._animate_spinners
+        )
 
-    # --- Message Handlers (using Textual's native message system) ---
+        # Subscribe to global conversation state updates
+        self._oh_app.runner_state_signal.subscribe(self, self._on_signal_update)
+
+    def on_unmount(self) -> None:
+        """Called when the panel is unmounted."""
+        # Unsubscribe from signals to prevent leaks
+        self._oh_app.runner_state_signal.unsubscribe(self)
+
+    def _animate_spinners(self) -> None:
+        """Update spinner frames for all running conversations."""
+        # Update frame index
+        self._spinner_index = (self._spinner_index + 1) % len(self._spinner_frames)
+        current_frame = self._spinner_frames[self._spinner_index]
+
+        # Update all running items
+        list_container = self.query_one("#history-list", VerticalScroll)
+
+        for item in list_container.query(HistoryItem):
+            # Animate if running
+            if item._is_running:
+                item.set_spinner_frame(current_frame)
+
+    def _on_signal_update(self, payload: tuple[uuid.UUID, bool]) -> None:
+        """Handle signal update from App (Observer pattern).
+
+        Payload: (conversation_id, is_running)
+        """
+        conversation_id, is_running = payload
+        self.update_conversation_status(conversation_id, is_running)
+
+    def update_conversation_status(
+        self, conversation_id: uuid.UUID, is_running: bool
+    ) -> None:
+        """Update the running status of a conversation item."""
+        conv_hex = conversation_id.hex
+
+        if is_running:
+            # Track that we've seen this conversation running
+            self._seen_running.add(conv_hex)
+            # Running conversations are not "unread"
+            self._unread_conversations.discard(conv_hex)
+        else:
+            # Only mark as unread if:
+            # 1. We've seen it running before (it actually finished, not just loaded)
+            # 2. It's not the current conversation
+            if (
+                conv_hex in self._seen_running
+                and conversation_id != self.current_conversation_id
+            ):
+                self._unread_conversations.add(conv_hex)
+
+        list_container = self.query_one("#history-list", VerticalScroll)
+        for item in list_container.query(HistoryItem):
+            if item.conversation_id == conv_hex:
+                item.set_running(is_running)
+                # Sync unread status with the set
+                item.set_unread(conv_hex in self._unread_conversations)
+                break
 
     @on(ConversationCreated)
     def _on_conversation_created(self, event: ConversationCreated) -> None:
@@ -189,7 +309,7 @@ class HistorySidePanel(Container):
 
     @on(ConversationSwitched)
     def _on_conversation_switched(self, event: ConversationSwitched) -> None:
-        """Handle message: current conversation changed."""
+        """Handle message: active conversation changed."""
         self.set_current_conversation(event.conversation_id)
 
     @on(ConversationTitleUpdated)
@@ -238,14 +358,29 @@ class HistorySidePanel(Container):
         for conv in self._local_rows:
             is_current = conv.id == current_id_str
             is_selected = conv.id == selected_id_str and selected_id_str is not None
-            list_container.mount(
-                HistoryItem(
-                    conversation=conv,
-                    is_current=is_current,
-                    is_selected=is_selected,
-                    on_select=self._handle_select,
-                )
+
+            # Check running status
+            is_running = False
+            try:
+                conv_uuid = uuid.UUID(conv.id)
+                runner = self._oh_app.conversation_session_manager.get_runner(conv_uuid)
+                if runner and runner.is_running:
+                    is_running = True
+            except ValueError:
+                pass
+
+            item = HistoryItem(
+                conversation=conv,
+                is_current=is_current,
+                is_selected=is_selected,
+                is_running=is_running,
+                on_select=self._handle_select,
             )
+            # Restore unread status if tracked
+            if conv.id in self._unread_conversations:
+                item.set_unread(True)
+
+            list_container.mount(item)
 
     def _handle_select(self, conversation_id: str) -> None:
         """Handle conversation selection."""
@@ -272,6 +407,18 @@ class HistorySidePanel(Container):
         """Set current conversation and update highlights in-place."""
         self.current_conversation_id = conversation_id
         self.selected_conversation_id = None
+
+        # Clear unread status when switching to this conversation
+        conv_hex = conversation_id.hex
+        if conv_hex in self._unread_conversations:
+            self._unread_conversations.discard(conv_hex)
+            # Update the item's visual state
+            list_container = self.query_one("#history-list", VerticalScroll)
+            for item in list_container.query(HistoryItem):
+                if item.conversation_id == conv_hex:
+                    item.set_unread(False)
+                    break
+
         self._update_highlights()
 
     def select_current_conversation(self) -> None:

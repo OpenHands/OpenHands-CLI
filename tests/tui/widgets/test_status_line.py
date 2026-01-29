@@ -1,4 +1,5 @@
 import types
+import uuid
 from unittest.mock import MagicMock
 
 import pytest
@@ -17,14 +18,19 @@ from openhands_cli.utils import abbreviate_number, format_cost
 def dummy_app() -> object:
     """Minimal 'app' object to satisfy the widgets' expectations."""
     app = types.SimpleNamespace()
+    app.conversation_id = uuid.uuid4()
     # For WorkingStatusLine
-    app.conversation_running_signal = types.SimpleNamespace(subscribe=MagicMock())
+    app.runner_state_signal = types.SimpleNamespace(
+        subscribe=MagicMock(), unsubscribe=MagicMock()
+    )
     # For InfoStatusLine
     app.input_field = types.SimpleNamespace(
-        mutliline_mode_status=types.SimpleNamespace(subscribe=MagicMock())
+        multiline_mode_status=types.SimpleNamespace(
+            subscribe=MagicMock(), unsubscribe=MagicMock()
+        )
     )
     # For metrics display
-    app.conversation_runner = None
+    app.conversation_session_manager = types.SimpleNamespace(get_runner=MagicMock())
     return app
 
 
@@ -43,7 +49,7 @@ def test_conversation_start_sets_timer_and_flags(dummy_app, monkeypatch):
     assert widget._timer is None
     assert widget._is_working is False
 
-    widget._on_conversation_state_changed(True)
+    widget._on_runner_state_changed((dummy_app.conversation_id, True))
 
     assert widget._is_working is True
     assert widget._conversation_start_time is not None
@@ -63,7 +69,7 @@ def test_conversation_stop_stops_timer_and_clears_state(dummy_app, monkeypatch):
     update_text_mock = MagicMock()
     monkeypatch.setattr(widget, "_update_text", update_text_mock)
 
-    widget._on_conversation_state_changed(False)
+    widget._on_runner_state_changed((dummy_app.conversation_id, False))
 
     assert widget._is_working is False
     assert widget._conversation_start_time is None
@@ -354,7 +360,7 @@ def test_conversation_state_changed_starts_metrics_timer(dummy_app, monkeypatch)
 
     assert widget._metrics_update_timer is None
 
-    widget._on_conversation_state_changed(True)
+    widget._on_runner_state_changed((dummy_app.conversation_id, True))
 
     set_interval_mock.assert_called_once()
     assert widget._metrics_update_timer is fake_timer
@@ -370,7 +376,7 @@ def test_conversation_state_changed_stops_metrics_timer(dummy_app, monkeypatch):
     update_metrics_mock = MagicMock()
     monkeypatch.setattr(widget, "_update_metrics", update_metrics_mock)
 
-    widget._on_conversation_state_changed(False)
+    widget._on_runner_state_changed((dummy_app.conversation_id, False))
 
     fake_timer.stop.assert_called_once()
     assert widget._metrics_update_timer is None
@@ -409,7 +415,7 @@ def test_update_metrics_gets_all_metrics_from_conversation_runner(
     mock_runner = MagicMock()
     mock_runner.visualizer = mock_visualizer
 
-    dummy_app.conversation_runner = mock_runner
+    dummy_app.conversation_session_manager.get_runner.return_value = mock_runner
 
     update_text_mock = MagicMock()
     monkeypatch.setattr(widget, "_update_text", update_text_mock)
@@ -427,6 +433,7 @@ def test_update_metrics_gets_all_metrics_from_conversation_runner(
 
 def test_update_metrics_handles_no_conversation_runner(dummy_app, monkeypatch):
     """_update_metrics handles case when conversation runner is None."""
+    dummy_app.conversation_session_manager.get_runner.return_value = None
     widget = InfoStatusLine(app=dummy_app)
     widget._accumulated_cost = 0.0
     widget._input_tokens = 0
@@ -452,7 +459,7 @@ def test_update_metrics_handles_no_stats(dummy_app, monkeypatch):
     mock_runner = MagicMock()
     mock_runner.visualizer = mock_visualizer
 
-    dummy_app.conversation_runner = mock_runner
+    dummy_app.conversation_session_manager.get_runner.return_value = mock_runner
 
     update_text_mock = MagicMock()
     monkeypatch.setattr(widget, "_update_text", update_text_mock)
@@ -488,7 +495,7 @@ def test_update_metrics_handles_zero_prompt_tokens(dummy_app, monkeypatch):
     mock_runner = MagicMock()
     mock_runner.visualizer = mock_visualizer
 
-    dummy_app.conversation_runner = mock_runner
+    dummy_app.conversation_session_manager.get_runner.return_value = mock_runner
 
     update_text_mock = MagicMock()
     monkeypatch.setattr(widget, "_update_text", update_text_mock)

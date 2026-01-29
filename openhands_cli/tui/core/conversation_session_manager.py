@@ -6,6 +6,7 @@ Supports multiple concurrent sessions for multi-thread chat support.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -24,16 +25,18 @@ class ConversationSession:
     conversation_id: uuid.UUID
     runner: ConversationRunner | None = None
     pane: ConversationPane | None = None
+    task: asyncio.Task | None = None
 
 
 class ConversationSessionManager:
-    """Manages conversation sessions with pane caching.
+    """Manages conversation sessions with pane caching (Single Source of Truth).
 
     Each visited conversation gets its own session with:
     - ConversationRunner (agent interaction)
+    - asyncio.Task (background execution)
     - ConversationPane (cached UI with rendered content)
 
-    Pane caching enables instant switching between conversations
+    Pane caching (Flyweight pattern) enables instant switching between conversations
     without reloading events from disk.
     """
 
@@ -70,11 +73,15 @@ class ConversationSessionManager:
         self.get_or_create_session(conversation_id)
 
     def set_runner(
-        self, conversation_id: uuid.UUID, runner: ConversationRunner | None
+        self,
+        conversation_id: uuid.UUID,
+        runner: ConversationRunner | None,
+        task: asyncio.Task | None = None,
     ) -> None:
-        """Set the runner for a conversation."""
+        """Set the runner and optional background task for a conversation."""
         session = self.get_or_create_session(conversation_id)
         session.runner = runner
+        session.task = task
 
     def set_pane(
         self, conversation_id: uuid.UUID, pane: ConversationPane | None
@@ -97,9 +104,25 @@ class ConversationSessionManager:
         session = self._sessions.get(conversation_id)
         return session.runner if session else None
 
+    def get_task(self, conversation_id: uuid.UUID) -> asyncio.Task | None:
+        """Get background task for a conversation (None if not cached)."""
+        session = self._sessions.get(conversation_id)
+        return session.task if session else None
+
     def has_cached_session(self, conversation_id: uuid.UUID) -> bool:
         """Check if conversation has both cached pane and runner."""
         session = self._sessions.get(conversation_id)
         if not session:
             return False
         return session.pane is not None and session.runner is not None
+
+    async def close_all(self) -> None:
+        """Cancel all running tasks and clear sessions."""
+        for session in self._sessions.values():
+            if session.task and not session.task.done():
+                session.task.cancel()
+                try:
+                    await session.task
+                except asyncio.CancelledError:
+                    pass
+        self._sessions.clear()

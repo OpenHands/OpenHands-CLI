@@ -490,11 +490,11 @@ class TestOpenHandsAppCommands:
             )
 
     @pytest.mark.asyncio
-    async def test_new_command_blocked_when_conversation_running(
+    async def test_new_command_succeeds_when_conversation_running(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """`/new` should show warning when a conversation is running."""
+        """`/new` should succeed even when a conversation is running (multi-runner)."""
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
@@ -514,20 +514,21 @@ class TestOpenHandsAppCommands:
             # Store the original conversation ID
             original_conversation_id = oh_app.conversation_id
 
-            # Mock notify to verify warning is shown
+            # Mock notify to verify success notification is shown
             notify_mock = mock.MagicMock()
             oh_app.notify = notify_mock
 
             oh_app._handle_command("/new")
 
-            # Verify conversation ID was NOT changed
-            assert oh_app.conversation_id == original_conversation_id
+            # With multi-runner support, /new should succeed
+            # Verify conversation ID WAS changed
+            assert oh_app.conversation_id != original_conversation_id
 
-            # Verify error notification was shown
+            # Verify success notification was shown
             notify_mock.assert_called_once()
             call_args = notify_mock.call_args
-            assert call_args[1]["title"] == "New Conversation Error"
-            assert call_args[1]["severity"] == "error"
+            assert call_args[1]["title"] == "New Conversation"
+            assert call_args[1]["severity"] == "information"
 
     @pytest.mark.asyncio
     async def test_new_command_hides_conversation_panes(
@@ -744,11 +745,11 @@ class TestOpenHandsAppCommands:
             assert switch_calls[0] == conv2_id
 
     @pytest.mark.asyncio
-    async def test_history_switch_shows_modal_when_agent_running(
+    async def test_history_switch_works_when_agent_running(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Switching conversation while agent is running should show modal."""
+        """Switching conversation while agent is running should work (multi-runner)."""
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
@@ -776,8 +777,10 @@ class TestOpenHandsAppCommands:
             dummy_runner.is_running = True
             oh_app.conversation_runner = dummy_runner
 
+            # With multi-runner support, switching should work without modal
             oh_app._conversation_manager.switch_to(target_id)
             await pilot.pause()
 
+            # Should NOT show a modal (multi-runner allows background running)
             top_screen = oh_app.screen_stack[-1]
-            assert isinstance(top_screen, SwitchConversationModal)
+            assert not isinstance(top_screen, SwitchConversationModal)

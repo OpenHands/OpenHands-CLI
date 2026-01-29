@@ -63,15 +63,9 @@ class ConversationManager:
         """
         app = self.app
 
-        # Check if a conversation is currently running
-        if app.conversation_runner and app.conversation_runner.is_running:
-            app.notify(
-                title="New Conversation Error",
-                message="Cannot start a new conversation while one is running. "
-                "Please wait for the current conversation to complete or pause it.",
-                severity="error",
-            )
-            return None
+        # With multi-runner support, we can start a new conversation
+        # even if the current one is running. The current one will continue
+        # in the background.
 
         # Create a new conversation via store
         new_id_str = self.store.create()
@@ -80,9 +74,6 @@ class ConversationManager:
         # Update active conversation
         app.conversation_id = new_id
         app.conversation_session_manager.set_active_conversation(new_id)
-
-        # Reset the conversation runner
-        app.conversation_runner = None
 
         # Remove any existing confirmation panel
         if app.confirmation_panel:
