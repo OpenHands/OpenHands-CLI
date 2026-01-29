@@ -14,21 +14,19 @@ Widget Hierarchy:
     ├── ScrollableContent(VerticalScroll, #scroll_view)
     │   ├── SplashContent(#splash_content)
     │   └── ... dynamically added conversation widgets
-    └── InputAreaContainer(#input_area)  ← docked to bottom, handles messages
+    └── InputAreaContainer(#input_area)  ← docked to bottom
         ├── WorkingStatusLine
         ├── InputField
         └── InfoStatusLine
 
 Message Flow:
-    InputField → InputAreaContainer → ConversationView
-    - UserInputSubmitted: InputAreaContainer renders, posts ProcessUserInput
+    InputField → ConversationView
+    - UserInputSubmitted: ConversationView renders and processes with runner
     - SlashCommandSubmitted: InputAreaContainer executes commands
-    - ProcessUserInput: ConversationView processes with runner
     - NewConversationRequested: ConversationView handles /new command
 """
 
 import logging
-import threading
 import time
 import uuid
 from typing import TYPE_CHECKING, Any
@@ -44,7 +42,7 @@ from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
     NeverConfirm,
 )
-from openhands_cli.tui.messages import NewConversationRequested, ProcessUserInput
+from openhands_cli.tui.messages import NewConversationRequested, UserInputSubmitted
 
 
 if TYPE_CHECKING:
@@ -146,7 +144,6 @@ class ConversationView(Container):
         self._conversation_start_time: float | None = None
         self._conversation: BaseConversation | None = None
         self._timer = None
-        self._main_thread_id = threading.current_thread().ident
 
         # ConversationRunner - lazy initialized on first use
         self._conversation_runner: ConversationRunner | None = None
@@ -242,7 +239,6 @@ class ConversationView(Container):
 
     def on_mount(self) -> None:
         """Start the elapsed time timer."""
-        self._main_thread_id = threading.current_thread().ident
         self._timer = self.set_interval(1.0, self._update_elapsed)
 
     def on_unmount(self) -> None:
@@ -287,25 +283,22 @@ class ConversationView(Container):
 
     # ---- Thread-Safe State Update Methods ----
 
-    def _is_main_thread(self) -> bool:
-        """Check if we're on the main thread."""
-        return threading.current_thread().ident == self._main_thread_id
-
     def _schedule_update(self, attr: str, value: Any) -> None:
         """Schedule a state update, handling cross-thread calls.
 
-        Uses threading.current_thread() for reliable thread detection
-        instead of exception-based control flow.
+        Uses Textual's call_from_thread() for thread safety. If already on
+        the main thread, call_from_thread() raises RuntimeError, so we
+        catch that and do the update directly.
         """
 
         def do_update() -> None:
             setattr(self, attr, value)
 
-        if self._is_main_thread():
-            do_update()
-        else:
-            # We're in a background thread, schedule on main thread
+        try:
             self.app.call_from_thread(do_update)
+        except RuntimeError:
+            # Already on main thread - do update directly
+            do_update()
 
     def set_running(self, value: bool) -> None:
         """Set the running state. Thread-safe."""
@@ -512,21 +505,32 @@ class ConversationView(Container):
             severity="information",
         )
 
-    @on(ProcessUserInput)
-    async def _on_process_user_input(self, event: ProcessUserInput) -> None:
-        """Handle user input processing request.
+    @on(UserInputSubmitted)
+    async def _on_user_input_submitted(self, event: UserInputSubmitted) -> None:
+        """Handle user input by rendering it and processing with the runner.
 
-        This is triggered after rendering the user message.
-        ConversationView owns the ConversationRunner, so it handles processing.
+        ConversationView handles both rendering and processing since it owns
+        both the scroll view and the ConversationRunner.
         """
+        from textual.widgets import Static
+
         event.stop()
+
+        # Render the user message in the scrollable content area
+        user_message_widget = Static(
+            f"> {event.content}", classes="user-message", markup=False
+        )
+        await self.scroll_view.mount(user_message_widget)
+        self.scroll_view.scroll_end(animate=False)
+
+        # Process the message
         await self.process_user_input(event.content)
 
     async def process_user_input(self, content: str) -> None:
         """Process user input with the conversation runner.
 
         This method can be called:
-        - Via ProcessUserInput message (from ConversationView for typed inputs)
+        - Via UserInputSubmitted message (for typed inputs)
         - Directly by App (for queued inputs from --task/--file)
 
         Args:

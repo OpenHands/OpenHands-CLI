@@ -2,7 +2,7 @@
 
 This is the main Textual application for the OpenHands CLI. The architecture
 separates concerns between App (shell/navigation), ConversationView (state/lifecycle),
-and InputAreaContainer (input handling/content rendering).
+and InputAreaContainer (slash command handling).
 
 Widget Hierarchy::
 
@@ -12,22 +12,21 @@ Widget Hierarchy::
             ├── ScrollableContent(#scroll_view)  ← Scrollable conversation content
             │   ├── SplashContent(#splash_content) ← data_bind to conversation_id
             │   └── ... conversation widgets (dynamically added)
-            └── InputAreaContainer(#input_area)  ← docked to bottom, handles messages
+            └── InputAreaContainer(#input_area)  ← docked to bottom
                 ├── WorkingStatusLine (data_bind)
                 ├── InputField          ← Posts messages
                 └── InfoStatusLine (data_bind)
     └── Footer
 
 Message Flow:
-    InputField → InputAreaContainer → ConversationView
-        - UserInputSubmitted: InputAreaContainer renders, posts ProcessUserInput
+    InputField → ConversationView
+        - UserInputSubmitted: ConversationView renders and processes with runner
         - SlashCommandSubmitted: InputAreaContainer executes command (stops bubbling)
-        - ProcessUserInput: ConversationView processes with runner
         - NewConversationRequested: ConversationView handles /new command
 
 Responsibilities:
-    - InputAreaContainer: Input handling, command execution, content rendering
-    - ConversationView: State management, ConversationRunner lifecycle
+    - InputAreaContainer: Slash command execution
+    - ConversationView: State management, ConversationRunner lifecycle, content rendering
     - ScrollableContent: Scrollable container for splash + conversation widgets
     - OpenHandsApp: Screen/modal management, side panels, global key bindings
     - SplashContent: Displays splash screen, auto-updates via conversation_id binding

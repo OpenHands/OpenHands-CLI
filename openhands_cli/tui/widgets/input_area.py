@@ -2,7 +2,6 @@
 
 This container is docked to the bottom of ConversationView (as a sibling of
 ScrollableContent) and handles:
-- UserInputSubmitted: Renders user message to scroll_view, posts ProcessUserInput
 - SlashCommandSubmitted: Executes slash commands
 - Clearing scroll_view content when conversation_id changes
 
@@ -14,6 +13,7 @@ Widget Hierarchy:
         ├── InputField  ← posts messages
         └── InfoStatusLine
 
+Note: UserInputSubmitted bubbles up to ConversationView for rendering and processing.
 The child widgets are composed by ConversationView (not this container) to enable
 data_bind() to work properly.
 """
@@ -25,14 +25,11 @@ from typing import TYPE_CHECKING
 from textual import on
 from textual.containers import Container
 from textual.reactive import var
-from textual.widgets import Static
 
 from openhands_cli.tui.core.commands import show_help
 from openhands_cli.tui.messages import (
     NewConversationRequested,
-    ProcessUserInput,
     SlashCommandSubmitted,
-    UserInputSubmitted,
 )
 
 
@@ -41,12 +38,14 @@ if TYPE_CHECKING:
 
 
 class InputAreaContainer(Container):
-    """Container for the input area that handles user input and commands.
+    """Container for the input area that handles slash commands.
 
     InputAreaContainer is responsible for:
-    - Rendering user messages (UserInputSubmitted) to sibling scroll_view
     - Executing slash commands (SlashCommandSubmitted)
     - Clearing scroll_view content when conversation_id changes
+
+    Note: UserInputSubmitted bubbles up to ConversationView for rendering
+    and processing.
 
     It delegates to self.app for:
     - Conversation runner management (owned by ConversationView)
@@ -97,27 +96,6 @@ class InputAreaContainer(Container):
 
         # Scroll to top to show splash screen
         scroll_view.scroll_home(animate=False)
-
-    @on(UserInputSubmitted)
-    async def _on_user_input_submitted(self, event: UserInputSubmitted) -> None:
-        """Handle user input by rendering it and posting for processing.
-
-        Flow:
-        1. Stop event propagation
-        2. Render the user message in the scroll view
-        3. Post ProcessUserInput to ConversationView for agent processing
-        """
-        event.stop()
-
-        # Render the user message in the scrollable content area
-        user_message_widget = Static(
-            f"> {event.content}", classes="user-message", markup=False
-        )
-        await self.scroll_view.mount(user_message_widget)
-        self.scroll_view.scroll_end(animate=False)
-
-        # Post to ConversationView for processing with the runner
-        self.post_message(ProcessUserInput(content=event.content))
 
     @on(SlashCommandSubmitted)
     def _on_slash_command_submitted(self, event: SlashCommandSubmitted) -> None:

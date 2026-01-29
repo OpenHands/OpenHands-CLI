@@ -7,10 +7,9 @@ from child to parent, allowing ancestor widgets to handle them.
 Message Flow:
     InputField
         ↓
-    InputAreaContainer ← Handles UserInputSubmitted (renders, posts ProcessUserInput)
-                       ← Handles SlashCommandSubmitted (executes commands)
+    InputAreaContainer ← Handles SlashCommandSubmitted (executes commands)
         ↓
-    ConversationView   ← Handles ProcessUserInput (processes with runner)
+    ConversationView   ← Handles UserInputSubmitted (renders and processes)
                        ← Handles NewConversationRequested
         ↓
     OpenHandsApp       ← Handles app-level concerns (modals, notifications)
@@ -24,8 +23,8 @@ from textual.message import Message
 class UserInputSubmitted(Message):
     """Message sent when user submits regular text input.
 
-    This message is handled by ConversationView to render the user message
-    and process it with the conversation runner.
+    This message bubbles up to ConversationView which renders the user message
+    and processes it with the conversation runner.
     """
 
     content: str
@@ -35,7 +34,7 @@ class UserInputSubmitted(Message):
 class SlashCommandSubmitted(Message):
     """Message sent when user submits a slash command.
 
-    This message is handled by ConversationView for command execution.
+    This message is handled by InputAreaContainer for command execution.
     """
 
     command: str
@@ -55,15 +54,3 @@ class NewConversationRequested(Message):
     """
 
     pass
-
-
-@dataclass
-class ProcessUserInput(Message):
-    """Message sent when user input needs to be processed by the agent.
-
-    This message is handled by ConversationView which owns the ConversationRunner.
-    Note: This is now largely superseded by UserInputSubmitted which handles
-    both rendering and processing in ConversationView.
-    """
-
-    content: str
