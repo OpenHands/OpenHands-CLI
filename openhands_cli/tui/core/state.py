@@ -190,7 +190,10 @@ class ConversationView(Container):
         from openhands_cli.tui.widgets.user_input.input_field import InputField
 
         # ScrollableContent holds splash and dynamically added widgets
-        with ScrollableContent(id="scroll_view"):
+        # - conversation_id is bound to clear content on conversation change
+        with ScrollableContent(id="scroll_view").data_bind(
+            conversation_id=ConversationView.conversation_id,
+        ):
             # SplashContent contains all splash widgets
             # - conversation_id is bound reactively for conversation switching
             # - initialize() is called by OpenHandsApp for one-time setup
@@ -199,11 +202,8 @@ class ConversationView(Container):
             )
 
         # Input area docked to bottom (sibling of scroll_view)
-        # - conversation_id is bound to clear scroll_view content on change
-        # - Handles UserInputSubmitted and SlashCommandSubmitted
-        with InputAreaContainer(id="input_area").data_bind(
-            conversation_id=ConversationView.conversation_id,
-        ):
+        # - Handles SlashCommandSubmitted
+        with InputAreaContainer(id="input_area"):
             # Status lines and input field with data_bind
             yield WorkingStatusLine().data_bind(
                 running=ConversationView.running,
@@ -460,7 +460,7 @@ class ConversationView(Container):
         1. Checks if a conversation is running
         2. Creates a new conversation ID
         3. Resets state
-        4. Sets new conversation_id (watch_conversation_id clears content)
+        4. Sets new conversation_id (ScrollableContent clears content)
         5. Notifies the user
         """
         event.stop()
@@ -489,7 +489,7 @@ class ConversationView(Container):
         self.reset_conversation_state()
 
         # Set new conversation ID - triggers:
-        # - watch_conversation_id() clears dynamic content
+        # - ScrollableContent.watch_conversation_id() clears dynamic content
         # - SplashContent.watch_conversation_id() re-renders
         self.conversation_id = new_id
 

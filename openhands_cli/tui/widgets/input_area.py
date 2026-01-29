@@ -1,9 +1,7 @@
 """Input area container for status lines and input field.
 
 This container is docked to the bottom of ConversationView (as a sibling of
-ScrollableContent) and handles:
-- SlashCommandSubmitted: Executes slash commands
-- Clearing scroll_view content when conversation_id changes
+ScrollableContent) and handles slash command execution.
 
 Widget Hierarchy:
     ConversationView(#conversation_view)
@@ -19,12 +17,10 @@ data_bind() to work properly.
 """
 
 import asyncio
-import uuid
 from typing import TYPE_CHECKING
 
 from textual import on
 from textual.containers import Container
-from textual.reactive import var
 
 from openhands_cli.tui.core.commands import show_help
 from openhands_cli.tui.messages import (
@@ -40,9 +36,8 @@ if TYPE_CHECKING:
 class InputAreaContainer(Container):
     """Container for the input area that handles slash commands.
 
-    InputAreaContainer is responsible for:
-    - Executing slash commands (SlashCommandSubmitted)
-    - Clearing scroll_view content when conversation_id changes
+    InputAreaContainer is responsible for executing slash commands
+    (SlashCommandSubmitted).
 
     Note: UserInputSubmitted bubbles up to ConversationView for rendering
     and processing.
@@ -52,13 +47,7 @@ class InputAreaContainer(Container):
     - Screen/modal pushing (exit, confirm, settings)
     - Side panel toggling (history)
     - Notifications
-
-    Reactive Properties (via data_bind from ConversationView):
-    - conversation_id: Current conversation ID (clears content on change)
     """
-
-    # Reactive property bound via data_bind() to ConversationView
-    conversation_id: var[uuid.UUID] = var(uuid.uuid4)
 
     @property
     def scroll_view(self) -> "ScrollableContent":
@@ -68,34 +57,6 @@ class InputAreaContainer(Container):
         # scroll_view is a sibling - query from parent (ConversationView)
         assert self.parent is not None, "InputAreaContainer must have a parent"
         return self.parent.query_one("#scroll_view", ScrollableContent)
-
-    def watch_conversation_id(self, old_id: uuid.UUID, new_id: uuid.UUID) -> None:
-        """Clear dynamic content when conversation changes.
-
-        When conversation_id changes, removes all dynamically added widgets
-        (user messages, agent responses, etc.) while preserving:
-        - SplashContent (#splash_content) - re-renders via its own binding
-        """
-        if old_id == new_id:
-            return
-
-        # Don't try to clear content if we're not mounted yet
-        if not self.is_mounted:
-            return
-
-        try:
-            scroll_view = self.scroll_view
-        except Exception:
-            # scroll_view might not exist yet during initialization
-            return
-
-        # Remove all children from scroll_view except splash_content
-        for widget in list(scroll_view.children):
-            if widget.id != "splash_content":
-                widget.remove()
-
-        # Scroll to top to show splash screen
-        scroll_view.scroll_home(animate=False)
 
     @on(SlashCommandSubmitted)
     def _on_slash_command_submitted(self, event: SlashCommandSubmitted) -> None:

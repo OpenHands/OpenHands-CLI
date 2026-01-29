@@ -172,7 +172,7 @@ class ConversationSwitcher:
         app = self.app
 
         # Set the conversation ID - triggers reactive updates:
-        # - ConversationView.watch_conversation_id() clears dynamic content
+        # - ScrollableContent.watch_conversation_id() clears dynamic content
         # - SplashContent.watch_conversation_id() re-renders
         app.conversation_id = conversation_id
         app.conversation_runner = None
