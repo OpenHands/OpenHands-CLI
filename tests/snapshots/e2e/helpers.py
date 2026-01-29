@@ -7,9 +7,26 @@ repeated pilot.pause() calls.
 import asyncio
 from typing import TYPE_CHECKING
 
+from textual.widgets import TextArea
+
 
 if TYPE_CHECKING:
     from textual.pilot import Pilot
+
+
+def disable_cursor_blink(pilot: "Pilot") -> None:
+    """Disable cursor blinking on all TextArea widgets for deterministic snapshots.
+
+    The cursor blink state varies depending on timing, causing flaky snapshot tests.
+    This function finds all TextArea widgets and disables blinking while keeping
+    the cursor visible.
+
+    Args:
+        pilot: The Textual pilot instance
+    """
+    for widget in pilot.app.query(TextArea):
+        widget.cursor_blink = False
+        widget._cursor_visible = True
 
 
 async def wait_for_app_ready(pilot: "Pilot") -> None:
@@ -22,6 +39,8 @@ async def wait_for_app_ready(pilot: "Pilot") -> None:
         pilot: The Textual pilot instance
     """
     await pilot.wait_for_scheduled_animations()
+    # Disable cursor blinking for deterministic snapshots
+    disable_cursor_blink(pilot)
 
 
 async def wait_for_idle(pilot: "Pilot", timeout: float = 30.0) -> None:

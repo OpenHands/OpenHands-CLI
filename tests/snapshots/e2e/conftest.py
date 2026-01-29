@@ -28,6 +28,10 @@ FIXED_CONVERSATION_ID = uuid_module.UUID("00000000-0000-0000-0000-000000000001")
 # Fixed Python interpreter path for deterministic snapshots
 FIXED_PYTHON_PATH = "/openhands/micromamba/envs/openhands/bin/python"
 
+# Fixed OS description for deterministic snapshots
+# (kernel version varies between environments)
+FIXED_OS_DESCRIPTION = "Linux (kernel 6.0.0-test)"
+
 
 @dataclass
 class E2ETestEnvironment:
@@ -95,6 +99,18 @@ def patch_deterministic_paths(monkeypatch: pytest.MonkeyPatch) -> None:
             return result
 
         monkeypatch.setattr(CmdOutputMetadata, "from_ps1_match", patched_from_ps1_match)
+    except ImportError:
+        pass  # If the module doesn't exist, skip patching
+
+    # Patch get_os_description to return a fixed value
+    # The kernel version varies between environments (CI vs local, different runners)
+    # which causes snapshot mismatches
+    try:
+        import openhands_cli.utils
+
+        monkeypatch.setattr(
+            openhands_cli.utils, "get_os_description", lambda: FIXED_OS_DESCRIPTION
+        )
     except ImportError:
         pass  # If the module doesn't exist, skip patching
 
