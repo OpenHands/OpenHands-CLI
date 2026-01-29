@@ -362,7 +362,7 @@ class TestHeadlessRunnerOutput:
             runner = ConversationRunner(
                 conversation_id=uuid.uuid4(),
                 running_state_callback=Mock(),
-                confirmation_callback=Mock(),
+                app=Mock(),  # Pass app instead of confirmation_callback
                 notification_callback=Mock(),
                 visualizer=Mock(),
             )
@@ -431,7 +431,7 @@ class TestConversationSummary:
             runner = ConversationRunner(
                 conversation_id=uuid.uuid4(),
                 running_state_callback=Mock(),
-                confirmation_callback=Mock(),
+                app=Mock(),  # Pass app instead of confirmation_callback
                 notification_callback=Mock(),
                 visualizer=Mock(),
             )
@@ -452,7 +452,7 @@ class TestConversationSummary:
             runner = ConversationRunner(
                 conversation_id=uuid.uuid4(),
                 running_state_callback=Mock(),
-                confirmation_callback=Mock(),
+                app=Mock(),  # Pass app instead of confirmation_callback
                 notification_callback=Mock(),
                 visualizer=Mock(),
             )

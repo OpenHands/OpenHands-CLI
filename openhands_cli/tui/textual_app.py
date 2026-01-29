@@ -41,6 +41,8 @@ from openhands_cli.tui.core.commands import is_valid_command, show_help
 from openhands_cli.tui.core.conversation_manager import ConversationManager
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.core.messages import (
+    ConfirmationNeeded,
+    ConfirmationProvided,
     ConversationCreated,
     ConversationSwitched,
     ConversationTitleUpdated,
@@ -456,7 +458,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         runner = ConversationRunner(
             conversation_uuid,
             self.conversation_running_signal.publish,
-            self._handle_confirmation_request,
+            self,  # Pass app for posting messages
             lambda title, message, severity: (
                 self.notify(title=title, message=message, severity=severity)
             ),
@@ -550,6 +552,16 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # If History panel is open, update "New conversation" title immediately
         # on the first message (without waiting for persistence on disk).
         self._conversation_manager.update_title(user_message)
+
+        # Block new messages while waiting for confirmation
+        if self.conversation_runner.is_waiting_for_confirmation:
+            self.notify(
+                title="Confirmation Required",
+                message="Please confirm or reject the pending action before "
+                "sending a new message.",
+                severity="warning",
+            )
+            return
 
         # Show that we're processing the message
         if self.conversation_runner.is_running:
@@ -837,70 +849,84 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """Handle request from history panel to switch conversations."""
         self._conversation_manager.switch_to(event.conversation_id)
 
-    def _handle_confirmation_request(
-        self, pending_actions: list[ActionEvent]
-    ) -> UserConfirmation:
-        """Handle confirmation request by showing an inline panel in the main display.
+    @on(ConfirmationNeeded)
+    def _on_confirmation_needed(self, event: ConfirmationNeeded) -> None:
+        """Handle ConfirmationNeeded message - show confirmation panel.
 
-        The inline confirmation panel is mounted in the main_display area,
-        underneath the latest action event collapsible. Since the action details
-        are already visible in the collapsible above, this panel only shows
-        the confirmation options.
-
-        Args:
-            pending_actions: List of pending actions that need confirmation
-
-        Returns:
-            UserConfirmation decision from the user
+        This is called when the conversation runner needs user confirmation
+        for pending actions. The worker has already exited (non-blocking),
+        so the UI can safely show the panel and wait for user input.
         """
-        # This will be called from a background thread, so we need to use
-        # call_from_thread to interact with the UI safely
-        from concurrent.futures import Future
+        # Remove any existing confirmation panel
+        if self.confirmation_panel:
+            self.confirmation_panel.remove()
+            self.confirmation_panel = None
 
-        # Create a future to wait for the user's decision
-        decision_future: Future[UserConfirmation] = Future()
+        # Create and mount the inline confirmation panel in main_display
+        # This places it underneath the latest action event collapsible
+        self.confirmation_panel = InlineConfirmationPanel(
+            len(event.pending_actions), self._on_confirmation_decision
+        )
+        self.main_display.mount(self.confirmation_panel)
+        # Scroll to show the confirmation panel
+        self.main_display.scroll_end(animate=False)
 
-        def show_confirmation_panel():
-            """Show the inline confirmation panel in the UI thread."""
-            try:
-                # Remove any existing confirmation panel
-                if self.confirmation_panel:
-                    self.confirmation_panel.remove()
-                    self.confirmation_panel = None
+    def _on_confirmation_decision(self, decision: UserConfirmation) -> None:
+        """Handle user's confirmation decision from the panel.
 
-                # Create callback that will resolve the future
-                def on_confirmation_decision(decision: UserConfirmation):
-                    # Remove the panel
-                    if self.confirmation_panel:
-                        self.confirmation_panel.remove()
-                        self.confirmation_panel = None
-                    # Resolve the future with the decision
-                    if not decision_future.done():
-                        decision_future.set_result(decision)
+        Posts a ConfirmationProvided message to resume the conversation.
+        """
+        # Remove the panel
+        if self.confirmation_panel:
+            self.confirmation_panel.remove()
+            self.confirmation_panel = None
 
-                # Create and mount the inline confirmation panel in main_display
-                # This places it underneath the latest action event collapsible
-                self.confirmation_panel = InlineConfirmationPanel(
-                    len(pending_actions), on_confirmation_decision
-                )
-                self.main_display.mount(self.confirmation_panel)
-                # Scroll to show the confirmation panel
-                self.main_display.scroll_end(animate=False)
+        # Post message to resume the conversation
+        self.post_message(ConfirmationProvided(decision))
 
-            except Exception:
-                # If there's an error, default to DEFER
-                if not decision_future.done():
-                    decision_future.set_result(UserConfirmation.DEFER)
+    @on(ConfirmationProvided)
+    def _on_confirmation_provided(self, event: ConfirmationProvided) -> None:
+        """Handle ConfirmationProvided message - resume conversation.
 
-        # Schedule the UI update on the main thread
-        self.call_from_thread(show_confirmation_panel)
+        Starts a new worker to continue the conversation with the user's decision.
+        """
+        if not self.conversation_runner:
+            return
 
-        # Wait for the user's decision (this will block the background thread)
+        # Start a new worker to resume the conversation
+        self.run_worker(
+            self._resume_conversation_with_decision(event.decision),
+            name="resume_conversation",
+        )
+
+    async def _resume_conversation_with_decision(
+        self, decision: UserConfirmation
+    ) -> None:
+        """Resume conversation in a background thread with the user's decision."""
+        import asyncio
+
+        await asyncio.get_event_loop().run_in_executor(
+            None, self._resume_conversation_sync, decision
+        )
+
+    def _resume_conversation_sync(self, decision: UserConfirmation) -> None:
+        """Synchronously resume conversation with confirmation decision."""
+        if not self.conversation_runner:
+            return
+
+        self.conversation_runner._update_run_status(True)
         try:
-            return decision_future.result(timeout=300)  # 5 minute timeout
-        except Exception:
-            # If timeout or error, default to DEFER
-            return UserConfirmation.DEFER
+            self.conversation_runner.resume_with_confirmation(decision)
+        except Exception as e:
+            self.call_from_thread(
+                lambda: self.notify(
+                    title="Error",
+                    message=f"Failed to resume conversation: {e}",
+                    severity="error",
+                )
+            )
+        finally:
+            self.conversation_runner._update_run_status(False)
 
     def _handle_exit(self) -> None:
         """Handle exit command with optional confirmation."""
