@@ -631,12 +631,12 @@ class TestPlanPanelIntegration:
 
             def compose(self):
                 with Horizontal(id="content_area"):
-                    with VerticalScroll(id="main_display"):
+                    with VerticalScroll(id="scroll_view"):
                         yield Static("Content")
 
         app = TestApp()
         async with app.run_test():
-            container = app.query_one("#main_display", VerticalScroll)
+            container = app.query_one("#scroll_view", VerticalScroll)
             visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
             # Create a TaskTrackerObservation event
@@ -682,7 +682,7 @@ class TestPlanPanelIntegration:
 
             def compose(self):
                 with Horizontal(id="content_area"):
-                    with VerticalScroll(id="main_display"):
+                    with VerticalScroll(id="scroll_view"):
                         yield Static("Content")
 
             def on_mount(self):
@@ -691,7 +691,7 @@ class TestPlanPanelIntegration:
         app = TestApp()
         async with app.run_test() as pilot:
             await pilot.pause()  # Wait for on_mount
-            container = app.query_one("#main_display", VerticalScroll)
+            container = app.query_one("#scroll_view", VerticalScroll)
             visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
             # Mock settings and toggle
@@ -735,7 +735,7 @@ class TestPlanPanelIntegration:
 
             def compose(self):
                 with Horizontal(id="content_area"):
-                    with VerticalScroll(id="main_display"):
+                    with VerticalScroll(id="scroll_view"):
                         yield Static("Content")
 
             def on_mount(self):
@@ -744,7 +744,7 @@ class TestPlanPanelIntegration:
         app = TestApp()
         async with app.run_test() as pilot:
             await pilot.pause()  # Wait for on_mount
-            container = app.query_one("#main_display", VerticalScroll)
+            container = app.query_one("#scroll_view", VerticalScroll)
             visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
             # Mock that panel is already on screen
@@ -790,7 +790,7 @@ class TestPlanPanelIntegration:
 
             def compose(self):
                 with Horizontal(id="content_area"):
-                    with VerticalScroll(id="main_display"):
+                    with VerticalScroll(id="scroll_view"):
                         yield Static("Content")
 
             def on_mount(self):
@@ -799,7 +799,7 @@ class TestPlanPanelIntegration:
         app = TestApp()
         async with app.run_test() as pilot:
             await pilot.pause()  # Wait for on_mount
-            container = app.query_one("#main_display", VerticalScroll)
+            container = app.query_one("#scroll_view", VerticalScroll)
             visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
             # Ensure panel is not on screen

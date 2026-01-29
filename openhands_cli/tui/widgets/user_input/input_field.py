@@ -12,7 +12,8 @@ from textual.message import Message
 from textual.signal import Signal
 from textual.widgets import TextArea
 
-from openhands_cli.tui.core.commands import COMMANDS
+from openhands_cli.tui.core.commands import COMMANDS, is_valid_command
+from openhands_cli.tui.messages import SlashCommandSubmitted, UserInputSubmitted
 from openhands_cli.tui.widgets.user_input.autocomplete_dropdown import (
     AutoCompleteDropdown,
 )
@@ -304,14 +305,34 @@ class InputField(Container):
             if content:
                 self._clear_current()
                 self.action_toggle_input_mode()
-                self.post_message(self.Submitted(content))
+                # Use the same submission logic as single-line mode
+                if is_valid_command(content):
+                    command = content[1:]  # Remove leading "/"
+                    self.post_message(SlashCommandSubmitted(command=command))
+                else:
+                    self.post_message(UserInputSubmitted(content=content))
 
     def _submit_current_content(self) -> None:
-        """Submit current content and clear input."""
+        """Submit current content and clear input.
+
+        Posts different messages based on content type:
+        - SlashCommandSubmitted for valid slash commands
+        - UserInputSubmitted for regular user input
+        """
         content = self._get_current_text().strip()
-        if content:
-            self._clear_current()
-            self.post_message(self.Submitted(content))
+        if not content:
+            return
+
+        self._clear_current()
+
+        # Check if this is a valid slash command
+        if is_valid_command(content):
+            # Extract command name (without the leading slash)
+            command = content[1:]  # Remove leading "/"
+            self.post_message(SlashCommandSubmitted(command=command))
+        else:
+            # Regular user input
+            self.post_message(UserInputSubmitted(content=content))
 
     @on(SingleLineInputWithWrapping.MultiLinePasteDetected)
     def _on_paste_detected(

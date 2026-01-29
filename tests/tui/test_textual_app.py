@@ -3,7 +3,6 @@
 import uuid
 from unittest.mock import Mock
 
-from openhands_cli.tui.core.conversation_manager import ConversationManager
 from openhands_cli.tui.core.conversation_switcher import ConversationSwitcher
 from openhands_cli.tui.panels.history_side_panel import HistorySidePanel
 from openhands_cli.tui.textual_app import OpenHandsApp
@@ -15,7 +14,10 @@ class TestSettingsRestartNotification:
     def test_saving_settings_without_conversation_runner_no_notification(self):
         """Saving settings without conversation_runner does not show notification."""
         app = OpenHandsApp.__new__(OpenHandsApp)
-        app.conversation_runner = None
+        # Mock conversation_view for the conversation_runner property
+        app.conversation_view = Mock()
+        app.conversation_view.conversation_runner = None
+        
         app.notify = Mock()
 
         app._notify_restart_required()
@@ -25,7 +27,10 @@ class TestSettingsRestartNotification:
     def test_saving_settings_with_conversation_runner_shows_notification(self):
         """Saving settings with conversation_runner shows restart notification."""
         app = OpenHandsApp.__new__(OpenHandsApp)
-        app.conversation_runner = Mock()
+        # Mock conversation_view for the conversation_runner property
+        app.conversation_view = Mock()
+        app.conversation_view.conversation_runner = Mock()
+        
         app.notify = Mock()
 
         app._notify_restart_required()
@@ -49,9 +54,11 @@ class TestSettingsRestartNotification:
         monkeypatch.setattr(ta, "SettingsScreen", MockSettingsScreen)
 
         app = OpenHandsApp.__new__(OpenHandsApp)
-        # conversation_runner exists but is not running (so settings can be opened)
-        app.conversation_runner = Mock()
-        app.conversation_runner.is_running = False
+        # Mock conversation_view for the conversation_runner property
+        app.conversation_view = Mock()
+        app.conversation_view.conversation_runner = Mock()
+        app.conversation_view.conversation_runner.is_running = False
+        
         app.push_screen = Mock()
         app._reload_visualizer = Mock()
         app.notify = Mock()
@@ -68,18 +75,28 @@ class TestHistoryIntegration:
     """Unit tests for history panel wiring and conversation switching."""
 
     def test_history_command_calls_toggle(self):
-        """`/history` command handler delegates to action_toggle_history."""
-        app = OpenHandsApp.__new__(OpenHandsApp)
-        app.action_toggle_history = Mock()
+        """`/history` in InputAreaContainer delegates to action_toggle_history."""
+        from openhands_cli.tui.widgets.input_area import InputAreaContainer
 
-        app._handle_history_command()
+        input_area = Mock(spec=InputAreaContainer)
+        mock_app = Mock()
+        mock_app.action_toggle_history = Mock()
+        input_area.app = mock_app
 
-        app.action_toggle_history.assert_called_once()
+        # Call the real implementation
+        InputAreaContainer._command_history(input_area)
+
+        mock_app.action_toggle_history.assert_called_once()
 
     def test_action_toggle_history_calls_panel_toggle(self, monkeypatch):
         """action_toggle_history calls HistorySidePanel.toggle with correct args."""
         app = OpenHandsApp.__new__(OpenHandsApp)
-        app.conversation_id = uuid.uuid4()
+        # Initialize conversation_view to avoid AttributeError
+        from openhands_cli.tui.core.state import ConversationView
+
+        app.conversation_view = Mock(spec=ConversationView)
+        app.conversation_view.conversation_id = uuid.uuid4()
+        
 
         toggle_mock = Mock()
         monkeypatch.setattr(HistorySidePanel, "toggle", toggle_mock)
@@ -90,7 +107,8 @@ class TestHistoryIntegration:
         _app_arg = toggle_mock.call_args[0][0]
         assert _app_arg is app
         assert (
-            toggle_mock.call_args[1]["current_conversation_id"] == app.conversation_id
+            toggle_mock.call_args[1]["current_conversation_id"]
+            == app.conversation_view.conversation_id
         )
 
 
@@ -101,11 +119,16 @@ class TestConversationSwitcher:
         """After conversation switch completes, input field receives focus."""
         # Create mock app and manager
         app = Mock()
-        app.main_display = Mock()
+        app.scroll_view = Mock()
         app.notify = Mock()
         app.input_field = Mock()
         app.input_field.focus_input = Mock()
-        app.post_message = Mock()  # Mock post_message on app
+        app.conversation_view = Mock()
+        # conversation_id property delegates to conversation_view
+        type(app).conversation_id = property(
+            lambda self: self.conversation_view.conversation_id,
+            lambda self, v: setattr(self.conversation_view, "conversation_id", v),
+        )
 
         switcher = ConversationSwitcher(app)
         switcher._dismiss_loading = Mock()
@@ -116,8 +139,9 @@ class TestConversationSwitcher:
         switcher._finish_switch(runner, target_id)
 
         app.input_field.focus_input.assert_called_once()
-        # Verify that ConversationSwitched message was posted to app
-        app.post_message.assert_called_once()
+        # Verify that ConversationView was updated with the new conversation ID
+        assert app.conversation_view.conversation_id == target_id
+        app.conversation_view.reset_conversation_state.assert_called_once()
 
     def test_switch_to_invalid_uuid_shows_error(self):
         """Switching with an invalid UUID shows an error notification."""
@@ -150,54 +174,21 @@ class TestConversationSwitcher:
         assert "already active" in call_kwargs["message"].lower()
 
 
-class TestConversationManager:
-    """Tests for ConversationManager."""
+class TestInputAreaContainerCommands:
+    """Tests for InputAreaContainer command methods."""
 
-    def test_create_new_resets_conversation(self):
-        """create_new resets conversation state and posts creation message."""
-        app = Mock()
-        app.conversation_runner = None
-        app.confirmation_panel = None
-        app.main_display = Mock()
-        app.main_display.children = []
-        app.query_one = Mock(return_value=Mock())
-        app.notify = Mock()
-        app.post_message = Mock()  # Mock post_message on app
+    def test_command_new_posts_message(self):
+        """_command_new posts NewConversationRequested message."""
+        from openhands_cli.tui.messages import NewConversationRequested
+        from openhands_cli.tui.widgets.input_area import InputAreaContainer
 
-        manager = ConversationManager(app, Mock())
-        manager.store.create.return_value = uuid.uuid4().hex  # type: ignore
+        input_area = Mock(spec=InputAreaContainer)
+        input_area.post_message = Mock()
 
-        result = manager.create_new()
+        # Call the real implementation
+        InputAreaContainer._command_new(input_area)
 
-        assert result is not None
-        assert app.conversation_id == result
-        app.post_message.assert_called_once()  # Expect ConversationCreated message
-        app.notify.assert_called_once()
-
-    def test_create_new_blocked_when_running(self):
-        """create_new returns None when a conversation is running."""
-        app = Mock()
-        app.conversation_runner = Mock()
-        app.conversation_runner.is_running = True
-        app.notify = Mock()
-
-        manager = ConversationManager(app, Mock())
-
-        result = manager.create_new()
-
-        assert result is None
-        app.notify.assert_called_once()
-        call_kwargs = app.notify.call_args[1]
-        assert call_kwargs["severity"] == "error"
-
-    def test_update_title_posts_message(self):
-        """update_title posts ConversationTitleUpdated message."""
-        app = Mock()
-        app.conversation_id = uuid.uuid4()
-        app.post_message = Mock()  # Mock post_message on app
-
-        manager = ConversationManager(app, Mock())
-
-        manager.update_title("Test title")
-
-        app.post_message.assert_called_once()
+        # Verify message was posted
+        input_area.post_message.assert_called_once()
+        posted_message = input_area.post_message.call_args[0][0]
+        assert isinstance(posted_message, NewConversationRequested)

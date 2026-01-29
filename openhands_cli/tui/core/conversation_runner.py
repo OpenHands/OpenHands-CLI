@@ -1,8 +1,9 @@
-"""Conversation runner with confirmation mode support for the refactored UI."""
+"""Conversation runner with confirmation mode support."""
 
 import asyncio
 import uuid
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.text import Text
@@ -20,8 +21,6 @@ from openhands.sdk.conversation.state import (
 )
 from openhands.sdk.event.base import Event
 from openhands.sdk.security.confirmation_policy import (
-    AlwaysConfirm,
-    ConfirmationPolicyBase,
     ConfirmRisky,
     NeverConfirm,
 )
@@ -30,17 +29,24 @@ from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.user_actions.types import UserConfirmation
 
 
+if TYPE_CHECKING:
+    from openhands_cli.tui.core.state import ConversationView
+
+
 class ConversationRunner:
-    """Conversation runner with confirmation mode support for the refactored UI."""
+    """Conversation runner with confirmation mode support.
+
+    ConversationView owns the confirmation policy. This class delegates policy
+    operations to ConversationView rather than managing policy state internally.
+    """
 
     def __init__(
         self,
         conversation_id: uuid.UUID,
-        running_state_callback: Callable[[bool], None],
+        conversation_view: "ConversationView",
         confirmation_callback: Callable,
         notification_callback: Callable[[str, str, SeverityLevel], None],
         visualizer: ConversationVisualizer,
-        initial_confirmation_policy: ConfirmationPolicyBase | None = None,
         event_callback: Callable[[Event], None] | None = None,
         *,
         env_overrides_enabled: bool = False,
@@ -50,20 +56,22 @@ class ConversationRunner:
 
         Args:
             conversation_id: UUID for the conversation.
-            error_callback: Callback for handling errors.
-                          Should accept (error_title: str, error_message: str).
-            visualizer: Optional visualizer for output display.
-            initial_confirmation_policy: Initial confirmation policy to use.
-                                        If None, defaults to AlwaysConfirm.
+            conversation_view: ConversationView for reactive state updates.
+                Owns confirmation policy and syncs it to conversation.
+            confirmation_callback: Callback for handling action confirmations.
+            notification_callback: Callback for notifications.
+            visualizer: Visualizer for output display.
+            event_callback: Optional callback for each event.
             env_overrides_enabled: If True, environment variables will override
-                                   stored LLM settings.
+                stored LLM settings.
             critic_disabled: If True, critic functionality will be disabled.
         """
-        starting_confirmation_policy = initial_confirmation_policy or AlwaysConfirm()
         self.visualizer = visualizer
+
+        # Create conversation with policy from ConversationView
         self.conversation: BaseConversation = setup_conversation(
             conversation_id,
-            confirmation_policy=starting_confirmation_policy,
+            confirmation_policy=conversation_view.confirmation_policy,
             visualizer=visualizer,
             event_callback=event_callback,
             env_overrides_enabled=env_overrides_enabled,
@@ -72,44 +80,17 @@ class ConversationRunner:
 
         self._running = False
 
-        # Set confirmation mode state based on initial policy
-        self._confirmation_mode_active = not isinstance(
-            starting_confirmation_policy, NeverConfirm
-        )
-        self._running_state_callback: Callable = running_state_callback
-        self._confirmation_callback: Callable = confirmation_callback
-        self._notification_callback: Callable[[str, str, SeverityLevel], None] = (
-            notification_callback
-        )
+        # State management via ConversationView (which owns the confirmation policy)
+        self._conversation_view = conversation_view
+        self._confirmation_callback = confirmation_callback
+        self._notification_callback = notification_callback
+
+        # Attach conversation to ConversationView - this syncs the policy
+        self._conversation_view.attach_conversation(self.conversation)
 
     @property
     def is_confirmation_mode_active(self) -> bool:
-        """Check if confirmation mode is currently active."""
-        return self._confirmation_mode_active
-
-    def get_confirmation_policy(self) -> ConfirmationPolicyBase:
-        """Get the current confirmation policy."""
-        return self.conversation.state.confirmation_policy
-
-    def toggle_confirmation_mode(self) -> None:
-        """Toggle confirmation mode on/off."""
-        new_confirmation_mode_state = not self._confirmation_mode_active
-
-        # Choose confirmation policy based on new state
-        if new_confirmation_mode_state:
-            confirmation_policy = AlwaysConfirm()
-        else:
-            confirmation_policy = NeverConfirm()
-
-        # Use the centralized method to change policy and update state
-        self._change_confirmation_policy(confirmation_policy)
-
-    def set_confirmation_policy(
-        self, confirmation_policy: ConfirmationPolicyBase
-    ) -> None:
-        """Set the confirmation policy for the conversation."""
-        if self.conversation:
-            self.conversation.set_confirmation_policy(confirmation_policy)
+        return self._conversation_view.is_confirmation_active
 
     async def queue_message(self, user_input: str) -> None:
         """Queue a message for a running conversation"""
@@ -152,10 +133,11 @@ class ConversationRunner:
             message: The message to process
         """
         self._update_run_status(True)
+
         try:
             # Send message and run conversation
             self.conversation.send_message(message)
-            if self._confirmation_mode_active:
+            if self.is_confirmation_mode_active:
                 self._run_with_confirmation()
             elif headless:
                 console = Console()
@@ -242,29 +224,14 @@ class ConversationRunner:
             # Pause the conversation for later resumption
             self.conversation.pause()
         elif decision == UserConfirmation.ALWAYS_PROCEED:
-            # Accept actions and change policy to NeverConfirm
-            self._change_confirmation_policy(NeverConfirm())
+            # Accept actions and change policy to NeverConfirm via ConversationView
+            self._conversation_view.set_confirmation_policy(NeverConfirm())
         elif decision == UserConfirmation.CONFIRM_RISKY:
-            # Accept actions and change policy to ConfirmRisky
-            self._change_confirmation_policy(ConfirmRisky())
+            # Accept actions and change policy to ConfirmRisky via ConversationView
+            self._conversation_view.set_confirmation_policy(ConfirmRisky())
 
         # For ACCEPT and policy-changing decisions, we continue normally
         return decision
-
-    def _change_confirmation_policy(self, new_policy: ConfirmationPolicyBase) -> None:
-        """Change the confirmation policy and update internal state.
-
-        Args:
-            new_policy: The new confirmation policy to set
-        """
-
-        self.conversation.set_confirmation_policy(new_policy)
-
-        # Update internal state based on the policy type
-        if isinstance(new_policy, NeverConfirm):
-            self._confirmation_mode_active = False
-        else:
-            self._confirmation_mode_active = True
 
     @property
     def is_running(self) -> bool:
@@ -320,9 +287,10 @@ class ConversationRunner:
                 "error",
             )
 
-    def _update_run_status(self, is_running: bool):
+    def _update_run_status(self, is_running: bool) -> None:
+        """Update the running status via ConversationView."""
         self._running = is_running
-        self._running_state_callback(is_running)
+        self._conversation_view.set_running(is_running)
 
     def pause_runner_without_blocking(self):
         if self.is_running:

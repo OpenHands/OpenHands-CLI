@@ -5,6 +5,8 @@ This class encapsulates all the complexity of switching between conversations:
 - Thread coordination
 - UI preparation and finalization
 - Error handling
+
+State changes are made via ConversationView, which UI components watch for updates.
 """
 
 from __future__ import annotations
@@ -14,13 +16,8 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from textual.notifications import Notification, Notify
-from textual.widgets import Static
 
-from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.splash import get_conversation_text
-from openhands_cli.tui.core.messages import ConversationSwitched, RevertSelectionRequest
 from openhands_cli.tui.modals import SwitchConversationModal
-from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
 
 if TYPE_CHECKING:
@@ -37,12 +34,6 @@ class ConversationSwitcher:
     def __init__(self, app: OpenHandsApp):
         self.app = app
         self._loading_notification: Notification | None = None
-        self._is_switching: bool = False
-
-    @property
-    def is_switching(self) -> bool:
-        """Check if a conversation switch is in progress."""
-        return self._is_switching
 
     def switch_to(self, conversation_id: str) -> None:
         """Switch to an existing local conversation.
@@ -86,8 +77,8 @@ class ConversationSwitcher:
         if confirmed:
             self._switch_with_pause(target_id)
         else:
-            # Revert selection highlight back to current conversation.
-            self.app.post_message(RevertSelectionRequest())
+            # Revert selection - set is_switching to False triggers UI update
+            self.app.conversation_view.finish_switching()
             self.app.input_field.focus_input()
 
     def _switch_with_pause(self, target_id: uuid.UUID) -> None:
@@ -122,13 +113,8 @@ class ConversationSwitcher:
             )
             return
 
-        # Show a persistent loading notification
+        # Show a persistent loading notification and mark switching in progress
         self._show_loading()
-
-        # Create visualizer on UI thread (captures correct main thread id)
-        visualizer = ConversationVisualizer(
-            self.app.main_display, self.app, skip_user_messages=True
-        )
 
         def _worker() -> None:
             if pre_switch_action:
@@ -136,7 +122,7 @@ class ConversationSwitcher:
                     pre_switch_action()
                 except Exception:
                     pass  # Don't block switch on pre-action failure
-            self._switch_thread(target_id, visualizer)
+            self._switch_thread(target_id)
 
         self.app.run_worker(
             _worker,
@@ -149,7 +135,8 @@ class ConversationSwitcher:
 
     def _show_loading(self) -> None:
         """Show a loading notification that can be dismissed after the switch."""
-        self._is_switching = True
+        # Mark switching in progress via ConversationView
+        self.app.conversation_view.start_switching()
 
         # Dismiss any previous loading notification
         if self._loading_notification is not None:
@@ -177,13 +164,16 @@ class ConversationSwitcher:
             self.app._unnotify(self._loading_notification)
         finally:
             self._loading_notification = None
-            self._is_switching = False
+            # Mark switching complete via ConversationView
+            self.app.conversation_view.finish_switching()
 
     def _prepare_ui(self, conversation_id: uuid.UUID) -> None:
         """Prepare UI for switching conversations (runs on the UI thread)."""
         app = self.app
 
-        # Set the conversation ID immediately
+        # Set the conversation ID - triggers reactive updates:
+        # - ConversationView.watch_conversation_id() clears dynamic content
+        # - SplashContent.watch_conversation_id() re-renders
         app.conversation_id = conversation_id
         app.conversation_runner = None
 
@@ -192,27 +182,17 @@ class ConversationSwitcher:
             app.confirmation_panel.remove()
             app.confirmation_panel = None
 
-        # Clear dynamically added widgets, keep splash widgets
-        widgets_to_remove = [
-            w
-            for w in app.main_display.children
-            if not (w.id or "").startswith("splash_")
-        ]
-        for widget in widgets_to_remove:
-            widget.remove()
-
-        # Update splash conversation widget
-        splash_conversation = app.query_one("#splash_conversation", Static)
-        splash_conversation.update(
-            get_conversation_text(app.conversation_id.hex, theme=OPENHANDS_THEME)
-        )
-
     def _finish_switch(self, runner, target_id: uuid.UUID) -> None:
         """Finalize conversation switch (runs on the UI thread)."""
         self.app.conversation_runner = runner
-        self.app.main_display.scroll_end(animate=False)
+        self.app.scroll_view.scroll_end(animate=False)
         self._dismiss_loading()
-        self.app.post_message(ConversationSwitched(target_id))
+
+        # Update ConversationView - UI components will react automatically
+        self.app.conversation_id = target_id
+        # Reset running state, metrics, etc.
+        self.app.conversation_view.reset_conversation_state()
+
         self.app.notify(
             title="Switched",
             message=f"Resumed conversation {target_id.hex[:8]}",
@@ -221,23 +201,22 @@ class ConversationSwitcher:
         self.app.input_field.disabled = False
         self.app.input_field.focus_input()
 
-    def _switch_thread(
-        self,
-        target_id: uuid.UUID,
-        visualizer: ConversationVisualizer,
-    ) -> None:
+    def _switch_thread(self, target_id: uuid.UUID) -> None:
         """Background thread worker for switching conversations."""
         try:
             # Prepare UI first (on main thread)
             self.app.call_from_thread(self._prepare_ui, target_id)
 
-            # Create conversation runner (loads from disk)
-            runner = self.app.create_conversation_runner(
-                conversation_id=target_id, visualizer=visualizer
-            )
+            # Set the new conversation_id on ConversationView and create runner
+            # This needs to be done on the main thread since it modifies state
+            def _create_runner_for_conversation() -> None:
+                self.app.conversation_view.conversation_id = target_id
+                # Force creation of new runner for this conversation
+                self.app.conversation_view.conversation_runner = None
+                runner = self.app.conversation_view.get_or_create_runner()
+                self._finish_switch(runner, target_id)
 
-            # Finalize on UI thread
-            self.app.call_from_thread(self._finish_switch, runner, target_id)
+            self.app.call_from_thread(_create_runner_for_conversation)
         except Exception as e:
             error_message = f"{type(e).__name__}: {e}"
 

@@ -1,26 +1,46 @@
-"""Minimal textual app for OpenHands CLI migration.
+"""OpenHands CLI TUI application.
 
-This is the starting point for migrating from prompt_toolkit to textual.
-It creates a basic app with:
-- A scrollable main display (RichLog) that shows the splash screen initially
-- An Input widget at the bottom for user messages
-- A status line showing timer and work directory
-- The splash screen content scrolls off as new messages are added
+This is the main Textual application for the OpenHands CLI. The architecture
+separates concerns between App (shell/navigation), ConversationView (state/lifecycle),
+and InputAreaContainer (slash command handling).
+
+Widget Hierarchy::
+
+    OpenHandsApp
+    └── Horizontal(#content_area)
+        └── ConversationView(#conversation_view)  ← Owns state + ConversationRunner
+            ├── ScrollableContent(#scroll_view)  ← Scrollable conversation content
+            │   ├── SplashContent(#splash_content) ← data_bind to conversation_id
+            │   └── ... conversation widgets (dynamically added)
+            └── InputAreaContainer(#input_area)  ← docked to bottom
+                ├── WorkingStatusLine (data_bind)
+                ├── InputField          ← Posts messages
+                └── InfoStatusLine (data_bind)
+    └── Footer
+
+Message Flow:
+    InputField → ConversationView
+        - UserInputSubmitted: ConversationView renders and processes with runner
+        - SlashCommandSubmitted: InputAreaContainer executes command (stops bubbling)
+        - NewConversationRequested: ConversationView handles /new command
+
+Responsibilities:
+    - InputAreaContainer: Slash command execution
+    - ConversationView: State management, ConversationRunner lifecycle, content rendering
+    - ScrollableContent: Scrollable container for splash + conversation widgets
+    - OpenHandsApp: Screen/modal management, side panels, global key bindings
+    - SplashContent: Displays splash screen, auto-updates via conversation_id binding
 """
 
-import asyncio
 import uuid
 from collections.abc import Iterable
 from typing import ClassVar
 
 from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
-from textual.containers import Container, Horizontal, VerticalScroll
-from textual.css.query import NoMatches
-from textual.message import Message
+from textual.containers import Horizontal
 from textual.screen import Screen
-from textual.signal import Signal
-from textual.widgets import Footer, Input, Static, TextArea
+from textual.widgets import Footer, Input, TextArea
 from textual_autocomplete import AutoComplete
 
 from openhands.sdk import BaseConversation
@@ -36,37 +56,26 @@ from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.locations import get_conversations_dir
 from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.splash import get_splash_content
-from openhands_cli.tui.core.commands import is_valid_command, show_help
-from openhands_cli.tui.core.conversation_manager import ConversationManager
+from openhands_cli.tui.core import ConversationFinished, ConversationView
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
-from openhands_cli.tui.core.messages import (
-    ConversationCreated,
-    ConversationSwitched,
-    ConversationTitleUpdated,
-    RevertSelectionRequest,
-    SwitchConversationRequest,
-)
+from openhands_cli.tui.core.conversation_switcher import ConversationSwitcher
 from openhands_cli.tui.modals import SettingsScreen
-from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModal
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
-from openhands_cli.tui.panels.history_side_panel import HistorySidePanel
+from openhands_cli.tui.panels.history_side_panel import (
+    HistorySidePanel,
+    SwitchConversationRequest,
+)
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
-from openhands_cli.tui.widgets import InputField
+from openhands_cli.tui.widgets import InputField, ScrollableContent
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
     CollapsibleNavigationMixin,
     CollapsibleTitle,
 )
-from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
-from openhands_cli.tui.widgets.status_line import (
-    InfoStatusLine,
-    WorkingStatusLine,
-)
+from openhands_cli.tui.widgets.splash import SplashContent
 from openhands_cli.user_actions.types import UserConfirmation
-from openhands_cli.utils import json_callback
 
 
 class OpenHandsApp(CollapsibleNavigationMixin, App):
@@ -84,8 +93,30 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     ]
 
     input_field: getters.query_one[InputField] = getters.query_one(InputField)
-    main_display: getters.query_one[VerticalScroll] = getters.query_one("#main_display")
+    scroll_view: getters.query_one[ScrollableContent] = getters.query_one(
+        "#scroll_view"
+    )
     content_area: getters.query_one[Horizontal] = getters.query_one("#content_area")
+
+    @property
+    def conversation_id(self) -> uuid.UUID:
+        """Get current conversation ID from ConversationView (source of truth)."""
+        return self.conversation_view.conversation_id
+
+    @conversation_id.setter
+    def conversation_id(self, value: uuid.UUID) -> None:
+        """Set conversation ID in ConversationView (source of truth)."""
+        self.conversation_view.conversation_id = value
+
+    @property
+    def conversation_runner(self) -> ConversationRunner | None:
+        """Get conversation runner from ConversationView (source of truth)."""
+        return self.conversation_view.conversation_runner
+
+    @conversation_runner.setter
+    def conversation_runner(self, value: ConversationRunner | None) -> None:
+        """Set conversation runner in ConversationView (source of truth)."""
+        self.conversation_view.conversation_runner = value
 
     def __init__(
         self,
@@ -116,8 +147,14 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """
         super().__init__(**kwargs)
 
-        self.conversation_running_signal = Signal(self, "conversation_running_signal")
-        self.is_ui_initialized = False
+        # ConversationView is the single source of truth for application state
+        # It owns the ConversationRunner and all reactive state
+        self.conversation_view = ConversationView(
+            initial_confirmation_policy=initial_confirmation_policy or AlwaysConfirm(),
+            env_overrides_enabled=env_overrides_enabled,
+            critic_disabled=critic_disabled,
+            json_mode=json_mode,
+        )
 
         # Store exit confirmation setting
         self.exit_confirmation = exit_confirmation
@@ -125,38 +162,32 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Store headless mode setting for auto-exit behavior
         self.headless_mode = headless_mode
 
-        # Store JSON mode setting
-        self.json_mode = json_mode
-
-        # Store agent loading options
+        # Store these for _reload_visualizer (still need App-level access)
         self.env_overrides_enabled = env_overrides_enabled
-        self.critic_disabled = critic_disabled
 
-        # Store resume conversation ID
-        self.conversation_id = (
+        # conversation_id is owned by ConversationView - we just initialize it here
+        initial_conversation_id = (
             resume_conversation_id if resume_conversation_id else uuid.uuid4()
         )
+        self.conversation_view.conversation_id = initial_conversation_id
+
         self.conversation_dir = BaseConversation.get_persistence_dir(
-            get_conversations_dir(), self.conversation_id
+            get_conversations_dir(), initial_conversation_id
         )
 
         # Store queued inputs (copy to prevent mutating caller's list)
         self.pending_inputs = list(queued_inputs) if queued_inputs else []
 
-        # Store initial confirmation policy
-        self.initial_confirmation_policy = (
-            initial_confirmation_policy or AlwaysConfirm()
-        )
-
-        # Initialize conversation runner (updated with write callback in on_mount)
-        self.conversation_runner = None
+        # ConversationRunner is now owned by ConversationView
         self._store = LocalFileStore()
-        self._conversation_manager = ConversationManager(self, self._store)
-        self._reload_visualizer = (
-            lambda: self.conversation_runner.visualizer.reload_configuration()
-            if self.conversation_runner
-            else None
-        )
+        self._conversation_switcher = ConversationSwitcher(self)
+
+        def reload_visualizer():
+            runner = self.conversation_view.conversation_runner
+            if runner:
+                runner.visualizer.reload_configuration()
+
+        self._reload_visualizer = reload_visualizer
 
         # Confirmation panel tracking
         self.confirmation_panel: InlineConfirmationPanel | None = None
@@ -175,31 +206,34 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     CSS_PATH = "textual_app.tcss"
 
     def compose(self) -> ComposeResult:
-        """Create child widgets for the app."""
-        # Content area - horizontal layout for main display and optional confirmation
+        """Create child widgets for the app.
+
+        Widget Hierarchy::
+
+            OpenHandsApp
+            └── Horizontal(#content_area)
+                └── ConversationView(#conversation_view)  ← Owns state
+                    ├── ScrollableContent(#scroll_view)
+                    │   ├── SplashContent  ← data_bind
+                    │   └── ... conversation content
+                    └── InputAreaContainer(#input_area)  ← handles input
+                        ├── WorkingStatusLine (data_bind)
+                        ├── InputField
+                        └── InfoStatusLine (data_bind)
+            └── Footer
+
+        Message Flow:
+            InputField → InputAreaContainer → ConversationView → OpenHandsApp
+
+        Data Binding:
+            All widgets are composed from ConversationView.compose(), so data_bind
+            works because the active pump is ConversationView (the reactive owner).
+        """
+        # Content area - horizontal layout for conversation and optional panels
         with Horizontal(id="content_area"):
-            # Main scrollable display - using VerticalScroll to support Collapsible
-            with VerticalScroll(id="main_display"):
-                # Add initial splash content as individual widgets
-                yield Static(id="splash_banner", classes="splash-banner")
-                yield Static(id="splash_version", classes="splash-version")
-                yield Static(id="splash_status", classes="status-panel")
-                yield Static(id="splash_conversation", classes="conversation-panel")
-                yield Static(
-                    id="splash_instructions_header", classes="splash-instruction-header"
-                )
-                yield Static(id="splash_instructions", classes="splash-instruction")
-                yield Static(id="splash_update_notice", classes="splash-update-notice")
-                yield Static(id="splash_critic_notice", classes="splash-critic-notice")
-
-            # Input area - docked to bottom
-            with Container(id="input_area"):
-                yield WorkingStatusLine(self)
-                yield InputField(
-                    placeholder="Type your message, @mention a file, or / for commands"
-                )
-
-                yield InfoStatusLine(self)
+            # ConversationView composes scroll_view, input_area and all child widgets
+            # This enables data_bind() to work (requires owner as active pump)
+            yield self.conversation_view
 
         # Footer - shows available key bindings
         yield Footer()
@@ -224,11 +258,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     def on_mount(self) -> None:
         """Called when app starts."""
         from openhands_cli.stores import MissingEnvironmentVariablesError
-
-        # Subscribe to conversation running signal for auto-exit in headless mode
-        self.conversation_running_signal.subscribe(
-            self, self._on_conversation_state_changed
-        )
 
         # Check if user has existing settings
         try:
@@ -287,10 +316,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         )
         self.app.push_screen(exit_modal)
 
-    def _on_conversation_state_changed(self, is_running: bool) -> None:
-        """Handle conversation state changes for auto-exit in headless mode."""
-        # If conversation just finished and we're in headless mode, exit
-        if not is_running and self.headless_mode:
+    @on(ConversationFinished)
+    def on_conversation_finished(self, _event: ConversationFinished) -> None:
+        """Handle conversation finished."""
+        if self.headless_mode:
             self._print_conversation_summary()
             self.exit()
 
@@ -368,10 +397,19 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             )
 
     def _initialize_main_ui(self) -> None:
-        """Initialize the main UI components."""
+        """Initialize the main UI components.
 
-        if self.is_ui_initialized:
-            return
+        This method is responsible for:
+        1. Checking if the agent has a critic configured
+        2. Initializing the splash content (one-time setup)
+        3. Processing any queued inputs
+
+        UI lifecycle is owned by OpenHandsApp, not ConversationView. The splash
+        content initialization is a direct method call, not a reactive
+        state change, because it's a one-time operation.
+        """
+
+        splash_content = self.query_one("#splash_content", SplashContent)
 
         # Check if agent has critic configured
         has_critic = False
@@ -379,7 +417,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             agent_store = AgentStore()
             agent = agent_store.load_or_create(
                 env_overrides_enabled=self.env_overrides_enabled,
-                critic_disabled=self.critic_disabled,
+                critic_disabled=self.conversation_view._critic_disabled,
             )
             if agent:
                 has_critic = agent.critic is not None
@@ -387,87 +425,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             # If we can't load agent, just continue without critic notice
             pass
 
-        # Get structured splash content
-        splash_content = get_splash_content(
-            conversation_id=self.conversation_id.hex,
-            theme=OPENHANDS_THEME,
-            has_critic=has_critic,
-        )
-
-        # Update individual splash widgets
-        self.query_one("#splash_banner", Static).update(splash_content["banner"])
-        self.query_one("#splash_version", Static).update(splash_content["version"])
-        self.query_one("#splash_status", Static).update(splash_content["status_text"])
-        self.query_one("#splash_conversation", Static).update(
-            splash_content["conversation_text"]
-        )
-        self.query_one("#splash_instructions_header", Static).update(
-            splash_content["instructions_header"]
-        )
-
-        # Join instructions into a single string
-        instructions_text = "\n".join(splash_content["instructions"])
-        self.query_one("#splash_instructions", Static).update(instructions_text)
-
-        # Update notice (hide if None)
-        update_notice_widget = self.query_one("#splash_update_notice", Static)
-        if splash_content["update_notice"]:
-            update_notice_widget.update(splash_content["update_notice"])
-            update_notice_widget.display = True
-        else:
-            update_notice_widget.display = False
-
-        # Update critic notice (hide if None)
-        critic_notice_widget = self.query_one("#splash_critic_notice", Static)
-        if splash_content["critic_notice"]:
-            critic_notice_widget.update(splash_content["critic_notice"])
-            critic_notice_widget.display = True
-        else:
-            critic_notice_widget.display = False
+        # Initialize splash content - direct call for UI lifecycle
+        splash_content.initialize(has_critic=has_critic)
 
         # Process any queued inputs
         self._process_queued_inputs()
-        self.is_ui_initialized = True
-
-    def create_conversation_runner(
-        self,
-        conversation_id: uuid.UUID | None = None,
-        visualizer: ConversationVisualizer | None = None,
-    ) -> ConversationRunner:
-        """Create a ConversationRunner for a given conversation id.
-
-        Args:
-            conversation_id: Conversation id to use. Defaults to current id.
-            visualizer: Optional visualizer. If not provided, a new one is created.
-        """
-        conversation_uuid = conversation_id or self.conversation_id
-
-        # Initialize conversation runner with visualizer that can add widgets.
-        # Skip user messages since we display them immediately in the UI.
-        conversation_visualizer = visualizer or ConversationVisualizer(
-            self.main_display, self, skip_user_messages=True, name="OpenHands Agent"
-        )
-
-        # Create JSON callback if in JSON mode
-        event_callback = None
-        if self.json_mode:
-            event_callback = json_callback
-
-        runner = ConversationRunner(
-            conversation_uuid,
-            self.conversation_running_signal.publish,
-            self._handle_confirmation_request,
-            lambda title, message, severity: (
-                self.notify(title=title, message=message, severity=severity)
-            ),
-            conversation_visualizer,
-            self.initial_confirmation_policy,
-            event_callback,
-            env_overrides_enabled=self.env_overrides_enabled,
-            critic_disabled=self.critic_disabled,
-        )
-
-        return runner
 
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.
@@ -475,109 +437,30 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         Currently processes only the first queued input immediately.
         In the future, this could be extended to process multiple instructions
         from the queue one by one as the agent completes each task.
+
+        Posts UserInputSubmitted to ConversationView, which flows through the same
+        path as typed inputs:
+        1. ConversationView._on_user_input_submitted() - renders + processes with runner
         """
+        from openhands_cli.tui.messages import UserInputSubmitted
+
         if not self.pending_inputs:
             return
 
         # Process the first queued input immediately
         user_input = self.pending_inputs.pop(0)
 
-        # Add the user message to the main display as a Static widget
-        user_message_widget = Static(
-            f"> {user_input}", classes="user-message", markup=False
+        # Post to InputAreaContainer - reuses the same flow as typed inputs
+        self.conversation_view.input_area.post_message(
+            UserInputSubmitted(content=user_input)
         )
-        self.main_display.mount(user_message_widget)
-        self.main_display.scroll_end(animate=False)
-
-        # Handle the message asynchronously
-        asyncio.create_task(self._handle_user_message(user_input))
-
-    @on(InputField.Submitted)
-    async def handle_user_input(self, message: InputField.Submitted) -> None:
-        content = message.content.strip()
-        if not content:
-            return
-
-        # Add the user message to the main display as a Static widget
-        user_message_widget = Static(
-            f"> {content}", classes="user-message", markup=False
-        )
-        await self.main_display.mount(user_message_widget)
-        self.main_display.scroll_end(animate=False)
-        # Force immediate refresh to show the message without delay
-        self.refresh()
-
-        # Handle commands - only exact matches
-        if is_valid_command(content):
-            self._handle_command(content)
-        else:
-            # Handle regular messages with conversation runner
-            await self._handle_user_message(content)
-
-    def _handle_command(self, command: str) -> None:
-        """Handle command execution."""
-
-        if command == "/help":
-            show_help(self.main_display)
-        elif command == "/new":
-            self._handle_new_command()
-        elif command == "/history":
-            self._handle_history_command()
-        elif command == "/confirm":
-            self._handle_confirm_command()
-        elif command == "/condense":
-            self._handle_condense_command()
-        elif command == "/feedback":
-            self._handle_feedback_command()
-        elif command == "/exit":
-            self._handle_exit()
-        else:
-            self.notify(
-                title="Command error",
-                message=f"Unknown command: {command}",
-                severity="error",
-            )
-
-    async def _handle_user_message(self, user_message: str) -> None:
-        """Handle regular user messages with the conversation runner."""
-        # Dismiss any pending critic feedback widgets when user sends a new message
-        self._dismiss_pending_feedback_widgets()
-
-        # Check if conversation runner is initialized
-        if self.conversation_runner is None:
-            self.conversation_runner = self.create_conversation_runner()
-
-        # If History panel is open, update "New conversation" title immediately
-        # on the first message (without waiting for persistence on disk).
-        self._conversation_manager.update_title(user_message)
-
-        # Show that we're processing the message
-        if self.conversation_runner.is_running:
-            await self.conversation_runner.queue_message(user_message)
-            return
-
-        # Process message asynchronously to keep UI responsive
-        # Only run worker if we have an active app (not in tests)
-        try:
-            self.run_worker(
-                self.conversation_runner.process_message_async(
-                    user_message, self.headless_mode
-                ),
-                name="process_message",
-            )
-        except RuntimeError:
-            # In test environment, just show a placeholder message
-            placeholder_widget = Static(
-                f"[{OPENHANDS_THEME.success}]Message would be processed by "
-                f"conversation runner[/{OPENHANDS_THEME.success}]",
-                classes="status-message",
-            )
-            self.main_display.mount(placeholder_widget)
-            self.main_display.scroll_end(animate=False)
 
     def action_request_quit(self) -> None:
-        """Action to handle Ctrl+Q key binding."""
-        self._handle_exit()
+        """Action to handle Ctrl+Q key binding.
+
+        Delegates to InputAreaContainer's _command_exit() for consistent behavior.
+        """
+        self.conversation_view.input_area._command_exit()
 
     def action_toggle_cells(self) -> None:
         """Action to handle Ctrl+O key binding.
@@ -585,7 +468,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         Collapses all cells if any are expanded, otherwise expands all cells.
         This provides a quick way to minimize or maximize all content at once.
         """
-        collapsibles = self.main_display.query(Collapsible)
+        collapsibles = self.scroll_view.query(Collapsible)
 
         # If any cell is expanded, collapse all; otherwise expand all
         any_expanded = any(not collapsible.collapsed for collapsible in collapsibles)
@@ -605,7 +488,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Skip if autocomplete dropdown is visible (Tab is used for selection)
         if event.key == "tab" and isinstance(self.focused, Input | TextArea):
             if not self._is_autocomplete_showing():
-                collapsibles = list(self.main_display.query(Collapsible))
+                collapsibles = list(self.scroll_view.query(Collapsible))
                 if collapsibles:
                     # Focus the last (most recent) collapsible's title
                     last_collapsible = collapsibles[-1]
@@ -708,92 +591,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         else:
             self.notify(message="No running conversation to pause", severity="error")
 
-    def _handle_confirm_command(self) -> None:
-        """Handle the /confirm command to show confirmation settings modal."""
-        if not self.conversation_runner:
-            # If no conversation runner, create one to get the current policy
-            self.conversation_runner = self.create_conversation_runner()
-
-        # Get current confirmation policy
-        current_policy = self.conversation_runner.get_confirmation_policy()
-
-        # Show the confirmation settings modal
-        confirmation_modal = ConfirmationSettingsModal(
-            current_policy=current_policy,
-            on_policy_selected=self._on_confirmation_policy_selected,
-        )
-        self.push_screen(confirmation_modal)
-
-    def _on_confirmation_policy_selected(self, policy: ConfirmationPolicyBase) -> None:
-        """Handle when a confirmation policy is selected from the modal.
-
-        Args:
-            policy: The selected confirmation policy
-        """
-        if not self.conversation_runner:
-            return
-
-        # Set the new confirmation policy
-        self.conversation_runner.set_confirmation_policy(policy)
-
-        # Show status message based on the policy type
-        if isinstance(policy, NeverConfirm):
-            policy_name = "Always approve actions (no confirmation)"
-        elif isinstance(policy, AlwaysConfirm):
-            policy_name = "Confirm every action"
-        elif isinstance(policy, ConfirmRisky):
-            policy_name = "Confirm high-risk actions only"
-        else:
-            policy_name = "Custom policy"
-
-        self.notify(f"Confirmation policy set to: {policy_name}")
-
-    def _handle_condense_command(self) -> None:
-        """Handle the /condense command to condense conversation history."""
-        if not self.conversation_runner:
-            self.notify(
-                title="Condense Error",
-                message="No conversation available to condense",
-                severity="error",
-            )
-            return
-
-        # Use the async condensation method from conversation runner
-        # This will handle all error cases and notifications
-        asyncio.create_task(self.conversation_runner.condense_async())
-
-    def _handle_feedback_command(self) -> None:
-        """Handle the /feedback command to open feedback form in browser."""
-        import webbrowser
-
-        feedback_url = "https://forms.gle/chHc5VdS3wty5DwW6"
-        webbrowser.open(feedback_url)
-        self.notify(
-            title="Feedback",
-            message="Opening feedback form in your browser...",
-            severity="information",
-        )
-
-    def _dismiss_pending_feedback_widgets(self) -> None:
-        """Remove all pending CriticFeedbackWidget instances from the UI.
-
-        Called when user sends a new message, indicating they chose to
-        ignore the feedback prompt.
-        """
-        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
-
-        # Find and remove all CriticFeedbackWidget instances
-        for widget in self.main_display.query(CriticFeedbackWidget):
-            widget.remove()
-
-    def _handle_new_command(self) -> None:
-        """Handle the /new command to start a new conversation."""
-        self._conversation_manager.create_new()
-
-    def _handle_history_command(self) -> None:
-        """Handle the /history command to show conversation history panel."""
-        self.action_toggle_history()
-
     def action_toggle_history(self) -> None:
         """Toggle the history side panel."""
         HistorySidePanel.toggle(
@@ -801,48 +598,17 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             current_conversation_id=self.conversation_id,
         )
 
-    @on(ConversationCreated)
-    def on_conversation_created(self, event: ConversationCreated) -> None:
-        """Propagate conversation creation to history panel."""
-        self._notify_history_panel(event)
-
-    @on(ConversationTitleUpdated)
-    def on_conversation_title_updated(self, event: ConversationTitleUpdated) -> None:
-        """Propagate title update to history panel."""
-        self._notify_history_panel(event)
-
-    @on(ConversationSwitched)
-    def on_conversation_switched(self, event: ConversationSwitched) -> None:
-        """Propagate conversation switch to history panel."""
-        self._notify_history_panel(event)
-
-    @on(RevertSelectionRequest)
-    def on_revert_selection_request(self, event: RevertSelectionRequest) -> None:
-        """Propagate revert selection request to history panel."""
-        self._notify_history_panel(event)
-
-    def _notify_history_panel(self, message: Message) -> None:
-        """Helper to send message to history panel if it exists.
-
-        This decouples the sender (Manager/Switcher) from the receiver (Panel).
-        The sender just posts to App, and App forwards to Panel if present.
-        """
-        try:
-            self.query_one(HistorySidePanel).post_message(message)
-        except NoMatches:
-            pass
-
     @on(SwitchConversationRequest)
     def _on_switch_conversation_request(self, event: SwitchConversationRequest) -> None:
         """Handle request from history panel to switch conversations."""
-        self._conversation_manager.switch_to(event.conversation_id)
+        self._conversation_switcher.switch_to(event.conversation_id)
 
     def _handle_confirmation_request(
         self, pending_actions: list[ActionEvent]
     ) -> UserConfirmation:
-        """Handle confirmation request by showing an inline panel in the main display.
+        """Handle confirmation request by showing an inline panel in the scroll view.
 
-        The inline confirmation panel is mounted in the main_display area,
+        The inline confirmation panel is mounted in the scroll_view area,
         underneath the latest action event collapsible. Since the action details
         are already visible in the collapsible above, this panel only shows
         the confirmation options.
@@ -878,14 +644,14 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                     if not decision_future.done():
                         decision_future.set_result(decision)
 
-                # Create and mount the inline confirmation panel in main_display
+                # Create and mount the inline confirmation panel in scroll_view
                 # This places it underneath the latest action event collapsible
                 self.confirmation_panel = InlineConfirmationPanel(
                     len(pending_actions), on_confirmation_decision
                 )
-                self.main_display.mount(self.confirmation_panel)
+                self.scroll_view.mount(self.confirmation_panel)
                 # Scroll to show the confirmation panel
-                self.main_display.scroll_end(animate=False)
+                self.scroll_view.scroll_end(animate=False)
 
             except Exception:
                 # If there's an error, default to DEFER
@@ -901,13 +667,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         except Exception:
             # If timeout or error, default to DEFER
             return UserConfirmation.DEFER
-
-    def _handle_exit(self) -> None:
-        """Handle exit command with optional confirmation."""
-        if self.exit_confirmation:
-            self.push_screen(ExitConfirmationModal())
-        else:
-            self.exit()
 
 
 def main(
