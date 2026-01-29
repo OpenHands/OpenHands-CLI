@@ -1,35 +1,35 @@
 """OpenHands CLI TUI application.
 
 This is the main Textual application for the OpenHands CLI. The architecture
-separates concerns between App (shell/navigation), ConversationView (state/lifecycle),
-and InputAreaContainer (slash command handling).
+separates concerns between:
+- OpenHandsApp: Screen/modal management, side panels, global key bindings
+- ConversationManager: Handles operations (create, switch, send messages)
+- ConversationState: Pure reactive state container for UI binding
+- InputAreaContainer: Posts operation messages that bubble to ConversationManager
 
 Widget Hierarchy::
 
     OpenHandsApp
-    └── Horizontal(#content_area)
-        └── ConversationView(#conversation_view)  ← Owns state + ConversationRunner
-            ├── ScrollableContent(#scroll_view)  ← Scrollable conversation content
-            │   ├── SplashContent(#splash_content) ← data_bind to conversation_id
-            │   └── ... conversation widgets (dynamically added)
-            └── InputAreaContainer(#input_area)  ← docked to bottom
-                ├── WorkingStatusLine (data_bind)
-                ├── InputField          ← Posts messages
-                └── InfoStatusLine (data_bind)
+    └── ConversationManager (Container)  ← Messages bubble here
+        └── Horizontal(#content_area)
+            └── ConversationState(#conversation_state)  ← Owns reactive state
+                ├── ScrollableContent(#scroll_view)  ← data_bind to conversation_id
+                │   ├── SplashContent(#splash_content) ← data_bind to conversation_id
+                │   └── ... conversation widgets (dynamically added)
+                └── InputAreaContainer(#input_area)
+                    ├── WorkingStatusLine (data_bind)
+                    ├── InputField          ← Posts messages
+                    └── InfoStatusLine (data_bind)
     └── Footer
 
-Message Flow:
-    InputField → ConversationView
-        - UserInputSubmitted: ConversationView renders and processes with runner
-        - SlashCommandSubmitted: InputAreaContainer executes command (stops bubbling)
-        - NewConversationRequested: ConversationView handles /new command
+Message Flow (bubbling up to ConversationManager):
+    InputField → UserInputSubmitted → bubbles → ConversationManager
+    InputAreaContainer → CreateConversation/etc → bubbles → ConversationManager
+    HistorySidePanel → SwitchConversation → bubbles → ConversationManager
 
-Responsibilities:
-    - InputAreaContainer: Slash command execution
-    - ConversationView: State management, ConversationRunner lifecycle, content rendering
-    - ScrollableContent: Scrollable container for splash + conversation widgets
-    - OpenHandsApp: Screen/modal management, side panels, global key bindings
-    - SplashContent: Displays splash screen, auto-updates via conversation_id binding
+Data Binding:
+    ConversationManager updates ConversationState, which triggers reactive
+    updates to all bound UI components via data_bind() and watch().
 """
 
 import uuid
@@ -56,16 +56,19 @@ from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.locations import get_conversations_dir
 from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.core import ConversationFinished, ConversationView
+from openhands_cli.tui.core import (
+    ConversationFinished,
+    ConversationManager,
+    ConversationState,
+    ConversationView,  # Backward compatibility alias
+    PauseConversation,
+    SendMessage,
+)
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
-from openhands_cli.tui.core.conversation_switcher import ConversationSwitcher
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
-from openhands_cli.tui.panels.history_side_panel import (
-    HistorySidePanel,
-    SwitchConversationRequest,
-)
+from openhands_cli.tui.panels.history_side_panel import HistorySidePanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
 from openhands_cli.tui.widgets import InputField, ScrollableContent
@@ -100,23 +103,23 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     @property
     def conversation_id(self) -> uuid.UUID:
-        """Get current conversation ID from ConversationView (source of truth)."""
-        return self.conversation_view.conversation_id
+        """Get current conversation ID from ConversationState (source of truth)."""
+        return self.conversation_state.conversation_id
 
     @conversation_id.setter
     def conversation_id(self, value: uuid.UUID) -> None:
-        """Set conversation ID in ConversationView (source of truth)."""
-        self.conversation_view.conversation_id = value
+        """Set conversation ID in ConversationState (source of truth)."""
+        self.conversation_state.conversation_id = value
 
     @property
     def conversation_runner(self) -> ConversationRunner | None:
-        """Get conversation runner from ConversationView (source of truth)."""
-        return self.conversation_view.conversation_runner
+        """Get conversation runner from ConversationManager."""
+        return self.conversation_manager.current_runner
 
-    @conversation_runner.setter
-    def conversation_runner(self, value: ConversationRunner | None) -> None:
-        """Set conversation runner in ConversationView (source of truth)."""
-        self.conversation_view.conversation_runner = value
+    @property
+    def conversation_view(self) -> ConversationState:
+        """Backward compatibility alias for conversation_state."""
+        return self.conversation_state
 
     def __init__(
         self,
@@ -147,10 +150,14 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """
         super().__init__(**kwargs)
 
-        # ConversationView is the single source of truth for application state
-        # It owns the ConversationRunner and all reactive state
-        self.conversation_view = ConversationView(
+        # ConversationState holds reactive state for UI binding
+        self.conversation_state = ConversationState(
             initial_confirmation_policy=initial_confirmation_policy or AlwaysConfirm(),
+        )
+
+        # ConversationManager handles operations and updates state
+        self.conversation_manager = ConversationManager(
+            state=self.conversation_state,
             env_overrides_enabled=env_overrides_enabled,
             critic_disabled=critic_disabled,
             json_mode=json_mode,
@@ -165,11 +172,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Store these for _reload_visualizer (still need App-level access)
         self.env_overrides_enabled = env_overrides_enabled
 
-        # conversation_id is owned by ConversationView - we just initialize it here
+        # Initialize conversation_id
         initial_conversation_id = (
             resume_conversation_id if resume_conversation_id else uuid.uuid4()
         )
-        self.conversation_view.conversation_id = initial_conversation_id
+        self.conversation_state.conversation_id = initial_conversation_id
 
         self.conversation_dir = BaseConversation.get_persistence_dir(
             get_conversations_dir(), initial_conversation_id
@@ -178,12 +185,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Store queued inputs (copy to prevent mutating caller's list)
         self.pending_inputs = list(queued_inputs) if queued_inputs else []
 
-        # ConversationRunner is now owned by ConversationView
         self._store = LocalFileStore()
-        self._conversation_switcher = ConversationSwitcher(self)
 
         def reload_visualizer():
-            runner = self.conversation_view.conversation_runner
+            runner = self.conversation_manager.current_runner
             if runner:
                 runner.visualizer.reload_configuration()
 
@@ -211,29 +216,33 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         Widget Hierarchy::
 
             OpenHandsApp
-            └── Horizontal(#content_area)
-                └── ConversationView(#conversation_view)  ← Owns state
-                    ├── ScrollableContent(#scroll_view)
-                    │   ├── SplashContent  ← data_bind
-                    │   └── ... conversation content
-                    └── InputAreaContainer(#input_area)  ← handles input
-                        ├── WorkingStatusLine (data_bind)
-                        ├── InputField
-                        └── InfoStatusLine (data_bind)
+            └── ConversationManager (Container)  ← Messages bubble here
+                └── Horizontal(#content_area)
+                    └── ConversationState(#conversation_state)  ← Owns reactive state
+                        ├── ScrollableContent(#scroll_view)
+                        │   ├── SplashContent  ← data_bind
+                        │   └── ... conversation content
+                        └── InputAreaContainer(#input_area)
+                            ├── WorkingStatusLine (data_bind)
+                            ├── InputField
+                            └── InfoStatusLine (data_bind)
             └── Footer
 
         Message Flow:
-            InputField → InputAreaContainer → ConversationView → OpenHandsApp
+            InputField → UserInputSubmitted → bubbles up → ConversationManager
+            InputField → SlashCommand → InputAreaContainer → CreateConversation → bubbles up → ConversationManager
 
         Data Binding:
-            All widgets are composed from ConversationView.compose(), so data_bind
-            works because the active pump is ConversationView (the reactive owner).
+            All widgets are composed from ConversationState.compose(), so data_bind
+            works because the active pump is ConversationState (the reactive owner).
         """
-        # Content area - horizontal layout for conversation and optional panels
-        with Horizontal(id="content_area"):
-            # ConversationView composes scroll_view, input_area and all child widgets
-            # This enables data_bind() to work (requires owner as active pump)
-            yield self.conversation_view
+        # ConversationManager wraps content so messages bubble up to it
+        with self.conversation_manager:
+            # Content area - horizontal layout for conversation and optional panels
+            with Horizontal(id="content_area"):
+                # ConversationState composes scroll_view, input_area and all child widgets
+                # This enables data_bind() to work (requires owner as active pump)
+                yield self.conversation_state
 
         # Footer - shows available key bindings
         yield Footer()
@@ -438,29 +447,24 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         In the future, this could be extended to process multiple instructions
         from the queue one by one as the agent completes each task.
 
-        Posts UserInputSubmitted to ConversationView, which flows through the same
-        path as typed inputs:
-        1. ConversationView._on_user_input_submitted() - renders + processes with runner
+        Posts SendMessage to ConversationManager, which handles rendering
+        and processing with the runner.
         """
-        from openhands_cli.tui.messages import UserInputSubmitted
-
         if not self.pending_inputs:
             return
 
         # Process the first queued input immediately
         user_input = self.pending_inputs.pop(0)
 
-        # Post to InputAreaContainer - reuses the same flow as typed inputs
-        self.conversation_view.input_area.post_message(
-            UserInputSubmitted(content=user_input)
-        )
+        # Post to ConversationManager
+        self.conversation_manager.post_message(SendMessage(user_input))
 
     def action_request_quit(self) -> None:
         """Action to handle Ctrl+Q key binding.
 
         Delegates to InputAreaContainer's _command_exit() for consistent behavior.
         """
-        self.conversation_view.input_area._command_exit()
+        self.conversation_state.input_area._command_exit()
 
     def action_toggle_cells(self) -> None:
         """Action to handle Ctrl+O key binding.
@@ -585,11 +589,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def action_pause_conversation(self) -> None:
         """Action to handle Esc key binding - pause the running conversation."""
-        # Run the pause operation asynchronously to avoid blocking the UI
-        if self.conversation_runner:
-            self.conversation_runner.pause_runner_without_blocking()
-        else:
-            self.notify(message="No running conversation to pause", severity="error")
+        # Post to ConversationManager to pause
+        self.conversation_manager.post_message(PauseConversation())
 
     def action_toggle_history(self) -> None:
         """Toggle the history side panel."""
@@ -597,11 +598,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self,
             current_conversation_id=self.conversation_id,
         )
-
-    @on(SwitchConversationRequest)
-    def _on_switch_conversation_request(self, event: SwitchConversationRequest) -> None:
-        """Handle request from history panel to switch conversations."""
-        self._conversation_switcher.switch_to(event.conversation_id)
 
     def _handle_confirmation_request(
         self, pending_actions: list[ActionEvent]

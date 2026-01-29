@@ -1,32 +1,29 @@
 """Input area container for status lines and input field.
 
-This container is docked to the bottom of ConversationView (as a sibling of
+This container is docked to the bottom of ConversationState (as a sibling of
 ScrollableContent) and handles slash command execution.
 
 Widget Hierarchy:
-    ConversationView(#conversation_view)
-    ├── ScrollableContent(#scroll_view)  ← sibling, content rendered here
-    └── InputAreaContainer(#input_area)  ← docked to bottom
-        ├── WorkingStatusLine
-        ├── InputField  ← posts messages
-        └── InfoStatusLine
+    ConversationManager (ancestor - messages bubble here)
+    └── ConversationState(#conversation_state)
+        ├── ScrollableContent(#scroll_view)  ← sibling, content rendered here
+        └── InputAreaContainer(#input_area)  ← docked to bottom
+            ├── WorkingStatusLine
+            ├── InputField  ← posts messages
+            └── InfoStatusLine
 
-Note: UserInputSubmitted bubbles up to ConversationView for rendering and processing.
-The child widgets are composed by ConversationView (not this container) to enable
-data_bind() to work properly.
+Message Flow:
+    - SlashCommandSubmitted → InputAreaContainer posts operation messages
+    - All messages bubble up to ConversationManager (ancestor)
 """
 
-import asyncio
 from typing import TYPE_CHECKING
 
 from textual import on
 from textual.containers import Container
 
 from openhands_cli.tui.core.commands import show_help
-from openhands_cli.tui.messages import (
-    NewConversationRequested,
-    SlashCommandSubmitted,
-)
+from openhands_cli.tui.messages import SlashCommandSubmitted
 
 
 if TYPE_CHECKING:
@@ -36,17 +33,12 @@ if TYPE_CHECKING:
 class InputAreaContainer(Container):
     """Container for the input area that handles slash commands.
 
-    InputAreaContainer is responsible for executing slash commands
-    (SlashCommandSubmitted).
+    InputAreaContainer posts operation messages (CreateConversation, etc.)
+    that bubble up to ConversationManager, which is an ancestor in the
+    widget hierarchy.
 
-    Note: UserInputSubmitted bubbles up to ConversationView for rendering
-    and processing.
-
-    It delegates to self.app for:
-    - Conversation runner management (owned by ConversationView)
-    - Screen/modal pushing (exit, confirm, settings)
-    - Side panel toggling (history)
-    - Notifications
+    UserInputSubmitted messages from InputField also bubble up to
+    ConversationManager automatically.
     """
 
     @property
@@ -54,16 +46,16 @@ class InputAreaContainer(Container):
         """Get the sibling scrollable content area."""
         from openhands_cli.tui.widgets.main_display import ScrollableContent
 
-        # scroll_view is a sibling - query from parent (ConversationView)
+        # scroll_view is a sibling - query from parent (ConversationState)
         assert self.parent is not None, "InputAreaContainer must have a parent"
         return self.parent.query_one("#scroll_view", ScrollableContent)
 
     @on(SlashCommandSubmitted)
     def _on_slash_command_submitted(self, event: SlashCommandSubmitted) -> None:
-        """Handle slash commands.
+        """Handle slash commands by routing to appropriate handlers.
 
-        Routes to appropriate _command_* method based on the command.
-        Stops event propagation since InputAreaContainer handles all commands.
+        Routes to ConversationManager for conversation operations,
+        or to app-level handlers for UI operations.
         """
         event.stop()
 
@@ -97,7 +89,10 @@ class InputAreaContainer(Container):
 
     def _command_new(self) -> None:
         """Handle the /new command to start a new conversation."""
-        self.post_message(NewConversationRequested())
+        from openhands_cli.tui.core import CreateConversation
+
+        # Message bubbles up to ConversationManager (ancestor)
+        self.post_message(CreateConversation())
 
     def _command_history(self) -> None:
         """Handle the /history command to show conversation history panel."""
@@ -108,6 +103,7 @@ class InputAreaContainer(Container):
 
     def _command_confirm(self) -> None:
         """Handle the /confirm command to show confirmation settings modal."""
+        from openhands_cli.tui.core import SetConfirmationPolicy
         from openhands_cli.tui.modals.confirmation_modal import (
             ConfirmationSettingsModal,
         )
@@ -115,32 +111,25 @@ class InputAreaContainer(Container):
 
         app: OpenHandsApp = self.app  # type: ignore[assignment]
 
-        # Get current confirmation policy from ConversationView
-        current_policy = app.conversation_view.confirmation_policy
+        # Get current confirmation policy from state
+        current_policy = app.conversation_state.confirmation_policy
 
-        # Show the confirmation settings modal
+        # Callback posts message that bubbles up to ConversationManager
+        def on_policy_selected(policy):
+            self.post_message(SetConfirmationPolicy(policy))
+
         confirmation_modal = ConfirmationSettingsModal(
             current_policy=current_policy,
-            on_policy_selected=app.conversation_view.set_confirmation_policy,
+            on_policy_selected=on_policy_selected,
         )
         app.push_screen(confirmation_modal)
 
     def _command_condense(self) -> None:
         """Handle the /condense command to condense conversation history."""
-        from openhands_cli.tui.textual_app import OpenHandsApp
+        from openhands_cli.tui.core import CondenseConversation
 
-        app: OpenHandsApp = self.app  # type: ignore[assignment]
-
-        if not app.conversation_runner:
-            app.notify(
-                title="Condense Error",
-                message="No conversation available to condense",
-                severity="error",
-            )
-            return
-
-        # Use the async condensation method from conversation runner
-        asyncio.create_task(app.conversation_runner.condense_async())
+        # Message bubbles up to ConversationManager (ancestor)
+        self.post_message(CondenseConversation())
 
     def _command_feedback(self) -> None:
         """Handle the /feedback command to open feedback form in browser."""

@@ -3,8 +3,8 @@
 This module provides ScrollableContent, a VerticalScroll container that
 holds conversation content (splash screen and dynamically added messages).
 
-Widget Hierarchy (within ConversationView):
-    ConversationView(Container, #conversation_view)
+Widget Hierarchy (within ConversationState):
+    ConversationState(Container, #conversation_state)
     ├── ScrollableContent(VerticalScroll, #scroll_view)
     │   ├── SplashContent(#splash_content)
     │   └── ... dynamically added conversation widgets
@@ -14,8 +14,8 @@ Widget Hierarchy (within ConversationView):
         └── InfoStatusLine
 
 ScrollableContent handles clearing dynamic content when conversation_id changes
-via data_bind() to ConversationView.conversation_id. Message handling
-(UserInputSubmitted, SlashCommandSubmitted) is done by ConversationView.
+via data_bind() to ConversationState.conversation_id. Message handling
+(UserInputSubmitted) is done by ConversationManager.
 """
 
 import uuid
@@ -31,13 +31,13 @@ class ScrollableContent(VerticalScroll):
     - SplashContent at the top
     - Dynamically added conversation widgets (user messages, agent responses)
 
-    Reactive Properties (via data_bind from ConversationView):
+    Reactive Properties (via data_bind from ConversationState):
     - conversation_id: Current conversation ID (clears content on change)
 
-    Message handling is done by ConversationView, not by this widget.
+    Message handling is done by ConversationManager, not by this widget.
     """
 
-    # Reactive property bound via data_bind() to ConversationView
+    # Reactive property bound via data_bind() to ConversationState
     conversation_id: var[uuid.UUID] = var(uuid.uuid4)
 
     def watch_conversation_id(self, old_id: uuid.UUID, new_id: uuid.UUID) -> None:

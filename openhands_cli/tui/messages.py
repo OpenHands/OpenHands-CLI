@@ -7,10 +7,9 @@ from child to parent, allowing ancestor widgets to handle them.
 Message Flow:
     InputField
         ↓
-    InputAreaContainer ← Handles SlashCommandSubmitted (executes commands)
+    InputAreaContainer ← Handles SlashCommandSubmitted (routes to ConversationManager)
         ↓
-    ConversationView   ← Handles UserInputSubmitted (renders and processes)
-                       ← Handles NewConversationRequested
+    ConversationManager ← Handles UserInputSubmitted (renders and processes)
         ↓
     OpenHandsApp       ← Handles app-level concerns (modals, notifications)
 """

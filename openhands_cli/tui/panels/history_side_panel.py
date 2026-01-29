@@ -1,10 +1,13 @@
 """History side panel widget for switching between conversations.
 
-This panel watches ConversationView for conversation state changes instead of
+This panel watches ConversationState for conversation state changes instead of
 receiving forwarded messages. When mounted, it subscribes to:
 - conversation_id: to update current/selected highlighting
 - conversation_title: to update the title display for new conversations
 - is_switching: to handle revert selection when switch is cancelled
+
+Conversation switching is done by posting SwitchConversation messages to
+ConversationManager.
 """
 
 from __future__ import annotations
@@ -16,7 +19,6 @@ from typing import TYPE_CHECKING
 
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.css.query import NoMatches
-from textual.message import Message
 from textual.widgets import Static
 
 from openhands_cli.conversations.models import ConversationMetadata
@@ -26,24 +28,13 @@ from openhands_cli.tui.panels.history_panel_style import HISTORY_PANEL_STYLE
 
 
 if TYPE_CHECKING:
+    from openhands_cli.tui.core.conversation_manager import ConversationManager
     from openhands_cli.tui.textual_app import OpenHandsApp
 
 
 def _escape_rich_markup(text: str) -> str:
     """Escape Rich markup characters in text to prevent markup errors."""
     return text.replace("[", r"\[").replace("]", r"\]")
-
-
-class SwitchConversationRequest(Message):
-    """Sent by UI components (like HistorySidePanel) to request a conversation switch.
-
-    This represents user intent, not state change. The app handles this by
-    calling ConversationSwitcher.switch_to(), which updates ConversationView.
-    """
-
-    def __init__(self, conversation_id: str) -> None:
-        super().__init__()
-        self.conversation_id = conversation_id
 
 
 class HistoryItem(Static):
@@ -196,27 +187,27 @@ class HistorySidePanel(Container):
     def on_mount(self):
         """Called when the panel is mounted.
 
-        Sets up watchers on ConversationView to react to conversation state changes.
+        Sets up watchers on ConversationState to react to conversation state changes.
         """
-        cv = self._oh_app.conversation_view
+        state = self._oh_app.conversation_state
 
         # Initialize from current state
-        self.current_conversation_id = cv.conversation_id
+        self.current_conversation_id = state.conversation_id
         self.selected_conversation_id = self.current_conversation_id
-        self._previous_is_switching = cv.is_switching
+        self._previous_is_switching = state.is_switching
 
-        # Watch ConversationView for changes
-        self.watch(cv, "conversation_id", self._on_conversation_id_changed)
-        self.watch(cv, "conversation_title", self._on_conversation_title_changed)
-        self.watch(cv, "is_switching", self._on_is_switching_changed)
+        # Watch ConversationState for changes
+        self.watch(state, "conversation_id", self._on_conversation_id_changed)
+        self.watch(state, "conversation_title", self._on_conversation_title_changed)
+        self.watch(state, "is_switching", self._on_is_switching_changed)
 
         # Load and render conversations
         self.refresh_content()
 
-    # --- ConversationView Watchers ---
+    # --- ConversationState Watchers ---
 
     def _on_conversation_id_changed(self, new_id: uuid.UUID | None) -> None:
-        """React to conversation_id changes in ConversationView.
+        """React to conversation_id changes in ConversationState.
 
         This handles both new conversation creation and conversation switching.
         """
@@ -231,7 +222,7 @@ class HistorySidePanel(Container):
         self.select_current_conversation()
 
     def _on_conversation_title_changed(self, new_title: str | None) -> None:
-        """React to conversation_title changes in ConversationView."""
+        """React to conversation_title changes in ConversationState."""
         if new_title and self.current_conversation_id:
             self.update_conversation_title_if_needed(
                 conversation_id=self.current_conversation_id,
@@ -239,7 +230,7 @@ class HistorySidePanel(Container):
             )
 
     def _on_is_switching_changed(self, is_switching: bool) -> None:
-        """React to is_switching changes in ConversationView.
+        """React to is_switching changes in ConversationState.
 
         When switching ends (is_switching goes from True to False) but the
         conversation_id hasn't changed, it means the switch was cancelled.
@@ -252,7 +243,7 @@ class HistorySidePanel(Container):
         if was_switching and not is_switching:
             # The conversation_id watcher handles successful switches,
             # so we only need to handle cancelled switches here
-            current_state_id = self._oh_app.conversation_view.conversation_id
+            current_state_id = self._oh_app.conversation_state.conversation_id
             if current_state_id == self.current_conversation_id:
                 # Switch was cancelled - revert selection to current
                 self.select_current_conversation()
@@ -297,12 +288,14 @@ class HistorySidePanel(Container):
             )
 
     def _handle_select(self, conversation_id: str) -> None:
-        """Handle conversation selection."""
+        """Handle conversation selection by posting SwitchConversation."""
+        from openhands_cli.tui.core import SwitchConversation
+
         self.selected_conversation_id = uuid.UUID(conversation_id)
         self._update_highlights()
 
-        # Post a message to request conversation switch (App will handle it)
-        self.post_message(SwitchConversationRequest(conversation_id))
+        # Message bubbles up to ConversationManager (ancestor via content_area)
+        self.post_message(SwitchConversation(uuid.UUID(conversation_id)))
 
     def _update_highlights(self) -> None:
         """Update current/selected highlights without reloading the list."""

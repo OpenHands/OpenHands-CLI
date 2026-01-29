@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.text import Text
+from textual.message_pump import MessagePump
 from textual.notifications import SeverityLevel
 
 from openhands.sdk import (
@@ -17,7 +18,7 @@ from openhands.sdk import (
 )
 from openhands.sdk.conversation.exceptions import ConversationRunError
 from openhands.sdk.conversation.state import (
-    ConversationState,
+    ConversationState as SDKConversationState,
 )
 from openhands.sdk.event.base import Event
 from openhands.sdk.security.confirmation_policy import (
@@ -30,20 +31,22 @@ from openhands_cli.user_actions.types import UserConfirmation
 
 
 if TYPE_CHECKING:
-    from openhands_cli.tui.core.state import ConversationView
+    from openhands_cli.tui.core.state import ConversationState
 
 
 class ConversationRunner:
     """Conversation runner with confirmation mode support.
 
-    ConversationView owns the confirmation policy. This class delegates policy
-    operations to ConversationView rather than managing policy state internally.
+    Uses MessagePump to post policy change messages to ConversationManager.
+    ConversationState is used only for reading state (is_confirmation_active)
+    and updating running status.
     """
 
     def __init__(
         self,
         conversation_id: uuid.UUID,
-        conversation_view: "ConversationView",
+        state: "ConversationState",
+        message_pump: MessagePump,
         confirmation_callback: Callable,
         notification_callback: Callable[[str, str, SeverityLevel], None],
         visualizer: ConversationVisualizer,
@@ -56,8 +59,8 @@ class ConversationRunner:
 
         Args:
             conversation_id: UUID for the conversation.
-            conversation_view: ConversationView for reactive state updates.
-                Owns confirmation policy and syncs it to conversation.
+            state: ConversationState for reading state and updating running status.
+            message_pump: MessagePump (ConversationManager) for posting policy changes.
             confirmation_callback: Callback for handling action confirmations.
             notification_callback: Callback for notifications.
             visualizer: Visualizer for output display.
@@ -68,10 +71,10 @@ class ConversationRunner:
         """
         self.visualizer = visualizer
 
-        # Create conversation with policy from ConversationView
+        # Create conversation with policy from state
         self.conversation: BaseConversation = setup_conversation(
             conversation_id,
-            confirmation_policy=conversation_view.confirmation_policy,
+            confirmation_policy=state.confirmation_policy,
             visualizer=visualizer,
             event_callback=event_callback,
             env_overrides_enabled=env_overrides_enabled,
@@ -80,17 +83,16 @@ class ConversationRunner:
 
         self._running = False
 
-        # State management via ConversationView (which owns the confirmation policy)
-        self._conversation_view = conversation_view
+        # State for reading (is_confirmation_active) and updating (set_running)
+        self._state = state
+        # MessagePump for posting policy change messages
+        self._message_pump = message_pump
         self._confirmation_callback = confirmation_callback
         self._notification_callback = notification_callback
 
-        # Attach conversation to ConversationView - this syncs the policy
-        self._conversation_view.attach_conversation(self.conversation)
-
     @property
     def is_confirmation_mode_active(self) -> bool:
-        return self._conversation_view.is_confirmation_active
+        return self._state.is_confirmation_active
 
     async def queue_message(self, user_input: str) -> None:
         """Queue a message for a running conversation"""
@@ -199,10 +201,13 @@ class ConversationRunner:
         Returns:
             UserConfirmation indicating the user's choice
         """
+        # Import here to avoid circular import at module level
+        from openhands_cli.tui.core.conversation_manager import SetConfirmationPolicy
+
         if not self.conversation:
             return UserConfirmation.DEFER
 
-        pending_actions = ConversationState.get_unmatched_actions(
+        pending_actions = SDKConversationState.get_unmatched_actions(
             self.conversation.state.events
         )
 
@@ -224,11 +229,11 @@ class ConversationRunner:
             # Pause the conversation for later resumption
             self.conversation.pause()
         elif decision == UserConfirmation.ALWAYS_PROCEED:
-            # Accept actions and change policy to NeverConfirm via ConversationView
-            self._conversation_view.set_confirmation_policy(NeverConfirm())
+            # Post policy change message to ConversationManager
+            self._message_pump.post_message(SetConfirmationPolicy(NeverConfirm()))
         elif decision == UserConfirmation.CONFIRM_RISKY:
-            # Accept actions and change policy to ConfirmRisky via ConversationView
-            self._conversation_view.set_confirmation_policy(ConfirmRisky())
+            # Post policy change message to ConversationManager
+            self._message_pump.post_message(SetConfirmationPolicy(ConfirmRisky()))
 
         # For ACCEPT and policy-changing decisions, we continue normally
         return decision
@@ -288,9 +293,9 @@ class ConversationRunner:
             )
 
     def _update_run_status(self, is_running: bool) -> None:
-        """Update the running status via ConversationView."""
+        """Update the running status via ConversationState."""
         self._running = is_running
-        self._conversation_view.set_running(is_running)
+        self._state.set_running(is_running)
 
     def pause_runner_without_blocking(self):
         if self.is_running:
