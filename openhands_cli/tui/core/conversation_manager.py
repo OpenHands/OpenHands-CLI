@@ -75,7 +75,11 @@ class ConversationManager:
 
         # Create a new conversation via store
         new_id_str = self.store.create()
-        app.conversation_id = uuid.UUID(new_id_str)
+        new_id = uuid.UUID(new_id_str)
+
+        # Update active conversation
+        app.conversation_id = new_id
+        app.conversation_session_manager.set_active_conversation(new_id)
 
         # Reset the conversation runner
         app.conversation_runner = None
@@ -85,24 +89,21 @@ class ConversationManager:
             app.confirmation_panel.remove()
             app.confirmation_panel = None
 
-        # Clear all dynamically added widgets from main_display
-        # Keep only the splash widgets (those with IDs starting with "splash_")
-        widgets_to_remove = [
-            w
-            for w in app.main_display.children
-            if not (w.id or "").startswith("splash_")
-        ]
-        for widget in widgets_to_remove:
-            widget.remove()
+        # Hide all existing panes before showing splash
+        app._hide_all_panes()
 
-        # Update the splash conversation widget with the new conversation ID
+        # Show system splash for new conversations (don't create pane yet -
+        # it will be created when user types first message)
+        app._set_splash_visible(True)
+
+        # Update splash conversation widget with new ID
         splash_conversation = app.query_one("#splash_conversation", Static)
         splash_conversation.update(
-            get_conversation_text(app.conversation_id.hex, theme=OPENHANDS_THEME)
+            get_conversation_text(new_id.hex, theme=OPENHANDS_THEME)
         )
 
         # Notify app about creation (App will propagate to history panel)
-        app.post_message(ConversationCreated(app.conversation_id))
+        app.post_message(ConversationCreated(new_id))
 
         # Scroll to top to show the splash screen
         app.main_display.scroll_home(animate=False)
@@ -114,7 +115,7 @@ class ConversationManager:
             severity="information",
         )
 
-        return app.conversation_id
+        return new_id
 
     def update_title(self, title: str) -> None:
         """Update the current conversation's title in the history panel.

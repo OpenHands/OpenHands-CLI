@@ -530,11 +530,11 @@ class TestOpenHandsAppCommands:
             assert call_args[1]["severity"] == "error"
 
     @pytest.mark.asyncio
-    async def test_new_command_clears_dynamically_added_widgets(
+    async def test_new_command_hides_conversation_panes(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """`/new` should clear dynamically added widgets but keep splash widgets."""
+        """`/new` should hide conversation panes and show splash."""
         from textual.widgets import Static
 
         monkeypatch.setattr(
@@ -548,13 +548,13 @@ class TestOpenHandsAppCommands:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            # Add a dynamic widget to main_display (simulating conversation content)
-            dynamic_widget = Static("Test message", classes="user-message")
-            oh_app.main_display.mount(dynamic_widget)
+            # Create a conversation pane (simulating active conversation)
+            pane = oh_app.get_or_create_pane(oh_app.conversation_id)
             await pilot.pause()
 
-            # Verify the widget was added
-            assert dynamic_widget in oh_app.main_display.children
+            # Verify the pane exists and is visible
+            assert pane in oh_app.main_display.children
+            assert pane.display is True
 
             # Mock notify
             notify_mock = mock.MagicMock()
@@ -563,8 +563,13 @@ class TestOpenHandsAppCommands:
             oh_app._handle_command("/new")
             await pilot.pause()
 
-            # Verify dynamic widget was removed
-            assert dynamic_widget not in oh_app.main_display.children
+            # Verify pane is hidden (not removed)
+            assert pane in oh_app.main_display.children
+            assert pane.display is False
+
+            # Verify splash is visible
+            splash_pane = oh_app.query_one("#splash_system_pane")
+            assert splash_pane.display is True
 
             # Verify splash widgets still exist
             splash_banner = oh_app.query_one("#splash_banner", Static)

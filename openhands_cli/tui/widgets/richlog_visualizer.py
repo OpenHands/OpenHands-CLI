@@ -48,7 +48,7 @@ ELLIPSIS = "..."
 
 
 if TYPE_CHECKING:
-    from textual.containers import VerticalScroll
+    from textual.containers import Container, VerticalScroll
     from textual.widget import Widget
 
     from openhands_cli.tui.textual_app import OpenHandsApp
@@ -84,13 +84,14 @@ def _get_event_border_color(event: Event) -> str:
 class ConversationVisualizer(ConversationVisualizerBase):
     """Handles visualization of conversation events for Textual apps.
 
-    This visualizer creates Collapsible widgets and adds them to a VerticalScroll
-    container. Supports delegate visualization by tracking agent identity.
+    This visualizer creates Collapsible widgets and adds them to a Container
+    (typically VerticalScroll or ConversationPane). Supports delegate
+    visualization by tracking agent identity.
     """
 
     def __init__(
         self,
-        container: "VerticalScroll",
+        container: "VerticalScroll | Container",
         app: "OpenHandsApp",
         skip_user_messages: bool = False,
         name: str | None = None,
@@ -98,7 +99,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """Initialize the visualizer.
 
         Args:
-            container: The Textual VerticalScroll container to add widgets to
+            container: The Textual container to add widgets to (VerticalScroll
+                       or any Container that supports mount())
             app: The Textual app instance for thread-safe UI updates
             skip_user_messages: If True, skip displaying user messages
             name: Agent name to display in panel titles for delegation context.
@@ -318,7 +320,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """Add a widget to the UI (must be called from main thread)."""
         self._container.mount(widget)
         # Automatically scroll to the bottom to show the newly added widget
-        self._container.scroll_end(animate=False)
+        # (only if container supports scrolling, e.g., VerticalScroll)
+        if hasattr(self._container, "scroll_end"):
+            self._container.scroll_end(animate=False)
 
     def _update_widget_in_ui(
         self, collapsible: Collapsible, new_title: str, new_content: str
@@ -326,7 +330,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """Update an existing widget in the UI (must be called from main thread)."""
         collapsible.update_title(new_title)
         collapsible.update_content(new_content)
-        self._container.scroll_end(animate=False)
+        if hasattr(self._container, "scroll_end"):
+            self._container.scroll_end(animate=False)
 
     def _handle_observation_event(
         self, event: ObservationEvent | UserRejectObservation | AgentErrorEvent
