@@ -108,7 +108,7 @@ class SplashContent(Container):
         return self._is_initialized
 
     def watch_conversation_id(
-        self, _old_value: uuid.UUID, new_value: uuid.UUID
+        self, _old_value: uuid.UUID, _new_value: uuid.UUID
     ) -> None:
         """Update conversation display when conversation_id changes.
 

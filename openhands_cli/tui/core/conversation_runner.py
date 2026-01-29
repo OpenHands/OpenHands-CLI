@@ -56,14 +56,14 @@ class ConversationRunner:
 
         Args:
             conversation_id: UUID for the conversation.
-            conversation_view: ConversationView for reactive state updates. ConversationView owns the
-                      confirmation policy and syncs it to conversation.
+            conversation_view: ConversationView for reactive state updates.
+                Owns confirmation policy and syncs it to conversation.
             confirmation_callback: Callback for handling action confirmations.
             notification_callback: Callback for notifications.
             visualizer: Visualizer for output display.
             event_callback: Optional callback for each event.
             env_overrides_enabled: If True, environment variables will override
-                                   stored LLM settings.
+                stored LLM settings.
             critic_disabled: If True, critic functionality will be disabled.
         """
         self.visualizer = visualizer

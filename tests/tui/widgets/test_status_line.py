@@ -1,6 +1,5 @@
 from unittest.mock import MagicMock
 
-import openhands_cli.tui.widgets.status_line as status_line_module
 from openhands.sdk.llm.utils.metrics import Metrics, TokenUsage
 
 # Adjust the import path to wherever this file actually lives

@@ -2,32 +2,33 @@
 
 This is the main Textual application for the OpenHands CLI. The architecture
 separates concerns between App (shell/navigation), ConversationView (state/lifecycle),
-and MainDisplay (content/commands).
+and InputAreaContainer (input handling/content rendering).
 
 Widget Hierarchy::
 
     OpenHandsApp
     └── Horizontal(#content_area)
         └── ConversationView(#conversation_view)  ← Owns state + ConversationRunner
-            └── MainDisplay(#main_display)  ← Handles commands + renders content
-                ├── SplashContent(#splash_content) ← data_bind to conversation_id
-                ├── ... conversation widgets (dynamically added)
-                └── InputAreaContainer(#input_area)
-                    ├── WorkingStatusLine (data_bind)
-                    ├── InputField          ← Posts messages
-                    └── InfoStatusLine (data_bind)
+            ├── ScrollableContent(#scroll_view)  ← Scrollable conversation content
+            │   ├── SplashContent(#splash_content) ← data_bind to conversation_id
+            │   └── ... conversation widgets (dynamically added)
+            └── InputAreaContainer(#input_area)  ← docked to bottom, handles messages
+                ├── WorkingStatusLine (data_bind)
+                ├── InputField          ← Posts messages
+                └── InfoStatusLine (data_bind)
     └── Footer
 
 Message Flow:
-    InputField → MainDisplay → ConversationView
-        - UserInputSubmitted: MainDisplay renders, posts ProcessUserInput
+    InputField → InputAreaContainer → ConversationView
+        - UserInputSubmitted: InputAreaContainer renders, posts ProcessUserInput
+        - SlashCommandSubmitted: InputAreaContainer executes command (stops bubbling)
         - ProcessUserInput: ConversationView processes with runner
-        - SlashCommandSubmitted: MainDisplay executes command (stops bubbling)
         - NewConversationRequested: ConversationView handles /new command
 
 Responsibilities:
-    - MainDisplay: Content rendering, command routing, user message display
-    - ConversationView: Reactive state, ConversationRunner lifecycle, input processing
+    - InputAreaContainer: Input handling, command execution, content rendering
+    - ConversationView: State management, ConversationRunner lifecycle
+    - ScrollableContent: Scrollable container for splash + conversation widgets
     - OpenHandsApp: Screen/modal management, side panels, global key bindings
     - SplashContent: Displays splash screen, auto-updates via conversation_id binding
 """
@@ -59,7 +60,6 @@ from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.core import ConversationFinished, ConversationView
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.core.conversation_switcher import ConversationSwitcher
-
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
@@ -69,7 +69,7 @@ from openhands_cli.tui.panels.history_side_panel import (
 )
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
-from openhands_cli.tui.widgets import InputField, MainDisplay
+from openhands_cli.tui.widgets import InputField, ScrollableContent
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
     CollapsibleNavigationMixin,
@@ -94,27 +94,29 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     ]
 
     input_field: getters.query_one[InputField] = getters.query_one(InputField)
-    main_display: getters.query_one[MainDisplay] = getters.query_one("#main_display")
+    scroll_view: getters.query_one[ScrollableContent] = getters.query_one(
+        "#scroll_view"
+    )
     content_area: getters.query_one[Horizontal] = getters.query_one("#content_area")
 
     @property
     def conversation_id(self) -> uuid.UUID:
-        """Get the current conversation ID from ConversationView (single source of truth)."""
+        """Get current conversation ID from ConversationView (source of truth)."""
         return self.conversation_view.conversation_id
 
     @conversation_id.setter
     def conversation_id(self, value: uuid.UUID) -> None:
-        """Set the conversation ID in ConversationView (single source of truth)."""
+        """Set conversation ID in ConversationView (source of truth)."""
         self.conversation_view.conversation_id = value
 
     @property
     def conversation_runner(self) -> ConversationRunner | None:
-        """Get the conversation runner from ConversationView (single source of truth)."""
+        """Get conversation runner from ConversationView (source of truth)."""
         return self.conversation_view.conversation_runner
 
     @conversation_runner.setter
     def conversation_runner(self, value: ConversationRunner | None) -> None:
-        """Set the conversation runner in ConversationView (single source of truth)."""
+        """Set conversation runner in ConversationView (source of truth)."""
         self.conversation_view.conversation_runner = value
 
     def __init__(
@@ -183,11 +185,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # ConversationRunner is now owned by ConversationView
         self._store = LocalFileStore()
         self._conversation_switcher = ConversationSwitcher(self)
-        self._reload_visualizer = (
-            lambda: self.conversation_view.conversation_runner.visualizer.reload_configuration()
-            if self.conversation_view.conversation_runner
-            else None
-        )
+
+        def reload_visualizer():
+            runner = self.conversation_view.conversation_runner
+            if runner:
+                runner.visualizer.reload_configuration()
+
+        self._reload_visualizer = reload_visualizer
 
         # Confirmation panel tracking
         self.confirmation_panel: InlineConfirmationPanel | None = None
@@ -212,27 +216,26 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
             OpenHandsApp
             └── Horizontal(#content_area)
-                └── ConversationView(#conversation_view)  ← Composes MainDisplay + input area
-                    └── MainDisplay(#main_display)  ← Handles commands + content
-                        ├── Static (splash widgets)
-                        ├── SplashConversation  ← data_bind to conversation_id
-                        ├── ... conversation content
-                        └── InputAreaContainer  ← docked to bottom
-                            ├── WorkingStatusLine (data_bind)
-                            ├── InputField
-                            └── InfoStatusLine (data_bind)
+                └── ConversationView(#conversation_view)  ← Owns state
+                    ├── ScrollableContent(#scroll_view)
+                    │   ├── SplashContent  ← data_bind
+                    │   └── ... conversation content
+                    └── InputAreaContainer(#input_area)  ← handles input
+                        ├── WorkingStatusLine (data_bind)
+                        ├── InputField
+                        └── InfoStatusLine (data_bind)
             └── Footer
 
         Message Flow:
-            InputField → MainDisplay → ConversationView → OpenHandsApp
+            InputField → InputAreaContainer → ConversationView → OpenHandsApp
 
         Data Binding:
-            All widgets are composed from ConversationView.compose(), so data_bind() works
-            because the active message pump is ConversationView (the reactive owner).
+            All widgets are composed from ConversationView.compose(), so data_bind
+            works because the active pump is ConversationView (the reactive owner).
         """
-        # Content area - horizontal layout for main display and optional confirmation
+        # Content area - horizontal layout for conversation and optional panels
         with Horizontal(id="content_area"):
-            # ConversationView composes MainDisplay and all child widgets
+            # ConversationView composes scroll_view, input_area and all child widgets
             # This enables data_bind() to work (requires owner as active pump)
             yield self.conversation_view
 
@@ -439,10 +442,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         In the future, this could be extended to process multiple instructions
         from the queue one by one as the agent completes each task.
 
-        Posts UserInputSubmitted to MainDisplay, which flows through the same
+        Posts UserInputSubmitted to ConversationView, which flows through the same
         path as typed inputs:
-        1. MainDisplay.on_user_input_submitted() - renders + posts ProcessUserInput
-        2. ConversationView._on_process_user_input() - processes with runner
+        1. ConversationView._on_user_input_submitted() - renders + processes with runner
         """
         from openhands_cli.tui.messages import UserInputSubmitted
 
@@ -452,15 +454,17 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Process the first queued input immediately
         user_input = self.pending_inputs.pop(0)
 
-        # Post to MainDisplay - reuses the same flow as typed inputs
-        self.main_display.post_message(UserInputSubmitted(content=user_input))
+        # Post to InputAreaContainer - reuses the same flow as typed inputs
+        self.conversation_view.input_area.post_message(
+            UserInputSubmitted(content=user_input)
+        )
 
     def action_request_quit(self) -> None:
         """Action to handle Ctrl+Q key binding.
 
-        Delegates to MainDisplay's _command_exit() for consistent behavior.
+        Delegates to InputAreaContainer's _command_exit() for consistent behavior.
         """
-        self.main_display._command_exit()
+        self.conversation_view.input_area._command_exit()
 
     def action_toggle_cells(self) -> None:
         """Action to handle Ctrl+O key binding.
@@ -468,7 +472,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         Collapses all cells if any are expanded, otherwise expands all cells.
         This provides a quick way to minimize or maximize all content at once.
         """
-        collapsibles = self.main_display.query(Collapsible)
+        collapsibles = self.scroll_view.query(Collapsible)
 
         # If any cell is expanded, collapse all; otherwise expand all
         any_expanded = any(not collapsible.collapsed for collapsible in collapsibles)
@@ -488,7 +492,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Skip if autocomplete dropdown is visible (Tab is used for selection)
         if event.key == "tab" and isinstance(self.focused, Input | TextArea):
             if not self._is_autocomplete_showing():
-                collapsibles = list(self.main_display.query(Collapsible))
+                collapsibles = list(self.scroll_view.query(Collapsible))
                 if collapsibles:
                     # Focus the last (most recent) collapsible's title
                     last_collapsible = collapsibles[-1]
@@ -606,9 +610,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     def _handle_confirmation_request(
         self, pending_actions: list[ActionEvent]
     ) -> UserConfirmation:
-        """Handle confirmation request by showing an inline panel in the main display.
+        """Handle confirmation request by showing an inline panel in the scroll view.
 
-        The inline confirmation panel is mounted in the main_display area,
+        The inline confirmation panel is mounted in the scroll_view area,
         underneath the latest action event collapsible. Since the action details
         are already visible in the collapsible above, this panel only shows
         the confirmation options.
@@ -644,14 +648,14 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                     if not decision_future.done():
                         decision_future.set_result(decision)
 
-                # Create and mount the inline confirmation panel in main_display
+                # Create and mount the inline confirmation panel in scroll_view
                 # This places it underneath the latest action event collapsible
                 self.confirmation_panel = InlineConfirmationPanel(
                     len(pending_actions), on_confirmation_decision
                 )
-                self.main_display.mount(self.confirmation_panel)
+                self.scroll_view.mount(self.confirmation_panel)
                 # Scroll to show the confirmation panel
-                self.main_display.scroll_end(animate=False)
+                self.scroll_view.scroll_end(animate=False)
 
             except Exception:
                 # If there's an error, default to DEFER

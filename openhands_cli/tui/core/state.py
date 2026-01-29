@@ -3,11 +3,28 @@
 This module provides ConversationView, a centralized state container that:
 - Holds all reactive state properties for the TUI
 - Owns the ConversationRunner (lazy initialization)
-- Composes the input area widgets (required for Textual's data_bind)
+- Composes the scroll view and input area widgets
 - Provides thread-safe state update methods
 
 The design follows Textual's reactive pattern where widgets bind to
 ancestor state via data_bind() for automatic UI updates.
+
+Widget Hierarchy:
+    ConversationView(Container, #conversation_view)
+    ├── ScrollableContent(VerticalScroll, #scroll_view)
+    │   ├── SplashContent(#splash_content)
+    │   └── ... dynamically added conversation widgets
+    └── InputAreaContainer(#input_area)  ← docked to bottom, handles messages
+        ├── WorkingStatusLine
+        ├── InputField
+        └── InfoStatusLine
+
+Message Flow:
+    InputField → InputAreaContainer → ConversationView
+    - UserInputSubmitted: InputAreaContainer renders, posts ProcessUserInput
+    - SlashCommandSubmitted: InputAreaContainer executes commands
+    - ProcessUserInput: ConversationView processes with runner
+    - NewConversationRequested: ConversationView handles /new command
 """
 
 import logging
@@ -34,6 +51,8 @@ if TYPE_CHECKING:
     from openhands.sdk import BaseConversation
     from openhands.sdk.event import ActionEvent
     from openhands_cli.tui.core.conversation_runner import ConversationRunner
+    from openhands_cli.tui.widgets.input_area import InputAreaContainer
+    from openhands_cli.tui.widgets.main_display import ScrollableContent
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +85,9 @@ class ConversationView(Container):
 
     Example:
         # In OpenHandsApp:
-        self.conversation_view = ConversationView(initial_confirmation_policy=AlwaysConfirm())
+        self.conversation_view = ConversationView(
+            initial_confirmation_policy=AlwaysConfirm()
+        )
 
         # Child widgets bind to state via data_bind():
         WorkingStatusLine().data_bind(
@@ -135,25 +156,35 @@ class ConversationView(Container):
         self._critic_disabled = critic_disabled
         self._json_mode = json_mode
 
-        # ConversationView is a Container that wraps MainDisplay
-        # This allows all child widgets to use data_bind() with ConversationView properties
+        # ConversationView is a Container that holds scroll_view and input_area
         super().__init__(id="conversation_view", **kwargs)
 
         if initial_confirmation_policy is not None:
             self.confirmation_policy = initial_confirmation_policy
 
     def compose(self):
-        """Compose MainDisplay and input area widgets.
+        """Compose scroll view and input area widgets.
 
-        ConversationView composes all widgets that need to bind to its reactive properties.
-        This is required because data_bind() checks that the active message pump
-        (the compose caller) is an instance of the reactive owner class.
+        ConversationView composes all widgets that need to bind to its reactive
+        properties. This is required because data_bind() checks that the active
+        message pump (the compose caller) is an instance of the reactive owner.
 
         By yielding widgets here, data_bind(ConversationView.xxx) works because
         the active message pump during compose is ConversationView itself.
+
+        Widget Hierarchy::
+
+            ConversationView(#conversation_view)
+            ├── ScrollableContent(#scroll_view)
+            │   ├── SplashContent(#splash_content)
+            │   └── ... dynamically added conversation widgets
+            └── InputAreaContainer(#input_area)  ← docked to bottom
+
+        Note: InputAreaContainer is a SIBLING of ScrollableContent, not a child.
+        This ensures widgets mounted to scroll_view are laid out correctly.
         """
         from openhands_cli.tui.widgets.input_area import InputAreaContainer
-        from openhands_cli.tui.widgets.main_display import MainDisplay
+        from openhands_cli.tui.widgets.main_display import ScrollableContent
         from openhands_cli.tui.widgets.splash import SplashContent
         from openhands_cli.tui.widgets.status_line import (
             InfoStatusLine,
@@ -161,13 +192,8 @@ class ConversationView(Container):
         )
         from openhands_cli.tui.widgets.user_input.input_field import InputField
 
-        # MainDisplay handles UserInputSubmitted and SlashCommandSubmitted
-        # - running: bound for checking conversation state
-        # - conversation_id: bound for clearing content on conversation change
-        with MainDisplay(id="main_display").data_bind(
-            running=ConversationView.running,
-            conversation_id=ConversationView.conversation_id,
-        ):
+        # ScrollableContent holds splash and dynamically added widgets
+        with ScrollableContent(id="scroll_view"):
             # SplashContent contains all splash widgets
             # - conversation_id is bound reactively for conversation switching
             # - initialize() is called by OpenHandsApp for one-time setup
@@ -175,26 +201,44 @@ class ConversationView(Container):
                 conversation_id=ConversationView.conversation_id,
             )
 
-            # Input area docked to bottom of MainDisplay viewport
-            with InputAreaContainer(id="input_area"):
-                # Status lines and input field with data_bind
-                yield WorkingStatusLine().data_bind(
-                    running=ConversationView.running,
-                    elapsed_seconds=ConversationView.elapsed_seconds,
-                )
-                yield InputField(
-                    placeholder="Type your message, @mention a file, or / for commands"
-                )
-                yield InfoStatusLine().data_bind(
-                    running=ConversationView.running,
-                    is_multiline_mode=ConversationView.is_multiline_mode,
-                    metrics=ConversationView.metrics,
-                )
+        # Input area docked to bottom (sibling of scroll_view)
+        # - conversation_id is bound to clear scroll_view content on change
+        # - Handles UserInputSubmitted and SlashCommandSubmitted
+        with InputAreaContainer(id="input_area").data_bind(
+            conversation_id=ConversationView.conversation_id,
+        ):
+            # Status lines and input field with data_bind
+            yield WorkingStatusLine().data_bind(
+                running=ConversationView.running,
+                elapsed_seconds=ConversationView.elapsed_seconds,
+            )
+            yield InputField(
+                placeholder="Type your message, @mention a file, or / for commands"
+            )
+            yield InfoStatusLine().data_bind(
+                running=ConversationView.running,
+                is_multiline_mode=ConversationView.is_multiline_mode,
+                metrics=ConversationView.metrics,
+            )
 
     @property
     def is_confirmation_active(self) -> bool:
         """Check if confirmation is required (not NeverConfirm)."""
         return not isinstance(self.confirmation_policy, NeverConfirm)
+
+    @property
+    def scroll_view(self) -> "ScrollableContent":
+        """Get the scrollable content area."""
+        from openhands_cli.tui.widgets.main_display import ScrollableContent
+
+        return self.query_one("#scroll_view", ScrollableContent)
+
+    @property
+    def input_area(self) -> "InputAreaContainer":
+        """Get the input area container."""
+        from openhands_cli.tui.widgets.input_area import InputAreaContainer
+
+        return self.query_one("#input_area", InputAreaContainer)
 
     def on_mount(self) -> None:
         """Start the elapsed time timer."""
@@ -369,7 +413,7 @@ class ConversationView(Container):
         """Create a new ConversationRunner.
 
         Uses self.app to access:
-        - main_display for visualizer
+        - scroll_view for visualizer (the scrollable content area)
         - notify() for notifications
         - _handle_confirmation_request for confirmations
         """
@@ -377,19 +421,19 @@ class ConversationView(Container):
 
         # Import for type checking
         from openhands_cli.tui.textual_app import OpenHandsApp
-        from openhands_cli.tui.widgets.main_display import MainDisplay
+        from openhands_cli.tui.widgets.main_display import ScrollableContent
         from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
         from openhands_cli.utils import json_callback
 
         # Get app reference - available since ConversationView is a mounted widget
         app: OpenHandsApp = self.app  # type: ignore[assignment]
 
-        # Get main_display from app
-        main_display = app.query_one("#main_display", MainDisplay)
+        # Get scroll_view - the scrollable content area where widgets are mounted
+        scroll_view = app.query_one("#scroll_view", ScrollableContent)
 
-        # Create visualizer that renders to main_display
+        # Create visualizer that renders to scroll_view
         conversation_visualizer = ConversationVisualizer(
-            main_display, app, skip_user_messages=True, name="OpenHands Agent"
+            scroll_view, app, skip_user_messages=True, name="OpenHands Agent"
         )
 
         # Create JSON callback if in JSON mode
@@ -414,17 +458,15 @@ class ConversationView(Container):
     # ---- Message Handlers ----
 
     @on(NewConversationRequested)
-    def _on_new_conversation_requested(
-        self, event: NewConversationRequested
-    ) -> None:
+    def _on_new_conversation_requested(self, event: NewConversationRequested) -> None:
         """Handle request to start a new conversation.
 
-        This is triggered by the /new command from MainDisplay.
+        This is triggered by the /new command.
         ConversationView owns conversation lifecycle, so it:
         1. Checks if a conversation is running
         2. Creates a new conversation ID
         3. Resets state
-        4. Sets new conversation_id (MainDisplay clears itself reactively)
+        4. Sets new conversation_id (watch_conversation_id clears content)
         5. Notifies the user
         """
         event.stop()
@@ -453,7 +495,7 @@ class ConversationView(Container):
         self.reset_conversation_state()
 
         # Set new conversation ID - triggers:
-        # - MainDisplay.watch_conversation_id() clears dynamic content
+        # - watch_conversation_id() clears dynamic content
         # - SplashContent.watch_conversation_id() re-renders
         self.conversation_id = new_id
 
@@ -473,7 +515,7 @@ class ConversationView(Container):
     async def _on_process_user_input(self, event: ProcessUserInput) -> None:
         """Handle user input processing request.
 
-        This is triggered by MainDisplay after rendering the user message.
+        This is triggered after rendering the user message.
         ConversationView owns the ConversationRunner, so it handles processing.
         """
         event.stop()
@@ -483,7 +525,7 @@ class ConversationView(Container):
         """Process user input with the conversation runner.
 
         This method can be called:
-        - Via ProcessUserInput message (from MainDisplay for typed inputs)
+        - Via ProcessUserInput message (from ConversationView for typed inputs)
         - Directly by App (for queued inputs from --task/--file)
 
         Args:
@@ -520,10 +562,10 @@ class ConversationView(Container):
         ignore the feedback prompt.
         """
         from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
-        from openhands_cli.tui.widgets.main_display import MainDisplay
+        from openhands_cli.tui.widgets.main_display import ScrollableContent
 
-        main_display = self.query_one("#main_display", MainDisplay)
+        scroll_view = self.query_one("#scroll_view", ScrollableContent)
 
         # Find and remove all CriticFeedbackWidget instances
-        for widget in main_display.query(CriticFeedbackWidget):
+        for widget in scroll_view.query(CriticFeedbackWidget):
             widget.remove()

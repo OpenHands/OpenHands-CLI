@@ -172,7 +172,7 @@ class ConversationSwitcher:
         app = self.app
 
         # Set the conversation ID - triggers reactive updates:
-        # - MainDisplay.watch_conversation_id() clears dynamic content
+        # - ConversationView.watch_conversation_id() clears dynamic content
         # - SplashContent.watch_conversation_id() re-renders
         app.conversation_id = conversation_id
         app.conversation_runner = None
@@ -185,7 +185,7 @@ class ConversationSwitcher:
     def _finish_switch(self, runner, target_id: uuid.UUID) -> None:
         """Finalize conversation switch (runs on the UI thread)."""
         self.app.conversation_runner = runner
-        self.app.main_display.scroll_end(animate=False)
+        self.app.scroll_view.scroll_end(animate=False)
         self._dismiss_loading()
 
         # Update ConversationView - UI components will react automatically

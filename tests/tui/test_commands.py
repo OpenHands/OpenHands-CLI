@@ -73,7 +73,7 @@ class TestCommands:
         params = list(sig.parameters.keys())
 
         assert len(params) == 1
-        assert params[0] == "main_display"
+        assert params[0] == "scroll_view"
 
     @pytest.mark.parametrize(
         "expected_content",
@@ -242,7 +242,7 @@ class TestOpenHandsAppCommands:
             # Verify state_manager has the default policy
             assert isinstance(oh_app.state_manager.confirmation_policy, AlwaysConfirm)
 
-            oh_app.main_display._command_confirm()
+            oh_app.conversation_view.input_area._command_confirm()
 
             top_screen = oh_app.screen_stack[-1]
             assert isinstance(top_screen, ConfirmationSettingsModal)
@@ -264,7 +264,7 @@ class TestOpenHandsAppCommands:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            oh_app.main_display._command_exit()
+            oh_app.conversation_view.input_area._command_exit()
 
             top_screen = oh_app.screen_stack[-1]
             assert isinstance(top_screen, ExitConfirmationModal)
@@ -290,7 +290,7 @@ class TestOpenHandsAppCommands:
             exit_mock = mock.MagicMock()
             oh_app.exit = exit_mock
 
-            oh_app.main_display._command_exit()
+            oh_app.conversation_view.input_area._command_exit()
 
             exit_mock.assert_called_once_with()
 
@@ -336,7 +336,7 @@ class TestOpenHandsAppCommands:
             else:
                 oh_app.conversation_runner = None
 
-            oh_app.main_display._command_condense()
+            oh_app.conversation_view.input_area._command_condense()
 
             if expected_notification:
                 # Should have called notify with error
@@ -376,7 +376,7 @@ class TestOpenHandsAppCommands:
             notify_mock = mock.MagicMock()
             oh_app.notify = notify_mock
 
-            oh_app.main_display._command_condense()
+            oh_app.conversation_view.input_area._command_condense()
 
             # Verify the async method was called
             dummy_runner.condense_async.assert_called_once_with()
@@ -407,7 +407,7 @@ class TestOpenHandsAppCommands:
             notify_mock = mock.MagicMock()
             oh_app.notify = notify_mock
 
-            oh_app.main_display._command_condense()
+            oh_app.conversation_view.input_area._command_condense()
 
             # Verify error notification was called with correct parameters
             notify_mock.assert_called_once_with(
@@ -439,7 +439,7 @@ class TestOpenHandsAppCommands:
                 notify_mock = mock.MagicMock()
                 oh_app.notify = notify_mock
 
-                oh_app.main_display._command_feedback()
+                oh_app.conversation_view.input_area._command_feedback()
 
                 # Verify browser was opened with correct URL
                 mock_browser.assert_called_once_with(
@@ -478,7 +478,7 @@ class TestOpenHandsAppCommands:
             oh_app.notify = notify_mock
 
             # Call _command_new which posts NewConversationRequested message
-            oh_app.main_display._command_new()
+            oh_app.conversation_view.input_area._command_new()
 
             # Process the message
             await pilot.pause()
@@ -524,7 +524,7 @@ class TestOpenHandsAppCommands:
             oh_app.notify = notify_mock
 
             # Call _command_new which posts NewConversationRequested message
-            oh_app.main_display._command_new()
+            oh_app.conversation_view.input_area._command_new()
 
             # Process the message
             await pilot.pause()
@@ -557,23 +557,23 @@ class TestOpenHandsAppCommands:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            # Add a dynamic widget to main_display (simulating conversation content)
+            # Add a dynamic widget to scroll_view (simulating conversation content)
             dynamic_widget = Static("Test message", classes="user-message")
-            oh_app.main_display.mount(dynamic_widget)
+            oh_app.scroll_view.mount(dynamic_widget)
             await pilot.pause()
 
             # Verify the widget was added
-            assert dynamic_widget in oh_app.main_display.children
+            assert dynamic_widget in oh_app.scroll_view.children
 
             # Mock notify
             notify_mock = mock.MagicMock()
             oh_app.notify = notify_mock
 
-            oh_app.main_display._command_new()
+            oh_app.conversation_view.input_area._command_new()
             await pilot.pause()
 
             # Verify dynamic widget was removed
-            assert dynamic_widget not in oh_app.main_display.children
+            assert dynamic_widget not in oh_app.scroll_view.children
 
             # Verify splash widgets still exist
             splash_banner = oh_app.query_one("#splash_banner", Static)
@@ -602,7 +602,7 @@ class TestOpenHandsAppCommands:
             notify_mock = mock.MagicMock()
             oh_app.notify = notify_mock
 
-            oh_app.main_display._command_new()
+            oh_app.conversation_view.input_area._command_new()
             await pilot.pause()
 
             # Verify splash conversation widget contains the new conversation ID
@@ -635,7 +635,7 @@ class TestOpenHandsAppCommands:
                 len(panels) > 0 and panels.first().display if len(panels) > 0 else False
             )
 
-            oh_app.main_display._command_history()
+            oh_app.conversation_view.input_area._command_history()
             await pilot.pause()
 
             # Panel should now be visible
@@ -644,7 +644,7 @@ class TestOpenHandsAppCommands:
             assert panels.first().display is True
 
             # Toggle again - should hide
-            oh_app.main_display._command_history()
+            oh_app.conversation_view.input_area._command_history()
             await pilot.pause()
 
             panels = oh_app.query(HistorySidePanel)
@@ -681,14 +681,14 @@ class TestOpenHandsAppCommands:
             oh_app = cast(OpenHandsApp, pilot.app)
             original_id = oh_app.conversation_id
 
-            oh_app.main_display._command_history()
+            oh_app.conversation_view.input_area._command_history()
             await pilot.pause()
 
             panel = oh_app.query_one(HistorySidePanel)
             items_before = panel.query(HistoryItem)
             count_before = len(items_before)
 
-            oh_app.main_display._command_new()
+            oh_app.conversation_view.input_area._command_new()
             await pilot.pause()
 
             assert oh_app.conversation_id != original_id
@@ -739,7 +739,7 @@ class TestOpenHandsAppCommands:
 
             oh_app._conversation_switcher.switch_to = mock_switch  # type: ignore[method-assign]
 
-            oh_app.main_display._command_history()
+            oh_app.conversation_view.input_area._command_history()
             await pilot.pause()
 
             panel = oh_app.query_one(HistorySidePanel)

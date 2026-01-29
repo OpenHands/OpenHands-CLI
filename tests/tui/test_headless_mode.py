@@ -244,7 +244,8 @@ class TestHeadlessAppBehavior:
     ConversationView's watch_running and ConversationFinished message handling.
     """
 
-    pass  # Placeholder - add new tests for ConversationView-based headless behavior if needed
+    # Placeholder - add tests for ConversationView-based headless behavior if needed
+    pass
 
 
 class TestPrintConversationSummary:

@@ -75,16 +75,16 @@ class TestHistoryIntegration:
     """Unit tests for history panel wiring and conversation switching."""
 
     def test_history_command_calls_toggle(self):
-        """`/history` command in MainDisplay delegates to action_toggle_history."""
-        from openhands_cli.tui.widgets import MainDisplay
+        """`/history` in InputAreaContainer delegates to action_toggle_history."""
+        from openhands_cli.tui.widgets.input_area import InputAreaContainer
 
-        main_display = Mock(spec=MainDisplay)
+        input_area = Mock(spec=InputAreaContainer)
         mock_app = Mock()
         mock_app.action_toggle_history = Mock()
-        main_display.app = mock_app
+        input_area.app = mock_app
 
         # Call the real implementation
-        MainDisplay._command_history(main_display)
+        InputAreaContainer._command_history(input_area)
 
         mock_app.action_toggle_history.assert_called_once()
 
@@ -119,7 +119,7 @@ class TestConversationSwitcher:
         """After conversation switch completes, input field receives focus."""
         # Create mock app and manager
         app = Mock()
-        app.main_display = Mock()
+        app.scroll_view = Mock()
         app.notify = Mock()
         app.input_field = Mock()
         app.input_field.focus_input = Mock()
@@ -174,21 +174,21 @@ class TestConversationSwitcher:
         assert "already active" in call_kwargs["message"].lower()
 
 
-class TestMainDisplayCommands:
-    """Tests for MainDisplay command methods."""
+class TestInputAreaContainerCommands:
+    """Tests for InputAreaContainer command methods."""
 
     def test_command_new_posts_message(self):
         """_command_new posts NewConversationRequested message."""
         from openhands_cli.tui.messages import NewConversationRequested
-        from openhands_cli.tui.widgets import MainDisplay
+        from openhands_cli.tui.widgets.input_area import InputAreaContainer
 
-        main_display = Mock(spec=MainDisplay)
-        main_display.post_message = Mock()
+        input_area = Mock(spec=InputAreaContainer)
+        input_area.post_message = Mock()
 
         # Call the real implementation
-        MainDisplay._command_new(main_display)
+        InputAreaContainer._command_new(input_area)
 
         # Verify message was posted
-        main_display.post_message.assert_called_once()
-        posted_message = main_display.post_message.call_args[0][0]
+        input_area.post_message.assert_called_once()
+        posted_message = input_area.post_message.call_args[0][0]
         assert isinstance(posted_message, NewConversationRequested)

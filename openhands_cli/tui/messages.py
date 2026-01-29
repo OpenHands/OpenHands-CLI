@@ -7,12 +7,13 @@ from child to parent, allowing ancestor widgets to handle them.
 Message Flow:
     InputField
         ↓
-    MainDisplay(#main_display)  ← Handles UserInputSubmitted (renders message)
-                                ← Handles SlashCommandSubmitted (posts domain messages)
+    InputAreaContainer ← Handles UserInputSubmitted (renders, posts ProcessUserInput)
+                       ← Handles SlashCommandSubmitted (executes commands)
         ↓
-    ConversationView            ← Handles NewConversationRequested
+    ConversationView   ← Handles ProcessUserInput (processes with runner)
+                       ← Handles NewConversationRequested
         ↓
-    OpenHandsApp                ← Handles app-level concerns (modals, notifications)
+    OpenHandsApp       ← Handles app-level concerns (modals, notifications)
 """
 
 from pydantic.dataclasses import dataclass
@@ -23,8 +24,8 @@ from textual.message import Message
 class UserInputSubmitted(Message):
     """Message sent when user submits regular text input.
 
-    This message is handled by MainDisplay to render the user message,
-    then bubbles to App to send to the agent.
+    This message is handled by ConversationView to render the user message
+    and process it with the conversation runner.
     """
 
     content: str
@@ -34,8 +35,7 @@ class UserInputSubmitted(Message):
 class SlashCommandSubmitted(Message):
     """Message sent when user submits a slash command.
 
-    This message bubbles directly to App for command execution.
-    MainDisplay ignores it (doesn't render commands as user messages).
+    This message is handled by ConversationView for command execution.
     """
 
     command: str
@@ -50,8 +50,8 @@ class SlashCommandSubmitted(Message):
 class NewConversationRequested(Message):
     """Message sent when user requests a new conversation (via /new command).
 
-    This message is posted by MainDisplay and handled by ConversationView,
-    which owns the conversation lifecycle and state.
+    This message is handled by ConversationView, which owns the conversation
+    lifecycle and state.
     """
 
     pass
@@ -61,11 +61,9 @@ class NewConversationRequested(Message):
 class ProcessUserInput(Message):
     """Message sent when user input needs to be processed by the agent.
 
-    This message is posted by MainDisplay after rendering the user message,
-    and handled by ConversationView which owns the ConversationRunner.
-
-    Flow:
-        UserInputSubmitted → MainDisplay (renders) → ProcessUserInput → ConversationView (processes)
+    This message is handled by ConversationView which owns the ConversationRunner.
+    Note: This is now largely superseded by UserInputSubmitted which handles
+    both rendering and processing in ConversationView.
     """
 
     content: str

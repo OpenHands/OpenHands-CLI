@@ -34,7 +34,7 @@ class HistoryMessagesTestApp(App):
         # Track messages received by the app
         self.received_switch_requests: list[str] = []
         self._store = LocalFileStore()
-        # ConversationView for reactive state (backwards compatible alias: state_manager)
+        # ConversationView for reactive state (backwards compat alias: state_manager)
         self.app_state = ConversationView()
         self.state_manager = self.app_state  # Backwards compatibility
 
