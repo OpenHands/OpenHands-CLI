@@ -1,4 +1,4 @@
-"""E2E test runner for OpenHands CLI."""
+"""Binary test runner for OpenHands CLI executable."""
 
 import time
 from collections.abc import Callable
@@ -9,9 +9,9 @@ from .test_experimental_ui import test_experimental_ui
 from .test_version import test_version
 
 
-def run_all_e2e_tests() -> TestSummary:
-    """Run all E2E tests and return a summary."""
-    print("🧪 Running E2E tests...")
+def run_all_tui_e2e() -> TestSummary:
+    """Run all binary tests and return a summary."""
+    print("🧪 Running binary tests...")
     print("=" * 60)
 
     # Define all tests

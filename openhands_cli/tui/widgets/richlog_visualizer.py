@@ -631,19 +631,16 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if not event.llm_message:
                 return None
 
-            # Skip direct user messages (we render them separately in the UI)
-            if (
-                self._skip_user_messages
-                and event.llm_message.role == "user"
-                and not event.sender
-            ):
+            # Skip direct user messages (they are displayed separately in the UI)
+            # This applies both when skip_user_messages is set, and for user messages
+            # without a sender in delegation context
+            if event.llm_message.role == "user" and not event.sender:
                 return None
 
-            message_content = str(content)
-
-            # Check if this is a delegation message (has sender AND visualizer has name)
+            # Case 1: Delegation message (both sender and name are set)
+            # Format with arrow notation showing sender → receiver
             if event.sender and self._name:
-                # Delegation context: prefix messages with agent info
+                message_content = str(content)
                 agent_name = self._get_formatted_agent_name()
                 event_sender = self._format_agent_name_with_suffix(event.sender)
 
@@ -655,20 +652,22 @@ class ConversationVisualizer(ConversationVisualizerBase):
                     prefix = f"**{agent_name} → {event_sender}:**\n\n"
 
                 message_content = prefix + message_content
-
-                # Render delegation messages (both user and assistant)
                 widget = Markdown(message_content)
                 widget.styles.padding = AGENT_MESSAGE_PADDING
                 return widget
 
-            # Render non-delegation assistant messages
-            if event.llm_message.role == "assistant":
-                widget = Markdown(message_content)
+            # Case 2: Regular agent message (name set, no sender, assistant role)
+            # This is the normal case for agent responses in the main conversation
+            # Fixes GitHub issue #399: Agent MessageEvents were being silently dropped
+            if self._name and event.llm_message.role == "assistant":
+                widget = Markdown(str(content))
                 widget.styles.padding = AGENT_MESSAGE_PADDING
                 return widget
 
-            # Skip non-delegation user messages that reach here
-            return None
+            # Case 3: No name context - skip MessageEvents
+            # (visualizer without name is typically not used in CLI)
+            if not self._name:
+                return None
 
         # For other events, use collapsible
         return self._create_event_collapsible(event)

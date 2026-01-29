@@ -4,7 +4,7 @@ from textual.containers import Container
 from textual.widgets import OptionList
 from textual.widgets.option_list import Option
 
-from openhands_cli.locations import WORK_DIR
+from openhands_cli.locations import get_work_dir
 from openhands_cli.tui.widgets.user_input.models import (
     CompletionItem,
     CompletionType,
@@ -194,10 +194,10 @@ class AutoCompleteDropdown(Container):
         # Determine the directory to search
         if "/" in path_part:
             dir_part = "/".join(path_part.split("/")[:-1])
-            search_dir = Path(WORK_DIR) / dir_part
+            search_dir = Path(get_work_dir()) / dir_part
             filename_part = path_part.split("/")[-1]
         else:
-            search_dir = Path(WORK_DIR)
+            search_dir = Path(get_work_dir())
             filename_part = path_part
 
         candidates = []
@@ -216,7 +216,7 @@ class AutoCompleteDropdown(Container):
                     continue
 
                 try:
-                    rel_path = item.relative_to(Path(WORK_DIR))
+                    rel_path = item.relative_to(Path(get_work_dir()))
                     path_str = str(rel_path)
                     prefix = "📁 " if item.is_dir() else "📄 "
                     if item.is_dir():

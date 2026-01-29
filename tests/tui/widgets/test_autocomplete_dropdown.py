@@ -134,15 +134,10 @@ class TestAutoCompleteDropdown:
 
     # File candidate logic
 
-    def test_file_candidates_use_work_dir_and_add_prefixes(self, tmp_path, monkeypatch):
+    def test_file_candidates_use_work_dir_and_add_prefixes(self, mock_locations):
         """File candidates come from WORK_DIR, add @ prefix and 📁/📄 icons."""
-        (tmp_path / "README.md").write_text("test")
-        (tmp_path / "src").mkdir()
-
-        monkeypatch.setattr(
-            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.WORK_DIR",
-            str(tmp_path),
-        )
+        (mock_locations.work_dir / "README.md").write_text("test")
+        (mock_locations.work_dir / "src").mkdir()
 
         mock_widget = create_mock_single_line_widget()
         autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
@@ -164,29 +159,19 @@ class TestAutoCompleteDropdown:
         for c in candidates:
             assert c.completion_type == CompletionType.FILE
 
-    def test_file_candidates_for_nonexistent_directory(self, tmp_path, monkeypatch):
+    def test_file_candidates_for_nonexistent_directory(self, mock_locations):
         """Non-existent directories produce no file candidates."""
-        monkeypatch.setattr(
-            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.WORK_DIR",
-            str(tmp_path),
-        )
-
         mock_widget = create_mock_single_line_widget()
         autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
         candidates = autocomplete._get_file_candidates("@nonexistent/")
 
         assert candidates == []
 
-    def test_file_candidates_filters_by_filename(self, tmp_path, monkeypatch):
+    def test_file_candidates_filters_by_filename(self, mock_locations):
         """File candidates are filtered by the filename part after @."""
-        (tmp_path / "README.md").write_text("test")
-        (tmp_path / "requirements.txt").write_text("test")
-        (tmp_path / "setup.py").write_text("test")
-
-        monkeypatch.setattr(
-            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.WORK_DIR",
-            str(tmp_path),
-        )
+        (mock_locations.work_dir / "README.md").write_text("test")
+        (mock_locations.work_dir / "requirements.txt").write_text("test")
+        (mock_locations.work_dir / "setup.py").write_text("test")
 
         mock_widget = create_mock_single_line_widget()
         autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
@@ -198,17 +183,12 @@ class TestAutoCompleteDropdown:
         assert any("requirements.txt" in d for d in display_texts)
         assert not any("setup.py" in d for d in display_texts)
 
-    def test_file_candidates_handles_subdirectories(self, tmp_path, monkeypatch):
+    def test_file_candidates_handles_subdirectories(self, mock_locations):
         """File candidates work with subdirectory paths."""
-        src_dir = tmp_path / "src"
+        src_dir = mock_locations.work_dir / "src"
         src_dir.mkdir()
         (src_dir / "main.py").write_text("test")
         (src_dir / "utils.py").write_text("test")
-
-        monkeypatch.setattr(
-            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.WORK_DIR",
-            str(tmp_path),
-        )
 
         mock_widget = create_mock_single_line_widget()
         autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
@@ -218,15 +198,10 @@ class TestAutoCompleteDropdown:
         assert any("main.py" in d for d in display_texts)
         assert any("utils.py" in d for d in display_texts)
 
-    def test_file_candidates_skips_hidden_files_by_default(self, tmp_path, monkeypatch):
+    def test_file_candidates_skips_hidden_files_by_default(self, mock_locations):
         """Hidden files are skipped unless explicitly typing them."""
-        (tmp_path / ".hidden").write_text("test")
-        (tmp_path / "visible.txt").write_text("test")
-
-        monkeypatch.setattr(
-            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.WORK_DIR",
-            str(tmp_path),
-        )
+        (mock_locations.work_dir / ".hidden").write_text("test")
+        (mock_locations.work_dir / "visible.txt").write_text("test")
 
         mock_widget = create_mock_single_line_widget()
         autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
@@ -236,17 +211,10 @@ class TestAutoCompleteDropdown:
         assert any("visible.txt" in d for d in display_texts)
         assert not any(".hidden" in d for d in display_texts)
 
-    def test_file_candidates_shows_hidden_files_when_typing_dot(
-        self, tmp_path, monkeypatch
-    ):
+    def test_file_candidates_shows_hidden_files_when_typing_dot(self, mock_locations):
         """Hidden files are shown when explicitly typing a dot."""
-        (tmp_path / ".hidden").write_text("test")
-        (tmp_path / "visible.txt").write_text("test")
-
-        monkeypatch.setattr(
-            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.WORK_DIR",
-            str(tmp_path),
-        )
+        (mock_locations.work_dir / ".hidden").write_text("test")
+        (mock_locations.work_dir / "visible.txt").write_text("test")
 
         mock_widget = create_mock_single_line_widget()
         autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
@@ -255,12 +223,8 @@ class TestAutoCompleteDropdown:
 
         assert any(".hidden" in d for d in display_texts)
 
-    def test_file_candidates_handles_permission_error(self, tmp_path, monkeypatch):
+    def test_file_candidates_handles_permission_error(self, mock_locations):
         """File candidates gracefully handle permission errors."""
-        monkeypatch.setattr(
-            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.WORK_DIR",
-            str(tmp_path),
-        )
 
         mock_widget = create_mock_single_line_widget()
         autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
@@ -490,15 +454,10 @@ class TestAutoCompleteDropdown:
         mock_cmd.assert_not_called()
 
     def test_update_candidates_shows_dropdown_for_valid_candidates(
-        self, tmp_path, monkeypatch
+        self, mock_locations
     ):
         """update_candidates shows dropdown when candidates are found."""
-        (tmp_path / "test.txt").write_text("test")
-
-        monkeypatch.setattr(
-            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.WORK_DIR",
-            str(tmp_path),
-        )
+        (mock_locations.work_dir / "test.txt").write_text("test")
 
         mock_widget = create_mock_single_line_widget("@t")
         autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])

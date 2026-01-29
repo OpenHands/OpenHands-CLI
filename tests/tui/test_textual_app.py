@@ -62,6 +62,7 @@ class TestSettingsRestartNotification:
         app.push_screen = Mock()
         app._reload_visualizer = Mock()
         app.notify = Mock()
+        app.env_overrides_enabled = False
 
         app.action_open_settings()
 

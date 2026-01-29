@@ -7,13 +7,14 @@ from rich.console import Console
 from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, Workspace
 from openhands.sdk.context import Skill
 from openhands.sdk.event.base import Event
+from openhands.sdk.hooks import HookConfig
 from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
 )
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 
 # Register tools on import
-from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
+from openhands_cli.locations import get_conversations_dir, get_work_dir
 from openhands_cli.stores import AgentStore
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
@@ -28,6 +29,9 @@ def load_agent_specs(
     conversation_id: str | None = None,
     mcp_servers: dict[str, dict[str, Any]] | None = None,
     skills: list[Skill] | None = None,
+    *,
+    env_overrides_enabled: bool = False,
+    critic_disabled: bool = False,
 ) -> Agent:
     """Load agent specifications.
 
@@ -35,6 +39,10 @@ def load_agent_specs(
         conversation_id: Optional conversation ID for session tracking
         mcp_servers: Optional dict of MCP servers to augment agent configuration
         skills: Optional list of skills to include in the agent configuration
+        env_overrides_enabled: If True, environment variables will override
+            stored LLM settings, and agent can be created from env vars if no
+            disk config exists.
+        critic_disabled: If True, critic functionality will be disabled.
 
     Returns:
         Configured Agent instance
@@ -43,7 +51,11 @@ def load_agent_specs(
         MissingAgentSpec: If agent specification is not found or invalid
     """
     agent_store = AgentStore()
-    agent = agent_store.load(session_id=conversation_id)
+    agent = agent_store.load_or_create(
+        session_id=conversation_id,
+        env_overrides_enabled=env_overrides_enabled,
+        critic_disabled=critic_disabled,
+    )
     if not agent:
         raise MissingAgentSpec(
             "Agent specification not found. Please configure your settings."
@@ -83,6 +95,9 @@ def setup_conversation(
     confirmation_policy: ConfirmationPolicyBase,
     visualizer: ConversationVisualizer | None = None,
     event_callback: Callable[[Event], None] | None = None,
+    *,
+    env_overrides_enabled: bool = False,
+    critic_disabled: bool = False,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
@@ -93,6 +108,10 @@ def setup_conversation(
         confirmation_policy: Confirmation policy to use.
         visualizer: Optional visualizer to use. If None, a default will be used
         event_callback: Optional callback function to handle events (e.g., JSON output)
+        env_overrides_enabled: If True, environment variables will override
+            stored LLM settings, and agent can be created from env vars if no
+            disk config exists.
+        critic_disabled: If True, critic functionality will be disabled.
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
@@ -100,20 +119,30 @@ def setup_conversation(
     console = Console()
     console.print("Initializing agent...", style="white")
 
-    agent = load_agent_specs(str(conversation_id))
+    agent = load_agent_specs(
+        str(conversation_id),
+        env_overrides_enabled=env_overrides_enabled,
+        critic_disabled=critic_disabled,
+    )
 
     # Prepare callbacks list
     callbacks = [event_callback] if event_callback else None
 
+    # Load hooks from ~/.openhands/hooks.json or {working_dir}/.openhands/hooks.json
+    hook_config = HookConfig.load(working_dir=get_work_dir())
+    if not hook_config.is_empty():
+        console.print("✓ Hooks loaded", style="green")
+
     # Create conversation - agent context is now set in AgentStore.load()
     conversation: BaseConversation = Conversation(
         agent=agent,
-        workspace=Workspace(working_dir=WORK_DIR),
+        workspace=Workspace(working_dir=get_work_dir()),
         # Conversation will add /<conversation_id> to this path
-        persistence_dir=CONVERSATIONS_DIR,
+        persistence_dir=get_conversations_dir(),
         conversation_id=conversation_id,
         visualizer=visualizer,
         callbacks=callbacks,
+        hook_config=hook_config,
     )
 
     conversation.set_security_analyzer(LLMSecurityAnalyzer())

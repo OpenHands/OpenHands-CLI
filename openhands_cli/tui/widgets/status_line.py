@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from textual.timer import Timer
 from textual.widgets import Static
 
-from openhands_cli.locations import WORK_DIR
+from openhands_cli.locations import get_work_dir
 from openhands_cli.theme import SPINNER_FRAMES, SPINNER_INTERVAL
 from openhands_cli.utils import abbreviate_number, format_cost
 
@@ -219,7 +219,7 @@ class InfoStatusLine(Static):
 
     def _get_work_dir_display(self) -> str:
         """Get the work directory display string with tilde-shortening."""
-        work_dir = WORK_DIR
+        work_dir = get_work_dir()
         home = os.path.expanduser("~")
         if work_dir.startswith(home):
             work_dir = work_dir.replace(home, "~", 1)

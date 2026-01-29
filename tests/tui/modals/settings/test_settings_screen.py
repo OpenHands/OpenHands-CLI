@@ -33,8 +33,20 @@ class InMemoryAgentStore:
     def save(self, agent: Agent) -> None:
         self._agent = agent
 
-    def load(self) -> Agent | None:
+    def load_from_disk(self) -> Agent | None:
         return self._agent
+
+    def load_or_create(
+        self,
+        session_id: str | None = None,
+        *,
+        env_overrides_enabled: bool = False,
+        critic_disabled: bool = False,
+    ) -> Agent | None:
+        return self._agent
+
+    def create_from_env_overrides(self) -> Agent:
+        raise NotImplementedError("Not implemented in test mock")
 
 
 class SettingsTestApp(App):
@@ -134,7 +146,7 @@ async def test_load_current_settings_basic_mode(
     assert screen is not None
 
     # Force a reload to simulate on_mount behavior
-    screen.current_agent = fake_agent_store.load()
+    screen.current_agent = fake_agent_store.load_from_disk()
 
     with patch.object(ss, "get_model_options") as mock_get_options:
         # Model options don't include provider prefix
@@ -189,7 +201,7 @@ async def test_load_current_settings_advanced_mode(
     screen = app_obj.settings_screen
     assert screen is not None
 
-    screen.current_agent = fake_agent_store.load()
+    screen.current_agent = fake_agent_store.load_from_disk()
     screen._load_current_settings()
 
     assert screen.is_advanced_mode is True
@@ -213,7 +225,7 @@ async def test_memory_condensation_enabled_with_existing_api_key(
     screen = app_obj.settings_screen
     assert screen is not None
     # Load existing settings (simulates reopening settings tab)
-    screen.current_agent = fake_agent_store.load()
+    screen.current_agent = fake_agent_store.load_from_disk()
     with patch.object(ss, "get_model_options") as mock_get_options:
         mock_get_options.return_value = [
             ("gpt-4o-mini", "gpt-4o-mini"),
@@ -240,7 +252,7 @@ async def test_memory_condensation_disabled_without_api_key(
     app_obj, _ = app
     fake_agent_store.save(test_agent_no_api_key)
     screen = app_obj.settings_screen
-    screen.current_agent = fake_agent_store.load()
+    screen.current_agent = fake_agent_store.load_from_disk()
     with patch.object(ss, "get_model_options") as mock_get_options:
         mock_get_options.return_value = [
             ("gpt-4o-mini", "gpt-4o-mini"),

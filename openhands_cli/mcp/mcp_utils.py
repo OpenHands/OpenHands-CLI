@@ -21,7 +21,7 @@ def _get_mcp_config_path() -> Path:
     # Import the module and get the current value to support patching
     import openhands_cli.locations as locations
 
-    return Path(locations.PERSISTENCE_DIR) / locations.MCP_CONFIG_FILE
+    return Path(locations.get_persistence_dir()) / locations.MCP_CONFIG_FILE
 
 
 class MCPConfigurationError(Exception):

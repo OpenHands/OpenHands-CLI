@@ -38,7 +38,7 @@ class TestAutoCopyOnSelection:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -77,7 +77,7 @@ class TestAutoCopyOnSelection:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -111,7 +111,7 @@ class TestAutoCopyOnSelection:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)
@@ -156,7 +156,7 @@ class TestAutoCopyOnSelection:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: False,
+            lambda env_overrides_enabled=False: False,
         )
 
         app = OpenHandsApp(exit_confirmation=False)

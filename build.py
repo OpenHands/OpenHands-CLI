@@ -148,9 +148,9 @@ def main() -> int:
 
     # Test the executable
     if not args.no_test:
-        from e2e_tests.runner import print_detailed_results, run_all_e2e_tests
+        from tui_e2e.runner import print_detailed_results, run_all_tui_e2e
 
-        summary = run_all_e2e_tests()
+        summary = run_all_tui_e2e()
         print_detailed_results(summary)
 
         if not summary.all_passed:
