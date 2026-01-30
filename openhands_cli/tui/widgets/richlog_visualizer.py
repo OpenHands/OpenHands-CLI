@@ -310,6 +310,19 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Automatically scroll to the bottom to show the newly added widget
         self._container.scroll_end(animate=False)
 
+    def render_user_message(self, content: str) -> None:
+        """Render a user message to the UI.
+
+        Args:
+            content: The user's message text to display.
+        """
+        from textual.widgets import Static
+
+        user_message_widget = Static(
+            f"> {content}", classes="user-message", markup=False
+        )
+        self._run_on_main_thread(self._add_widget_to_ui, user_message_widget)
+
     def _update_widget_in_ui(
         self, collapsible: Collapsible, new_title: str, new_content: str
     ) -> None:

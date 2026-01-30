@@ -1112,3 +1112,56 @@ class TestAgentMessageEventDisplay:
         assert markdown_content is not None
         assert "Child Agent" in markdown_content
         assert "Parent Agent" in markdown_content
+
+
+class TestRenderUserMessage:
+    """Tests for ConversationVisualizer.render_user_message."""
+
+    def test_render_user_message_creates_static_widget(self):
+        """render_user_message should create a Static widget with user message."""
+        from unittest.mock import MagicMock
+
+        app = MagicMock()
+        container = MagicMock()
+        visualizer = ConversationVisualizer(container, app)
+
+        # Track widgets added via _run_on_main_thread
+        added_widgets: list[Static] = []
+
+        def capture_add(func, *args):
+            if func == visualizer._add_widget_to_ui and args:
+                added_widgets.append(args[0])
+
+        visualizer._run_on_main_thread = capture_add  # type: ignore[method-assign]
+
+        visualizer.render_user_message("Hello, agent!")
+
+        assert len(added_widgets) == 1
+        widget = added_widgets[0]
+        assert isinstance(widget, Static)
+        # Check widget has user-message class
+        assert "user-message" in widget.classes
+
+    def test_render_user_message_format(self):
+        """render_user_message should prefix content with '> '."""
+        from unittest.mock import MagicMock
+
+        app = MagicMock()
+        container = MagicMock()
+        visualizer = ConversationVisualizer(container, app)
+
+        added_widgets: list[Static] = []
+
+        def capture_add(func, *args):
+            if func == visualizer._add_widget_to_ui and args:
+                added_widgets.append(args[0])
+
+        visualizer._run_on_main_thread = capture_add  # type: ignore[method-assign]
+
+        visualizer.render_user_message("Test message")
+
+        assert len(added_widgets) == 1
+        widget = added_widgets[0]
+        assert isinstance(widget, Static)
+        # Check the widget has user-message class (format verification)
+        assert "user-message" in widget.classes

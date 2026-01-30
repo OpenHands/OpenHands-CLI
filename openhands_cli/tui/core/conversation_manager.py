@@ -190,25 +190,18 @@ class ConversationManager(Container):
 
     async def _process_user_message(self, content: str) -> None:
         """Process a user message - render it and send to runner."""
-        from textual.widgets import Static
-
         from openhands_cli.tui.textual_app import OpenHandsApp
 
         app: OpenHandsApp = self.app  # type: ignore[assignment]
 
-        # Render user message to scroll view
-        scroll_view = app.scroll_view
-        user_message_widget = Static(
-            f"> {content}", classes="user-message", markup=False
-        )
-        await scroll_view.mount(user_message_widget)
-        scroll_view.scroll_end(animate=False)
+        # Get or create runner for current conversation
+        runner = self._get_or_create_runner(self._state.conversation_id)
+
+        # Render user message via the visualizer
+        runner.visualizer.render_user_message(content)
 
         # Dismiss any pending critic feedback widgets
         self._dismiss_pending_feedback_widgets()
-
-        # Get or create runner for current conversation
-        runner = self._get_or_create_runner(self._state.conversation_id)
 
         # Update conversation title (for history panel)
         self._state.set_conversation_title(content)
