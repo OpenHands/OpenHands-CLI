@@ -106,6 +106,8 @@ def patch_deterministic_paths(monkeypatch: pytest.MonkeyPatch) -> None:
         def patched_from_ps1_match(cls, match):
             result = original_from_ps1_match.__func__(cls, match)
             result.py_interpreter_path = FIXED_PYTHON_PATH
+            # Normalize work dir to avoid /private/tmp vs /tmp mismatch.
+            result.working_dir = str(WORK_DIR)
             return result
 
         monkeypatch.setattr(CmdOutputMetadata, "from_ps1_match", patched_from_ps1_match)
