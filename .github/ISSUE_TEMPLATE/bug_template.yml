@@ -127,7 +127,9 @@ body:
     id: terminal
     attributes:
       label: Terminal / Shell
-      description: Which terminal emulator and shell are you using?
+      description: |
+        Which terminal emulator and shell are you using?
+
       placeholder: ex. iTerm2 + zsh, Windows Terminal + PowerShell, GNOME Terminal + bash
 
   - type: textarea
