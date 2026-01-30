@@ -153,6 +153,19 @@ class ConversationRunner:
         """
         self._update_run_status(True)
         try:
+            # Check if conversation is waiting for confirmation before sending new message
+            # This handles the case where user stepped away during confirmation and returned
+            if (
+                self._confirmation_mode_active
+                and self.conversation.state.execution_status
+                == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
+            ):
+                # Resolve pending confirmation first before processing new message
+                user_confirmation = self._handle_confirmation_request()
+                if user_confirmation == UserConfirmation.DEFER:
+                    # User deferred again, don't process the new message yet
+                    return
+
             # Send message and run conversation
             self.conversation.send_message(message)
             if self._confirmation_mode_active:
