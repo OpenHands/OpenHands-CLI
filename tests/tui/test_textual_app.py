@@ -112,8 +112,9 @@ class TestConversationSwitcher:
 
         runner = Mock()
         target_id = uuid.uuid4()
+        pane = Mock()
 
-        switcher._finish_switch(runner, target_id)
+        switcher._finish_switch(runner, target_id, pane)
 
         app.input_field.focus_input.assert_called_once()
         # Verify that ConversationSwitched message was posted to app
