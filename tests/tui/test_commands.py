@@ -334,11 +334,11 @@ class TestOpenHandsAppCommands:
                 dummy_runner = mock.MagicMock()
                 dummy_runner.is_running = runner_running
                 dummy_runner.condense_async = mock.AsyncMock()
-                oh_app.conversation_runner = dummy_runner
+                oh_app.conversation_manager._current_runner = dummy_runner
             else:
-                oh_app.conversation_runner = None
+                oh_app.conversation_manager._current_runner = None
 
-            oh_app.conversation_view.input_area._command_condense()
+            oh_app.conversation_state.input_area._command_condense()
 
             if expected_notification:
                 # Should have called notify with error
@@ -372,13 +372,13 @@ class TestOpenHandsAppCommands:
             dummy_runner = mock.MagicMock()
             dummy_runner.is_running = False
             dummy_runner.condense_async = mock.AsyncMock()
-            oh_app.conversation_runner = dummy_runner
+            oh_app.conversation_manager._current_runner = dummy_runner
 
             # Mock notify to ensure no error notifications
             notify_mock = mock.MagicMock()
             oh_app.notify = notify_mock
 
-            oh_app.conversation_view.input_area._command_condense()
+            oh_app.conversation_state.input_area._command_condense()
 
             # Verify the async method was called
             dummy_runner.condense_async.assert_called_once_with()
@@ -403,13 +403,13 @@ class TestOpenHandsAppCommands:
             oh_app = cast(OpenHandsApp, pilot.app)
 
             # Ensure no conversation runner
-            oh_app.conversation_runner = None
+            oh_app.conversation_manager._current_runner = None
 
             # Mock notify to capture the error message
             notify_mock = mock.MagicMock()
             oh_app.notify = notify_mock
 
-            oh_app.conversation_view.input_area._command_condense()
+            oh_app.conversation_state.input_area._command_condense()
 
             # Verify error notification was called with correct parameters
             notify_mock.assert_called_once_with(
@@ -736,12 +736,14 @@ class TestOpenHandsAppCommands:
 
             switch_calls: list[str] = []
 
-            def mock_switch(cid: str) -> None:
-                switch_calls.append(cid)
+            # Mock the _on_switch_conversation handler
+            def mock_switch_handler(event) -> None:
+                switch_calls.append(event.conversation_id)
+                event.stop()
 
-            oh_app._conversation_switcher.switch_to = mock_switch  # type: ignore[method-assign]
+            oh_app.conversation_manager._on_switch_conversation = mock_switch_handler  # type: ignore[method-assign]
 
-            oh_app.conversation_view.input_area._command_history()
+            oh_app.conversation_state.input_area._command_history()
             await pilot.pause()
 
             panel = oh_app.query_one(HistorySidePanel)
@@ -762,7 +764,8 @@ class TestOpenHandsAppCommands:
             "is_initial_setup_required",
             lambda env_overrides_enabled=False: False,
         )
-        target_id = uuid.uuid4().hex
+        target_uuid = uuid.uuid4()
+        target_id = target_uuid.hex
         monkeypatch.setattr(
             LocalFileStore,
             "list_conversations",
@@ -782,9 +785,12 @@ class TestOpenHandsAppCommands:
 
             dummy_runner = mock.MagicMock()
             dummy_runner.is_running = True
-            oh_app.conversation_runner = dummy_runner
+            oh_app.conversation_manager._current_runner = dummy_runner
 
-            oh_app._conversation_switcher.switch_to(target_id)
+            # Post a SwitchConversation message to trigger the handler
+            from openhands_cli.tui.core.conversation_manager import SwitchConversation
+
+            oh_app.conversation_manager.post_message(SwitchConversation(target_uuid))
             await pilot.pause()
 
             top_screen = oh_app.screen_stack[-1]

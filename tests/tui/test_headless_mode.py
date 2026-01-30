@@ -259,7 +259,7 @@ class TestPrintConversationSummary:
             lambda env_overrides_enabled=False: False,
         )
         app = OpenHandsApp(exit_confirmation=False)
-        app.conversation_runner = None
+        app.conversation_manager._current_runner = None
 
         # Just ensure this doesn't raise
         app._print_conversation_summary()
@@ -281,7 +281,7 @@ class TestPrintConversationSummary:
             2,
             Text("Last agent message"),
         )
-        app.conversation_runner = mock_runner
+        app.conversation_manager._current_runner = mock_runner
 
         with patch("rich.console.Console") as mock_console_cls:
             mock_console = MagicMock()
@@ -304,10 +304,17 @@ class TestHeadlessRunnerOutput:
     def test_headless_mode_prints_status_without_spinner(self):
         """Test that headless mode prints status messages without spinner."""
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
+        from openhands_cli.tui.core.state import ConversationState
 
         mock_conversation = Mock()
         mock_conversation.send_message = Mock()
         mock_conversation.run = Mock()
+
+        # Create mock state and message_pump
+        mock_state = Mock(spec=ConversationState)
+        mock_state.confirmation_policy = NeverConfirm()
+        mock_state.attach_conversation = Mock()
+        mock_message_pump = Mock()
 
         with patch(
             "openhands_cli.tui.core.conversation_runner.setup_conversation",
@@ -315,13 +322,12 @@ class TestHeadlessRunnerOutput:
         ):
             runner = ConversationRunner(
                 conversation_id=uuid.uuid4(),
-                running_state_callback=Mock(),
+                state=mock_state,
+                message_pump=mock_message_pump,
                 confirmation_callback=Mock(),
                 notification_callback=Mock(),
                 visualizer=Mock(),
             )
-
-        runner._confirmation_mode_active = False
 
         message = Mock()
 
@@ -349,6 +355,7 @@ class TestConversationSummary:
         """It should count agent messages and return last agent message text."""
         from openhands.sdk.event import MessageEvent
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
+        from openhands_cli.tui.core.state import ConversationState
 
         mock_conversation = Mock()
         mock_conversation.state = Mock()
@@ -378,13 +385,20 @@ class TestConversationSummary:
             agent_event,
         ]
 
+        # Create mock state and message_pump
+        mock_state = Mock(spec=ConversationState)
+        mock_state.confirmation_policy = AlwaysConfirm()
+        mock_state.attach_conversation = Mock()
+        mock_message_pump = Mock()
+
         with patch(
             "openhands_cli.tui.core.conversation_runner.setup_conversation",
             return_value=mock_conversation,
         ):
             runner = ConversationRunner(
                 conversation_id=uuid.uuid4(),
-                running_state_callback=Mock(),
+                state=mock_state,
+                message_pump=mock_message_pump,
                 confirmation_callback=Mock(),
                 notification_callback=Mock(),
                 visualizer=Mock(),
@@ -398,11 +412,13 @@ class TestConversationSummary:
     def test_conversation_summary_empty_state(self):
         """With no conversation / events, we should get a safe default."""
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
+        from openhands_cli.tui.core.state import ConversationState
 
-        # Create a mock ConversationView
-        mock_conversation_view = Mock()
-        mock_conversation_view.confirmation_policy = AlwaysConfirm()
-        mock_conversation_view.attach_conversation = Mock()
+        # Create a mock ConversationState and message_pump
+        mock_state = Mock(spec=ConversationState)
+        mock_state.confirmation_policy = AlwaysConfirm()
+        mock_state.attach_conversation = Mock()
+        mock_message_pump = Mock()
 
         with patch(
             "openhands_cli.tui.core.conversation_runner.setup_conversation",
@@ -410,7 +426,8 @@ class TestConversationSummary:
         ):
             runner = ConversationRunner(
                 conversation_id=uuid.uuid4(),
-                conversation_view=mock_conversation_view,
+                state=mock_state,
+                message_pump=mock_message_pump,
                 confirmation_callback=Mock(),
                 notification_callback=Mock(),
                 visualizer=Mock(),

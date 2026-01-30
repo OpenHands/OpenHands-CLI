@@ -1,7 +1,7 @@
 """Tests for HistorySidePanel and conversation switching.
 
-The HistorySidePanel uses the ConversationView pattern for state updates.
-It watches ConversationView's reactive properties (conversation_id, conversation_title,
+The HistorySidePanel uses the ConversationState pattern for state updates.
+It watches ConversationState's reactive properties (conversation_id, conversation_title,
 is_switching) instead of receiving forwarded messages.
 """
 
@@ -17,34 +17,39 @@ from textual.widgets import Button, Static
 
 from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.conversations.store.local import LocalFileStore
-from openhands_cli.tui.core.state import ConversationView
+from openhands_cli.tui.core import SwitchConversation
+from openhands_cli.tui.core.state import ConversationState
 from openhands_cli.tui.modals.switch_conversation_modal import SwitchConversationModal
 from openhands_cli.tui.panels.history_side_panel import (
     HistoryItem,
     HistorySidePanel,
-    SwitchConversationRequest,
 )
 
 
 class HistoryMessagesTestApp(App):
-    """Minimal app for testing HistorySidePanel with ConversationView."""
+    """Minimal app for testing HistorySidePanel with ConversationState."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Track messages received by the app
-        self.received_switch_requests: list[str] = []
+        self.received_switch_requests: list[uuid.UUID] = []
         self._store = LocalFileStore()
-        # ConversationView for reactive state
-        self.conversation_view = ConversationView()
+        # ConversationState for reactive state
+        self.conversation_state = ConversationState()
+
+    @property
+    def conversation_view(self) -> ConversationState:
+        """Backward compat alias."""
+        return self.conversation_state
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="content_area"):
             yield Static("main", id="main")
-            yield self.conversation_view
+            yield self.conversation_state
             yield HistorySidePanel(app=self, current_conversation_id=None)  # type: ignore
 
-    def on_switch_conversation_request(self, event: SwitchConversationRequest) -> None:
-        """Handle switch conversation request from history panel."""
+    def on_switch_conversation(self, event: SwitchConversation) -> None:
+        """Handle switch conversation from history panel."""
         self.received_switch_requests.append(event.conversation_id)
 
 
@@ -119,7 +124,7 @@ async def test_history_panel_updates_from_conversation_view(
 async def test_history_panel_posts_switch_request_on_selection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test that selecting a conversation posts SwitchConversationRequest."""
+    """Test that selecting a conversation posts SwitchConversation."""
     conv_id = uuid.uuid4().hex
     conversations = [
         ConversationMetadata(
@@ -140,9 +145,9 @@ async def test_history_panel_posts_switch_request_on_selection(
         panel._handle_select(conv_id)
         await pilot.pause()
 
-        # Verify that app received the SwitchConversationRequest message
+        # Verify that app received the SwitchConversation message
         assert len(app.received_switch_requests) == 1
-        assert app.received_switch_requests[0] == conv_id
+        assert app.received_switch_requests[0] == uuid.UUID(conv_id)
 
 
 class SwitchModalTestApp(App):

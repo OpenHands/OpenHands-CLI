@@ -60,7 +60,6 @@ from openhands_cli.tui.core import (
     ConversationFinished,
     ConversationManager,
     ConversationState,
-    ConversationView,  # Backward compatibility alias
     PauseConversation,
     SendMessage,
 )
@@ -229,19 +228,20 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             └── Footer
 
         Message Flow:
-            InputField → UserInputSubmitted → bubbles up → ConversationManager
-            InputField → SlashCommand → InputAreaContainer → CreateConversation → bubbles up → ConversationManager
+            InputField → UserInputSubmitted → bubbles → ConversationManager
+            InputField → SlashCommand → InputAreaContainer → CreateConversation
+                → bubbles → ConversationManager
 
         Data Binding:
-            All widgets are composed from ConversationState.compose(), so data_bind
-            works because the active pump is ConversationState (the reactive owner).
+            All widgets are composed from ConversationState.compose(), so
+            data_bind works because the active pump is ConversationState.
         """
         # ConversationManager wraps content so messages bubble up to it
         with self.conversation_manager:
             # Content area - horizontal layout for conversation and optional panels
             with Horizontal(id="content_area"):
-                # ConversationState composes scroll_view, input_area and all child widgets
-                # This enables data_bind() to work (requires owner as active pump)
+                # ConversationState composes scroll_view, input_area and children
+                # This enables data_bind() (requires owner as active pump)
                 yield self.conversation_state
 
         # Footer - shows available key bindings
@@ -426,7 +426,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             agent_store = AgentStore()
             agent = agent_store.load_or_create(
                 env_overrides_enabled=self.env_overrides_enabled,
-                critic_disabled=self.conversation_view._critic_disabled,
+                critic_disabled=self.conversation_manager._critic_disabled,
             )
             if agent:
                 has_critic = agent.critic is not None

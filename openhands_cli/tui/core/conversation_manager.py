@@ -28,17 +28,14 @@ State Updates:
 import asyncio
 import logging
 import uuid
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from textual import on, work
+from textual import on
 from textual.containers import Container
 from textual.message import Message
-from textual.worker import Worker
 
 from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
-    NeverConfirm,
 )
 from openhands_cli.tui.messages import UserInputSubmitted
 
@@ -46,8 +43,6 @@ from openhands_cli.tui.messages import UserInputSubmitted
 if TYPE_CHECKING:
     from openhands_cli.tui.core.conversation_runner import ConversationRunner
     from openhands_cli.tui.core.state import ConversationState
-    from openhands_cli.tui.textual_app import OpenHandsApp
-    from openhands_cli.tui.widgets.main_display import ScrollableContent
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +138,8 @@ class ConversationManager(Container):
 
         Args:
             state: The ConversationState to update with operation results.
-            env_overrides_enabled: If True, environment variables override stored settings.
+            env_overrides_enabled: If True, environment variables override
+                stored settings.
             critic_disabled: If True, critic functionality is disabled.
             json_mode: If True, enable JSON output mode.
         """
@@ -154,8 +150,8 @@ class ConversationManager(Container):
         self._json_mode = json_mode
 
         # Runner registry - maps conversation_id to runner
-        self._runners: dict[uuid.UUID, "ConversationRunner"] = {}
-        self._current_runner: "ConversationRunner | None" = None
+        self._runners: dict[uuid.UUID, ConversationRunner] = {}
+        self._current_runner: ConversationRunner | None = None
 
         # Switch coordination
         self._loading_notification = None
@@ -306,7 +302,9 @@ class ConversationManager(Container):
                         "Do you want to switch anyway?"
                     )
                 ),
-                lambda confirmed: self._handle_switch_confirmation(confirmed, target_id),
+                lambda confirmed: self._handle_switch_confirmation(
+                    confirmed, target_id
+                ),
             )
             return
 
@@ -355,7 +353,11 @@ class ConversationManager(Container):
         # Run switch in background thread
         def _switch_worker() -> None:
             # Pause current runner if needed
-            if pause_current and self._current_runner and self._current_runner.is_running:
+            if (
+                pause_current
+                and self._current_runner
+                and self._current_runner.is_running
+            ):
                 self._current_runner.conversation.pause()
 
             # Prepare UI on main thread
@@ -504,9 +506,7 @@ class ConversationManager(Container):
 
     # ---- Runner Management ----
 
-    def _get_or_create_runner(
-        self, conversation_id: uuid.UUID
-    ) -> "ConversationRunner":
+    def _get_or_create_runner(self, conversation_id: uuid.UUID) -> "ConversationRunner":
         """Get existing runner or create a new one."""
         if conversation_id in self._runners:
             runner = self._runners[conversation_id]
@@ -559,8 +559,8 @@ class ConversationManager(Container):
 
     def _dismiss_pending_feedback_widgets(self) -> None:
         """Remove all pending CriticFeedbackWidget instances."""
-        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
         from openhands_cli.tui.textual_app import OpenHandsApp
+        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
 
         app: OpenHandsApp = self.app  # type: ignore[assignment]
 

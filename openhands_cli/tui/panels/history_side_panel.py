@@ -28,7 +28,6 @@ from openhands_cli.tui.panels.history_panel_style import HISTORY_PANEL_STYLE
 
 
 if TYPE_CHECKING:
-    from openhands_cli.tui.core.conversation_manager import ConversationManager
     from openhands_cli.tui.textual_app import OpenHandsApp
 
 
