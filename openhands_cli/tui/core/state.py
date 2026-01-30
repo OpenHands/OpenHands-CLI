@@ -115,10 +115,6 @@ class ConversationState(Container):
     metrics: var[Metrics | None] = var(None)
     """Combined metrics from conversation stats."""
 
-    # ---- UI State ----
-    is_multiline_mode: var[bool] = var(False)
-    """Whether input field is in multiline mode."""
-
     def __init__(
         self,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
@@ -178,7 +174,6 @@ class ConversationState(Container):
             )
             yield InfoStatusLine().data_bind(
                 running=ConversationState.running,
-                is_multiline_mode=ConversationState.is_multiline_mode,
                 metrics=ConversationState.metrics,
             )
 

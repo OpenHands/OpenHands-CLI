@@ -84,6 +84,9 @@ class InfoStatusLine(Static):
 
     This widget uses data_bind() to bind to ConversationView reactive properties.
     When ConversationView metrics change, this widget automatically updates.
+
+    The multiline mode state is synced via Signal subscription to InputField,
+    since it's UI widget state (not conversation state).
     """
 
     DEFAULT_CSS = """
@@ -98,26 +101,42 @@ class InfoStatusLine(Static):
     # Reactive properties bound via data_bind() to ConversationView
     # Note: Named 'running' to avoid conflict with MessagePump.is_running
     running: var[bool] = var(False)
-    is_multiline_mode: var[bool] = var(False)
     # Metrics object from conversation stats (bound from ConversationView)
     metrics: var[Metrics | None] = var(None)
+
+    # Local UI state - updated via Signal subscription to InputField
+    is_multiline_mode: var[bool] = var(False)
 
     def __init__(self, **kwargs) -> None:
         super().__init__("", id="info_status_line", markup=True, **kwargs)
         self.work_dir_display = self._get_work_dir_display()
 
     def on_mount(self) -> None:
-        """Initialize the info status line."""
+        """Initialize the info status line and subscribe to InputField signal."""
+        from openhands_cli.tui.widgets.user_input.input_field import InputField
+
+        # Subscribe to InputField's multiline mode signal
+        input_field = self.app.query_one(InputField)
+        input_field.multiline_mode_status.subscribe(
+            self, self._on_multiline_mode_changed
+        )
+
         self._update_text()
 
     def on_resize(self) -> None:
         """Recalculate layout when widget is resized."""
         self._update_text()
 
+    # ----- Signal Callback -----
+
+    def _on_multiline_mode_changed(self, is_multiline: bool) -> None:
+        """Handle multiline mode changes from InputField signal."""
+        self.is_multiline_mode = is_multiline
+
     # ----- Reactive Watchers -----
 
     def watch_is_multiline_mode(self, _value: bool) -> None:
-        """React to multiline mode changes from ConversationView."""
+        """React to multiline mode changes (local state updated via signal)."""
         self._update_text()
 
     def watch_metrics(self, _value: Metrics | None) -> None:
