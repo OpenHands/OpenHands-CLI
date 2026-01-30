@@ -289,6 +289,7 @@ class HistorySidePanel(Container):
             if (
                 conv_hex in self._seen_running
                 and conversation_id != self.current_conversation_id
+                and conversation_id != self.selected_conversation_id
             ):
                 self._unread_conversations.add(conv_hex)
 
@@ -366,6 +367,8 @@ class HistorySidePanel(Container):
                 runner = self._oh_app.conversation_session_manager.get_runner(conv_uuid)
                 if runner and runner.is_running:
                     is_running = True
+                    # Seed seen-running for chats already running on mount
+                    self._seen_running.add(conv.id)
             except ValueError:
                 pass
 
