@@ -245,22 +245,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
         plan_panel.toggle()
 
     def _get_agent_model(self) -> str | None:
-        """Get the agent's model name from the conversation runner.
+        """Get the agent's model name from the conversation state.
 
         Returns:
             The agent model name or None if not available.
         """
-        try:
-            if (
-                self._app.conversation_runner
-                and self._app.conversation_runner.conversation
-                and hasattr(self._app.conversation_runner.conversation, "agent")
-                and self._app.conversation_runner.conversation.agent  # type: ignore[union-attr]
-            ):
-                return self._app.conversation_runner.conversation.agent.llm.model  # type: ignore[union-attr]
-        except Exception:
-            pass
-        return None
+        return self._app.conversation_state.agent_model
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
@@ -319,6 +309,19 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._container.mount(widget)
         # Automatically scroll to the bottom to show the newly added widget
         self._container.scroll_end(animate=False)
+
+    def render_user_message(self, content: str) -> None:
+        """Render a user message to the UI.
+
+        Args:
+            content: The user's message text to display.
+        """
+        from textual.widgets import Static
+
+        user_message_widget = Static(
+            f"> {content}", classes="user-message", markup=False
+        )
+        self._run_on_main_thread(self._add_widget_to_ui, user_message_widget)
 
     def _update_widget_in_ui(
         self, collapsible: Collapsible, new_title: str, new_content: str

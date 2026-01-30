@@ -8,6 +8,7 @@ from textual.app import App
 from textual.events import Paste
 from textual.widgets import TextArea
 
+from openhands_cli.tui.messages import UserInputSubmitted
 from openhands_cli.tui.widgets.user_input.input_field import (
     InputField,
     get_external_editor,
@@ -149,7 +150,7 @@ class TestInputField:
         if should_submit:
             field_with_mocks.post_message.assert_called_once()
             msg = field_with_mocks.post_message.call_args[0][0]
-            assert isinstance(msg, InputField.Submitted)
+            assert isinstance(msg, UserInputSubmitted)
             assert msg.content == content.strip()
             # Input cleared after submission
             field_with_mocks.single_line_widget.clear.assert_called_once()  # type: ignore[union-attr]
@@ -195,7 +196,7 @@ class TestInputField:
             # Message posted
             field_with_mocks.post_message.assert_called_once()
             msg = field_with_mocks.post_message.call_args[0][0]
-            assert isinstance(msg, InputField.Submitted)
+            assert isinstance(msg, UserInputSubmitted)
             assert msg.content == content.strip()
         else:
             field_with_mocks.post_message.assert_not_called()
