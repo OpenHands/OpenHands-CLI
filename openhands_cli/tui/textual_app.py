@@ -482,7 +482,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Process the first queued input immediately
         user_input = self.pending_inputs.pop(0)
 
+        # Handle commands - only exact matches (don't add to scroll view)
+        if is_valid_command(user_input):
+            self._handle_command(user_input)
+            return
+
         # Add the user message to the main display as a Static widget
+        # (only for non-command messages)
         user_message_widget = Static(
             f"> {user_input}", classes="user-message", markup=False
         )
@@ -498,7 +504,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if not content:
             return
 
+        # Handle commands - only exact matches (don't add to scroll view)
+        if is_valid_command(content):
+            self._handle_command(content)
+            return
+
         # Add the user message to the main display as a Static widget
+        # (only for non-command messages)
         user_message_widget = Static(
             f"> {content}", classes="user-message", markup=False
         )
@@ -507,12 +519,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Force immediate refresh to show the message without delay
         self.refresh()
 
-        # Handle commands - only exact matches
-        if is_valid_command(content):
-            self._handle_command(content)
-        else:
-            # Handle regular messages with conversation runner
-            await self._handle_user_message(content)
+        # Handle regular messages with conversation runner
+        await self._handle_user_message(content)
 
     def _handle_command(self, command: str) -> None:
         """Handle command execution."""
