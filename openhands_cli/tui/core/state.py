@@ -362,7 +362,3 @@ class ConversationState(Container):
         self.conversation_title = None
         self._conversation_start_time = None
         self._conversation = None
-
-
-# Backward compatibility alias - ConversationView is now ConversationState
-ConversationView = ConversationState

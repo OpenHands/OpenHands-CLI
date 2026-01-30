@@ -148,7 +148,7 @@ class TestAutocompleteShutdownCrash:
             await pilot.pause()
 
             # Execute the exit command
-            oh_app.conversation_view.input_area._command_exit()
+            oh_app.conversation_state.input_area._command_exit()
             await pilot.pause()
 
             # Should exit cleanly without crash

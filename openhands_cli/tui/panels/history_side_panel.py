@@ -123,7 +123,7 @@ class HistoryItem(Static):
 class HistorySidePanel(Container):
     """Side panel widget that displays conversation history (local only).
 
-    This panel watches ConversationView for state changes instead of receiving
+    This panel watches ConversationState for state changes instead of receiving
     forwarded messages. This eliminates the need for manual message routing
     through OpenHandsApp.
     """

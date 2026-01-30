@@ -37,11 +37,6 @@ class HistoryMessagesTestApp(App):
         # ConversationState for reactive state
         self.conversation_state = ConversationState()
 
-    @property
-    def conversation_view(self) -> ConversationState:
-        """Backward compat alias."""
-        return self.conversation_state
-
     def compose(self) -> ComposeResult:
         with Horizontal(id="content_area"):
             yield Static("main", id="main")
@@ -54,10 +49,10 @@ class HistoryMessagesTestApp(App):
 
 
 @pytest.mark.asyncio
-async def test_history_panel_updates_from_conversation_view(
+async def test_history_panel_updates_from_conversation_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test that the history panel responds to ConversationView state changes."""
+    """Test that the history panel responds to ConversationState state changes."""
     # Stub local conversations list.
     base_id = uuid.uuid4().hex
     conversations = [
@@ -79,9 +74,9 @@ async def test_history_panel_updates_from_conversation_view(
         list_container = panel.query_one("#history-list", VerticalScroll)
         assert len(list_container.query(HistoryItem)) == 1
 
-        # Update conversation_id via ConversationView (simulating new conversation)
+        # Update conversation_id via ConversationState (simulating new conversation)
         new_id = uuid.uuid4()
-        app.conversation_view.conversation_id = new_id
+        app.conversation_state.conversation_id = new_id
         await pilot.pause()
 
         assert panel.current_conversation_id == new_id
@@ -96,8 +91,8 @@ async def test_history_panel_updates_from_conversation_view(
         ]
         assert len(placeholder_items) == 1
 
-        # Update title via ConversationView
-        app.conversation_view.conversation_title = "first message"
+        # Update title via ConversationState
+        app.conversation_state.conversation_title = "first message"
         await pilot.pause()
 
         placeholder = placeholder_items[0]
@@ -111,9 +106,9 @@ async def test_history_panel_updates_from_conversation_view(
 
         # Simulate a cancelled switch (is_switching goes True then False without
         # conversation_id changing)
-        app.conversation_view.is_switching = True
+        app.conversation_state.is_switching = True
         await pilot.pause()
-        app.conversation_view.is_switching = False
+        app.conversation_state.is_switching = False
         await pilot.pause()
 
         # Selection should revert to current conversation

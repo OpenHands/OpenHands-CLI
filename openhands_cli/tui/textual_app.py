@@ -109,11 +109,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """Set conversation ID in ConversationState (source of truth)."""
         self.conversation_state.conversation_id = value
 
-    @property
-    def conversation_view(self) -> ConversationState:
-        """Backward compatibility alias for conversation_state."""
-        return self.conversation_state
-
     def __init__(
         self,
         exit_confirmation: bool = True,
@@ -404,7 +399,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         2. Initializing the splash content (one-time setup)
         3. Processing any queued inputs
 
-        UI lifecycle is owned by OpenHandsApp, not ConversationView. The splash
+        UI lifecycle is owned by OpenHandsApp, not ConversationState. The splash
         content initialization is a direct method call, not a reactive
         state change, because it's a one-time operation.
         """

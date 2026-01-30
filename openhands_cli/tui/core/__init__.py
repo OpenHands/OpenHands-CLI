@@ -13,14 +13,12 @@ from openhands_cli.tui.core.state import (
     ConfirmationRequired,
     ConversationFinished,
     ConversationState,
-    ConversationView,  # Backward compatibility alias
 )
 
 
 __all__ = [
     # State
     "ConversationState",
-    "ConversationView",  # Backward compatibility alias
     "ConversationFinished",
     "ConfirmationRequired",
     # Manager
