@@ -1,163 +1,165 @@
+---
 name: Bug
 description: Report a problem with OpenHands CLI
 title: '[Bug]: '
-labels: ['bug']
+labels: [bug]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        ## Thank you for reporting a bug! 🐛
+    - type: markdown
+      attributes:
+          value: |
+              ## Thank you for reporting a bug! 🐛
 
-        **Please fill out all required fields.** Issues missing critical information (version, installation method, reproduction steps, etc.) will be delayed or closed until complete details are provided.
+              **Please fill out all required fields.** Issues missing critical information (version, installation method, reproduction steps, etc.) will be delayed or closed until complete details are provided.
 
-        Clear, detailed reports help us resolve issues faster.
+              Clear, detailed reports help us resolve issues faster.
 
-  - type: checkboxes
-    attributes:
-      label: Is there an existing issue for the same bug?
-      description: Please search existing issues before creating a new one. If found, react or comment to the duplicate issue instead of making a new one.
-      options:
-      - label: I have searched existing issues and this is not a duplicate.
-        required: true
+    - type: checkboxes
+      attributes:
+          label: Is there an existing issue for the same bug?
+          description: Please search existing issues before creating a new one. If found, react or comment to the duplicate issue instead of making a 
+              new one.
+          options:
+              - label: I have searched existing issues and this is not a duplicate.
+                required: true
 
-  - type: textarea
-    id: bug-description
-    attributes:
-      label: Bug Description
-      description: Clearly describe what went wrong. Be specific and concise.
-      placeholder: Example - "When I run a Python task in the CLI, the TUI crashes after 30 seconds with a connection timeout error."
-    validations:
-      required: true
+    - type: textarea
+      id: bug-description
+      attributes:
+          label: Bug Description
+          description: Clearly describe what went wrong. Be specific and concise.
+          placeholder: Example - "When I run a Python task in the CLI, the TUI crashes after 30 seconds with a connection timeout error."
+      validations:
+          required: true
 
-  - type: textarea
-    id: expected-behavior
-    attributes:
-      label: Expected Behavior
-      description: What did you expect to happen?
-      placeholder: Example - "The CLI should execute the Python script and return results in the terminal."
-    validations:
-      required: false
-
-  - type: textarea
-    id: actual-behavior
-    attributes:
-      label: Actual Behavior
-      description: What actually happened?
-      placeholder: Example - "Connection timed out after 30 seconds, task failed with error code 500."
-    validations:
-      required: false
-
-  - type: textarea
-    id: reproduction-steps
-    attributes:
-      label: Steps to Reproduce
-      description: Provide clear, step-by-step instructions to reproduce the bug.
-      placeholder: |
-        1. Install OpenHands CLI using `uv tool install openhands-cli`
-        2. Configure with Claude 3.5 Sonnet
-        3. Run command: `openhands "write a python script"`
-        4. Wait 30 seconds
-        5. Error appears
-    validations:
-      required: false
-
-  - type: dropdown
-    id: installation
-    attributes:
-      label: OpenHands CLI Installation Method
-      description: How are you running OpenHands CLI?
-      options:
-        - CLI (uv tool install)
-        - CLI (executable binary)
-        - CLI (pip install)
-        - CLI (from source)
-        - Other
-      default: 0
-    validations:
-      required: false
-
-  - type: input
-    id: installation-other
-    attributes:
-      label: If you selected "Other", please specify
-      description: Describe your installation method
-      placeholder: ex. Custom build, Docker container, etc.
-
-  - type: input
-    id: openhands-version
-    attributes:
-      label: OpenHands CLI Version
-      description: What version are you using? Run `openhands --version` to find this.
-      placeholder: ex. 0.2.0, main, commit hash, etc.
-    validations:
-      required: false
-
-  - type: checkboxes
-    id: version-confirmation
-    attributes:
-      label: Version Confirmation
-      description: Bugs on older versions may already be fixed. Please upgrade before submitting.
-      options:
-        - label: "I have confirmed this bug exists on the LATEST version of OpenHands CLI"
+    - type: textarea
+      id: expected-behavior
+      attributes:
+          label: Expected Behavior
+          description: What did you expect to happen?
+          placeholder: Example - "The CLI should execute the Python script and return results in the terminal."
+      validations:
           required: false
 
-  - type: input
-    id: model-name
-    attributes:
-      label: Model Name
-      description: Which LLM model are you using?
-      placeholder: ex. gpt-4o, claude-3-5-sonnet-20241022, openrouter/deepseek-r1, etc.
-    validations:
-      required: false
+    - type: textarea
+      id: actual-behavior
+      attributes:
+          label: Actual Behavior
+          description: What actually happened?
+          placeholder: Example - "Connection timed out after 30 seconds, task failed with error code 500."
+      validations:
+          required: false
 
-  - type: dropdown
-    id: os
-    attributes:
-      label: Operating System
-      options:
-        - MacOS
-        - Linux
-        - WSL on Windows
-        - Windows (native)
-        - Other
-    validations:
-      required: false
+    - type: textarea
+      id: reproduction-steps
+      attributes:
+          label: Steps to Reproduce
+          description: Provide clear, step-by-step instructions to reproduce the bug.
+          placeholder: |
+              1. Install OpenHands CLI using `uv tool install openhands-cli`
+              2. Configure with Claude 3.5 Sonnet
+              3. Run command: `openhands "write a python script"`
+              4. Wait 30 seconds
+              5. Error appears
+      validations:
+          required: false
 
-  - type: input
-    id: terminal
-    attributes:
-      label: Terminal / Shell
-      description: |
-        Which terminal emulator and shell are you using?
+    - type: dropdown
+      id: installation
+      attributes:
+          label: OpenHands CLI Installation Method
+          description: How are you running OpenHands CLI?
+          options:
+              - CLI (uv tool install)
+              - CLI (executable binary)
+              - CLI (pip install)
+              - CLI (from source)
+              - Other
+          default: 0
+      validations:
+          required: false
 
-      placeholder: ex. iTerm2 + zsh, Windows Terminal + PowerShell, GNOME Terminal + bash
+    - type: input
+      id: installation-other
+      attributes:
+          label: If you selected "Other", please specify
+          description: Describe your installation method
+          placeholder: ex. Custom build, Docker container, etc.
 
-  - type: textarea
-    id: logs
-    attributes:
-      label: Logs and Error Messages
-      description: |
-        **Paste relevant logs, error messages, or stack traces.** Use code blocks (```) for formatting.
+    - type: input
+      id: openhands-version
+      attributes:
+          label: OpenHands CLI Version
+          description: What version are you using? Run `openhands --version` to find this.
+          placeholder: ex. 0.2.0, main, commit hash, etc.
+      validations:
+          required: false
 
-        CLI logs are typically in the terminal output or in `~/.openhands/logs/`. Include timestamps if errors occurred at a specific time.
-      placeholder: |
-        ```
-        Paste error logs here
-        ```
+    - type: checkboxes
+      id: version-confirmation
+      attributes:
+          label: Version Confirmation
+          description: Bugs on older versions may already be fixed. Please upgrade before submitting.
+          options:
+              - label: I have confirmed this bug exists on the LATEST version of OpenHands CLI
+                required: false
 
-  - type: textarea
-    id: additional-context
-    attributes:
-      label: Screenshots and Additional Context
-      description: |
-        Add screenshots, videos, terminal recordings (e.g., asciinema), runtime environment details, or other context that helps explain the issue.
+    - type: input
+      id: model-name
+      attributes:
+          label: Model Name
+          description: Which LLM model are you using?
+          placeholder: ex. gpt-4o, claude-3-5-sonnet-20241022, openrouter/deepseek-r1, etc.
+      validations:
+          required: false
 
-        💡 **Terminal recordings help a lot:** Consider using tools like asciinema to record terminal sessions showing the bug.
+    - type: dropdown
+      id: os
+      attributes:
+          label: Operating System
+          options:
+              - MacOS
+              - Linux
+              - WSL on Windows
+              - Windows (native)
+              - Other
+      validations:
+          required: false
 
-      placeholder: Drag and drop screenshots here, paste links, or add additional context.
+    - type: input
+      id: terminal
+      attributes:
+          label: Terminal / Shell
+          description: |
+              Which terminal emulator and shell are you using?
 
-  - type: markdown
-    attributes:
-      value: |
-        ---
-        **Note:** Issues with incomplete information may be closed or deprioritized. Maintainers and community members have limited bandwidth and prioritize well-documented bugs that are easier to reproduce and fix. Thank you for your understanding!
+          placeholder: ex. iTerm2 + zsh, Windows Terminal + PowerShell, GNOME Terminal + bash
+
+    - type: textarea
+      id: logs
+      attributes:
+          label: Logs and Error Messages
+          description: |
+              **Paste relevant logs, error messages, or stack traces.** Use code blocks (```) for formatting.
+
+              CLI logs are typically in the terminal output or in `~/.openhands/logs/`. Include timestamps if errors occurred at a specific time.
+          placeholder: |
+              ```
+              Paste error logs here
+              ```
+
+    - type: textarea
+      id: additional-context
+      attributes:
+          label: Screenshots and Additional Context
+          description: |
+              Add screenshots, videos, terminal recordings (e.g., asciinema), runtime environment details, or other context that helps explain the issue.
+
+              💡 **Terminal recordings help a lot:** Consider using tools like asciinema to record terminal sessions showing the bug.
+
+          placeholder: Drag and drop screenshots here, paste links, or add additional context.
+
+    - type: markdown
+      attributes:
+          value: |
+              ---
+              **Note:** Issues with incomplete information may be closed or deprioritized. Maintainers and community members have limited bandwidth and prioritize well-documented bugs that are easier to reproduce and fix. Thank you for your understanding!
