@@ -202,6 +202,9 @@ class HistorySidePanel(Container):
 
         # Load and render conversations
         self.refresh_content()
+        # Ensure current conversation is visible even if not yet persisted
+        if self.current_conversation_id is not None:
+            self.ensure_conversation_visible(self.current_conversation_id)
 
     # --- ConversationState Watchers ---
 
