@@ -223,7 +223,10 @@ class ConversationPane(Container):
 
             app: OpenHandsApp = self.app  # type: ignore[assignment]
             self._visualizer = ConversationVisualizer(
-                self.content_container, app, skip_user_messages=True
+                self.content_container,
+                app,
+                skip_user_messages=True,
+                name="OpenHands Agent",
             )
         return self._visualizer
 

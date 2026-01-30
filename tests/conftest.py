@@ -14,9 +14,10 @@ from openhands_cli.utils import get_default_cli_agent
 # Enable colors for Textual snapshot tests (prevents grayscale rendering).
 # Textual checks for NO_COLOR env var to decide if colors are enabled.
 # If NO_COLOR is set (even to empty string), Textual renders in grayscale.
-os.environ.pop("NO_COLOR", None)
-os.environ.setdefault("TERM", "xterm-256color")
-os.environ.setdefault("COLORTERM", "truecolor")
+def pytest_configure(config):
+    os.environ.pop("NO_COLOR", None)
+    os.environ.setdefault("TERM", "xterm-256color")
+    os.environ.setdefault("COLORTERM", "truecolor")
 
 
 @dataclass

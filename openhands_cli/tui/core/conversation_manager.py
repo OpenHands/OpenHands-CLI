@@ -75,6 +75,10 @@ class ConversationManager:
         app.conversation_id = new_id
         app.conversation_session_manager.set_active_conversation(new_id)
 
+        # Sync conversation_runner with the session manager's cached runner
+        # (will be None for new conversations)
+        app.conversation_runner = app.conversation_session_manager.get_runner(new_id)
+
         # Remove any existing confirmation panel
         if app.confirmation_panel:
             app.confirmation_panel.remove()
