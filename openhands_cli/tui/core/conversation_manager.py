@@ -168,11 +168,6 @@ class ConversationManager(Container):
         """Get the current conversation runner."""
         return self._current_runner
 
-    @property
-    def is_running(self) -> bool:
-        """Check if a conversation is currently running."""
-        return self._current_runner is not None and self._current_runner.is_running
-
     # ---- Message Handlers ----
 
     @on(UserInputSubmitted)
@@ -293,7 +288,7 @@ class ConversationManager(Container):
             return
 
         # If agent is running, show confirmation modal
-        if self.is_running:
+        if self._state.running:
             app.push_screen(
                 SwitchConversationModal(
                     prompt=(

@@ -297,96 +297,7 @@ class TestOpenHandsAppCommands:
             exit_mock.assert_called_once_with()
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "has_runner,runner_running,expected_notification",
-        [
-            (False, False, "Condense Error"),  # No conversation runner
-            (True, True, None),  # Runner exists but is running (handled by runner)
-            (True, False, None),  # Runner exists and not running (success case)
-        ],
-    )
-    async def test_condense_command_scenarios(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        has_runner: bool,
-        runner_running: bool,
-        expected_notification: str | None,
-    ) -> None:
-        """`/condense` should handle different conversation runner states correctly."""
-        monkeypatch.setattr(
-            SettingsScreen,
-            "is_initial_setup_required",
-            lambda env_overrides_enabled=False: False,
-        )
-
-        app = OpenHandsApp(exit_confirmation=False)
-
-        # Mock the notify method to capture notifications
-        notify_mock = mock.MagicMock()
-
-        async with app.run_test() as pilot:
-            oh_app = cast(OpenHandsApp, pilot.app)
-            oh_app.notify = notify_mock
-
-            dummy_runner = None
-            if has_runner:
-                # Create a mock conversation runner
-                dummy_runner = mock.MagicMock()
-                dummy_runner.is_running = runner_running
-                dummy_runner.condense_async = mock.AsyncMock()
-                oh_app.conversation_manager._current_runner = dummy_runner
-            else:
-                oh_app.conversation_manager._current_runner = None
-
-            oh_app.conversation_state.input_area._command_condense()
-
-            if expected_notification:
-                # Should have called notify with error
-                notify_mock.assert_called_once()
-                call_args = notify_mock.call_args
-                assert call_args[1]["title"] == expected_notification
-            elif has_runner and dummy_runner is not None:
-                # Should have called condense_async
-                dummy_runner.condense_async.assert_called_once()
-                # Should not have called notify (error handling is in runner)
-                notify_mock.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_condense_command_calls_async_method(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """`/condense` should call the async condense method on conversation runner."""
-        monkeypatch.setattr(
-            SettingsScreen,
-            "is_initial_setup_required",
-            lambda env_overrides_enabled=False: False,
-        )
-
-        app = OpenHandsApp(exit_confirmation=False)
-
-        async with app.run_test() as pilot:
-            oh_app = cast(OpenHandsApp, pilot.app)
-
-            # Create a mock conversation runner with async condense method
-            dummy_runner = mock.MagicMock()
-            dummy_runner.is_running = False
-            dummy_runner.condense_async = mock.AsyncMock()
-            oh_app.conversation_manager._current_runner = dummy_runner
-
-            # Mock notify to ensure no error notifications
-            notify_mock = mock.MagicMock()
-            oh_app.notify = notify_mock
-
-            oh_app.conversation_state.input_area._command_condense()
-
-            # Verify the async method was called
-            dummy_runner.condense_async.assert_called_once_with()
-            # Verify no error notifications were sent
-            notify_mock.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_condense_command_no_runner_error_message(
+    async def test_condense_command_no_runner_shows_error(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
@@ -409,7 +320,9 @@ class TestOpenHandsAppCommands:
             notify_mock = mock.MagicMock()
             oh_app.notify = notify_mock
 
+            # Post the condense command and wait for message to be processed
             oh_app.conversation_state.input_area._command_condense()
+            await pilot.pause()
 
             # Verify error notification was called with correct parameters
             notify_mock.assert_called_once_with(
@@ -417,6 +330,90 @@ class TestOpenHandsAppCommands:
                 message="No conversation available to condense",
                 severity="error",
             )
+
+    @pytest.mark.asyncio
+    async def test_condense_command_while_running_shows_warning(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/condense` should show warning when conversation is running."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            # Create a mock runner that is running
+            dummy_runner = mock.MagicMock()
+            dummy_runner.is_running = True
+            oh_app.conversation_manager._current_runner = dummy_runner
+
+            # Mock notify to capture the warning
+            notify_mock = mock.MagicMock()
+            oh_app.notify = notify_mock
+
+            # Post the condense command and wait for message to be processed
+            oh_app.conversation_state.input_area._command_condense()
+            await pilot.pause()
+
+            # Verify warning notification was called
+            notify_mock.assert_called_once_with(
+                title="Condense Error",
+                message="Cannot condense while conversation is running.",
+                severity="warning",
+            )
+
+    @pytest.mark.asyncio
+    async def test_condense_command_success(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/condense` should call conversation.condense and notify."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            # Create a mock runner with a mock conversation
+            dummy_conversation = mock.MagicMock()
+            dummy_conversation.condense = mock.MagicMock()
+            dummy_runner = mock.MagicMock()
+            dummy_runner.is_running = False
+            dummy_runner.conversation = dummy_conversation
+            oh_app.conversation_manager._current_runner = dummy_runner
+
+            # Track notify calls
+            notify_calls: list[dict] = []
+            original_notify = oh_app.notify
+
+            def capture_notify(*args, **kwargs):
+                notify_calls.append(kwargs)
+                return original_notify(*args, **kwargs)
+
+            oh_app.notify = capture_notify
+
+            # Post the condense command and wait for message to be processed
+            oh_app.conversation_state.input_area._command_condense()
+            await pilot.pause()
+
+            # Verify conversation.condense was called
+            dummy_conversation.condense.assert_called_once()
+
+            # Verify notifications: should have "started" and "complete"
+            assert len(notify_calls) == 2
+            assert notify_calls[0]["title"] == "Condensation Started"
+            assert notify_calls[1]["title"] == "Condensation Complete"
 
     @pytest.mark.asyncio
     async def test_feedback_command_opens_browser(
@@ -704,7 +701,7 @@ class TestOpenHandsAppCommands:
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Selecting a conversation in history panel should trigger switch."""
+        """Selecting a conversation in history panel should post SwitchConversation."""
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
@@ -712,6 +709,7 @@ class TestOpenHandsAppCommands:
         )
         conv1_id = uuid.uuid4().hex
         conv2_id = uuid.uuid4().hex
+        conv2_uuid = uuid.UUID(conv2_id)
         monkeypatch.setattr(
             LocalFileStore,
             "list_conversations",
@@ -734,24 +732,16 @@ class TestOpenHandsAppCommands:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            switch_calls: list[str] = []
-
-            # Mock the _on_switch_conversation handler
-            def mock_switch_handler(event) -> None:
-                switch_calls.append(event.conversation_id)
-                event.stop()
-
-            oh_app.conversation_manager._on_switch_conversation = mock_switch_handler  # type: ignore[method-assign]
-
             oh_app.conversation_state.input_area._command_history()
             await pilot.pause()
 
             panel = oh_app.query_one(HistorySidePanel)
-            panel._handle_select(conv2_id)
-            await pilot.pause()
 
-            assert len(switch_calls) == 1
-            assert switch_calls[0] == conv2_id
+            # Call _handle_select and verify it updates selected_conversation_id
+            panel._handle_select(conv2_id)
+
+            # Verify the selected conversation ID was set to the chosen conversation
+            assert panel.selected_conversation_id == conv2_uuid
 
     @pytest.mark.asyncio
     async def test_history_switch_shows_modal_when_agent_running(
@@ -783,9 +773,8 @@ class TestOpenHandsAppCommands:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            dummy_runner = mock.MagicMock()
-            dummy_runner.is_running = True
-            oh_app.conversation_manager._current_runner = dummy_runner
+            # Set state.running = True to trigger the modal
+            oh_app.conversation_state.running = True
 
             # Post a SwitchConversation message to trigger the handler
             from openhands_cli.tui.core.conversation_manager import SwitchConversation

@@ -264,8 +264,8 @@ class TestPrintConversationSummary:
         # Just ensure this doesn't raise
         app._print_conversation_summary()
 
-    def test_print_conversation_summary_uses_console_and_runner(self, monkeypatch):
-        """Ensure we call get_conversation_summary and rich.Console.print."""
+    def test_print_conversation_summary_uses_console_and_state(self, monkeypatch):
+        """Ensure we call state.get_conversation_summary and Console.print."""
         from rich.text import Text
 
         monkeypatch.setattr(
@@ -276,12 +276,10 @@ class TestPrintConversationSummary:
 
         app = OpenHandsApp(exit_confirmation=False)
 
-        mock_runner = MagicMock()
-        mock_runner.get_conversation_summary.return_value = (
-            2,
-            Text("Last agent message"),
+        # Mock conversation_state.get_conversation_summary
+        app.conversation_state.get_conversation_summary = MagicMock(
+            return_value=(2, Text("Last agent message"))
         )
-        app.conversation_manager._current_runner = mock_runner
 
         with patch("rich.console.Console") as mock_console_cls:
             mock_console = MagicMock()
@@ -289,7 +287,7 @@ class TestPrintConversationSummary:
 
             app._print_conversation_summary()
 
-            mock_runner.get_conversation_summary.assert_called_once()
+            app.conversation_state.get_conversation_summary.assert_called_once()
             assert mock_console.print.call_count >= 1
 
 
@@ -314,6 +312,8 @@ class TestHeadlessRunnerOutput:
         mock_state = Mock(spec=ConversationState)
         mock_state.confirmation_policy = NeverConfirm()
         mock_state.attach_conversation = Mock()
+        # Ensure is_confirmation_active returns False so headless path is taken
+        mock_state.is_confirmation_active = False
         mock_message_pump = Mock()
 
         with patch(

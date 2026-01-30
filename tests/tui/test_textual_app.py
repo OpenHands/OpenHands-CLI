@@ -53,9 +53,9 @@ class TestSettingsRestartNotification:
         monkeypatch.setattr(ta, "SettingsScreen", MockSettingsScreen)
 
         app = OpenHandsApp.__new__(OpenHandsApp)
-        # Mock conversation_manager with is_running = False
-        app.conversation_manager = Mock()
-        app.conversation_manager.is_running = False
+        # Mock conversation_state with running = False
+        app.conversation_state = Mock()
+        app.conversation_state.running = False
 
         app.push_screen = Mock()
         app._reload_visualizer = Mock()

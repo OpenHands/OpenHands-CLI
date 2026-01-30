@@ -104,9 +104,7 @@ def test_elapsed_seconds_shown_in_working_text(monkeypatch):
 # ----- InfoStatusLine tests -----
 
 
-def test_get_work_dir_display_shortens_home_to_tilde(
-    dummy_app, mock_locations, monkeypatch
-):
+def test_get_work_dir_display_shortens_home_to_tilde(mock_locations, monkeypatch):
     """_get_work_dir_display replaces the home prefix with '~' when applicable."""
     work_dir_inside_home = mock_locations.home_dir / "projects" / "my-project"
     work_dir_inside_home.mkdir(parents=True, exist_ok=True)

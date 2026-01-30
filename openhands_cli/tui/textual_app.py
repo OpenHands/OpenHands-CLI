@@ -358,8 +358,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def action_open_settings(self) -> None:
         """Action to open the settings screen."""
-        # Check if conversation is running via ConversationManager
-        if self.conversation_manager.is_running:
+        # Check if conversation is running via ConversationState
+        if self.conversation_state.running:
             self.notify(
                 "Settings are not available while a conversation is running. "
                 "Please wait for the current conversation to complete.",
