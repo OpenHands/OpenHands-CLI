@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 import pytest
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalScroll
+from textual.signal import Signal
 from textual.widgets import Button, Static
 
 from openhands_cli.conversations.models import ConversationMetadata
@@ -37,6 +39,12 @@ class HistoryMessagesTestApp(App):
             self,  # type: ignore[arg-type]
             self._store,
         )
+        # Mock conversation_session_manager for HistorySidePanel
+        self.conversation_session_manager = SimpleNamespace(
+            get_runner=lambda conv_id: None  # No runners in test
+        )
+        # Mock runner_state_signal for HistorySidePanel subscriptions
+        self.runner_state_signal = Signal(self, "runner_state_signal")
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="content_area"):

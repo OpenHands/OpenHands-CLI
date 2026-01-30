@@ -8,6 +8,8 @@ It creates a basic app with:
 - The splash screen content scrolls off as new messages are added
 """
 
+from __future__ import annotations
+
 import asyncio
 import uuid
 from collections.abc import Iterable
@@ -40,6 +42,9 @@ from openhands_cli.tui.content.splash import get_splash_content
 from openhands_cli.tui.core.commands import is_valid_command, show_help
 from openhands_cli.tui.core.conversation_manager import ConversationManager
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
+from openhands_cli.tui.core.conversation_session_manager import (
+    ConversationSessionManager,
+)
 from openhands_cli.tui.core.messages import (
     ConversationCreated,
     ConversationSwitched,
@@ -51,9 +56,11 @@ from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModal
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
+from openhands_cli.tui.panels.conversation_pane import ConversationPane
 from openhands_cli.tui.panels.history_side_panel import HistorySidePanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
+from openhands_cli.tui.panels.system_splash_pane import SystemSplashPane
 from openhands_cli.tui.widgets import InputField
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
@@ -116,7 +123,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """
         super().__init__(**kwargs)
 
-        self.conversation_running_signal = Signal(self, "conversation_running_signal")
+        self.runner_state_signal = Signal(self, "runner_state_signal")
         self.is_ui_initialized = False
 
         # Store exit confirmation setting
@@ -136,6 +143,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.conversation_id = (
             resume_conversation_id if resume_conversation_id else uuid.uuid4()
         )
+        self._resume_conversation_id = resume_conversation_id
+        self._conversation_session_manager = ConversationSessionManager(
+            self.conversation_id
+        )
+        # Public accessor for session manager (used by ConversationSwitcher)
+        self.conversation_session_manager = self._conversation_session_manager
         self.conversation_dir = BaseConversation.get_persistence_dir(
             get_conversations_dir(), self.conversation_id
         )
@@ -178,19 +191,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """Create child widgets for the app."""
         # Content area - horizontal layout for main display and optional confirmation
         with Horizontal(id="content_area"):
-            # Main scrollable display - using VerticalScroll to support Collapsible
             with VerticalScroll(id="main_display"):
-                # Add initial splash content as individual widgets
-                yield Static(id="splash_banner", classes="splash-banner")
-                yield Static(id="splash_version", classes="splash-version")
-                yield Static(id="splash_status", classes="status-panel")
-                yield Static(id="splash_conversation", classes="conversation-panel")
-                yield Static(
-                    id="splash_instructions_header", classes="splash-instruction-header"
-                )
-                yield Static(id="splash_instructions", classes="splash-instruction")
-                yield Static(id="splash_update_notice", classes="splash-update-notice")
-                yield Static(id="splash_critic_notice", classes="splash-critic-notice")
+                # System splash is global (shown on startup, hidden when chatting).
+                yield SystemSplashPane(id="splash_system_pane")
+                # ConversationPanes are created dynamically per conversation.
+                # They're cached in conversation_session_manager for instant switching.
 
             # Input area - docked to bottom
             with Container(id="input_area"):
@@ -223,12 +228,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def on_mount(self) -> None:
         """Called when app starts."""
-        from openhands_cli.stores import MissingEnvironmentVariablesError
-
-        # Subscribe to conversation running signal for auto-exit in headless mode
-        self.conversation_running_signal.subscribe(
-            self, self._on_conversation_state_changed
-        )
+        # Subscribe to runner state signal for auto-exit in headless mode
+        self.runner_state_signal.subscribe(self, self._on_runner_state_changed_signal)
 
         # Check if user has existing settings
         try:
@@ -286,6 +287,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             on_exit_cancelled=self._show_initial_settings,
         )
         self.app.push_screen(exit_modal)
+
+    def _on_runner_state_changed_signal(self, payload: tuple[uuid.UUID, bool]) -> None:
+        """Handle runner state changes from signal."""
+        conversation_id, is_running = payload
+        # Only care about the active conversation for auto-exit/summary
+        if conversation_id == self.conversation_id:
+            self._on_conversation_state_changed(is_running)
 
     def _on_conversation_state_changed(self, is_running: bool) -> None:
         """Handle conversation state changes for auto-exit in headless mode."""
@@ -425,9 +433,131 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         else:
             critic_notice_widget.display = False
 
+        # Restore resumed conversation (from --resume flag) before processing inputs.
+        if self._resume_conversation_id and not self.headless_mode:
+            self._restore_resumed_conversation()
+
         # Process any queued inputs
         self._process_queued_inputs()
         self.is_ui_initialized = True
+
+    def _set_splash_visible(self, visible: bool) -> None:
+        """Show/hide system splash pane.
+
+        For resumed/switched conversations: hide splash (chat content visible).
+        For new conversations: show splash.
+        """
+        try:
+            system_pane = self.query_one("#splash_system_pane")
+            system_pane.display = visible
+        except Exception:
+            pass
+
+    def get_or_create_pane(
+        self, conversation_id: uuid.UUID, show_header: bool = False
+    ) -> ConversationPane:
+        """Get cached pane or create a new one for the conversation.
+
+        Panes are cached in conversation_session_manager for instant switching.
+
+        Args:
+            conversation_id: The conversation ID.
+            show_header: If True, show conversation ID header in the pane.
+                         Use True when switching from history, False for new chats.
+        """
+        # Check cache first
+        cached_pane = self._conversation_session_manager.get_pane(conversation_id)
+        if cached_pane is not None:
+            return cached_pane
+
+        # Create new pane
+        pane = ConversationPane(
+            conversation_id=conversation_id, show_header=show_header
+        )
+        self.main_display.mount(pane)
+
+        # Cache it
+        self._conversation_session_manager.set_pane(conversation_id, pane)
+
+        return pane
+
+    def get_active_pane(self) -> ConversationPane | None:
+        """Get the currently active conversation pane."""
+        return self._conversation_session_manager.get_pane(self.conversation_id)
+
+    def get_active_content_container(self) -> VerticalScroll | Container:
+        """Get the container where content should be mounted.
+
+        Returns the active pane's content container, or main_display as fallback.
+        """
+        pane = self.get_active_pane()
+        if pane is not None:
+            return pane.content_container
+        return self.main_display
+
+    def _hide_all_panes(self) -> None:
+        """Hide all conversation panes in main_display.
+
+        Used when switching conversations or creating new ones to ensure
+        clean slate before showing the target pane.
+        """
+        for widget in self.main_display.children:
+            if isinstance(widget, ConversationPane):
+                widget.display = False
+
+    def switch_active_pane(self, new_conversation_id: uuid.UUID) -> ConversationPane:
+        """Switch to a different conversation's pane.
+
+        Hides the current pane and shows/creates the new one.
+        Shows conversation ID header since user is switching from history.
+        """
+        self._hide_all_panes()
+
+        # Hide system splash when chatting
+        self._set_splash_visible(False)
+
+        # Get or create and show new pane (show_header=True for history switch)
+        new_pane = self.get_or_create_pane(new_conversation_id, show_header=True)
+        # Ensure header is visible for cached panes (might have been created without)
+        new_pane.set_header_visible(True)
+        new_pane.display = True
+
+        # Sync running state for the new conversation
+        runner = self.conversation_session_manager.get_runner(new_conversation_id)
+        is_running = runner.is_running if runner else False
+        self.runner_state_signal.publish((new_conversation_id, is_running))
+
+        return new_pane
+
+    def _restore_resumed_conversation(self) -> None:
+        """Restore a conversation resumed via --resume flag.
+
+        Creates the pane and runner, loads history from disk, and renders history.
+        """
+        if self._resume_conversation_id is None:
+            return
+
+        # Create pane first (visualizer will target pane's content container)
+        pane = self.switch_active_pane(self.conversation_id)
+
+        if self.conversation_runner is None:
+            self.conversation_runner = self.create_conversation_runner(
+                conversation_id=self.conversation_id
+            )
+
+        events = (
+            list(self.conversation_runner.conversation.state.events)
+            if self.conversation_runner.conversation.state
+            else []
+        )
+        if not events:
+            self._resume_conversation_id = None
+            return
+
+        # Call pane's render method directly.
+        pane.render_history(events, self.conversation_runner.visualizer)
+
+        self._resume_conversation_id = None
 
     def create_conversation_runner(
         self,
@@ -442,11 +572,15 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """
         conversation_uuid = conversation_id or self.conversation_id
 
-        # Initialize conversation runner with visualizer that can add widgets.
-        # Skip user messages since we display them immediately in the UI.
-        conversation_visualizer = visualizer or ConversationVisualizer(
-            self.main_display, self, skip_user_messages=True, name="OpenHands Agent"
-        )
+        # Get or create pane for this conversation.
+        # IMPORTANT: Visualizer is bound to the correct pane's container,
+        # ensuring rendered events always go to the right chat in multi-chat mode.
+        pane = self.get_or_create_pane(conversation_uuid, show_header=False)
+        if conversation_uuid != self.conversation_id:
+            # If creating a runner for a background thread, keep pane hidden.
+            pane.display = False
+
+        conversation_visualizer = visualizer or pane.get_visualizer()
 
         # Create JSON callback if in JSON mode
         event_callback = None
@@ -455,7 +589,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         runner = ConversationRunner(
             conversation_uuid,
-            self.conversation_running_signal.publish,
+            lambda is_running: self._on_runner_state_changed(
+                conversation_uuid, is_running
+            ),
             self._handle_confirmation_request,
             lambda title, message, severity: (
                 self.notify(title=title, message=message, severity=severity)
@@ -466,8 +602,32 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             env_overrides_enabled=self.env_overrides_enabled,
             critic_disabled=self.critic_disabled,
         )
+        self._conversation_session_manager.set_runner(conversation_uuid, runner)
 
         return runner
+
+    def _on_runner_state_changed(
+        self, conversation_id: uuid.UUID, is_running: bool
+    ) -> None:
+        """Handle state change from any runner.
+
+        Implements the Observer pattern:
+        1. Worker (Runner) notifies App about state change.
+        2. Dispatcher (App) schedules UI update on main thread via Command pattern.
+        3. Bus (Signal) publishes event to all subscribers (History, StatusLine).
+        """
+
+        # Wrap the logic in a function to be called on the main thread
+        def _update_ui():
+            # Notify observers via signal (robust observer pattern)
+            # Textual Signal.publish takes a single argument (the payload).
+            self.runner_state_signal.publish((conversation_id, is_running))
+
+            # For headless mode, check auto-exit
+            self._on_conversation_state_changed(is_running)
+
+        # Ensure all UI updates happen on the main thread
+        self.call_from_thread(_update_ui)
 
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.
@@ -482,37 +642,53 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Process the first queued input immediately
         user_input = self.pending_inputs.pop(0)
 
-        # Add the user message to the main display as a Static widget
+        # Ensure the active conversation pane exists so live + history rendering
+        # routes to the same container (important for future multi-session support).
+        pane = self.get_active_pane()
+        if pane is None:
+            pane = self.get_or_create_pane(self.conversation_id)
+        pane.mark_as_active()
+
+        # Add the user message to the active pane's content container
         user_message_widget = Static(
             f"> {user_input}", classes="user-message", markup=False
         )
-        self.main_display.mount(user_message_widget)
-        self.main_display.scroll_end(animate=False)
+        content = self.get_active_content_container()
+        content.mount(user_message_widget)
+        content.scroll_end(animate=False)
 
         # Handle the message asynchronously
         asyncio.create_task(self._handle_user_message(user_input))
 
     @on(InputField.Submitted)
     async def handle_user_input(self, message: InputField.Submitted) -> None:
-        content = message.content.strip()
-        if not content:
+        msg_content = message.content.strip()
+        if not msg_content:
             return
 
-        # Add the user message to the main display as a Static widget
+        # Ensure pane exists for this conversation
+        pane = self.get_active_pane()
+        if pane is None:
+            pane = self.get_or_create_pane(self.conversation_id)
+        # Mark pane as active to prevent duplicate rendering on switch back
+        pane.mark_as_active()
+
+        # Add the user message to the active pane's content container
         user_message_widget = Static(
-            f"> {content}", classes="user-message", markup=False
+            f"> {msg_content}", classes="user-message", markup=False
         )
-        await self.main_display.mount(user_message_widget)
-        self.main_display.scroll_end(animate=False)
+        container = self.get_active_content_container()
+        await container.mount(user_message_widget)
+        container.scroll_end(animate=False)
         # Force immediate refresh to show the message without delay
         self.refresh()
 
         # Handle commands - only exact matches
-        if is_valid_command(content):
-            self._handle_command(content)
+        if is_valid_command(msg_content):
+            self._handle_command(msg_content)
         else:
             # Handle regular messages with conversation runner
-            await self._handle_user_message(content)
+            await self._handle_user_message(msg_content)
 
     def _handle_command(self, command: str) -> None:
         """Handle command execution."""

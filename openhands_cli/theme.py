@@ -29,3 +29,7 @@ def create_openhands_theme() -> Theme:
 
 # Create the theme instance
 OPENHANDS_THEME = create_openhands_theme()
+
+# Common UI constants
+SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+SPINNER_INTERVAL = 0.1

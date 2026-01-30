@@ -14,16 +14,15 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from textual.notifications import Notification, Notify
-from textual.widgets import Static
 
-from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.splash import get_conversation_text
-from openhands_cli.tui.core.messages import ConversationSwitched, RevertSelectionRequest
-from openhands_cli.tui.modals import SwitchConversationModal
-from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
+from openhands_cli.tui.core.messages import (
+    ConversationSwitched,
+    RevertSelectionRequest,
+)
 
 
 if TYPE_CHECKING:
+    from openhands_cli.tui.panels.conversation_pane import ConversationPane
     from openhands_cli.tui.textual_app import OpenHandsApp
 
 
@@ -63,20 +62,8 @@ class ConversationSwitcher:
             )
             return
 
-        # If an agent is currently running, confirm before switching.
-        if self.app.conversation_runner and self.app.conversation_runner.is_running:
-            self.app.push_screen(
-                SwitchConversationModal(
-                    prompt=(
-                        "The agent is still running.\n\n"
-                        "Switching conversations will pause the current run.\n"
-                        "Do you want to switch anyway?"
-                    )
-                ),
-                lambda confirmed: self._handle_confirmation(confirmed, target_id),
-            )
-            return
-
+        # With multi-chat runners, we can switch freely without pausing.
+        # The background runner will continue its work.
         self._perform_switch(target_id)
 
     def _handle_confirmation(
@@ -96,7 +83,9 @@ class ConversationSwitcher:
         self.app.input_field.disabled = True
 
         def _pause_if_running() -> None:
-            runner = self.app.conversation_runner
+            runner = self.app.conversation_session_manager.get_runner(
+                self.app.conversation_id
+            )
             if runner and runner.is_running:
                 runner.conversation.pause()
 
@@ -125,18 +114,13 @@ class ConversationSwitcher:
         # Show a persistent loading notification
         self._show_loading()
 
-        # Create visualizer on UI thread (captures correct main thread id)
-        visualizer = ConversationVisualizer(
-            self.app.main_display, self.app, skip_user_messages=True
-        )
-
         def _worker() -> None:
             if pre_switch_action:
                 try:
                     pre_switch_action()
                 except Exception:
                     pass  # Don't block switch on pre-action failure
-            self._switch_thread(target_id, visualizer)
+            self._switch_thread(target_id)
 
         self.app.run_worker(
             _worker,
@@ -179,38 +163,36 @@ class ConversationSwitcher:
             self._loading_notification = None
             self._is_switching = False
 
-    def _prepare_ui(self, conversation_id: uuid.UUID) -> None:
-        """Prepare UI for switching conversations (runs on the UI thread)."""
+    def _prepare_ui(self, conversation_id: uuid.UUID) -> ConversationPane:
+        """Prepare UI for switching conversations (runs on the UI thread).
+
+        Returns the pane for the target conversation.
+        """
         app = self.app
 
         # Set the conversation ID immediately
         app.conversation_id = conversation_id
-        app.conversation_runner = None
+        app.conversation_session_manager.set_active_conversation(conversation_id)
+
+        # Sync conversation_runner with the session manager's cached runner.
+        # Can be None if switching to a conversation without cached runner yet.
+        app.conversation_runner = app.conversation_session_manager.get_runner(
+            conversation_id
+        )
 
         # Remove any existing confirmation panel
         if app.confirmation_panel:
             app.confirmation_panel.remove()
             app.confirmation_panel = None
 
-        # Clear dynamically added widgets, keep splash widgets
-        widgets_to_remove = [
-            w
-            for w in app.main_display.children
-            if not (w.id or "").startswith("splash_")
-        ]
-        for widget in widgets_to_remove:
-            widget.remove()
+        # Switch to target pane (hides old pane, shows/creates new one)
+        pane = app.switch_active_pane(conversation_id)
 
-        # Update splash conversation widget
-        splash_conversation = app.query_one("#splash_conversation", Static)
-        splash_conversation.update(
-            get_conversation_text(app.conversation_id.hex, theme=OPENHANDS_THEME)
-        )
+        return pane
 
-    def _finish_switch(self, runner, target_id: uuid.UUID) -> None:
+    def _finish_switch(self, target_id: uuid.UUID, pane) -> None:
         """Finalize conversation switch (runs on the UI thread)."""
-        self.app.conversation_runner = runner
-        self.app.main_display.scroll_end(animate=False)
+        pane.scroll_to_end()
         self._dismiss_loading()
         self.app.post_message(ConversationSwitched(target_id))
         self.app.notify(
@@ -221,23 +203,57 @@ class ConversationSwitcher:
         self.app.input_field.disabled = False
         self.app.input_field.focus_input()
 
-    def _switch_thread(
-        self,
-        target_id: uuid.UUID,
-        visualizer: ConversationVisualizer,
-    ) -> None:
-        """Background thread worker for switching conversations."""
-        try:
-            # Prepare UI first (on main thread)
-            self.app.call_from_thread(self._prepare_ui, target_id)
+    def _switch_thread(self, target_id: uuid.UUID) -> None:
+        """Background thread worker for switching conversations.
 
-            # Create conversation runner (loads from disk)
+        If we have a fully cached session (pane + runner), we do instant switch
+        without loading from disk. Otherwise we load events and render.
+        """
+        try:
+            # Check for fully cached session BEFORE preparing UI
+            csm = self.app.conversation_session_manager
+            cached_runner = csm.get_runner(target_id)
+            has_full_cache = (
+                csm.has_cached_pane(target_id) and cached_runner is not None
+            )
+
+            # Prepare UI (on main thread) - returns the pane
+            pane: ConversationPane = self.app.call_from_thread(
+                self._prepare_ui, target_id
+            )
+
+            if has_full_cache and pane.is_rendered:
+                # Full cache hit! Instant switch - no disk loading.
+                # Just reuse cached runner.
+                self.app.call_from_thread(self._finish_switch, target_id, pane)
+                return
+
+            # Cache miss - need to load and render.
+            # Get visualizer from pane (bound to pane's container).
+            visualizer = self.app.call_from_thread(pane.get_visualizer)
+
+            # Create runner (loads events from disk)
             runner = self.app.create_conversation_runner(
                 conversation_id=target_id, visualizer=visualizer
             )
 
+            # Update app.conversation_runner on the main thread
+            self.app.call_from_thread(
+                lambda: setattr(self.app, "conversation_runner", runner)
+            )
+
+            # Get events and render (only if pane not already rendered)
+            if not pane.is_rendered:
+                events = (
+                    list(runner.conversation.state.events)
+                    if runner.conversation.state
+                    else []
+                )
+                if events:
+                    self.app.call_from_thread(pane.render_history, events, visualizer)
+
             # Finalize on UI thread
-            self.app.call_from_thread(self._finish_switch, runner, target_id)
+            self.app.call_from_thread(self._finish_switch, target_id, pane)
         except Exception as e:
             error_message = f"{type(e).__name__}: {e}"
 

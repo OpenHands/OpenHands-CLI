@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import os
 import time
+import uuid
 from typing import TYPE_CHECKING
 
 from textual.timer import Timer
 from textual.widgets import Static
 
 from openhands_cli.locations import get_work_dir
+from openhands_cli.theme import SPINNER_FRAMES, SPINNER_INTERVAL
 from openhands_cli.utils import abbreviate_number, format_cost
 
 
@@ -39,25 +41,33 @@ class WorkingStatusLine(Static):
     def on_mount(self) -> None:
         """Initialize the working status line and start periodic updates."""
         self._update_text()
-        self.main_app.conversation_running_signal.subscribe(
-            self, self._on_conversation_state_changed
-        )
+        self.main_app.runner_state_signal.subscribe(self, self._on_runner_state_changed)
 
     def on_unmount(self) -> None:
         """Stop timer when widget is removed."""
         if self._timer:
             self._timer.stop()
             self._timer = None
+        self.main_app.runner_state_signal.unsubscribe(self)
 
-    def _on_conversation_state_changed(self, is_running: bool) -> None:
-        """Update when conversation running state changes."""
+    def _on_runner_state_changed(self, payload: tuple[uuid.UUID, bool]) -> None:
+        """Update when conversation running state changes (Observer pattern).
+
+        Filters events to only react to active conversation (Single Source of Truth).
+        """
+        conversation_id, is_running = payload
+
+        # Only care about the active conversation
+        if conversation_id != self.main_app.conversation_id:
+            return
+
         self._is_working = is_running
         if is_running:
             self._conversation_start_time = time.time()
             if self._timer:
                 self._timer.stop()
 
-            self._timer = self.set_interval(0.1, self._on_tick)
+            self._timer = self.set_interval(SPINNER_INTERVAL, self._on_tick)
             return
 
         self._conversation_start_time = None
@@ -87,7 +97,7 @@ class WorkingStatusLine(Static):
         working_indicator = ""
         if self._is_working:
             # Braille pattern spinner - smooth and professional
-            frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧"]
+            frames = SPINNER_FRAMES
             working_indicator = f"{frames[self._working_frame % len(frames)]} Working"
 
         return f"{working_indicator} ({elapsed}s • ESC: pause)"
@@ -130,22 +140,28 @@ class InfoStatusLine(Static):
         self.main_app.input_field.multiline_mode_status.subscribe(
             self, self._on_handle_mutliline_mode
         )
-        self.main_app.conversation_running_signal.subscribe(
-            self, self._on_conversation_state_changed
-        )
+        self.main_app.runner_state_signal.subscribe(self, self._on_runner_state_changed)
 
     def on_unmount(self) -> None:
         """Stop timer when widget is removed."""
         if self._metrics_update_timer:
             self._metrics_update_timer.stop()
             self._metrics_update_timer = None
+        self.main_app.input_field.multiline_mode_status.unsubscribe(self)
+        self.main_app.runner_state_signal.unsubscribe(self)
 
     def on_resize(self) -> None:
         """Recalculate layout when widget is resized."""
         self._update_text()
 
-    def _on_conversation_state_changed(self, is_running: bool) -> None:
+    def _on_runner_state_changed(self, payload: tuple[uuid.UUID, bool]) -> None:
         """Update metrics display when conversation state changes."""
+        conversation_id, is_running = payload
+
+        # Only care about the active conversation
+        if conversation_id != self.main_app.conversation_id:
+            return
+
         if is_running:
             # Start periodic metrics updates while conversation is running
             if self._metrics_update_timer:
@@ -160,8 +176,11 @@ class InfoStatusLine(Static):
 
     def _update_metrics(self) -> None:
         """Update the conversation metrics from conversation stats."""
-        if self.main_app.conversation_runner:
-            visualizer = self.main_app.conversation_runner.visualizer
+        runner = self.main_app.conversation_session_manager.get_runner(
+            self.main_app.conversation_id
+        )
+        if runner:
+            visualizer = runner.visualizer
             stats = visualizer.conversation_stats
             if stats:
                 combined_metrics = stats.get_combined_metrics()

@@ -490,11 +490,11 @@ class TestOpenHandsAppCommands:
             )
 
     @pytest.mark.asyncio
-    async def test_new_command_blocked_when_conversation_running(
+    async def test_new_command_succeeds_when_conversation_running(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """`/new` should show warning when a conversation is running."""
+        """`/new` should succeed even when a conversation is running (multi-runner)."""
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
@@ -514,27 +514,28 @@ class TestOpenHandsAppCommands:
             # Store the original conversation ID
             original_conversation_id = oh_app.conversation_id
 
-            # Mock notify to verify warning is shown
+            # Mock notify to verify success notification is shown
             notify_mock = mock.MagicMock()
             oh_app.notify = notify_mock
 
             oh_app._handle_command("/new")
 
-            # Verify conversation ID was NOT changed
-            assert oh_app.conversation_id == original_conversation_id
+            # With multi-runner support, /new should succeed
+            # Verify conversation ID WAS changed
+            assert oh_app.conversation_id != original_conversation_id
 
-            # Verify error notification was shown
+            # Verify success notification was shown
             notify_mock.assert_called_once()
             call_args = notify_mock.call_args
-            assert call_args[1]["title"] == "New Conversation Error"
-            assert call_args[1]["severity"] == "error"
+            assert call_args[1]["title"] == "New Conversation"
+            assert call_args[1]["severity"] == "information"
 
     @pytest.mark.asyncio
-    async def test_new_command_clears_dynamically_added_widgets(
+    async def test_new_command_hides_conversation_panes(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """`/new` should clear dynamically added widgets but keep splash widgets."""
+        """`/new` should hide conversation panes and show splash."""
         from textual.widgets import Static
 
         monkeypatch.setattr(
@@ -548,13 +549,13 @@ class TestOpenHandsAppCommands:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            # Add a dynamic widget to main_display (simulating conversation content)
-            dynamic_widget = Static("Test message", classes="user-message")
-            oh_app.main_display.mount(dynamic_widget)
+            # Create a conversation pane (simulating active conversation)
+            pane = oh_app.get_or_create_pane(oh_app.conversation_id)
             await pilot.pause()
 
-            # Verify the widget was added
-            assert dynamic_widget in oh_app.main_display.children
+            # Verify the pane exists and is visible
+            assert pane in oh_app.main_display.children
+            assert pane.display is True
 
             # Mock notify
             notify_mock = mock.MagicMock()
@@ -563,8 +564,13 @@ class TestOpenHandsAppCommands:
             oh_app._handle_command("/new")
             await pilot.pause()
 
-            # Verify dynamic widget was removed
-            assert dynamic_widget not in oh_app.main_display.children
+            # Verify pane is hidden (not removed)
+            assert pane in oh_app.main_display.children
+            assert pane.display is False
+
+            # Verify splash is visible
+            splash_pane = oh_app.query_one("#splash_system_pane")
+            assert splash_pane.display is True
 
             # Verify splash widgets still exist
             splash_banner = oh_app.query_one("#splash_banner", Static)
@@ -739,11 +745,11 @@ class TestOpenHandsAppCommands:
             assert switch_calls[0] == conv2_id
 
     @pytest.mark.asyncio
-    async def test_history_switch_shows_modal_when_agent_running(
+    async def test_history_switch_works_when_agent_running(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Switching conversation while agent is running should show modal."""
+        """Switching conversation while agent is running should work (multi-runner)."""
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
@@ -771,8 +777,10 @@ class TestOpenHandsAppCommands:
             dummy_runner.is_running = True
             oh_app.conversation_runner = dummy_runner
 
+            # With multi-runner support, switching should work without modal
             oh_app._conversation_manager.switch_to(target_id)
             await pilot.pause()
 
+            # Should NOT show a modal (multi-runner allows background running)
             top_screen = oh_app.screen_stack[-1]
-            assert isinstance(top_screen, SwitchConversationModal)
+            assert not isinstance(top_screen, SwitchConversationModal)

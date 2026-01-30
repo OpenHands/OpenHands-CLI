@@ -486,7 +486,7 @@ class TestHeadlessInitialSetupGuard:
 
         # Avoid Textual's "node must be running" restriction in this unit test
         monkeypatch.setattr(
-            app.conversation_running_signal,
+            app.runner_state_signal,
             "subscribe",
             MagicMock(),
         )

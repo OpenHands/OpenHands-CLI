@@ -4,6 +4,7 @@ These fixtures set up the mock LLM server and agent configuration
 for deterministic e2e testing with trajectory replay.
 """
 
+import os
 import shutil
 import sys
 import uuid as uuid_module
@@ -31,6 +32,15 @@ FIXED_PYTHON_PATH = "/openhands/micromamba/envs/openhands/bin/python"
 # Fixed OS description for deterministic snapshots
 # (kernel version varies between environments)
 FIXED_OS_DESCRIPTION = "Linux (kernel 6.0.0-test)"
+
+
+# Enable colors for Textual snapshot tests (prevents grayscale rendering).
+# Textual checks for NO_COLOR env var to decide if colors are enabled.
+# If NO_COLOR is set (even to empty string), Textual renders in grayscale.
+def pytest_configure(config):
+    os.environ.pop("NO_COLOR", None)
+    os.environ.setdefault("TERM", "xterm-256color")
+    os.environ.setdefault("COLORTERM", "truecolor")
 
 
 @dataclass
@@ -96,6 +106,8 @@ def patch_deterministic_paths(monkeypatch: pytest.MonkeyPatch) -> None:
         def patched_from_ps1_match(cls, match):
             result = original_from_ps1_match.__func__(cls, match)
             result.py_interpreter_path = FIXED_PYTHON_PATH
+            # Normalize work dir to avoid /private/tmp vs /tmp mismatch.
+            result.working_dir = str(WORK_DIR)
             return result
 
         monkeypatch.setattr(CmdOutputMetadata, "from_ps1_match", patched_from_ps1_match)

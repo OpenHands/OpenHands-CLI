@@ -5,6 +5,22 @@ from textual.theme import Theme
 from openhands_cli.version_check import check_for_updates
 
 
+def format_conversation_header(
+    conversation_id: str, *, prefix: str, theme: Theme
+) -> str:
+    """Format a conversation header with Rich markup.
+
+    Args:
+        conversation_id: The conversation ID to display
+        prefix: Text prefix (e.g., "Initialized conversation", "Conversation")
+        theme: Theme to use for colors
+
+    Returns:
+        Formatted string with accent-colored prefix and conversation ID
+    """
+    return f"[{theme.accent}]{prefix}[/] {conversation_id}"
+
+
 def get_conversation_text(conversation_id: str, *, theme: Theme) -> str:
     """Get the formatted conversation initialization text.
 
@@ -15,7 +31,9 @@ def get_conversation_text(conversation_id: str, *, theme: Theme) -> str:
     Returns:
         Formatted string with conversation initialization message
     """
-    return f"[{theme.accent}]Initialized conversation[/] {conversation_id}"
+    return format_conversation_header(
+        conversation_id, prefix="Initialized conversation", theme=theme
+    )
 
 
 def get_openhands_banner() -> str:

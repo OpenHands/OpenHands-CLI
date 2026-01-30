@@ -1,5 +1,7 @@
+import os
 from dataclasses import dataclass
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from pydantic import SecretStr
@@ -7,6 +9,15 @@ from pydantic import SecretStr
 from openhands.sdk import LLM, Agent
 from openhands_cli.locations import AGENT_SETTINGS_PATH
 from openhands_cli.utils import get_default_cli_agent
+
+
+# Enable colors for Textual snapshot tests (prevents grayscale rendering).
+# Textual checks for NO_COLOR env var to decide if colors are enabled.
+# If NO_COLOR is set (even to empty string), Textual renders in grayscale.
+def pytest_configure(config):
+    os.environ.pop("NO_COLOR", None)
+    os.environ.setdefault("TERM", "xterm-256color")
+    os.environ.setdefault("COLORTERM", "truecolor")
 
 
 @dataclass
@@ -122,6 +133,59 @@ def setup_test_persistence_dir(base_path: Path) -> tuple[Path, Path]:
 # =============================================================================
 # Fixtures
 # =============================================================================
+
+
+# Fixture: mock_verified_models - Simplified model data
+@pytest.fixture
+def mock_verified_models():
+    with (
+        patch(
+            "openhands_cli.user_actions.settings_action.VERIFIED_MODELS",
+            {
+                "openai": ["gpt-4o", "gpt-4o-mini"],
+                "anthropic": ["claude-3-5-sonnet", "claude-3-5-haiku"],
+            },
+        ),
+        patch(
+            "openhands_cli.user_actions.settings_action.UNVERIFIED_MODELS_EXCLUDING_BEDROCK",
+            {
+                "openai": ["gpt-custom"],
+                "anthropic": [],
+                "custom": ["my-model"],
+            },
+        ),
+    ):
+        yield
+
+
+# Fixture: mock_cli_interactions - Reusable CLI mock patterns
+@pytest.fixture
+def mock_cli_interactions():
+    class Mocks:
+        def __init__(self):
+            self.p_confirm = patch(
+                "openhands_cli.user_actions.settings_action.cli_confirm"
+            )
+            self.p_text = patch(
+                "openhands_cli.user_actions.settings_action.cli_text_input"
+            )
+            self.cli_confirm = None
+            self.cli_text_input = None
+
+        def start(self):
+            self.cli_confirm = self.p_confirm.start()
+            self.cli_text_input = self.p_text.start()
+            return self
+
+        def stop(self):
+            self.p_confirm.stop()
+            self.p_text.stop()
+
+    mocks = Mocks().start()
+    try:
+        yield mocks
+    finally:
+        mocks.stop()
 
 
 # Fixture: temp_config_path - Shared MCP config path for tests
