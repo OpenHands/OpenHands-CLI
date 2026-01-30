@@ -245,22 +245,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
         plan_panel.toggle()
 
     def _get_agent_model(self) -> str | None:
-        """Get the agent's model name from the conversation runner.
+        """Get the agent's model name from the conversation state.
 
         Returns:
             The agent model name or None if not available.
         """
-        try:
-            if (
-                self._app.conversation_runner
-                and self._app.conversation_runner.conversation
-                and hasattr(self._app.conversation_runner.conversation, "agent")
-                and self._app.conversation_runner.conversation.agent  # type: ignore[union-attr]
-            ):
-                return self._app.conversation_runner.conversation.agent.llm.model  # type: ignore[union-attr]
-        except Exception:
-            pass
-        return None
+        return self._app.conversation_state.agent_model
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""

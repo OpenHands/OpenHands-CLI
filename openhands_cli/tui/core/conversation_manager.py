@@ -596,3 +596,12 @@ class ConversationManager(Container):
         This is a convenience method for programmatic use.
         """
         self.post_message(PauseConversation())
+
+    def reload_visualizer_configuration(self) -> None:
+        """Reload the visualizer configuration for the current conversation.
+
+        This is used when settings change and the visualizer needs to
+        update its configuration.
+        """
+        if self._current_runner:
+            self._current_runner.visualizer.reload_configuration()

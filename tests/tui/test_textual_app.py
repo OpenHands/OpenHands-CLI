@@ -10,12 +10,12 @@ from openhands_cli.tui.textual_app import OpenHandsApp
 class TestSettingsRestartNotification:
     """Tests for restart notification when saving settings."""
 
-    def test_saving_settings_without_conversation_runner_no_notification(self):
-        """Saving settings without conversation_runner does not show notification."""
+    def test_saving_settings_without_conversation_created_no_notification(self):
+        """Saving settings without conversation created does not show notification."""
         app = OpenHandsApp.__new__(OpenHandsApp)
-        # Mock conversation_manager for the conversation_runner property
-        app.conversation_manager = Mock()
-        app.conversation_manager.current_runner = None
+        # Mock conversation_state with is_conversation_created = False
+        app.conversation_state = Mock()
+        app.conversation_state.is_conversation_created = False
 
         app.notify = Mock()
 
@@ -23,12 +23,12 @@ class TestSettingsRestartNotification:
 
         app.notify.assert_not_called()
 
-    def test_saving_settings_with_conversation_runner_shows_notification(self):
-        """Saving settings with conversation_runner shows restart notification."""
+    def test_saving_settings_with_conversation_created_shows_notification(self):
+        """Saving settings with conversation created shows restart notification."""
         app = OpenHandsApp.__new__(OpenHandsApp)
-        # Mock conversation_manager for the conversation_runner property
-        app.conversation_manager = Mock()
-        app.conversation_manager.current_runner = Mock()
+        # Mock conversation_state with is_conversation_created = True
+        app.conversation_state = Mock()
+        app.conversation_state.is_conversation_created = True
 
         app.notify = Mock()
 
@@ -53,10 +53,9 @@ class TestSettingsRestartNotification:
         monkeypatch.setattr(ta, "SettingsScreen", MockSettingsScreen)
 
         app = OpenHandsApp.__new__(OpenHandsApp)
-        # Mock conversation_manager for the conversation_runner property
+        # Mock conversation_manager with is_running = False
         app.conversation_manager = Mock()
-        app.conversation_manager.current_runner = Mock()
-        app.conversation_manager.current_runner.is_running = False
+        app.conversation_manager.is_running = False
 
         app.push_screen = Mock()
         app._reload_visualizer = Mock()
@@ -114,8 +113,8 @@ class TestInputAreaContainerCommands:
     """Tests for InputAreaContainer command methods."""
 
     def test_command_new_posts_message(self):
-        """_command_new posts NewConversationRequested message."""
-        from openhands_cli.tui.messages import NewConversationRequested
+        """_command_new posts CreateConversation message."""
+        from openhands_cli.tui.core import CreateConversation
         from openhands_cli.tui.widgets.input_area import InputAreaContainer
 
         input_area = Mock(spec=InputAreaContainer)
@@ -127,4 +126,4 @@ class TestInputAreaContainerCommands:
         # Verify message was posted
         input_area.post_message.assert_called_once()
         posted_message = input_area.post_message.call_args[0][0]
-        assert isinstance(posted_message, NewConversationRequested)
+        assert isinstance(posted_message, CreateConversation)

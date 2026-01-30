@@ -63,7 +63,6 @@ from openhands_cli.tui.core import (
     PauseConversation,
     SendMessage,
 )
-from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
@@ -109,11 +108,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     def conversation_id(self, value: uuid.UUID) -> None:
         """Set conversation ID in ConversationState (source of truth)."""
         self.conversation_state.conversation_id = value
-
-    @property
-    def conversation_runner(self) -> ConversationRunner | None:
-        """Get conversation runner from ConversationManager."""
-        return self.conversation_manager.current_runner
 
     @property
     def conversation_view(self) -> ConversationState:
@@ -186,12 +180,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         self._store = LocalFileStore()
 
-        def reload_visualizer():
-            runner = self.conversation_manager.current_runner
-            if runner:
-                runner.visualizer.reload_configuration()
-
-        self._reload_visualizer = reload_visualizer
+        # Callback for reloading visualizer configuration after settings changes
+        self._reload_visualizer = (
+            self.conversation_manager.reload_visualizer_configuration
+        )
 
         # Confirmation panel tracking
         self.confirmation_panel: InlineConfirmationPanel | None = None
@@ -340,12 +332,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         console = Console()
 
-        if not self.conversation_runner:
+        summary = self.conversation_state.get_conversation_summary()
+        if summary is None:
             return
 
-        num_agent_messages, last_agent_message = (
-            self.conversation_runner.get_conversation_summary()
-        )
+        num_agent_messages, last_agent_message = summary
 
         console.print()  # blank line
         console.print(Rule("CONVERSATION SUMMARY"))
@@ -367,8 +358,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def action_open_settings(self) -> None:
         """Action to open the settings screen."""
-        # Check if conversation is running
-        if self.conversation_runner and self.conversation_runner.is_running:
+        # Check if conversation is running via ConversationManager
+        if self.conversation_manager.is_running:
             self.notify(
                 "Settings are not available while a conversation is running. "
                 "Please wait for the current conversation to complete.",
@@ -390,15 +381,15 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     def _notify_restart_required(self) -> None:
         """Notify user that CLI restart is required for agent settings changes.
 
-        Only shows notification if a conversation runner has been instantiated,
-        meaning a conversation has already started with the previous settings.
+        Only shows notification if a conversation has been created, meaning a
+        conversation has already started with the previous settings.
 
         Note: This callback is only registered for `action_open_settings` (existing
         users), not for `_show_initial_settings` (first-time setup). Additionally,
-        during first-time setup, conversation_runner is always None, so even if
+        during first-time setup, is_conversation_created is False, so even if
         this method were called, no notification would be shown.
         """
-        if self.conversation_runner:
+        if self.conversation_state.is_conversation_created:
             self.notify(
                 "Settings saved. Please restart the CLI for changes to take effect.",
                 severity="information",

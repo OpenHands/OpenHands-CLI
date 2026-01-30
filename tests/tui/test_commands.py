@@ -488,8 +488,8 @@ class TestOpenHandsAppCommands:
             # Verify a new conversation ID was generated
             assert oh_app.conversation_id != original_conversation_id
 
-            # Verify conversation runner was reset
-            assert oh_app.conversation_runner is None
+            # Verify conversation state was reset (no conversation created yet)
+            assert not oh_app.conversation_state.is_conversation_created
 
             # Verify notification was shown
             notify_mock.assert_called_once_with(

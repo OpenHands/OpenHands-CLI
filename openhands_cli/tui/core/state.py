@@ -41,6 +41,8 @@ from openhands.sdk.security.confirmation_policy import (
 
 
 if TYPE_CHECKING:
+    from rich.text import Text
+
     from openhands.sdk import BaseConversation
     from openhands.sdk.event import ActionEvent
     from openhands_cli.tui.widgets.input_area import InputAreaContainer
@@ -186,6 +188,56 @@ class ConversationState(Container):
         return not isinstance(self.confirmation_policy, NeverConfirm)
 
     @property
+    def is_conversation_created(self) -> bool:
+        """Check if a conversation has been created/attached.
+
+        Returns True when attach_conversation() has been called and a
+        ConversationRunner exists. UI components can use this to determine
+        if a conversation session has been started (vs. being in initial/splash state).
+        """
+        return self._conversation is not None
+
+    @property
+    def agent_model(self) -> str | None:
+        """Get the agent's model name from the attached conversation.
+
+        Returns:
+            The agent model name or None if not available.
+        """
+        if self._conversation is None:
+            return None
+        try:
+            if (
+                hasattr(self._conversation, "agent") and self._conversation.agent  # type: ignore[union-attr]
+            ):
+                return self._conversation.agent.llm.model  # type: ignore[union-attr]
+        except Exception:
+            pass
+        return None
+
+    def get_conversation_summary(self) -> tuple[int, "Text"] | None:
+        """Get a summary of the conversation for headless mode output.
+
+        Returns:
+            Tuple of (agent_event_count, last_agent_message) or None if
+            no conversation is attached.
+        """
+        from rich.text import Text
+
+        if self._conversation is None or self._conversation.state is None:
+            return None
+
+        agent_event_count = 0
+        last_agent_message = Text(text="No agent messages found")
+
+        for event in self._conversation.state.events:
+            if event.source == "agent":
+                agent_event_count += 1
+                last_agent_message = event.visualize
+
+        return agent_event_count, last_agent_message
+
+    @property
     def scroll_view(self) -> "ScrollableContent":
         """Get the scrollable content area."""
         from openhands_cli.tui.widgets.main_display import ScrollableContent
@@ -285,6 +337,8 @@ class ConversationState(Container):
 
         This allows ConversationState to read metrics from the conversation's
         stats. Policy sync is handled by ConversationManager, not here.
+
+        After this call, is_conversation_created will return True.
         """
         self._conversation = conversation
 
@@ -304,6 +358,8 @@ class ConversationState(Container):
         Resets: running, elapsed_seconds, metrics, conversation_title, internal state.
         Preserves: confirmation_policy (persists across conversations),
                    conversation_id (set explicitly when switching).
+
+        After this call, is_conversation_created will return False.
         """
         self.running = False
         self.elapsed_seconds = 0
