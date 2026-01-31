@@ -96,6 +96,17 @@ class SettingsTab(Container):
                         disabled=True,
                     )
 
+                    # Timeout (seconds)
+                    with Container(classes="form_group"):
+                        yield Label("LLM Timeout (seconds):", classes="form_label")
+                        yield Input(
+                            placeholder="10–3600 (optional)",
+                            id="timeout_input",
+                            classes="form_input",
+                            # Enabled when API key is entered (same condition as memory)
+                            disabled=True,
+                        )
+
                 # Memory Condensation
                 with Container(classes="form_group"):
                     yield Label("Memory Condensation:", classes="form_label")

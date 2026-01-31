@@ -31,6 +31,9 @@ class SettingsFormData(BaseModel):
     # API key typed into the UI (may be empty -> should keep existing)
     api_key_input: str | None = None
 
+    # New timeout field (seconds). Optional – if None the LLM default (300) is used.
+    timeout: int | None = None
+
     # Whether the user wants memory condensation enabled
     memory_condensation_enabled: bool = True
 
@@ -38,6 +41,36 @@ class SettingsFormData(BaseModel):
     @classmethod
     def strip_strings(cls, v: str | None) -> str | None:
         return v.strip() if isinstance(v, str) else v
+
+    @field_validator("timeout", mode="before")
+    @classmethod
+    def validate_timeout(cls, v: str | int | None) -> int | None:
+        """Validate and coerce the timeout value.
+
+        Accepts an integer or a string containing digits. The value must be
+        between 10 and 3600 seconds inclusive. Returns ``None`` for empty
+        strings, ``None`` inputs, or values outside the allowed range. This
+        allows the caller to retain the existing timeout when the user enters
+        an invalid value.
+        """
+        if v is None:
+            return None
+        if isinstance(v, int):
+            timeout_val = v
+        elif isinstance(v, str):
+            v = v.strip()
+            if v == "":
+                return None
+            if not v.isdigit():
+                # Non‑numeric input – treat as invalid and ignore
+                return None
+            timeout_val = int(v)
+        else:
+            return None
+        if not (10 <= timeout_val <= 3600):
+            # Out‑of‑range – ignore and let caller keep original value
+            return None
+        return timeout_val
 
     def resolve_data_fields(self, existing_agent: Agent | None):
         # Check advance mode requirements
@@ -115,6 +148,7 @@ def save_settings(
             api_key=data.api_key_input,
             base_url=data.base_url,
             usage_id="agent",
+            timeout=data.timeout,
             **extra_kwargs,
         )
 
