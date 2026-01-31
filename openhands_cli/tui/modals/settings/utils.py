@@ -32,7 +32,11 @@ class SettingsFormData(BaseModel):
     api_key_input: str | None = None
 
     # New timeout field (seconds). Optional – if None the LLM default (300) is used.
-    timeout: int | None = None
+    timeout: int | str | None = None
+    max_tokens: int | str | None = None
+    max_size: int | str | None = None
+    # New max tokens field (optional). Maps to LLM max_output_tokens.
+    # New max size for condenser (optional). Maps to LLMSummarizingCondenser max_size.
 
     # Whether the user wants memory condensation enabled
     memory_condensation_enabled: bool = True
@@ -71,6 +75,49 @@ class SettingsFormData(BaseModel):
             # Out‑of‑range – ignore and let caller keep original value
             return None
         return timeout_val
+
+    @field_validator("max_tokens", mode="before")
+    @classmethod
+    def validate_max_tokens(cls, v: str | int | None) -> int | None:
+        """Validate max_tokens input.
+
+        Accepts an integer or numeric string. Returns ``None`` for empty or
+        invalid values. No upper bound enforced (LLM may have its own limits).
+        """
+        if v is None:
+            return None
+        if isinstance(v, int):
+            return v if v > 0 else None
+        if isinstance(v, str):
+            v = v.strip()
+            if v == "":
+                return None
+            if not v.isdigit():
+                return None
+            val = int(v)
+            return val if val > 0 else None
+        return None
+
+    @field_validator("max_size", mode="before")
+    @classmethod
+    def validate_max_size(cls, v: str | int | None) -> int | None:
+        """Validate max_size for condenser.
+
+        Must be a positive integer. Returns ``None`` for empty/invalid.
+        """
+        if v is None:
+            return None
+        if isinstance(v, int):
+            return v if v > 0 else None
+        if isinstance(v, str):
+            v = v.strip()
+            if v == "":
+                return None
+            if not v.isdigit():
+                return None
+            val = int(v)
+            return val if val > 0 else None
+        return None
 
     def resolve_data_fields(self, existing_agent: Agent | None):
         # Check advance mode requirements
@@ -148,7 +195,8 @@ def save_settings(
             api_key=data.api_key_input,
             base_url=data.base_url,
             usage_id="agent",
-            timeout=data.timeout,
+            timeout=int(data.timeout) if isinstance(data.timeout, str) else data.timeout,
+            max_output_tokens=int(data.max_tokens) if isinstance(data.max_tokens, str) else data.max_tokens,
             **extra_kwargs,
         )
 
@@ -179,8 +227,21 @@ def save_settings(
         if data.memory_condensation_enabled and not agent.condenser:
             # Enable condensation
             condenser_llm = agent.llm.model_copy(update={"usage_id": "condenser"})
-            condenser = LLMSummarizingCondenser(llm=condenser_llm)
+            # Use provided max_size if available
+            condenser = LLMSummarizingCondenser(
+                llm=condenser_llm,
+                max_size=data.max_size if data.max_size is not None else 240,
+            )
             agent = agent.model_copy(update={"condenser": condenser})
+        elif data.memory_condensation_enabled and agent.condenser:
+            # Update existing condenser max_size if provided
+            if (
+                isinstance(agent.condenser, LLMSummarizingCondenser)
+                and data.max_size is not None
+            ):
+                agent.condenser = agent.condenser.model_copy(
+                    update={"max_size": data.max_size}
+                )
         elif not data.memory_condensation_enabled and agent.condenser:
             # Disable condensation
             agent = agent.model_copy(update={"condenser": None})

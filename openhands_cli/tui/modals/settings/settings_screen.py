@@ -54,6 +54,8 @@ class SettingsScreen(ModalScreen):
         "#memory_condensation_select"
     )
     timeout_input: getters.query_one[Input] = getters.query_one("#timeout_input")
+    max_tokens_input: getters.query_one[Input] = getters.query_one("#max_tokens_input")
+    max_size_input: getters.query_one[Input] = getters.query_one("#max_size_input")
     basic_section: getters.query_one[Container] = getters.query_one("#basic_section")
     advanced_section: getters.query_one[Container] = getters.query_one(
         "#advanced_section"
@@ -313,6 +315,8 @@ class SettingsScreen(ModalScreen):
             # or when there's an existing API key in the agent
             self.memory_select.disabled = not (api_key or self._has_existing_api_key())
             self.timeout_input.disabled = self.memory_select.disabled
+            self.max_tokens_input.disabled = self.memory_select.disabled
+            self.max_size_input.disabled = self.memory_select.disabled
 
         except Exception:
             # Silently handle errors during initialization
@@ -402,9 +406,12 @@ class SettingsScreen(ModalScreen):
             api_key_input=self.api_key_input.value,
             memory_condensation_enabled=bool(self.memory_select.value),
             timeout=timeout_input_value,
+            max_tokens=self.max_tokens_input.value,
+            max_size=self.max_size_input.value,
         )
 
-        # Preserve existing timeout if user entered an invalid value (validator returned None)
+        # Preserve existing timeout if user entered an invalid value
+        # (validator returned None)
         if form_data.timeout is None and self.current_agent:
             form_data.timeout = getattr(self.current_agent.llm, "timeout", None)
         result = save_settings(form_data, self.current_agent)
