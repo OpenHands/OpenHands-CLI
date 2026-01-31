@@ -31,6 +31,8 @@ from openhands_cli.tui.modals.settings.components import (
     SettingsTab,
 )
 from openhands_cli.tui.modals.settings.utils import SettingsFormData, save_settings
+from openhands.sdk import LLMSummarizingCondenser
+
 
 
 class SettingsScreen(ModalScreen):
@@ -208,6 +210,19 @@ class SettingsScreen(ModalScreen):
             self.timeout_input.value = str(llm.timeout)
         else:
             self.timeout_input.value = ""
+
+        # Max tokens (optional) – show existing value if set
+        max_output = getattr(llm, "max_output_tokens", None)
+        if max_output is not None:
+            self.max_tokens_input.value = str(max_output)
+        else:
+            self.max_tokens_input.value = ""
+
+        # Condenser max size (optional) – show existing value if set
+        if self.current_agent and self.current_agent.condenser and isinstance(self.current_agent.condenser, LLMSummarizingCondenser):
+            self.max_size_input.value = str(self.current_agent.condenser.max_size)
+        else:
+            self.max_size_input.value = ""
 
         # Update field dependencies after loading all values
         self._update_field_dependencies()

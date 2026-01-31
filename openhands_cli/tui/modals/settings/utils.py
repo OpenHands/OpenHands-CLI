@@ -239,9 +239,10 @@ def save_settings(
                 isinstance(agent.condenser, LLMSummarizingCondenser)
                 and data.max_size is not None
             ):
-                agent.condenser = agent.condenser.model_copy(
+                new_condenser = agent.condenser.model_copy(
                     update={"max_size": data.max_size}
                 )
+                agent = agent.model_copy(update={"condenser": new_condenser})
         elif not data.memory_condensation_enabled and agent.condenser:
             # Disable condensation
             agent = agent.model_copy(update={"condenser": None})
