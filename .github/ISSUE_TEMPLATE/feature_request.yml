@@ -26,7 +26,7 @@ body:
           label: Problem or Use Case
           description: What problem are you trying to solve? What use case would this feature enable?
           placeholder: |
-              Example - "As a developer using the CLI, I need to save and resume conversations. Currently, when I close the terminal, all conversation history is lost, which is frustrating for long-running tasks."
+              Example - "As a developer using the CLI, I need to export a conversation transcript. Right now there is no command to save the session as Markdown or JSON, which makes it hard to share results or archive work."
       validations:
           required: true
 
@@ -36,7 +36,7 @@ body:
           label: Proposed Solution
           description: Describe your ideal solution. What should this feature do? How should it work?
           placeholder: |
-              Example - "Add a conversation history feature that allows saving conversations with a name/ID. Include commands like `openhands resume <conversation-id>` and `openhands list` to show saved conversations."
+              Example - "Add a command like `openhands export --format markdown|json --output transcript.md` to save the current conversation transcript. Optionally allow exporting a specific conversation ID."
       validations:
           required: true
 
