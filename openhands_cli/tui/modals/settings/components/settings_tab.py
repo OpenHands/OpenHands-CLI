@@ -96,6 +96,39 @@ class SettingsTab(Container):
                         disabled=True,
                     )
 
+                    # Timeout (seconds)
+                    with Container(classes="form_group"):
+                        yield Label("LLM Timeout (seconds):", classes="form_label")
+                        yield Input(
+                            placeholder="10–3600 (optional)",
+                            id="timeout_input",
+                            classes="form_input",
+                            # Enabled when API key is entered (same condition as memory)
+                            disabled=True,
+                        )
+
+                    # Max Tokens (optional)
+                    with Container(classes="form_group"):
+                        yield Label("LLM Max Tokens (optional):", classes="form_label")
+                        yield Input(
+                            placeholder="e.g., 2000",
+                            id="max_tokens_input",
+                            classes="form_input",
+                            disabled=True,
+                        )
+
+                    # Max Size (optional)
+                    with Container(classes="form_group"):
+                        yield Label(
+                            "Condenser Max Size (optional):", classes="form_label"
+                        )
+                        yield Input(
+                            placeholder="e.g., 240",
+                            id="max_size_input",
+                            classes="form_input",
+                            disabled=True,
+                        )
+
                 # Memory Condensation
                 with Container(classes="form_group"):
                     yield Label("Memory Condensation:", classes="form_label")
