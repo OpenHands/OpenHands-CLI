@@ -3,6 +3,7 @@
 import asyncio
 import uuid
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.text import Text
@@ -26,8 +27,12 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands_cli.setup import setup_conversation
+from openhands_cli.tui.core.messages import ConfirmationNeeded
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.user_actions.types import UserConfirmation
+
+if TYPE_CHECKING:
+    from textual.app import App
 
 
 class ConversationRunner:
@@ -37,7 +42,7 @@ class ConversationRunner:
         self,
         conversation_id: uuid.UUID,
         running_state_callback: Callable[[bool], None],
-        confirmation_callback: Callable,
+        app: "App",
         notification_callback: Callable[[str, str, SeverityLevel], None],
         visualizer: ConversationVisualizer,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
@@ -50,11 +55,13 @@ class ConversationRunner:
 
         Args:
             conversation_id: UUID for the conversation.
-            error_callback: Callback for handling errors.
-                          Should accept (error_title: str, error_message: str).
+            running_state_callback: Callback to update running state.
+            app: The Textual app instance for posting messages.
+            notification_callback: Callback for notifications.
             visualizer: Optional visualizer for output display.
             initial_confirmation_policy: Initial confirmation policy to use.
                                         If None, defaults to AlwaysConfirm.
+            event_callback: Optional callback for events.
             env_overrides_enabled: If True, environment variables will override
                                    stored LLM settings.
             critic_disabled: If True, critic functionality will be disabled.
@@ -71,13 +78,13 @@ class ConversationRunner:
         )
 
         self._running = False
+        self._app = app
 
         # Set confirmation mode state based on initial policy
         self._confirmation_mode_active = not isinstance(
             starting_confirmation_policy, NeverConfirm
         )
         self._running_state_callback: Callable = running_state_callback
-        self._confirmation_callback: Callable = confirmation_callback
         self._notification_callback: Callable[[str, str, SeverityLevel], None] = (
             notification_callback
         )
@@ -177,18 +184,13 @@ class ConversationRunner:
             self._update_run_status(False)
 
     def _run_with_confirmation(self) -> None:
-        """Run conversation with confirmation mode enabled."""
+        """Run conversation with confirmation mode enabled (non-blocking).
+
+        When confirmation is needed, posts a ConfirmationNeeded message and exits.
+        The UI handles the confirmation and calls resume_with_confirmation() to continue.
+        """
         if not self.conversation:
             return
-
-        # If agent was paused, resume with confirmation request
-        if (
-            self.conversation.state.execution_status
-            == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
-        ):
-            user_confirmation = self._handle_confirmation_request()
-            if user_confirmation == UserConfirmation.DEFER:
-                return
 
         while True:
             self.conversation.run()
@@ -204,35 +206,36 @@ class ConversationRunner:
                 self.conversation.state.execution_status
                 == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
             ):
-                user_confirmation = self._handle_confirmation_request()
-                if user_confirmation == UserConfirmation.DEFER:
+                # Get pending actions and post message to UI
+                pending_actions = ConversationState.get_unmatched_actions(
+                    self.conversation.state.events
+                )
+
+                if pending_actions:
+                    # Post message to UI thread and EXIT (non-blocking)
+                    self._app.call_from_thread(
+                        lambda actions=pending_actions: self._app.post_message(
+                            ConfirmationNeeded(actions)
+                        )
+                    )
+                    # Exit the loop - UI will handle confirmation and resume
                     return
+                # If no pending actions, continue the loop
             else:
                 # For other states, break to avoid infinite loop
                 break
 
-    def _handle_confirmation_request(self) -> UserConfirmation:
-        """Handle confirmation request from user.
+    def resume_with_confirmation(self, decision: UserConfirmation) -> None:
+        """Resume conversation after user provides confirmation decision.
 
-        Returns:
-            UserConfirmation indicating the user's choice
+        Called by the UI after user selects an option from the confirmation panel.
+        This method applies the decision and continues the conversation.
+
+        Args:
+            decision: The user's confirmation decision
         """
         if not self.conversation:
-            return UserConfirmation.DEFER
-
-        pending_actions = ConversationState.get_unmatched_actions(
-            self.conversation.state.events
-        )
-
-        if not pending_actions:
-            return UserConfirmation.ACCEPT
-
-        # Get user decision through callback
-        if self._confirmation_callback:
-            decision = self._confirmation_callback(pending_actions)
-        else:
-            # Default to accepting if no callback is set
-            decision = UserConfirmation.ACCEPT
+            return
 
         # Handle the user's decision
         if decision == UserConfirmation.REJECT:
@@ -241,15 +244,20 @@ class ConversationRunner:
         elif decision == UserConfirmation.DEFER:
             # Pause the conversation for later resumption
             self.conversation.pause()
+            return  # Don't continue running
         elif decision == UserConfirmation.ALWAYS_PROCEED:
             # Accept actions and change policy to NeverConfirm
             self._change_confirmation_policy(NeverConfirm())
         elif decision == UserConfirmation.CONFIRM_RISKY:
             # Accept actions and change policy to ConfirmRisky
             self._change_confirmation_policy(ConfirmRisky())
+        # For ACCEPT, we just continue without changing anything
 
-        # For ACCEPT and policy-changing decisions, we continue normally
-        return decision
+        # Continue running the conversation
+        if self._confirmation_mode_active:
+            self._run_with_confirmation()
+        else:
+            self.conversation.run()
 
     def _change_confirmation_policy(self, new_policy: ConfirmationPolicyBase) -> None:
         """Change the confirmation policy and update internal state.
@@ -270,6 +278,20 @@ class ConversationRunner:
     def is_running(self) -> bool:
         """Check if conversation is currently running."""
         return self._running
+
+    @property
+    def is_waiting_for_confirmation(self) -> bool:
+        """Check if conversation is waiting for user confirmation.
+
+        Returns True when the agent has proposed actions that need approval.
+        This is used to disable user input while confirmation is pending.
+        """
+        if not self.conversation:
+            return False
+        return (
+            self.conversation.state.execution_status
+            == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
+        )
 
     async def pause(self) -> None:
         """Pause the running conversation."""
