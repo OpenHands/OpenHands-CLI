@@ -811,8 +811,14 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     @on(ConversationCreated)
     def on_conversation_created(self, event: ConversationCreated) -> None:
-        """Propagate conversation creation to history panel."""
+        """Propagate conversation creation to history panel and reset metrics."""
         self._notify_history_panel(event)
+        # Reset token metrics on the info status line
+        try:
+            info_status_line = self.query_one(InfoStatusLine)
+            info_status_line.reset_metrics()
+        except NoMatches:
+            pass
 
     @on(ConversationTitleUpdated)
     def on_conversation_title_updated(self, event: ConversationTitleUpdated) -> None:
