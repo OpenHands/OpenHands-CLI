@@ -97,6 +97,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         json_mode: bool = False,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
+        iterative_refinement: bool = False,
+        critic_threshold: float = 0.5,
         **kwargs,
     ):
         """Initialize the app with custom OpenHands theme.
@@ -113,6 +115,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             env_overrides_enabled: If True, environment variables will override
                                    stored LLM settings.
             critic_disabled: If True, critic functionality will be disabled.
+            iterative_refinement: If True, enable iterative refinement mode.
+            critic_threshold: Critic score threshold for iterative refinement.
         """
         super().__init__(**kwargs)
 
@@ -131,6 +135,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Store agent loading options
         self.env_overrides_enabled = env_overrides_enabled
         self.critic_disabled = critic_disabled
+
+        # Store iterative refinement settings (CLI args override persisted settings)
+        self.iterative_refinement = iterative_refinement
+        self.critic_threshold = critic_threshold
 
         # Store resume conversation ID
         self.conversation_id = (
@@ -467,7 +475,52 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             critic_disabled=self.critic_disabled,
         )
 
+        # Set up iterative refinement callback if enabled
+        # CLI args take precedence over persisted settings
+        if self.iterative_refinement:
+            # Update the visualizer's CLI settings with CLI arg values
+            conversation_visualizer.cli_settings.enable_iterative_refinement = True
+            conversation_visualizer.cli_settings.critic_threshold = (
+                self.critic_threshold
+            )
+
+            # Set the refinement callback to queue messages back to the agent
+            def refinement_callback(message: str) -> None:
+                # Queue the refinement message to be sent to the agent
+                self._queue_refinement_message(runner, message)
+
+            conversation_visualizer.set_refinement_callback(refinement_callback)
+
         return runner
+
+    def _queue_refinement_message(
+        self, runner: ConversationRunner, message: str
+    ) -> None:
+        """Queue a refinement message to be sent to the agent.
+
+        This is called from the visualizer when iterative refinement is triggered.
+
+        Args:
+            runner: The conversation runner to send the message through
+            message: The refinement message to send to the agent
+        """
+        # Display the refinement message in the UI as a system message
+        from textual.widgets import Static
+
+        refinement_widget = Static(
+            f"[bold yellow]🔄 Iterative Refinement[/bold yellow]\n{message}",
+            classes="refinement-message",
+        )
+        self.call_from_thread(self.main_display.mount, refinement_widget)
+        self.call_from_thread(lambda: self.main_display.scroll_end(animate=False))
+
+        # Queue the message to the running conversation
+        import asyncio
+
+        asyncio.run_coroutine_threadsafe(
+            runner.queue_message(message),
+            asyncio.get_event_loop(),
+        )
 
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.
@@ -934,6 +987,8 @@ def main(
     json_mode: bool = False,
     env_overrides_enabled: bool = False,
     critic_disabled: bool = False,
+    iterative_refinement: bool = False,
+    critic_threshold: float = 0.5,
 ):
     """Run the textual app.
 
@@ -948,6 +1003,8 @@ def main(
         env_overrides_enabled: If True, environment variables will override
             stored LLM settings.
         critic_disabled: If True, critic functionality will be disabled.
+        iterative_refinement: If True, enable iterative refinement mode.
+        critic_threshold: Critic score threshold for iterative refinement.
 
     Raises:
         MissingEnvironmentVariablesError: If env_overrides_enabled is True but
@@ -983,6 +1040,8 @@ def main(
         json_mode=json_mode,
         env_overrides_enabled=env_overrides_enabled,
         critic_disabled=critic_disabled,
+        iterative_refinement=iterative_refinement,
+        critic_threshold=critic_threshold,
     )
 
     app.run(headless=headless)
