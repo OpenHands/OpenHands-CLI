@@ -25,13 +25,19 @@ def build_refinement_message(
     score_percentage = critic_result.score * 100
     threshold_percentage = threshold * 100
 
-    # Build the base message
+    # Build the base message with context about the critic model
     lines = [
         "⚠️ **Iterative Refinement Triggered**",
         "",
-        f"The critic model has predicted that your task success probability "
-        f"is **{score_percentage:.1f}%**, which is below the threshold of "
-        f"{threshold_percentage:.0f}%.",
+        "A **critic model** (a separate AI trained to evaluate task completion) "
+        "has analyzed your recent work and predicted the probability that the "
+        "user will be satisfied with the current state of the task.",
+        "",
+        f"**Predicted success probability: {score_percentage:.1f}%** "
+        f"(threshold: {threshold_percentage:.0f}%)",
+        "",
+        "This low score suggests there may be incomplete work, missing "
+        "requirements, or issues that need to be addressed.",
         "",
     ]
 
