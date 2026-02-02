@@ -77,6 +77,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+o", "toggle_cells", "Toggle Cells"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
+        ("ctrl+r", "toggle_iterative_refinement", "Toggle iterative refinement"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
         ("ctrl+c", "request_quit", "Quit the application"),
@@ -121,6 +122,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         super().__init__(**kwargs)
 
         self.conversation_running_signal = Signal(self, "conversation_running_signal")
+        self.iterative_refinement_signal = Signal(
+            self, "iterative_refinement_signal"
+        )  # Signal for refinement state changes
         self.is_ui_initialized = False
 
         # Store exit confirmation setting
@@ -653,6 +657,51 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         for collapsible in collapsibles:
             collapsible.collapsed = any_expanded
+
+    def action_toggle_iterative_refinement(self) -> None:
+        """Action to handle Ctrl+R key binding.
+
+        Toggles iterative refinement mode on/off. When enabled, the agent will
+        receive feedback messages if the critic score is below the threshold.
+        """
+        # Toggle the state
+        self.iterative_refinement = not self.iterative_refinement
+
+        # Update the visualizer's settings if conversation runner exists
+        if self.conversation_runner:
+            visualizer = self.conversation_runner.visualizer
+            visualizer.cli_settings.enable_iterative_refinement = (
+                self.iterative_refinement
+            )
+
+            # Set or clear the refinement callback based on new state
+            if self.iterative_refinement:
+                # Capture the runner reference to avoid None type issues
+                runner = self.conversation_runner
+
+                def refinement_callback(message: str) -> None:
+                    if runner is not None:
+                        self._queue_refinement_message(runner, message)
+
+                visualizer.set_refinement_callback(refinement_callback)
+            else:
+                visualizer.set_refinement_callback(None)
+
+        # Publish signal to update status indicators
+        self.iterative_refinement_signal.publish(self.iterative_refinement)
+
+        # Show notification
+        status = "enabled" if self.iterative_refinement else "disabled"
+        threshold_info = (
+            f" (threshold: {self.critic_threshold * 100:.0f}%)"
+            if self.iterative_refinement
+            else ""
+        )
+        self.notify(
+            f"Iterative refinement {status}{threshold_info}",
+            severity="information",
+            timeout=3.0,
+        )
 
     def on_key(self, event: events.Key) -> None:
         """Handle keyboard navigation.

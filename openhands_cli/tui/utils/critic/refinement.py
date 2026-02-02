@@ -27,7 +27,7 @@ def build_refinement_message(
 
     # Build the base message
     lines = [
-        f"⚠️ **Iterative Refinement Triggered**",
+        "⚠️ **Iterative Refinement Triggered**",
         "",
         f"The critic model has predicted that your task success probability "
         f"is **{score_percentage:.1f}%**, which is below the threshold of "
@@ -46,17 +46,21 @@ def build_refinement_message(
             lines.append("")
 
     # Add the refinement instruction
-    lines.extend([
-        "**Please review the user's original requirements and your current changes.**",
-        "",
-        "Ensure you have:",
-        "1. Fully addressed all aspects of the user's request",
-        "2. Verified your implementation is complete and correct",
-        "3. Resolved any potential issues identified above",
-        "",
-        "If you believe the task is complete, use the finish tool to explain "
-        "what was accomplished. Otherwise, continue working on the remaining items.",
-    ])
+    lines.extend(
+        [
+            "**Please review the user's original requirements and your current "
+            "changes.**",
+            "",
+            "Ensure you have:",
+            "1. Fully addressed all aspects of the user's request",
+            "2. Verified your implementation is complete and correct",
+            "3. Resolved any potential issues identified above",
+            "",
+            "If you believe the task is complete, use the finish tool to explain "
+            "what was accomplished. Otherwise, continue working on the remaining "
+            "items.",
+        ]
+    )
 
     return "\n".join(lines)
 
