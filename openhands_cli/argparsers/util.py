@@ -1,6 +1,8 @@
 import argparse
 
-from openhands_cli.stores.cli_settings import DEFAULT_CRITIC_THRESHOLD
+
+# Default threshold for iterative refinement (50%)
+DEFAULT_CRITIC_THRESHOLD = 0.5
 
 
 def add_confirmation_mode_args(

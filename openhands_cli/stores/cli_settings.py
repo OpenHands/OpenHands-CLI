@@ -4,11 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from pydantic import BaseModel, Field
-
-
-# Default threshold for iterative refinement (50%)
-DEFAULT_CRITIC_THRESHOLD = 0.5
+from pydantic import BaseModel
 
 
 class CliSettings(BaseModel):
@@ -17,22 +13,6 @@ class CliSettings(BaseModel):
     default_cells_expanded: bool = True
     auto_open_plan_panel: bool = True
     enable_critic: bool = True
-    enable_iterative_refinement: bool = Field(
-        default=False,
-        description=(
-            "When enabled, if the critic score is below the threshold, "
-            "a message is sent to the agent to review and improve its work."
-        ),
-    )
-    critic_threshold: float = Field(
-        default=DEFAULT_CRITIC_THRESHOLD,
-        ge=0.0,
-        le=1.0,
-        description=(
-            "The critic score threshold for iterative refinement. "
-            "If score is below this threshold, refinement is triggered."
-        ),
-    )
 
     @classmethod
     def get_config_path(cls) -> Path:

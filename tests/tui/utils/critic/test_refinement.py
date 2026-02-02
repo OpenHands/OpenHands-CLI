@@ -1,7 +1,5 @@
 """Tests for the iterative refinement utilities."""
 
-import pytest
-
 from openhands.sdk.critic.result import CriticResult
 from openhands_cli.tui.utils.critic.refinement import (
     build_refinement_message,
@@ -161,50 +159,33 @@ class TestBuildRefinementMessage:
         assert "100%" in message
 
 
-class TestCliSettingsWithIterativeRefinement:
-    """Tests for CliSettings iterative refinement fields."""
+class TestDefaultCriticThreshold:
+    """Tests for DEFAULT_CRITIC_THRESHOLD constant."""
 
-    def test_defaults(self):
-        """Test default values for iterative refinement settings."""
-        from openhands_cli.stores import CliSettings
+    def test_default_threshold_value(self):
+        """Test that the default critic threshold is 0.5."""
+        from openhands_cli.argparsers.util import DEFAULT_CRITIC_THRESHOLD
 
-        cfg = CliSettings()
-        assert cfg.enable_iterative_refinement is False
-        assert cfg.critic_threshold == 0.5
+        assert DEFAULT_CRITIC_THRESHOLD == 0.5
 
-    def test_custom_values(self):
-        """Test setting custom values for iterative refinement."""
-        from openhands_cli.stores import CliSettings
+    def test_threshold_used_in_should_trigger_refinement(self):
+        """Test that DEFAULT_CRITIC_THRESHOLD works with should_trigger_refinement."""
+        from openhands_cli.argparsers.util import DEFAULT_CRITIC_THRESHOLD
 
-        cfg = CliSettings(
-            enable_iterative_refinement=True,
-            critic_threshold=0.7,
+        # Score below default threshold
+        result = CriticResult(score=0.3, message="Below threshold")
+        assert (
+            should_trigger_refinement(
+                result, threshold=DEFAULT_CRITIC_THRESHOLD, enabled=True
+            )
+            is True
         )
-        assert cfg.enable_iterative_refinement is True
-        assert cfg.critic_threshold == 0.7
 
-    def test_threshold_validation_bounds(self):
-        """Test that critic_threshold is bounded to 0-1 range."""
-        from openhands_cli.stores import CliSettings
-
-        # Valid values
-        cfg = CliSettings(critic_threshold=0.0)
-        assert cfg.critic_threshold == 0.0
-
-        cfg = CliSettings(critic_threshold=1.0)
-        assert cfg.critic_threshold == 1.0
-
-        cfg = CliSettings(critic_threshold=0.5)
-        assert cfg.critic_threshold == 0.5
-
-    def test_threshold_out_of_bounds_raises(self):
-        """Test that out-of-bounds threshold values raise validation error."""
-        from pydantic import ValidationError
-
-        from openhands_cli.stores import CliSettings
-
-        with pytest.raises(ValidationError):
-            CliSettings(critic_threshold=-0.1)
-
-        with pytest.raises(ValidationError):
-            CliSettings(critic_threshold=1.1)
+        # Score above default threshold
+        result = CriticResult(score=0.7, message="Above threshold")
+        assert (
+            should_trigger_refinement(
+                result, threshold=DEFAULT_CRITIC_THRESHOLD, enabled=True
+            )
+            is False
+        )

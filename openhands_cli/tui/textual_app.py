@@ -457,7 +457,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Initialize conversation runner with visualizer that can add widgets.
         # Skip user messages since we display them immediately in the UI.
         conversation_visualizer = visualizer or ConversationVisualizer(
-            self.main_display, self, skip_user_messages=True, name="OpenHands Agent"
+            self.main_display,
+            self,
+            skip_user_messages=True,
+            name="OpenHands Agent",
+            iterative_refinement_enabled=self.iterative_refinement,
+            critic_threshold=self.critic_threshold,
         )
 
         # Create JSON callback if in JSON mode
@@ -480,14 +485,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         )
 
         # Set up iterative refinement callback if enabled
-        # CLI args take precedence over persisted settings
         if self.iterative_refinement:
-            # Update the visualizer's CLI settings with CLI arg values
-            conversation_visualizer.cli_settings.enable_iterative_refinement = True
-            conversation_visualizer.cli_settings.critic_threshold = (
-                self.critic_threshold
-            )
-
             # Set the refinement callback to queue messages back to the agent
             def refinement_callback(message: str) -> None:
                 # Queue the refinement message to be sent to the agent
@@ -670,8 +668,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Update the visualizer's settings if conversation runner exists
         if self.conversation_runner:
             visualizer = self.conversation_runner.visualizer
-            visualizer.cli_settings.enable_iterative_refinement = (
-                self.iterative_refinement
+            visualizer.set_iterative_refinement(
+                self.iterative_refinement, self.critic_threshold
             )
 
             # Set or clear the refinement callback based on new state

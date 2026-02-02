@@ -106,8 +106,6 @@ class TestCliSettings:
             default_cells_expanded=False,
             auto_open_plan_panel=False,
             enable_critic=False,
-            enable_iterative_refinement=False,
-            critic_threshold=0.5,
         )
 
         with patch.object(CliSettings, "get_config_path", return_value=config_path):
@@ -118,8 +116,6 @@ class TestCliSettings:
                 "default_cells_expanded": False,
                 "auto_open_plan_panel": False,
                 "enable_critic": False,
-                "enable_iterative_refinement": False,
-                "critic_threshold": 0.5,
             },
             indent=2,
         )

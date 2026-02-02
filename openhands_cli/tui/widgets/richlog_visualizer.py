@@ -96,6 +96,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         skip_user_messages: bool = False,
         name: str | None = None,
         refinement_callback: "Callable[[str], None] | None" = None,
+        iterative_refinement_enabled: bool = False,
+        critic_threshold: float = 0.5,
     ):
         """Initialize the visualizer.
 
@@ -107,6 +109,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
                   When set, titles will be prefixed with the agent name.
             refinement_callback: Optional callback to send refinement messages to
                   the agent when iterative refinement is triggered.
+            iterative_refinement_enabled: Whether iterative refinement is enabled.
+            critic_threshold: Threshold for triggering iterative refinement.
         """
         super().__init__()
         self._container = container
@@ -114,6 +118,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._skip_user_messages = skip_user_messages
         self._name = name
         self._refinement_callback = refinement_callback
+        self._iterative_refinement_enabled = iterative_refinement_enabled
+        self._critic_threshold = critic_threshold
         # Store the main thread ID for thread safety checks
         self._main_thread_id = threading.get_ident()
         # Cache CLI settings to avoid repeated file system reads
@@ -139,6 +145,16 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """
         self._refinement_callback = callback
 
+    def set_iterative_refinement(self, enabled: bool, threshold: float) -> None:
+        """Update iterative refinement settings.
+
+        Args:
+            enabled: Whether iterative refinement is enabled.
+            threshold: Threshold for triggering refinement.
+        """
+        self._iterative_refinement_enabled = enabled
+        self._critic_threshold = threshold
+
     def create_sub_visualizer(self, agent_id: str) -> "ConversationVisualizer":
         """Create a visualizer for a sub-agent during delegation.
 
@@ -158,6 +174,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
             skip_user_messages=self._skip_user_messages,
             name=agent_id,
             refinement_callback=self._refinement_callback,
+            iterative_refinement_enabled=self._iterative_refinement_enabled,
+            critic_threshold=self._critic_threshold,
         )
 
     @staticmethod
@@ -334,13 +352,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 # Check if iterative refinement should be triggered
                 if self._refinement_callback and should_trigger_refinement(
                     critic_result=critic_result,
-                    threshold=self.cli_settings.critic_threshold,
-                    enabled=self.cli_settings.enable_iterative_refinement,
+                    threshold=self._critic_threshold,
+                    enabled=self._iterative_refinement_enabled,
                 ):
                     # Build and send refinement message
                     refinement_message = build_refinement_message(
                         critic_result=critic_result,
-                        threshold=self.cli_settings.critic_threshold,
+                        threshold=self._critic_threshold,
                     )
                     self._refinement_callback(refinement_message)
 

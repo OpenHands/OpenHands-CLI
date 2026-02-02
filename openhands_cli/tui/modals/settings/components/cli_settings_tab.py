@@ -2,7 +2,7 @@
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
-from textual.widgets import Input, Label, Static, Switch
+from textual.widgets import Label, Static, Switch
 
 from openhands_cli.stores import CliSettings
 
@@ -80,39 +80,12 @@ class CliSettingsTab(Container):
                 description=(
                     "When enabled and using OpenHands LLM provider, an experimental "
                     "critic feature will predict task success and collect feedback. "
+                    "Use --iterative-refinement flag or Ctrl+R to enable automatic "
+                    "agent feedback when critic score is low."
                 ),
                 switch_id="enable_critic_switch",
                 value=self.cli_settings.enable_critic,
             )
-
-            yield SettingsSwitch(
-                label="Enable Iterative Refinement",
-                description=(
-                    "When enabled along with Critic, if the critic predicts task "
-                    "success probability below the threshold, a message is sent "
-                    "to the agent to review and improve its work. Can also be "
-                    "enabled via --iterative-refinement CLI flag."
-                ),
-                switch_id="enable_iterative_refinement_switch",
-                value=self.cli_settings.enable_iterative_refinement,
-            )
-
-            # Critic threshold input
-            with Container(classes="form_group"):
-                with Horizontal(classes="input_container"):
-                    yield Label("Critic Threshold:", classes="form_label")
-                    yield Input(
-                        value=str(self.cli_settings.critic_threshold),
-                        id="critic_threshold_input",
-                        classes="form_input",
-                        placeholder="0.5",
-                    )
-                yield Static(
-                    "Threshold for iterative refinement (0.0-1.0). When critic "
-                    "score is below this value, refinement is triggered. "
-                    "Default: 0.5. Can also be set via --critic-threshold CLI flag.",
-                    classes="form_help",
-                )
 
     def get_cli_settings(self) -> CliSettings:
         """Get the current CLI settings from the form."""
@@ -123,22 +96,9 @@ class CliSettingsTab(Container):
             "#auto_open_plan_panel_switch", Switch
         )
         enable_critic_switch = self.query_one("#enable_critic_switch", Switch)
-        enable_iterative_refinement_switch = self.query_one(
-            "#enable_iterative_refinement_switch", Switch
-        )
-        critic_threshold_input = self.query_one("#critic_threshold_input", Input)
-
-        # Parse critic threshold with validation
-        try:
-            critic_threshold = float(critic_threshold_input.value)
-            critic_threshold = max(0.0, min(1.0, critic_threshold))  # Clamp to 0-1
-        except ValueError:
-            critic_threshold = self.cli_settings.critic_threshold  # Use existing value
 
         return CliSettings(
             default_cells_expanded=default_cells_expanded_switch.value,
             auto_open_plan_panel=auto_open_plan_panel_switch.value,
             enable_critic=enable_critic_switch.value,
-            enable_iterative_refinement=enable_iterative_refinement_switch.value,
-            critic_threshold=critic_threshold,
         )
