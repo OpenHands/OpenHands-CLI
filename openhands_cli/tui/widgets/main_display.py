@@ -51,34 +51,22 @@ class ScrollableContent(VerticalScroll):
     ) -> None:
         """Clear dynamic content when conversation changes.
 
-        When conversation_id changes to a new UUID, removes all dynamically
-        added widgets (user messages, agent responses, etc.) while preserving:
-        - SplashContent (#splash_content) - re-renders via its own binding
-
-        Skips if new_id is None (switching in progress).
+        Clears dynamically added widgets (preserving SplashContent) when:
+        - Switch starts: old_id=UUID -> new_id=None
+        - New conversation: old_id=UUID -> new_id=different UUID
         """
         if old_id == new_id:
             return
 
-        # Skip during switch (conversation_id = None)
-        if new_id is None:
-            return
-
-        # Don't try to clear content if we're not mounted yet
         if not self.is_mounted:
             return
 
-        # Skip clearing if this is initial load (old was None from var default)
-        # In that case, just let the content render naturally
-        if old_id is None:
-            return
-
-        # New/different conversation - clear and show splash
-        for widget in list(self.children):
-            if widget.id != "splash_content":
-                widget.remove()
-
-        self.scroll_home(animate=False)
+        # Clear widgets when leaving a conversation (old_id was a valid UUID)
+        if old_id is not None:
+            for widget in list(self.children):
+                if widget.id != "splash_content":
+                    widget.remove()
+            self.scroll_home(animate=False)
 
     def watch_pending_action_count(self, old_count: int, new_count: int) -> None:
         """Mount InlineConfirmationPanel when pending_action_count becomes > 0.
