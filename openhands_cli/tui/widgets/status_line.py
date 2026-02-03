@@ -134,6 +134,16 @@ class InfoStatusLine(Static):
             self, self._on_conversation_state_changed
         )
 
+    def reset_metrics(self) -> None:
+        """Reset all conversation metrics to initial state."""
+        self._input_tokens = 0
+        self._output_tokens = 0
+        self._cache_hit_rate = "N/A"
+        self._last_request_input_tokens = 0
+        self._context_window = 0
+        self._accumulated_cost = 0.0
+        self._update_text()
+
     def on_unmount(self) -> None:
         """Stop timer when widget is removed."""
         if self._metrics_update_timer:
