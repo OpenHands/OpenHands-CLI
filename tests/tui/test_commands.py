@@ -700,6 +700,7 @@ class TestOpenHandsAppCommands:
     async def test_history_panel_selection_triggers_switch(
         self,
         monkeypatch: pytest.MonkeyPatch,
+        setup_test_agent_config,
     ) -> None:
         """Selecting a conversation in history panel should post SwitchConversation."""
         monkeypatch.setattr(
