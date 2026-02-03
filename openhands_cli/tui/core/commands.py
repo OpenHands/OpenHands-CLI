@@ -16,6 +16,7 @@ COMMANDS = [
     DropdownItem(main="/help - Display available commands"),
     DropdownItem(main="/new - Start a new conversation"),
     DropdownItem(main="/history - Toggle conversation history"),
+    DropdownItem(main="/config - Configure model, provider, and settings"),
     DropdownItem(main="/confirm - Configure confirmation settings"),
     DropdownItem(main="/condense - Condense conversation history"),
     DropdownItem(main="/feedback - Send anonymous feedback about CLI"),
@@ -69,6 +70,7 @@ def show_help(main_display: VerticalScroll) -> None:
   [{secondary}]/help[/{secondary}] - Display available commands
   [{secondary}]/new[/{secondary}] - Start a new conversation
   [{secondary}]/history[/{secondary}] - Toggle conversation history
+  [{secondary}]/config[/{secondary}] - Configure model, provider, and settings
   [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
   [{secondary}]/condense[/{secondary}] - Condense conversation history
   [{secondary}]/feedback[/{secondary}] - Send anonymous feedback about CLI

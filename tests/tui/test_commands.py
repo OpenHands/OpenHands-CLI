@@ -29,7 +29,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 7
+        assert len(COMMANDS) == 8
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -44,6 +44,7 @@ class TestCommands:
             ("/help", "Display available commands"),
             ("/new", "Start a new conversation"),
             ("/history", "Toggle conversation history"),
+            ("/config", "Configure model, provider, and settings"),
             ("/confirm", "Configure confirmation settings"),
             ("/condense", "Condense conversation history"),
             ("/feedback", "Send anonymous feedback about CLI"),
@@ -82,6 +83,7 @@ class TestCommands:
             "/help",
             "/new",
             "/history",
+            "/config",
             "/confirm",
             "/condense",
             "/feedback",
@@ -89,6 +91,7 @@ class TestCommands:
             "Display available commands",
             "Start a new conversation",
             "Toggle conversation history",
+            "Configure model, provider, and settings",
             "Configure confirmation settings",
             "Condense conversation history",
             "Send anonymous feedback about CLI",
@@ -159,6 +162,7 @@ class TestCommands:
             ("/help", True),
             ("/new", True),
             ("/history", True),
+            ("/config", True),
             ("/confirm", True),
             ("/condense", True),
             ("/feedback", True),
@@ -182,7 +186,7 @@ class TestCommands:
         assert "/history" in command_names
         assert "/help" in command_names
         assert "/new" in command_names
-        assert len(COMMANDS) == 7
+        assert len(COMMANDS) == 8
 
     def test_all_commands_included_in_help(self):
         """Test that all commands from COMMANDS list are included in help text.
@@ -217,6 +221,29 @@ class TestCommands:
 
 class TestOpenHandsAppCommands:
     """Integration-style tests for command handling in OpenHandsApp."""
+
+    @pytest.mark.asyncio
+    async def test_config_command_calls_open_settings(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/config` should invoke action_open_settings (same settings UI as first-run)."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+        open_settings_mock = mock.MagicMock()
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+            oh_app.action_open_settings = open_settings_mock
+
+            oh_app._handle_command("/config")
+
+            open_settings_mock.assert_called_once_with()
 
     @pytest.mark.asyncio
     async def test_confirm_command_opens_confirmation_settings_modal(

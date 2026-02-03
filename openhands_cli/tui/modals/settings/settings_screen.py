@@ -63,6 +63,8 @@ class SettingsScreen(ModalScreen):
         on_settings_saved: Callable[[], None] | list[Callable[[], None]] | None = None,
         on_first_time_settings_cancelled: Callable[[], None] | None = None,
         env_overrides_enabled: bool = False,
+        show_cli_tab: bool | None = None,
+        force_initial_setup_ui: bool = False,
         **kwargs,
     ):
         """Initialize the settings screen.
@@ -73,6 +75,10 @@ class SettingsScreen(ModalScreen):
                 cancelled during first-time setup
             env_overrides_enabled: If True, environment variables will override
                 stored LLM settings when checking for initial setup
+            show_cli_tab: If True, show CLI Settings tab. If False, hide it (same
+                as first-run). If None, show only when not initial setup.
+            force_initial_setup_ui: If True, always show the same UI as first-run
+                (Agent Settings tab only, no CLI tab). Used by /config command.
         """
         super().__init__(**kwargs)
         self.agent_store = AgentStore()
@@ -82,6 +88,12 @@ class SettingsScreen(ModalScreen):
         self.is_initial_setup = SettingsScreen.is_initial_setup_required(
             env_overrides_enabled=env_overrides_enabled
         )
+        if show_cli_tab is None and not force_initial_setup_ui:
+            self.show_cli_tab = not self.is_initial_setup
+        elif show_cli_tab is not None:
+            self.show_cli_tab = show_cli_tab
+        else:
+            self.show_cli_tab = False
 
         # Convert single callback to list for uniform handling
         if on_settings_saved is None:
@@ -102,16 +114,15 @@ class SettingsScreen(ModalScreen):
             self.message_widget = Static("", id="message_area")
             yield self.message_widget
 
-            # Tabbed content
-            with TabbedContent(id="settings_tabs"):
-                # Settings Tab
-                with TabPane("Agent Settings", id="settings_tab"):
-                    yield SettingsTab()
-
-                # CLI Settings Tab - only show if not first-time setup
-                if not self.is_initial_setup:
+            # Same layout as first-run: Agent Settings only (no tab bar)
+            if self.show_cli_tab:
+                with TabbedContent(id="settings_tabs"):
+                    with TabPane("Agent Settings", id="settings_tab"):
+                        yield SettingsTab()
                     with TabPane("CLI Settings", id="cli_settings_tab"):
                         yield CliSettingsTab()
+            else:
+                yield SettingsTab()
 
             # Buttons
             with Horizontal(id="button_container"):
@@ -136,13 +147,11 @@ class SettingsScreen(ModalScreen):
 
     def on_show(self) -> None:
         """Reload settings when the screen is shown."""
-        # Only reload if we don't have current settings loaded
-        # This prevents unnecessary clearing when returning from modals
-        if not self.current_agent:
-            self._clear_form()
-            self._load_current_settings()
-            self._update_advanced_visibility()
-            self._update_field_dependencies()
+        # Always reload from disk so we have fresh data (e.g. when opening via /config)
+        self.current_agent = self.agent_store.load_from_disk()
+        self._load_current_settings()
+        self._update_advanced_visibility()
+        self._update_field_dependencies()
 
     def _clear_form(self) -> None:
         """Clear all form values before reloading."""
@@ -397,8 +406,8 @@ class SettingsScreen(ModalScreen):
             self._show_message(result.error_message or "Unknown error", is_error=True)
             return
 
-        # Save CLI settings if not in initial setup mode
-        if not self.is_initial_setup:
+        # Save CLI settings only when the CLI tab was shown
+        if self.show_cli_tab:
             try:
                 cli_settings_tab = self.query_one("#cli_settings_tab", TabPane)
                 cli_settings_component = cli_settings_tab.query_one(CliSettingsTab)
