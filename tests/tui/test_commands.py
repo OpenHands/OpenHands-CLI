@@ -2,6 +2,8 @@
 
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
+from types import SimpleNamespace
 from typing import cast
 from unittest import mock
 
@@ -12,7 +14,12 @@ from textual_autocomplete import DropdownItem
 from openhands.sdk.security.confirmation_policy import AlwaysConfirm
 from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.conversations.store.local import LocalFileStore
-from openhands_cli.tui.core.commands import COMMANDS, is_valid_command, show_help
+from openhands_cli.tui.core.commands import (
+    COMMANDS,
+    extract_command_and_args,
+    is_valid_command,
+    show_help,
+)
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.confirmation_modal import (
     ConfirmationSettingsModal,
@@ -29,7 +36,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 7
+        assert len(COMMANDS) == 8
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -47,6 +54,7 @@ class TestCommands:
             ("/confirm", "Configure confirmation settings"),
             ("/condense", "Condense conversation history"),
             ("/feedback", "Send anonymous feedback about CLI"),
+            ("/export", "Save the current conversation to Markdown/JSON"),
             ("/exit", "Exit the application"),
         ],
     )
@@ -85,6 +93,7 @@ class TestCommands:
             "/confirm",
             "/condense",
             "/feedback",
+            "/export",
             "/exit",
             "Display available commands",
             "Start a new conversation",
@@ -92,6 +101,7 @@ class TestCommands:
             "Configure confirmation settings",
             "Condense conversation history",
             "Send anonymous feedback about CLI",
+            "Save current conversation as Markdown/JSON",
             "Exit the application",
             "Tips:",
             "Type / and press Tab",
@@ -162,9 +172,10 @@ class TestCommands:
             ("/confirm", True),
             ("/condense", True),
             ("/feedback", True),
+            ("/export ./logs", True),
             ("/exit", True),
-            ("/help extra", False),
-            ("/exit now", False),
+            ("/help extra", True),
+            ("/exit now", True),
             ("/unknown", False),
             ("/", False),
             ("help", False),
@@ -175,6 +186,23 @@ class TestCommands:
         """Command validation is strict and argument-sensitive."""
         assert is_valid_command(cmd) is expected
 
+    @pytest.mark.parametrize(
+        ("user_input", "expected_command", "expected_args"),
+        [
+            ("/export", "/export", ""),
+            ("/export   ./exports", "/export", "./exports"),
+            ("/help extra tips", "/help", "extra tips"),
+            ("not a command", None, ""),
+            ("/", None, ""),
+        ],
+    )
+    def test_extract_command_and_args(
+        self, user_input: str, expected_command: str | None, expected_args: str
+    ):
+        command, args = extract_command_and_args(user_input)
+        assert command == expected_command
+        assert args == expected_args
+
     def test_commands_contains_history(self):
         """Test COMMANDS includes /history."""
         command_names = [str(cmd.main).split(" - ")[0] for cmd in COMMANDS]
@@ -182,7 +210,7 @@ class TestCommands:
         assert "/history" in command_names
         assert "/help" in command_names
         assert "/new" in command_names
-        assert len(COMMANDS) == 7
+        assert len(COMMANDS) == 8
 
     def test_all_commands_included_in_help(self):
         """Test that all commands from COMMANDS list are included in help text.
@@ -217,6 +245,120 @@ class TestCommands:
 
 class TestOpenHandsAppCommands:
     """Integration-style tests for command handling in OpenHandsApp."""
+
+    @pytest.mark.asyncio
+    async def test_commands_reject_unexpected_arguments(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=True)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+            notify_mock = mock.MagicMock()
+            oh_app.notify = notify_mock
+
+            oh_app._handle_command("/help", "extra info")
+
+            notify_mock.assert_called_once()
+            call_kwargs = notify_mock.call_args[1]
+            assert call_kwargs["severity"] == "error"
+            assert "does not take arguments" in call_kwargs["message"]
+
+    @pytest.mark.asyncio
+    async def test_export_command_invokes_exporter(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+        markdown_path = tmp_path / "conversation.md"
+        json_path = tmp_path / "conversation.json"
+
+        def fake_prepare(self, argument: str):
+            assert argument == ""
+            return markdown_path, json_path
+
+        export_calls: dict[str, tuple] = {}
+
+        def fake_export(store, conversation_id, md_path, js_path):
+            export_calls["args"] = (store, conversation_id, md_path, js_path)
+            return SimpleNamespace(
+                markdown_path=md_path,
+                json_path=js_path,
+                event_count=5,
+            )
+
+        monkeypatch.setattr(
+            OpenHandsApp,
+            "_prepare_export_paths",
+            fake_prepare,
+        )
+        monkeypatch.setattr(
+            "openhands_cli.tui.textual_app.export_conversation_transcript",
+            fake_export,
+        )
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+            notify_mock = mock.MagicMock()
+            oh_app.notify = notify_mock
+            monkeypatch.setattr(oh_app._store, "exists", lambda _conversation_id: True)
+
+            oh_app._handle_command("/export")
+
+            assert "args" in export_calls
+            _, conv_id, md_arg, json_arg = export_calls["args"]
+            assert conv_id == oh_app.conversation_id.hex
+            assert md_arg == markdown_path
+            assert json_arg == json_path
+
+            notify_mock.assert_called_once()
+            call_kwargs = notify_mock.call_args[1]
+            assert call_kwargs["severity"] == "information"
+            assert str(markdown_path) in call_kwargs["message"]
+            assert str(json_path) in call_kwargs["message"]
+
+    @pytest.mark.asyncio
+    async def test_export_command_requires_persisted_conversation(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+            notify_mock = mock.MagicMock()
+            oh_app.notify = notify_mock
+            monkeypatch.setattr(oh_app._store, "exists", lambda _conversation_id: False)
+
+            oh_app._handle_command("/export")
+
+            notify_mock.assert_called_once()
+            call_kwargs = notify_mock.call_args[1]
+            assert call_kwargs["severity"] == "error"
+            assert (
+                "No conversation data available to export yet."
+                in call_kwargs["message"]
+            )
 
     @pytest.mark.asyncio
     async def test_confirm_command_opens_confirmation_settings_modal(
