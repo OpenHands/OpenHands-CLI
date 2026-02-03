@@ -7,8 +7,10 @@ from openhands_cli.tui.core.conversation_manager import (
     PauseConversation,
     SendMessage,
     SetConfirmationPolicy,
+    SwitchConfirmed,
     SwitchConversation,
 )
+from openhands_cli.tui.core.events import RequestSwitchConfirmation
 from openhands_cli.tui.core.state import (
     ConfirmationRequired,
     ConversationFinished,
@@ -23,11 +25,14 @@ __all__ = [
     "ConfirmationRequired",
     # Manager
     "ConversationManager",
-    # Messages
+    # Operation Messages (input to ConversationManager)
     "SendMessage",
     "CreateConversation",
     "SwitchConversation",
     "PauseConversation",
     "CondenseConversation",
     "SetConfirmationPolicy",
+    "SwitchConfirmed",
+    # Events (App ↔ ConversationManager)
+    "RequestSwitchConfirmation",
 ]

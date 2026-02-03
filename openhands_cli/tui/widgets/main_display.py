@@ -38,26 +38,39 @@ class ScrollableContent(VerticalScroll):
     """
 
     # Reactive property bound via data_bind() to ConversationState
-    conversation_id: var[uuid.UUID] = var(uuid.uuid4)
+    # None indicates switching in progress
+    conversation_id: var[uuid.UUID | None] = var(None)
 
-    def watch_conversation_id(self, old_id: uuid.UUID, new_id: uuid.UUID) -> None:
+    def watch_conversation_id(
+        self, old_id: uuid.UUID | None, new_id: uuid.UUID | None
+    ) -> None:
         """Clear dynamic content when conversation changes.
 
-        When conversation_id changes, removes all dynamically added widgets
-        (user messages, agent responses, etc.) while preserving:
+        When conversation_id changes to a new UUID, removes all dynamically
+        added widgets (user messages, agent responses, etc.) while preserving:
         - SplashContent (#splash_content) - re-renders via its own binding
+
+        Skips if new_id is None (switching in progress).
         """
         if old_id == new_id:
+            return
+
+        # Skip during switch (conversation_id = None)
+        if new_id is None:
             return
 
         # Don't try to clear content if we're not mounted yet
         if not self.is_mounted:
             return
 
-        # Remove all children except splash_content
+        # Skip clearing if this is initial load (old was None from var default)
+        # In that case, just let the content render naturally
+        if old_id is None:
+            return
+
+        # New/different conversation - clear and show splash
         for widget in list(self.children):
             if widget.id != "splash_content":
                 widget.remove()
 
-        # Scroll to top to show splash screen
         self.scroll_home(animate=False)

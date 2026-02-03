@@ -326,8 +326,8 @@ class TestOpenHandsAppCommands:
 
             # Verify error notification was called with correct parameters
             notify_mock.assert_called_once_with(
+                "No conversation available to condense",
                 title="Condense Error",
-                message="No conversation available to condense",
                 severity="error",
             )
 
@@ -363,8 +363,8 @@ class TestOpenHandsAppCommands:
 
             # Verify warning notification was called
             notify_mock.assert_called_once_with(
+                "Cannot condense while conversation is running.",
                 title="Condense Error",
-                message="Cannot condense while conversation is running.",
                 severity="warning",
             )
 
@@ -490,8 +490,8 @@ class TestOpenHandsAppCommands:
 
             # Verify notification was shown
             notify_mock.assert_called_once_with(
+                "Started a new conversation",
                 title="New Conversation",
-                message="Started a new conversation",
                 severity="information",
             )
 

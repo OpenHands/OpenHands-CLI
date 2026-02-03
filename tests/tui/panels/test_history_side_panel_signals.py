@@ -104,11 +104,11 @@ async def test_history_panel_updates_from_conversation_state(
         assert panel.selected_conversation_id is not None
         assert panel.selected_conversation_id.hex == base_id
 
-        # Simulate a cancelled switch (is_switching goes True then False without
-        # conversation_id changing)
-        app.conversation_state.is_switching = True
+        # Simulate a cancelled switch (conversation_id goes None then back to original)
+        original_id = app.conversation_state.conversation_id
+        app.conversation_state.conversation_id = None  # Start switching
         await pilot.pause()
-        app.conversation_state.is_switching = False
+        app.conversation_state.conversation_id = original_id  # Cancel switch
         await pilot.pause()
 
         # Selection should revert to current conversation

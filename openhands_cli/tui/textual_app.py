@@ -2,8 +2,10 @@
 
 This is the main Textual application for the OpenHands CLI. The architecture
 separates concerns between:
-- OpenHandsApp: Screen/modal management, side panels, global key bindings
-- ConversationManager: Handles operations (create, switch, send messages)
+- OpenHandsApp: Screen/modal management, side panels, global key bindings,
+  and UI event handling
+- ConversationManager: Handles operations (create, switch, send messages),
+  posts UI events
 - ConversationState: Pure reactive state container for UI binding
 - InputAreaContainer: Posts operation messages that bubble to ConversationManager
 
@@ -22,10 +24,13 @@ Widget Hierarchy::
                     └── InfoStatusLine (data_bind)
     └── Footer
 
-Message Flow (bubbling up to ConversationManager):
+Message Flow:
     InputField → UserInputSubmitted → bubbles → ConversationManager
     InputAreaContainer → CreateConversation/etc → bubbles → ConversationManager
     HistorySidePanel → SwitchConversation → bubbles → ConversationManager
+
+UI Event Flow (separation of concerns):
+    ConversationManager → posts UIEvent → bubbles up → App handles with @on
 
 Data Binding:
     ConversationManager updates ConversationState, which triggers reactive
@@ -61,8 +66,10 @@ from openhands_cli.tui.core import (
     ConversationManager,
     ConversationState,
     PauseConversation,
+    RequestSwitchConfirmation,
     SendMessage,
 )
+from openhands_cli.tui.core.conversation_manager import SwitchConfirmed
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
@@ -100,12 +107,15 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     content_area: getters.query_one[Horizontal] = getters.query_one("#content_area")
 
     @property
-    def conversation_id(self) -> uuid.UUID:
-        """Get current conversation ID from ConversationState (source of truth)."""
+    def conversation_id(self) -> uuid.UUID | None:
+        """Get current conversation ID from ConversationState (source of truth).
+
+        Returns None when a conversation switch is in progress.
+        """
         return self.conversation_state.conversation_id
 
     @conversation_id.setter
-    def conversation_id(self, value: uuid.UUID) -> None:
+    def conversation_id(self, value: uuid.UUID | None) -> None:
         """Set conversation ID in ConversationState (source of truth)."""
         self.conversation_state.conversation_id = value
 
@@ -143,19 +153,20 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             initial_confirmation_policy=initial_confirmation_policy or AlwaysConfirm(),
         )
 
-        # ConversationManager handles operations and updates state
-        self.conversation_manager = ConversationManager(
-            state=self.conversation_state,
-            env_overrides_enabled=env_overrides_enabled,
-            critic_disabled=critic_disabled,
-            json_mode=json_mode,
-        )
-
         # Store exit confirmation setting
         self.exit_confirmation = exit_confirmation
 
         # Store headless mode setting for auto-exit behavior
         self.headless_mode = headless_mode
+
+        # ConversationManager handles operations and posts UI events
+        self.conversation_manager = ConversationManager(
+            state=self.conversation_state,
+            env_overrides_enabled=env_overrides_enabled,
+            critic_disabled=critic_disabled,
+            json_mode=json_mode,
+            headless_mode=headless_mode,
+        )
 
         # Store these for _reload_visualizer (still need App-level access)
         self.env_overrides_enabled = env_overrides_enabled
@@ -650,6 +661,33 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             # If timeout or error, default to DEFER
             return UserConfirmation.DEFER
 
+    # =========================================================================
+    # UI Event Handlers - Handle events from ConversationManager
+    # =========================================================================
+
+    @on(RequestSwitchConfirmation)
+    def _on_request_switch_confirmation(self, event: RequestSwitchConfirmation) -> None:
+        """Handle switch confirmation modal request."""
+        event.stop()
+        from openhands_cli.tui.modals import SwitchConversationModal
+
+        def handle_confirmation(confirmed: bool | None) -> None:
+            # Post result back to ConversationManager
+            self.conversation_manager.post_message(
+                SwitchConfirmed(event.target_id, confirmed or False)
+            )
+
+        self.push_screen(
+            SwitchConversationModal(
+                prompt=(
+                    "The agent is still running.\n\n"
+                    "Switching conversations will pause the current run.\n"
+                    "Do you want to switch anyway?"
+                )
+            ),
+            handle_confirmation,
+        )
+
 
 def main(
     resume_conversation_id: str | None = None,
@@ -661,7 +699,7 @@ def main(
     json_mode: bool = False,
     env_overrides_enabled: bool = False,
     critic_disabled: bool = False,
-):
+) -> uuid.UUID | None:
     """Run the textual app.
 
     Args:

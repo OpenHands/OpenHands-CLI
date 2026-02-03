@@ -313,10 +313,18 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def render_user_message(self, content: str) -> None:
         """Render a user message to the UI.
 
+        Dismisses any pending feedback widgets before rendering the user message.
+
         Args:
             content: The user's message text to display.
         """
         from textual.widgets import Static
+
+        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
+
+        # Dismiss pending feedback widgets (user chose to continue instead of rating)
+        for widget in self._container.query(CriticFeedbackWidget):
+            widget.remove()
 
         user_message_widget = Static(
             f"> {content}", classes="user-message", markup=False

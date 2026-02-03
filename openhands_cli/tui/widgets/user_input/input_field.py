@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import uuid
 from pathlib import Path
 from typing import ClassVar
 
@@ -9,6 +10,7 @@ from textual import events, on
 from textual.binding import Binding
 from textual.containers import Container
 from textual.message import Message
+from textual.reactive import reactive
 from textual.signal import Signal
 from textual.widgets import TextArea
 
@@ -67,6 +69,10 @@ class InputField(Container):
     Multiline mode (toggled with Ctrl+L):
     - Uses larger TextArea for explicit multiline editing
     - Ctrl+J to submit
+
+    Reactive Behavior:
+    - Binds to `is_switching` from ConversationState
+    - Auto-disables during conversation switches
     """
 
     BINDINGS: ClassVar = [
@@ -76,6 +82,10 @@ class InputField(Container):
             "ctrl+x", "open_external_editor", "Open external editor", priority=True
         ),
     ]
+
+    # Reactive property bound from ConversationState
+    # None = switching in progress (input disabled)
+    conversation_id: reactive[uuid.UUID | None] = reactive(None)
 
     DEFAULT_CSS = """
     InputField {
@@ -163,6 +173,14 @@ class InputField(Container):
     def on_mount(self) -> None:
         """Focus the input when mounted."""
         self.focus_input()
+
+    def watch_conversation_id(self, conversation_id: uuid.UUID | None) -> None:
+        """React to conversation_id changes - disable input when None (switching)."""
+        is_switching = conversation_id is None
+        self.disabled = is_switching
+        if not is_switching:
+            # Re-enable and focus when switch completes
+            self.focus_input()
 
     def focus_input(self) -> None:
         self.active_input_widget.focus()

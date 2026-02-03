@@ -94,14 +94,11 @@ class ConversationState(Container):
     """Whether the conversation is currently running/processing."""
 
     # ---- Conversation Identity ----
-    conversation_id: var[uuid.UUID] = var(uuid.uuid4)
-    """The currently active conversation ID."""
+    conversation_id: var[uuid.UUID | None] = var(None)
+    """The currently active conversation ID. None during switching."""
 
     conversation_title: var[str | None] = var(None)
     """The title of the current conversation (first user message)."""
-
-    is_switching: var[bool] = var(False)
-    """Whether a conversation switch is in progress."""
 
     # ---- Confirmation Policy ----
     confirmation_policy: var[ConfirmationPolicyBase] = var(AlwaysConfirm())
@@ -171,11 +168,21 @@ class ConversationState(Container):
             )
             yield InputField(
                 placeholder="Type your message, @mention a file, or / for commands"
+            ).data_bind(
+                conversation_id=ConversationState.conversation_id,
             )
             yield InfoStatusLine().data_bind(
                 running=ConversationState.running,
                 metrics=ConversationState.metrics,
             )
+
+    @property
+    def is_switching(self) -> bool:
+        """Check if a conversation switch is in progress.
+
+        True when conversation_id is None (during switch transition).
+        """
+        return self.conversation_id is None
 
     @property
     def is_confirmation_active(self) -> bool:
@@ -309,8 +316,11 @@ class ConversationState(Container):
         """Set the metrics object. Thread-safe."""
         self._schedule_update("metrics", metrics)
 
-    def set_conversation_id(self, conversation_id: uuid.UUID) -> None:
-        """Set the current conversation ID. Thread-safe."""
+    def set_conversation_id(self, conversation_id: uuid.UUID | None) -> None:
+        """Set the current conversation ID. Thread-safe.
+
+        Set to None to indicate switching is in progress.
+        """
         self._schedule_update("conversation_id", conversation_id)
 
     def set_conversation_title(self, title: str) -> None:
@@ -318,12 +328,20 @@ class ConversationState(Container):
         self._schedule_update("conversation_title", title)
 
     def start_switching(self) -> None:
-        """Mark that a conversation switch is in progress. Thread-safe."""
-        self._schedule_update("is_switching", True)
+        """Mark that a conversation switch is in progress. Thread-safe.
 
-    def finish_switching(self) -> None:
-        """Mark that a conversation switch has completed. Thread-safe."""
-        self._schedule_update("is_switching", False)
+        Sets conversation_id to None, which triggers reactive UI updates
+        (InputField disables, App shows loading notification).
+        """
+        self._schedule_update("conversation_id", None)
+
+    def finish_switching(self, target_id: uuid.UUID) -> None:
+        """Complete the conversation switch. Thread-safe.
+
+        Sets conversation_id to target_id, which triggers reactive UI updates
+        (InputField enables, App dismisses loading notification).
+        """
+        self._schedule_update("conversation_id", target_id)
 
     # ---- Conversation Attachment (for metrics) ----
 

@@ -54,7 +54,8 @@ class SplashContent(Container):
     """
 
     # Reactive property bound from ConversationState for conversation switching
-    conversation_id: var[uuid.UUID] = var(uuid.uuid4)
+    # None indicates switching in progress
+    conversation_id: var[uuid.UUID | None] = var(None)
 
     # Internal state (not in ConversationState - widget owns its initialization)
     _is_initialized: bool = False
@@ -103,14 +104,15 @@ class SplashContent(Container):
         return self._is_initialized
 
     def watch_conversation_id(
-        self, _old_value: uuid.UUID, _new_value: uuid.UUID
+        self, _old_value: uuid.UUID | None, _new_value: uuid.UUID | None
     ) -> None:
         """Update conversation display when conversation_id changes.
 
         This enables reactive updates when switching conversations
-        via the history panel or /new command.
+        via the history panel or /new command. Skips update when
+        conversation_id is None (during switching).
         """
-        if self._is_initialized:
+        if self._is_initialized and self.conversation_id is not None:
             conversation_text = get_conversation_text(
                 self.conversation_id.hex, theme=OPENHANDS_THEME
             )
@@ -118,8 +120,10 @@ class SplashContent(Container):
 
     def _populate_content(self) -> None:
         """Populate splash content widgets with actual content."""
+        # Use empty string if conversation_id is None (shouldn't happen during init)
+        conv_id_hex = self.conversation_id.hex if self.conversation_id else ""
         splash_content = get_splash_content(
-            conversation_id=self.conversation_id.hex,
+            conversation_id=conv_id_hex,
             theme=OPENHANDS_THEME,
             has_critic=self._has_critic,
         )
