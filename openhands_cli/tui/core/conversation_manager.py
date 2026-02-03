@@ -49,9 +49,16 @@ from textual.message import Message
 
 from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
+    ConfirmRisky,
+    NeverConfirm,
 )
-from openhands_cli.tui.core.events import RequestSwitchConfirmation
+from openhands_cli.tui.core.events import (
+    ConfirmationDecision,
+    RequestSwitchConfirmation,
+    ShowConfirmationPanel,
+)
 from openhands_cli.tui.messages import UserInputSubmitted
+from openhands_cli.user_actions.types import UserConfirmation
 
 
 if TYPE_CHECKING:
@@ -172,7 +179,6 @@ class ConversationManager(Container):
         state: "ConversationState",
         *,
         visualizer_factory: VisualizerFactory | None = None,
-        confirmation_callback: Callable | None = None,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
         json_mode: bool = False,
@@ -184,8 +190,6 @@ class ConversationManager(Container):
             state: The ConversationState to update with operation results.
             visualizer_factory: Factory function to create visualizers. If None,
                 a default factory using app references will be created on first use.
-            confirmation_callback: Callback for handling action confirmations.
-                If None, will be obtained from app on first use.
             env_overrides_enabled: If True, environment variables override
                 stored settings.
             critic_disabled: If True, critic functionality is disabled.
@@ -195,7 +199,6 @@ class ConversationManager(Container):
         super().__init__()
         self._state = state
         self._visualizer_factory = visualizer_factory
-        self._confirmation_callback = confirmation_callback
         self._env_overrides_enabled = env_overrides_enabled
         self._critic_disabled = critic_disabled
         self._json_mode = json_mode
@@ -226,15 +229,6 @@ class ConversationManager(Container):
         except RuntimeError:
             # Already on main thread
             self.post_message(event)
-
-    def _remove_confirmation_panel(self) -> None:
-        """Remove inline confirmation panel if present."""
-        from openhands_cli.tui.textual_app import OpenHandsApp
-
-        app = self.app
-        if isinstance(app, OpenHandsApp) and app.confirmation_panel:
-            app.confirmation_panel.remove()
-            app.confirmation_panel = None
 
     # ---- Message Handlers ----
 
@@ -302,11 +296,9 @@ class ConversationManager(Container):
         self._current_runner = None
 
         # Update state - triggers reactive UI updates
+        # Note: reset_conversation_state() clears waiting_for_confirmation
         self._state.reset_conversation_state()
         self._state.conversation_id = new_id
-
-        # Remove any existing confirmation panel
-        self._remove_confirmation_panel()
 
         # Notify about new conversation
         self.app.notify(
@@ -389,13 +381,11 @@ class ConversationManager(Container):
         target_id = event.target_id
 
         # Reset state for new conversation (conversation_id still None)
+        # Note: reset_conversation_state() clears waiting_for_confirmation
         self._state.reset_conversation_state()
 
         # Clear current runner, will be created on next message
         self._current_runner = None
-
-        # Remove confirmation panel if present
-        self._remove_confirmation_panel()
 
         # Get or create runner for new conversation
         self._current_runner = self._get_or_create_runner(target_id)
@@ -489,6 +479,50 @@ class ConversationManager(Container):
         # Update state for UI (triggers reactive updates)
         self._state.confirmation_policy = event.policy
 
+    @on(ShowConfirmationPanel)
+    def _on_show_confirmation_panel(self, event: ShowConfirmationPanel) -> None:
+        """Handle request to show confirmation panel.
+
+        Sets pending_action_count > 0, which triggers:
+        - InputField to disable
+        - ScrollableContent to mount the InlineConfirmationPanel
+        """
+        event.stop()
+
+        # Set action count to trigger UI updates (>0 shows panel)
+        self._state.set_pending_action_count(len(event.pending_actions))
+
+    @on(ConfirmationDecision)
+    def _on_confirmation_decision(self, event: ConfirmationDecision) -> None:
+        """Handle user's confirmation decision from the inline panel.
+
+        Resets pending_action_count, updates policy if needed, and resumes
+        the conversation in a background worker.
+
+        Note: The panel removes itself after posting the message.
+        """
+        event.stop()
+
+        # Reset action count (panel already removed itself)
+        self._state.set_pending_action_count(0)
+
+        if not self._current_runner:
+            return
+
+        decision = event.decision
+
+        # Handle policy changes for ALWAYS_PROCEED and CONFIRM_RISKY
+        if decision == UserConfirmation.ALWAYS_PROCEED:
+            self.post_message(SetConfirmationPolicy(NeverConfirm()))
+        elif decision == UserConfirmation.CONFIRM_RISKY:
+            self.post_message(SetConfirmationPolicy(ConfirmRisky()))
+
+        # Resume conversation processing in background
+        self.run_worker(
+            self._current_runner.resume_after_confirmation(decision),
+            name="resume_conversation",
+        )
+
     # ---- Runner Management ----
 
     def _get_or_create_runner(self, conversation_id: uuid.UUID) -> "ConversationRunner":
@@ -535,23 +569,6 @@ class ConversationManager(Container):
         # Create JSON callback if in JSON mode
         event_callback = json_callback if self._json_mode else None
 
-        # Use injected callback or get from app
-        confirmation_callback = self._confirmation_callback
-        if confirmation_callback is None:
-            from openhands_cli.tui.textual_app import OpenHandsApp
-
-            app = self.app
-            if isinstance(app, OpenHandsApp):
-                confirmation_callback = app._handle_confirmation_request
-            else:
-                # Default no-op callback
-                from openhands_cli.user_actions.types import UserConfirmation
-
-                def default_confirmation_callback(_: list) -> UserConfirmation:
-                    return UserConfirmation.ACCEPT
-
-                confirmation_callback = default_confirmation_callback
-
         # Create notification callback that calls app.notify directly
         from textual.notifications import SeverityLevel
 
@@ -563,12 +580,11 @@ class ConversationManager(Container):
                 lambda: self.app.notify(message, title=title, severity=severity)
             )
 
-        # Create runner
+        # Create runner - confirmation is handled via messages, not callbacks
         runner = ConversationRunner(
             conversation_id,
             state=self._state,
             message_pump=self,
-            confirmation_callback=confirmation_callback,
             notification_callback=notification_callback,
             visualizer=visualizer,
             event_callback=event_callback,

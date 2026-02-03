@@ -49,7 +49,6 @@ from textual.widgets import Footer, Input, TextArea
 from textual_autocomplete import AutoComplete
 
 from openhands.sdk import BaseConversation
-from openhands.sdk.event import ActionEvent
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmationPolicyBase,
@@ -72,7 +71,6 @@ from openhands_cli.tui.core import (
 from openhands_cli.tui.core.conversation_manager import SwitchConfirmed
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
-from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
 from openhands_cli.tui.panels.history_side_panel import HistorySidePanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
@@ -83,7 +81,6 @@ from openhands_cli.tui.widgets.collapsible import (
     CollapsibleTitle,
 )
 from openhands_cli.tui.widgets.splash import SplashContent
-from openhands_cli.user_actions.types import UserConfirmation
 
 
 class OpenHandsApp(CollapsibleNavigationMixin, App):
@@ -190,9 +187,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self._reload_visualizer = (
             self.conversation_manager.reload_visualizer_configuration
         )
-
-        # Confirmation panel tracking
-        self.confirmation_panel: InlineConfirmationPanel | None = None
 
         # MCP panel tracking
         self.mcp_panel: MCPSidePanel | None = None
@@ -595,71 +589,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self,
             current_conversation_id=self.conversation_id,
         )
-
-    def _handle_confirmation_request(
-        self, pending_actions: list[ActionEvent]
-    ) -> UserConfirmation:
-        """Handle confirmation request by showing an inline panel in the scroll view.
-
-        The inline confirmation panel is mounted in the scroll_view area,
-        underneath the latest action event collapsible. Since the action details
-        are already visible in the collapsible above, this panel only shows
-        the confirmation options.
-
-        Args:
-            pending_actions: List of pending actions that need confirmation
-
-        Returns:
-            UserConfirmation decision from the user
-        """
-        # This will be called from a background thread, so we need to use
-        # call_from_thread to interact with the UI safely
-        from concurrent.futures import Future
-
-        # Create a future to wait for the user's decision
-        decision_future: Future[UserConfirmation] = Future()
-
-        def show_confirmation_panel():
-            """Show the inline confirmation panel in the UI thread."""
-            try:
-                # Remove any existing confirmation panel
-                if self.confirmation_panel:
-                    self.confirmation_panel.remove()
-                    self.confirmation_panel = None
-
-                # Create callback that will resolve the future
-                def on_confirmation_decision(decision: UserConfirmation):
-                    # Remove the panel
-                    if self.confirmation_panel:
-                        self.confirmation_panel.remove()
-                        self.confirmation_panel = None
-                    # Resolve the future with the decision
-                    if not decision_future.done():
-                        decision_future.set_result(decision)
-
-                # Create and mount the inline confirmation panel in scroll_view
-                # This places it underneath the latest action event collapsible
-                self.confirmation_panel = InlineConfirmationPanel(
-                    len(pending_actions), on_confirmation_decision
-                )
-                self.scroll_view.mount(self.confirmation_panel)
-                # Scroll to show the confirmation panel
-                self.scroll_view.scroll_end(animate=False)
-
-            except Exception:
-                # If there's an error, default to DEFER
-                if not decision_future.done():
-                    decision_future.set_result(UserConfirmation.DEFER)
-
-        # Schedule the UI update on the main thread
-        self.call_from_thread(show_confirmation_panel)
-
-        # Wait for the user's decision (this will block the background thread)
-        try:
-            return decision_future.result(timeout=300)  # 5 minute timeout
-        except Exception:
-            # If timeout or error, default to DEFER
-            return UserConfirmation.DEFER
 
     # =========================================================================
     # UI Event Handlers - Handle events from ConversationManager

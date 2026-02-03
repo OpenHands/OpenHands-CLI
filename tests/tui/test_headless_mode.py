@@ -324,7 +324,6 @@ class TestHeadlessRunnerOutput:
                 conversation_id=uuid.uuid4(),
                 state=mock_state,
                 message_pump=mock_message_pump,
-                confirmation_callback=Mock(),
                 notification_callback=Mock(),
                 visualizer=Mock(),
             )
@@ -399,7 +398,6 @@ class TestConversationSummary:
                 conversation_id=uuid.uuid4(),
                 state=mock_state,
                 message_pump=mock_message_pump,
-                confirmation_callback=Mock(),
                 notification_callback=Mock(),
                 visualizer=Mock(),
             )
@@ -428,7 +426,6 @@ class TestConversationSummary:
                 conversation_id=uuid.uuid4(),
                 state=mock_state,
                 message_pump=mock_message_pump,
-                confirmation_callback=Mock(),
                 notification_callback=Mock(),
                 visualizer=Mock(),
             )

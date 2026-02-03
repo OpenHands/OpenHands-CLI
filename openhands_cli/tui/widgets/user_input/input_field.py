@@ -83,9 +83,11 @@ class InputField(Container):
         ),
     ]
 
-    # Reactive property bound from ConversationState
+    # Reactive properties bound from ConversationState
     # None = switching in progress (input disabled)
     conversation_id: reactive[uuid.UUID | None] = reactive(None)
+    # >0 = waiting for user confirmation (input disabled)
+    pending_action_count: reactive[int] = reactive(0)
 
     DEFAULT_CSS = """
     InputField {
@@ -176,11 +178,23 @@ class InputField(Container):
 
     def watch_conversation_id(self, conversation_id: uuid.UUID | None) -> None:
         """React to conversation_id changes - disable input when None (switching)."""
-        is_switching = conversation_id is None
-        self.disabled = is_switching
-        if not is_switching:
+        self._update_disabled_state()
+        if conversation_id is not None and self.pending_action_count == 0:
             # Re-enable and focus when switch completes
             self.focus_input()
+
+    def watch_pending_action_count(self, count: int) -> None:
+        """React to pending_action_count changes - disable input when >0."""
+        self._update_disabled_state()
+        if count == 0 and self.conversation_id is not None:
+            # Re-enable and focus when confirmation is complete
+            self.focus_input()
+
+    def _update_disabled_state(self) -> None:
+        """Update disabled state based on conversation_id and pending actions."""
+        is_switching = self.conversation_id is None
+        is_waiting = self.pending_action_count > 0
+        self.disabled = is_switching or is_waiting
 
     def focus_input(self) -> None:
         self.active_input_widget.focus()

@@ -104,6 +104,10 @@ class ConversationState(Container):
     confirmation_policy: var[ConfirmationPolicyBase] = var(AlwaysConfirm())
     """The confirmation policy. ConversationManager syncs this to conversation."""
 
+    # ---- Confirmation State ----
+    pending_action_count: var[int] = var(0)
+    """Number of pending actions awaiting confirmation. >0 means waiting."""
+
     # ---- Timing ----
     elapsed_seconds: var[int] = var(0)
     """Seconds elapsed since conversation started."""
@@ -155,6 +159,7 @@ class ConversationState(Container):
         # ScrollableContent holds splash and dynamically added widgets
         with ScrollableContent(id="scroll_view").data_bind(
             conversation_id=ConversationState.conversation_id,
+            pending_action_count=ConversationState.pending_action_count,
         ):
             yield SplashContent(id="splash_content").data_bind(
                 conversation_id=ConversationState.conversation_id,
@@ -170,6 +175,7 @@ class ConversationState(Container):
                 placeholder="Type your message, @mention a file, or / for commands"
             ).data_bind(
                 conversation_id=ConversationState.conversation_id,
+                pending_action_count=ConversationState.pending_action_count,
             )
             yield InfoStatusLine().data_bind(
                 running=ConversationState.running,
@@ -343,6 +349,13 @@ class ConversationState(Container):
         """
         self._schedule_update("conversation_id", target_id)
 
+    def set_pending_action_count(self, count: int) -> None:
+        """Set number of pending actions awaiting confirmation. Thread-safe.
+
+        Set to >0 to show confirmation panel, 0 to hide it.
+        """
+        self._schedule_update("pending_action_count", count)
+
     # ---- Conversation Attachment (for metrics) ----
 
     def attach_conversation(self, conversation: "BaseConversation") -> None:
@@ -368,7 +381,8 @@ class ConversationState(Container):
     def reset_conversation_state(self) -> None:
         """Reset state for a new conversation.
 
-        Resets: running, elapsed_seconds, metrics, conversation_title, internal state.
+        Resets: running, elapsed_seconds, metrics, conversation_title,
+                pending_action_count, internal state.
         Preserves: confirmation_policy (persists across conversations),
                    conversation_id (set explicitly when switching).
 
@@ -378,5 +392,6 @@ class ConversationState(Container):
         self.elapsed_seconds = 0
         self.metrics = None
         self.conversation_title = None
+        self.pending_action_count = 0
         self._conversation_start_time = None
         self._conversation = None

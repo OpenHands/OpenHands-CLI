@@ -7,15 +7,18 @@ Widget Hierarchy (within ConversationState):
     ConversationState(Container, #conversation_state)
     ├── ScrollableContent(VerticalScroll, #scroll_view)
     │   ├── SplashContent(#splash_content)
-    │   └── ... dynamically added conversation widgets
+    │   ├── ... dynamically added conversation widgets
+    │   └── InlineConfirmationPanel (when pending_action_count > 0)
     └── InputAreaContainer(#input_area)  ← docked to bottom
         ├── WorkingStatusLine
         ├── InputField
         └── InfoStatusLine
 
-ScrollableContent handles clearing dynamic content when conversation_id changes
-via data_bind() to ConversationState.conversation_id. Message handling
-(UserInputSubmitted) is done by ConversationManager.
+ScrollableContent handles:
+- Clearing dynamic content when conversation_id changes
+- Mounting InlineConfirmationPanel when pending_action_count becomes > 0
+
+Message handling (UserInputSubmitted) is done by ConversationManager.
 """
 
 import uuid
@@ -30,16 +33,18 @@ class ScrollableContent(VerticalScroll):
     This widget holds:
     - SplashContent at the top
     - Dynamically added conversation widgets (user messages, agent responses)
+    - InlineConfirmationPanel (when waiting for user confirmation)
 
     Reactive Properties (via data_bind from ConversationState):
     - conversation_id: Current conversation ID (clears content on change)
+    - pending_action_count: Number of actions awaiting confirmation (>0 mounts panel)
 
     Message handling is done by ConversationManager, not by this widget.
     """
 
-    # Reactive property bound via data_bind() to ConversationState
-    # None indicates switching in progress
+    # Reactive properties bound via data_bind() to ConversationState
     conversation_id: var[uuid.UUID | None] = var(None)
+    pending_action_count: var[int] = var(0)
 
     def watch_conversation_id(
         self, old_id: uuid.UUID | None, new_id: uuid.UUID | None
@@ -74,3 +79,21 @@ class ScrollableContent(VerticalScroll):
                 widget.remove()
 
         self.scroll_home(animate=False)
+
+    def watch_pending_action_count(self, old_count: int, new_count: int) -> None:
+        """Mount InlineConfirmationPanel when pending_action_count becomes > 0.
+
+        When count goes from 0 to >0, mounts the confirmation panel.
+        The panel removes itself when user makes a selection.
+        """
+        if not self.is_mounted:
+            return
+
+        # Mount panel when transitioning from 0 to >0
+        if old_count == 0 and new_count > 0:
+            from openhands_cli.tui.panels.confirmation_panel import (
+                InlineConfirmationPanel,
+            )
+
+            self.mount(InlineConfirmationPanel(new_count))
+            self.scroll_end(animate=False)

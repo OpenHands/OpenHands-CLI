@@ -21,11 +21,8 @@ from openhands.sdk.conversation.state import (
     ConversationState as SDKConversationState,
 )
 from openhands.sdk.event.base import Event
-from openhands.sdk.security.confirmation_policy import (
-    ConfirmRisky,
-    NeverConfirm,
-)
 from openhands_cli.setup import setup_conversation
+from openhands_cli.tui.core.events import ShowConfirmationPanel
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.user_actions.types import UserConfirmation
 
@@ -35,9 +32,12 @@ if TYPE_CHECKING:
 
 
 class ConversationRunner:
-    """Conversation runner with confirmation mode support.
+    """Conversation runner with non-blocking confirmation mode support.
 
-    Uses MessagePump to post policy change messages to ConversationManager.
+    Uses MessagePump to post messages to ConversationManager:
+    - ShowConfirmationPanel: Request UI to show confirmation panel
+    - Policy changes are handled by ConversationManager
+
     ConversationState is used only for reading state (is_confirmation_active)
     and updating running status.
     """
@@ -47,7 +47,6 @@ class ConversationRunner:
         conversation_id: uuid.UUID,
         state: "ConversationState",
         message_pump: MessagePump,
-        confirmation_callback: Callable,
         notification_callback: Callable[[str, str, SeverityLevel], None],
         visualizer: ConversationVisualizer,
         event_callback: Callable[[Event], None] | None = None,
@@ -60,8 +59,7 @@ class ConversationRunner:
         Args:
             conversation_id: UUID for the conversation.
             state: ConversationState for reading state and updating running status.
-            message_pump: MessagePump (ConversationManager) for posting policy changes.
-            confirmation_callback: Callback for handling action confirmations.
+            message_pump: MessagePump (ConversationManager) for posting messages.
             notification_callback: Callback for notifications.
             visualizer: Visualizer for output display.
             event_callback: Optional callback for each event.
@@ -85,9 +83,8 @@ class ConversationRunner:
 
         # State for reading (is_confirmation_active) and updating (set_running)
         self._state = state
-        # MessagePump for posting policy change messages
+        # MessagePump for posting messages (ShowConfirmationPanel, etc.)
         self._message_pump = message_pump
-        self._confirmation_callback = confirmation_callback
         self._notification_callback = notification_callback
 
     @property
@@ -133,15 +130,41 @@ class ConversationRunner:
 
         Args:
             message: The message to process
+            headless: If True, print status to console
         """
+        self.conversation.send_message(message)
+        self._execute_conversation(headless=headless)
+
+    def _execute_conversation(
+        self,
+        decision: UserConfirmation | None = None,
+        headless: bool = False,
+    ) -> None:
+        """Core execution loop - runs conversation and handles confirmation.
+
+        Args:
+            decision: User's confirmation decision (if resuming after confirmation)
+            headless: If True, print status to console
+        """
+        if not self.conversation:
+            return
+
         self._update_run_status(True)
 
         try:
-            # Send message and run conversation
-            self.conversation.send_message(message)
-            if self.is_confirmation_mode_active:
-                self._run_with_confirmation()
-            elif headless:
+            # Handle user decision if resuming after confirmation
+            if decision is not None:
+                if decision == UserConfirmation.REJECT:
+                    self.conversation.reject_pending_actions(
+                        "User rejected the actions"
+                    )
+                elif decision == UserConfirmation.DEFER:
+                    self.conversation.pause()
+                    return
+                # ACCEPT and policy changes just continue running
+
+            # Run conversation
+            if headless:
                 console = Console()
                 console.print("Agent is working")
                 self.conversation.run()
@@ -149,94 +172,36 @@ class ConversationRunner:
             else:
                 self.conversation.run()
 
+            # Check if confirmation needed (only in confirmation mode)
+            if (
+                self.is_confirmation_mode_active
+                and self.conversation.state.execution_status
+                == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
+            ):
+                self._request_confirmation()
+
         except ConversationRunError as e:
-            # Handle conversation run errors (includes LLM errors)
             self._notification_callback("Conversation Error", str(e), "error")
         except Exception as e:
-            # Handle any other unexpected errors
             self._notification_callback(
                 "Unexpected Error", f"{type(e).__name__}: {e}", "error"
             )
         finally:
             self._update_run_status(False)
 
-    def _run_with_confirmation(self) -> None:
-        """Run conversation with confirmation mode enabled."""
-        if not self.conversation:
-            return
-
-        # If agent was paused, resume with confirmation request
-        if (
-            self.conversation.state.execution_status
-            == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
-        ):
-            user_confirmation = self._handle_confirmation_request()
-            if user_confirmation == UserConfirmation.DEFER:
-                return
-
-        while True:
-            self.conversation.run()
-
-            # In confirmation mode, agent either finishes or waits for user confirmation
-            if (
-                self.conversation.state.execution_status
-                == ConversationExecutionStatus.FINISHED
-            ):
-                break
-
-            elif (
-                self.conversation.state.execution_status
-                == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
-            ):
-                user_confirmation = self._handle_confirmation_request()
-                if user_confirmation == UserConfirmation.DEFER:
-                    return
-            else:
-                # For other states, break to avoid infinite loop
-                break
-
-    def _handle_confirmation_request(self) -> UserConfirmation:
-        """Handle confirmation request from user.
-
-        Returns:
-            UserConfirmation indicating the user's choice
-        """
-        # Import here to avoid circular import at module level
-        from openhands_cli.tui.core.conversation_manager import SetConfirmationPolicy
-
-        if not self.conversation:
-            return UserConfirmation.DEFER
-
+    def _request_confirmation(self) -> None:
+        """Post ShowConfirmationPanel message for pending actions."""
         pending_actions = SDKConversationState.get_unmatched_actions(
             self.conversation.state.events
         )
+        if pending_actions:
+            self._message_pump.post_message(ShowConfirmationPanel(pending_actions))
 
-        if not pending_actions:
-            return UserConfirmation.ACCEPT
-
-        # Get user decision through callback
-        if self._confirmation_callback:
-            decision = self._confirmation_callback(pending_actions)
-        else:
-            # Default to accepting if no callback is set
-            decision = UserConfirmation.ACCEPT
-
-        # Handle the user's decision
-        if decision == UserConfirmation.REJECT:
-            # Reject pending actions - this creates UserRejectObservation events
-            self.conversation.reject_pending_actions("User rejected the actions")
-        elif decision == UserConfirmation.DEFER:
-            # Pause the conversation for later resumption
-            self.conversation.pause()
-        elif decision == UserConfirmation.ALWAYS_PROCEED:
-            # Post policy change message to ConversationManager
-            self._message_pump.post_message(SetConfirmationPolicy(NeverConfirm()))
-        elif decision == UserConfirmation.CONFIRM_RISKY:
-            # Post policy change message to ConversationManager
-            self._message_pump.post_message(SetConfirmationPolicy(ConfirmRisky()))
-
-        # For ACCEPT and policy-changing decisions, we continue normally
-        return decision
+    async def resume_after_confirmation(self, decision: UserConfirmation) -> None:
+        """Resume conversation after user makes a confirmation decision."""
+        await asyncio.get_event_loop().run_in_executor(
+            None, self._execute_conversation, decision
+        )
 
     @property
     def is_running(self) -> bool:

@@ -1,12 +1,12 @@
 """Confirmation panel for displaying user confirmation options inline."""
 
-from collections.abc import Callable
 from typing import ClassVar
 
 from textual.app import ComposeResult
 from textual.containers import Container, Vertical
 from textual.widgets import ListItem, ListView, Static
 
+from openhands_cli.tui.core.events import ConfirmationDecision
 from openhands_cli.tui.panels.confirmation_panel_style import (
     INLINE_CONFIRMATION_PANEL_STYLE,
 )
@@ -45,6 +45,9 @@ class InlineConfirmationPanel(Container):
     underneath the latest action event collapsible. It only shows
     the confirmation options since the action details are already
     visible in the action event collapsible above.
+
+    When the user selects an option, the panel posts a ConfirmationDecision
+    message that bubbles up to the ConversationManager for processing.
     """
 
     DEFAULT_CSS = INLINE_CONFIRMATION_PANEL_STYLE
@@ -59,18 +62,15 @@ class InlineConfirmationPanel(Container):
     def __init__(
         self,
         num_actions: int,
-        confirmation_callback: Callable[[UserConfirmation], None],
         **kwargs,
     ):
         """Initialize the inline confirmation panel.
 
         Args:
             num_actions: Number of pending actions that need confirmation
-            confirmation_callback: Callback function to call with user's decision
         """
         super().__init__(**kwargs)
         self.num_actions = num_actions
-        self.confirmation_callback = confirmation_callback
 
     def compose(self) -> ComposeResult:
         """Create the inline confirmation panel layout."""
@@ -107,6 +107,10 @@ class InlineConfirmationPanel(Container):
             option = self.query_one(f"#option-{item_id}", ConfirmationOption)
             option.set_highlighted(i == highlighted_index)
 
+    def _remove_self(self) -> None:
+        """Remove this panel from the DOM."""
+        self.remove()
+
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         """Handle ListView highlight changes to update > markers."""
         if event.item is not None:
@@ -114,16 +118,22 @@ class InlineConfirmationPanel(Container):
             self._update_option_highlights(listview.index or 0)
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
-        """Handle ListView selection events."""
+        """Handle ListView selection events by posting ConfirmationDecision message.
+
+        After posting the message, the panel removes itself from the DOM.
+        """
         item_id = event.item.id
 
         if item_id == "accept":
-            self.confirmation_callback(UserConfirmation.ACCEPT)
+            self.post_message(ConfirmationDecision(UserConfirmation.ACCEPT))
         elif item_id == "reject":
-            self.confirmation_callback(UserConfirmation.REJECT)
+            self.post_message(ConfirmationDecision(UserConfirmation.REJECT))
         elif item_id == "always":
             # Accept and set NeverConfirm policy
-            self.confirmation_callback(UserConfirmation.ALWAYS_PROCEED)
+            self.post_message(ConfirmationDecision(UserConfirmation.ALWAYS_PROCEED))
         elif item_id == "risky":
             # Accept and set ConfirmRisky policy
-            self.confirmation_callback(UserConfirmation.CONFIRM_RISKY)
+            self.post_message(ConfirmationDecision(UserConfirmation.CONFIRM_RISKY))
+
+        # Remove self from DOM and clear app's reference
+        self._remove_self()

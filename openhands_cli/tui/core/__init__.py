@@ -10,7 +10,11 @@ from openhands_cli.tui.core.conversation_manager import (
     SwitchConfirmed,
     SwitchConversation,
 )
-from openhands_cli.tui.core.events import RequestSwitchConfirmation
+from openhands_cli.tui.core.events import (
+    ConfirmationDecision,
+    RequestSwitchConfirmation,
+    ShowConfirmationPanel,
+)
 from openhands_cli.tui.core.state import (
     ConfirmationRequired,
     ConversationFinished,
@@ -35,4 +39,6 @@ __all__ = [
     "SwitchConfirmed",
     # Events (App ↔ ConversationManager)
     "RequestSwitchConfirmation",
+    "ShowConfirmationPanel",
+    "ConfirmationDecision",
 ]
