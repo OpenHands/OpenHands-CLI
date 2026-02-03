@@ -212,6 +212,11 @@ def main() -> None:
             from openhands_cli.tui.textual_app import main as textual_main
 
             queued_inputs = create_seeded_instructions_from_args(args)
+
+            # Get iterative refinement settings from CLI args
+            iterative_refinement = getattr(args, "iterative_refinement", False)
+            critic_threshold = getattr(args, "critic_threshold", 0.5)
+
             conversation_id = textual_main(
                 resume_conversation_id=resume_id,
                 queued_inputs=queued_inputs,
@@ -222,6 +227,8 @@ def main() -> None:
                 json_mode=json_mode,
                 env_overrides_enabled=env_overrides_enabled,
                 critic_disabled=critic_disabled,
+                iterative_refinement=iterative_refinement,
+                critic_threshold=critic_threshold,
             )
             console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
             console.print(

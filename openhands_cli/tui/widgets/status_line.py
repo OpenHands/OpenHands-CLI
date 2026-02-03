@@ -28,20 +28,31 @@ class WorkingStatusLine(Static):
     """
 
     def __init__(self, app: OpenHandsApp, **kwargs) -> None:
-        super().__init__("", id="working_status_line", markup=False, **kwargs)
+        super().__init__("", id="working_status_line", markup=True, **kwargs)
         self._conversation_start_time: float | None = None
         self._timer: Timer | None = None
         self._working_frame: int = 0
         self._is_working: bool = False
+        self._iterative_refinement: bool = False
 
         self.main_app = app
 
     def on_mount(self) -> None:
         """Initialize the working status line and start periodic updates."""
+        # Initialize iterative refinement state from app
+        self._iterative_refinement = self.main_app.iterative_refinement
         self._update_text()
         self.main_app.conversation_running_signal.subscribe(
             self, self._on_conversation_state_changed
         )
+        self.main_app.iterative_refinement_signal.subscribe(
+            self, self._on_iterative_refinement_changed
+        )
+
+    def _on_iterative_refinement_changed(self, is_enabled: bool) -> None:
+        """Update when iterative refinement state changes."""
+        self._iterative_refinement = is_enabled
+        self._update_text()
 
     def on_unmount(self) -> None:
         """Stop timer when widget is removed."""
@@ -92,10 +103,34 @@ class WorkingStatusLine(Static):
 
         return f"{working_indicator} ({elapsed}s • ESC: pause)"
 
+    def _get_refinement_indicator(self) -> str:
+        """Return the iterative refinement indicator if enabled."""
+        if self._iterative_refinement:
+            threshold = self.main_app.critic_threshold * 100
+            return (
+                f"[bold cyan]🔄 Refinement[/bold cyan] [dim](< {threshold:.0f}%)[/dim]"
+            )
+        return ""
+
     def _update_text(self) -> None:
-        """Rebuild the working status text."""
+        """Rebuild the working status text with refinement indicator."""
+        parts = []
+
+        # Add refinement indicator (always show when enabled)
+        refinement_indicator = self._get_refinement_indicator()
+        if refinement_indicator:
+            parts.append(refinement_indicator)
+
+        # Add working text (timer, etc.)
         working_text = self._get_working_text()
-        self.update(working_text if working_text else " ")
+        if working_text:
+            parts.append(working_text)
+
+        # Join parts with separator
+        if parts:
+            self.update(" • ".join(parts))
+        else:
+            self.update(" ")
 
 
 class InfoStatusLine(Static):

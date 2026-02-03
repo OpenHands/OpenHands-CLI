@@ -77,6 +77,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+o", "toggle_cells", "Toggle Cells"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
+        ("ctrl+r", "toggle_iterative_refinement", "Toggle iterative refinement"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
         ("ctrl+c", "request_quit", "Quit the application"),
@@ -97,6 +98,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         json_mode: bool = False,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
+        iterative_refinement: bool = False,
+        critic_threshold: float = 0.5,
         **kwargs,
     ):
         """Initialize the app with custom OpenHands theme.
@@ -113,10 +116,15 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             env_overrides_enabled: If True, environment variables will override
                                    stored LLM settings.
             critic_disabled: If True, critic functionality will be disabled.
+            iterative_refinement: If True, enable iterative refinement mode.
+            critic_threshold: Critic score threshold for iterative refinement.
         """
         super().__init__(**kwargs)
 
         self.conversation_running_signal = Signal(self, "conversation_running_signal")
+        self.iterative_refinement_signal = Signal(
+            self, "iterative_refinement_signal"
+        )  # Signal for refinement state changes
         self.is_ui_initialized = False
 
         # Store exit confirmation setting
@@ -131,6 +139,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Store agent loading options
         self.env_overrides_enabled = env_overrides_enabled
         self.critic_disabled = critic_disabled
+
+        # Store iterative refinement settings (CLI args override persisted settings)
+        self.iterative_refinement = iterative_refinement
+        self.critic_threshold = critic_threshold
 
         # Store resume conversation ID
         self.conversation_id = (
@@ -445,7 +457,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Initialize conversation runner with visualizer that can add widgets.
         # Skip user messages since we display them immediately in the UI.
         conversation_visualizer = visualizer or ConversationVisualizer(
-            self.main_display, self, skip_user_messages=True, name="OpenHands Agent"
+            self.main_display,
+            self,
+            skip_user_messages=True,
+            name="OpenHands Agent",
+            iterative_refinement_enabled=self.iterative_refinement,
+            critic_threshold=self.critic_threshold,
         )
 
         # Create JSON callback if in JSON mode
@@ -467,7 +484,45 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             critic_disabled=self.critic_disabled,
         )
 
+        # Set up iterative refinement callback if enabled
+        if self.iterative_refinement:
+            # Set the refinement callback to queue messages back to the agent
+            def refinement_callback(message: str) -> None:
+                # Queue the refinement message to be sent to the agent
+                self._queue_refinement_message(runner, message)
+
+            conversation_visualizer.set_refinement_callback(refinement_callback)
+
         return runner
+
+    def _queue_refinement_message(
+        self, runner: ConversationRunner, message: str
+    ) -> None:
+        """Queue a refinement message to be sent to the agent.
+
+        This is called from the visualizer when iterative refinement is triggered.
+
+        Args:
+            runner: The conversation runner to send the message through
+            message: The refinement message to send to the agent
+        """
+        # Display the refinement message in the UI as a system message
+        from textual.widgets import Static
+
+        refinement_widget = Static(
+            f"[bold yellow]🔄 Iterative Refinement[/bold yellow]\n{message}",
+            classes="refinement-message",
+        )
+        self.call_from_thread(self.main_display.mount, refinement_widget)
+        self.call_from_thread(lambda: self.main_display.scroll_end(animate=False))
+
+        # Queue the message to the running conversation
+        import asyncio
+
+        asyncio.run_coroutine_threadsafe(
+            runner.queue_message(message),
+            asyncio.get_event_loop(),
+        )
 
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.
@@ -600,6 +655,51 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         for collapsible in collapsibles:
             collapsible.collapsed = any_expanded
+
+    def action_toggle_iterative_refinement(self) -> None:
+        """Action to handle Ctrl+R key binding.
+
+        Toggles iterative refinement mode on/off. When enabled, the agent will
+        receive feedback messages if the critic score is below the threshold.
+        """
+        # Toggle the state
+        self.iterative_refinement = not self.iterative_refinement
+
+        # Update the visualizer's settings if conversation runner exists
+        if self.conversation_runner:
+            visualizer = self.conversation_runner.visualizer
+            visualizer.set_iterative_refinement(
+                self.iterative_refinement, self.critic_threshold
+            )
+
+            # Set or clear the refinement callback based on new state
+            if self.iterative_refinement:
+                # Capture the runner reference to avoid None type issues
+                runner = self.conversation_runner
+
+                def refinement_callback(message: str) -> None:
+                    if runner is not None:
+                        self._queue_refinement_message(runner, message)
+
+                visualizer.set_refinement_callback(refinement_callback)
+            else:
+                visualizer.set_refinement_callback(None)
+
+        # Publish signal to update status indicators
+        self.iterative_refinement_signal.publish(self.iterative_refinement)
+
+        # Show notification
+        status = "enabled" if self.iterative_refinement else "disabled"
+        threshold_info = (
+            f" (threshold: {self.critic_threshold * 100:.0f}%)"
+            if self.iterative_refinement
+            else ""
+        )
+        self.notify(
+            f"Iterative refinement {status}{threshold_info}",
+            severity="information",
+            timeout=3.0,
+        )
 
     def on_key(self, event: events.Key) -> None:
         """Handle keyboard navigation.
@@ -934,6 +1034,8 @@ def main(
     json_mode: bool = False,
     env_overrides_enabled: bool = False,
     critic_disabled: bool = False,
+    iterative_refinement: bool = False,
+    critic_threshold: float = 0.5,
 ):
     """Run the textual app.
 
@@ -948,6 +1050,8 @@ def main(
         env_overrides_enabled: If True, environment variables will override
             stored LLM settings.
         critic_disabled: If True, critic functionality will be disabled.
+        iterative_refinement: If True, enable iterative refinement mode.
+        critic_threshold: Critic score threshold for iterative refinement.
 
     Raises:
         MissingEnvironmentVariablesError: If env_overrides_enabled is True but
@@ -983,6 +1087,8 @@ def main(
         json_mode=json_mode,
         env_overrides_enabled=env_overrides_enabled,
         critic_disabled=critic_disabled,
+        iterative_refinement=iterative_refinement,
+        critic_threshold=critic_threshold,
     )
 
     app.run(headless=headless)
