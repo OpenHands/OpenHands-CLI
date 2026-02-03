@@ -33,7 +33,7 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.conversations.store.local import LocalFileStore
-from openhands_cli.locations import CONVERSATIONS_DIR
+from openhands_cli.locations import get_conversations_dir
 from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_splash_content
@@ -137,7 +137,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             resume_conversation_id if resume_conversation_id else uuid.uuid4()
         )
         self.conversation_dir = BaseConversation.get_persistence_dir(
-            CONVERSATIONS_DIR, self.conversation_id
+            get_conversations_dir(), self.conversation_id
         )
 
         # Store queued inputs (copy to prevent mutating caller's list)
@@ -482,7 +482,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Process the first queued input immediately
         user_input = self.pending_inputs.pop(0)
 
+        # Handle commands - only exact matches (don't add to scroll view)
+        if is_valid_command(user_input):
+            self._handle_command(user_input)
+            return
+
         # Add the user message to the main display as a Static widget
+        # (only for non-command messages)
         user_message_widget = Static(
             f"> {user_input}", classes="user-message", markup=False
         )
@@ -498,7 +504,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if not content:
             return
 
+        # Handle commands - only exact matches (don't add to scroll view)
+        if is_valid_command(content):
+            self._handle_command(content)
+            return
+
         # Add the user message to the main display as a Static widget
+        # (only for non-command messages)
         user_message_widget = Static(
             f"> {content}", classes="user-message", markup=False
         )
@@ -507,12 +519,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Force immediate refresh to show the message without delay
         self.refresh()
 
-        # Handle commands - only exact matches
-        if is_valid_command(content):
-            self._handle_command(content)
-        else:
-            # Handle regular messages with conversation runner
-            await self._handle_user_message(content)
+        # Handle regular messages with conversation runner
+        await self._handle_user_message(content)
 
     def _handle_command(self, command: str) -> None:
         """Handle command execution."""
@@ -803,8 +811,14 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     @on(ConversationCreated)
     def on_conversation_created(self, event: ConversationCreated) -> None:
-        """Propagate conversation creation to history panel."""
+        """Propagate conversation creation to history panel and reset metrics."""
         self._notify_history_panel(event)
+        # Reset token metrics on the info status line
+        try:
+            info_status_line = self.query_one(InfoStatusLine)
+            info_status_line.reset_metrics()
+        except NoMatches:
+            pass
 
     @on(ConversationTitleUpdated)
     def on_conversation_title_updated(self, event: ConversationTitleUpdated) -> None:

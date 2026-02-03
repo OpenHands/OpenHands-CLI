@@ -122,28 +122,20 @@ def test_get_working_text_when_not_started_returns_empty(dummy_app, monkeypatch)
 # ----- InfoStatusLine tests -----
 
 
-def test_get_work_dir_display_shortens_home_to_tilde(dummy_app, monkeypatch):
+def test_get_work_dir_display_shortens_home_to_tilde(
+    dummy_app, mock_locations, monkeypatch
+):
     """_get_work_dir_display replaces the home prefix with '~' when applicable."""
-    # Pretend the home directory is /home/testuser
-    monkeypatch.setattr(
-        status_line_module.os.path,
-        "expanduser",
-        lambda path: "/home/testuser" if path == "~" else path,
-    )
-    # Set WORK_DIR to be inside that home directory
-    monkeypatch.setattr(
-        status_line_module,
-        "WORK_DIR",
-        "/home/testuser/projects/openhands",
-    )
+    work_dir_inside_home = mock_locations.home_dir / "projects" / "my-project"
+    work_dir_inside_home.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("OPENHANDS_WORK_DIR", str(work_dir_inside_home))
 
     widget = InfoStatusLine(app=dummy_app)
     display = widget._get_work_dir_display()
 
     assert display.startswith("~")
-    assert "projects/openhands" in display
-    # Just to be safe, ensure the raw /home/testuser prefix is gone
-    assert "/home/testuser" not in display
+    assert "projects/my-project" in display
+    assert str(mock_locations.home_dir) not in display
 
 
 def test_handle_multiline_mode_updates_indicator_and_refreshes(dummy_app, monkeypatch):

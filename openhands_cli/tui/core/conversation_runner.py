@@ -159,9 +159,9 @@ class ConversationRunner:
                 self._run_with_confirmation()
             elif headless:
                 console = Console()
-                with console.status("Agent is working") as status:
-                    self.conversation.run()
-                    status.update("Agent finished")
+                console.print("Agent is working")
+                self.conversation.run()
+                console.print("Agent finished")
             else:
                 self.conversation.run()
 
