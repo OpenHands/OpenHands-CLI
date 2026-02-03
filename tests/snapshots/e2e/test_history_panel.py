@@ -57,6 +57,11 @@ async def _run_first_conversation(pilot: "Pilot") -> None:
     await pilot.press("enter")
     await wait_for_idle(pilot)
 
+    # Ensure consistent scroll position by scrolling to end
+    # This makes the snapshot deterministic across different environments
+    await pilot.press("end")
+    await pilot.wait_for_scheduled_animations()
+
 
 async def _start_new_conversation(pilot: "Pilot") -> None:
     """Phase 3: Run first conversation, then start new conversation with /new."""
