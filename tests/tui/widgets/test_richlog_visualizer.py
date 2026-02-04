@@ -835,20 +835,6 @@ class TestSubVisualizerCreation:
         assert sub_vis._container is visualizer._container
         assert sub_vis._app is visualizer._app
 
-    def test_create_sub_visualizer_preserves_skip_user_messages(self):
-        """Sub-visualizer inherits skip_user_messages setting from parent."""
-        app = App()
-        container = VerticalScroll()
-        parent = ConversationVisualizer(
-            container,
-            app,  # type: ignore[arg-type]
-            skip_user_messages=True,
-        )
-
-        sub_vis = parent.create_sub_visualizer("child_agent")
-
-        assert sub_vis._skip_user_messages is True
-
 
 class TestMessageEventDelegation:
     """Tests for MessageEvent handling in delegation context."""
@@ -987,7 +973,6 @@ class TestAgentMessageEventDisplay:
         visualizer = ConversationVisualizer(
             container,
             app,  # type: ignore[arg-type]
-            skip_user_messages=True,
             name="OpenHands Agent",
         )
 
@@ -1025,7 +1010,6 @@ class TestAgentMessageEventDisplay:
         visualizer = ConversationVisualizer(
             container,
             app,  # type: ignore[arg-type]
-            skip_user_messages=True,
             name="OpenHands Agent",
         )
 
@@ -1051,34 +1035,6 @@ class TestAgentMessageEventDisplay:
             "Agent MessageEvent with critic_result should display. "
             "Users wait for critic feedback that never appears due to this bug."
         )
-
-    def test_user_message_still_skipped_when_skip_user_messages_true(self):
-        """User MessageEvents should still be skipped when skip_user_messages=True.
-
-        This test ensures the fix doesn't break the existing behavior of
-        skipping user messages (which are displayed separately in the UI).
-        """
-        from openhands.sdk import Message
-
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(
-            container,
-            app,  # type: ignore[arg-type]
-            skip_user_messages=True,
-            name="OpenHands Agent",
-        )
-
-        message = Message(
-            role="user",
-            content=[TextContent(text="Please analyze this data")],
-        )
-        event = MessageEvent(llm_message=message, source="user")
-
-        widget = visualizer._create_event_widget(event)
-
-        # User messages should still be skipped
-        assert widget is None, "User messages should still be skipped"
 
     def test_delegation_message_still_works_with_sender(self):
         """Delegation MessageEvents with sender should still display correctly.

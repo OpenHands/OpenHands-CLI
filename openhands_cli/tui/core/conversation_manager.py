@@ -15,7 +15,6 @@ Architecture:
 
     Direct Calls:
         ConversationManager calls app methods directly:
-        - self.app.notify() for notifications
         - self.run_worker() for background tasks
 
     Events (minimal):
@@ -41,7 +40,7 @@ import asyncio
 import logging
 import uuid
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from textual import on
 from textual.containers import Container
@@ -178,7 +177,6 @@ class ConversationManager(Container):
         self,
         state: "ConversationState",
         *,
-        visualizer_factory: VisualizerFactory | None = None,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
         json_mode: bool = False,
@@ -198,7 +196,6 @@ class ConversationManager(Container):
         """
         super().__init__()
         self._state = state
-        self._visualizer_factory = visualizer_factory
         self._env_overrides_enabled = env_overrides_enabled
         self._critic_disabled = critic_disabled
         self._json_mode = json_mode
@@ -219,16 +216,6 @@ class ConversationManager(Container):
     def current_runner(self) -> "ConversationRunner | None":
         """Get the current conversation runner."""
         return self._current_runner
-
-    # ---- Helper Methods ----
-
-    def _post_event(self, event: Message) -> None:
-        """Post an event, handling cross-thread calls safely."""
-        try:
-            self.app.call_from_thread(lambda: self.post_message(event))
-        except RuntimeError:
-            # Already on main thread
-            self.post_message(event)
 
     # ---- Message Handlers ----
 
@@ -279,7 +266,7 @@ class ConversationManager(Container):
 
         # Check if a conversation is currently running
         if self._state.running:
-            self.app.notify(
+            self.notify(
                 "Cannot start a new conversation while one is running. "
                 "Please wait for the current conversation to complete or pause it.",
                 title="New Conversation Error",
@@ -301,7 +288,7 @@ class ConversationManager(Container):
         self._state.conversation_id = new_id
 
         # Notify about new conversation
-        self.app.notify(
+        self.notify(
             "Started a new conversation",
             title="New Conversation",
             severity="information",
@@ -316,7 +303,7 @@ class ConversationManager(Container):
 
         # Don't switch if already on this conversation
         if self._state.conversation_id == target_id:
-            self.app.notify(
+            self.notify(
                 "This conversation is already active.",
                 title="Already Active",
                 severity="information",
@@ -363,7 +350,7 @@ class ConversationManager(Container):
                 self._current_runner.conversation.pause()
 
             # Prepare switch on main thread
-            self._post_event(_SwitchPrepare(target_id))
+            self.post_message(_SwitchPrepare(target_id))
 
         self.run_worker(
             _switch_worker,
@@ -403,7 +390,7 @@ class ConversationManager(Container):
         self._state.finish_switching(target_id)
 
         # Notify user
-        self.app.notify(
+        self.notify(
             f"Resumed conversation {target_id.hex[:8]}",
             title="Switched",
             severity="information",
@@ -415,14 +402,14 @@ class ConversationManager(Container):
         event.stop()
 
         if self._current_runner and self._current_runner.is_running:
-            self.app.notify(
+            self.notify(
                 "Pausing conversation, this may take a few seconds...",
                 title="Pausing conversation",
                 severity="information",
             )
             await asyncio.to_thread(self._current_runner.conversation.pause)
         else:
-            self.app.notify(
+            self.notify(
                 "No running conversation to pause",
                 severity="error",
             )
@@ -433,7 +420,7 @@ class ConversationManager(Container):
         event.stop()
 
         if not self._current_runner:
-            self.app.notify(
+            self.notify(
                 "No conversation available to condense",
                 title="Condense Error",
                 severity="error",
@@ -441,7 +428,7 @@ class ConversationManager(Container):
             return
 
         if self._current_runner.is_running:
-            self.app.notify(
+            self.notify(
                 "Cannot condense while conversation is running.",
                 title="Condense Error",
                 severity="warning",
@@ -449,19 +436,19 @@ class ConversationManager(Container):
             return
 
         try:
-            self.app.notify(
+            self.notify(
                 "Conversation condensation will be completed shortly...",
                 title="Condensation Started",
                 severity="information",
             )
             await asyncio.to_thread(self._current_runner.conversation.condense)
-            self.app.notify(
+            self.notify(
                 "Conversation history has been condensed successfully",
                 title="Condensation Complete",
                 severity="information",
             )
         except Exception as e:
-            self.app.notify(
+            self.notify(
                 f"Failed to condense conversation: {str(e)}",
                 title="Condensation Error",
                 severity="error",
@@ -540,31 +527,18 @@ class ConversationManager(Container):
     def _create_runner(self, conversation_id: uuid.UUID) -> "ConversationRunner":
         """Create a new ConversationRunner for the given conversation."""
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
+        from openhands_cli.tui.textual_app import OpenHandsApp
+        from openhands_cli.tui.widgets.richlog_visualizer import (
+            ConversationVisualizer,
+        )
         from openhands_cli.utils import json_callback
 
-        # Use injected factory or create default
-        if self._visualizer_factory:
-            visualizer = self._visualizer_factory(conversation_id)
-        else:
-            # Fallback: create visualizer directly (for backwards compat)
-            # Import here to avoid circular import
-            from openhands_cli.tui.textual_app import OpenHandsApp
-            from openhands_cli.tui.widgets.richlog_visualizer import (
-                ConversationVisualizer,
-            )
-
-            app = self.app
-            if isinstance(app, OpenHandsApp):
-                visualizer = ConversationVisualizer(
-                    app.scroll_view,
-                    app,
-                    skip_user_messages=True,
-                    name="OpenHands Agent",
-                )
-            else:
-                raise RuntimeError(
-                    "visualizer_factory must be provided when not using OpenHandsApp"
-                )
+        app = cast(OpenHandsApp, self.app)
+        visualizer = ConversationVisualizer(
+            app.scroll_view,
+            app,
+            name="OpenHands Agent",
+        )
 
         # Create JSON callback if in JSON mode
         event_callback = json_callback if self._json_mode else None
@@ -575,10 +549,7 @@ class ConversationManager(Container):
         def notification_callback(
             title: str, message: str, severity: SeverityLevel
         ) -> None:
-            # Use call_from_thread since this may be called from background thread
-            self.app.call_from_thread(
-                lambda: self.app.notify(message, title=title, severity=severity)
-            )
+            self.notify(message, title=title, severity=severity)
 
         # Create runner - confirmation is handled via messages, not callbacks
         runner = ConversationRunner(

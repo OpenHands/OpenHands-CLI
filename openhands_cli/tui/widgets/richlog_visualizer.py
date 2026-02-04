@@ -92,7 +92,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self,
         container: "VerticalScroll",
         app: "OpenHandsApp",
-        skip_user_messages: bool = False,
         name: str | None = None,
     ):
         """Initialize the visualizer.
@@ -107,7 +106,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         super().__init__()
         self._container = container
         self._app = app
-        self._skip_user_messages = skip_user_messages
         self._name = name
         # Store the main thread ID for thread safety checks
         self._main_thread_id = threading.get_ident()
@@ -141,7 +139,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         return ConversationVisualizer(
             container=self._container,
             app=self._app,
-            skip_user_messages=self._skip_user_messages,
             name=agent_id,
         )
 
@@ -638,7 +635,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 return None
 
             # Skip direct user messages (they are displayed separately in the UI)
-            # This applies both when skip_user_messages is set, and for user messages
+            # This applies for user messages
             # without a sender in delegation context
             if event.llm_message.role == "user" and not event.sender:
                 return None
