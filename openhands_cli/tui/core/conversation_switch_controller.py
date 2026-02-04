@@ -21,10 +21,10 @@ class ConversationSwitchController:
     def __init__(
         self,
         *,
-        state: "ConversationContainer",
-        runners: "RunnerRegistry",
+        state: ConversationContainer,
+        runners: RunnerRegistry,
         notify: Callable[..., None],
-        post_message: Callable[["TextualMessage"], bool],
+        post_message: Callable[[TextualMessage], bool],
         run_worker: Callable[..., object],
         call_from_thread: Callable[..., None],
     ) -> None:

@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from openhands.sdk.security.confirmation_policy import ConfirmRisky, NeverConfirm
-
 from openhands_cli.user_actions.types import UserConfirmation
 
 
@@ -23,9 +22,9 @@ class ConfirmationFlowController:
     def __init__(
         self,
         *,
-        state: "ConversationContainer",
-        runners: "RunnerRegistry",
-        policy_service: "ConfirmationPolicyService",
+        state: ConversationContainer,
+        runners: RunnerRegistry,
+        policy_service: ConfirmationPolicyService,
         run_worker: Callable[..., object],
     ) -> None:
         self._state = state

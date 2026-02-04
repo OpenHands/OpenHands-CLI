@@ -18,9 +18,9 @@ class ConversationCrudController:
     def __init__(
         self,
         *,
-        state: "ConversationContainer",
-        store: "ConversationStore",
-        runners: "RunnerRegistry",
+        state: ConversationContainer,
+        store: ConversationStore,
+        runners: RunnerRegistry,
         notify: Callable[..., None],
     ) -> None:
         self._state = state

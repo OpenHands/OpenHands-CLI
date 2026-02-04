@@ -31,7 +31,7 @@ class RunnerFactory:
     def __init__(
         self,
         *,
-        state: "ConversationContainer",
+        state: ConversationContainer,
         app_provider: AppProvider,
         scroll_view_provider: ScrollViewProvider,
         json_mode: bool,
@@ -51,7 +51,7 @@ class RunnerFactory:
         *,
         message_pump: MessagePump,
         notification_callback: NotificationCallback,
-    ) -> "ConversationRunner":
+    ) -> ConversationRunner:
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
         from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
         from openhands_cli.utils import json_callback
@@ -79,5 +79,5 @@ class RunnerFactory:
         )
 
         # Attach conversation to state for metrics reading
-        self._state.attach_conversation(runner.conversation)
+        self._state.attach_conversation_state(runner.conversation.state)
         return runner

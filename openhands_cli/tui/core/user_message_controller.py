@@ -16,8 +16,8 @@ class UserMessageController:
     def __init__(
         self,
         *,
-        state: "ConversationContainer",
-        runners: "RunnerRegistry",
+        state: ConversationContainer,
+        runners: RunnerRegistry,
         run_worker: Callable[..., object],
         headless_mode: bool,
     ) -> None:

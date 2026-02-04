@@ -10,16 +10,19 @@ from textual.message_pump import MessagePump
 
 if TYPE_CHECKING:
     from openhands_cli.tui.core.conversation_runner import ConversationRunner
-    from openhands_cli.tui.core.runner_factory import NotificationCallback, RunnerFactory
+    from openhands_cli.tui.core.runner_factory import (
+        NotificationCallback,
+        RunnerFactory,
+    )
 
 
 class RunnerRegistry:
     def __init__(
         self,
         *,
-        factory: "RunnerFactory",
+        factory: RunnerFactory,
         message_pump: MessagePump,
-        notification_callback: "NotificationCallback",
+        notification_callback: NotificationCallback,
     ) -> None:
         self._factory = factory
         self._message_pump = message_pump
@@ -28,13 +31,13 @@ class RunnerRegistry:
         self._current_runner: ConversationRunner | None = None
 
     @property
-    def current(self) -> "ConversationRunner | None":
+    def current(self) -> ConversationRunner | None:
         return self._current_runner
 
     def clear_current(self) -> None:
         self._current_runner = None
 
-    def get_or_create(self, conversation_id: uuid.UUID) -> "ConversationRunner":
+    def get_or_create(self, conversation_id: uuid.UUID) -> ConversationRunner:
         runner = self._runners.get(conversation_id)
         if runner is None:
             runner = self._factory.create(

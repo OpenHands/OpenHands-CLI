@@ -44,7 +44,7 @@ from openhands.sdk.security.confirmation_policy import (
 if TYPE_CHECKING:
     from rich.text import Text
 
-    from openhands.sdk import BaseConversation
+    from openhands.sdk.conversation.base import ConversationStateProtocol
     from openhands.sdk.event import ActionEvent
     from openhands_cli.tui.widgets.input_area import InputAreaContainer
     from openhands_cli.tui.widgets.main_display import ScrollableContent
@@ -125,7 +125,7 @@ class ConversationContainer(Container):
         # Initialize internal state BEFORE calling super().__init__
         # because reactive watchers may be triggered during initialization
         self._conversation_start_time: float | None = None
-        self._conversation: BaseConversation | None = None  # For metrics reading
+        self._conversation_state: ConversationStateProtocol | None = None
         self._timer = None
 
         super().__init__(id="conversation_state", **kwargs)
@@ -198,13 +198,8 @@ class ConversationContainer(Container):
 
     @property
     def is_conversation_created(self) -> bool:
-        """Check if a conversation has been created/attached.
-
-        Returns True when attach_conversation() has been called and a
-        ConversationRunner exists. UI components can use this to determine
-        if a conversation session has been started (vs. being in initial/splash state).
-        """
-        return self._conversation is not None
+        """Check if a conversation has been created/attached."""
+        return self._conversation_state is not None
 
     @property
     def agent_model(self) -> str | None:
@@ -213,16 +208,10 @@ class ConversationContainer(Container):
         Returns:
             The agent model name or None if not available.
         """
-        if self._conversation is None:
+        if self._conversation_state is None:
             return None
-        try:
-            if (
-                hasattr(self._conversation, "agent") and self._conversation.agent  # type: ignore[union-attr]
-            ):
-                return self._conversation.agent.llm.model  # type: ignore[union-attr]
-        except Exception:
-            pass
-        return None
+
+        return self._conversation_state.agent.llm.model
 
     def get_conversation_summary(self) -> tuple[int, "Text"] | None:
         """Get a summary of the conversation for headless mode output.
@@ -233,13 +222,13 @@ class ConversationContainer(Container):
         """
         from rich.text import Text
 
-        if self._conversation is None or self._conversation.state is None:
+        if self._conversation_state is None:
             return None
 
         agent_event_count = 0
         last_agent_message = Text(text="No agent messages found")
 
-        for event in self._conversation.state.events:
+        for event in self._conversation_state.events:
             if event.source == "agent":
                 agent_event_count += 1
                 last_agent_message = event.visualize
@@ -360,7 +349,9 @@ class ConversationContainer(Container):
 
     # ---- Conversation Attachment (for metrics) ----
 
-    def attach_conversation(self, conversation: "BaseConversation") -> None:
+    def attach_conversation_state(
+        self, conversation_state: "ConversationStateProtocol"
+    ) -> None:
         """Attach a conversation for metrics reading.
 
         This allows ConversationContainer to read metrics from the conversation's
@@ -368,14 +359,14 @@ class ConversationContainer(Container):
 
         After this call, is_conversation_created will return True.
         """
-        self._conversation = conversation
+        self._conversation_state = conversation_state
 
     def _update_metrics(self) -> None:
         """Update metrics from attached conversation stats."""
-        if self._conversation is None:
+        if self._conversation_state is None:
             return
 
-        stats = self._conversation.state.stats
+        stats = self._conversation_state.stats
         if stats:
             combined_metrics = stats.get_combined_metrics()
             self.metrics = combined_metrics

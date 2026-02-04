@@ -16,8 +16,8 @@ class ConfirmationPolicyService:
     def __init__(
         self,
         *,
-        state: "ConversationContainer",
-        runners: "RunnerRegistry",
+        state: ConversationContainer,
+        runners: RunnerRegistry,
     ) -> None:
         self._state = state
         self._runners = runners
