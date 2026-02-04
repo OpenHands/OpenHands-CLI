@@ -5,8 +5,10 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, ClassVar
 
+
 try:
     from posthog import Posthog
+
     POSTHOG_AVAILABLE = True
 except Exception:  # pragma: no cover - optional dependency
     Posthog = None  # type: ignore[assignment]
@@ -17,6 +19,8 @@ from textual.widgets import Button, Static
 
 
 if TYPE_CHECKING:
+    from posthog import Posthog as PosthogClient
+
     from openhands.sdk.critic.result import CriticResult
 
 
@@ -40,7 +44,7 @@ def send_critic_inference_event(
         conversation_id: The conversation ID for tracking
         agent_model: The agent's model name (e.g., "claude-sonnet-4-5-20250929")
     """
-    if not POSTHOG_AVAILABLE:
+    if not POSTHOG_AVAILABLE or Posthog is None:
         return
 
     try:
@@ -146,8 +150,8 @@ class CriticFeedbackWidget(Static, can_focus=True):
         self.agent_model = agent_model
         self._feedback_submitted = False
 
-        self._posthog = None
-        if POSTHOG_AVAILABLE:
+        self._posthog: PosthogClient | None = None
+        if POSTHOG_AVAILABLE and Posthog is not None:
             # Initialize PostHog client
             self._posthog = Posthog(
                 project_api_key=POSTHOG_API_KEY,
