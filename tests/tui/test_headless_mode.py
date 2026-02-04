@@ -259,7 +259,6 @@ class TestPrintConversationSummary:
             lambda env_overrides_enabled=False: False,
         )
         app = OpenHandsApp(exit_confirmation=False)
-        app.conversation_manager._current_runner = None
 
         # Just ensure this doesn't raise
         app._print_conversation_summary()

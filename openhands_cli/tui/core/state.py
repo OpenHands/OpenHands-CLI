@@ -10,7 +10,7 @@ Architecture:
     updates ConversationContainer. UI components auto-update via data_bind/watch.
 
     Policy Sync:
-        ConversationManager handles policy sync to conversation objects directly.
+        ConversationManager delegates policy sync to ConfirmationPolicyService.
         ConversationContainer only holds the reactive confirmation_policy var for UI.
 
 Widget Hierarchy:

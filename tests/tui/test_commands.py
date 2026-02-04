@@ -314,7 +314,7 @@ class TestOpenHandsAppCommands:
             oh_app = cast(OpenHandsApp, pilot.app)
 
             # Ensure no conversation runner
-            oh_app.conversation_manager._current_runner = None
+            oh_app.conversation_manager._runners.clear_current()
 
             # Mock notify to capture the error message
             notify_mock = mock.MagicMock()
@@ -349,10 +349,17 @@ class TestOpenHandsAppCommands:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            # Create a mock runner that is running
+            # Create a mock runner that simulates running condensation restriction
             dummy_runner = mock.MagicMock()
-            dummy_runner.is_running = True
-            oh_app.conversation_manager._current_runner = dummy_runner
+            dummy_runner.condense_async = mock.AsyncMock(
+                side_effect=lambda: oh_app.notify(
+                    "Cannot condense while conversation is running.",
+                    title="Condense Error",
+                    severity="warning",
+                    markup=True,
+                )
+            )
+            oh_app.conversation_manager._runners._current_runner = dummy_runner
 
             # Mock notify to capture the warning
             notify_mock = mock.MagicMock()
@@ -387,13 +394,28 @@ class TestOpenHandsAppCommands:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            # Create a mock runner with a mock conversation
+            # Create a mock runner that performs condensation and notifies
             dummy_conversation = mock.MagicMock()
             dummy_conversation.condense = mock.MagicMock()
             dummy_runner = mock.MagicMock()
-            dummy_runner.is_running = False
-            dummy_runner.conversation = dummy_conversation
-            oh_app.conversation_manager._current_runner = dummy_runner
+            dummy_runner.condense_async = mock.AsyncMock(
+                side_effect=lambda: (
+                    oh_app.notify(
+                        "Conversation condensation will be completed shortly...",
+                        title="Condensation Started",
+                        severity="information",
+                        markup=True,
+                    ),
+                    dummy_conversation.condense(),
+                    oh_app.notify(
+                        "Conversation history has been condensed successfully",
+                        title="Condensation Complete",
+                        severity="information",
+                        markup=True,
+                    ),
+                )
+            )
+            oh_app.conversation_manager._runners._current_runner = dummy_runner
 
             # Track notify calls
             notify_calls: list[dict] = []

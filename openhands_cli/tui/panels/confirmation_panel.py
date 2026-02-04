@@ -113,11 +113,21 @@ class InlineConfirmationPanel(Container):
             listview = self.query_one("#inline-confirmation-listview", ListView)
             self._update_option_highlights(listview.index or 0)
 
+    def _remove_self(self) -> None:
+        """Remove the panel from the DOM.
+
+        Kept as a separate method to simplify unit testing.
+        """
+        self.remove()
+
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         """Handle ListView selection events by posting ConfirmationDecision message.
 
         After posting the message, the panel removes itself from the DOM.
         """
+        if event.item is None or event.item.id is None:
+            return
+
         item_id = event.item.id
 
         if item_id == "accept":
@@ -125,10 +135,8 @@ class InlineConfirmationPanel(Container):
         elif item_id == "reject":
             self.post_message(ConfirmationDecision(UserConfirmation.REJECT))
         elif item_id == "always":
-            # Accept and set NeverConfirm policy
             self.post_message(ConfirmationDecision(UserConfirmation.ALWAYS_PROCEED))
         elif item_id == "risky":
-            # Accept and set ConfirmRisky policy
             self.post_message(ConfirmationDecision(UserConfirmation.CONFIRM_RISKY))
 
-        self.remove()
+        self._remove_self()

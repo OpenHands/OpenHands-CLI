@@ -69,6 +69,7 @@ from openhands_cli.tui.core import (
     SendMessage,
 )
 from openhands_cli.tui.core.conversation_manager import SwitchConfirmed
+from openhands_cli.tui.core.runner_factory import RunnerFactory
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.history_side_panel import HistorySidePanel
@@ -156,17 +157,25 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Store headless mode setting for auto-exit behavior
         self.headless_mode = headless_mode
 
-        # ConversationManager handles operations and posts UI events
-        self.conversation_manager = ConversationManager(
+        self.env_overrides_enabled = env_overrides_enabled
+        self.critic_disabled = critic_disabled
+
+        self._store = LocalFileStore()
+        runner_factory = RunnerFactory(
             state=self.conversation_state,
+            app_provider=lambda: self,
+            scroll_view_provider=lambda: self.scroll_view,
+            json_mode=json_mode,
             env_overrides_enabled=env_overrides_enabled,
             critic_disabled=critic_disabled,
-            json_mode=json_mode,
-            headless_mode=headless_mode,
         )
 
-        # Store these for _reload_visualizer (still need App-level access)
-        self.env_overrides_enabled = env_overrides_enabled
+        self.conversation_manager = ConversationManager(
+            state=self.conversation_state,
+            runner_factory=runner_factory,
+            store_service=self._store,
+            headless_mode=headless_mode,
+        )
 
         # Initialize conversation_id
         initial_conversation_id = (
@@ -180,8 +189,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Store queued inputs (copy to prevent mutating caller's list)
         self.pending_inputs = list(queued_inputs) if queued_inputs else []
-
-        self._store = LocalFileStore()
 
         # Callback for reloading visualizer configuration after settings changes
         self._reload_visualizer = (
@@ -417,7 +424,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             agent_store = AgentStore()
             agent = agent_store.load_or_create(
                 env_overrides_enabled=self.env_overrides_enabled,
-                critic_disabled=self.conversation_manager._critic_disabled,
+                critic_disabled=self.critic_disabled,
             )
             if agent:
                 has_critic = agent.critic is not None

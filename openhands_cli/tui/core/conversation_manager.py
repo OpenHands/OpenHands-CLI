@@ -1,75 +1,45 @@
-"""ConversationManager - centralized conversation operations handler.
+"""ConversationManager - thin Textual message router for conversations.
 
-This module provides ConversationManager, which handles all conversation
-operations including creating, switching, and sending messages.
+ConversationManager is intentionally small: it listens to a handful of Textual
+messages bubbling up from child widgets and delegates the actual work to focused
+controllers/services.
 
-Architecture:
-    ConversationManager is a Container that wraps the content area. Messages
-    from child components (InputField, InputAreaContainer, HistorySidePanel)
-    bubble up through the DOM tree and are handled here.
-
-    Reactive UI:
-        UI state changes are reactive via ConversationContainer:
-        - conversation_id=None: InputField disables (switching in progress)
-        - conversation_id=UUID: InputField enables (normal operation)
-
-    Direct Calls:
-        ConversationManager calls app methods directly:
-        - self.run_worker() for background tasks
-
-    Events (minimal):
-        - RequestSwitchConfirmation: App shows modal, returns SwitchConfirmed
-
-Widget Hierarchy:
-    OpenHandsApp
-    └── ConversationManager (Container)  ← Messages bubble here
-        └── Horizontal(#content_area)
-            └── ConversationContainer  ← Owns reactive state
-                └── InputAreaContainer, etc.
-
-Message Flow (natural bubbling):
-    InputField → UserInputSubmitted → bubbles up → ConversationManager
-    InputAreaContainer → CreateConversation → bubbles up → ConversationManager
-    HistorySidePanel → SwitchConversation → bubbles up → ConversationManager
-
-State Updates:
-    ConversationManager → updates → ConversationContainer → triggers → UI updates
+It is the integration point between Textual's message system and the TUI core
+business logic (runner lifecycle, CRUD/store interactions, switching flows,
+confirmation policy + resume flows, etc.).
 """
 
-import asyncio
-import logging
 import uuid
-from collections.abc import Callable
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from textual import on
 from textual.containers import Container
 from textual.message import Message
 
-from openhands.sdk.security.confirmation_policy import (
-    ConfirmationPolicyBase,
-    ConfirmRisky,
-    NeverConfirm,
+from openhands.sdk.security.confirmation_policy import ConfirmationPolicyBase
+from openhands_cli.conversations.protocols import ConversationStore
+from openhands_cli.tui.core.confirmation_flow_controller import (
+    ConfirmationFlowController,
 )
-from openhands_cli.tui.core.events import (
-    ConfirmationDecision,
-    RequestSwitchConfirmation,
-    ShowConfirmationPanel,
+from openhands_cli.tui.core.confirmation_policy_service import (
+    ConfirmationPolicyService,
 )
+from openhands_cli.tui.core.conversation_crud_controller import (
+    ConversationCrudController,
+)
+from openhands_cli.tui.core.conversation_switch_controller import (
+    ConversationSwitchController,
+)
+from openhands_cli.tui.core.events import ConfirmationDecision, ShowConfirmationPanel
+from openhands_cli.tui.core.runner_factory import RunnerFactory
+from openhands_cli.tui.core.runner_registry import RunnerRegistry
+from openhands_cli.tui.core.user_message_controller import UserMessageController
 from openhands_cli.tui.messages import UserInputSubmitted
-from openhands_cli.user_actions.types import UserConfirmation
 
 
 if TYPE_CHECKING:
     from openhands_cli.tui.core.conversation_runner import ConversationRunner
     from openhands_cli.tui.core.state import ConversationContainer
-    from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
-
-logger = logging.getLogger(__name__)
-
-
-# Type alias for visualizer factory
-VisualizerFactory = Callable[[uuid.UUID], "ConversationVisualizer"]
 
 
 # ============================================================================
@@ -128,82 +98,83 @@ class SwitchConfirmed(Message):
         self.confirmed = confirmed
 
 
-class _SwitchPrepare(Message):
-    """Internal message to prepare switch on main thread."""
-
-    def __init__(self, target_id: uuid.UUID) -> None:
-        super().__init__()
-        self.target_id = target_id
-
-
 # ============================================================================
 # ConversationManager - Handles conversation operations via events
 # ============================================================================
 
 
 class ConversationManager(Container):
-    """Manages conversation lifecycle and operations.
+    """Textual event handler that delegates conversation responsibilities.
 
-    ConversationManager is a Container that wraps the content area and:
-    - Receives operation messages that bubble up from child components
-    - Manages ConversationRunner instances
-    - Updates ConversationContainer with results (reactive UI updates)
-    - Calls app methods directly (notify, run_worker)
+    This widget owns no business logic beyond:
+    - stopping/ack'ing messages, and
+    - routing them to the appropriate controller/service.
 
-    Reactive UI:
-        State changes in ConversationContainer trigger automatic UI updates:
-        - conversation_id=None: InputField disables (switching in progress)
-        - conversation_id=UUID: UI components refresh for new conversation
-        - running: Status line updates
-
-    Events (minimal):
-        - RequestSwitchConfirmation: App shows modal, returns SwitchConfirmed
-
-    Widget Hierarchy:
-        OpenHandsApp
-        └── ConversationManager (Container) ← Messages bubble here
-            └── Horizontal(#content_area)
-                └── ConversationContainer ← Owns reactive state for data_bind
-                    └── InputAreaContainer, etc.
-
-    Example:
-        # In InputAreaContainer - messages bubble up naturally:
-        self.post_message(CreateConversation())
-
-        # UserInputSubmitted from InputField also bubbles up here
+    The core responsibilities are split into:
+    - RunnerRegistry / RunnerFactory: runner creation + lifecycle
+    - ConversationCrudController: create/reset
+    - ConversationSwitchController: switching + switch-confirmation orchestration
+    - UserMessageController: rendering + message send/queue behavior
+    - ConfirmationPolicyService + ConfirmationFlowController: policy + resume flows
     """
 
     def __init__(
         self,
         state: "ConversationContainer",
         *,
-        env_overrides_enabled: bool = False,
-        critic_disabled: bool = False,
-        json_mode: bool = False,
+        runner_factory: RunnerFactory,
+        store_service: ConversationStore,
         headless_mode: bool = False,
     ) -> None:
-        """Initialize the conversation manager.
-
-        Args:
-            state: The ConversationContainer to update with operation results.
-            visualizer_factory: Factory function to create visualizers. If None,
-                a default factory using app references will be created on first use.
-            env_overrides_enabled: If True, environment variables override
-                stored settings.
-            critic_disabled: If True, critic functionality is disabled.
-            json_mode: If True, enable JSON output mode.
-            headless_mode: If True, running in headless mode.
-        """
         super().__init__()
         self._state = state
-        self._env_overrides_enabled = env_overrides_enabled
-        self._critic_disabled = critic_disabled
-        self._json_mode = json_mode
         self._headless_mode = headless_mode
+        self._store_service = store_service
 
-        # Runner registry - maps conversation_id to runner
-        self._runners: dict[uuid.UUID, ConversationRunner] = {}
-        self._current_runner: ConversationRunner | None = None
+        from textual.notifications import SeverityLevel
+
+        def notification_callback(
+            title: str, message: str, severity: SeverityLevel
+        ) -> None:
+            self.notify(message, title=title, severity=severity)
+
+        self._runners = RunnerRegistry(
+            factory=runner_factory,
+            message_pump=self,
+            notification_callback=notification_callback,
+        )
+
+        self._policy_service = ConfirmationPolicyService(
+            state=self._state,
+            runners=self._runners,
+        )
+
+        self._message_controller = UserMessageController(
+            state=self._state,
+            runners=self._runners,
+            run_worker=self.run_worker,
+            headless_mode=self._headless_mode,
+        )
+        self._crud_controller = ConversationCrudController(
+            state=self._state,
+            store=self._store_service,
+            runners=self._runners,
+            notify=self.notify,
+        )
+        self._switch_controller = ConversationSwitchController(
+            state=self._state,
+            runners=self._runners,
+            notify=self.notify,
+            post_message=self.post_message,
+            run_worker=self.run_worker,
+            call_from_thread=lambda func, *args: self.app.call_from_thread(func, *args),
+        )
+        self._confirmation_controller = ConfirmationFlowController(
+            state=self._state,
+            runners=self._runners,
+            policy_service=self._policy_service,
+            run_worker=self.run_worker,
+        )
 
     # ---- Properties ----
 
@@ -215,7 +186,7 @@ class ConversationManager(Container):
     @property
     def current_runner(self) -> "ConversationRunner | None":
         """Get the current conversation runner."""
-        return self._current_runner
+        return self._runners.current
 
     # ---- Message Handlers ----
 
@@ -223,177 +194,33 @@ class ConversationManager(Container):
     async def _on_user_input_submitted(self, event: UserInputSubmitted) -> None:
         """Handle UserInputSubmitted from InputField."""
         event.stop()
-        await self._process_user_message(event.content)
+        await self._message_controller.handle_user_message(event.content)
 
     @on(SendMessage)
     async def _on_send_message(self, event: SendMessage) -> None:
         """Handle SendMessage posted directly to ConversationManager."""
         event.stop()
-        await self._process_user_message(event.content)
-
-    async def _process_user_message(self, content: str) -> None:
-        """Process a user message - render it and send to runner."""
-        # Guard: no conversation_id means switching in progress
-        if self._state.conversation_id is None:
-            return
-
-        # Get or create runner for current conversation
-        runner = self._get_or_create_runner(self._state.conversation_id)
-
-        # Render user message (also dismisses pending feedback widgets)
-        runner.visualizer.render_user_message(content)
-
-        # Update conversation title (for history panel)
-        self._state.set_conversation_title(content)
-
-        # If already running, queue the message
-        if runner.is_running:
-            await runner.queue_message(content)
-            return
-
-        # Process message asynchronously
-        self.run_worker(
-            runner.process_message_async(content, self._headless_mode),
-            name="process_message",
-        )
+        await self._message_controller.handle_user_message(event.content)
 
     @on(CreateConversation)
     def _on_create_conversation(self, event: CreateConversation) -> None:
         """Handle request to create a new conversation."""
         event.stop()
-
-        from openhands_cli.conversations.store.local import LocalFileStore
-
-        # Check if a conversation is currently running
-        if self._state.running:
-            self.notify(
-                "Cannot start a new conversation while one is running. "
-                "Please wait for the current conversation to complete or pause it.",
-                title="New Conversation Error",
-                severity="error",
-            )
-            return
-
-        # Create new conversation in store
-        store = LocalFileStore()
-        new_id_str = store.create()
-        new_id = uuid.UUID(new_id_str)
-
-        # Reset current runner
-        self._current_runner = None
-
-        # Update state - triggers reactive UI updates
-        # Note: reset_conversation_state() clears waiting_for_confirmation
-        self._state.reset_conversation_state()
-        self._state.conversation_id = new_id
-
-        # Notify about new conversation
-        self.notify(
-            "Started a new conversation",
-            title="New Conversation",
-            severity="information",
-        )
+        self._crud_controller.create_conversation()
 
     @on(SwitchConversation)
     def _on_switch_conversation(self, event: SwitchConversation) -> None:
         """Handle request to switch to a different conversation."""
         event.stop()
-
-        target_id = event.conversation_id
-
-        # Don't switch if already on this conversation
-        if self._state.conversation_id == target_id:
-            self.notify(
-                "This conversation is already active.",
-                title="Already Active",
-                severity="information",
-            )
-            return
-
-        # If agent is running, request confirmation modal (App handles this)
-        if self._state.running:
-            self.post_message(RequestSwitchConfirmation(target_id))
-            return
-
-        # Perform the switch
-        self._perform_switch(target_id)
+        self._switch_controller.request_switch(event.conversation_id)
 
     @on(SwitchConfirmed)
     def _on_switch_confirmed(self, event: SwitchConfirmed) -> None:
         """Handle switch confirmation result from modal."""
         event.stop()
-
-        if event.confirmed:
-            self._perform_switch(event.target_id, pause_current=True)
-        # If cancelled, no state changes needed - start_switching() wasn't called yet
-
-    def _perform_switch(
-        self, target_id: uuid.UUID, *, pause_current: bool = False
-    ) -> None:
-        """Perform the conversation switch.
-
-        Reactive behaviors handled by state changes:
-        - conversation_id=None -> InputField disables
-        - conversation_id=target_id -> InputField enables and focuses
-        """
-        # Update state - triggers reactive UI updates (input disabled)
-        self._state.start_switching()
-
-        # Run switch in background thread
-        def _switch_worker() -> None:
-            # Pause current runner if needed
-            if (
-                pause_current
-                and self._current_runner
-                and self._current_runner.is_running
-            ):
-                self._current_runner.conversation.pause()
-
-            # Prepare switch on main thread
-            self.post_message(_SwitchPrepare(target_id))
-
-        self.run_worker(
-            _switch_worker,
-            name="switch_conversation",
-            group="switch_conversation",
-            exclusive=True,
-            thread=True,
-            exit_on_error=False,
-        )
-
-    @on(_SwitchPrepare)
-    def _on_switch_prepare(self, event: "_SwitchPrepare") -> None:
-        """Prepare UI for switch (runs on main thread)."""
-        event.stop()
-        target_id = event.target_id
-
-        # Reset state for new conversation (conversation_id still None)
-        # Note: reset_conversation_state() clears waiting_for_confirmation
-        self._state.reset_conversation_state()
-
-        # Clear current runner, will be created on next message
-        self._current_runner = None
-
-        # Get or create runner for new conversation
-        self._current_runner = self._get_or_create_runner(target_id)
-
-        # Finish switch - sets conversation_id, triggers reactive UI updates
-        self._finish_switch(target_id)
-
-    def _finish_switch(self, target_id: uuid.UUID) -> None:
-        """Finalize the switch.
-
-        Setting conversation_id triggers reactive behaviors:
-        - InputField re-enables and focuses
-        """
-        # Update state - triggers reactive UI updates
-        self._state.finish_switching(target_id)
-
-        # Notify user
-        self.notify(
-            f"Resumed conversation {target_id.hex[:8]}",
-            title="Switched",
-            severity="information",
+        self._switch_controller.handle_switch_confirmed(
+            event.target_id,
+            confirmed=event.confirmed,
         )
 
     @on(PauseConversation)
@@ -401,25 +228,20 @@ class ConversationManager(Container):
         """Handle request to pause the current conversation."""
         event.stop()
 
-        if self._current_runner and self._current_runner.is_running:
-            self.notify(
-                "Pausing conversation, this may take a few seconds...",
-                title="Pausing conversation",
-                severity="information",
-            )
-            await asyncio.to_thread(self._current_runner.conversation.pause)
-        else:
-            self.notify(
-                "No running conversation to pause",
-                severity="error",
-            )
+        runner = self._runners.current
+        if runner is None:
+            self.notify("No running conversation to pause", severity="error")
+            return
+
+        await runner.pause()
 
     @on(CondenseConversation)
     async def _on_condense_conversation(self, event: CondenseConversation) -> None:
         """Handle request to condense conversation history."""
         event.stop()
 
-        if not self._current_runner:
+        runner = self._runners.current
+        if runner is None:
             self.notify(
                 "No conversation available to condense",
                 title="Condense Error",
@@ -427,146 +249,23 @@ class ConversationManager(Container):
             )
             return
 
-        if self._current_runner.is_running:
-            self.notify(
-                "Cannot condense while conversation is running.",
-                title="Condense Error",
-                severity="warning",
-            )
-            return
-
-        try:
-            self.notify(
-                "Conversation condensation will be completed shortly...",
-                title="Condensation Started",
-                severity="information",
-            )
-            await asyncio.to_thread(self._current_runner.conversation.condense)
-            self.notify(
-                "Conversation history has been condensed successfully",
-                title="Condensation Complete",
-                severity="information",
-            )
-        except Exception as e:
-            self.notify(
-                f"Failed to condense conversation: {str(e)}",
-                title="Condensation Error",
-                severity="error",
-            )
+        await runner.condense_async()
 
     @on(SetConfirmationPolicy)
     def _on_set_confirmation_policy(self, event: SetConfirmationPolicy) -> None:
         """Handle request to change confirmation policy."""
         event.stop()
-
-        # Update conversation directly if we have a runner
-        if self._current_runner and self._current_runner.conversation:
-            self._current_runner.conversation.set_confirmation_policy(event.policy)
-
-        # Update state for UI (triggers reactive updates)
-        self._state.confirmation_policy = event.policy
+        self._policy_service.set_policy(event.policy)
 
     @on(ShowConfirmationPanel)
     def _on_show_confirmation_panel(self, event: ShowConfirmationPanel) -> None:
-        """Handle request to show confirmation panel.
-
-        Sets pending_action_count > 0, which triggers:
-        - InputField to disable
-        - ScrollableContent to mount the InlineConfirmationPanel
-        """
         event.stop()
-
-        # Set action count to trigger UI updates (>0 shows panel)
-        self._state.set_pending_action_count(len(event.pending_actions))
+        self._confirmation_controller.show_panel(len(event.pending_actions))
 
     @on(ConfirmationDecision)
     def _on_confirmation_decision(self, event: ConfirmationDecision) -> None:
-        """Handle user's confirmation decision from the inline panel.
-
-        Resets pending_action_count, updates policy if needed, and resumes
-        the conversation in a background worker.
-
-        Note: The panel removes itself after posting the message.
-        """
         event.stop()
-
-        # Reset action count (panel already removed itself)
-        self._state.set_pending_action_count(0)
-
-        if not self._current_runner:
-            return
-
-        decision = event.decision
-
-        # Handle policy changes for ALWAYS_PROCEED and CONFIRM_RISKY
-        if decision == UserConfirmation.ALWAYS_PROCEED:
-            self.post_message(SetConfirmationPolicy(NeverConfirm()))
-        elif decision == UserConfirmation.CONFIRM_RISKY:
-            self.post_message(SetConfirmationPolicy(ConfirmRisky()))
-
-        # Resume conversation processing in background
-        self.run_worker(
-            self._current_runner.resume_after_confirmation(decision),
-            name="resume_conversation",
-        )
-
-    # ---- Runner Management ----
-
-    def _get_or_create_runner(self, conversation_id: uuid.UUID) -> "ConversationRunner":
-        """Get existing runner or create a new one."""
-        if conversation_id in self._runners:
-            runner = self._runners[conversation_id]
-            self._current_runner = runner
-            return runner
-
-        runner = self._create_runner(conversation_id)
-        self._runners[conversation_id] = runner
-        self._current_runner = runner
-        return runner
-
-    def _create_runner(self, conversation_id: uuid.UUID) -> "ConversationRunner":
-        """Create a new ConversationRunner for the given conversation."""
-        from openhands_cli.tui.core.conversation_runner import ConversationRunner
-        from openhands_cli.tui.textual_app import OpenHandsApp
-        from openhands_cli.tui.widgets.richlog_visualizer import (
-            ConversationVisualizer,
-        )
-        from openhands_cli.utils import json_callback
-
-        app = cast(OpenHandsApp, self.app)
-        visualizer = ConversationVisualizer(
-            app.scroll_view,
-            app,
-            name="OpenHands Agent",
-        )
-
-        # Create JSON callback if in JSON mode
-        event_callback = json_callback if self._json_mode else None
-
-        # Create notification callback that calls app.notify directly
-        from textual.notifications import SeverityLevel
-
-        def notification_callback(
-            title: str, message: str, severity: SeverityLevel
-        ) -> None:
-            self.notify(message, title=title, severity=severity)
-
-        # Create runner - confirmation is handled via messages, not callbacks
-        runner = ConversationRunner(
-            conversation_id,
-            state=self._state,
-            message_pump=self,
-            notification_callback=notification_callback,
-            visualizer=visualizer,
-            event_callback=event_callback,
-            env_overrides_enabled=self._env_overrides_enabled,
-            critic_disabled=self._critic_disabled,
-        )
-
-        # Attach conversation to state for metrics reading
-        self._state.attach_conversation(runner.conversation)
-
-        return runner
+        self._confirmation_controller.handle_decision(event.decision)
 
     # ---- Public API for direct calls ----
 
@@ -588,5 +287,6 @@ class ConversationManager(Container):
 
     def reload_visualizer_configuration(self) -> None:
         """Reload the visualizer configuration for the current conversation."""
-        if self._current_runner:
-            self._current_runner.visualizer.reload_configuration()
+        runner = self._runners.current
+        if runner is not None:
+            runner.visualizer.reload_configuration()
