@@ -107,10 +107,6 @@ class InlineConfirmationPanel(Container):
             option = self.query_one(f"#option-{item_id}", ConfirmationOption)
             option.set_highlighted(i == highlighted_index)
 
-    def _remove_self(self) -> None:
-        """Remove this panel from the DOM."""
-        self.remove()
-
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         """Handle ListView highlight changes to update > markers."""
         if event.item is not None:
@@ -135,5 +131,4 @@ class InlineConfirmationPanel(Container):
             # Accept and set ConfirmRisky policy
             self.post_message(ConfirmationDecision(UserConfirmation.CONFIRM_RISKY))
 
-        # Remove self from DOM and clear app's reference
-        self._remove_self()
+        self.remove()
