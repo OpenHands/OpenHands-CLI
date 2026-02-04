@@ -24,6 +24,7 @@ Widget Hierarchy:
         └── InfoStatusLine
 """
 
+import threading
 import time
 import uuid
 from typing import TYPE_CHECKING, Any
@@ -300,19 +301,20 @@ class ConversationContainer(Container):
     def _schedule_update(self, attr: str, value: Any) -> None:
         """Schedule a state update, handling cross-thread calls.
 
-        Uses Textual's call_from_thread() for thread safety. If already on
-        the main thread, call_from_thread() raises RuntimeError, so we
-        catch that and do the update directly.
+        Uses Textual's call_from_thread() for thread safety when called from
+        a background thread. If already on the main thread, performs the
+        update directly.
         """
 
         def do_update() -> None:
             setattr(self, attr, value)
 
-        try:
-            self.app.call_from_thread(do_update)
-        except RuntimeError:
+        if threading.current_thread() is threading.main_thread():
             # Already on main thread - do update directly
             do_update()
+        else:
+            # Cross-thread call - use Textual's thread-safe mechanism
+            self.app.call_from_thread(do_update)
 
     def set_running(self, value: bool) -> None:
         """Set the running state. Thread-safe."""
