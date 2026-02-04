@@ -251,13 +251,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
             The agent model name or None if not available.
         """
         try:
-            if (
-                self._app.conversation_runner
-                and self._app.conversation_runner.conversation
-                and hasattr(self._app.conversation_runner.conversation, "agent")
-                and self._app.conversation_runner.conversation.agent  # type: ignore[union-attr]
-            ):
-                return self._app.conversation_runner.conversation.agent.llm.model  # type: ignore[union-attr]
+            runner = self._app.conversation_runner
+            if runner is None or runner.conversation is None:
+                return None
+            agent = getattr(runner.conversation, "agent", None)
+            if agent is None:
+                return None
+            return agent.llm.model
         except Exception:
             pass
         return None
