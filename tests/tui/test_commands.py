@@ -329,6 +329,7 @@ class TestOpenHandsAppCommands:
                 "No conversation available to condense",
                 title="Condense Error",
                 severity="error",
+                markup=True,
             )
 
     @pytest.mark.asyncio
@@ -366,6 +367,7 @@ class TestOpenHandsAppCommands:
                 "Cannot condense while conversation is running.",
                 title="Condense Error",
                 severity="warning",
+                markup=True,
             )
 
     @pytest.mark.asyncio
@@ -493,6 +495,7 @@ class TestOpenHandsAppCommands:
                 "Started a new conversation",
                 title="New Conversation",
                 severity="information",
+                markup=True,
             )
 
     @pytest.mark.asyncio
