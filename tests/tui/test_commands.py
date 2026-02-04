@@ -226,7 +226,7 @@ class TestOpenHandsAppCommands:
         """`/confirm` should open ConfirmationSettingsModal.
 
         Note: The app reads the policy from conversation_state.confirmation_policy
-        (ConversationState owns the policy), not from conversation_runner.
+        (ConversationContainer owns the policy), not from conversation_runner.
         """
         monkeypatch.setattr(
             SettingsScreen,
@@ -512,7 +512,7 @@ class TestOpenHandsAppCommands:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            # Set running state directly on ConversationState (source of truth)
+            # Set running state directly on ConversationContainer (source of truth)
             oh_app.conversation_state.running = True
 
             # Store the original conversation ID

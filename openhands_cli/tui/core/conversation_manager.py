@@ -9,7 +9,7 @@ Architecture:
     bubble up through the DOM tree and are handled here.
 
     Reactive UI:
-        UI state changes are reactive via ConversationState:
+        UI state changes are reactive via ConversationContainer:
         - conversation_id=None: InputField disables (switching in progress)
         - conversation_id=UUID: InputField enables (normal operation)
 
@@ -24,7 +24,7 @@ Widget Hierarchy:
     OpenHandsApp
     └── ConversationManager (Container)  ← Messages bubble here
         └── Horizontal(#content_area)
-            └── ConversationState  ← Owns reactive state
+            └── ConversationContainer  ← Owns reactive state
                 └── InputAreaContainer, etc.
 
 Message Flow (natural bubbling):
@@ -33,7 +33,7 @@ Message Flow (natural bubbling):
     HistorySidePanel → SwitchConversation → bubbles up → ConversationManager
 
 State Updates:
-    ConversationManager → updates → ConversationState → triggers → UI updates
+    ConversationManager → updates → ConversationContainer → triggers → UI updates
 """
 
 import asyncio
@@ -62,7 +62,7 @@ from openhands_cli.user_actions.types import UserConfirmation
 
 if TYPE_CHECKING:
     from openhands_cli.tui.core.conversation_runner import ConversationRunner
-    from openhands_cli.tui.core.state import ConversationState
+    from openhands_cli.tui.core.state import ConversationContainer
     from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
 logger = logging.getLogger(__name__)
@@ -147,11 +147,11 @@ class ConversationManager(Container):
     ConversationManager is a Container that wraps the content area and:
     - Receives operation messages that bubble up from child components
     - Manages ConversationRunner instances
-    - Updates ConversationState with results (reactive UI updates)
+    - Updates ConversationContainer with results (reactive UI updates)
     - Calls app methods directly (notify, run_worker)
 
     Reactive UI:
-        State changes in ConversationState trigger automatic UI updates:
+        State changes in ConversationContainer trigger automatic UI updates:
         - conversation_id=None: InputField disables (switching in progress)
         - conversation_id=UUID: UI components refresh for new conversation
         - running: Status line updates
@@ -163,7 +163,7 @@ class ConversationManager(Container):
         OpenHandsApp
         └── ConversationManager (Container) ← Messages bubble here
             └── Horizontal(#content_area)
-                └── ConversationState ← Owns reactive state for data_bind
+                └── ConversationContainer ← Owns reactive state for data_bind
                     └── InputAreaContainer, etc.
 
     Example:
@@ -175,7 +175,7 @@ class ConversationManager(Container):
 
     def __init__(
         self,
-        state: "ConversationState",
+        state: "ConversationContainer",
         *,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
@@ -185,7 +185,7 @@ class ConversationManager(Container):
         """Initialize the conversation manager.
 
         Args:
-            state: The ConversationState to update with operation results.
+            state: The ConversationContainer to update with operation results.
             visualizer_factory: Factory function to create visualizers. If None,
                 a default factory using app references will be created on first use.
             env_overrides_enabled: If True, environment variables override
@@ -208,7 +208,7 @@ class ConversationManager(Container):
     # ---- Properties ----
 
     @property
-    def state(self) -> "ConversationState":
+    def state(self) -> "ConversationContainer":
         """Get the conversation state."""
         return self._state
 

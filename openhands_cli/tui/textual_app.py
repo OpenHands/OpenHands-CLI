@@ -6,7 +6,7 @@ separates concerns between:
   and UI event handling
 - ConversationManager: Handles operations (create, switch, send messages),
   posts UI events
-- ConversationState: Pure reactive state container for UI binding
+- ConversationContainer: Pure reactive state container for UI binding
 - InputAreaContainer: Posts operation messages that bubble to ConversationManager
 
 Widget Hierarchy::
@@ -14,7 +14,7 @@ Widget Hierarchy::
     OpenHandsApp
     └── ConversationManager (Container)  ← Messages bubble here
         └── Horizontal(#content_area)
-            └── ConversationState(#conversation_state)  ← Owns reactive state
+            └── ConversationContainer(#conversation_state)  ← Owns reactive state
                 ├── ScrollableContent(#scroll_view)  ← data_bind to conversation_id
                 │   ├── SplashContent(#splash_content) ← data_bind to conversation_id
                 │   └── ... conversation widgets (dynamically added)
@@ -33,7 +33,7 @@ UI Event Flow (separation of concerns):
     ConversationManager → posts UIEvent → bubbles up → App handles with @on
 
 Data Binding:
-    ConversationManager updates ConversationState, which triggers reactive
+    ConversationManager updates ConversationContainer, which triggers reactive
     updates to all bound UI components via data_bind() and watch().
 """
 
@@ -61,9 +61,9 @@ from openhands_cli.locations import get_conversations_dir
 from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.core import (
+    ConversationContainer,
     ConversationFinished,
     ConversationManager,
-    ConversationState,
     PauseConversation,
     RequestSwitchConfirmation,
     SendMessage,
@@ -105,7 +105,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     @property
     def conversation_id(self) -> uuid.UUID | None:
-        """Get current conversation ID from ConversationState (source of truth).
+        """Get current conversation ID from ConversationContainer (source of truth).
 
         Returns None when a conversation switch is in progress.
         """
@@ -113,7 +113,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     @conversation_id.setter
     def conversation_id(self, value: uuid.UUID | None) -> None:
-        """Set conversation ID in ConversationState (source of truth)."""
+        """Set conversation ID in ConversationContainer (source of truth)."""
         self.conversation_state.conversation_id = value
 
     def __init__(
@@ -145,8 +145,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """
         super().__init__(**kwargs)
 
-        # ConversationState holds reactive state for UI binding
-        self.conversation_state = ConversationState(
+        # ConversationContainer holds reactive state for UI binding
+        self.conversation_state = ConversationContainer(
             initial_confirmation_policy=initial_confirmation_policy or AlwaysConfirm(),
         )
 
@@ -209,7 +209,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             OpenHandsApp
             └── ConversationManager (Container)  ← Messages bubble here
                 └── Horizontal(#content_area)
-                    └── ConversationState(#conversation_state)  ← Owns reactive state
+                    └── ConversationContainer(#conversation_state)  ← Owns state
                         ├── ScrollableContent(#scroll_view)
                         │   ├── SplashContent  ← data_bind
                         │   └── ... conversation content
@@ -225,14 +225,14 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 → bubbles → ConversationManager
 
         Data Binding:
-            All widgets are composed from ConversationState.compose(), so
-            data_bind works because the active pump is ConversationState.
+            All widgets are composed from ConversationContainer.compose(), so
+            data_bind works because the active pump is ConversationContainer.
         """
         # ConversationManager wraps content so messages bubble up to it
         with self.conversation_manager:
             # Content area - horizontal layout for conversation and optional panels
             with Horizontal(id="content_area"):
-                # ConversationState composes scroll_view, input_area and children
+                # ConversationContainer composes scroll_view, input_area and children
                 # This enables data_bind() (requires owner as active pump)
                 yield self.conversation_state
 
@@ -358,7 +358,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def action_open_settings(self) -> None:
         """Action to open the settings screen."""
-        # Check if conversation is running via ConversationState
+        # Check if conversation is running via ConversationContainer
         if self.conversation_state.running:
             self.notify(
                 "Settings are not available while a conversation is running. "
@@ -404,7 +404,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         2. Initializing the splash content (one-time setup)
         3. Processing any queued inputs
 
-        UI lifecycle is owned by OpenHandsApp, not ConversationState. The splash
+        UI lifecycle is owned by OpenHandsApp, not ConversationContainer. The splash
         content initialization is a direct method call, not a reactive
         state change, because it's a one-time operation.
         """

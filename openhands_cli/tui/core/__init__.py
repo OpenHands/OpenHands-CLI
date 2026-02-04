@@ -17,14 +17,14 @@ from openhands_cli.tui.core.events import (
 )
 from openhands_cli.tui.core.state import (
     ConfirmationRequired,
+    ConversationContainer,
     ConversationFinished,
-    ConversationState,
 )
 
 
 __all__ = [
-    # State
-    "ConversationState",
+    # Container (UI component that owns reactive state)
+    "ConversationContainer",
     "ConversationFinished",
     "ConfirmationRequired",
     # Manager

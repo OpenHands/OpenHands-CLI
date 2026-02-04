@@ -3,17 +3,17 @@
 SplashContent encapsulates all splash screen widgets and manages their
 lifecycle through two mechanisms:
 
-1. **Reactive binding** (`data_bind`): conversation_id is bound from ConversationState
-   for automatic updates when switching conversations.
+1. **Reactive binding** (`data_bind`): conversation_id is bound from
+   ConversationContainer for automatic updates when switching conversations.
 
 2. **Direct initialization** (`initialize()`): Called by OpenHandsApp during
    UI setup to populate and show the splash content. This separates UI
    lifecycle concerns from conversation state.
 
 Example:
-    # In ConversationState.compose():
+    # In ConversationContainer.compose():
     yield SplashContent(id="splash_content").data_bind(
-        conversation_id=ConversationState.conversation_id,
+        conversation_id=ConversationContainer.conversation_id,
     )
 
     # In OpenHandsApp._initialize_main_ui():
@@ -53,11 +53,11 @@ class SplashContent(Container):
     when switching conversations.
     """
 
-    # Reactive property bound from ConversationState for conversation switching
+    # Reactive property bound from ConversationContainer for conversation switching
     # None indicates switching in progress
     conversation_id: var[uuid.UUID | None] = var(None)
 
-    # Internal state (not in ConversationState - widget owns its initialization)
+    # Internal state (not in ConversationContainer - widget owns its initialization)
     _is_initialized: bool = False
     _has_critic: bool = False
 

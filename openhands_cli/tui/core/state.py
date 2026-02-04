@@ -1,20 +1,20 @@
 """Centralized state management for OpenHands TUI.
 
 This module provides:
-- ConversationState: Pure reactive state container for UI binding
+- ConversationContainer: UI container that owns and exposes reactive state
 - ConversationFinished: Message emitted when conversation finishes
 
 Architecture:
-    ConversationState holds reactive properties that UI components bind to.
+    ConversationContainer holds reactive properties that UI components bind to.
     ConversationManager (in conversation_manager.py) handles operations and
-    updates ConversationState. UI components auto-update via data_bind/watch.
+    updates ConversationContainer. UI components auto-update via data_bind/watch.
 
     Policy Sync:
         ConversationManager handles policy sync to conversation objects directly.
-        ConversationState only holds the reactive confirmation_policy var for UI.
+        ConversationContainer only holds the reactive confirmation_policy var for UI.
 
 Widget Hierarchy:
-    ConversationState(Container, #conversation_state)
+    ConversationContainer(Container, #conversation_state)
     ├── ScrollableContent(VerticalScroll, #scroll_view)
     │   ├── SplashContent(#splash_content)
     │   └── ... dynamically added conversation widgets
@@ -63,30 +63,30 @@ class ConfirmationRequired(Message):
         self.pending_actions = pending_actions
 
 
-class ConversationState(Container):
-    """Pure reactive state container for UI binding.
+class ConversationContainer(Container):
+    """UI container that owns and exposes reactive state for conversation UI.
 
-    ConversationState is responsible for:
+    ConversationContainer is responsible for:
     - Holding reactive state (running, conversation_id, metrics, etc.)
     - Composing UI widgets (required for data_bind to work)
     - Providing thread-safe state update methods
 
     Business logic (creating/switching conversations, sending messages, policy
-    sync) is handled by ConversationManager. This class only holds state and
-    provides reactive bindings for UI components.
+    sync) is handled by ConversationManager. This class owns the UI structure
+    and provides reactive bindings for child components.
 
     Example:
         # UI components bind via data_bind():
         WorkingStatusLine().data_bind(
-            running=ConversationState.running,
-            elapsed_seconds=ConversationState.elapsed_seconds,
+            running=ConversationContainer.running,
+            elapsed_seconds=ConversationContainer.elapsed_seconds,
         )
 
         # Dynamically mounted widgets use watch():
-        self.watch(state, "conversation_id", self._on_change)
+        self.watch(container, "conversation_id", self._on_change)
 
         # ConversationManager updates state:
-        state.set_running(True)  # Triggers reactive updates
+        container.set_running(True)  # Triggers reactive updates
     """
 
     # ---- Core Running State ----
@@ -135,13 +135,13 @@ class ConversationState(Container):
     def compose(self):
         """Compose UI widgets that bind to reactive state.
 
-        ConversationState composes all widgets that need to bind to its reactive
+        ConversationContainer composes all widgets that need to bind to its reactive
         properties. This is required because data_bind() checks that the active
         message pump (the compose caller) is an instance of the reactive owner.
 
         Widget Hierarchy::
 
-            ConversationState(#conversation_state)
+            ConversationContainer(#conversation_state)
             ├── ScrollableContent(#scroll_view)
             │   ├── SplashContent(#splash_content)
             │   └── ... dynamically added conversation widgets
@@ -158,28 +158,28 @@ class ConversationState(Container):
 
         # ScrollableContent holds splash and dynamically added widgets
         with ScrollableContent(id="scroll_view").data_bind(
-            conversation_id=ConversationState.conversation_id,
-            pending_action_count=ConversationState.pending_action_count,
+            conversation_id=ConversationContainer.conversation_id,
+            pending_action_count=ConversationContainer.pending_action_count,
         ):
             yield SplashContent(id="splash_content").data_bind(
-                conversation_id=ConversationState.conversation_id,
+                conversation_id=ConversationContainer.conversation_id,
             )
 
         # Input area docked to bottom
         with InputAreaContainer(id="input_area"):
             yield WorkingStatusLine().data_bind(
-                running=ConversationState.running,
-                elapsed_seconds=ConversationState.elapsed_seconds,
+                running=ConversationContainer.running,
+                elapsed_seconds=ConversationContainer.elapsed_seconds,
             )
             yield InputField(
                 placeholder="Type your message, @mention a file, or / for commands"
             ).data_bind(
-                conversation_id=ConversationState.conversation_id,
-                pending_action_count=ConversationState.pending_action_count,
+                conversation_id=ConversationContainer.conversation_id,
+                pending_action_count=ConversationContainer.pending_action_count,
             )
             yield InfoStatusLine().data_bind(
-                running=ConversationState.running,
-                metrics=ConversationState.metrics,
+                running=ConversationContainer.running,
+                metrics=ConversationContainer.metrics,
             )
 
     @property
@@ -361,7 +361,7 @@ class ConversationState(Container):
     def attach_conversation(self, conversation: "BaseConversation") -> None:
         """Attach a conversation for metrics reading.
 
-        This allows ConversationState to read metrics from the conversation's
+        This allows ConversationContainer to read metrics from the conversation's
         stats. Policy sync is handled by ConversationManager, not here.
 
         After this call, is_conversation_created will return True.

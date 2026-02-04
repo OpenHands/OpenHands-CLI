@@ -241,10 +241,10 @@ class TestHeadlessAppBehavior:
 
     Note: Tests for _on_conversation_state_changed were removed as that method
     no longer exists. The headless exit behavior is now handled through
-    ConversationState's watch_running and ConversationFinished message handling.
+    ConversationContainer's watch_running and ConversationFinished message handling.
     """
 
-    # Placeholder - add tests for ConversationState-based headless behavior if needed
+    # Placeholder - add tests for ConversationContainer-based headless behavior
     pass
 
 
@@ -302,14 +302,14 @@ class TestHeadlessRunnerOutput:
     def test_headless_mode_prints_status_without_spinner(self):
         """Test that headless mode prints status messages without spinner."""
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
-        from openhands_cli.tui.core.state import ConversationState
+        from openhands_cli.tui.core.state import ConversationContainer
 
         mock_conversation = Mock()
         mock_conversation.send_message = Mock()
         mock_conversation.run = Mock()
 
         # Create mock state and message_pump
-        mock_state = Mock(spec=ConversationState)
+        mock_state = Mock(spec=ConversationContainer)
         mock_state.confirmation_policy = NeverConfirm()
         mock_state.attach_conversation = Mock()
         # Ensure is_confirmation_active returns False so headless path is taken
@@ -354,7 +354,7 @@ class TestConversationSummary:
         """It should count agent messages and return last agent message text."""
         from openhands.sdk.event import MessageEvent
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
-        from openhands_cli.tui.core.state import ConversationState
+        from openhands_cli.tui.core.state import ConversationContainer
 
         mock_conversation = Mock()
         mock_conversation.state = Mock()
@@ -385,7 +385,7 @@ class TestConversationSummary:
         ]
 
         # Create mock state and message_pump
-        mock_state = Mock(spec=ConversationState)
+        mock_state = Mock(spec=ConversationContainer)
         mock_state.confirmation_policy = AlwaysConfirm()
         mock_state.attach_conversation = Mock()
         mock_message_pump = Mock()
@@ -410,10 +410,10 @@ class TestConversationSummary:
     def test_conversation_summary_empty_state(self):
         """With no conversation / events, we should get a safe default."""
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
-        from openhands_cli.tui.core.state import ConversationState
+        from openhands_cli.tui.core.state import ConversationContainer
 
-        # Create a mock ConversationState and message_pump
-        mock_state = Mock(spec=ConversationState)
+        # Create a mock ConversationContainer and message_pump
+        mock_state = Mock(spec=ConversationContainer)
         mock_state.confirmation_policy = AlwaysConfirm()
         mock_state.attach_conversation = Mock()
         mock_message_pump = Mock()

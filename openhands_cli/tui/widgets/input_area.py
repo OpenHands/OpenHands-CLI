@@ -1,11 +1,11 @@
 """Input area container for status lines and input field.
 
-This container is docked to the bottom of ConversationState (as a sibling of
+This container is docked to the bottom of ConversationContainer (as a sibling of
 ScrollableContent) and handles slash command execution.
 
 Widget Hierarchy:
     ConversationManager (ancestor - messages bubble here)
-    └── ConversationState(#conversation_state)
+    └── ConversationContainer(#conversation_state)
         ├── ScrollableContent(#scroll_view)  ← sibling, content rendered here
         └── InputAreaContainer(#input_area)  ← docked to bottom
             ├── WorkingStatusLine
@@ -47,7 +47,7 @@ class InputAreaContainer(Container):
         """Get the sibling scrollable content area."""
         from openhands_cli.tui.widgets.main_display import ScrollableContent
 
-        # scroll_view is a sibling - query from parent (ConversationState)
+        # scroll_view is a sibling - query from parent (ConversationContainer)
         assert self.parent is not None, "InputAreaContainer must have a parent"
         return self.parent.query_one("#scroll_view", ScrollableContent)
 

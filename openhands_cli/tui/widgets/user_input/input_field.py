@@ -71,7 +71,7 @@ class InputField(Container):
     - Ctrl+J to submit
 
     Reactive Behavior:
-    - Binds to `is_switching` from ConversationState
+    - Binds to `is_switching` from ConversationContainer
     - Auto-disables during conversation switches
     """
 
@@ -83,7 +83,7 @@ class InputField(Container):
         ),
     ]
 
-    # Reactive properties bound from ConversationState
+    # Reactive properties bound from ConversationContainer
     # None = switching in progress (input disabled)
     conversation_id: reactive[uuid.UUID | None] = reactive(None)
     # >0 = waiting for user confirmation (input disabled)

@@ -90,9 +90,9 @@ class TestHistoryIntegration:
         """action_toggle_history calls HistorySidePanel.toggle with correct args."""
         app = OpenHandsApp.__new__(OpenHandsApp)
         # Initialize conversation_state to avoid AttributeError
-        from openhands_cli.tui.core.state import ConversationState
+        from openhands_cli.tui.core.state import ConversationContainer
 
-        app.conversation_state = Mock(spec=ConversationState)
+        app.conversation_state = Mock(spec=ConversationContainer)
         app.conversation_state.conversation_id = uuid.uuid4()
 
         toggle_mock = Mock()

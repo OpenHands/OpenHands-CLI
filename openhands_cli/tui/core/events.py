@@ -5,7 +5,7 @@ Minimal events for interactions that require App-level handling:
 - ShowConfirmationPanel: Request App to mount confirmation panel
 - ConfirmationDecision: User made a decision on pending actions
 
-Most UI state is handled reactively via ConversationState:
+Most UI state is handled reactively via ConversationContainer:
 - conversation_id=None: InputField disables, App shows loading state
 - conversation_id=UUID: InputField enables, normal operation
 

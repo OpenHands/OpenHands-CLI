@@ -3,8 +3,8 @@
 This module provides ScrollableContent, a VerticalScroll container that
 holds conversation content (splash screen and dynamically added messages).
 
-Widget Hierarchy (within ConversationState):
-    ConversationState(Container, #conversation_state)
+Widget Hierarchy (within ConversationContainer):
+    ConversationContainer(Container, #conversation_state)
     ├── ScrollableContent(VerticalScroll, #scroll_view)
     │   ├── SplashContent(#splash_content)
     │   ├── ... dynamically added conversation widgets
@@ -35,14 +35,14 @@ class ScrollableContent(VerticalScroll):
     - Dynamically added conversation widgets (user messages, agent responses)
     - InlineConfirmationPanel (when waiting for user confirmation)
 
-    Reactive Properties (via data_bind from ConversationState):
+    Reactive Properties (via data_bind from ConversationContainer):
     - conversation_id: Current conversation ID (clears content on change)
     - pending_action_count: Number of actions awaiting confirmation (>0 mounts panel)
 
     Message handling is done by ConversationManager, not by this widget.
     """
 
-    # Reactive properties bound via data_bind() to ConversationState
+    # Reactive properties bound via data_bind() to ConversationContainer
     conversation_id: var[uuid.UUID | None] = var(None)
     pending_action_count: var[int] = var(0)
 

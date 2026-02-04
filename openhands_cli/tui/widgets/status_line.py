@@ -14,8 +14,8 @@ from openhands_cli.utils import abbreviate_number, format_cost
 class WorkingStatusLine(Static):
     """Status line showing conversation timer and working indicator (above input).
 
-    This widget uses data_bind() to bind to ConversationState reactive properties.
-    When ConversationState.running or ConversationState.elapsed_seconds change,
+    This widget uses data_bind() to bind to ConversationContainer reactive properties.
+    When ConversationContainer.running or ConversationContainer.elapsed_seconds change,
     this widget's corresponding properties are automatically updated.
     """
 
@@ -51,7 +51,7 @@ class WorkingStatusLine(Static):
     # ----- Reactive Watchers -----
 
     def watch_running(self, _running: bool) -> None:
-        """React to running state changes from ConversationState."""
+        """React to running state changes from ConversationContainer."""
         self._update_text()
 
     # ----- Internal helpers -----
@@ -82,8 +82,8 @@ class WorkingStatusLine(Static):
 class InfoStatusLine(Static):
     """Status line showing work directory, input mode, and conversation metrics.
 
-    This widget uses data_bind() to bind to ConversationState reactive properties.
-    When ConversationState metrics change, this widget automatically updates.
+    This widget uses data_bind() to bind to ConversationContainer reactive properties.
+    When ConversationContainer metrics change, this widget automatically updates.
 
     The multiline mode state is synced via Signal subscription to InputField,
     since it's UI widget state (not conversation state).
@@ -98,10 +98,10 @@ class InfoStatusLine(Static):
     }
     """
 
-    # Reactive properties bound via data_bind() to ConversationState
+    # Reactive properties bound via data_bind() to ConversationContainer
     # Note: Named 'running' to avoid conflict with MessagePump.is_running
     running: var[bool] = var(False)
-    # Metrics object from conversation stats (bound from ConversationState)
+    # Metrics object from conversation stats (bound from ConversationContainer)
     metrics: var[Metrics | None] = var(None)
 
     # Local UI state - updated via Signal subscription to InputField
@@ -140,7 +140,7 @@ class InfoStatusLine(Static):
         self._update_text()
 
     def watch_metrics(self, _value: Metrics | None) -> None:
-        """React to metrics changes from ConversationState."""
+        """React to metrics changes from ConversationContainer."""
         self._update_text()
 
     # ----- Internal helpers -----

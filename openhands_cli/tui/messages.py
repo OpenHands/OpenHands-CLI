@@ -22,7 +22,7 @@ from textual.message import Message
 class UserInputSubmitted(Message):
     """Message sent when user submits regular text input.
 
-    This message bubbles up to ConversationState which renders the user message
+    This message bubbles up to ConversationContainer which renders the user message
     and processes it with the conversation runner.
     """
 
@@ -48,7 +48,7 @@ class SlashCommandSubmitted(Message):
 class NewConversationRequested(Message):
     """Message sent when user requests a new conversation (via /new command).
 
-    This message is handled by ConversationState, which owns the conversation
+    This message is handled by ConversationContainer, which owns the conversation
     lifecycle and state.
     """
 

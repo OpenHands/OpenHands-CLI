@@ -28,7 +28,7 @@ from openhands_cli.user_actions.types import UserConfirmation
 
 
 if TYPE_CHECKING:
-    from openhands_cli.tui.core.state import ConversationState
+    from openhands_cli.tui.core.state import ConversationContainer
 
 
 class ConversationRunner:
@@ -38,14 +38,14 @@ class ConversationRunner:
     - ShowConfirmationPanel: Request UI to show confirmation panel
     - Policy changes are handled by ConversationManager
 
-    ConversationState is used only for reading state (is_confirmation_active)
+    ConversationContainer is used only for reading state (is_confirmation_active)
     and updating running status.
     """
 
     def __init__(
         self,
         conversation_id: uuid.UUID,
-        state: "ConversationState",
+        state: "ConversationContainer",
         message_pump: MessagePump,
         notification_callback: Callable[[str, str, SeverityLevel], None],
         visualizer: ConversationVisualizer,
@@ -58,7 +58,7 @@ class ConversationRunner:
 
         Args:
             conversation_id: UUID for the conversation.
-            state: ConversationState for reading state and updating running status.
+            state: ConversationContainer for reading state and updating running status.
             message_pump: MessagePump (ConversationManager) for posting messages.
             notification_callback: Callback for notifications.
             visualizer: Visualizer for output display.
@@ -258,7 +258,7 @@ class ConversationRunner:
             )
 
     def _update_run_status(self, is_running: bool) -> None:
-        """Update the running status via ConversationState."""
+        """Update the running status via ConversationContainer."""
         self._running = is_running
         self._state.set_running(is_running)
 
