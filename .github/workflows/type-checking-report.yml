@@ -1,7 +1,8 @@
 ---
-# Weekly workflow that generates a type checking report using OpenHands CLI
-# The agent analyzes the codebase for missing type hints and creates a GitHub issue
-name: Weekly Type Checking Report
+# Weekly workflow that generates a code quality report using OpenHands CLI
+# The agent analyzes the codebase for type hints, state management, separation of concerns,
+# and code duplication, then creates a GitHub issue and optionally opens PRs for quick fixes
+name: Weekly Code Quality Report
 
 on:
     schedule:
@@ -14,16 +15,25 @@ on:
                 required: false
                 default: true
                 type: boolean
+            auto_fix_low_hanging:
+                description: Automatically open PRs for low-hanging improvements
+                required: false
+                default: true
+                type: boolean
 
 permissions:
-    contents: read
+    contents: write
     issues: write
+    pull-requests: write
 
 jobs:
-    type-checking-report:
-        name: Generate Type Checking Report
+    code-quality-report:
+        name: Generate Code Quality Report
         runs-on: blacksmith-2vcpu-ubuntu-2404
         if: github.repository == 'OpenHands/OpenHands-CLI'
+        outputs:
+            issue_number: ${{ steps.create_issue.outputs.issue_number }}
+            report_generated: ${{ steps.generate_report.outputs.report_generated }}
 
         steps:
             - name: Checkout repository
@@ -51,7 +61,7 @@ jobs:
                   uv run pyright --outputjson > pyright_output.json 2>&1 || true
                   echo "Pyright completed"
 
-            - name: Generate type checking report with OpenHands
+            - name: Generate code quality report with OpenHands
               id: generate_report
               env:
                   LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
@@ -59,40 +69,88 @@ jobs:
                   LLM_MODEL: litellm_proxy/claude-opus-4-5-20251101
               run: |
                   # Create the analysis prompt
-                  cat > /tmp/type_check_prompt.md << 'PROMPT_EOF'
-                  # Type Checking Analysis Task
+                  cat > /tmp/code_quality_prompt.md << 'PROMPT_EOF'
+                  # Code Quality Analysis Task
 
-                  Please analyze this Python codebase for type checking issues and generate a comprehensive report.
+                  Please analyze this Python codebase for code quality issues and generate a comprehensive report.
 
                   ## Instructions
 
-                  1. First, read the pyright output from `pyright_output.json` in the current directory
-                  2. Analyze the codebase in `openhands_cli/` directory for:
-                     - Missing type hints on function parameters and return types
-                     - Missing type hints on class attributes
-                     - Any `Any` types that could be more specific
-                     - Potential type safety issues that could lead to runtime bugs
-                     - Areas where better typing could improve code quality
+                  ### 1. Type Checking Analysis
+                  First, read the pyright output from `pyright_output.json` in the current directory.
+                  Analyze the codebase in `openhands_cli/` directory for:
+                  - Missing type hints on function parameters and return types
+                  - Missing type hints on class attributes
+                  - Any `Any` types that could be more specific
+                  - Potential type safety issues that could lead to runtime bugs
+                  - Areas where better typing could improve code quality
 
-                  3. Generate a markdown report with the following sections:
-                     - **Executive Summary**: Brief overview of findings
-                     - **Critical Issues**: Type errors that could cause runtime bugs
-                     - **Missing Type Hints**: Functions/methods lacking proper type annotations
-                     - **Improvement Opportunities**: Areas where typing could be enhanced
-                     - **Recommendations**: Prioritized list of suggested fixes
-                     - **Statistics**: Count of issues by category
+                  ### 2. State Management Analysis
+                  Analyze the codebase for state management patterns and issues:
+                  - Identify global state that could be encapsulated in classes or dataclasses
+                  - Look for mutable default arguments that could cause bugs
+                  - Find places where state is scattered across modules instead of centralized
+                  - Identify state that is passed through too many function calls (prop drilling)
+                  - Look for opportunities to use proper state containers (dataclasses, TypedDict, etc.)
+                  - Check `openhands_cli/stores/` for proper state management patterns
 
-                  4. Save the report to `type_checking_report.md` in the current directory
+                  ### 3. Separation of Concerns Analysis
+                  Analyze the codebase for proper separation of concerns:
+                  - Identify modules that mix business logic with UI/presentation code
+                  - Look for functions/classes that do too many things (violate single responsibility)
+                  - Find places where data access is mixed with business logic
+                  - Identify tightly coupled components that should be loosely coupled
+                  - Check if the `openhands_cli/acp_impl/`, `openhands_cli/tui/`, and `openhands_cli/auth/` directories have clear boundaries
 
-                  Focus on actionable items that would improve code quality and prevent runtime bugs.
+                  ### 4. Code Duplication Analysis (ACP vs TUI)
+                  Compare the ACP implementation (`openhands_cli/acp_impl/`) and TUI implementation (`openhands_cli/tui/`) for code duplication:
+                  - Identify similar or identical code patterns in both implementations
+                  - Look for duplicated utility functions, data processing, or event handling logic
+                  - Find opportunities to extract shared code into `openhands_cli/shared/` module
+                  - Check for duplicated constants, configurations, or data structures
+                  - Identify common patterns that could be abstracted into base classes or mixins
+                  - Pay special attention to:
+                    - Event handling and processing logic
+                    - Agent interaction patterns
+                    - Error handling approaches
+                    - State synchronization code
+                    - User input processing
+
+                  ### 5. Generate Report
+                  Generate a markdown report with the following sections:
+                  - **Executive Summary**: Brief overview of all findings
+                  - **Type Checking Issues**:
+                    - Critical Issues: Type errors that could cause runtime bugs
+                    - Missing Type Hints: Functions/methods lacking proper type annotations
+                    - Type Improvement Opportunities: Areas where typing could be enhanced
+                  - **State Management Issues**:
+                    - Current State: How state is currently managed
+                    - Problems Identified: Issues with current state management
+                    - Recommendations: How to improve state management
+                  - **Separation of Concerns Issues**:
+                    - Coupled Components: Areas where code is too tightly coupled
+                    - Mixed Responsibilities: Code that violates single responsibility principle
+                    - Recommendations: How to improve separation
+                  - **Code Duplication (ACP/TUI)**:
+                    - Duplicated Patterns: Specific code that appears in both implementations
+                    - Shared Code Opportunities: What could be moved to shared modules
+                    - Recommendations: Specific refactoring suggestions
+                  - **Low-Hanging Fruit**: Easy fixes that can be addressed quickly (mark each with estimated effort: trivial/small/medium)
+                  - **Statistics**: Count of issues by category
+                  - **Prioritized Action Items**: Ordered list of recommended fixes
+
+                  ### 6. Save Report
+                  Save the report to `code_quality_report.md` in the current directory.
+
+                  Focus on actionable items that would improve code quality, prevent runtime bugs, and reduce maintenance burden.
                   PROMPT_EOF
 
                   # Run OpenHands CLI in headless mode
                   uv run openhands --headless --always-approve --override-with-envs \
-                    --file /tmp/type_check_prompt.md || echo "OpenHands analysis completed"
+                    --file /tmp/code_quality_prompt.md || echo "OpenHands analysis completed"
 
                   # Check if report was generated
-                  if [ -f "type_checking_report.md" ]; then
+                  if [ -f "code_quality_report.md" ]; then
                     echo "report_generated=true" >> $GITHUB_OUTPUT
                     echo "Report generated successfully"
                   else
@@ -100,34 +158,36 @@ jobs:
                     echo "Report was not generated, creating fallback report from pyright output"
 
                     # Create a fallback report from pyright output
-                    cat > type_checking_report.md << 'FALLBACK_EOF'
-                  # Type Checking Report
+                    cat > code_quality_report.md << 'FALLBACK_EOF'
+                  # Code Quality Report
 
                   ## Summary
 
                   This report was auto-generated from pyright static analysis.
+                  Full analysis could not be completed.
 
                   ## Pyright Analysis Results
 
                   FALLBACK_EOF
 
                     if [ -f "pyright_output.json" ]; then
-                      echo '```json' >> type_checking_report.md
-                      cat pyright_output.json >> type_checking_report.md
-                      echo '```' >> type_checking_report.md
+                      echo '```json' >> code_quality_report.md
+                      cat pyright_output.json >> code_quality_report.md
+                      echo '```' >> code_quality_report.md
                     else
-                      echo "No pyright output available." >> type_checking_report.md
+                      echo "No pyright output available." >> code_quality_report.md
                     fi
                   fi
 
             - name: Upload report artifact
               uses: actions/upload-artifact@v4
               with:
-                  name: type-checking-report
-                  path: type_checking_report.md
+                  name: code-quality-report
+                  path: code_quality_report.md
                   if-no-files-found: warn
 
             - name: Create GitHub Issue
+              id: create_issue
               if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.create_issue) }}
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -136,17 +196,17 @@ jobs:
                   REPORT_DATE=$(date +"%Y-%m-%d")
 
                   # Read the report content
-                  if [ -f "type_checking_report.md" ]; then
-                    REPORT_CONTENT=$(cat type_checking_report.md)
+                  if [ -f "code_quality_report.md" ]; then
+                    REPORT_CONTENT=$(cat code_quality_report.md)
                   else
                     REPORT_CONTENT="No report was generated. Please check the workflow logs."
                   fi
 
                   # Create the issue body
                   cat > /tmp/issue_body.md << EOF
-                  ## Bi-weekly Type Checking Report - ${REPORT_DATE}
+                  ## Weekly Code Quality Report - ${REPORT_DATE}
 
-                  This is an automated report generated by the bi-weekly type checking workflow.
+                  This is an automated report generated by the weekly code quality workflow.
 
                   ${REPORT_CONTENT}
 
@@ -154,13 +214,193 @@ jobs:
 
                   **Workflow Run:** [View Details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
+                  **Categories Analyzed:**
+                  - 🔍 Type checking and type hints
+                  - 📦 State management patterns
+                  - 🔀 Separation of concerns
+                  - 🔁 Code duplication between ACP and TUI
+
                   **Next Steps:**
                   - Review the findings above
-                  - Create specific issues for critical items
-                  - Consider using GitHub Resolver to address low-hanging fruit
+                  - PRs for low-hanging fruit may be automatically created
+                  - Create specific issues for larger refactoring items
                   EOF
 
-                  # Create the issue using GitHub CLI (without labels to avoid errors if they don't exist)
-                  gh issue create \
-                    --title "🔍 Type Checking Report - ${REPORT_DATE}" \
-                    --body-file /tmp/issue_body.md
+                  # Create the issue using GitHub CLI and capture the issue number
+                  ISSUE_URL=$(gh issue create \
+                    --title "🔍 Code Quality Report - ${REPORT_DATE}" \
+                    --body-file /tmp/issue_body.md)
+
+                  # Extract issue number from URL
+                  ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
+                  echo "issue_number=${ISSUE_NUMBER}" >> $GITHUB_OUTPUT
+                  echo "Created issue #${ISSUE_NUMBER}"
+
+    auto-fix-low-hanging:
+        name: Auto-fix Low-Hanging Improvements
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+        needs: code-quality-report
+        if: |
+            needs.code-quality-report.outputs.report_generated == 'true' &&
+            (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.auto_fix_low_hanging))
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v7
+
+            - name: Install dependencies
+              run: |
+                  uv sync --group dev
+
+            - name: Download report artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: code-quality-report
+                  path: .
+
+            - name: Configure git
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+            - name: Auto-fix low-hanging improvements with OpenHands
+              env:
+                  LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+                  LLM_BASE_URL: https://llm-proxy.app.all-hands.dev
+                  LLM_MODEL: litellm_proxy/claude-opus-4-5-20251101
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  ISSUE_NUMBER: ${{ needs.code-quality-report.outputs.issue_number }}
+                  REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+              run: |
+                  # Create the auto-fix prompt
+                  cat > /tmp/auto_fix_prompt.md << 'PROMPT_EOF'
+                  # Auto-Fix Low-Hanging Code Quality Improvements
+
+                  You have access to a code quality report in `code_quality_report.md`. Your task is to automatically fix LOW-HANGING improvements and open PRs for them.
+
+                  ## Important Context
+                  - The tracking issue number is available in the environment variable `ISSUE_NUMBER`
+                  - The repository URL is available in `REPO_URL`
+                  - You should link all PRs back to issue #${ISSUE_NUMBER}
+
+                  ## Instructions
+
+                  ### 1. Read the Report
+                  Read `code_quality_report.md` and identify the **Low-Hanging Fruit** section.
+                  Focus ONLY on items marked as "trivial" or "small" effort.
+
+                  ### 2. Selection Criteria
+                  Only fix issues that are:
+                  - Adding missing type hints to simple functions (no complex generics)
+                  - Fixing obvious type annotation errors
+                  - Moving clearly duplicated utility functions to shared modules
+                  - Adding simple dataclass wrappers for state
+                  - Fixing mutable default arguments
+                  - Simple refactoring that doesn't change behavior
+
+                  DO NOT attempt:
+                  - Large architectural changes
+                  - Changes that require extensive testing
+                  - Changes that modify public APIs significantly
+                  - Complex generic type annotations
+                  - Changes marked as "medium" or higher effort
+
+                  ### 3. For Each Fix
+                  For each low-hanging improvement you can fix:
+
+                  a) Create a new branch with a descriptive name:
+                     ```bash
+                     git checkout -b fix/code-quality/<short-description>
+                     ```
+
+                  b) Make the minimal necessary changes to fix the issue
+
+                  c) Run linting to ensure code quality:
+                     ```bash
+                     make lint
+                     ```
+                     If linting fails, fix the issues or abandon this particular fix.
+
+                  d) Run tests to ensure nothing is broken:
+                     ```bash
+                     make test
+                     ```
+                     If tests fail, abandon this particular fix and move to the next one.
+
+                  e) Commit the changes with a clear message:
+                     ```bash
+                     git add -A
+                     git commit -m "fix(<scope>): <description>
+
+                     Addresses item from code quality report.
+
+                     Closes #${ISSUE_NUMBER}"
+                     ```
+
+                  f) Push the branch:
+                     ```bash
+                     git push origin fix/code-quality/<short-description>
+                     ```
+
+                  g) Create a PR using GitHub CLI:
+                     ```bash
+                     gh pr create \
+                       --title "fix(<scope>): <short description>" \
+                       --body "## Summary
+                     <Brief description of what this PR fixes>
+
+                     ## Changes
+                     - <List of changes made>
+
+                     ## Related Issue
+                     Addresses findings from #${ISSUE_NUMBER}
+
+                     ## Testing
+                     - [x] Linting passes
+                     - [x] Tests pass
+
+                     ---
+                     *This PR was automatically generated by the Code Quality Report workflow.*" \
+                       --base main
+                     ```
+
+                  h) Return to main branch for the next fix:
+                     ```bash
+                     git checkout main
+                     ```
+
+                  ### 4. Limits
+                  - Create a maximum of 3 PRs per run to avoid overwhelming reviewers
+                  - Each PR should be focused on a single type of improvement
+                  - If you cannot complete a fix cleanly, skip it and move to the next
+
+                  ### 5. Summary
+                  After completing all fixes, create a file `auto_fix_summary.md` with:
+                  - List of PRs created (with links)
+                  - List of items skipped and why
+                  - Any issues encountered
+
+                  Remember: Quality over quantity. Only create PRs for changes you are confident are correct and improve the codebase.
+                  PROMPT_EOF
+
+                  # Run OpenHands CLI in headless mode
+                  uv run openhands --headless --always-approve --override-with-envs \
+                    --file /tmp/auto_fix_prompt.md || echo "OpenHands auto-fix completed"
+
+            - name: Upload auto-fix summary
+              uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: auto-fix-summary
+                  path: auto_fix_summary.md
+                  if-no-files-found: ignore
