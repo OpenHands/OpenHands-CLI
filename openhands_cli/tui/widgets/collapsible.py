@@ -321,7 +321,7 @@ class CollapsibleNavigationMixin:
 
         # Get all collapsibles as a list for index-based navigation
         main_display = self.query_one("#main_display")
-        collapsibles = list(main_display.query(Collapsible))  # type: ignore[union-attr]
+        collapsibles = list(main_display.query(Collapsible))
         if not collapsibles:
             return
 
