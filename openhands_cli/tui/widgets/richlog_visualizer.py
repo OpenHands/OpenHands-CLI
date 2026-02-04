@@ -283,7 +283,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
             # Add critic collapsible if present (for MessageEvent and ActionEvent)
             critic_result = getattr(event, "critic_result", None)
-            if critic_result is not None:
+            if critic_result is not None and self.cli_settings.enable_critic:
                 from openhands_cli.tui.utils.critic import (
                     create_critic_collapsible,
                     send_critic_inference_event,
