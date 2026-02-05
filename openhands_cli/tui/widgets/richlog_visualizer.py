@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 from rich.text import Text
 from textual.widgets import Markdown
 
+from openhands.sdk.conversation.impl.local_conversation import LocalConversation
+from openhands.sdk.conversation.impl.remote_conversation import RemoteConversation
 from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
 from openhands.sdk.event import (
     ActionEvent,
@@ -21,8 +23,6 @@ from openhands.sdk.event import (
     UserRejectObservation,
 )
 from openhands.sdk.event.base import Event
-from openhands.sdk.conversation.impl.local_conversation import LocalConversation
-from openhands.sdk.conversation.impl.remote_conversation import RemoteConversation
 from openhands.sdk.event.condenser import Condensation, CondensationRequest
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.tool.builtins.finish import FinishAction
