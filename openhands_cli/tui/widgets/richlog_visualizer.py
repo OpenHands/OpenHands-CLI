@@ -21,6 +21,8 @@ from openhands.sdk.event import (
     UserRejectObservation,
 )
 from openhands.sdk.event.base import Event
+from openhands.sdk.conversation.impl.local_conversation import LocalConversation
+from openhands.sdk.conversation.impl.remote_conversation import RemoteConversation
 from openhands.sdk.event.condenser import Condensation, CondensationRequest
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.tool.builtins.finish import FinishAction
@@ -254,13 +256,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
             runner = self._app.conversation_runner
             if runner is None or runner.conversation is None:
                 return None
-            agent = getattr(runner.conversation, "agent", None)
-            if agent is None:
+            conversation = runner.conversation
+            if not isinstance(conversation, LocalConversation | RemoteConversation):
                 return None
-            return agent.llm.model
+            return conversation.agent.llm.model
         except Exception:
-            pass
-        return None
+            return None
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
