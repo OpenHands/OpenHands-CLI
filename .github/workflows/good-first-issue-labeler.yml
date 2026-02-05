@@ -1,0 +1,79 @@
+---
+name: Daily Good First Issue Labeling
+
+on:
+    schedule:
+        - cron: "0 12 * * *"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    issues: write
+
+jobs:
+    label-good-first-issues:
+        if: github.repository == 'OpenHands/OpenHands-CLI'
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v7
+
+            - name: Install dependencies
+              run: |
+                  uv sync --group dev
+
+            - name: Create labeling prompt
+              run: |
+                  cat > /tmp/good_first_issue_prompt.md << 'PROMPT_EOF'
+                  # Good First Issue Labeling Task
+
+                  You are responsible for applying the `good first issue` label to new issues in the
+                  OpenHands/OpenHands-CLI repository.
+
+                  ## Rules
+                  1. Use the GitHub REST API with the `GITHUB_TOKEN` environment variable.
+                  2. Only consider **open issues** created in the last 24 hours (UTC).
+                     - Exclude pull requests (items with a `pull_request` field).
+                  3. Skip any issue that already has the `good first issue` label.
+                  4. Be conservative. Only label issues that are:
+                     - Small, well-scoped, and low-risk
+                     - Clearly described with reproducible steps or clear acceptance criteria
+                     - Not large features, architecture changes, or multi-component refactors
+                  5. If you are uncertain, do not label the issue.
+                  6. Label at most 5 issues per run.
+                  7. If the `good first issue` label does not exist, create it with:
+                     - name: `good first issue`
+                     - color: `7057ff`
+                     - description: `Good first issue for new contributors`
+
+                  ## Suggested approach
+                  - Determine the UTC date 24 hours ago and query the Search API:
+                    `GET /search/issues?q=repo:OpenHands/OpenHands-CLI+is:issue+is:open+created:>=YYYY-MM-DD`
+                  - For each candidate issue, fetch details and labels via:
+                    `GET /repos/OpenHands/OpenHands-CLI/issues/{number}`
+                  - Apply the label using:
+                    `POST /repos/OpenHands/OpenHands-CLI/issues/{number}/labels`
+
+                  Provide a short summary of actions taken and reasons for any skips.
+                  PROMPT_EOF
+
+            - name: Run OpenHands labeler
+              env:
+                  LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+                  LLM_BASE_URL: https://llm-proxy.app.all-hands.dev
+                  LLM_MODEL: litellm_proxy/claude-opus-4-5-20251101
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  uv run openhands --headless --always-approve --override-with-envs \
+                    --file /tmp/good_first_issue_prompt.md || echo "OpenHands labeling completed"
