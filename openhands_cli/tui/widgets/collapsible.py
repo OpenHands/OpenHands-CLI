@@ -329,7 +329,7 @@ class CollapsibleNavigationMixin:
         try:
             current_index = collapsibles.index(event.collapsible)
         except ValueError:
-            # Collapsible not in list (shouldn't happen, but be safe)
+            # Collapsible not in list (this shouldn't happen)
             return
 
         # Calculate target index
