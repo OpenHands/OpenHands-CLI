@@ -13,7 +13,7 @@ OpenHands/OpenHands-CLI repository.
    - Clearly described with reproducible steps or clear acceptance criteria
    - Not large features, architecture changes, or multi-component refactors
 5. If you are uncertain, do not label the issue.
-7. If the `good first issue` label does not exist, create it with:
+6. If the `good first issue` label does not exist, create it with:
    - name: `good first issue`
    - color: `7057ff`
    - description: `Good first issue for new contributors`
