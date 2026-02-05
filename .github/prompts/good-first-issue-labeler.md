@@ -5,7 +5,7 @@ OpenHands/OpenHands-CLI repository.
 
 ## Rules
 1. Use the GitHub REST API with the `GITHUB_TOKEN` environment variable.
-2. Only consider **open issues** created in the last 24 hours (UTC).
+2. Only consider **open issues** created in the last 7 days (UTC).
    - Exclude pull requests (items with a `pull_request` field).
 3. Skip any issue that already has the `good first issue` label.
 4. Be conservative. Only label issues that are:
@@ -19,7 +19,7 @@ OpenHands/OpenHands-CLI repository.
    - description: `Good first issue for new contributors`
 
 ## Suggested approach
-- Determine the UTC date 24 hours ago and query the Search API:
+- Determine the UTC date 7 days ago and query the Search API:
   `GET /search/issues?q=repo:OpenHands/OpenHands-CLI+is:issue+is:open+created:>=YYYY-MM-DD`
 - For each candidate issue, fetch details and labels via:
   `GET /repos/OpenHands/OpenHands-CLI/issues/{number}`
