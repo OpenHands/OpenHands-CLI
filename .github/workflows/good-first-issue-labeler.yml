@@ -37,7 +37,7 @@ jobs:
               env:
                   LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
                   LLM_BASE_URL: https://llm-proxy.app.all-hands.dev
-                  LLM_MODEL: litellm_proxy/claude-opus-4-5-20251101
+                  LLM_MODEL: litellm_proxy/gpt-5.2
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   uv run openhands --headless --always-approve --override-with-envs \
