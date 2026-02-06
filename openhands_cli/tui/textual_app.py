@@ -354,11 +354,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         Only shows notification if a conversation runner has been instantiated,
         meaning a conversation has already started with the previous settings.
-
-        Note: This callback is only registered for `action_open_settings` (existing
-        users), not for `_show_initial_settings` (first-time setup). Additionally,
-        during first-time setup, conversation_runner is always None, so even if
-        this method were called, no notification would be shown.
         """
         if self.conversation_runner:
             self.notify(
