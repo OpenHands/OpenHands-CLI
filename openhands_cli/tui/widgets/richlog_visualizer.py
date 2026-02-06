@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 from rich.text import Text
 from textual.widgets import Markdown
 
+from openhands.sdk.conversation.impl.local_conversation import LocalConversation
+from openhands.sdk.conversation.impl.remote_conversation import RemoteConversation
 from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
 from openhands.sdk.event import (
     ActionEvent,
@@ -251,16 +253,15 @@ class ConversationVisualizer(ConversationVisualizerBase):
             The agent model name or None if not available.
         """
         try:
-            if (
-                self._app.conversation_runner
-                and self._app.conversation_runner.conversation
-                and hasattr(self._app.conversation_runner.conversation, "agent")
-                and self._app.conversation_runner.conversation.agent  # type: ignore[union-attr]
-            ):
-                return self._app.conversation_runner.conversation.agent.llm.model  # type: ignore[union-attr]
+            runner = self._app.conversation_runner
+            if runner is None or runner.conversation is None:
+                return None
+            conversation = runner.conversation
+            if not isinstance(conversation, LocalConversation | RemoteConversation):
+                return None
+            return conversation.agent.llm.model
         except Exception:
-            pass
-        return None
+            return None
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
