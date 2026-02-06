@@ -339,13 +339,15 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             )
             return
 
-        # Open the settings screen for existing users
+        # Open the same settings screen as first-run (Agent Settings only)
         settings_screen = SettingsScreen(
             on_settings_saved=[
                 self._reload_visualizer,
                 self._notify_restart_required,
             ],
             env_overrides_enabled=self.env_overrides_enabled,
+            show_cli_tab=False,
+            force_initial_setup_ui=True,
         )
         self.push_screen(settings_screen)
 
@@ -531,6 +533,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self._handle_new_command()
         elif command == "/history":
             self._handle_history_command()
+        elif command == "/config":
+            self.action_open_settings()
         elif command == "/confirm":
             self._handle_confirm_command()
         elif command == "/condense":
