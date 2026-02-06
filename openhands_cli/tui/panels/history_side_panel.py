@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from textual import on
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.css.query import NoMatches
-from textual.widgets import Static
+from textual.widgets import Button, Static
 
 from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.theme import OPENHANDS_THEME
@@ -170,7 +170,9 @@ class HistorySidePanel(Container):
 
     def compose(self):
         """Compose the history side panel content."""
-        yield Static("Conversations", classes="history-header", id="history-header")
+        with Horizontal(classes="history-header-row"):
+            yield Static("Conversations", classes="history-header", id="history-header")
+            yield Button("✕", id="history-close-btn", classes="history-close-btn")
         yield VerticalScroll(id="history-list")
 
     def on_mount(self):
@@ -206,6 +208,11 @@ class HistorySidePanel(Container):
     def _on_revert_selection(self, _event: RevertSelectionRequest) -> None:
         """Handle message: revert selection highlight to the current conversation."""
         self.select_current_conversation()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle close button: remove panel (same as /history again)."""
+        if event.button.id == "history-close-btn":
+            self.remove()
 
     def refresh_content(self) -> None:
         """Reload conversations and render the list."""

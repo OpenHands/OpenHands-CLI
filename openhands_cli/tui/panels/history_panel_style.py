@@ -12,10 +12,43 @@ HISTORY_PANEL_STYLE = """
         height: 100%;
     }
 
+    .history-header-row {
+        width: 100%;
+        height: 1;
+        align-vertical: middle;
+        margin-bottom: 1;
+    }
+
     .history-header {
         color: $primary;
         text-style: bold;
-        margin-bottom: 1;
+        width: 1fr;
+        height: 1;
+    }
+
+    #history-close-btn {
+        min-width: 3;
+        width: auto;
+        height: 1;
+        background: transparent;
+        color: #aaaaaa;
+        border: none;
+        padding: 0;
+        margin: 0;
+        text-style: bold;
+    }
+
+    #history-close-btn:hover {
+        background: #333333;
+        color: $error;
+        border: none;
+    }
+
+    #history-close-btn:focus {
+        background: transparent;
+        color: #aaaaaa;
+        border: none;
+        text-style: bold;
     }
 
     .history-item {
