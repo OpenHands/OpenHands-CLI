@@ -5,6 +5,9 @@ from dataclasses import dataclass
 
 from textual.message import Message
 
+from openhands.sdk.event import ActionEvent
+from openhands_cli.user_actions.types import UserConfirmation
+
 
 @dataclass
 class ConversationCreated(Message):
@@ -40,3 +43,25 @@ class RevertSelectionRequest(Message):
     """Sent to request the history panel to revert highlight to current conversation."""
 
     pass
+
+
+@dataclass
+class ConfirmationNeeded(Message):
+    """Posted when agent needs user confirmation for pending actions.
+
+    The worker exits after posting this message (non-blocking).
+    UI shows confirmation panel and waits for user input.
+    """
+
+    pending_actions: list[ActionEvent]
+
+
+@dataclass
+class ConfirmationProvided(Message):
+    """Posted when user provides confirmation decision.
+
+    UI posts this after user selects an option from the confirmation panel.
+    A new worker is started to resume the conversation with the decision.
+    """
+
+    decision: UserConfirmation
