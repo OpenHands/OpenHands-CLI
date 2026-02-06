@@ -19,6 +19,7 @@ COMMANDS = [
     DropdownItem(main="/confirm - Configure confirmation settings"),
     DropdownItem(main="/condense - Condense conversation history"),
     DropdownItem(main="/feedback - Send anonymous feedback about CLI"),
+    DropdownItem(main="/export - Save the current conversation to Markdown/JSON"),
     DropdownItem(main="/exit - Exit the application"),
 ]
 
@@ -41,16 +42,28 @@ def get_valid_commands() -> set[str]:
     return valid_commands
 
 
+def extract_command_and_args(user_input: str) -> tuple[str | None, str]:
+    """Parse user input into a command and optional arguments."""
+
+    stripped = user_input.strip()
+    if not stripped.startswith("/") or len(stripped) == 1:
+        return None, ""
+
+    parts = stripped.split(maxsplit=1)
+    command = parts[0]
+    args = parts[1].strip() if len(parts) > 1 else ""
+
+    if command not in get_valid_commands():
+        return None, ""
+
+    return command, args
+
+
 def is_valid_command(user_input: str) -> bool:
-    """Check if user input is an exact match for a valid command.
+    """Return True if user_input starts with a known slash command."""
 
-    Args:
-        user_input: The user's input string
-
-    Returns:
-        True if input exactly matches a valid command, False otherwise
-    """
-    return user_input in get_valid_commands()
+    command, _ = extract_command_and_args(user_input)
+    return command is not None
 
 
 def show_help(main_display: VerticalScroll) -> None:
@@ -72,6 +85,7 @@ def show_help(main_display: VerticalScroll) -> None:
   [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
   [{secondary}]/condense[/{secondary}] - Condense conversation history
   [{secondary}]/feedback[/{secondary}] - Send anonymous feedback about CLI
+  [{secondary}]/export[/{secondary}] - Save current conversation as Markdown/JSON
   [{secondary}]/exit[/{secondary}] - Exit the application
 
 [dim]Tips:[/dim]

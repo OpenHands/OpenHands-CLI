@@ -11,6 +11,8 @@ It creates a basic app with:
 import asyncio
 import uuid
 from collections.abc import Iterable
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import ClassVar
 
 from textual import events, getters, on
@@ -32,12 +34,19 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
+from openhands_cli.conversations.exporter import (
+    ConversationExportError,
+    export_conversation_transcript,
+)
 from openhands_cli.conversations.store.local import LocalFileStore
-from openhands_cli.locations import get_conversations_dir
+from openhands_cli.locations import get_conversations_dir, get_work_dir
 from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_splash_content
-from openhands_cli.tui.core.commands import is_valid_command, show_help
+from openhands_cli.tui.core.commands import (
+    extract_command_and_args,
+    show_help,
+)
 from openhands_cli.tui.core.conversation_manager import ConversationManager
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.core.messages import (
@@ -482,9 +491,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Process the first queued input immediately
         user_input = self.pending_inputs.pop(0)
 
-        # Handle commands - only exact matches (don't add to scroll view)
-        if is_valid_command(user_input):
-            self._handle_command(user_input)
+        command, arguments = extract_command_and_args(user_input)
+        # Handle commands - don't add to scroll view
+        if command:
+            self._handle_command(command, arguments)
             return
 
         # Add the user message to the main display as a Static widget
@@ -504,9 +514,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if not content:
             return
 
-        # Handle commands - only exact matches (don't add to scroll view)
-        if is_valid_command(content):
-            self._handle_command(content)
+        # Handle commands - don't add to scroll view
+        command, arguments = extract_command_and_args(content)
+        if command:
+            self._handle_command(command, arguments)
             return
 
         # Add the user message to the main display as a Static widget
@@ -522,8 +533,16 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Handle regular messages with conversation runner
         await self._handle_user_message(content)
 
-    def _handle_command(self, command: str) -> None:
+    def _handle_command(self, command: str, argument: str = "") -> None:
         """Handle command execution."""
+
+        if command != "/export" and argument:
+            self.notify(
+                title="Command error",
+                message=f"Command {command} does not take arguments.",
+                severity="error",
+            )
+            return
 
         if command == "/help":
             show_help(self.main_display)
@@ -537,6 +556,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self._handle_condense_command()
         elif command == "/feedback":
             self._handle_feedback_command()
+        elif command == "/export":
+            self._handle_export_command(argument)
         elif command == "/exit":
             self._handle_exit()
         else:
@@ -781,6 +802,99 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             message="Opening feedback form in your browser...",
             severity="information",
         )
+
+    def _handle_export_command(self, argument: str) -> None:
+        """Handle the /export command to save the current conversation transcript."""
+
+        conversation_id = self.conversation_id.hex
+        if not self._store.exists(conversation_id):
+            self.notify(
+                title="Export error",
+                message="No conversation data available to export yet.",
+                severity="error",
+            )
+            return
+
+        try:
+            markdown_path, json_path = self._prepare_export_paths(argument)
+            result = export_conversation_transcript(
+                self._store,
+                conversation_id,
+                markdown_path,
+                json_path,
+            )
+        except ConversationExportError as exc:
+            error_message = str(exc)
+            if "does not have any events" in error_message:
+                error_message = "No conversation data available to export yet."
+            self.notify(
+                title="Export error",
+                message=error_message,
+                severity="error",
+            )
+            return
+
+        self.notify(
+            title="Export complete",
+            message=(
+                f"Saved transcript to:\n- {result.markdown_path}\n- {result.json_path}"
+            ),
+            severity="information",
+        )
+
+    def _prepare_export_paths(self, argument: str) -> tuple[Path, Path]:
+        """Resolve export destination and avoid overwriting existing files."""
+
+        base_path = self._derive_export_base_path(argument)
+
+        counter = 0
+        while True:
+            candidate = (
+                base_path
+                if counter == 0
+                else base_path.with_name(f"{base_path.name}-{counter}")
+            )
+            markdown_path = candidate.with_suffix(".md")
+            json_path = candidate.with_suffix(".json")
+            if not markdown_path.exists() and not json_path.exists():
+                return markdown_path, json_path
+            counter += 1
+
+    def _derive_export_base_path(self, argument: str) -> Path:
+        """Return the base path (without extension) for export files."""
+
+        work_dir = Path(get_work_dir())
+        timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+        default_stem = f"openhands-conversation-{self.conversation_id.hex}-{timestamp}"
+        raw_argument = argument.strip()
+
+        if not raw_argument:
+            base_path = work_dir / default_stem
+            base_path.parent.mkdir(parents=True, exist_ok=True)
+            return base_path
+
+        candidate = Path(raw_argument).expanduser()
+        if not candidate.is_absolute():
+            candidate = work_dir / candidate
+
+        try:
+            # Directory: ends with /, exists as dir, or has no file extension
+            is_dir = (
+                raw_argument.endswith("/")
+                or candidate.is_dir()
+                or candidate.suffix.lower() not in {".md", ".json"}
+            )
+            if is_dir:
+                if not candidate.exists():
+                    candidate.mkdir(parents=True, exist_ok=True)
+                return candidate / default_stem
+            # Explicit filename (e.g. output.md or output.json)
+            parent = candidate.parent
+            if parent and not parent.exists():
+                parent.mkdir(parents=True, exist_ok=True)
+            return candidate.with_suffix("")
+        except OSError as exc:  # pragma: no cover - bubbled up to notifier
+            raise ConversationExportError(str(exc)) from exc
 
     def _dismiss_pending_feedback_widgets(self) -> None:
         """Remove all pending CriticFeedbackWidget instances from the UI.
