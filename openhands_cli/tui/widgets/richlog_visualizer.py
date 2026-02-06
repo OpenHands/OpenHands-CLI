@@ -5,6 +5,7 @@ This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 
 import re
 import threading
+import time
 from typing import TYPE_CHECKING
 
 from rich.text import Text
@@ -45,6 +46,16 @@ AGENT_MESSAGE_PADDING = (1, 0, 1, 1)  # top, right, bottom, left
 # Maximum line length for truncating titles/commands in collapsed view
 MAX_LINE_LENGTH = 70
 ELLIPSIS = "..."
+
+# Pending actions cache limits (Issue #426)
+# Hard cap on pending actions to prevent unbounded memory growth
+MAX_PENDING_ACTIONS = 100
+# TTL for pending actions in seconds (5 minutes)
+PENDING_ACTIONS_TTL_SECONDS = 300
+
+# Widget virtualization limits (Issue #426)
+# Maximum number of widgets to keep mounted in the container
+MAX_MOUNTED_WIDGETS = 500
 
 
 if TYPE_CHECKING:
@@ -114,7 +125,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Cache CLI settings to avoid repeated file system reads
         self._cli_settings: CliSettings | None = None
         # Track pending actions by tool_call_id for action-observation pairing
-        self._pending_actions: dict[str, tuple[ActionEvent, Collapsible]] = {}
+        # Value: (ActionEvent, Collapsible, timestamp) - timestamp for TTL cleanup
+        self._pending_actions: dict[str, tuple[ActionEvent, Collapsible, float]] = {}
+        # Track total mounted widgets count for virtualization
+        self._mounted_widget_count = 0
 
     @property
     def cli_settings(self) -> CliSettings:
@@ -315,10 +329,71 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 self._run_on_main_thread(self._add_widget_to_ui, feedback_widget)
 
     def _add_widget_to_ui(self, widget: "Widget") -> None:
-        """Add a widget to the UI (must be called from main thread)."""
+        """Add a widget to the UI (must be called from main thread).
+
+        Implements widget virtualization to prevent unbounded memory growth.
+        When widget count exceeds MAX_MOUNTED_WIDGETS, removes oldest widgets.
+        """
         self._container.mount(widget)
+        self._mounted_widget_count += 1
+
+        # Virtualization: remove oldest widgets when exceeding limit
+        if self._mounted_widget_count > MAX_MOUNTED_WIDGETS:
+            self._prune_old_widgets()
+
         # Automatically scroll to the bottom to show the newly added widget
         self._container.scroll_end(animate=False)
+
+    def _prune_old_widgets(self) -> None:
+        """Remove oldest widgets to maintain MAX_MOUNTED_WIDGETS limit.
+
+        Keeps splash screen widgets and removes the oldest event widgets.
+        """
+        # Get all children except splash widgets (they have splash- prefix in id)
+        children = list(self._container.children)
+        event_widgets = [
+            w for w in children if not (w.id and w.id.startswith("splash"))
+        ]
+
+        # Calculate how many to remove (keep 80% of max to avoid frequent pruning)
+        target_count = int(MAX_MOUNTED_WIDGETS * 0.8)
+        widgets_to_remove = len(event_widgets) - target_count
+
+        if widgets_to_remove <= 0:
+            return
+
+        # Remove oldest widgets (first in list)
+        for widget in event_widgets[:widgets_to_remove]:
+            widget.remove()
+            self._mounted_widget_count -= 1
+
+    def _cleanup_pending_actions(self) -> None:
+        """Clean up stale pending actions based on TTL and hard cap.
+
+        This prevents unbounded memory growth from actions that never
+        receive observations (e.g., agent crashes, mismatched events).
+        """
+        current_time = time.time()
+        stale_ids = []
+
+        # Find stale entries (exceeded TTL)
+        for tool_call_id, (_, _, timestamp) in self._pending_actions.items():
+            if current_time - timestamp > PENDING_ACTIONS_TTL_SECONDS:
+                stale_ids.append(tool_call_id)
+
+        # Remove stale entries
+        for tool_call_id in stale_ids:
+            self._pending_actions.pop(tool_call_id, None)
+
+        # Enforce hard cap by removing oldest entries
+        if len(self._pending_actions) > MAX_PENDING_ACTIONS:
+            # Sort by timestamp and keep only the newest MAX_PENDING_ACTIONS
+            sorted_items = sorted(
+                self._pending_actions.items(), key=lambda x: x[1][2]
+            )
+            excess_count = len(sorted_items) - MAX_PENDING_ACTIONS
+            for tool_call_id, _ in sorted_items[:excess_count]:
+                self._pending_actions.pop(tool_call_id, None)
 
     def _update_widget_in_ui(
         self, collapsible: Collapsible, new_title: str, new_content: str
@@ -339,7 +414,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         if tool_call_id not in self._pending_actions:
             return False
 
-        action_event, collapsible = self._pending_actions.pop(tool_call_id)
+        action_event, collapsible, _timestamp = self._pending_actions.pop(tool_call_id)
 
         # Determine success/error status
         is_error = isinstance(event, UserRejectObservation | AgentErrorEvent)
@@ -695,8 +770,15 @@ class ConversationVisualizer(ConversationVisualizerBase):
             # Action events default to collapsed since we have summary in title
             collapsible = self._make_collapsible(content_string, title, event)
 
-            # Store for pairing with observation
-            self._pending_actions[event.tool_call_id] = (event, collapsible)
+            # Store for pairing with observation (with timestamp for TTL)
+            self._pending_actions[event.tool_call_id] = (
+                event,
+                collapsible,
+                time.time(),
+            )
+
+            # Cleanup stale pending actions to prevent unbounded growth
+            self._cleanup_pending_actions()
 
             return collapsible
         elif isinstance(event, ObservationEvent):
