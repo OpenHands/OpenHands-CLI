@@ -2,7 +2,7 @@
 
 The HistorySidePanel uses the ConversationContainer pattern for state updates.
 It watches ConversationContainer's reactive properties (conversation_id,
-conversation_title, is_switching) instead of receiving forwarded messages.
+conversation_title, switch_confirmation_target) instead of receiving forwarded messages.
 """
 
 from __future__ import annotations
@@ -98,17 +98,16 @@ async def test_history_panel_updates_from_conversation_state(
         placeholder = placeholder_items[0]
         assert "first message" in str(placeholder.content)
 
-        # Test is_switching revert behavior:
+        # Test switch confirmation cancellation behavior:
         # Move selection away
         panel._handle_select(base_id)
         assert panel.selected_conversation_id is not None
         assert panel.selected_conversation_id.hex == base_id
 
-        # Simulate a cancelled switch (conversation_id goes None then back to original)
-        original_id = app.conversation_state.conversation_id
-        app.conversation_state.conversation_id = None  # Start switching
+        # Simulate a cancelled switch (confirmation target cleared)
+        app.conversation_state.switch_confirmation_target = uuid.UUID(base_id)
         await pilot.pause()
-        app.conversation_state.conversation_id = original_id  # Cancel switch
+        app.conversation_state.switch_confirmation_target = None
         await pilot.pause()
 
         # Selection should revert to current conversation

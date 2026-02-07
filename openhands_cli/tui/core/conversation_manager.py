@@ -140,6 +140,7 @@ class ConversationManager(Container):
 
         self._runners = RunnerRegistry(
             factory=runner_factory,
+            state=self._state,
             message_pump=self,
             notification_callback=notification_callback,
         )

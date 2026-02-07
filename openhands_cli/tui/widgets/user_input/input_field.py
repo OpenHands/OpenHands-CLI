@@ -71,7 +71,7 @@ class InputField(Container):
     - Ctrl+J to submit
 
     Reactive Behavior:
-    - Binds to `is_switching` from ConversationContainer
+    - Binds to `conversation_id` from ConversationContainer
     - Auto-disables during conversation switches
     """
 

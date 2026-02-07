@@ -45,6 +45,7 @@ class ConversationSwitchController:
             return
 
         if self._state.running:
+            self._state.set_switch_confirmation_target(target_id)
             self._post_message(RequestSwitchConfirmation(target_id))
             return
 
@@ -53,18 +54,30 @@ class ConversationSwitchController:
     def handle_switch_confirmed(self, target_id: uuid.UUID, *, confirmed: bool) -> None:
         if confirmed:
             self._perform_switch(target_id, pause_current=True)
+        else:
+            self._state.set_switch_confirmation_target(None)
 
     def _perform_switch(self, target_id: uuid.UUID, *, pause_current: bool) -> None:
         # Disable input and mark switching in progress.
+        previous_id = self._state.conversation_id
         self._state.start_switching()
 
         def worker() -> None:
-            if pause_current:
-                runner = self._runners.current
-                if runner is not None and runner.is_running:
-                    runner.conversation.pause()
+            try:
+                if pause_current:
+                    runner = self._runners.current
+                    if runner is not None and runner.is_running:
+                        runner.conversation.pause()
 
-            self._call_from_thread(self._prepare_switch, target_id)
+                def safe_prepare() -> None:
+                    try:
+                        self._prepare_switch(target_id)
+                    except Exception as exc:  # pragma: no cover - UI error handling
+                        self._handle_switch_error(exc, previous_id)
+
+                self._call_from_thread(safe_prepare)
+            except Exception as exc:  # pragma: no cover - UI error handling
+                self._call_from_thread(self._handle_switch_error, exc, previous_id)
 
         self._run_worker(
             worker,
@@ -75,6 +88,24 @@ class ConversationSwitchController:
             exit_on_error=False,
         )
 
+
+    def _handle_switch_error(
+        self, error: Exception, previous_id: uuid.UUID | None
+    ) -> None:
+        if previous_id is not None:
+            self._runners.get_or_create(previous_id)
+            self._state.finish_switching(previous_id)
+        else:
+            self._state.set_conversation_id(previous_id)
+
+        self._state.set_switch_confirmation_target(None)
+
+        self._notify(
+            f"{type(error).__name__}: {error}",
+            title="Switch Error",
+            severity="error",
+        )
+
     def _prepare_switch(self, target_id: uuid.UUID) -> None:
         # Reset for new conversation (conversation_id remains None until finish).
         self._state.reset_conversation_state()
@@ -83,6 +114,7 @@ class ConversationSwitchController:
         self._runners.get_or_create(target_id)
 
         self._state.finish_switching(target_id)
+        self._state.set_switch_confirmation_target(None)
 
         self._notify(
             f"Resumed conversation {target_id.hex[:8]}",
