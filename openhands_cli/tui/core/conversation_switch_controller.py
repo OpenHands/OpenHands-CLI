@@ -63,21 +63,22 @@ class ConversationSwitchController:
         self._state.start_switching()
 
         def worker() -> None:
-            try:
-                if pause_current:
+            if pause_current:
+                try:
                     runner = self._runners.current
                     if runner is not None and runner.is_running:
                         runner.conversation.pause()
+                except Exception as exc:  # pragma: no cover - UI error handling
+                    self._call_from_thread(self._handle_switch_error, exc, previous_id)
+                    return
 
-                def safe_prepare() -> None:
-                    try:
-                        self._prepare_switch(target_id)
-                    except Exception as exc:  # pragma: no cover - UI error handling
-                        self._handle_switch_error(exc, previous_id)
+            def safe_prepare() -> None:
+                try:
+                    self._prepare_switch(target_id)
+                except Exception as exc:  # pragma: no cover - UI error handling
+                    self._handle_switch_error(exc, previous_id)
 
-                self._call_from_thread(safe_prepare)
-            except Exception as exc:  # pragma: no cover - UI error handling
-                self._call_from_thread(self._handle_switch_error, exc, previous_id)
+            self._call_from_thread(safe_prepare)
 
         self._run_worker(
             worker,
@@ -93,10 +94,8 @@ class ConversationSwitchController:
     ) -> None:
         if previous_id is not None:
             self._runners.get_or_create(previous_id)
-            self._state.finish_switching(previous_id)
-        else:
-            self._state.set_conversation_id(previous_id)
 
+        self._state.set_conversation_id(previous_id)
         self._state.set_switch_confirmation_target(None)
 
         self._notify(
