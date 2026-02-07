@@ -38,7 +38,7 @@ def create_main_parser() -> argparse.ArgumentParser:
                 openhands --headless                # Start textual UI in headless mode
                 openhands --headless --json -t "Fix bug"  # Headless with JSON output
                 openhands --resume conversation-id  # Resume conversation
-                openhands --always-approve          # Auto-approve all actions
+                openhands --yolo                    # Auto-approve all actions
                 openhands --llm-approve             # LLM-based approval mode
                 openhands cloud -t "Fix bug"        # Create cloud conversation
                 openhands serve                     # Launch GUI server
