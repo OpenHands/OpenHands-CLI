@@ -38,7 +38,7 @@ This repository uses **uv** for dependency management and running tooling (such 
 ## Development Guidelines
 
 ### Linting Requirements
-**Always run lint before committing changes.** Use `make lint` to run all pre-commit hooks on all files.
+**Always run lint before committing changes.** Use `make lint` to run all pre-commit hooks on all files, and do it before every commit (not after) to avoid CI failures.
 
 ### Typing Requirements
 Prefer modern typing syntax (`X | None` over `Optional[X]`) in new code.
