@@ -105,7 +105,6 @@ class ConversationContainer(Container):
     switch_confirmation_target: var[uuid.UUID | None] = var(None)
     """Conversation ID awaiting confirmation before switching."""
 
-
     # ---- Confirmation Policy ----
     confirmation_policy: var[ConfirmationPolicyBase] = var(AlwaysConfirm())
     """The confirmation policy. ConversationManager syncs this to conversation."""
@@ -352,12 +351,9 @@ class ConversationContainer(Container):
         """
         self._schedule_update("pending_action_count", count)
 
-    def set_switch_confirmation_target(
-        self, target_id: uuid.UUID | None
-    ) -> None:
+    def set_switch_confirmation_target(self, target_id: uuid.UUID | None) -> None:
         """Set pending switch confirmation target. Thread-safe."""
         self._schedule_update("switch_confirmation_target", target_id)
-
 
     # ---- Conversation Attachment (for metrics) ----
 

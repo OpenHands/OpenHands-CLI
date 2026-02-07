@@ -88,7 +88,6 @@ class ConversationSwitchController:
             exit_on_error=False,
         )
 
-
     def _handle_switch_error(
         self, error: Exception, previous_id: uuid.UUID | None
     ) -> None:
