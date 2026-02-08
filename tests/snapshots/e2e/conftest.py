@@ -20,6 +20,7 @@ from tests.conftest import create_test_agent_config
 from tui_e2e.mock_llm_server import MockLLMServer
 from tui_e2e.trajectory import get_trajectories_dir, load_trajectory
 
+
 if TYPE_CHECKING:
     from syrupy.types import SerializableData, SerializedData
 
@@ -60,7 +61,9 @@ def normalize_svg_colors(svg: str) -> str:
 
     # Sort colors to create deterministic mapping
     # Group by (color, extra_styles) to handle font-weight etc.
-    sorted_colors = sorted(old_classes.items(), key=lambda x: (x[1][0], x[1][1], int(x[0])))
+    sorted_colors = sorted(
+        old_classes.items(), key=lambda x: (x[1][0], x[1][1], int(x[0]))
+    )
 
     # Create mapping from old class number to new class number
     class_mapping = {}
@@ -70,13 +73,12 @@ def normalize_svg_colors(svg: str) -> str:
         new_class_defs.append(f".terminal-r{new_num} {{ fill: {color}{extra} }}")
 
     # Remove old class definitions and insert new sorted ones
-    # Find the block of class definitions
     def remove_class_defs(match):
         return ""
 
     svg = re.sub(color_pattern, remove_class_defs, svg)
 
-    # Find where to insert the new class definitions (after the last @font-face or at the start of style)
+    # Find where to insert the new class definitions
     style_match = re.search(r"(<style[^>]*>.*?)(</style>)", svg, re.DOTALL)
     if style_match:
         style_content = style_match.group(1)
@@ -84,7 +86,9 @@ def normalize_svg_colors(svg: str) -> str:
 
         # Insert the new class definitions before </style>
         new_class_block = "\n    " + "\n".join(new_class_defs) + "\n    "
-        svg = svg.replace(style_match.group(0), style_content + new_class_block + style_end)
+        svg = svg.replace(
+            style_match.group(0), style_content + new_class_block + style_end
+        )
 
     # Replace class references in the SVG content
     # Match class="terminal-rN" or class="terminal-XXXXX-rN"
@@ -113,13 +117,16 @@ class ColorNormalizedSVGExtension(SingleFileSnapshotExtension):
     ) -> Optional["SerializableData"]:
         """Normalize SVG data right after they are loaded from persistent storage."""
         data = super()._read_snapshot_data_from_location(*args, **kwargs)
-        if data is not None:
+        if data is not None and isinstance(data, str):
             data = normalize_svg_colors(data)
         return data
 
     def serialize(self, *args, **kwargs) -> "SerializedData":
         """Normalize SVG data before comparison and persistence."""
-        return normalize_svg_colors(super().serialize(*args, **kwargs))
+        data = super().serialize(*args, **kwargs)
+        if isinstance(data, str):
+            return normalize_svg_colors(data)
+        return data
 
 
 @pytest.fixture
