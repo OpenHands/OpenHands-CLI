@@ -105,7 +105,6 @@ def setup_conversation(
     Args:
         conversation_id: conversation ID to use. If not provided, a random UUID
             will be generated.
-        confirmation_policy: Confirmation policy to use.
         visualizer: Optional visualizer to use. If None, a default will be used
         event_callback: Optional callback function to handle events (e.g., JSON output)
         env_overrides_enabled: If True, environment variables will override

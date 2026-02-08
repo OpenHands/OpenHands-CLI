@@ -79,9 +79,11 @@ class CliSettingsTab(Container):
                 label="Enable Critic (Experimental)",
                 description=(
                     "When enabled and using OpenHands LLM provider, an experimental "
-                    "critic feature will predict task success and collect feedback. "
+                    "critic model predicts task success likelihood in real-time. "
                     "Use --iterative-refinement flag or Ctrl+R to enable automatic "
-                    "agent feedback when critic score is low."
+                    "agent feedback when critic score is low. "
+                    "We collect anonymized data (IDs, critic response, feedback) to "
+                    "evaluate accuracy. See: https://openhands.dev/privacy"
                 ),
                 switch_id="enable_critic_switch",
                 value=self.cli_settings.enable_critic,
