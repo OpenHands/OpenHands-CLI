@@ -92,7 +92,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self,
         container: "VerticalScroll",
         app: "OpenHandsApp",
-        skip_user_messages: bool = False,
         name: str | None = None,
     ):
         """Initialize the visualizer.
@@ -107,7 +106,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         super().__init__()
         self._container = container
         self._app = app
-        self._skip_user_messages = skip_user_messages
         self._name = name
         # Store the main thread ID for thread safety checks
         self._main_thread_id = threading.get_ident()
@@ -141,7 +139,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         return ConversationVisualizer(
             container=self._container,
             app=self._app,
-            skip_user_messages=self._skip_user_messages,
             name=agent_id,
         )
 
@@ -245,22 +242,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
         plan_panel.toggle()
 
     def _get_agent_model(self) -> str | None:
-        """Get the agent's model name from the conversation runner.
+        """Get the agent's model name from the conversation state.
 
         Returns:
             The agent model name or None if not available.
         """
-        try:
-            if (
-                self._app.conversation_runner
-                and self._app.conversation_runner.conversation
-                and hasattr(self._app.conversation_runner.conversation, "agent")
-                and self._app.conversation_runner.conversation.agent  # type: ignore[union-attr]
-            ):
-                return self._app.conversation_runner.conversation.agent.llm.model  # type: ignore[union-attr]
-        except Exception:
-            pass
-        return None
+        return self._app.conversation_state.agent_model
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
@@ -319,6 +306,27 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._container.mount(widget)
         # Automatically scroll to the bottom to show the newly added widget
         self._container.scroll_end(animate=False)
+
+    def render_user_message(self, content: str) -> None:
+        """Render a user message to the UI.
+
+        Dismisses any pending feedback widgets before rendering the user message.
+
+        Args:
+            content: The user's message text to display.
+        """
+        from textual.widgets import Static
+
+        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
+
+        # Dismiss pending feedback widgets (user chose to continue instead of rating)
+        for widget in self._container.query(CriticFeedbackWidget):
+            widget.remove()
+
+        user_message_widget = Static(
+            f"> {content}", classes="user-message", markup=False
+        )
+        self._run_on_main_thread(self._add_widget_to_ui, user_message_widget)
 
     def _update_widget_in_ui(
         self, collapsible: Collapsible, new_title: str, new_content: str
@@ -627,7 +635,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 return None
 
             # Skip direct user messages (they are displayed separately in the UI)
-            # This applies both when skip_user_messages is set, and for user messages
+            # This applies for user messages
             # without a sender in delegation context
             if event.llm_message.role == "user" and not event.sender:
                 return None

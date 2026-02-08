@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import uuid
 from pathlib import Path
 from typing import ClassVar
 
@@ -9,10 +10,12 @@ from textual import events, on
 from textual.binding import Binding
 from textual.containers import Container
 from textual.message import Message
+from textual.reactive import reactive
 from textual.signal import Signal
 from textual.widgets import TextArea
 
-from openhands_cli.tui.core.commands import COMMANDS
+from openhands_cli.tui.core.commands import COMMANDS, is_valid_command
+from openhands_cli.tui.messages import SlashCommandSubmitted, UserInputSubmitted
 from openhands_cli.tui.widgets.user_input.autocomplete_dropdown import (
     AutoCompleteDropdown,
 )
@@ -66,6 +69,10 @@ class InputField(Container):
     Multiline mode (toggled with Ctrl+L):
     - Uses larger TextArea for explicit multiline editing
     - Ctrl+J to submit
+
+    Reactive Behavior:
+    - Binds to `conversation_id` from ConversationContainer
+    - Auto-disables during conversation switches
     """
 
     BINDINGS: ClassVar = [
@@ -75,6 +82,12 @@ class InputField(Container):
             "ctrl+x", "open_external_editor", "Open external editor", priority=True
         ),
     ]
+
+    # Reactive properties bound from ConversationContainer
+    # None = switching in progress (input disabled)
+    conversation_id: reactive[uuid.UUID | None] = reactive(None)
+    # >0 = waiting for user confirmation (input disabled)
+    pending_action_count: reactive[int] = reactive(0)
 
     DEFAULT_CSS = """
     InputField {
@@ -162,6 +175,26 @@ class InputField(Container):
     def on_mount(self) -> None:
         """Focus the input when mounted."""
         self.focus_input()
+
+    def watch_conversation_id(self, conversation_id: uuid.UUID | None) -> None:
+        """React to conversation_id changes - disable input when None (switching)."""
+        self._update_disabled_state()
+        if conversation_id is not None and self.pending_action_count == 0:
+            # Re-enable and focus when switch completes
+            self.focus_input()
+
+    def watch_pending_action_count(self, count: int) -> None:
+        """React to pending_action_count changes - disable input when >0."""
+        self._update_disabled_state()
+        if count == 0 and self.conversation_id is not None:
+            # Re-enable and focus when confirmation is complete
+            self.focus_input()
+
+    def _update_disabled_state(self) -> None:
+        """Update disabled state based on conversation_id and pending actions."""
+        is_switching = self.conversation_id is None
+        is_waiting = self.pending_action_count > 0
+        self.disabled = is_switching or is_waiting
 
     def focus_input(self) -> None:
         self.active_input_widget.focus()
@@ -304,14 +337,34 @@ class InputField(Container):
             if content:
                 self._clear_current()
                 self.action_toggle_input_mode()
-                self.post_message(self.Submitted(content))
+                # Use the same submission logic as single-line mode
+                if is_valid_command(content):
+                    command = content[1:]  # Remove leading "/"
+                    self.post_message(SlashCommandSubmitted(command=command))
+                else:
+                    self.post_message(UserInputSubmitted(content=content))
 
     def _submit_current_content(self) -> None:
-        """Submit current content and clear input."""
+        """Submit current content and clear input.
+
+        Posts different messages based on content type:
+        - SlashCommandSubmitted for valid slash commands
+        - UserInputSubmitted for regular user input
+        """
         content = self._get_current_text().strip()
-        if content:
-            self._clear_current()
-            self.post_message(self.Submitted(content))
+        if not content:
+            return
+
+        self._clear_current()
+
+        # Check if this is a valid slash command
+        if is_valid_command(content):
+            # Extract command name (without the leading slash)
+            command = content[1:]  # Remove leading "/"
+            self.post_message(SlashCommandSubmitted(command=command))
+        else:
+            # Regular user input
+            self.post_message(UserInputSubmitted(content=content))
 
     @on(SingleLineInputWithWrapping.MultiLinePasteDetected)
     def _on_paste_detected(

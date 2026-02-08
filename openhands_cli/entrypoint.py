@@ -224,15 +224,17 @@ def main() -> None:
                 critic_disabled=critic_disabled,
             )
             console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
-            console.print(
-                f"Conversation ID: {conversation_id.hex}",
-                style=OPENHANDS_THEME.accent,
-            )
-            console.print(
-                f"Hint: run openhands --resume {conversation_id} "
-                "to resume this conversation.",
-                style=OPENHANDS_THEME.secondary,
-            )
+            # Show conversation ID if available (may be None if app exited early)
+            if conversation_id is not None:
+                console.print(
+                    f"Conversation ID: {conversation_id.hex}",
+                    style=OPENHANDS_THEME.accent,
+                )
+                console.print(
+                    f"Hint: run openhands --resume {conversation_id} "
+                    "to resume this conversation.",
+                    style=OPENHANDS_THEME.secondary,
+                )
     except KeyboardInterrupt:
         console.print("\nGoodbye! 👋", style=OPENHANDS_THEME.warning)
     except EOFError:

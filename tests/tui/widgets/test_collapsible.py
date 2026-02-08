@@ -93,7 +93,7 @@ class MultiCollapsibleTestApp(CollapsibleNavigationMixin, App):
     def compose(self) -> ComposeResult:
         from textual.containers import VerticalScroll
 
-        with VerticalScroll(id="main_display"):
+        with VerticalScroll(id="scroll_view"):
             yield Collapsible(
                 "Content 1", title="Cell 1", collapsed=True, border_color="red"
             )

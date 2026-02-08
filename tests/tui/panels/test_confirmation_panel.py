@@ -9,13 +9,9 @@ from textual.app import App
 from textual.containers import Vertical
 from textual.widgets import ListView, Static
 
+from openhands_cli.tui.core.events import ConfirmationDecision
 from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
 from openhands_cli.user_actions.types import UserConfirmation
-
-
-@pytest.fixture
-def callback() -> mock.MagicMock:
-    return mock.MagicMock()
 
 
 def make_test_app(widget):
@@ -35,14 +31,10 @@ def make_test_app(widget):
     ],
 )
 async def test_inline_confirmation_panel_structure_contains_expected_nodes(
-    callback: mock.MagicMock,
     query: str,
     expected_type: type,
 ):
-    panel = InlineConfirmationPanel(
-        num_actions=1,
-        confirmation_callback=callback,
-    )
+    panel = InlineConfirmationPanel(num_actions=1)
     app = make_test_app(panel)
 
     async with app.run_test() as pilot:
@@ -52,11 +44,8 @@ async def test_inline_confirmation_panel_structure_contains_expected_nodes(
 
 
 @pytest.mark.asyncio
-async def test_inline_confirmation_panel_has_listview(callback: mock.MagicMock):
-    panel = InlineConfirmationPanel(
-        num_actions=1,
-        confirmation_callback=callback,
-    )
+async def test_inline_confirmation_panel_has_listview():
+    panel = InlineConfirmationPanel(num_actions=1)
     app = make_test_app(panel)
 
     async with app.run_test() as pilot:
@@ -75,34 +64,34 @@ async def test_inline_confirmation_panel_has_listview(callback: mock.MagicMock):
     ],
 )
 def test_listview_selection_triggers_expected_callback(
-    callback: mock.MagicMock,
     item_id: str,
     expected_confirmation: UserConfirmation,
 ):
-    panel = InlineConfirmationPanel(
-        num_actions=1,
-        confirmation_callback=callback,
-    )
+    """Test that selecting an item posts the correct ConfirmationDecision message."""
+    panel = InlineConfirmationPanel(num_actions=1)
 
     mock_item = mock.MagicMock()
     mock_item.id = item_id
     mock_event = mock.MagicMock()
     mock_event.item = mock_item
 
-    panel.on_list_view_selected(mock_event)
+    # Mock post_message to capture the message, and _remove_self since there's no app
+    with (
+        mock.patch.object(panel, "post_message") as mock_post,
+        mock.patch.object(panel, "_remove_self"),
+    ):
+        panel.on_list_view_selected(mock_event)
 
-    callback.assert_called_once_with(expected_confirmation)
+        mock_post.assert_called_once()
+        posted_message = mock_post.call_args[0][0]
+        assert isinstance(posted_message, ConfirmationDecision)
+        assert posted_message.decision == expected_confirmation
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("num_actions", [1, 3, 5])
-async def test_inline_panel_displays_correct_action_count(
-    callback: mock.MagicMock, num_actions: int
-):
-    panel = InlineConfirmationPanel(
-        num_actions=num_actions,
-        confirmation_callback=callback,
-    )
+async def test_inline_panel_displays_correct_action_count(num_actions: int):
+    panel = InlineConfirmationPanel(num_actions=num_actions)
     app = make_test_app(panel)
 
     async with app.run_test() as pilot:
@@ -112,11 +101,8 @@ async def test_inline_panel_displays_correct_action_count(
 
 
 @pytest.mark.asyncio
-async def test_inline_panel_renders_and_listview_exists(callback: mock.MagicMock):
-    panel = InlineConfirmationPanel(
-        num_actions=2,
-        confirmation_callback=callback,
-    )
+async def test_inline_panel_renders_and_listview_exists():
+    panel = InlineConfirmationPanel(num_actions=2)
     app = make_test_app(panel)
 
     async with app.run_test() as pilot:
@@ -127,11 +113,8 @@ async def test_inline_panel_renders_and_listview_exists(callback: mock.MagicMock
 
 
 @pytest.mark.asyncio
-async def test_listview_is_focusable(callback: mock.MagicMock):
-    panel = InlineConfirmationPanel(
-        num_actions=1,
-        confirmation_callback=callback,
-    )
+async def test_listview_is_focusable():
+    panel = InlineConfirmationPanel(num_actions=1)
     app = make_test_app(panel)
 
     async with app.run_test() as pilot:
@@ -140,30 +123,32 @@ async def test_listview_is_focusable(callback: mock.MagicMock):
 
 
 @pytest.mark.asyncio
-async def test_keyboard_enter_selects_first_item_and_calls_callback(
-    callback: mock.MagicMock,
-):
-    panel = InlineConfirmationPanel(
-        num_actions=1,
-        confirmation_callback=callback,
-    )
-    app = make_test_app(panel)
+async def test_keyboard_enter_selects_first_item_and_posts_message():
+    """Test that pressing enter on first item posts ConfirmationDecision message."""
+    messages_received = []
+
+    class TestApp(App):
+        def compose(self):
+            yield InlineConfirmationPanel(num_actions=1)
+
+        def on_confirmation_decision(self, event: ConfirmationDecision) -> None:
+            messages_received.append(event)
+
+    app = TestApp()
 
     async with app.run_test() as pilot:
         listview = pilot.app.query_one("#inline-confirmation-listview", ListView)
         listview.focus()
         await pilot.press("enter")
 
-        callback.assert_called_once_with(UserConfirmation.ACCEPT)
+        assert len(messages_received) == 1
+        assert messages_received[0].decision == UserConfirmation.ACCEPT
 
 
 @pytest.mark.asyncio
-async def test_inline_panel_has_four_options(callback: mock.MagicMock):
+async def test_inline_panel_has_four_options():
     """Test that the inline panel has all four confirmation options."""
-    panel = InlineConfirmationPanel(
-        num_actions=1,
-        confirmation_callback=callback,
-    )
+    panel = InlineConfirmationPanel(num_actions=1)
     app = make_test_app(panel)
 
     async with app.run_test() as pilot:

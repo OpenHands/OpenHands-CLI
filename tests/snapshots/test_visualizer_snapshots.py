@@ -36,7 +36,7 @@ class VisualizerTestApp(App):
         layout: vertical;
         background: $background;
     }
-    #main_display {
+    #scroll_view {
         height: 100%;
         width: 100%;
         margin: 1 1 0 1;
@@ -63,12 +63,12 @@ class VisualizerTestApp(App):
         self.plan_panel.user_dismissed = False
 
     def compose(self) -> ComposeResult:
-        with VerticalScroll(id="main_display"):
+        with VerticalScroll(id="scroll_view"):
             # User message with same styling as real CLI
             yield Static("> hi how are you", classes="user-message")
 
     def on_mount(self) -> None:
-        container = self.query_one("#main_display", VerticalScroll)
+        container = self.query_one("#scroll_view", VerticalScroll)
         # Cast to satisfy type checker - this is a test-only workaround
         self.visualizer = ConversationVisualizer(container, cast("OpenHandsApp", self))
         for event in self.events:

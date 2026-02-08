@@ -1,4 +1,9 @@
-"""Tests for HistorySidePanel and conversation switching."""
+"""Tests for HistorySidePanel and conversation switching.
+
+The HistorySidePanel uses the ConversationContainer pattern for state updates.
+It watches ConversationContainer's reactive properties (conversation_id,
+conversation_title, switch_confirmation_target) instead of receiving forwarded messages.
+"""
 
 from __future__ import annotations
 
@@ -12,47 +17,42 @@ from textual.widgets import Button, Static
 
 from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.conversations.store.local import LocalFileStore
-from openhands_cli.tui.core.conversation_manager import ConversationManager
-from openhands_cli.tui.core.messages import (
-    ConversationCreated,
-    ConversationTitleUpdated,
-    RevertSelectionRequest,
-    SwitchConversationRequest,
-)
+from openhands_cli.tui.core import SwitchConversation
+from openhands_cli.tui.core.state import ConversationContainer
 from openhands_cli.tui.modals.switch_conversation_modal import SwitchConversationModal
-from openhands_cli.tui.panels.history_side_panel import HistoryItem, HistorySidePanel
+from openhands_cli.tui.panels.history_side_panel import (
+    HistoryItem,
+    HistorySidePanel,
+)
 
 
 class HistoryMessagesTestApp(App):
-    """Minimal app for testing HistorySidePanel with Textual messages."""
+    """Minimal app for testing HistorySidePanel with ConversationContainer."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Track messages received by the app
-        self.received_switch_requests: list[str] = []
+        self.received_switch_requests: list[uuid.UUID] = []
         self._store = LocalFileStore()
-        # Mock the store for tests if needed,
-        # but we rely on monkeypatching LocalFileStore in tests
-        self._conversation_manager = ConversationManager(
-            self,  # type: ignore[arg-type]
-            self._store,
-        )
+        # ConversationContainer for reactive state
+        self.conversation_state = ConversationContainer()
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="content_area"):
             yield Static("main", id="main")
+            yield self.conversation_state
             yield HistorySidePanel(app=self, current_conversation_id=None)  # type: ignore
 
-    def on_switch_conversation_request(self, event: SwitchConversationRequest) -> None:
-        """Handle switch conversation request from history panel."""
+    def on_switch_conversation(self, event: SwitchConversation) -> None:
+        """Handle switch conversation from history panel."""
         self.received_switch_requests.append(event.conversation_id)
 
 
 @pytest.mark.asyncio
-async def test_history_panel_updates_from_messages(
+async def test_history_panel_updates_from_conversation_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test that the history panel responds to Textual messages."""
+    """Test that the history panel responds to ConversationContainer state changes."""
     # Stub local conversations list.
     base_id = uuid.uuid4().hex
     conversations = [
@@ -70,19 +70,19 @@ async def test_history_panel_updates_from_messages(
     async with app.run_test() as pilot:
         panel = app.query_one(HistorySidePanel)
 
-        # Initial render contains the single lister conversation.
+        # Initial render contains the single listed conversation.
         list_container = panel.query_one("#history-list", VerticalScroll)
         assert len(list_container.query(HistoryItem)) == 1
 
-        # Post "ConversationCreated" message directly to the panel.
+        # Update conversation_id via ConversationContainer (simulating new conversation)
         new_id = uuid.uuid4()
-        panel.post_message(ConversationCreated(new_id))
+        app.conversation_state.conversation_id = new_id
         await pilot.pause()
 
         assert panel.current_conversation_id == new_id
         assert panel.selected_conversation_id == new_id
 
-        # Should now have 2 items (existing + placeholder).
+        # Should now have 2 items (existing + placeholder for new).
         assert len(list_container.query(HistoryItem)) == 2
         placeholder_items = [
             item
@@ -91,20 +91,26 @@ async def test_history_panel_updates_from_messages(
         ]
         assert len(placeholder_items) == 1
 
-        # Post title update message directly to the panel.
-        panel.post_message(ConversationTitleUpdated(new_id, "first message"))
+        # Update title via ConversationContainer
+        app.conversation_state.conversation_title = "first message"
         await pilot.pause()
 
         placeholder = placeholder_items[0]
         assert "first message" in str(placeholder.content)
 
-        # Move selection away and then revert via RevertSelectionRequest.
+        # Test switch confirmation cancellation behavior:
+        # Move selection away
         panel._handle_select(base_id)
         assert panel.selected_conversation_id is not None
         assert panel.selected_conversation_id.hex == base_id
 
-        panel.post_message(RevertSelectionRequest())
+        # Simulate a cancelled switch (confirmation target cleared)
+        app.conversation_state.switch_confirmation_target = uuid.UUID(base_id)
         await pilot.pause()
+        app.conversation_state.switch_confirmation_target = None
+        await pilot.pause()
+
+        # Selection should revert to current conversation
         assert panel.selected_conversation_id == panel.current_conversation_id
 
 
@@ -112,7 +118,7 @@ async def test_history_panel_updates_from_messages(
 async def test_history_panel_posts_switch_request_on_selection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test that selecting a conversation posts SwitchConversationRequest."""
+    """Test that selecting a conversation posts SwitchConversation."""
     conv_id = uuid.uuid4().hex
     conversations = [
         ConversationMetadata(
@@ -133,9 +139,9 @@ async def test_history_panel_posts_switch_request_on_selection(
         panel._handle_select(conv_id)
         await pilot.pause()
 
-        # Verify that app received the SwitchConversationRequest message
+        # Verify that app received the SwitchConversation message
         assert len(app.received_switch_requests) == 1
-        assert app.received_switch_requests[0] == conv_id
+        assert app.received_switch_requests[0] == uuid.UUID(conv_id)
 
 
 class SwitchModalTestApp(App):
