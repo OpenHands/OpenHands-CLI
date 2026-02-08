@@ -15,6 +15,7 @@ from openhands.sdk import (
     LocalConversation,
     Workspace,
 )
+from openhands.sdk.hooks import HookConfig
 from openhands_cli.acp_impl.agent.base_agent import BaseOpenHandsACPAgent
 from openhands_cli.acp_impl.agent.util import AgentType
 from openhands_cli.acp_impl.confirmation import ConfirmationMode
@@ -24,7 +25,7 @@ from openhands_cli.acp_impl.slash_commands import (
     apply_confirmation_mode_to_conversation,
 )
 from openhands_cli.acp_impl.utils import RESOURCE_SKILL
-from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
+from openhands_cli.locations import MCP_CONFIG_FILE, get_conversations_dir, get_work_dir
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
 
@@ -140,7 +141,7 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
             )
 
         if working_dir is None:
-            working_dir = WORK_DIR
+            working_dir = get_work_dir()
         working_path = Path(working_dir)
 
         if not working_path.exists():
@@ -170,14 +171,20 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
             else:
                 asyncio.run_coroutine_threadsafe(subscriber(event), loop)
 
+        # Load hooks from ~/.openhands/hooks.json or {working_dir}/.openhands/hooks.json
+        hook_config = HookConfig.load(working_dir=str(working_path))
+        if not hook_config.is_empty():
+            logger.info("Hooks loaded from hooks.json")
+
         conversation = Conversation(
             agent=agent,
             workspace=workspace,
-            persistence_dir=CONVERSATIONS_DIR,
+            persistence_dir=get_conversations_dir(),
             conversation_id=UUID(session_id),
             callbacks=[sync_callback],
             token_callbacks=[token_subscriber.on_token] if streaming_enabled else None,
             visualizer=None,
+            hook_config=hook_config,
         )
 
         subscriber.conversation = conversation

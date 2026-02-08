@@ -170,7 +170,7 @@ class TestHelperFunctions:
                 mock_agent.condenser = MagicMock()
 
                 mock_store.create_and_save_from_settings.return_value = mock_agent
-                mock_store.load.return_value = None  # No existing agent
+                mock_store.load_from_disk.return_value = None  # No existing agent
                 mock_store_class.return_value = mock_store
 
                 create_and_save_agent_configuration(llm_api_key, settings)
@@ -178,7 +178,6 @@ class TestHelperFunctions:
                 mock_store.create_and_save_from_settings.assert_called_once_with(
                     llm_api_key=llm_api_key,
                     settings=settings,
-                    base_url="https://llm-proxy.eval.all-hands.dev/",
                 )
                 assert mock_print.call_count >= 5  # Multiple print statements
 
@@ -325,6 +324,7 @@ class TestHelperFunctions:
         mock_llm.base_url = None  # This is the key test condition
         mock_agent.llm = mock_llm
 
+        # New settings also doesn't have llm_base_url
         new_settings = {"llm_model": "claude-sonnet-4-5-20250929"}
 
         with patch("openhands_cli.auth.api_client._p") as mock_print:
@@ -337,21 +337,11 @@ class TestHelperFunctions:
                 # Check all the print calls
                 print_calls = [call.args[0] for call in mock_print.call_args_list]
 
-                # Count Base URL prints - should be exactly 1 when base_url is None
+                # Count Base URL prints - should be 0 when both base_urls are None
                 all_base_url_prints = [
                     call for call in print_calls if "Base URL" in call
                 ]
-                assert len(all_base_url_prints) == 1, (
-                    f"Expected exactly 1 Base URL print (for new config), "
+                assert len(all_base_url_prints) == 0, (
+                    f"Expected no Base URL prints when both base_urls are None, "
                     f"but found {len(all_base_url_prints)}: {all_base_url_prints}"
-                )
-
-                # Verify the Base URL print is for the new configuration
-                new_config_base_url_print = [
-                    call
-                    for call in all_base_url_prints
-                    if "https://llm-proxy.app.all-hands.dev/" in call
-                ]
-                assert len(new_config_base_url_print) == 1, (
-                    "The Base URL print should be for the new configuration"
                 )

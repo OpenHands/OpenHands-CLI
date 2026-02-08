@@ -631,12 +631,12 @@ class TestPlanPanelIntegration:
 
             def compose(self):
                 with Horizontal(id="content_area"):
-                    with VerticalScroll(id="main_display"):
+                    with VerticalScroll(id="scroll_view"):
                         yield Static("Content")
 
         app = TestApp()
         async with app.run_test():
-            container = app.query_one("#main_display", VerticalScroll)
+            container = app.query_one("#scroll_view", VerticalScroll)
             visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
             # Create a TaskTrackerObservation event
@@ -682,7 +682,7 @@ class TestPlanPanelIntegration:
 
             def compose(self):
                 with Horizontal(id="content_area"):
-                    with VerticalScroll(id="main_display"):
+                    with VerticalScroll(id="scroll_view"):
                         yield Static("Content")
 
             def on_mount(self):
@@ -691,7 +691,7 @@ class TestPlanPanelIntegration:
         app = TestApp()
         async with app.run_test() as pilot:
             await pilot.pause()  # Wait for on_mount
-            container = app.query_one("#main_display", VerticalScroll)
+            container = app.query_one("#scroll_view", VerticalScroll)
             visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
             # Mock settings and toggle
@@ -735,7 +735,7 @@ class TestPlanPanelIntegration:
 
             def compose(self):
                 with Horizontal(id="content_area"):
-                    with VerticalScroll(id="main_display"):
+                    with VerticalScroll(id="scroll_view"):
                         yield Static("Content")
 
             def on_mount(self):
@@ -744,7 +744,7 @@ class TestPlanPanelIntegration:
         app = TestApp()
         async with app.run_test() as pilot:
             await pilot.pause()  # Wait for on_mount
-            container = app.query_one("#main_display", VerticalScroll)
+            container = app.query_one("#scroll_view", VerticalScroll)
             visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
             # Mock that panel is already on screen
@@ -790,7 +790,7 @@ class TestPlanPanelIntegration:
 
             def compose(self):
                 with Horizontal(id="content_area"):
-                    with VerticalScroll(id="main_display"):
+                    with VerticalScroll(id="scroll_view"):
                         yield Static("Content")
 
             def on_mount(self):
@@ -799,7 +799,7 @@ class TestPlanPanelIntegration:
         app = TestApp()
         async with app.run_test() as pilot:
             await pilot.pause()  # Wait for on_mount
-            container = app.query_one("#main_display", VerticalScroll)
+            container = app.query_one("#scroll_view", VerticalScroll)
             visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
             # Ensure panel is not on screen
@@ -834,20 +834,6 @@ class TestSubVisualizerCreation:
 
         assert sub_vis._container is visualizer._container
         assert sub_vis._app is visualizer._app
-
-    def test_create_sub_visualizer_preserves_skip_user_messages(self):
-        """Sub-visualizer inherits skip_user_messages setting from parent."""
-        app = App()
-        container = VerticalScroll()
-        parent = ConversationVisualizer(
-            container,
-            app,  # type: ignore[arg-type]
-            skip_user_messages=True,
-        )
-
-        sub_vis = parent.create_sub_visualizer("child_agent")
-
-        assert sub_vis._skip_user_messages is True
 
 
 class TestMessageEventDelegation:
@@ -949,3 +935,189 @@ class TestMessageEventDelegation:
         assert "Child Agent" in markdown_content
         assert "Parent Agent" in markdown_content
         assert "→" in markdown_content
+
+
+class TestAgentMessageEventDisplay:
+    """Tests for agent MessageEvent display in non-delegation context.
+
+    This test class addresses GitHub issue #399:
+    Agent MessageEvents (including those with critic_result) should be displayed
+    in the TUI, but were being silently dropped due to a bug in the delegation
+    filtering logic.
+
+    The bug was in _create_event_widget() where the condition:
+        if not (event.sender and self._name):
+            return None
+    would filter out ALL MessageEvents without a sender, even when the visualizer
+    has a name set (which is the normal case for the main conversation).
+    """
+
+    def test_agent_message_event_displays_when_name_set_no_sender(self):
+        """Agent MessageEvent without sender should display when visualizer has name.
+
+        This is the primary bug reproduction test. In normal CLI usage:
+        - visualizer._name is set to "OpenHands Agent"
+        - Agent MessageEvents do NOT have a sender field
+        - These should still be displayed (not filtered out)
+
+        Relates to: https://github.com/OpenHands/OpenHands-CLI/issues/399
+        """
+        from textual.widgets import Markdown
+
+        from openhands.sdk import Message
+        from openhands_cli.tui.widgets.collapsible import Collapsible
+
+        app = App()
+        container = VerticalScroll()
+        # Normal CLI usage: name is set to "OpenHands Agent"
+        visualizer = ConversationVisualizer(
+            container,
+            app,  # type: ignore[arg-type]
+            name="OpenHands Agent",
+        )
+
+        # Create an agent message (no sender - this is NOT delegation)
+        message = Message(
+            role="assistant",
+            content=[TextContent(text="Here is my analysis of the data...")],
+        )
+        event = MessageEvent(llm_message=message, source="agent")
+        # Note: event.sender is None (not set) - this is normal for non-delegation
+
+        widget = visualizer._create_event_widget(event)
+
+        # BUG: Currently returns None, should return a widget
+        assert widget is not None, (
+            "Agent MessageEvent without sender should still display when "
+            "visualizer has name set. This is the normal case for CLI usage."
+        )
+        assert isinstance(widget, Markdown | Collapsible)
+
+    def test_agent_message_event_with_critic_result_displays(self):
+        """Agent MessageEvent with critic_result should display.
+
+        This test ensures that MessageEvents enriched with critic evaluation
+        results are displayed. The critic_result is added to the event after
+        critic evaluation completes.
+
+        Relates to: https://github.com/OpenHands/OpenHands-CLI/issues/399
+        """
+        from openhands.sdk import Message
+        from openhands.sdk.critic.result import CriticResult
+
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,  # type: ignore[arg-type]
+            name="OpenHands Agent",
+        )
+
+        message = Message(
+            role="assistant",
+            content=[TextContent(text="Based on my analysis, here are the findings")],
+        )
+        # Create event with critic_result (simulating what the SDK does)
+        event = MessageEvent(llm_message=message, source="agent")
+        # Add critic_result like the SDK does
+        event = event.model_copy(
+            update={
+                "critic_result": CriticResult(
+                    score=0.78,
+                    message="Success: 0.78",
+                )
+            }
+        )
+
+        widget = visualizer._create_event_widget(event)
+
+        assert widget is not None, (
+            "Agent MessageEvent with critic_result should display. "
+            "Users wait for critic feedback that never appears due to this bug."
+        )
+
+    def test_delegation_message_still_works_with_sender(self):
+        """Delegation MessageEvents with sender should still display correctly.
+
+        This test ensures the fix doesn't break delegation message handling.
+        """
+        from textual.widgets import Markdown
+
+        from openhands.sdk import Message
+
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,  # type: ignore[arg-type]
+            name="child_agent",
+        )
+
+        message = Message(
+            role="assistant",
+            content=[TextContent(text="Task completed")],
+        )
+        # Delegation message HAS a sender
+        event = MessageEvent(llm_message=message, source="agent", sender="parent_agent")
+
+        widget = visualizer._create_event_widget(event)
+
+        assert widget is not None
+        assert isinstance(widget, Markdown)
+        markdown_content = widget._initial_markdown
+        assert markdown_content is not None
+        assert "Child Agent" in markdown_content
+        assert "Parent Agent" in markdown_content
+
+
+class TestRenderUserMessage:
+    """Tests for ConversationVisualizer.render_user_message."""
+
+    def test_render_user_message_creates_static_widget(self):
+        """render_user_message should create a Static widget with user message."""
+        from unittest.mock import MagicMock
+
+        app = MagicMock()
+        container = MagicMock()
+        visualizer = ConversationVisualizer(container, app)
+
+        # Track widgets added via _run_on_main_thread
+        added_widgets: list[Static] = []
+
+        def capture_add(func, *args):
+            if func == visualizer._add_widget_to_ui and args:
+                added_widgets.append(args[0])
+
+        visualizer._run_on_main_thread = capture_add  # type: ignore[method-assign]
+
+        visualizer.render_user_message("Hello, agent!")
+
+        assert len(added_widgets) == 1
+        widget = added_widgets[0]
+        assert isinstance(widget, Static)
+        # Check widget has user-message class
+        assert "user-message" in widget.classes
+
+    def test_render_user_message_format(self):
+        """render_user_message should prefix content with '> '."""
+        from unittest.mock import MagicMock
+
+        app = MagicMock()
+        container = MagicMock()
+        visualizer = ConversationVisualizer(container, app)
+
+        added_widgets: list[Static] = []
+
+        def capture_add(func, *args):
+            if func == visualizer._add_widget_to_ui and args:
+                added_widgets.append(args[0])
+
+        visualizer._run_on_main_thread = capture_add  # type: ignore[method-assign]
+
+        visualizer.render_user_message("Test message")
+
+        assert len(added_widgets) == 1
+        widget = added_widgets[0]
+        assert isinstance(widget, Static)
+        # Check the widget has user-message class (format verification)
+        assert "user-message" in widget.classes

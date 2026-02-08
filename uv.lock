@@ -1569,7 +1569,7 @@ wheels = [
 
 [[package]]
 name = "openhands"
-version = "1.10.0"
+version = "1.11.0"
 source = { editable = "." }
 dependencies = [
     { name = "agent-client-protocol" },
@@ -1580,6 +1580,7 @@ dependencies = [
     { name = "prompt-toolkit" },
     { name = "pydantic" },
     { name = "pyperclip" },
+    { name = "rich" },
     { name = "streamingjson" },
     { name = "textual" },
     { name = "textual-autocomplete" },
@@ -1599,6 +1600,7 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-forked" },
+    { name = "pytest-httpserver" },
     { name = "pytest-textual-snapshot" },
     { name = "pytest-xdist" },
     { name = "ruff" },
@@ -1609,12 +1611,13 @@ dev = [
 requires-dist = [
     { name = "agent-client-protocol", specifier = ">=0.7.0,<0.8.0" },
     { name = "httpx", specifier = ">=0.25.0" },
-    { name = "openhands-sdk", specifier = "==1.9.0" },
-    { name = "openhands-tools", specifier = "==1.9.0" },
+    { name = "openhands-sdk", specifier = "==1.10.0" },
+    { name = "openhands-tools", specifier = "==1.10.0" },
     { name = "openhands-workspace", specifier = "==1.9.0" },
     { name = "prompt-toolkit", specifier = ">=3" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyperclip", specifier = ">=1.9.0" },
+    { name = "rich", specifier = "<14.3.0" },
     { name = "streamingjson", specifier = ">=0.0.2" },
     { name = "textual", specifier = ">=0.79.0" },
     { name = "textual-autocomplete", specifier = ">=4.0.6" },
@@ -1634,6 +1637,7 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.21.0" },
     { name = "pytest-cov", specifier = ">=5.0.0" },
     { name = "pytest-forked", specifier = ">=1.6.0" },
+    { name = "pytest-httpserver", specifier = ">=1.1.3" },
     { name = "pytest-textual-snapshot", specifier = ">=1.1.0" },
     { name = "pytest-xdist", specifier = ">=3.6.1" },
     { name = "ruff", specifier = ">=0.12.10" },
@@ -1663,7 +1667,7 @@ wheels = [
 
 [[package]]
 name = "openhands-sdk"
-version = "1.9.0"
+version = "1.10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "deprecation" },
@@ -1678,14 +1682,14 @@ dependencies = [
     { name = "tenacity" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/06/52/cbbdad58757503c2566a8a813b2ffef3648fde4a608352fda2ece03a2930/openhands_sdk-1.9.0.tar.gz", hash = "sha256:70048888fd4fbe44a86c35c402bbb99d30cf0cba50579ee1a8e3f43e05154150", size = 248667, upload-time = "2026-01-21T17:35:05.967Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/50/90/d550bd34f5a0fda25f3e56bcc470a1fa795cab00ab1cc023337b1c4faae0/openhands_sdk-1.10.0.tar.gz", hash = "sha256:93371b1af4532266ad2d225b9d7d3d711c745df31888efe643970673f62bdef9", size = 259509, upload-time = "2026-01-26T16:53:20.856Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f3/0b/a9038d66088f5c32d56c6530b09c2d3be37b0ec6eb628605e689a749782e/openhands_sdk-1.9.0-py3-none-any.whl", hash = "sha256:b427d8b9e587a5360c7d61742c290601998557e9b38b1c9e11a297659812c00d", size = 321426, upload-time = "2026-01-21T17:35:03.548Z" },
+    { url = "https://files.pythonhosted.org/packages/49/a9/6975b5c6ccb383d35d80572bc30927809fe21c7eb2c423e799c4fd2940ce/openhands_sdk-1.10.0-py3-none-any.whl", hash = "sha256:5c8875f2a07d7fabe3449914639572bef9003821207cb06aa237a239e964eed5", size = 333209, upload-time = "2026-01-26T16:53:19.645Z" },
 ]
 
 [[package]]
 name = "openhands-tools"
-version = "1.9.0"
+version = "1.10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bashlex" },
@@ -1698,9 +1702,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "tom-swe" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a3/66/292a75a520c1c19693e47d4252e4f80fe75fc92d0c6ed057b602f2d15159/openhands_tools-1.9.0.tar.gz", hash = "sha256:d45f5f5210cb2bbcd8ab5f3a32051db1a532d0ec07cd306105f95cde42cf67f2", size = 92052, upload-time = "2026-01-21T17:35:00.233Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/c9/12ecdc3f3ad36cda98f791d36a5124b0c0279c8f68cac61c840567fd9a76/openhands_tools-1.10.0.tar.gz", hash = "sha256:7ed38cb13545ec2c4a35c26ece725d5b35788d30597db8b1904619c043ec1194", size = 92198, upload-time = "2026-01-26T16:53:23.902Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fa/53/b52eca39df7213317301d012114ae6d89261cddc64f94c8e370da11b04bd/openhands_tools-1.9.0-py3-none-any.whl", hash = "sha256:8becde0e913a31babb41eb93a8c10bf41d87ca1febd07bc958839c3583655305", size = 127813, upload-time = "2026-01-21T17:35:04.866Z" },
+    { url = "https://files.pythonhosted.org/packages/fa/d1/c10c0374fff3297660e17a55be06ef42eaeb098eeb4b94170d41e23b787a/openhands_tools-1.10.0-py3-none-any.whl", hash = "sha256:1d5d2d1e34cc4ceb02c0ff1f008b06883ad48a8e7236ab8dd61ece64fbf8e2ed", size = 127990, upload-time = "2026-01-26T16:53:15.827Z" },
 ]
 
 [[package]]
@@ -4670,6 +4674,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/8c/c9/93ad2ba2413057ee694884b88cf7467a46c50c438977720aeac26e73fdb7/pytest-forked-1.6.0.tar.gz", hash = "sha256:4dafd46a9a600f65d822b8f605133ecf5b3e1941ebb3588e943b4e3eb71a5a3f", size = 9977, upload-time = "2023-02-12T23:22:27.544Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f4/af/9c0bda43e486a3c9bf1e0f876d0f241bc3f229d7d65d09331a0868db9629/pytest_forked-1.6.0-py3-none-any.whl", hash = "sha256:810958f66a91afb1a1e2ae83089d8dc1cd2437ac96b12963042fbb9fb4d16af0", size = 4897, upload-time = "2023-02-12T23:22:26.022Z" },
+]
+
+[[package]]
+name = "pytest-httpserver"
+version = "1.1.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "werkzeug" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f1/d8/def15ba33bd696dd72dd4562a5287c0cba4d18a591eeb82e0b08ab385afc/pytest_httpserver-1.1.3.tar.gz", hash = "sha256:af819d6b533f84b4680b9416a5b3f67f1df3701f1da54924afd4d6e4ba5917ec", size = 68870, upload-time = "2025-04-10T08:17:15.6Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0d/d2/dfc2f25f3905921c2743c300a48d9494d29032f1389fc142e718d6978fb2/pytest_httpserver-1.1.3-py3-none-any.whl", hash = "sha256:5f84757810233e19e2bb5287f3826a71c97a3740abe3a363af9155c0f82fdbb9", size = 21000, upload-time = "2025-04-10T08:17:13.906Z" },
 ]
 
 [[package]]

@@ -92,7 +92,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self,
         container: "VerticalScroll",
         app: "OpenHandsApp",
-        skip_user_messages: bool = False,
         name: str | None = None,
     ):
         """Initialize the visualizer.
@@ -107,7 +106,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         super().__init__()
         self._container = container
         self._app = app
-        self._skip_user_messages = skip_user_messages
         self._name = name
         # Store the main thread ID for thread safety checks
         self._main_thread_id = threading.get_ident()
@@ -141,7 +139,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         return ConversationVisualizer(
             container=self._container,
             app=self._app,
-            skip_user_messages=self._skip_user_messages,
             name=agent_id,
         )
 
@@ -245,22 +242,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
         plan_panel.toggle()
 
     def _get_agent_model(self) -> str | None:
-        """Get the agent's model name from the conversation runner.
+        """Get the agent's model name from the conversation state.
 
         Returns:
             The agent model name or None if not available.
         """
-        try:
-            if (
-                self._app.conversation_runner
-                and self._app.conversation_runner.conversation
-                and hasattr(self._app.conversation_runner.conversation, "agent")
-                and self._app.conversation_runner.conversation.agent  # type: ignore[union-attr]
-            ):
-                return self._app.conversation_runner.conversation.agent.llm.model  # type: ignore[union-attr]
-        except Exception:
-            pass
-        return None
+        return self._app.conversation_state.agent_model
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
@@ -283,7 +270,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
             # Add critic collapsible if present (for MessageEvent and ActionEvent)
             critic_result = getattr(event, "critic_result", None)
-            if critic_result is not None:
+            if critic_result is not None and self.cli_settings.enable_critic:
                 from openhands_cli.tui.utils.critic import (
                     create_critic_collapsible,
                     send_critic_inference_event,
@@ -319,6 +306,27 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._container.mount(widget)
         # Automatically scroll to the bottom to show the newly added widget
         self._container.scroll_end(animate=False)
+
+    def render_user_message(self, content: str) -> None:
+        """Render a user message to the UI.
+
+        Dismisses any pending feedback widgets before rendering the user message.
+
+        Args:
+            content: The user's message text to display.
+        """
+        from textual.widgets import Static
+
+        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
+
+        # Dismiss pending feedback widgets (user chose to continue instead of rating)
+        for widget in self._container.query(CriticFeedbackWidget):
+            widget.remove()
+
+        user_message_widget = Static(
+            f"> {content}", classes="user-message", markup=False
+        )
+        self._run_on_main_thread(self._add_widget_to_ui, user_message_widget)
 
     def _update_widget_in_ui(
         self, collapsible: Collapsible, new_title: str, new_content: str
@@ -626,35 +634,43 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if not event.llm_message:
                 return None
 
-            # Skip direct user messages
-            if (
-                self._skip_user_messages
-                and event.llm_message.role == "user"
-                and not event.sender
-            ):
+            # Skip direct user messages (they are displayed separately in the UI)
+            # This applies for user messages
+            # without a sender in delegation context
+            if event.llm_message.role == "user" and not event.sender:
                 return None
 
-            # Only render delegation messages
-            if not (event.sender and self._name):
+            # Case 1: Delegation message (both sender and name are set)
+            # Format with arrow notation showing sender → receiver
+            if event.sender and self._name:
+                message_content = str(content)
+                agent_name = self._get_formatted_agent_name()
+                event_sender = self._format_agent_name_with_suffix(event.sender)
+
+                if event.llm_message.role == "user":
+                    # Message from another agent (via delegation)
+                    prefix = f"**{event_sender} → {agent_name}:**\n\n"
+                else:
+                    # Agent message - derive recipient from sender context
+                    prefix = f"**{agent_name} → {event_sender}:**\n\n"
+
+                message_content = prefix + message_content
+                widget = Markdown(message_content)
+                widget.styles.padding = AGENT_MESSAGE_PADDING
+                return widget
+
+            # Case 2: Regular agent message (name set, no sender, assistant role)
+            # This is the normal case for agent responses in the main conversation
+            # Fixes GitHub issue #399: Agent MessageEvents were being silently dropped
+            if self._name and event.llm_message.role == "assistant":
+                widget = Markdown(str(content))
+                widget.styles.padding = AGENT_MESSAGE_PADDING
+                return widget
+
+            # Case 3: No name context - skip MessageEvents
+            # (visualizer without name is typically not used in CLI)
+            if not self._name:
                 return None
-
-            # Display messages as markdown for proper rendering
-            # In delegation context, prefix messages with agent info
-            message_content = str(content)
-            agent_name = self._get_formatted_agent_name()
-            event_sender = self._format_agent_name_with_suffix(event.sender)
-
-            if event.llm_message.role == "user":
-                # Message from another agent (via delegation)
-                prefix = f"**{event_sender} → {agent_name}:**\n\n"
-            else:
-                # Agent message - derive recipient from sender context
-                prefix = f"**{agent_name} → {event_sender}:**\n\n"
-
-            message_content = prefix + message_content
-            widget = Markdown(message_content)
-            widget.styles.padding = AGENT_MESSAGE_PADDING
-            return widget
 
         # For other events, use collapsible
         return self._create_event_collapsible(event)

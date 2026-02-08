@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
@@ -14,6 +13,7 @@ from textual.containers import Horizontal
 from textual.widgets import Static
 
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
+from tests.conftest import MockLocations
 
 
 if TYPE_CHECKING:
@@ -178,7 +178,9 @@ class TestRefreshContentWithServerObjects:
     """Tests for MCPSidePanel.refresh_content with server objects."""
 
     @pytest.mark.asyncio
-    async def test_refresh_content_with_remote_mcp_servers(self, tmp_path: Path):
+    async def test_refresh_content_with_remote_mcp_servers(
+        self, mock_locations: MockLocations
+    ):
         """Test refresh_content handles RemoteMCPServer objects in agent config.
 
         This test reproduces the bug from issue #362 where opening the MCP menu
@@ -193,7 +195,7 @@ class TestRefreshContentWithServerObjects:
                 }
             }
         }
-        mcp_config_file = tmp_path / "mcp.json"
+        mcp_config_file = mock_locations.persistence_dir / "mcp.json"
         mcp_config_file.write_text(json.dumps(mcp_config_data))
 
         # Create agent with RemoteMCPServer objects (as they would be loaded)
@@ -218,20 +220,21 @@ class TestRefreshContentWithServerObjects:
 
         app = TestApp()
 
-        with patch("openhands_cli.locations.PERSISTENCE_DIR", str(tmp_path)):
-            async with app.run_test() as pilot:
-                await pilot.pause()
+        async with app.run_test() as pilot:
+            await pilot.pause()
 
-                panel = MCPSidePanel(agent=mock_agent)
-                content_area = app.query_one("#content_area", Horizontal)
-                content_area.mount(panel)
-                await pilot.pause()
+            panel = MCPSidePanel(agent=mock_agent)
+            content_area = app.query_one("#content_area", Horizontal)
+            content_area.mount(panel)
+            await pilot.pause()
 
-                # This should NOT raise TypeError
-                panel.refresh_content()
+            # This should NOT raise TypeError
+            panel.refresh_content()
 
     @pytest.mark.asyncio
-    async def test_refresh_content_with_disabled_servers(self, tmp_path: Path):
+    async def test_refresh_content_with_disabled_servers(
+        self, mock_locations: MockLocations
+    ):
         """Test refresh_content handles disabled servers (issue #362 scenario).
 
         The user mentioned having some MCP servers explicitly disabled.
@@ -251,7 +254,7 @@ class TestRefreshContentWithServerObjects:
                 },
             }
         }
-        mcp_config_file = tmp_path / "mcp.json"
+        mcp_config_file = mock_locations.persistence_dir / "mcp.json"
         mcp_config_file.write_text(json.dumps(mcp_config_data))
 
         # Create agent with RemoteMCPServer objects
@@ -280,17 +283,16 @@ class TestRefreshContentWithServerObjects:
 
         app = TestApp()
 
-        with patch("openhands_cli.locations.PERSISTENCE_DIR", str(tmp_path)):
-            async with app.run_test() as pilot:
-                await pilot.pause()
+        async with app.run_test() as pilot:
+            await pilot.pause()
 
-                panel = MCPSidePanel(agent=mock_agent)
-                content_area = app.query_one("#content_area", Horizontal)
-                content_area.mount(panel)
-                await pilot.pause()
+            panel = MCPSidePanel(agent=mock_agent)
+            content_area = app.query_one("#content_area", Horizontal)
+            content_area.mount(panel)
+            await pilot.pause()
 
-                # This should NOT raise TypeError
-                panel.refresh_content()
+            # This should NOT raise TypeError
+            panel.refresh_content()
 
 
 # ============================================================================
@@ -302,45 +304,45 @@ class TestToggle:
     """Tests for MCPSidePanel.toggle class method."""
 
     @pytest.mark.asyncio
-    async def test_toggle_mounts_panel(self, tmp_path: Path):
+    async def test_toggle_mounts_panel(self, mock_locations: MockLocations):
         """Verify toggle() mounts the panel."""
         app = MCPPanelTestApp()
 
-        with patch("openhands_cli.locations.PERSISTENCE_DIR", str(tmp_path)):
-            async with app.run_test() as pilot:
-                await pilot.pause()
+        async with app.run_test() as pilot:
+            await pilot.pause()
 
-                # Toggle to mount
-                MCPSidePanel.toggle(app)
-                await pilot.pause()
+            # Toggle to mount
+            MCPSidePanel.toggle(app)
+            await pilot.pause()
 
-                # Verify panel is mounted
-                panels = app.query(MCPSidePanel)
-                assert len(panels) == 1
+            # Verify panel is mounted
+            panels = app.query(MCPSidePanel)
+            assert len(panels) == 1
 
     @pytest.mark.asyncio
-    async def test_toggle_removes_panel(self, tmp_path: Path):
+    async def test_toggle_removes_panel(self, mock_locations: MockLocations):
         """Verify toggle() removes an existing panel."""
         app = MCPPanelTestApp()
 
-        with patch("openhands_cli.locations.PERSISTENCE_DIR", str(tmp_path)):
-            async with app.run_test() as pilot:
-                await pilot.pause()
+        async with app.run_test() as pilot:
+            await pilot.pause()
 
-                # Toggle to mount
-                MCPSidePanel.toggle(app)
-                await pilot.pause()
+            # Toggle to mount
+            MCPSidePanel.toggle(app)
+            await pilot.pause()
 
-                # Toggle to remove
-                MCPSidePanel.toggle(app)
-                await pilot.pause()
+            # Toggle to remove
+            MCPSidePanel.toggle(app)
+            await pilot.pause()
 
-                # Verify panel is removed
-                panels = app.query(MCPSidePanel)
-                assert len(panels) == 0
+            # Verify panel is removed
+            panels = app.query(MCPSidePanel)
+            assert len(panels) == 0
 
     @pytest.mark.asyncio
-    async def test_toggle_with_remote_mcp_servers_in_agent(self, tmp_path: Path):
+    async def test_toggle_with_remote_mcp_servers_in_agent(
+        self, mock_locations: MockLocations
+    ):
         """Test toggle works when agent has RemoteMCPServer objects.
 
         This is the main reproduction test for issue #362.
@@ -355,7 +357,7 @@ class TestToggle:
                 }
             }
         }
-        mcp_config_file = tmp_path / "mcp.json"
+        mcp_config_file = mock_locations.persistence_dir / "mcp.json"
         mcp_config_file.write_text(json.dumps(mcp_config_data))
 
         # Create agent settings with RemoteMCPServer objects
@@ -374,10 +376,7 @@ class TestToggle:
 
         app = MCPPanelTestApp()
 
-        with (
-            patch("openhands_cli.locations.PERSISTENCE_DIR", str(tmp_path)),
-            patch("openhands_cli.stores.AgentStore") as mock_agent_store_class,
-        ):
+        with patch("openhands_cli.stores.AgentStore") as mock_agent_store_class:
             mock_agent_store = MagicMock()
             mock_agent_store.load.return_value = mock_agent
             mock_agent_store_class.return_value = mock_agent_store

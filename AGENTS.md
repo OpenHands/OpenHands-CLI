@@ -12,14 +12,16 @@ This repo contains the current CLI UX, including the Textual TUI and a browser-s
 
 ## Project Structure & Module Organization
 - `openhands_cli/`: Core CLI/TUI code (`openhands_cli/entrypoint.py`, `openhands_cli/tui/`, `openhands_cli/auth/`, `openhands_cli/mcp/`, `openhands_cli/cloud/`, `openhands_cli/user_actions/`, `openhands_cli/conversations/`, `openhands_cli/theme.py`, helpers in `openhands_cli/utils.py`). Keep new modules snake_case and colocate tests.
-- `tests/`: Pytest suite covering units, integration, and snapshot tests; mirrors source layout. `e2e_tests/`: end-to-end ACP/UI flows.
+- `tests/`: Pytest suite covering units, integration, and snapshot tests; mirrors source layout. `tui_e2e/`: tests for the PyInstaller-built executable.
 - `scripts/acp/`: JSON-RPC and debug helpers for ACP development; `hooks/`: PyInstaller/runtime hooks.
 - Tooling & packaging: `Makefile` for common tasks, `build.sh`/`build.py` for PyInstaller artifacts, `openhands-cli.spec` for the frozen binary, `uv.lock` for resolved deps.
 - `.openhands/skills/`: agent guidance for this repo.
 
 ## Setup, Build, and Development Commands
-- install dependencies: `make install`
-- install dev dependencies: `make install-dev`
+This repository uses **uv** for dependency management and running tooling (such as in `Makefile`, CI workflows, and `uv.lock`). Avoid using `pip install ...` directly if possible.
+
+- install dependencies: `make install` (runs `uv sync`)
+- install dev dependencies: `make install-dev` (runs `uv sync --group dev`)
 - install pre-commit hooks: `uv run pre-commit install` (included in `make build`)
 - build (sync + install hooks): `make build`
 - lint (all pre-commit hooks): `make lint`
@@ -30,13 +32,13 @@ This repo contains the current CLI UX, including the Textual TUI and a browser-s
 - run the browser-served web app (Textual `textual-serve`): `openhands web`
 - run the Docker-based OpenHands GUI server: `openhands serve`
 - run the ACP entrypoint: `uv run openhands-acp`
-- run tests: `make test` (for faster runs: `uv run pytest -m "not integration"`; end-to-end: `uv run pytest e2e_tests`)
+- run tests: `make test` (for faster runs: `uv run pytest -m "not integration"`; binary tests: `uv run pytest tui_e2e`)
 - build PyInstaller binaries: `./build.sh --install-pyinstaller`
 
 ## Development Guidelines
 
 ### Linting Requirements
-**Always run lint before committing changes.** Use `make lint` to run all pre-commit hooks on all files.
+**Always run lint before committing changes.** Use `make lint` to run all pre-commit hooks on all files, and do it before every commit (not after) to avoid CI failures.
 
 ### Typing Requirements
 Prefer modern typing syntax (`X | None` over `Optional[X]`) in new code.
@@ -54,6 +56,11 @@ Prefer modern typing syntax (`X | None` over `Optional[X]`) in new code.
 - Pytest discovery: files `test_*.py`, classes `Test*`, functions `test_*`. Use `@pytest.mark.integration` for costly flows.
 - Match test locations to implementation (`tests/` mirrors `openhands_cli/`); add fixtures in `tests/conftest.py` when shared.
 - Run `make test` before PRs.
+
+### Binary Tests with Mock LLM
+- Binary tests in `tui_e2e/` can use `mock_llm_server.py` for deterministic testing without real LLM calls.
+- The mock LLM server provides OpenAI-compatible endpoints with proper tool call format.
+- Use `openai/gpt-4o-mock` as the model name (litellm requires a provider prefix).
 
 ## Snapshot Testing with pytest-textual-snapshot
 The CLI uses [pytest-textual-snapshot](https://github.com/Textualize/pytest-textual-snapshot) for visual regression testing of Textual UI components. Snapshots are SVG screenshots that capture the exact visual state of the application.
@@ -163,7 +170,7 @@ To view the generated SVG snapshots in a browser:
 - Before opening a PR, run this verification flow (and include the exact commands run in the PR description):
   1. `make lint`
   2. `make test`
-  3. If you touched ACP / end-to-end UI flow code (e.g., `e2e_tests/`, `openhands_cli/acp_impl/`, `openhands_cli/mcp/`, auth/connection flow): `uv run pytest e2e_tests`
+  3. If you touched ACP / binary executable code (e.g., `tui_e2e/`, `openhands_cli/acp_impl/`, `openhands_cli/mcp/`, auth/connection flow): `uv run pytest tui_e2e`
   4. If you touched TUI code (e.g., `openhands_cli/tui/`, widgets, styles, layout): `uv run pytest tests/snapshots -v` (use `--snapshot-update` only for intentional UI changes)
 
 #### PR submission checklist
@@ -171,10 +178,69 @@ To view the generated SVG snapshots in a browser:
 - [ ] Tests added/updated for behavior changes (or PR explains why not)
 - [ ] `make lint`
 - [ ] `make test`
-- [ ] (If ACP/UI flow touched) `uv run pytest e2e_tests`
+- [ ] (If ACP/binary executable touched) `uv run pytest tui_e2e`
 - [ ] (If TUI touched) snapshot tests run and snapshots updated/reviewed
 - [ ] PR description includes: what changed, why, commands run, and UI evidence (snapshots/screenshots)
 
 ## Security & Configuration Tips
 - Do not embed API keys or endpoints in code; rely on runtime configuration/env vars when integrating new services.
 - When packaging, verify no sensitive files are included in `dist/`; adjust `openhands-cli.spec` if new assets are added.
+
+## TUI State Management Architecture
+
+The TUI uses a reactive state management pattern with clear separation of concerns. Key files are in `openhands_cli/tui/core/`.
+
+### Core Components
+
+**ConversationContainer (`state.py`)** - Reactive state holder
+- A Textual `Container` widget that owns all conversation-related reactive properties
+- Properties include: `running`, `conversation_id`, `conversation_title`, `confirmation_policy`, `pending_action_count`, `elapsed_seconds`, `metrics`
+- UI widgets bind to these properties via `data_bind()` and auto-update when state changes
+- Provides thread-safe state update methods (e.g., `set_running()`, `set_conversation_id()`)
+- Composes the main UI hierarchy: `ScrollableContent` + `InputAreaContainer`
+
+**ConversationManager (`conversation_manager.py`)** - Message router
+- A thin Textual `Container` that listens to messages and delegates to controllers
+- Owns: `RunnerRegistry`, `ConfirmationPolicyService`, and all controllers
+- Message handlers (`@on(MessageType)`) route to appropriate controllers
+- Provides public API methods that post messages internally
+
+**Controllers** - Single-responsibility business logic
+- `UserMessageController` - Handles user input, renders messages, queues/processes with runner
+- `ConversationCrudController` - Creates new conversations, resets state
+- `ConversationSwitchController` - Orchestrates switching (pause current, prepare new)
+- `ConfirmationFlowController` - Shows confirmation panel, handles user decisions
+
+**RunnerFactory + RunnerRegistry** - Runner lifecycle
+- `RunnerFactory` - Creates `ConversationRunner` instances with dependencies
+- `RunnerRegistry` - Caches runners by conversation_id, tracks current runner
+
+### Widget Hierarchy
+
+```
+OpenHandsApp
+└── ConversationManager(Container)  ← message router
+    └── ConversationContainer(#conversation_state)  ← reactive state
+        ├── ScrollableContent(#scroll_view)  ← binds to conversation_id, pending_action_count
+        │   ├── SplashContent(#splash_content)  ← binds to conversation_id
+        │   └── ... dynamically added conversation widgets
+        └── InputAreaContainer(#input_area)  ← handles slash commands
+            ├── WorkingStatusLine  ← binds to running, elapsed_seconds
+            ├── InputField  ← binds to conversation_id, pending_action_count
+            └── InfoStatusLine  ← binds to running, metrics
+```
+
+### Data Flow
+
+1. **User input** → `InputField` posts `UserInputSubmitted` → bubbles to `ConversationManager` → `UserMessageController.handle_user_message()`
+2. **Slash commands** → `InputField` posts `SlashCommandSubmitted` → `InputAreaContainer` routes to command handlers → posts operation messages (e.g., `CreateConversation`)
+3. **State changes** → Controllers call `ConversationContainer.set_*()` methods → reactive properties update → bound widgets auto-refresh
+4. **Cross-thread updates** → `ConversationContainer._schedule_update()` uses `call_from_thread()` for thread safety
+
+### Key Design Principles
+
+- **Reactive state**: UI components bind to `ConversationContainer` properties via `data_bind()`, auto-update on changes
+- **Single source of truth**: `ConversationContainer` owns all conversation state
+- **Thread safety**: State updates use `call_from_thread()` when called from background threads
+- **Message-based communication**: Components communicate via Textual messages that bubble up the widget tree
+- **Controller pattern**: Business logic split into focused controllers, `ConversationManager` is just a router

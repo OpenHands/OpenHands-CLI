@@ -135,6 +135,20 @@ class TestMainEntryPoint:
         assert kwargs["queued_inputs"] is None
 
     @patch("openhands_cli.tui.textual_app.main")
+    @patch("sys.argv", ["openhands", "--yolo"])
+    def test_main_with_yolo_argument(self, mock_textual_main: MagicMock) -> None:
+        """Test that main() passes always_approve=True with --yolo."""
+        mock_textual_main.side_effect = KeyboardInterrupt()
+
+        main()
+
+        mock_textual_main.assert_called_once()
+        kwargs = mock_textual_main.call_args.kwargs
+        assert kwargs["resume_conversation_id"] is None
+        assert kwargs["always_approve"] is True
+        assert kwargs["queued_inputs"] is None
+
+    @patch("openhands_cli.tui.textual_app.main")
     @patch("sys.argv", ["openhands", "--llm-approve"])
     def test_main_with_llm_approve_argument(self, mock_textual_main: MagicMock) -> None:
         """Test that main() passes llm_approve=True with --llm-approve."""
@@ -158,6 +172,7 @@ class TestMainEntryPoint:
         (["openhands"], None, False, False),
         (["openhands", "--resume", "test-id"], "test-id", False, False),
         (["openhands", "--always-approve"], None, True, False),
+        (["openhands", "--yolo"], None, True, False),
         (["openhands", "--llm-approve"], None, False, True),
         (
             ["openhands", "--resume", "test-id", "--always-approve"],

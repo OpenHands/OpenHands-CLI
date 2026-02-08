@@ -9,7 +9,7 @@ from pathlib import Path
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 
-from openhands_cli.locations import PERSISTENCE_DIR
+from openhands_cli.locations import get_persistence_dir
 
 
 def _format_docker_command_for_logging(cmd: list[str]) -> str:
@@ -68,7 +68,7 @@ def check_docker_requirements() -> bool:
 
 def ensure_config_dir_exists() -> Path:
     """Ensure the OpenHands configuration directory exists and return its path."""
-    path = Path(PERSISTENCE_DIR)
+    path = Path(get_persistence_dir())
     path.mkdir(exist_ok=True, parents=True)
     return path
 

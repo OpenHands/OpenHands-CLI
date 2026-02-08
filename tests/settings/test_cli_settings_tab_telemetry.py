@@ -1,6 +1,6 @@
 """Tests for the CLI settings tab component."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from textual.app import App, ComposeResult

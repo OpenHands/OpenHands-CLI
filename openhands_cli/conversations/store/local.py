@@ -17,18 +17,19 @@ from openhands.sdk.event.base import Event
 # from openhands.tools.preset.default import register_default_tools (moved to __init__)
 from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.conversations.protocols import ConversationStore
-from openhands_cli.locations import CONVERSATIONS_DIR
+from openhands_cli.locations import get_conversations_dir
 from openhands_cli.utils import extract_text_from_message_content
 
 
 class LocalFileStore(ConversationStore):
     """Local file system implementation of conversation storage."""
 
-    def __init__(self, base_dir: str = CONVERSATIONS_DIR):
+    def __init__(self, base_dir: str | None = None):
         """Initialize the local file store.
 
         Args:
             base_dir: Base directory for storing conversations.
+                Defaults to get_conversations_dir().
         """
         # Register default tools to ensure all Action subclasses are available
         # for proper deserialization of events.
@@ -36,7 +37,9 @@ class LocalFileStore(ConversationStore):
         from openhands.tools.preset.default import register_default_tools
 
         register_default_tools(enable_browser=False)
-        self.base_dir = Path(base_dir)
+        self.base_dir = Path(
+            base_dir if base_dir is not None else get_conversations_dir()
+        )
         self._event_adapter = TypeAdapter(Event)
 
     def list_conversations(self, limit: int = 100) -> list[ConversationMetadata]:
