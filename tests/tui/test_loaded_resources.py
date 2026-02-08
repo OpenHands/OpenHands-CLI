@@ -7,7 +7,7 @@ import pytest
 from textual.containers import VerticalScroll
 
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.splash import (
+from openhands_cli.tui.content.resources import (
     HookInfo,
     LoadedResourcesInfo,
     SkillInfo,

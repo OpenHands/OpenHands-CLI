@@ -16,7 +16,7 @@ from openhands_cli.theme import OPENHANDS_THEME
 
 
 if TYPE_CHECKING:
-    from openhands_cli.tui.content.splash import LoadedResourcesInfo
+    from openhands_cli.tui.content.resources import LoadedResourcesInfo
 
 
 # Available commands with descriptions after the command

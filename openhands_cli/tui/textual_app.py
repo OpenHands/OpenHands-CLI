@@ -61,7 +61,7 @@ from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.locations import get_conversations_dir, get_work_dir
 from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.splash import (
+from openhands_cli.tui.content.resources import (
     HookInfo,
     LoadedResourcesInfo,
     SkillInfo,
