@@ -475,9 +475,9 @@ def test_chatgpt_subscription_save_with_mock_auth(deps: FakeAgentStore) -> None:
     assert result.success is True
     assert len(deps.saved_agents) == 1
 
-    # Verify create_llm was called with the model name
+    # Verify create_llm was called with the model name and usage_id
     # It's called once for the main LLM (no condenser since memory_condensation=False)
-    mock_auth.create_llm.assert_called_with(model="gpt-5.2-codex")
+    mock_auth.create_llm.assert_called_with(model="gpt-5.2-codex", usage_id="agent")
 
     # Verify the saved agent has the mock LLM
     saved_agent = deps.saved_agents[-1]

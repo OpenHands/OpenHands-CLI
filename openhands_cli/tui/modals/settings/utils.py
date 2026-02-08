@@ -125,7 +125,7 @@ def save_settings(
 
             # Get the model name without provider prefix for create_llm
             model_name = str(data.model)
-            llm = chatgpt_auth.create_llm(model=model_name)
+            llm = chatgpt_auth.create_llm(model=model_name, usage_id="agent")
         else:
             # Standard API key based auth
             extra_kwargs: dict[str, Any] = {}
@@ -151,40 +151,46 @@ def save_settings(
         agent = existing_agent or get_default_cli_agent(llm=llm)
         agent = agent.model_copy(update={"llm": llm})
 
-        # Handle condenser - for ChatGPT subscription, use the same auth
-        if data.is_chatgpt_subscription and chatgpt_auth is not None:
-            # For subscription models, create a separate LLM for condenser
-            model_name = str(data.model)
-            condenser_llm = chatgpt_auth.create_llm(model=model_name)
-        else:
-            condenser_llm = llm.model_copy(update={"usage_id": "condenser"})
-            if should_set_litellm_extra_body(full_model, data.base_url):
-                condenser_llm = condenser_llm.model_copy(
-                    update={
-                        "litellm_extra_body": {
-                            "metadata": get_llm_metadata(
-                                model_name=full_model, llm_type="condenser"
-                            )
+        # Handle condenser based on memory_condensation_enabled setting
+        needs_condenser = data.memory_condensation_enabled or (
+            agent.condenser and isinstance(agent.condenser, LLMSummarizingCondenser)
+        )
+
+        if needs_condenser:
+            # Create condenser LLM - for ChatGPT subscription, use the same auth
+            if data.is_chatgpt_subscription and chatgpt_auth is not None:
+                model_name = str(data.model)
+                condenser_llm = chatgpt_auth.create_llm(
+                    model=model_name, usage_id="condenser"
+                )
+            else:
+                condenser_llm = llm.model_copy(update={"usage_id": "condenser"})
+                if should_set_litellm_extra_body(full_model, data.base_url):
+                    condenser_llm = condenser_llm.model_copy(
+                        update={
+                            "litellm_extra_body": {
+                                "metadata": get_llm_metadata(
+                                    model_name=full_model, llm_type="condenser"
+                                )
+                            }
                         }
+                    )
+
+            if agent.condenser and isinstance(agent.condenser, LLMSummarizingCondenser):
+                # Update existing condenser's LLM
+                agent = agent.model_copy(
+                    update={
+                        "condenser": agent.condenser.model_copy(
+                            update={"llm": condenser_llm}
+                        )
                     }
                 )
+            elif data.memory_condensation_enabled and not agent.condenser:
+                # Enable condensation with new condenser
+                condenser = LLMSummarizingCondenser(llm=condenser_llm)
+                agent = agent.model_copy(update={"condenser": condenser})
 
-        if agent.condenser and isinstance(agent.condenser, LLMSummarizingCondenser):
-            agent = agent.model_copy(
-                update={
-                    "condenser": agent.condenser.model_copy(
-                        update={"llm": condenser_llm}
-                    )
-                }
-            )
-
-        if data.memory_condensation_enabled and not agent.condenser:
-            # Enable condensation
-            if not data.is_chatgpt_subscription:
-                condenser_llm = agent.llm.model_copy(update={"usage_id": "condenser"})
-            condenser = LLMSummarizingCondenser(llm=condenser_llm)
-            agent = agent.model_copy(update={"condenser": condenser})
-        elif not data.memory_condensation_enabled and agent.condenser:
+        if not data.memory_condensation_enabled and agent.condenser:
             # Disable condensation
             agent = agent.model_copy(update={"condenser": None})
 

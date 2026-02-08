@@ -1,7 +1,7 @@
 """Settings tab component for the settings modal."""
 
 from textual.app import ComposeResult
-from textual.containers import Container, VerticalScroll
+from textual.containers import Container, Horizontal, VerticalScroll
 from textual.widgets import Button, Input, Label, Select, Static
 
 from openhands_cli.tui.modals.settings.choices import (
@@ -110,12 +110,19 @@ class SettingsTab(Container):
                         id="chatgpt_auth_status",
                         classes="form_help",
                     )
-                    yield Button(
-                        "Sign In with Browser",
-                        id="chatgpt_login_button",
-                        variant="primary",
-                        classes="chatgpt_button",
-                    )
+                    with Horizontal(classes="chatgpt_buttons"):
+                        yield Button(
+                            "Sign In with Browser",
+                            id="chatgpt_login_button",
+                            variant="primary",
+                            classes="chatgpt_button",
+                        )
+                        yield Button(
+                            "Copy Auth URL",
+                            id="chatgpt_copy_url_button",
+                            variant="default",
+                            classes="chatgpt_button",
+                        )
 
                 # Memory Condensation
                 with Container(classes="form_group"):

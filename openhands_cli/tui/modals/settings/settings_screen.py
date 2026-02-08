@@ -72,6 +72,9 @@ class SettingsScreen(ModalScreen):
     chatgpt_login_button: getters.query_one[Button] = getters.query_one(
         "#chatgpt_login_button"
     )
+    chatgpt_copy_url_button: getters.query_one[Button] = getters.query_one(
+        "#chatgpt_copy_url_button"
+    )
 
     def __init__(
         self,
@@ -335,6 +338,62 @@ class SettingsScreen(ModalScreen):
         finally:
             self.chatgpt_login_button.disabled = False
 
+    async def _copy_chatgpt_auth_url(self) -> None:
+        """Copy ChatGPT OAuth URL to clipboard and start waiting for callback."""
+        import webbrowser
+
+        import pyperclip
+
+        captured_url: str | None = None
+
+        # Temporarily patch webbrowser.open to capture URL and copy to clipboard
+        original_open = webbrowser.open
+
+        def capture_and_copy_url(url: str, *_args, **_kwargs) -> bool:
+            nonlocal captured_url
+            captured_url = url
+            # Copy immediately using pyperclip (same as app's clipboard)
+            try:
+                pyperclip.copy(url)
+            except pyperclip.PyperclipException:
+                pass
+            # Also use OSC 52 fallback
+            self.app.copy_to_clipboard(url)
+            # Update status now that URL is copied
+            self.chatgpt_auth_status.update(
+                "📋 URL copied! Paste in browser, waiting for auth..."
+            )
+            return True  # Pretend we opened it
+
+        try:
+            # Update UI
+            self.chatgpt_auth_status.update("📋 Copying auth URL...")
+            self.chatgpt_copy_url_button.disabled = True
+            self.chatgpt_login_button.disabled = True
+
+            # Patch webbrowser.open to capture URL
+            webbrowser.open = capture_and_copy_url
+
+            # Start login flow (won't actually open browser due to patch)
+            creds = await self._chatgpt_auth.login(open_browser=True)
+
+            if creds is not None:
+                self._chatgpt_authenticated = True
+                self._update_chatgpt_auth_status()
+                self._update_field_dependencies()
+            else:
+                self.chatgpt_auth_status.update("✗ Authentication failed")
+                self.chatgpt_auth_status.add_class("error_message")
+
+        except Exception as e:
+            self.chatgpt_auth_status.update(f"✗ Error: {e}")
+            self.chatgpt_auth_status.add_class("error_message")
+        finally:
+            # Restore original webbrowser.open
+            webbrowser.open = original_open
+            self.chatgpt_copy_url_button.disabled = False
+            self.chatgpt_login_button.disabled = False
+
     def _update_field_dependencies(self) -> None:
         """Update field enabled/disabled state based on dependency chain."""
         try:
@@ -477,6 +536,11 @@ class SettingsScreen(ModalScreen):
             # Start async login task
             self._chatgpt_login_task = asyncio.create_task(
                 self._perform_chatgpt_login()
+            )
+        elif event.button.id == "chatgpt_copy_url_button":
+            # Start async copy URL task
+            self._chatgpt_login_task = asyncio.create_task(
+                self._copy_chatgpt_auth_url()
             )
 
     def action_cancel(self) -> None:
