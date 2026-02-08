@@ -12,12 +12,10 @@ from openhands_cli.tui.content.splash import (
     LoadedResourcesInfo,
     SkillInfo,
     ToolInfo,
-    get_splash_content,
 )
 from openhands_cli.tui.core.commands import show_skills
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.textual_app import OpenHandsApp
-from openhands_cli.version_check import VersionInfo
 
 
 class TestLoadedResourcesInfo:
@@ -170,53 +168,6 @@ class TestToolInfo:
         tool = ToolInfo(name="test_tool", description="A test tool")
         assert tool.name == "test_tool"
         assert tool.description == "A test tool"
-
-
-class TestGetSplashContentWithLoadedResources:
-    """Tests for get_splash_content with loaded resources."""
-
-    def test_splash_content_includes_loaded_resources(self):
-        """Test that splash content includes loaded resources info."""
-        with mock.patch(
-            "openhands_cli.tui.content.splash.check_for_updates"
-        ) as mock_check:
-            mock_check.return_value = VersionInfo(
-                current_version="1.0.0",
-                latest_version="1.0.0",
-                needs_update=False,
-                error=None,
-            )
-
-            loaded_resources = LoadedResourcesInfo(
-                skills=[SkillInfo(name="skill1")],
-                tools=[ToolInfo(name="tool1")],
-            )
-
-            content = get_splash_content(
-                "test-123",
-                theme=OPENHANDS_THEME,
-                loaded_resources=loaded_resources,
-            )
-
-            assert "loaded_resources" in content
-            assert content["loaded_resources"] is loaded_resources
-
-    def test_splash_content_without_loaded_resources(self):
-        """Test that splash content works without loaded resources."""
-        with mock.patch(
-            "openhands_cli.tui.content.splash.check_for_updates"
-        ) as mock_check:
-            mock_check.return_value = VersionInfo(
-                current_version="1.0.0",
-                latest_version="1.0.0",
-                needs_update=False,
-                error=None,
-            )
-
-            content = get_splash_content("test-123", theme=OPENHANDS_THEME)
-
-            assert "loaded_resources" in content
-            assert content["loaded_resources"] is None
 
 
 class TestShowSkillsCommand:

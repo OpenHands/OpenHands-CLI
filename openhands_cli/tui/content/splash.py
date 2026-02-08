@@ -139,7 +139,6 @@ def get_splash_content(
     *,
     theme: Theme,
     has_critic: bool = False,
-    loaded_resources: LoadedResourcesInfo | None = None,
 ) -> dict:
     """Get structured splash screen content for native Textual widgets.
 
@@ -147,7 +146,6 @@ def get_splash_content(
         conversation_id: Optional conversation ID to display
         theme: Theme to use for colors
         has_critic: Whether the agent has a critic configured
-        loaded_resources: Information about loaded skills, hooks, and tools
     """
     # Use theme colors
     primary_color = theme.primary
@@ -178,7 +176,6 @@ def get_splash_content(
         ],
         "update_notice": None,
         "critic_notice": None,
-        "loaded_resources": loaded_resources,
     }
 
     # Add update notification if needed

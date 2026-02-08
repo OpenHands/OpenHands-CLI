@@ -498,8 +498,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self, loaded_resources: LoadedResourcesInfo
     ) -> None:
         """Add a collapsible widget showing loaded resources to the scroll view."""
-        from textual.widgets import Static
-
         summary = loaded_resources.get_summary()
         details = loaded_resources.get_details(theme=OPENHANDS_THEME)
 
@@ -512,9 +510,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             classes="loaded-resources-collapsible",
         )
 
-        # Mount after the critic notice (or update notice if no critic)
-        critic_notice = self.scroll_view.query_one("#splash_critic_notice", Static)
-        self.scroll_view.mount(collapsible, after=critic_notice)
+        # Mount after the splash content as a normal chat collapsible
+        splash_content = self.scroll_view.query_one("#splash_content", SplashContent)
+        self.scroll_view.mount(collapsible, after=splash_content)
 
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.
