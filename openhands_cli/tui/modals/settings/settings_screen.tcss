@@ -190,3 +190,28 @@ VerticalScroll > .scrollbar--vertical:hover {
     text-style: italic;
     height: auto;
 }
+
+/* Resources Tab Styles */
+#resources_content {
+    padding: 2;
+    height: 1fr;
+    scrollbar-gutter: stable;
+    overflow-y: auto;
+}
+
+.resources_section_header {
+    color: $primary;
+    text-style: bold;
+    margin-top: 2;
+    margin-bottom: 1;
+    padding-top: 1;
+    border-top: solid $secondary;
+}
+
+.resources_section_content {
+    color: $foreground;
+    margin-left: 1;
+    margin-bottom: 1;
+    height: auto;
+    min-height: 2;
+}

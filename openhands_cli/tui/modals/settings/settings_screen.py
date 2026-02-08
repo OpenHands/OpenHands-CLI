@@ -28,6 +28,7 @@ from openhands_cli.tui.modals.settings.choices import (
 )
 from openhands_cli.tui.modals.settings.components import (
     CliSettingsTab,
+    ResourcesTab,
     SettingsTab,
 )
 from openhands_cli.tui.modals.settings.utils import SettingsFormData, save_settings
@@ -112,6 +113,11 @@ class SettingsScreen(ModalScreen):
                 if not self.is_initial_setup:
                     with TabPane("CLI Settings", id="cli_settings_tab"):
                         yield CliSettingsTab()
+
+                # Resources Tab - only show if not first-time setup
+                if not self.is_initial_setup:
+                    with TabPane("Resources", id="resources_tab"):
+                        yield ResourcesTab()
 
             # Buttons
             with Horizontal(id="button_container"):

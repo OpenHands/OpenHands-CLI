@@ -29,7 +29,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 7
+        assert len(COMMANDS) == 8
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -46,6 +46,7 @@ class TestCommands:
             ("/history", "Toggle conversation history"),
             ("/confirm", "Configure confirmation settings"),
             ("/condense", "Condense conversation history"),
+            ("/skills", "View loaded skills, hooks, and tools"),
             ("/feedback", "Send anonymous feedback about CLI"),
             ("/exit", "Exit the application"),
         ],
@@ -84,6 +85,7 @@ class TestCommands:
             "/history",
             "/confirm",
             "/condense",
+            "/skills",
             "/feedback",
             "/exit",
             "Display available commands",
@@ -91,6 +93,7 @@ class TestCommands:
             "Toggle conversation history",
             "Configure confirmation settings",
             "Condense conversation history",
+            "View loaded skills, hooks, and tools",
             "Send anonymous feedback about CLI",
             "Exit the application",
             "Tips:",
@@ -161,6 +164,7 @@ class TestCommands:
             ("/history", True),
             ("/confirm", True),
             ("/condense", True),
+            ("/skills", True),
             ("/feedback", True),
             ("/exit", True),
             ("/help extra", False),
@@ -182,7 +186,8 @@ class TestCommands:
         assert "/history" in command_names
         assert "/help" in command_names
         assert "/new" in command_names
-        assert len(COMMANDS) == 7
+        assert "/skills" in command_names
+        assert len(COMMANDS) == 8
 
     def test_all_commands_included_in_help(self):
         """Test that all commands from COMMANDS list are included in help text.
