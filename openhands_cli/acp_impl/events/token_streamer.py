@@ -49,6 +49,7 @@ from openhands_cli.acp_impl.events.utils import (
     format_content_blocks,
     get_metadata,
 )
+from openhands_cli.shared.token_streaming import extract_streaming_content
 
 
 ACPUpdate = (
@@ -179,42 +180,28 @@ class TokenBasedEventSubscriber:
 
     def on_token(self, chunk: LLMStreamChunk) -> None:
         try:
+            # Handle tool calls from all choices (they're grouped by tool_call.index)
             for choice in chunk.choices:
                 delta = getattr(choice, "delta", None)
                 if not delta:
                     continue
-
-                choice_index = getattr(choice, "index", 0) or 0
-
-                # Tool calls are already grouped by tool_call.index internally,
-                # so we process them from all choices.
                 tool_calls = getattr(delta, "tool_calls", None)
                 if tool_calls:
                     for tool_call in tool_calls:
                         self._handle_tool_call_streaming(tool_call)
 
-                # Only process content/reasoning from choice.index == 0.
-                # We maintain single-stream state (_reasoning_header_emitted) that
-                # cannot track per-choice headers. If a provider emits multiple
-                # choices (n > 1) or out-of-order indices, processing all would
-                # interleave content. Standard streaming uses n=1, so choice > 0
-                # is rare; we ignore it to avoid corruption.
-                if choice_index != 0:
-                    continue
+            # Extract text content using shared utility (only from choice.index == 0)
+            streaming = extract_streaming_content(chunk)
 
-                reasoning = getattr(delta, "reasoning_content", None)
-                content = getattr(delta, "content", None)
+            if streaming.reasoning:
+                reasoning = streaming.reasoning
+                if not self._reasoning_header_emitted:
+                    self._reasoning_header_emitted = True
+                    reasoning = REASONING_HEADER + reasoning
+                self._schedule_update(update_agent_thought_text(reasoning))
 
-                if isinstance(reasoning, str) and reasoning.strip():
-                    # Prepend header on first non-empty reasoning chunk for consistency
-                    # with non-streaming mode (EventSubscriber)
-                    if not self._reasoning_header_emitted:
-                        self._reasoning_header_emitted = True
-                        reasoning = REASONING_HEADER + reasoning
-                    self._schedule_update(update_agent_thought_text(reasoning))
-
-                if isinstance(content, str) and content:
-                    self._schedule_update(update_agent_message_text(content))
+            if streaming.content:
+                self._schedule_update(update_agent_message_text(streaming.content))
 
         except Exception as e:
             logger.warning("Error during token streaming: %s", e, exc_info=True)

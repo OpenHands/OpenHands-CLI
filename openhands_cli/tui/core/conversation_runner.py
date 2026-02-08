@@ -26,6 +26,7 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands_cli.setup import setup_conversation
+from openhands_cli.tui.core.token_streamer import TUITokenStreamer
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.user_actions.types import UserConfirmation
 
@@ -42,9 +43,12 @@ class ConversationRunner:
         visualizer: ConversationVisualizer,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
         event_callback: Callable[[Event], None] | None = None,
+        token_write_callback: Callable[[str], None] | None = None,
         *,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
+        streaming_enabled: bool = False,
+        loop: asyncio.AbstractEventLoop | None = None,
     ):
         """Initialize the conversation runner.
 
@@ -55,17 +59,35 @@ class ConversationRunner:
             visualizer: Optional visualizer for output display.
             initial_confirmation_policy: Initial confirmation policy to use.
                                         If None, defaults to AlwaysConfirm.
+            token_write_callback: Optional callback to write streaming tokens.
             env_overrides_enabled: If True, environment variables will override
                                    stored LLM settings.
             critic_disabled: If True, critic functionality will be disabled.
+            streaming_enabled: If True, enable token streaming for LLM responses.
+                              Default is False for backward compatibility.
+            loop: Event loop for thread-safe streaming callbacks. If provided,
+                  token callbacks will be scheduled on this loop.
         """
         starting_confirmation_policy = initial_confirmation_policy or AlwaysConfirm()
         self.visualizer = visualizer
+
+        # Set up token streaming if enabled
+        self._token_streamer: TUITokenStreamer | None = None
+        token_callback = None
+        if streaming_enabled:
+            self._token_streamer = TUITokenStreamer(
+                visualizer=visualizer,
+                write_callback=token_write_callback,
+                loop=loop,
+            )
+            token_callback = self._token_streamer.on_token
+
         self.conversation: BaseConversation = setup_conversation(
             conversation_id,
             confirmation_policy=starting_confirmation_policy,
             visualizer=visualizer,
             event_callback=event_callback,
+            token_callback=token_callback,
             env_overrides_enabled=env_overrides_enabled,
             critic_disabled=critic_disabled,
         )

@@ -41,12 +41,16 @@ from openhands_cli.acp_impl.events.utils import (
     get_tool_kind,
     get_tool_title,
 )
+from openhands_cli.shared.token_streaming import REASONING_HEADER
 
 
 logger = get_logger(__name__)
 
-# Formatting constants for consistent headers across streaming and non-streaming modes
-REASONING_HEADER = "**Reasoning**:\n"
+# Re-export REASONING_HEADER for backward compatibility
+# (imported from shared module where it's now canonical)
+__all__ = ["REASONING_HEADER", "SharedEventHandler"]
+
+# Additional formatting constant (ACP-specific)
 THOUGHT_HEADER = "\n**Thought**:\n"
 
 

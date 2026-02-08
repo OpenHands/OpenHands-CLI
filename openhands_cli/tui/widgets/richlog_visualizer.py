@@ -125,6 +125,23 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def reload_configuration(self) -> None:
         self._cli_settings = CliSettings.load()
 
+    def write_streaming_token(self, text: str) -> None:
+        """Write a streaming token to the display.
+
+        This method is called from the token streaming handler to display
+        tokens as they arrive from the LLM. For now, this is a no-op placeholder
+        that will be implemented to show streaming text in the UI.
+
+        Args:
+            text: The token text to display.
+        """
+        # TODO: Implement streaming token display
+        # Options:
+        # 1. Create a "streaming message" widget that accumulates text
+        # 2. Use a dedicated streaming area in the UI
+        # 3. Append to an existing message widget
+        pass
+
     def create_sub_visualizer(self, agent_id: str) -> "ConversationVisualizer":
         """Create a visualizer for a sub-agent during delegation.
 

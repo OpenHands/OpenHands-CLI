@@ -453,6 +453,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if self.json_mode:
             event_callback = json_callback
 
+        # Get the event loop for thread-safe streaming callbacks
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
         runner = ConversationRunner(
             conversation_uuid,
             self.conversation_running_signal.publish,
@@ -463,8 +469,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             conversation_visualizer,
             self.initial_confirmation_policy,
             event_callback,
+            token_write_callback=conversation_visualizer.write_streaming_token,
             env_overrides_enabled=self.env_overrides_enabled,
             critic_disabled=self.critic_disabled,
+            streaming_enabled=True,
+            loop=loop,
         )
 
         return runner

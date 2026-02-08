@@ -8,6 +8,7 @@ from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, W
 from openhands.sdk.context import Skill
 from openhands.sdk.event.base import Event
 from openhands.sdk.hooks import HookConfig
+from openhands.sdk.llm.streaming import TokenCallbackType
 from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
 )
@@ -95,6 +96,7 @@ def setup_conversation(
     confirmation_policy: ConfirmationPolicyBase,
     visualizer: ConversationVisualizer | None = None,
     event_callback: Callable[[Event], None] | None = None,
+    token_callback: TokenCallbackType | None = None,
     *,
     env_overrides_enabled: bool = False,
     critic_disabled: bool = False,
@@ -108,6 +110,7 @@ def setup_conversation(
         confirmation_policy: Confirmation policy to use.
         visualizer: Optional visualizer to use. If None, a default will be used
         event_callback: Optional callback function to handle events (e.g., JSON output)
+        token_callback: Optional callback for streaming token deltas.
         env_overrides_enabled: If True, environment variables will override
             stored LLM settings, and agent can be created from env vars if no
             disk config exists.
@@ -125,8 +128,17 @@ def setup_conversation(
         critic_disabled=critic_disabled,
     )
 
+    # Enable streaming if token_callback is provided and not already enabled
+    if token_callback is not None and not agent.llm.stream:
+        agent = agent.model_copy(
+            update={"llm": agent.llm.model_copy(update={"stream": True})}
+        )
+
     # Prepare callbacks list
     callbacks = [event_callback] if event_callback else None
+
+    # Prepare token callbacks list
+    token_callbacks = [token_callback] if token_callback else None
 
     # Load hooks from ~/.openhands/hooks.json or {working_dir}/.openhands/hooks.json
     hook_config = HookConfig.load(working_dir=get_work_dir())
@@ -142,6 +154,7 @@ def setup_conversation(
         conversation_id=conversation_id,
         visualizer=visualizer,
         callbacks=callbacks,
+        token_callbacks=token_callbacks,
         hook_config=hook_config,
     )
 
