@@ -128,8 +128,8 @@ def setup_conversation(
         critic_disabled=critic_disabled,
     )
 
-    # Enable streaming if token_callback is provided
-    if token_callback is not None:
+    # Enable streaming if token_callback is provided and not already enabled
+    if token_callback is not None and not agent.llm.stream:
         agent = agent.model_copy(
             update={"llm": agent.llm.model_copy(update={"stream": True})}
         )

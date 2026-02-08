@@ -4,10 +4,14 @@ This module provides a simple token streaming handler that writes
 streamed LLM tokens to the TUI's visualizer widget.
 """
 
+import logging
 from collections.abc import Callable
 
 from openhands.sdk.llm.streaming import LLMStreamChunk
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
+
+
+logger = logging.getLogger(__name__)
 
 
 class TUITokenStreamer:
@@ -15,6 +19,9 @@ class TUITokenStreamer:
 
     This class receives streaming token chunks from the LLM and writes
     them to the TUI's visualizer widget for real-time display.
+
+    Note: The caller should call `reset()` before starting a new streaming
+    response to ensure header state is properly reset.
     """
 
     def __init__(
@@ -25,18 +32,22 @@ class TUITokenStreamer:
         """Initialize the token streamer.
 
         Args:
-            visualizer: The TUI visualizer to write tokens to.
-            write_callback: Optional callback to write text to the UI.
-                           If not provided, uses visualizer's write method.
+            visualizer: The TUI visualizer (stored for future extensions).
+            write_callback: Callback to write text to the UI. If not provided,
+                           streaming tokens will be silently discarded. This is
+                           acceptable as the visualizer will still receive
+                           complete events through the normal event callback.
         """
         self.visualizer = visualizer
         self._write_callback = write_callback
-        self._current_content = ""
         self._reasoning_header_emitted = False
 
     def reset(self) -> None:
-        """Reset state for a new streaming response."""
-        self._current_content = ""
+        """Reset state for a new streaming response.
+
+        Call this before starting a new streaming response to ensure
+        the reasoning header is emitted again.
+        """
         self._reasoning_header_emitted = False
 
     def on_token(self, chunk: LLMStreamChunk) -> None:
@@ -73,9 +84,9 @@ class TUITokenStreamer:
                 if isinstance(content, str) and content:
                     self._write_text(content)
 
-        except Exception:
-            # Silently ignore streaming errors to avoid disrupting the UI
-            pass
+        except Exception as e:
+            # Log streaming errors but don't disrupt the UI
+            logger.debug("Token streaming error: %s", e)
 
     def _write_text(self, text: str) -> None:
         """Write text to the UI.
@@ -85,6 +96,5 @@ class TUITokenStreamer:
         """
         if self._write_callback:
             self._write_callback(text)
-        # Note: The visualizer doesn't have a direct write method for streaming,
-        # so we rely on the write_callback for now. The visualizer will receive
-        # complete events through the normal event callback mechanism.
+        # Note: Without a callback, tokens are discarded but the visualizer
+        # will still receive complete events through the normal callback.
