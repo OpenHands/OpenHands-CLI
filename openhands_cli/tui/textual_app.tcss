@@ -122,3 +122,7 @@ Footer {
     color: $foreground;
     margin: 0;
 }
+
+.loaded-resources-collapsible {
+    padding-left: 0;
+}
