@@ -15,7 +15,7 @@ This repo contains the current CLI UX, including the Textual TUI and a browser-s
 - `tests/`: Pytest suite covering units, integration, and snapshot tests; mirrors source layout. `tui_e2e/`: tests for the PyInstaller-built executable.
 - `scripts/acp/`: JSON-RPC and debug helpers for ACP development; `hooks/`: PyInstaller/runtime hooks.
 - Tooling & packaging: `Makefile` for common tasks, `build.sh`/`build.py` for PyInstaller artifacts, `openhands-cli.spec` for the frozen binary, `uv.lock` for resolved deps.
-- `.openhands/skills/`: agent guidance for this repo.
+- `.agents/skills/`: agent guidance for this repo.
 
 ## Setup, Build, and Development Commands
 This repository uses **uv** for dependency management and running tooling (such as in `Makefile`, CI workflows, and `uv.lock`). Avoid using `pip install ...` directly if possible.
