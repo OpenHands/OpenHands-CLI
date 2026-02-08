@@ -185,3 +185,62 @@ To view the generated SVG snapshots in a browser:
 ## Security & Configuration Tips
 - Do not embed API keys or endpoints in code; rely on runtime configuration/env vars when integrating new services.
 - When packaging, verify no sensitive files are included in `dist/`; adjust `openhands-cli.spec` if new assets are added.
+
+## TUI State Management Architecture
+
+The TUI uses a reactive state management pattern with clear separation of concerns. Key files are in `openhands_cli/tui/core/`.
+
+### Core Components
+
+**ConversationContainer (`state.py`)** - Reactive state holder
+- A Textual `Container` widget that owns all conversation-related reactive properties
+- Properties include: `running`, `conversation_id`, `conversation_title`, `confirmation_policy`, `pending_action_count`, `elapsed_seconds`, `metrics`
+- UI widgets bind to these properties via `data_bind()` and auto-update when state changes
+- Provides thread-safe state update methods (e.g., `set_running()`, `set_conversation_id()`)
+- Composes the main UI hierarchy: `ScrollableContent` + `InputAreaContainer`
+
+**ConversationManager (`conversation_manager.py`)** - Message router
+- A thin Textual `Container` that listens to messages and delegates to controllers
+- Owns: `RunnerRegistry`, `ConfirmationPolicyService`, and all controllers
+- Message handlers (`@on(MessageType)`) route to appropriate controllers
+- Provides public API methods that post messages internally
+
+**Controllers** - Single-responsibility business logic
+- `UserMessageController` - Handles user input, renders messages, queues/processes with runner
+- `ConversationCrudController` - Creates new conversations, resets state
+- `ConversationSwitchController` - Orchestrates switching (pause current, prepare new)
+- `ConfirmationFlowController` - Shows confirmation panel, handles user decisions
+
+**RunnerFactory + RunnerRegistry** - Runner lifecycle
+- `RunnerFactory` - Creates `ConversationRunner` instances with dependencies
+- `RunnerRegistry` - Caches runners by conversation_id, tracks current runner
+
+### Widget Hierarchy
+
+```
+OpenHandsApp
+└── ConversationManager(Container)  ← message router
+    └── ConversationContainer(#conversation_state)  ← reactive state
+        ├── ScrollableContent(#scroll_view)  ← binds to conversation_id, pending_action_count
+        │   ├── SplashContent(#splash_content)  ← binds to conversation_id
+        │   └── ... dynamically added conversation widgets
+        └── InputAreaContainer(#input_area)  ← handles slash commands
+            ├── WorkingStatusLine  ← binds to running, elapsed_seconds
+            ├── InputField  ← binds to conversation_id, pending_action_count
+            └── InfoStatusLine  ← binds to running, metrics
+```
+
+### Data Flow
+
+1. **User input** → `InputField` posts `UserInputSubmitted` → bubbles to `ConversationManager` → `UserMessageController.handle_user_message()`
+2. **Slash commands** → `InputField` posts `SlashCommandSubmitted` → `InputAreaContainer` routes to command handlers → posts operation messages (e.g., `CreateConversation`)
+3. **State changes** → Controllers call `ConversationContainer.set_*()` methods → reactive properties update → bound widgets auto-refresh
+4. **Cross-thread updates** → `ConversationContainer._schedule_update()` uses `call_from_thread()` for thread safety
+
+### Key Design Principles
+
+- **Reactive state**: UI components bind to `ConversationContainer` properties via `data_bind()`, auto-update on changes
+- **Single source of truth**: `ConversationContainer` owns all conversation state
+- **Thread safety**: State updates use `call_from_thread()` when called from background threads
+- **Message-based communication**: Components communicate via Textual messages that bubble up the widget tree
+- **Controller pattern**: Business logic split into focused controllers, `ConversationManager` is just a router

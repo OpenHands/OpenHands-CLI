@@ -631,12 +631,12 @@ class TestPlanPanelIntegration:
 
             def compose(self):
                 with Horizontal(id="content_area"):
-                    with VerticalScroll(id="main_display"):
+                    with VerticalScroll(id="scroll_view"):
                         yield Static("Content")
 
         app = TestApp()
         async with app.run_test():
-            container = app.query_one("#main_display", VerticalScroll)
+            container = app.query_one("#scroll_view", VerticalScroll)
             visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
             # Create a TaskTrackerObservation event
@@ -682,7 +682,7 @@ class TestPlanPanelIntegration:
 
             def compose(self):
                 with Horizontal(id="content_area"):
-                    with VerticalScroll(id="main_display"):
+                    with VerticalScroll(id="scroll_view"):
                         yield Static("Content")
 
             def on_mount(self):
@@ -691,7 +691,7 @@ class TestPlanPanelIntegration:
         app = TestApp()
         async with app.run_test() as pilot:
             await pilot.pause()  # Wait for on_mount
-            container = app.query_one("#main_display", VerticalScroll)
+            container = app.query_one("#scroll_view", VerticalScroll)
             visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
             # Mock settings and toggle
@@ -735,7 +735,7 @@ class TestPlanPanelIntegration:
 
             def compose(self):
                 with Horizontal(id="content_area"):
-                    with VerticalScroll(id="main_display"):
+                    with VerticalScroll(id="scroll_view"):
                         yield Static("Content")
 
             def on_mount(self):
@@ -744,7 +744,7 @@ class TestPlanPanelIntegration:
         app = TestApp()
         async with app.run_test() as pilot:
             await pilot.pause()  # Wait for on_mount
-            container = app.query_one("#main_display", VerticalScroll)
+            container = app.query_one("#scroll_view", VerticalScroll)
             visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
             # Mock that panel is already on screen
@@ -790,7 +790,7 @@ class TestPlanPanelIntegration:
 
             def compose(self):
                 with Horizontal(id="content_area"):
-                    with VerticalScroll(id="main_display"):
+                    with VerticalScroll(id="scroll_view"):
                         yield Static("Content")
 
             def on_mount(self):
@@ -799,7 +799,7 @@ class TestPlanPanelIntegration:
         app = TestApp()
         async with app.run_test() as pilot:
             await pilot.pause()  # Wait for on_mount
-            container = app.query_one("#main_display", VerticalScroll)
+            container = app.query_one("#scroll_view", VerticalScroll)
             visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
             # Ensure panel is not on screen
@@ -834,20 +834,6 @@ class TestSubVisualizerCreation:
 
         assert sub_vis._container is visualizer._container
         assert sub_vis._app is visualizer._app
-
-    def test_create_sub_visualizer_preserves_skip_user_messages(self):
-        """Sub-visualizer inherits skip_user_messages setting from parent."""
-        app = App()
-        container = VerticalScroll()
-        parent = ConversationVisualizer(
-            container,
-            app,  # type: ignore[arg-type]
-            skip_user_messages=True,
-        )
-
-        sub_vis = parent.create_sub_visualizer("child_agent")
-
-        assert sub_vis._skip_user_messages is True
 
 
 class TestMessageEventDelegation:
@@ -987,7 +973,6 @@ class TestAgentMessageEventDisplay:
         visualizer = ConversationVisualizer(
             container,
             app,  # type: ignore[arg-type]
-            skip_user_messages=True,
             name="OpenHands Agent",
         )
 
@@ -1025,7 +1010,6 @@ class TestAgentMessageEventDisplay:
         visualizer = ConversationVisualizer(
             container,
             app,  # type: ignore[arg-type]
-            skip_user_messages=True,
             name="OpenHands Agent",
         )
 
@@ -1051,34 +1035,6 @@ class TestAgentMessageEventDisplay:
             "Agent MessageEvent with critic_result should display. "
             "Users wait for critic feedback that never appears due to this bug."
         )
-
-    def test_user_message_still_skipped_when_skip_user_messages_true(self):
-        """User MessageEvents should still be skipped when skip_user_messages=True.
-
-        This test ensures the fix doesn't break the existing behavior of
-        skipping user messages (which are displayed separately in the UI).
-        """
-        from openhands.sdk import Message
-
-        app = App()
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(
-            container,
-            app,  # type: ignore[arg-type]
-            skip_user_messages=True,
-            name="OpenHands Agent",
-        )
-
-        message = Message(
-            role="user",
-            content=[TextContent(text="Please analyze this data")],
-        )
-        event = MessageEvent(llm_message=message, source="user")
-
-        widget = visualizer._create_event_widget(event)
-
-        # User messages should still be skipped
-        assert widget is None, "User messages should still be skipped"
 
     def test_delegation_message_still_works_with_sender(self):
         """Delegation MessageEvents with sender should still display correctly.
@@ -1112,3 +1068,56 @@ class TestAgentMessageEventDisplay:
         assert markdown_content is not None
         assert "Child Agent" in markdown_content
         assert "Parent Agent" in markdown_content
+
+
+class TestRenderUserMessage:
+    """Tests for ConversationVisualizer.render_user_message."""
+
+    def test_render_user_message_creates_static_widget(self):
+        """render_user_message should create a Static widget with user message."""
+        from unittest.mock import MagicMock
+
+        app = MagicMock()
+        container = MagicMock()
+        visualizer = ConversationVisualizer(container, app)
+
+        # Track widgets added via _run_on_main_thread
+        added_widgets: list[Static] = []
+
+        def capture_add(func, *args):
+            if func == visualizer._add_widget_to_ui and args:
+                added_widgets.append(args[0])
+
+        visualizer._run_on_main_thread = capture_add  # type: ignore[method-assign]
+
+        visualizer.render_user_message("Hello, agent!")
+
+        assert len(added_widgets) == 1
+        widget = added_widgets[0]
+        assert isinstance(widget, Static)
+        # Check widget has user-message class
+        assert "user-message" in widget.classes
+
+    def test_render_user_message_format(self):
+        """render_user_message should prefix content with '> '."""
+        from unittest.mock import MagicMock
+
+        app = MagicMock()
+        container = MagicMock()
+        visualizer = ConversationVisualizer(container, app)
+
+        added_widgets: list[Static] = []
+
+        def capture_add(func, *args):
+            if func == visualizer._add_widget_to_ui and args:
+                added_widgets.append(args[0])
+
+        visualizer._run_on_main_thread = capture_add  # type: ignore[method-assign]
+
+        visualizer.render_user_message("Test message")
+
+        assert len(added_widgets) == 1
+        widget = added_widgets[0]
+        assert isinstance(widget, Static)
+        # Check the widget has user-message class (format verification)
+        assert "user-message" in widget.classes
