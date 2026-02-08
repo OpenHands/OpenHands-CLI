@@ -74,9 +74,9 @@ async def _select_auto_low_med(pilot: "Pilot") -> None:
 
 
 async def _type_second_message_high_risk(pilot: "Pilot") -> None:
-    """Phase 4: After selecting Auto LOW/MED, type message that triggers HIGH risk action.
+    """Phase 4: Type message that triggers HIGH risk action.
 
-    HIGH risk actions still require confirmation with ConfirmRisky policy.
+    After selecting Auto LOW/MED, HIGH risk actions still require confirmation.
     """
     await _select_auto_low_med(pilot)
 
@@ -207,5 +207,7 @@ class TestConfirmationMode:
         """
         app = _create_app(mock_llm_with_trajectory["conversation_id"])
         assert snap_compare(
-            app, terminal_size=(120, 40), run_before=_type_third_message_low_risk_auto_proceeds
+            app,
+            terminal_size=(120, 40),
+            run_before=_type_third_message_low_risk_auto_proceeds,
         )
