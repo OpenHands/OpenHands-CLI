@@ -274,7 +274,6 @@ def patch_deterministic_paths(monkeypatch: pytest.MonkeyPatch) -> None:
 
         def patched_build_agent_context(self) -> AgentContext:
             from openhands.sdk.context.skills.skill import load_project_skills
-
             from openhands_cli.locations import get_work_dir
             from openhands_cli.utils import get_os_description
 
@@ -285,14 +284,17 @@ def patch_deterministic_paths(monkeypatch: pytest.MonkeyPatch) -> None:
                     f"User operating system: {get_os_description()}",
                 ]
             )
+            # Disable user/public skills for deterministic tests
             return AgentContext(
                 skills=skills,
                 system_message_suffix=system_suffix,
-                load_user_skills=False,  # Disable user skills for deterministic tests
-                load_public_skills=False,  # Disable public skills for deterministic tests
+                load_user_skills=False,
+                load_public_skills=False,
             )
 
-        monkeypatch.setattr(AgentStore, "_build_agent_context", patched_build_agent_context)
+        monkeypatch.setattr(
+            AgentStore, "_build_agent_context", patched_build_agent_context
+        )
     except (ImportError, AttributeError):
         pass  # If the module doesn't exist, skip patching
 
