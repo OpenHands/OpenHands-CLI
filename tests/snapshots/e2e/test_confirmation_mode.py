@@ -49,26 +49,29 @@ async def _wait_for_initial_state(pilot: "Pilot") -> None:
     await wait_for_app_ready(pilot)
 
 
-async def _type_first_message(pilot: "Pilot") -> None:
-    """Phase 2: Type the first message to trigger an action."""
+async def _type_first_message_and_navigate_to_auto(pilot: "Pilot") -> None:
+    """Phase 2: Type message and navigate to 'Auto LOW/MED' option.
+
+    Shows confirmation panel with 'Auto LOW/MED' highlighted, ready to click.
+    Options order: Yes (0), No (1), Always (2), Auto LOW/MED (3)
+    """
     await wait_for_app_ready(pilot)
     await type_text(pilot, "echo hello world")
     await pilot.press("enter")
     await wait_for_idle(pilot, timeout=10)
 
-
-async def _select_auto_low_med(pilot: "Pilot") -> None:
-    """Phase 3: Select 'Auto LOW/MED' option to set ConfirmRisky policy.
-
-    Options order: Yes (0), No (1), Always (2), Auto LOW/MED (3)
-    Navigate down 3 times and press enter.
-    """
-    await _type_first_message(pilot)
-
     # Navigate to "Auto LOW/MED" (4th option, index 3)
     await pilot.press("down")  # No
     await pilot.press("down")  # Always
     await pilot.press("down")  # Auto LOW/MED
+    await pilot.wait_for_scheduled_animations()
+
+
+async def _select_auto_low_med(pilot: "Pilot") -> None:
+    """Phase 3: Select 'Auto LOW/MED' option to set ConfirmRisky policy."""
+    await _type_first_message_and_navigate_to_auto(pilot)
+
+    # Press enter to select "Auto LOW/MED"
     await pilot.press("enter")
     await wait_for_idle(pilot, timeout=10)
 
@@ -142,16 +145,19 @@ class TestConfirmationMode:
     @pytest.mark.parametrize(
         "mock_llm_with_trajectory", ["confirmation_mode"], indirect=True
     )
-    def test_phase2_first_message_confirmation_panel(
+    def test_phase2_confirmation_panel_auto_low_med_highlighted(
         self, snap_compare, mock_llm_with_trajectory
     ):
-        """Phase 2: User types first message, confirmation panel appears.
+        """Phase 2: Confirmation panel with 'Auto LOW/MED' option highlighted.
 
-        The AlwaysConfirm policy triggers the confirmation panel for all actions.
+        User types first message, confirmation panel appears, and user navigates
+        to 'Auto LOW/MED' option (ready to click).
         """
         app = _create_app(mock_llm_with_trajectory["conversation_id"])
         assert snap_compare(
-            app, terminal_size=(120, 40), run_before=_type_first_message
+            app,
+            terminal_size=(120, 40),
+            run_before=_type_first_message_and_navigate_to_auto,
         )
 
     @pytest.mark.parametrize(
