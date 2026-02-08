@@ -1,0 +1,1 @@
+{"id":"9fd0dd1f-b618-4a36-b5e8-0ef604038b11","timestamp":"2026-01-28T12:46:49.131704","source":"user","llm_message":{"role":"user","content":[{"cache_prompt":false,"type":"text","text":"create a dummy plan","enable_truncation":true}],"thinking_blocks":[]},"activated_skills":[],"extended_content":[],"kind":"MessageEvent"}

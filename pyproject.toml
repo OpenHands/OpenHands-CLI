@@ -4,7 +4,7 @@ requires = [ "hatchling>=1.25" ]
 
 [project]
 name = "openhands"
-version = "1.9.1"
+version = "1.11.0"
 description = "OpenHands CLI - Terminal User Interface for OpenHands AI Agent"
 readme = "README.md"
 license = { text = "MIT" }
@@ -16,10 +16,11 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-  "openhands-sdk==1.8.2",
-  "openhands-tools==1.8.2",
-  "openhands-workspace==1.8.2",
+  "openhands-sdk==1.10.0",
+  "openhands-tools==1.10.0",
+  "openhands-workspace==1.9.0",
   "prompt-toolkit>=3",
+  "rich<14.3.0",
   "textual>=0.79.0",
   "typer>=0.17.4",
   "agent-client-protocol>=0.7.0,<0.8.0",
@@ -51,6 +52,7 @@ dev = [
   "pyright[nodejs]>=1.1.405",
   "pre-commit>=4.3.0",
   "textual-dev>=1.8.0",
+  "pytest-httpserver>=1.1.3",
 ]
 
 [tool.hatch.metadata]
@@ -140,5 +142,5 @@ typeCheckingMode = "standard"
 # USE EXACT COMMIT FROM AGENT-SDK (PR #1368 - Add condense method to conversation class)
 
 # [tool.uv.sources]
-# openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "5ee81068fd16bb84d9a611e9af44825478155e15" }
-# openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "5ee81068fd16bb84d9a611e9af44825478155e15" }
+# openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "c76e5bd220ea9eb95a9d351313bdb4e533c9da6e" }
+# openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "c76e5bd220ea9eb95a9d351313bdb4e533c9da6e" }

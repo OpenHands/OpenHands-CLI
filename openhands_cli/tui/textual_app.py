@@ -58,7 +58,7 @@ from openhands.sdk.security.confirmation_policy import (
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.locations import get_conversations_dir
-from openhands_cli.stores import AgentStore
+from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.core import (
     ConversationContainer,
@@ -125,6 +125,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
         headless_mode: bool = False,
         json_mode: bool = False,
+        env_overrides_enabled: bool = False,
+        critic_disabled: bool = False,
         cloud: bool = False,
         server_url: str | None = None,
         sandbox_id: str | None = None,
@@ -141,6 +143,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                                        If None, defaults to AlwaysConfirm.
             headless_mode: If True, run in headless mode.
             json_mode: If True, enable JSON output mode.
+            env_overrides_enabled: If True, environment variables will override
+                                   stored LLM settings.
+            critic_disabled: If True, critic functionality will be disabled.
             cloud: If True, use OpenHands Cloud for remote execution.
             server_url: The OpenHands Cloud server URL (used when cloud=True).
             sandbox_id: Optional sandbox ID to reclaim an existing sandbox.
@@ -158,10 +163,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Store headless mode setting for auto-exit behavior
         self.headless_mode = headless_mode
 
-        # Store cloud mode settings
-        self.cloud = cloud
-        self.server_url = server_url
-        self.sandbox_id = sandbox_id
+        self.env_overrides_enabled = env_overrides_enabled
+        self.critic_disabled = critic_disabled
 
         self._store = LocalFileStore()
         runner_factory = RunnerFactory(
@@ -169,6 +172,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             app_provider=lambda: self,
             scroll_view_provider=lambda: self.scroll_view,
             json_mode=json_mode,
+            env_overrides_enabled=env_overrides_enabled,
+            critic_disabled=critic_disabled,
             cloud=cloud,
             server_url=server_url,
             sandbox_id=sandbox_id,
@@ -269,8 +274,18 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def on_mount(self) -> None:
         """Called when app starts."""
+        from openhands_cli.stores import MissingEnvironmentVariablesError
+
         # Check if user has existing settings
-        initial_setup_required = SettingsScreen.is_initial_setup_required()
+        try:
+            initial_setup_required = SettingsScreen.is_initial_setup_required(
+                env_overrides_enabled=self.env_overrides_enabled
+            )
+        except MissingEnvironmentVariablesError as e:
+            # Store the error to be re-raised after clean exit
+            self._missing_env_vars_error = e
+            self.exit()
+            return
 
         if initial_setup_required:
             # In headless mode we cannot open interactive settings.
@@ -304,6 +319,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 self._reload_visualizer,
             ],
             on_first_time_settings_cancelled=self._handle_initial_setup_cancelled,
+            env_overrides_enabled=self.env_overrides_enabled,
         )
         self.push_screen(settings_screen)
 
@@ -374,6 +390,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 self._reload_visualizer,
                 self._notify_restart_required,
             ],
+            env_overrides_enabled=self.env_overrides_enabled,
         )
         self.push_screen(settings_screen)
 
@@ -414,7 +431,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         has_critic = False
         try:
             agent_store = AgentStore()
-            agent = agent_store.load()
+            agent = agent_store.load_or_create(
+                env_overrides_enabled=self.env_overrides_enabled,
+                critic_disabled=self.critic_disabled,
+            )
             if agent:
                 has_critic = agent.critic is not None
         except Exception:
@@ -622,6 +642,8 @@ def main(
     exit_without_confirmation: bool = False,
     headless: bool = False,
     json_mode: bool = False,
+    env_overrides_enabled: bool = False,
+    critic_disabled: bool = False,
     cloud: bool = False,
     server_url: str | None = None,
     sandbox_id: str | None = None,
@@ -636,10 +658,30 @@ def main(
         exit_without_confirmation: If True, exit without showing confirmation dialog.
         headless: If True, run in headless mode (no UI output, auto-approve actions).
         json_mode: If True, enable JSON output mode (implies headless).
+        env_overrides_enabled: If True, environment variables will override
+            stored LLM settings.
+        critic_disabled: If True, critic functionality will be disabled.
         cloud: If True, use OpenHands Cloud for remote execution.
         server_url: The OpenHands Cloud server URL (used when cloud=True).
         sandbox_id: Optional sandbox ID to reclaim an existing sandbox.
+
+    Raises:
+        MissingEnvironmentVariablesError: If env_overrides_enabled is True but
+            required environment variables are missing. The app exits cleanly and
+            the error is re-raised to be handled by the entrypoint.
     """
+
+    # Determine if envs are required to be configured
+    # Raise error before textual app is run to avoid traceback
+    # Skip this check for cloud mode since it uses cloud authentication
+    if not cloud:
+        try:
+            SettingsScreen.is_initial_setup_required(
+                env_overrides_enabled=env_overrides_enabled
+            )
+        except MissingEnvironmentVariablesError as e:
+            raise e
+
     # Determine initial confirmation policy from CLI arguments
     # If headless mode is enabled, always use NeverConfirm (auto-approve all actions)
     initial_confirmation_policy = AlwaysConfirm()  # Default
@@ -657,6 +699,8 @@ def main(
         initial_confirmation_policy=initial_confirmation_policy,
         headless_mode=headless,
         json_mode=json_mode,
+        env_overrides_enabled=env_overrides_enabled,
+        critic_disabled=critic_disabled,
         cloud=cloud,
         server_url=server_url,
         sandbox_id=sandbox_id,

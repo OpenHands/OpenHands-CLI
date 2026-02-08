@@ -52,6 +52,8 @@ class ConversationRunner:
         visualizer: ConversationVisualizer,
         event_callback: Callable[[Event], None] | None = None,
         *,
+        env_overrides_enabled: bool = False,
+        critic_disabled: bool = False,
         cloud: bool = False,
         server_url: str | None = None,
         sandbox_id: str | None = None,
@@ -65,6 +67,9 @@ class ConversationRunner:
             notification_callback: Callback for notifications.
             visualizer: Visualizer for output display.
             event_callback: Optional callback for each event.
+            env_overrides_enabled: If True, environment variables will override
+                stored LLM settings.
+            critic_disabled: If True, critic functionality will be disabled.
             cloud: If True, use OpenHands Cloud for remote execution.
             server_url: The OpenHands Cloud server URL (used when cloud=True).
             sandbox_id: Optional sandbox ID to reclaim an existing sandbox.
@@ -84,6 +89,8 @@ class ConversationRunner:
             confirmation_policy=state.confirmation_policy,
             visualizer=visualizer,
             event_callback=event_callback,
+            env_overrides_enabled=env_overrides_enabled,
+            critic_disabled=critic_disabled,
             cloud=cloud,
             server_url=server_url,
             sandbox_id=sandbox_id,

@@ -1,5 +1,18 @@
-"""Cloud conversation creation functionality."""
+"""Cloud conversation creation functionality.
 
+ARCHITECTURAL NOTE:
+This module contains direct API implementation for conversation management.
+This logic is slated for migration to `openhands_cli/conversations/store/cloud.py`.
+
+The goal is to have a unified `ConversationStore` interface where:
+- `LocalFileStore` handles local filesystem operations.
+- `CloudStore` handles these API interactions.
+
+Future maintainers: Please move methods from here into the `CloudStore` class
+implementation and deprecate this module.
+"""
+
+import logging
 import os
 import subprocess
 from typing import Any
@@ -9,6 +22,8 @@ from rich.console import Console
 from openhands_cli.auth.api_client import OpenHandsApiClient
 from openhands_cli.theme import OPENHANDS_THEME
 
+
+logger = logging.getLogger(__name__)
 
 console = Console()
 

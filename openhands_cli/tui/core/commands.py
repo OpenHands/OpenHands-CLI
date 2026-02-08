@@ -15,6 +15,7 @@ from openhands_cli.theme import OPENHANDS_THEME
 COMMANDS = [
     DropdownItem(main="/help - Display available commands"),
     DropdownItem(main="/new - Start a new conversation"),
+    DropdownItem(main="/history - Toggle conversation history"),
     DropdownItem(main="/confirm - Configure confirmation settings"),
     DropdownItem(main="/condense - Condense conversation history"),
     DropdownItem(main="/feedback - Send anonymous feedback about CLI"),
@@ -52,11 +53,11 @@ def is_valid_command(user_input: str) -> bool:
     return user_input in get_valid_commands()
 
 
-def show_help(main_display: VerticalScroll) -> None:
-    """Display help information in the main display.
+def show_help(scroll_view: VerticalScroll) -> None:
+    """Display help information in the scrollable content area.
 
     Args:
-        main_display: The VerticalScroll widget to mount help content to
+        scroll_view: The VerticalScroll widget to mount help content to
     """
     primary = OPENHANDS_THEME.primary
     secondary = OPENHANDS_THEME.secondary
@@ -67,6 +68,7 @@ def show_help(main_display: VerticalScroll) -> None:
 
   [{secondary}]/help[/{secondary}] - Display available commands
   [{secondary}]/new[/{secondary}] - Start a new conversation
+  [{secondary}]/history[/{secondary}] - Toggle conversation history
   [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
   [{secondary}]/condense[/{secondary}] - Condense conversation history
   [{secondary}]/feedback[/{secondary}] - Send anonymous feedback about CLI
@@ -78,4 +80,4 @@ def show_help(main_display: VerticalScroll) -> None:
   • Press Enter to select a command
 """
     help_widget = Static(help_text, classes="help-message")
-    main_display.mount(help_widget)
+    scroll_view.mount(help_widget)

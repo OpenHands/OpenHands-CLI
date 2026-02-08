@@ -1,7 +1,7 @@
 """CLI Settings tab component for the settings modal."""
 
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal
+from textual.containers import Container, Horizontal, VerticalScroll
 from textual.widgets import Label, Static, Switch
 
 from openhands_cli.stores import CliSettings
@@ -50,7 +50,7 @@ class CliSettingsTab(Container):
 
     def compose(self) -> ComposeResult:
         """Compose the CLI settings tab content."""
-        with Container(id="cli_settings_content"):
+        with VerticalScroll(id="cli_settings_content"):
             yield Static("CLI Settings", classes="form_section_title")
 
             yield SettingsSwitch(
@@ -75,6 +75,18 @@ class CliSettingsTab(Container):
                 value=self.cli_settings.auto_open_plan_panel,
             )
 
+            yield SettingsSwitch(
+                label="Enable Critic (Experimental)",
+                description=(
+                    "When enabled and using OpenHands LLM provider, an experimental "
+                    "critic model predicts task success likelihood in real-time. "
+                    "We collect anonymized data (IDs, critic response, feedback) to "
+                    "evaluate accuracy. See: https://openhands.dev/privacy"
+                ),
+                switch_id="enable_critic_switch",
+                value=self.cli_settings.enable_critic,
+            )
+
     def get_cli_settings(self) -> CliSettings:
         """Get the current CLI settings from the form."""
         default_cells_expanded_switch = self.query_one(
@@ -83,8 +95,10 @@ class CliSettingsTab(Container):
         auto_open_plan_panel_switch = self.query_one(
             "#auto_open_plan_panel_switch", Switch
         )
+        enable_critic_switch = self.query_one("#enable_critic_switch", Switch)
 
         return CliSettings(
             default_cells_expanded=default_cells_expanded_switch.value,
             auto_open_plan_panel=auto_open_plan_panel_switch.value,
+            enable_critic=enable_critic_switch.value,
         )

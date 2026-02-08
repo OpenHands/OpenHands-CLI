@@ -65,6 +65,62 @@ class TestSimpleMainHeadlessValidation:
         mock_textual_main.assert_not_called()
 
     @patch("openhands_cli.tui.textual_app.main")
+    def test_headless_flag_passes_critic_disabled_true(self, mock_textual_main):
+        """Test that --headless flag passes critic_disabled=True to textual_main."""
+        # Mock textual_main to return a UUID
+        mock_textual_main.return_value = uuid.uuid4()
+
+        test_args = ["openhands", "--headless", "--task", "test task"]
+
+        with patch.object(sys, "argv", test_args):
+            simple_main()
+
+        # Verify textual_main was called with critic_disabled=True
+        mock_textual_main.assert_called_once()
+        kwargs = mock_textual_main.call_args.kwargs
+        assert kwargs.get("critic_disabled") is True
+
+    @patch("openhands_cli.tui.textual_app.main")
+    def test_headless_with_override_envs_passes_both_params(self, mock_textual_main):
+        """Test --headless --override-with-envs passes both params to textual_main."""
+        # Mock textual_main to return a UUID
+        mock_textual_main.return_value = uuid.uuid4()
+
+        test_args = [
+            "openhands",
+            "--headless",
+            "--override-with-envs",
+            "--task",
+            "test task",
+        ]
+
+        with patch.object(sys, "argv", test_args):
+            simple_main()
+
+        # Verify textual_main was called with both params set correctly
+        mock_textual_main.assert_called_once()
+        kwargs = mock_textual_main.call_args.kwargs
+        assert kwargs.get("critic_disabled") is True
+        assert kwargs.get("env_overrides_enabled") is True
+
+    @patch("openhands_cli.tui.textual_app.main")
+    def test_non_headless_passes_critic_disabled_false(self, mock_textual_main):
+        """Test that without --headless, critic_disabled=False is passed."""
+        # Mock textual_main to return a UUID
+        mock_textual_main.return_value = uuid.uuid4()
+
+        # Run without --headless flag
+        test_args = ["openhands", "--task", "test task"]
+
+        with patch.object(sys, "argv", test_args):
+            simple_main()
+
+        # Verify textual_main was called with critic_disabled=False
+        mock_textual_main.assert_called_once()
+        kwargs = mock_textual_main.call_args.kwargs
+        assert kwargs.get("critic_disabled") is False
+
+    @patch("openhands_cli.tui.textual_app.main")
     def test_headless_with_task_calls_textual_main_with_queued_input(
         self, mock_textual_main
     ):
@@ -181,49 +237,15 @@ class TestHeadlessConfirmationPolicy:
 
 
 class TestHeadlessAppBehavior:
-    """Tests focused on headless flag and auto-exit behavior in OpenHandsApp."""
+    """Tests focused on headless flag and auto-exit behavior in OpenHandsApp.
 
-    @pytest.mark.asyncio
-    async def test_conversation_state_change_triggers_summary_and_exit_in_headless(
-        self, monkeypatch: pytest.MonkeyPatch
-    ):
-        """When headless and conversation finishes, we should print summary & exit."""
-        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda: False)
+    Note: Tests for _on_conversation_state_changed were removed as that method
+    no longer exists. The headless exit behavior is now handled through
+    ConversationContainer's watch_running and ConversationFinished message handling.
+    """
 
-        app = OpenHandsApp(exit_confirmation=False, headless_mode=True)
-
-        app._print_conversation_summary = MagicMock()
-        app.exit = MagicMock()
-
-        app._on_conversation_state_changed(is_running=False)
-
-        app._print_conversation_summary.assert_called_once()
-        app.exit.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_conversation_state_change_no_exit_when_running(
-        self, monkeypatch: pytest.MonkeyPatch
-    ):
-        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda: False)
-
-        app = OpenHandsApp(exit_confirmation=False)
-        app.headless_mode = True
-        app.exit = MagicMock()
-
-        app._on_conversation_state_changed(is_running=True)
-        app.exit.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_conversation_state_change_no_exit_in_non_headless(
-        self, monkeypatch: pytest.MonkeyPatch
-    ):
-        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda: False)
-
-        app = OpenHandsApp(exit_confirmation=False)
-        app.exit = MagicMock()
-
-        app._on_conversation_state_changed(is_running=False)
-        app.exit.assert_not_called()
+    # Placeholder - add tests for ConversationContainer-based headless behavior
+    pass
 
 
 class TestPrintConversationSummary:
@@ -231,27 +253,32 @@ class TestPrintConversationSummary:
 
     def test_print_conversation_summary_no_runner_is_noop(self, monkeypatch):
         """If no conversation_runner is set, method should be a no-op (no crash)."""
-        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda: False)
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
         app = OpenHandsApp(exit_confirmation=False)
-        app.conversation_runner = None
 
         # Just ensure this doesn't raise
         app._print_conversation_summary()
 
-    def test_print_conversation_summary_uses_console_and_runner(self, monkeypatch):
-        """Ensure we call get_conversation_summary and rich.Console.print."""
+    def test_print_conversation_summary_uses_console_and_state(self, monkeypatch):
+        """Ensure we call state.get_conversation_summary and Console.print."""
         from rich.text import Text
 
-        monkeypatch.setattr(SettingsScreen, "is_initial_setup_required", lambda: False)
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
 
         app = OpenHandsApp(exit_confirmation=False)
 
-        mock_runner = MagicMock()
-        mock_runner.get_conversation_summary.return_value = (
-            2,
-            Text("Last agent message"),
+        # Mock conversation_state.get_conversation_summary
+        app.conversation_state.get_conversation_summary = MagicMock(
+            return_value=(2, Text("Last agent message"))
         )
-        app.conversation_runner = mock_runner
 
         with patch("rich.console.Console") as mock_console_cls:
             mock_console = MagicMock()
@@ -259,13 +286,64 @@ class TestPrintConversationSummary:
 
             app._print_conversation_summary()
 
-            mock_runner.get_conversation_summary.assert_called_once()
+            app.conversation_state.get_conversation_summary.assert_called_once()
             assert mock_console.print.call_count >= 1
 
 
 # ---------------------------------------------------------------------------
 # ConversationRunner.get_conversation_summary behavior
 # ---------------------------------------------------------------------------
+
+
+class TestHeadlessRunnerOutput:
+    """Tests for headless mode output without spinner."""
+
+    def test_headless_mode_prints_status_without_spinner(self):
+        """Test that headless mode prints status messages without spinner."""
+        from openhands_cli.tui.core.conversation_runner import ConversationRunner
+        from openhands_cli.tui.core.state import ConversationContainer
+
+        mock_conversation = Mock()
+        mock_conversation.send_message = Mock()
+        mock_conversation.run = Mock()
+
+        # Create mock state and message_pump
+        mock_state = Mock(spec=ConversationContainer)
+        mock_state.confirmation_policy = NeverConfirm()
+        mock_state.attach_conversation = Mock()
+        # Ensure is_confirmation_active returns False so headless path is taken
+        mock_state.is_confirmation_active = False
+        mock_message_pump = Mock()
+
+        with patch(
+            "openhands_cli.tui.core.conversation_runner.setup_conversation",
+            return_value=mock_conversation,
+        ):
+            runner = ConversationRunner(
+                conversation_id=uuid.uuid4(),
+                state=mock_state,
+                message_pump=mock_message_pump,
+                notification_callback=Mock(),
+                visualizer=Mock(),
+            )
+
+        message = Mock()
+
+        with patch(
+            "openhands_cli.tui.core.conversation_runner.Console"
+        ) as mock_console_cls:
+            mock_console = MagicMock()
+            mock_console_cls.return_value = mock_console
+
+            runner._run_conversation_sync(message, headless=True)
+
+            # Verify console.print was called with the expected messages
+            print_calls = [call[0][0] for call in mock_console.print.call_args_list]
+            assert "Agent is working" in print_calls
+            assert "Agent finished" in print_calls
+
+            # Verify console.status was NOT called (no spinner)
+            mock_console.status.assert_not_called()
 
 
 class TestConversationSummary:
@@ -275,6 +353,7 @@ class TestConversationSummary:
         """It should count agent messages and return last agent message text."""
         from openhands.sdk.event import MessageEvent
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
+        from openhands_cli.tui.core.state import ConversationContainer
 
         mock_conversation = Mock()
         mock_conversation.state = Mock()
@@ -304,15 +383,23 @@ class TestConversationSummary:
             agent_event,
         ]
 
-        runner = ConversationRunner(
-            conversation_id=uuid.uuid4(),
-            running_state_callback=Mock(),
-            confirmation_callback=Mock(),
-            notification_callback=Mock(),
-            visualizer=Mock(),
-        )
+        # Create mock state and message_pump
+        mock_state = Mock(spec=ConversationContainer)
+        mock_state.confirmation_policy = AlwaysConfirm()
+        mock_state.attach_conversation = Mock()
+        mock_message_pump = Mock()
 
-        runner.conversation = mock_conversation
+        with patch(
+            "openhands_cli.tui.core.conversation_runner.setup_conversation",
+            return_value=mock_conversation,
+        ):
+            runner = ConversationRunner(
+                conversation_id=uuid.uuid4(),
+                state=mock_state,
+                message_pump=mock_message_pump,
+                notification_callback=Mock(),
+                visualizer=Mock(),
+            )
 
         agent_count, last_agent_message = runner.get_conversation_summary()
         assert agent_count == 2
@@ -322,6 +409,13 @@ class TestConversationSummary:
     def test_conversation_summary_empty_state(self):
         """With no conversation / events, we should get a safe default."""
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
+        from openhands_cli.tui.core.state import ConversationContainer
+
+        # Create a mock ConversationContainer and message_pump
+        mock_state = Mock(spec=ConversationContainer)
+        mock_state.confirmation_policy = AlwaysConfirm()
+        mock_state.attach_conversation = Mock()
+        mock_message_pump = Mock()
 
         with patch(
             "openhands_cli.tui.core.conversation_runner.setup_conversation",
@@ -329,8 +423,8 @@ class TestConversationSummary:
         ):
             runner = ConversationRunner(
                 conversation_id=uuid.uuid4(),
-                running_state_callback=Mock(),
-                confirmation_callback=Mock(),
+                state=mock_state,
+                message_pump=mock_message_pump,
                 notification_callback=Mock(),
                 visualizer=Mock(),
             )
@@ -353,20 +447,13 @@ class TestHeadlessInitialSetupGuard:
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
-            lambda: True,
+            lambda env_overrides_enabled=False: True,
         )
 
         app = OpenHandsApp(
             exit_confirmation=False,
             headless_mode=True,
             resume_conversation_id=uuid.uuid4(),
-        )
-
-        # Avoid Textual's "node must be running" restriction in this unit test
-        monkeypatch.setattr(
-            app.conversation_running_signal,
-            "subscribe",
-            MagicMock(),
         )
 
         # We don't want to actually exit the process in the test
@@ -449,3 +536,42 @@ class TestJsonModeIntegration:
         # Should not raise an exception
         with patch("builtins.print"):
             json_callback(mock_event)
+
+
+class TestMissingEnvVarsErrorHandling:
+    """Tests for MissingEnvironmentVariablesError handling in entrypoint."""
+
+    def test_missing_env_vars_error_prints_message_and_exits(self, capsys) -> None:
+        """Test that MissingEnvironmentVariablesError prints message and exits."""
+        from openhands_cli.stores import MissingEnvironmentVariablesError
+
+        # Mock textual_main to raise MissingEnvironmentVariablesError
+        # (simulating what happens when the app runs and AgentStore.load() fails)
+        def raise_missing_env_vars(*args, **kwargs):
+            raise MissingEnvironmentVariablesError(["LLM_API_KEY", "LLM_MODEL"])
+
+        test_args = [
+            "openhands",
+            "--headless",
+            "--override-with-envs",
+            "--task",
+            "test",
+        ]
+
+        with (
+            patch.object(sys, "argv", test_args),
+            patch(
+                "openhands_cli.tui.textual_app.main", side_effect=raise_missing_env_vars
+            ),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                simple_main()
+
+            # Should exit with code 1
+            assert exc_info.value.code == 1
+
+            # Check that the error message was printed
+            captured = capsys.readouterr()
+            assert "LLM_API_KEY" in captured.out
+            assert "LLM_MODEL" in captured.out
+            assert "Missing required environment variable(s)" in captured.out

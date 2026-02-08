@@ -17,6 +17,7 @@ async def _fetch_user_data_with_context(
     server_url: str,
     api_key: str,
     already_logged_in: bool,
+    skip_settings_sync: bool = False,
 ) -> None:
     """Fetch user data and print messages depending on login context."""
 
@@ -30,6 +31,10 @@ async def _fetch_user_data_with_context(
             f"[{OPENHANDS_THEME.secondary}]Pulling latest settings from remote..."
             f"[/{OPENHANDS_THEME.secondary}]"
         )
+
+    # If already logged, skip re-fetching settings
+    if already_logged_in and skip_settings_sync:
+        return
 
     try:
         await fetch_user_data_after_oauth(server_url, api_key)
@@ -55,7 +60,7 @@ async def _fetch_user_data_with_context(
         )
 
 
-async def login_command(server_url: str) -> bool:
+async def login_command(server_url: str, skip_settings_sync: bool = False) -> bool:
     """Execute the login command.
 
     Args:
@@ -92,12 +97,13 @@ async def login_command(server_url: str) -> bool:
             server_url,
             existing_api_key,
             already_logged_in=True,
+            skip_settings_sync=skip_settings_sync,
         )
         return True
 
     # No existing token: run device flow
     try:
-        tokens = await authenticate_with_device_flow(server_url)
+        token_response = await authenticate_with_device_flow(server_url)
     except DeviceFlowError as e:
         _p(
             f"[{OPENHANDS_THEME.error}]Authentication failed: "
@@ -105,19 +111,7 @@ async def login_command(server_url: str) -> bool:
         )
         return False
 
-    api_key = tokens.get("access_token")
-
-    if not api_key:
-        _p(
-            f"\n[{OPENHANDS_THEME.warning}]Warning: "
-            f"No access token found in OAuth response.[/{OPENHANDS_THEME.warning}]"
-        )
-        _p(
-            f"[{OPENHANDS_THEME.secondary}]You can still use OpenHands CLI with "
-            f"cloud features.[/{OPENHANDS_THEME.secondary}]"
-        )
-        # Authentication technically succeeded, even if we lack a token
-        return True
+    api_key = token_response.access_token
 
     # Store the API key securely
     token_storage.store_api_key(api_key)
@@ -136,6 +130,7 @@ async def login_command(server_url: str) -> bool:
         server_url,
         api_key,
         already_logged_in=False,
+        skip_settings_sync=skip_settings_sync,
     )
     return True
 

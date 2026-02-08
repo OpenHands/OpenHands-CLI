@@ -8,7 +8,11 @@ from openhands_cli.argparsers.auth_parser import add_login_parser, add_logout_pa
 from openhands_cli.argparsers.cloud_parser import add_cloud_parser
 from openhands_cli.argparsers.mcp_parser import add_mcp_parser
 from openhands_cli.argparsers.serve_parser import add_serve_parser
-from openhands_cli.argparsers.util import add_confirmation_mode_args, add_resume_args
+from openhands_cli.argparsers.util import (
+    add_confirmation_mode_args,
+    add_env_override_args,
+    add_resume_args,
+)
 from openhands_cli.argparsers.view_parser import add_view_parser
 from openhands_cli.argparsers.web_parser import add_web_parser
 
@@ -99,6 +103,9 @@ def create_main_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Exit the application without showing confirmation dialog",
     )
+
+    # Environment variable override option
+    add_env_override_args(parser)
 
     # Subcommands
     subparsers = parser.add_subparsers(dest="command", help="Additional commands")

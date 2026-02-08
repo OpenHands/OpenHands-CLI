@@ -58,7 +58,7 @@ class MCPSidePanel(VerticalScroll):
             from openhands_cli.stores import AgentStore
 
             agent_store = AgentStore()
-            agent = agent_store.load()
+            agent = agent_store.load_from_disk()
         except Exception:
             pass
 

@@ -35,6 +35,8 @@ class RunnerFactory:
         app_provider: AppProvider,
         scroll_view_provider: ScrollViewProvider,
         json_mode: bool,
+        env_overrides_enabled: bool,
+        critic_disabled: bool,
         cloud: bool = False,
         server_url: str | None = None,
         sandbox_id: str | None = None,
@@ -43,6 +45,8 @@ class RunnerFactory:
         self._app_provider = app_provider
         self._scroll_view_provider = scroll_view_provider
         self._json_mode = json_mode
+        self._env_overrides_enabled = env_overrides_enabled
+        self._critic_disabled = critic_disabled
         self._cloud = cloud
         self._server_url = server_url
         self._sandbox_id = sandbox_id
@@ -76,6 +80,8 @@ class RunnerFactory:
             notification_callback=notification_callback,
             visualizer=visualizer,
             event_callback=event_callback,
+            env_overrides_enabled=self._env_overrides_enabled,
+            critic_disabled=self._critic_disabled,
             cloud=self._cloud,
             server_url=self._server_url,
             sandbox_id=self._sandbox_id,

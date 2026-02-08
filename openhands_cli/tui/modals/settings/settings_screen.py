@@ -62,21 +62,26 @@ class SettingsScreen(ModalScreen):
         self,
         on_settings_saved: Callable[[], None] | list[Callable[[], None]] | None = None,
         on_first_time_settings_cancelled: Callable[[], None] | None = None,
+        env_overrides_enabled: bool = False,
         **kwargs,
     ):
         """Initialize the settings screen.
 
         Args:
-            is_initial_setup: True if this is the initial setup for a new user
             on_settings_saved: Callback(s) to invoke when settings are saved
-            on_settings_cancelled: Callback to invoke when settings are cancelled
+            on_first_time_settings_cancelled: Callback to invoke when settings are
+                cancelled during first-time setup
+            env_overrides_enabled: If True, environment variables will override
+                stored LLM settings when checking for initial setup
         """
         super().__init__(**kwargs)
         self.agent_store = AgentStore()
-        self.current_agent = self.agent_store.load()
+        self.current_agent = self.agent_store.load_from_disk()
         self.is_advanced_mode = False
         self.message_widget = None
-        self.is_initial_setup = SettingsScreen.is_initial_setup_required()
+        self.is_initial_setup = SettingsScreen.is_initial_setup_required(
+            env_overrides_enabled=env_overrides_enabled
+        )
 
         # Convert single callback to list for uniform handling
         if on_settings_saved is None:
@@ -225,6 +230,14 @@ class SettingsScreen(ModalScreen):
             self.basic_section.display = True
             self.advanced_section.display = False
 
+    def _has_existing_api_key(self) -> bool:
+        """Check if there's an existing API key in the agent."""
+        return bool(
+            self.current_agent
+            and self.current_agent.llm
+            and self.current_agent.llm.api_key
+        )
+
     def _update_field_dependencies(self) -> None:
         """Update field enabled/disabled state based on dependency chain."""
         try:
@@ -289,7 +302,8 @@ class SettingsScreen(ModalScreen):
                     pass
 
             # Memory Condensation: enabled when API key is provided
-            self.memory_select.disabled = not api_key
+            # or when there's an existing API key in the agent
+            self.memory_select.disabled = not (api_key or self._has_existing_api_key())
 
         except Exception:
             # Silently handle errors during initialization
@@ -414,13 +428,28 @@ class SettingsScreen(ModalScreen):
         self.dismiss(True)
 
     @staticmethod
-    def is_initial_setup_required() -> bool:
+    def is_initial_setup_required(env_overrides_enabled: bool = False) -> bool:
         """Check if initial setup is required.
 
-        Returns:
-            True if initial setup is needed (no existing settings), False otherwise
-        """
+        Args:
+            env_overrides_enabled: If True, environment variables will override
+                stored LLM settings.
 
+        Returns:
+            True if initial setup is needed (no existing settings and no valid
+            env overrides), False otherwise.
+
+        Raises:
+            MissingEnvironmentVariablesError: If env_overrides_enabled is True
+                but required environment variables (LLM_API_KEY, LLM_MODEL) are
+                missing.
+
+        Note: AgentStore.load_or_create() handles creating an agent from environment
+        variables when env_overrides_enabled is True and required env vars
+        (LLM_API_KEY and LLM_MODEL) are set.
+        """
         agent_store = AgentStore()
-        existing_agent = agent_store.load()
+        existing_agent = agent_store.load_or_create(
+            env_overrides_enabled=env_overrides_enabled
+        )
         return existing_agent is None

@@ -5,9 +5,35 @@ as they would be sent by real clients like Zed, Toad, etc.
 """
 
 import json
+import os
 import subprocess
 
 import pytest
+
+from tests.conftest import create_test_agent_config, setup_test_persistence_dir
+
+
+@pytest.fixture
+def acp_test_env(tmp_path):
+    """Set up a temporary agent configuration for ACP tests.
+
+    This creates a minimal agent_settings.json in a temporary directory
+    and returns environment variables that point to it.
+    """
+    # Create temporary persistence directory
+    persistence_dir = tmp_path / "openhands"
+    persistence_dir.mkdir()
+    persistence_dir, conversations_dir = setup_test_persistence_dir(persistence_dir)
+
+    # Create agent configuration using shared helper
+    create_test_agent_config(persistence_dir)
+
+    # Return environment with OPENHANDS_PERSISTENCE_DIR set
+    env = os.environ.copy()
+    env["OPENHANDS_PERSISTENCE_DIR"] = str(persistence_dir)
+    env["OPENHANDS_CONVERSATIONS_DIR"] = str(conversations_dir)
+
+    return env
 
 
 @pytest.fixture
@@ -96,13 +122,14 @@ def test_jsonrpc_initialize(acp_executable):
         proc.wait(timeout=5)
 
 
-def test_jsonrpc_session_new_returns_session_id(acp_executable, tmp_path):
+def test_jsonrpc_session_new_returns_session_id(acp_executable, acp_test_env, tmp_path):
     """Test that session/new returns a valid session ID."""
     proc = subprocess.Popen(
         acp_executable,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
+        env=acp_test_env,
     )
 
     try:
@@ -190,7 +217,7 @@ def test_jsonrpc_error_handling(acp_executable):
         proc.wait(timeout=5)
 
 
-def test_jsonrpc_null_result_regression(acp_executable, tmp_path):
+def test_jsonrpc_null_result_regression(acp_executable, acp_test_env, tmp_path):
     """Regression test: Ensure session/new doesn't return null result.
 
     This was the original bug reported:
@@ -202,6 +229,7 @@ def test_jsonrpc_null_result_regression(acp_executable, tmp_path):
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
+        env=acp_test_env,
     )
 
     try:
@@ -263,13 +291,14 @@ def test_jsonrpc_null_result_regression(acp_executable, tmp_path):
         proc.wait(timeout=5)
 
 
-def test_parameter_naming_conventions(acp_executable, tmp_path):
+def test_parameter_naming_conventions(acp_executable, acp_test_env, tmp_path):
     """Test that parameter naming follows ACP protocol (camelCase in JSON-RPC)."""
     proc = subprocess.Popen(
         acp_executable,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
+        env=acp_test_env,
     )
 
     try:

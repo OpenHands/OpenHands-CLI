@@ -33,8 +33,20 @@ class InMemoryAgentStore:
     def save(self, agent: Agent) -> None:
         self._agent = agent
 
-    def load(self) -> Agent | None:
+    def load_from_disk(self) -> Agent | None:
         return self._agent
+
+    def load_or_create(
+        self,
+        session_id: str | None = None,
+        *,
+        env_overrides_enabled: bool = False,
+        critic_disabled: bool = False,
+    ) -> Agent | None:
+        return self._agent
+
+    def create_from_env_overrides(self) -> Agent:
+        raise NotImplementedError("Not implemented in test mock")
 
 
 class SettingsTestApp(App):
@@ -71,13 +83,18 @@ def fake_agent_store(monkeypatch) -> InMemoryAgentStore:
 
 @pytest.fixture
 def test_agent() -> Agent:
-    """A simple Agent with a known LLM config."""
-    llm = LLM(
-        model="openai/gpt-4o-mini",
-        api_key="test-api-key-12345",
-        usage_id="agent",
+    """Agent with API key for testing."""
+    return Agent(
+        llm=LLM(
+            model="openai/gpt-4o-mini", api_key="test-api-key-12345", usage_id="agent"
+        )
     )
-    return Agent(llm=llm)
+
+
+@pytest.fixture
+def test_agent_no_api_key() -> Agent:
+    """Agent without API key for testing."""
+    return Agent(llm=LLM(model="openai/gpt-4o-mini", api_key=None, usage_id="agent"))
 
 
 @pytest.fixture
@@ -129,7 +146,7 @@ async def test_load_current_settings_basic_mode(
     assert screen is not None
 
     # Force a reload to simulate on_mount behavior
-    screen.current_agent = fake_agent_store.load()
+    screen.current_agent = fake_agent_store.load_from_disk()
 
     with patch.object(ss, "get_model_options") as mock_get_options:
         # Model options don't include provider prefix
@@ -159,6 +176,11 @@ async def test_load_current_settings_basic_mode(
     # Memory select should reflect presence of condenser (None by default)
     assert memory_select.value is False
 
+    # Memory condensation should be enabled when there's an existing API key
+    # (even though api_key_input.value is empty, the agent has a saved API key)
+    assert api_key_input.value == ""  # Input is empty when loading existing settings
+    assert memory_select.disabled is False  # Should be enabled due to existing API key
+
 
 @pytest.mark.asyncio
 async def test_load_current_settings_advanced_mode(
@@ -179,13 +201,86 @@ async def test_load_current_settings_advanced_mode(
     screen = app_obj.settings_screen
     assert screen is not None
 
-    screen.current_agent = fake_agent_store.load()
+    screen.current_agent = fake_agent_store.load_from_disk()
     screen._load_current_settings()
 
     assert screen.is_advanced_mode is True
     assert screen.mode_select.value == "advanced"
     assert screen.custom_model_input.value == "custom-model"
     assert screen.base_url_input.value == "https://api.example.com/v1"
+
+
+@pytest.mark.asyncio
+async def test_memory_condensation_enabled_with_existing_api_key(
+    app, fake_agent_store: InMemoryAgentStore, test_agent: Agent
+):
+    """Memory condensation editable when reopening settings with existing API key.
+
+    Scenario: User sets API key, saves, then reopens settings.
+    The api_key_input.value is empty (to allow keeping current key),
+    but memory condensation should still be enabled because there's a saved API key.
+    """
+    app_obj, _ = app
+    fake_agent_store.save(test_agent)
+    screen = app_obj.settings_screen
+    assert screen is not None
+    # Load existing settings (simulates reopening settings tab)
+    screen.current_agent = fake_agent_store.load_from_disk()
+    with patch.object(ss, "get_model_options") as mock_get_options:
+        mock_get_options.return_value = [
+            ("gpt-4o-mini", "gpt-4o-mini"),
+            ("gpt-4o", "gpt-4o"),
+        ]
+        screen._load_current_settings()
+    # Verify the scenario: API key input is empty (placeholder shows existing key)
+    assert screen.api_key_input.value == ""
+    assert "Current:" in screen.api_key_input.placeholder
+    # But memory condensation should be enabled because agent has an API key
+    assert screen.memory_select.disabled is False
+    # User should be able to toggle memory condensation
+    screen.memory_select.value = True
+    assert screen.memory_select.value is True
+    screen.memory_select.value = False
+    assert screen.memory_select.value is False
+
+
+@pytest.mark.asyncio
+async def test_memory_condensation_disabled_without_api_key(
+    app, fake_agent_store: InMemoryAgentStore, test_agent_no_api_key: Agent
+):
+    """Memory condensation disabled when no API key in saved agent."""
+    app_obj, _ = app
+    fake_agent_store.save(test_agent_no_api_key)
+    screen = app_obj.settings_screen
+    screen.current_agent = fake_agent_store.load_from_disk()
+    with patch.object(ss, "get_model_options") as mock_get_options:
+        mock_get_options.return_value = [
+            ("gpt-4o-mini", "gpt-4o-mini"),
+            ("gpt-4o", "gpt-4o"),
+        ]
+        screen._load_current_settings()
+    assert screen.api_key_input.value == ""
+    assert "Current:" not in screen.api_key_input.placeholder
+    assert screen.memory_select.disabled is True
+
+
+@pytest.mark.asyncio
+async def test_memory_condensation_disabled_when_no_api_key(
+    app, fake_agent_store: InMemoryAgentStore
+):
+    """Memory condensation disabled when API key input empty and no existing agent."""
+    app_obj, _ = app
+    screen = app_obj.settings_screen
+    screen.current_agent = None
+    screen.mode_select.value = "basic"
+    screen.provider_select.value = "openai"
+    screen.model_select.set_options(
+        [("GPT-4o", "openai/gpt-4o"), ("GPT-4o Mini", "openai/gpt-4o-mini")]
+    )
+    screen.model_select.value = "openai/gpt-4o"
+    screen.api_key_input.value = ""
+    screen._update_field_dependencies()
+    assert screen.memory_select.disabled is True
 
 
 #

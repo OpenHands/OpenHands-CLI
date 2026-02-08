@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 
+from openhands.tools.delegate.definition import DelegateAction
 from openhands.tools.file_editor.definition import FileEditorAction
 from openhands.tools.task_tracker import TaskTrackerAction
 from openhands.tools.terminal import TerminalAction
@@ -49,6 +50,15 @@ class TestGetToolKind:
         action = FileEditorAction(command=command, path="/test.py")  # type: ignore[arg-type]
         assert get_tool_kind("file_editor", action=action) == expected
 
+    @pytest.mark.parametrize(
+        "delegate_command",
+        ["spawn", "delegate"],
+    )
+    def test_delegate_kind_from_action(self, delegate_command: str):
+        """DelegateAction always returns 'other' kind regardless of command."""
+        action = DelegateAction(command=delegate_command)  # type: ignore[arg-type]
+        assert get_tool_kind("delegate", action=action) == "other"
+
 
 class TestGetToolTitle:
     def test_task_tracker_title_empty_without_action(self):
@@ -82,6 +92,31 @@ class TestGetToolTitle:
     @pytest.mark.parametrize("tool_name", ["unknown_tool", "terminal", "file_editor"])
     def test_title_no_action_returns_empty(self, tool_name: str):
         assert get_tool_title(tool_name) == ""
+
+    @pytest.mark.parametrize(
+        "action,expected",
+        [
+            (
+                DelegateAction(command="spawn", ids=["agent1", "agent2"]),
+                "Spawning 2 sub-agent(s): agent1, agent2",
+            ),
+            (
+                DelegateAction(command="spawn"),
+                "Spawning sub-agents",
+            ),
+            (
+                DelegateAction(command="delegate", tasks={"a": "t1", "b": "t2"}),
+                "Delegating 2 task(s) to: a, b",
+            ),
+            (
+                DelegateAction(command="delegate"),
+                "Delegating tasks",
+            ),
+        ],
+    )
+    def test_delegate_title_from_action(self, action: DelegateAction, expected: str):
+        """DelegateAction title depends on command and ids/tasks."""
+        assert get_tool_title("delegate", action=action) == expected
 
     def test_title_with_summary_terminal(self):
         """Test that summary is included in terminal action title."""

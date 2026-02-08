@@ -14,6 +14,10 @@ from dotenv import load_dotenv
 from rich.console import Console
 
 from openhands_cli.argparsers.main_parser import create_main_parser
+from openhands_cli.stores import (
+    MissingEnvironmentVariablesError,
+    check_and_warn_env_vars,
+)
 from openhands_cli.terminal_compat import check_terminal_compatibility
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.utils import create_seeded_instructions_from_args
@@ -102,6 +106,16 @@ def main() -> None:
     # Automatically set exit_without_confirmation when headless mode is used
     if args.headless:
         args.exit_without_confirmation = True
+
+    # Handle --override-with-envs flag
+    env_overrides_enabled = getattr(args, "override_with_envs", False)
+
+    # Disable critic in headless mode to avoid interactive prompts
+    critic_disabled = args.headless
+
+    # Warn about env vars if they are set but not being used
+    if not env_overrides_enabled:
+        check_and_warn_env_vars()
 
     try:
         if args.command == "serve":
@@ -267,6 +281,8 @@ def main() -> None:
                 exit_without_confirmation=args.exit_without_confirmation,
                 headless=args.headless,
                 json_mode=json_mode,
+                env_overrides_enabled=env_overrides_enabled,
+                critic_disabled=critic_disabled,
             )
             console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
             # Show conversation ID if available (may be None if app exited early)
@@ -284,6 +300,10 @@ def main() -> None:
         console.print("\nGoodbye! 👋", style=OPENHANDS_THEME.warning)
     except EOFError:
         console.print("\nGoodbye! 👋", style=OPENHANDS_THEME.warning)
+    except MissingEnvironmentVariablesError as e:
+        # Display clean error message for missing env vars
+        console.print(f"[{OPENHANDS_THEME.error}]Error:[/{OPENHANDS_THEME.error}] {e}")
+        sys.exit(1)
     except Exception as e:
         console.print(f"Error: {str(e)}", style=OPENHANDS_THEME.error, markup=False)
         import traceback

@@ -38,6 +38,13 @@ SettingsScreen {
     height: 1fr;
 }
 
+#cli_settings_content {
+    padding: 2;
+    height: 1fr;
+    scrollbar-gutter: stable;
+    overflow-y: auto;
+}
+
 .switch_container {
     height: auto;
     align: left middle;
@@ -158,4 +165,28 @@ VerticalScroll > .scrollbar--vertical:hover {
     margin-bottom: 1;
     margin-top: 1;
     height: 1;
+}
+
+.model_category_title {
+    color: $secondary;
+    text-style: bold;
+    margin-top: 2;
+    margin-bottom: 1;
+    padding-top: 1;
+    border-top: solid $secondary;
+}
+
+.model_name {
+    color: $foreground;
+    margin-left: 2;
+    margin-bottom: 0;
+    height: 1;
+}
+
+.model_details {
+    color: $secondary;
+    margin-left: 4;
+    margin-bottom: 1;
+    text-style: italic;
+    height: auto;
 }

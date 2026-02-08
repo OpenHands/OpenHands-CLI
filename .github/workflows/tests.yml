@@ -1,6 +1,6 @@
 ---
-# Workflow that runs Python unit tests with pytest
-name: Unit Tests
+# Workflow that runs Python unit tests and snapshot tests with pytest
+name: Tests
 
 on:
     push:
@@ -17,7 +17,7 @@ concurrency:
     cancel-in-progress: true
 
 jobs:
-    test-python:
+    test-unit:
         name: Run unit tests (pytest)
         runs-on: blacksmith-2vcpu-ubuntu-2404
 
@@ -41,11 +41,12 @@ jobs:
               run: |
                   uv sync --group dev
 
-            - name: Run tests with coverage
+            - name: Run unit tests with coverage (excluding snapshots)
               run: |
                   # Clean up any existing coverage file
                   rm -f .coverage
                   uv run pytest -v \
+                    --ignore=tests/snapshots \
                     --cov=openhands_cli \
                     --cov-report=term-missing \
                     --cov-fail-under=0 \
@@ -85,10 +86,46 @@ jobs:
                   path: coverage-data.db
                   if-no-files-found: error
 
+    test-snapshots:
+        name: Run snapshot tests
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: 3.12
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v3
+              with:
+                  version: latest
+
+            - name: Install dependencies
+              run: |
+                  uv sync --group dev
+
+            - name: Run snapshot tests
+              run: |
+                  uv run pytest tests/snapshots -v
+
+            - name: Upload snapshot report on failure
+              if: failure()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: snapshot-report
+                  path: snapshot_report.html
+                  if-no-files-found: ignore
+
     coverage-report:
         name: Generate coverage report
         runs-on: blacksmith-2vcpu-ubuntu-2404
-        needs: [test-python]
+        needs: [test-unit]
         if: always() && github.event_name == 'pull_request'
 
         steps:

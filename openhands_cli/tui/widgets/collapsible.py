@@ -7,6 +7,7 @@ Ctrl+O to toggle all cells at once.
 
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol
 
+from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
@@ -211,7 +212,7 @@ class Collapsible(Widget):
         self,
         content: Any,
         *,
-        title: str = "Toggle",
+        title: str | Text = "Toggle",
         collapsed: bool = True,
         collapsed_symbol: str = "▶",
         expanded_symbol: str = "▼",
@@ -225,7 +226,7 @@ class Collapsible(Widget):
 
         Args:
             content: Content that will be collapsed/expanded (converted to string).
-            title: Title of the collapsed/expanded contents.
+            title: Title of the collapsed/expanded contents (str or Rich Text).
             collapsed: Default status of the contents.
             collapsed_symbol: Collapsed symbol before the title.
             expanded_symbol: Expanded symbol before the title.
@@ -253,11 +254,11 @@ class Collapsible(Widget):
             # Use "tall" for a thin vertical line, with gray color
             self.styles.border_left = ("tall", "gray")
 
-    def update_title(self, new_title: str) -> None:
+    def update_title(self, new_title: str | Text) -> None:
         """Update the title of the collapsible.
 
         Args:
-            new_title: The new title text to display.
+            new_title: The new title text to display (str or Rich Text).
         """
         self.title = new_title
         self._title.label = Content.from_text(new_title)
@@ -301,7 +302,7 @@ class CollapsibleNavigationMixin:
 
     Apps that contain Collapsible widgets can use this mixin to handle
     arrow key navigation between cells. The app must have a container
-    with id="main_display" containing the Collapsible widgets.
+    with id="scroll_view" containing the Collapsible widgets.
 
     Usage:
         class MyApp(CollapsibleNavigationMixin, App):
@@ -319,8 +320,8 @@ class CollapsibleNavigationMixin:
         event.stop()
 
         # Get all collapsibles as a list for index-based navigation
-        main_display = self.query_one("#main_display")
-        collapsibles = list(main_display.query(Collapsible))  # type: ignore[union-attr]
+        scroll_view = self.query_one("#scroll_view")
+        collapsibles = list(scroll_view.query(Collapsible))  # type: ignore[union-attr]
         if not collapsibles:
             return
 
@@ -328,7 +329,7 @@ class CollapsibleNavigationMixin:
         try:
             current_index = collapsibles.index(event.collapsible)
         except ValueError:
-            # Collapsible not in list (shouldn't happen, but be safe)
+            # Collapsible not in list (this shouldn't happen)
             return
 
         # Calculate target index

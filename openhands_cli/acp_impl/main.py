@@ -4,7 +4,7 @@ import asyncio
 import logging
 import sys
 
-from .agent import run_acp_server
+from openhands_cli.acp_impl.agent import run_acp_server
 
 
 # Configure logging
