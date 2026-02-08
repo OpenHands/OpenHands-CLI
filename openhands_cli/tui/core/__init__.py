@@ -10,11 +10,13 @@ from openhands_cli.tui.core.conversation_manager import (
     SwitchConfirmed,
     SwitchConversation,
 )
+from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.core.events import (
     ConfirmationDecision,
     RequestSwitchConfirmation,
     ShowConfirmationPanel,
 )
+from openhands_cli.tui.core.remote_conversation_runner import RemoteConversationRunner
 from openhands_cli.tui.core.state import (
     ConfirmationRequired,
     ConversationContainer,
@@ -29,6 +31,9 @@ __all__ = [
     "ConfirmationRequired",
     # Manager
     "ConversationManager",
+    # Runners
+    "ConversationRunner",
+    "RemoteConversationRunner",
     # Operation Messages (input to ConversationManager)
     "SendMessage",
     "CreateConversation",

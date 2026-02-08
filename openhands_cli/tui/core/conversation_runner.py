@@ -3,7 +3,7 @@
 import asyncio
 import uuid
 from collections.abc import Callable
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.text import Text
@@ -14,7 +14,6 @@ from openhands.sdk import (
     BaseConversation,
     ConversationExecutionStatus,
     Message,
-    RemoteConversation,
     TextContent,
 )
 from openhands.sdk.conversation.exceptions import ConversationRunError
@@ -41,6 +40,8 @@ class ConversationRunner:
 
     ConversationContainer is used only for reading state (is_confirmation_active)
     and updating running status.
+
+    For cloud-based conversations, use RemoteConversationRunner instead.
     """
 
     def __init__(
@@ -54,9 +55,6 @@ class ConversationRunner:
         *,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
-        cloud: bool = False,
-        server_url: str | None = None,
-        sandbox_id: str | None = None,
     ):
         """Initialize the conversation runner.
 
@@ -70,18 +68,8 @@ class ConversationRunner:
             env_overrides_enabled: If True, environment variables will override
                 stored LLM settings.
             critic_disabled: If True, critic functionality will be disabled.
-            cloud: If True, use OpenHands Cloud for remote execution.
-            server_url: The OpenHands Cloud server URL (used when cloud=True).
-            sandbox_id: Optional sandbox ID to reclaim an existing sandbox.
         """
         self.visualizer = visualizer
-
-        # Store cloud configuration for potential workspace restart
-        self._cloud = cloud
-        self._server_url = server_url
-        self._sandbox_id = sandbox_id
-        self._conversation_id = conversation_id
-        self._event_callback = event_callback
 
         # Create conversation with policy from state
         self.conversation: BaseConversation = setup_conversation(
@@ -91,9 +79,6 @@ class ConversationRunner:
             event_callback=event_callback,
             env_overrides_enabled=env_overrides_enabled,
             critic_disabled=critic_disabled,
-            cloud=cloud,
-            server_url=server_url,
-            sandbox_id=sandbox_id,
         )
 
         self._running = False
@@ -149,60 +134,8 @@ class ConversationRunner:
             message: The message to process
             headless: If True, print status to console
         """
-        # For cloud mode, ensure workspace is still alive before sending
-        if not self._ensure_workspace_alive():
-            return
-
         self.conversation.send_message(message)
         self._execute_conversation(headless=headless)
-
-    def _ensure_workspace_alive(self) -> bool:
-        """Check if cloud workspace is alive and restart if needed.
-
-        Returns:
-            True if workspace is alive (or not in cloud mode), False if restart failed.
-        """
-        if not self._cloud:
-            return True
-
-        conversation = cast(RemoteConversation, self.conversation)
-        # Check if workspace is alive
-        workspace = conversation.workspace
-
-        # Check if workspace has alive property and is not alive
-        if not workspace.alive:
-            self._notification_callback(
-                "Workspace Reconnecting",
-                "Cloud workspace is not responding. Attempting to reconnect...",
-                "warning",
-            )
-
-            # Reinitialize the conversation with the same sandbox_id
-            try:
-                self.conversation = setup_conversation(
-                    self._conversation_id,
-                    confirmation_policy=self._state.confirmation_policy,
-                    visualizer=self.visualizer,
-                    event_callback=self._event_callback,
-                    cloud=self._cloud,
-                    server_url=self._server_url,
-                    sandbox_id=self._sandbox_id,
-                )
-                self._notification_callback(
-                    "Workspace Reconnected",
-                    "Cloud workspace has been reconnected successfully.",
-                    "information",
-                )
-                return True
-            except Exception as e:
-                self._notification_callback(
-                    "Workspace Error",
-                    f"Failed to reconnect to cloud workspace: {e}",
-                    "error",
-                )
-                return False
-
-        return True
 
     def _execute_conversation(
         self,

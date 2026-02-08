@@ -1,6 +1,8 @@
 """RunnerFactory - builds ConversationRunner instances with required dependencies.
 
 This module exists to keep ConversationManager lightweight.
+It creates either a local ConversationRunner or a RemoteConversationRunner
+based on the cloud mode setting.
 """
 
 from __future__ import annotations
@@ -28,6 +30,12 @@ AppProvider = Callable[[], "OpenHandsApp"]
 
 
 class RunnerFactory:
+    """Factory for creating conversation runners.
+
+    Creates either a local ConversationRunner or a RemoteConversationRunner
+    based on the cloud mode setting.
+    """
+
     def __init__(
         self,
         *,
@@ -58,7 +66,11 @@ class RunnerFactory:
         message_pump: MessagePump,
         notification_callback: NotificationCallback,
     ) -> ConversationRunner:
-        from openhands_cli.tui.core.conversation_runner import ConversationRunner
+        """Create a conversation runner.
+
+        Returns a RemoteConversationRunner if cloud mode is enabled,
+        otherwise returns a local ConversationRunner.
+        """
         from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
         from openhands_cli.utils import json_callback
 
@@ -73,7 +85,41 @@ class RunnerFactory:
             json_callback if self._json_mode else None
         )
 
-        runner = ConversationRunner(
+        if self._cloud:
+            runner = self._create_remote_runner(
+                conversation_id,
+                message_pump=message_pump,
+                notification_callback=notification_callback,
+                visualizer=visualizer,
+                event_callback=event_callback,
+            )
+        else:
+            runner = self._create_local_runner(
+                conversation_id,
+                message_pump=message_pump,
+                notification_callback=notification_callback,
+                visualizer=visualizer,
+                event_callback=event_callback,
+            )
+
+        # Attach conversation to state for metrics reading
+        self._state.attach_conversation_state(runner.conversation.state)
+        return runner
+
+    def _create_local_runner(
+        self,
+        conversation_id: uuid.UUID,
+        *,
+        message_pump: MessagePump,
+        notification_callback: NotificationCallback,
+        visualizer: "ConversationVisualizer",
+        event_callback: Callable[[Event], None] | None,
+    ) -> ConversationRunner:
+        """Create a local conversation runner."""
+        from openhands_cli.tui.core.conversation_runner import ConversationRunner
+        from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
+
+        return ConversationRunner(
             conversation_id,
             state=self._state,
             message_pump=message_pump,
@@ -82,11 +128,29 @@ class RunnerFactory:
             event_callback=event_callback,
             env_overrides_enabled=self._env_overrides_enabled,
             critic_disabled=self._critic_disabled,
-            cloud=self._cloud,
+        )
+
+    def _create_remote_runner(
+        self,
+        conversation_id: uuid.UUID,
+        *,
+        message_pump: MessagePump,
+        notification_callback: NotificationCallback,
+        visualizer: "ConversationVisualizer",
+        event_callback: Callable[[Event], None] | None,
+    ) -> ConversationRunner:
+        """Create a remote conversation runner for cloud mode."""
+        from openhands_cli.tui.core.remote_conversation_runner import (
+            RemoteConversationRunner,
+        )
+
+        return RemoteConversationRunner(
+            conversation_id,
+            state=self._state,
+            message_pump=message_pump,
+            notification_callback=notification_callback,
+            visualizer=visualizer,
+            event_callback=event_callback,
             server_url=self._server_url,
             sandbox_id=self._sandbox_id,
         )
-
-        # Attach conversation to state for metrics reading
-        self._state.attach_conversation_state(runner.conversation.state)
-        return runner
