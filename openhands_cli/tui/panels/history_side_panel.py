@@ -4,7 +4,7 @@ This panel watches ConversationContainer for conversation state changes instead 
 receiving forwarded messages. When mounted, it subscribes to:
 - conversation_id: to update current/selected highlighting
 - conversation_title: to update the title display for new conversations
-- is_switching: to handle revert selection when switch is cancelled
+- switch_confirmation_target: to revert selection when switch is cancelled
 
 Conversation switching is done by posting SwitchConversation messages to
 ConversationManager.
@@ -147,7 +147,7 @@ class HistorySidePanel(Container):
         self.current_conversation_id = current_conversation_id
         self.selected_conversation_id: uuid.UUID | None = None
         self._local_rows: list[ConversationMetadata] = []
-        self._previous_is_switching: bool = False
+        self._previous_switch_confirmation_target: uuid.UUID | None = None
         self._store = LocalFileStore()
 
     @classmethod
@@ -193,12 +193,16 @@ class HistorySidePanel(Container):
         # Initialize from current state
         self.current_conversation_id = state.conversation_id
         self.selected_conversation_id = self.current_conversation_id
-        self._previous_is_switching = state.is_switching
+        self._previous_switch_confirmation_target = state.switch_confirmation_target
 
         # Watch ConversationContainer for changes
         self.watch(state, "conversation_id", self._on_conversation_id_changed)
         self.watch(state, "conversation_title", self._on_conversation_title_changed)
-        self.watch(state, "is_switching", self._on_is_switching_changed)
+        self.watch(
+            state,
+            "switch_confirmation_target",
+            self._on_switch_confirmation_target_changed,
+        )
 
         # Load and render conversations
         self.refresh_content()
@@ -231,23 +235,20 @@ class HistorySidePanel(Container):
                 title=new_title,
             )
 
-    def _on_is_switching_changed(self, is_switching: bool) -> None:
-        """React to is_switching changes in ConversationContainer.
+    def _on_switch_confirmation_target_changed(
+        self, target_id: uuid.UUID | None
+    ) -> None:
+        """React to switch confirmation cancellation.
 
-        When switching ends (is_switching goes from True to False) but the
-        conversation_id hasn't changed, it means the switch was cancelled.
-        In that case, revert the selection highlight.
+        When a switch confirmation is dismissed (target_id goes from UUID to None)
+        and the conversation_id hasn't changed, revert the selection highlight.
         """
-        was_switching = self._previous_is_switching
-        self._previous_is_switching = is_switching
+        previous_target = self._previous_switch_confirmation_target
+        self._previous_switch_confirmation_target = target_id
 
-        # If switch was cancelled (switching ended but conversation didn't change)
-        if was_switching and not is_switching:
-            # The conversation_id watcher handles successful switches,
-            # so we only need to handle cancelled switches here
+        if previous_target is not None and target_id is None:
             current_state_id = self._oh_app.conversation_state.conversation_id
             if current_state_id == self.current_conversation_id:
-                # Switch was cancelled - revert selection to current
                 self.select_current_conversation()
 
     def refresh_content(self) -> None:
