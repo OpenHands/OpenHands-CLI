@@ -265,6 +265,37 @@ def patch_deterministic_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     except (ImportError, AttributeError):
         pass  # If the module doesn't exist, skip patching
 
+    # Patch AgentStore._build_agent_context to disable public skills loading
+    # This ensures deterministic snapshots by not loading skills from the
+    # public skills repository, which varies between environments
+    try:
+        from openhands.sdk.context import AgentContext
+        from openhands_cli.stores.agent_store import AgentStore
+
+        def patched_build_agent_context(self) -> AgentContext:
+            from openhands.sdk.context.skills.skill import load_project_skills
+
+            from openhands_cli.locations import get_work_dir
+            from openhands_cli.utils import get_os_description
+
+            skills = load_project_skills(get_work_dir())
+            system_suffix = "\n".join(
+                [
+                    f"Your current working directory is: {get_work_dir()}",
+                    f"User operating system: {get_os_description()}",
+                ]
+            )
+            return AgentContext(
+                skills=skills,
+                system_message_suffix=system_suffix,
+                load_user_skills=False,  # Disable user skills for deterministic tests
+                load_public_skills=False,  # Disable public skills for deterministic tests
+            )
+
+        monkeypatch.setattr(AgentStore, "_build_agent_context", patched_build_agent_context)
+    except (ImportError, AttributeError):
+        pass  # If the module doesn't exist, skip patching
+
 
 def cleanup_work_dir() -> None:
     """Clean up the fixed work directory."""
