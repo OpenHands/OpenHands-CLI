@@ -5,6 +5,7 @@ the main UI, allowing users to configure their settings including
 LLM provider, model, API keys, and advanced options.
 """
 
+import asyncio
 from collections.abc import Callable
 from typing import ClassVar, Literal, cast
 
@@ -22,9 +23,11 @@ from textual.widgets import (
 )
 from textual.widgets._select import NoSelection
 
+from openhands.sdk.llm import OpenAISubscriptionAuth
 from openhands_cli.stores import AgentStore
 from openhands_cli.tui.modals.settings.choices import (
     get_model_options,
+    is_chatgpt_provider,
 )
 from openhands_cli.tui.modals.settings.components import (
     CliSettingsTab,
@@ -57,6 +60,21 @@ class SettingsScreen(ModalScreen):
     advanced_section: getters.query_one[Container] = getters.query_one(
         "#advanced_section"
     )
+    api_key_section: getters.query_one[Container] = getters.query_one(
+        "#api_key_section"
+    )
+    chatgpt_auth_section: getters.query_one[Container] = getters.query_one(
+        "#chatgpt_auth_section"
+    )
+    chatgpt_auth_status: getters.query_one[Static] = getters.query_one(
+        "#chatgpt_auth_status"
+    )
+    chatgpt_login_button: getters.query_one[Button] = getters.query_one(
+        "#chatgpt_login_button"
+    )
+    chatgpt_copy_url_button: getters.query_one[Button] = getters.query_one(
+        "#chatgpt_copy_url_button"
+    )
 
     def __init__(
         self,
@@ -82,6 +100,11 @@ class SettingsScreen(ModalScreen):
         self.is_initial_setup = SettingsScreen.is_initial_setup_required(
             env_overrides_enabled=env_overrides_enabled
         )
+
+        # ChatGPT subscription auth state
+        self._chatgpt_auth = OpenAISubscriptionAuth()
+        self._chatgpt_authenticated = False
+        self._chatgpt_login_task: asyncio.Task | None = None
 
         # Convert single callback to list for uniform handling
         if on_settings_saved is None:
@@ -132,7 +155,9 @@ class SettingsScreen(ModalScreen):
         """Initialize the form with current settings."""
         self._load_current_settings()
         self._update_advanced_visibility()
+        self._update_chatgpt_auth_visibility()
         self._update_field_dependencies()
+        self._check_existing_chatgpt_credentials()
 
     def on_show(self) -> None:
         """Reload settings when the screen is shown."""
@@ -142,6 +167,7 @@ class SettingsScreen(ModalScreen):
             self._clear_form()
             self._load_current_settings()
             self._update_advanced_visibility()
+            self._update_chatgpt_auth_visibility()
             self._update_field_dependencies()
 
     def _clear_form(self) -> None:
@@ -155,6 +181,10 @@ class SettingsScreen(ModalScreen):
         self.provider_select.value = Select.BLANK
         self.model_select.value = Select.BLANK
         self.memory_select.value = False
+
+        # Reset ChatGPT auth state
+        self._chatgpt_authenticated = False
+        self._update_chatgpt_auth_status()
 
     def _load_current_settings(self) -> None:
         """Load current settings into the form."""
@@ -238,6 +268,132 @@ class SettingsScreen(ModalScreen):
             and self.current_agent.llm.api_key
         )
 
+    def _update_chatgpt_auth_visibility(self) -> None:
+        """Show/hide ChatGPT auth section based on selected provider."""
+        try:
+            provider = self.provider_select.value
+            is_chatgpt = is_chatgpt_provider(str(provider) if provider else None)
+
+            # Show ChatGPT auth section only when ChatGPT provider is selected
+            # and we're in basic mode
+            show_chatgpt = is_chatgpt and not self.is_advanced_mode
+            self.chatgpt_auth_section.display = show_chatgpt
+            self.api_key_section.display = not show_chatgpt
+        except Exception:
+            # During initialization, widgets may not be ready
+            pass
+
+    def _check_existing_chatgpt_credentials(self) -> None:
+        """Check if there are existing valid ChatGPT credentials."""
+        try:
+            creds = self._chatgpt_auth.get_credentials()
+            if creds is not None:
+                self._chatgpt_authenticated = True
+                self._update_chatgpt_auth_status()
+        except Exception:
+            pass
+
+    def _update_chatgpt_auth_status(self) -> None:
+        """Update the ChatGPT auth status display."""
+        try:
+            if self._chatgpt_authenticated:
+                self.chatgpt_auth_status.update("✓ Signed in successfully")
+                self.chatgpt_auth_status.add_class("success_message")
+                self.chatgpt_auth_status.remove_class("error_message")
+                self.chatgpt_login_button.label = "Re-authenticate"
+            else:
+                self.chatgpt_auth_status.update("")
+                self.chatgpt_auth_status.remove_class("success_message")
+                self.chatgpt_auth_status.remove_class("error_message")
+                self.chatgpt_login_button.label = "Sign In with Browser"
+        except Exception:
+            pass
+
+    async def _perform_chatgpt_login(self) -> None:
+        """Perform ChatGPT OAuth login flow."""
+        try:
+            # Update UI to show waiting state
+            self.chatgpt_auth_status.update("⏳ Waiting for browser authentication...")
+            self.chatgpt_auth_status.remove_class("success_message")
+            self.chatgpt_auth_status.remove_class("error_message")
+            self.chatgpt_login_button.disabled = True
+            self.chatgpt_login_button.label = "Waiting..."
+
+            # Perform login (opens browser)
+            creds = await self._chatgpt_auth.login(open_browser=True)
+
+            if creds is not None:
+                self._chatgpt_authenticated = True
+                self._update_chatgpt_auth_status()
+                self._update_field_dependencies()
+            else:
+                self.chatgpt_auth_status.update("✗ Authentication failed")
+                self.chatgpt_auth_status.add_class("error_message")
+                self.chatgpt_login_button.label = "Try Again"
+
+        except Exception as e:
+            self.chatgpt_auth_status.update(f"✗ Error: {e}")
+            self.chatgpt_auth_status.add_class("error_message")
+            self.chatgpt_login_button.label = "Try Again"
+        finally:
+            self.chatgpt_login_button.disabled = False
+
+    async def _copy_chatgpt_auth_url(self) -> None:
+        """Copy ChatGPT OAuth URL to clipboard and start waiting for callback."""
+        import webbrowser
+
+        import pyperclip
+
+        captured_url: str | None = None
+
+        # Temporarily patch webbrowser.open to capture URL and copy to clipboard
+        original_open = webbrowser.open
+
+        def capture_and_copy_url(url: str, *_args, **_kwargs) -> bool:
+            nonlocal captured_url
+            captured_url = url
+            # Copy immediately using pyperclip (same as app's clipboard)
+            try:
+                pyperclip.copy(url)
+            except pyperclip.PyperclipException:
+                pass
+            # Also use OSC 52 fallback
+            self.app.copy_to_clipboard(url)
+            # Update status now that URL is copied
+            self.chatgpt_auth_status.update(
+                "📋 URL copied! Paste in browser, waiting for auth..."
+            )
+            return True  # Pretend we opened it
+
+        try:
+            # Update UI
+            self.chatgpt_auth_status.update("📋 Copying auth URL...")
+            self.chatgpt_copy_url_button.disabled = True
+            self.chatgpt_login_button.disabled = True
+
+            # Patch webbrowser.open to capture URL
+            webbrowser.open = capture_and_copy_url
+
+            # Start login flow (won't actually open browser due to patch)
+            creds = await self._chatgpt_auth.login(open_browser=True)
+
+            if creds is not None:
+                self._chatgpt_authenticated = True
+                self._update_chatgpt_auth_status()
+                self._update_field_dependencies()
+            else:
+                self.chatgpt_auth_status.update("✗ Authentication failed")
+                self.chatgpt_auth_status.add_class("error_message")
+
+        except Exception as e:
+            self.chatgpt_auth_status.update(f"✗ Error: {e}")
+            self.chatgpt_auth_status.add_class("error_message")
+        finally:
+            # Restore original webbrowser.open
+            webbrowser.open = original_open
+            self.chatgpt_copy_url_button.disabled = False
+            self.chatgpt_login_button.disabled = False
+
     def _update_field_dependencies(self) -> None:
         """Update field enabled/disabled state based on dependency chain."""
         try:
@@ -276,8 +432,25 @@ class SettingsScreen(ModalScreen):
                         provider and provider != Select.BLANK
                     )
 
-                    # API Key: enabled when model is selected
-                    self.api_key_input.disabled = not (model and model != Select.BLANK)
+                    # Check if ChatGPT provider is selected
+                    is_chatgpt = is_chatgpt_provider(
+                        str(provider) if provider else None
+                    )
+
+                    if is_chatgpt:
+                        # For ChatGPT, API key is not needed - auth is via OAuth
+                        # Memory is enabled when authenticated
+                        self.memory_select.disabled = not self._chatgpt_authenticated
+                    else:
+                        # API Key: enabled when model is selected
+                        self.api_key_input.disabled = not (
+                            model and model != Select.BLANK
+                        )
+                        # Memory Condensation: enabled when API key is provided
+                        # or when there's an existing API key in the agent
+                        self.memory_select.disabled = not (
+                            api_key or self._has_existing_api_key()
+                        )
                 except Exception:
                     pass
 
@@ -298,12 +471,14 @@ class SettingsScreen(ModalScreen):
 
                     # API Key: enabled when custom model is entered
                     self.api_key_input.disabled = not custom_model
+
+                    # Memory Condensation: enabled when API key is provided
+                    # or when there's an existing API key in the agent
+                    self.memory_select.disabled = not (
+                        api_key or self._has_existing_api_key()
+                    )
                 except Exception:
                     pass
-
-            # Memory Condensation: enabled when API key is provided
-            # or when there's an existing API key in the agent
-            self.memory_select.disabled = not (api_key or self._has_existing_api_key())
 
         except Exception:
             # Silently handle errors during initialization
@@ -332,11 +507,13 @@ class SettingsScreen(ModalScreen):
         if event.select.id == "mode_select":
             self.is_advanced_mode = event.value == "advanced"
             self._update_advanced_visibility()
+            self._update_chatgpt_auth_visibility()
             self._update_field_dependencies()
             self._clear_message()
         elif event.select.id == "provider_select":
             if event.value is not NoSelection:
                 self._update_model_options(str(event.value))
+            self._update_chatgpt_auth_visibility()
             self._update_field_dependencies()
             self._clear_message()
         elif event.select.id == "model_select":
@@ -355,6 +532,16 @@ class SettingsScreen(ModalScreen):
             self._save_settings()
         elif event.button.id == "cancel_button":
             self._handle_cancel()
+        elif event.button.id == "chatgpt_login_button":
+            # Start async login task
+            self._chatgpt_login_task = asyncio.create_task(
+                self._perform_chatgpt_login()
+            )
+        elif event.button.id == "chatgpt_copy_url_button":
+            # Start async copy URL task
+            self._chatgpt_login_task = asyncio.create_task(
+                self._copy_chatgpt_auth_url()
+            )
 
     def action_cancel(self) -> None:
         """Handle escape key to cancel settings."""
@@ -382,6 +569,17 @@ class SettingsScreen(ModalScreen):
         model = self.model_select.value
         custom_model = self.custom_model_input.value
         base_url = self.base_url_input.value
+
+        # Check if ChatGPT provider is selected
+        is_chatgpt = is_chatgpt_provider(
+            str(provider_value) if provider_value else None
+        )
+
+        # Validate ChatGPT auth if ChatGPT provider is selected
+        if is_chatgpt and not self._chatgpt_authenticated:
+            self._show_message("Please sign in with ChatGPT first", is_error=True)
+            return
+
         form_data = SettingsFormData(
             mode=mode,
             provider=None if provider_value is Select.BLANK else str(provider_value),
@@ -390,9 +588,10 @@ class SettingsScreen(ModalScreen):
             base_url=None if base_url is Select.BLANK else str(base_url),
             api_key_input=self.api_key_input.value,
             memory_condensation_enabled=bool(self.memory_select.value),
+            is_chatgpt_subscription=is_chatgpt,
         )
 
-        result = save_settings(form_data, self.current_agent)
+        result = save_settings(form_data, self.current_agent, self._chatgpt_auth)
         if not result.success:
             self._show_message(result.error_message or "Unknown error", is_error=True)
             return

@@ -118,8 +118,10 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
                 mcp_servers=mcp_servers,
                 skills=[RESOURCE_SKILL],
             )
-            streaming_enabled = (
-                self._streaming_enabled and not agent.llm.uses_responses_api()
+            # Enable streaming if requested, unless using Responses API (except for
+            # subscription models which require streaming via Responses API)
+            streaming_enabled = self._streaming_enabled and (
+                agent.llm.is_subscription or not agent.llm.uses_responses_api()
             )
 
             if streaming_enabled:

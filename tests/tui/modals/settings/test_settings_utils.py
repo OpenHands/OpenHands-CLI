@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
 from pydantic import SecretStr
 
 import openhands_cli.tui.modals.settings.utils as settings_utils
 from openhands.sdk import LLM, Agent, LLMSummarizingCondenser
+from openhands_cli.tui.modals.settings.choices import CHATGPT_PROVIDER_ID
 
 
 class FakeAgentStore:
@@ -381,3 +384,135 @@ def test_litellm_metadata_is_added_when_required(
     assert isinstance(saved_agent.condenser, LLMSummarizingCondenser)
     assert saved_agent.condenser.llm.litellm_extra_body is not None
     assert saved_agent.condenser.llm.litellm_extra_body["metadata"]["foo"] == "bar"
+
+
+#
+# 6. ChatGPT Subscription auth tests
+#
+
+
+def test_chatgpt_subscription_skips_api_key_validation() -> None:
+    """ChatGPT subscription mode should not require an API key."""
+    data = settings_utils.SettingsFormData(
+        mode="basic",
+        provider=CHATGPT_PROVIDER_ID,
+        model="gpt-5.2-codex",
+        custom_model=None,
+        base_url=None,
+        api_key_input=None,  # No API key
+        memory_condensation_enabled=False,
+        is_chatgpt_subscription=True,
+    )
+
+    # This should NOT raise an exception
+    data.resolve_data_fields(existing_agent=None)
+
+    # API key should still be None
+    assert data.api_key_input is None
+
+
+def test_chatgpt_subscription_model_name_uses_openai_prefix() -> None:
+    """ChatGPT subscription model name should use openai/ prefix."""
+    data = settings_utils.SettingsFormData(
+        mode="basic",
+        provider=CHATGPT_PROVIDER_ID,
+        model="gpt-5.2-codex",
+        custom_model=None,
+        base_url=None,
+        api_key_input=None,
+        memory_condensation_enabled=False,
+        is_chatgpt_subscription=True,
+    )
+
+    data.resolve_data_fields(existing_agent=None)
+    assert data.get_full_model_name() == "openai/gpt-5.2-codex"
+
+
+def test_chatgpt_subscription_save_requires_auth_handler(
+    deps: FakeAgentStore,
+) -> None:
+    """save_settings should fail if chatgpt_auth is not provided for subscription."""
+    data = settings_utils.SettingsFormData(
+        mode="basic",
+        provider=CHATGPT_PROVIDER_ID,
+        model="gpt-5.2-codex",
+        custom_model=None,
+        base_url=None,
+        api_key_input=None,
+        memory_condensation_enabled=False,
+        is_chatgpt_subscription=True,
+    )
+
+    # Pass None for chatgpt_auth
+    result = settings_utils.save_settings(data, existing_agent=None, chatgpt_auth=None)
+
+    assert result.success is False
+    assert "auth handler not provided" in (result.error_message or "").lower()
+
+
+def test_chatgpt_subscription_save_with_mock_auth(deps: FakeAgentStore) -> None:
+    """save_settings should work with a mocked ChatGPT auth handler."""
+    # Create a mock auth handler
+    mock_auth = MagicMock()
+    mock_llm = LLM(model="openai/gpt-5.2-codex", api_key="mock-token")
+    mock_auth.create_llm.return_value = mock_llm
+
+    data = settings_utils.SettingsFormData(
+        mode="basic",
+        provider=CHATGPT_PROVIDER_ID,
+        model="gpt-5.2-codex",
+        custom_model=None,
+        base_url=None,
+        api_key_input=None,
+        memory_condensation_enabled=False,
+        is_chatgpt_subscription=True,
+    )
+
+    result = settings_utils.save_settings(
+        data, existing_agent=None, chatgpt_auth=mock_auth
+    )
+
+    assert result.success is True
+    assert len(deps.saved_agents) == 1
+
+    # Verify create_llm was called with the model name and usage_id
+    # It's called once for the main LLM (no condenser since memory_condensation=False)
+    mock_auth.create_llm.assert_called_with(model="gpt-5.2-codex", usage_id="agent")
+
+    # Verify the saved agent has the mock LLM
+    saved_agent = deps.saved_agents[-1]
+    assert saved_agent.llm.model == "openai/gpt-5.2-codex"
+
+
+def test_chatgpt_subscription_save_with_condenser(deps: FakeAgentStore) -> None:
+    """save_settings should create condenser LLM for ChatGPT subscription."""
+    # Create a mock auth handler
+    mock_auth = MagicMock()
+    mock_llm = LLM(model="openai/gpt-5.2-codex", api_key="mock-token")
+    mock_auth.create_llm.return_value = mock_llm
+
+    data = settings_utils.SettingsFormData(
+        mode="basic",
+        provider=CHATGPT_PROVIDER_ID,
+        model="gpt-5.2-codex",
+        custom_model=None,
+        base_url=None,
+        api_key_input=None,
+        memory_condensation_enabled=True,  # Enable condenser
+        is_chatgpt_subscription=True,
+    )
+
+    result = settings_utils.save_settings(
+        data, existing_agent=None, chatgpt_auth=mock_auth
+    )
+
+    assert result.success is True
+    assert len(deps.saved_agents) == 1
+
+    # Verify create_llm was called twice (main LLM + condenser LLM)
+    assert mock_auth.create_llm.call_count == 2
+
+    # Verify the saved agent has both LLM and condenser
+    saved_agent = deps.saved_agents[-1]
+    assert saved_agent.llm.model == "openai/gpt-5.2-codex"
+    assert saved_agent.condenser is not None
