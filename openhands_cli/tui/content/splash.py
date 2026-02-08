@@ -56,11 +56,17 @@ class LoadedResourcesInfo:
         """Get a summary string of loaded resources."""
         parts = []
         if self.skills_count > 0:
-            parts.append(f"{self.skills_count} skill{'s' if self.skills_count != 1 else ''}")
+            parts.append(
+                f"{self.skills_count} skill{'s' if self.skills_count != 1 else ''}"
+            )
         if self.hooks_count > 0:
-            parts.append(f"{self.hooks_count} hook{'s' if self.hooks_count != 1 else ''}")
+            parts.append(
+                f"{self.hooks_count} hook{'s' if self.hooks_count != 1 else ''}"
+            )
         if self.tools_count > 0:
-            parts.append(f"{self.tools_count} tool{'s' if self.tools_count != 1 else ''}")
+            parts.append(
+                f"{self.tools_count} tool{'s' if self.tools_count != 1 else ''}"
+            )
         return ", ".join(parts) if parts else "No resources loaded"
 
     def get_details(self, *, theme: Theme) -> str:
@@ -73,7 +79,11 @@ class LoadedResourcesInfo:
             lines.append(f"[{primary}]Skills ({self.skills_count}):[/{primary}]")
             for skill in self.skills:
                 desc = f" - {skill.description}" if skill.description else ""
-                source = f" [{secondary}]({skill.source})[/{secondary}]" if skill.source else ""
+                source = (
+                    f" [{secondary}]({skill.source})[/{secondary}]"
+                    if skill.source
+                    else ""
+                )
                 lines.append(f"  • {skill.name}{desc}{source}")
 
         if self.hooks:

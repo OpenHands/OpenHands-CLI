@@ -25,6 +25,7 @@ from textual_autocomplete import AutoComplete
 
 from openhands.sdk import BaseConversation
 from openhands.sdk.event import ActionEvent
+from openhands.sdk.hooks import HookConfig
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmationPolicyBase,
@@ -32,7 +33,6 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
-from openhands.sdk.hooks import HookConfig
 from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.locations import get_conversations_dir, get_work_dir
 from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
@@ -410,7 +410,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                         loaded_resources.tools.append(
                             ToolInfo(
                                 name=tool.name,
-                                description=tool.description,
                             )
                         )
         except Exception:

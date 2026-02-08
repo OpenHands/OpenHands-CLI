@@ -14,6 +14,7 @@ from textual_autocomplete import DropdownItem
 
 from openhands_cli.theme import OPENHANDS_THEME
 
+
 if TYPE_CHECKING:
     from openhands_cli.tui.content.splash import LoadedResourcesInfo
 
@@ -115,27 +116,39 @@ def show_skills(
         lines.append(f"[dim]Summary: {loaded_resources.get_summary()}[/dim]\n")
 
         if loaded_resources.skills:
-            lines.append(f"[{primary}]Skills ({loaded_resources.skills_count}):[/{primary}]")
+            lines.append(
+                f"[{primary}]Skills ({loaded_resources.skills_count}):[/{primary}]"
+            )
             for skill in loaded_resources.skills:
                 desc = f" - {skill.description}" if skill.description else ""
-                source = f" [{secondary}]({skill.source})[/{secondary}]" if skill.source else ""
+                source = (
+                    f" [{secondary}]({skill.source})[/{secondary}]"
+                    if skill.source
+                    else ""
+                )
                 lines.append(f"  • {skill.name}{desc}{source}")
             lines.append("")
 
         if loaded_resources.hooks:
-            lines.append(f"[{primary}]Hooks ({loaded_resources.hooks_count}):[/{primary}]")
+            lines.append(
+                f"[{primary}]Hooks ({loaded_resources.hooks_count}):[/{primary}]"
+            )
             for hook in loaded_resources.hooks:
                 lines.append(f"  • {hook.hook_type}: {hook.count}")
             lines.append("")
 
         if loaded_resources.tools:
-            lines.append(f"[{primary}]Tools ({loaded_resources.tools_count}):[/{primary}]")
+            lines.append(
+                f"[{primary}]Tools ({loaded_resources.tools_count}):[/{primary}]"
+            )
             for tool in loaded_resources.tools:
                 desc = f" - {tool.description}" if tool.description else ""
                 lines.append(f"  • {tool.name}{desc}")
             lines.append("")
 
-        if not (loaded_resources.skills or loaded_resources.hooks or loaded_resources.tools):
+        if not (
+            loaded_resources.skills or loaded_resources.hooks or loaded_resources.tools
+        ):
             lines.append("[dim]No skills, hooks, or tools loaded.[/dim]")
 
         skills_text = "\n".join(lines)
