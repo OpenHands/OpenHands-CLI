@@ -4,11 +4,18 @@ This module contains all available commands, their descriptions,
 and the logic for handling command execution.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from textual.containers import VerticalScroll
 from textual.widgets import Static
 from textual_autocomplete import DropdownItem
 
 from openhands_cli.theme import OPENHANDS_THEME
+
+if TYPE_CHECKING:
+    from openhands_cli.tui.content.splash import LoadedResourcesInfo
 
 
 # Available commands with descriptions after the command
@@ -18,6 +25,7 @@ COMMANDS = [
     DropdownItem(main="/history - Toggle conversation history"),
     DropdownItem(main="/confirm - Configure confirmation settings"),
     DropdownItem(main="/condense - Condense conversation history"),
+    DropdownItem(main="/skills - View loaded skills, hooks, and tools"),
     DropdownItem(main="/feedback - Send anonymous feedback about CLI"),
     DropdownItem(main="/exit - Exit the application"),
 ]
@@ -71,6 +79,7 @@ def show_help(main_display: VerticalScroll) -> None:
   [{secondary}]/history[/{secondary}] - Toggle conversation history
   [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
   [{secondary}]/condense[/{secondary}] - Condense conversation history
+  [{secondary}]/skills[/{secondary}] - View loaded skills, hooks, and tools
   [{secondary}]/feedback[/{secondary}] - Send anonymous feedback about CLI
   [{secondary}]/exit[/{secondary}] - Exit the application
 
@@ -81,3 +90,55 @@ def show_help(main_display: VerticalScroll) -> None:
 """
     help_widget = Static(help_text, classes="help-message")
     main_display.mount(help_widget)
+
+
+def show_skills(
+    main_display: VerticalScroll, loaded_resources: LoadedResourcesInfo | None
+) -> None:
+    """Display loaded skills, hooks, and tools information in the main display.
+
+    Args:
+        main_display: The VerticalScroll widget to mount skills content to
+        loaded_resources: Information about loaded resources, or None if not available
+    """
+    primary = OPENHANDS_THEME.primary
+    secondary = OPENHANDS_THEME.secondary
+
+    if loaded_resources is None:
+        skills_text = f"""
+[bold {primary}]Loaded Resources[/bold {primary}]
+[dim]No resources information available.[/dim]
+"""
+    else:
+        # Build the skills text
+        lines = [f"\n[bold {primary}]Loaded Resources[/bold {primary}]"]
+        lines.append(f"[dim]Summary: {loaded_resources.get_summary()}[/dim]\n")
+
+        if loaded_resources.skills:
+            lines.append(f"[{primary}]Skills ({loaded_resources.skills_count}):[/{primary}]")
+            for skill in loaded_resources.skills:
+                desc = f" - {skill.description}" if skill.description else ""
+                source = f" [{secondary}]({skill.source})[/{secondary}]" if skill.source else ""
+                lines.append(f"  • {skill.name}{desc}{source}")
+            lines.append("")
+
+        if loaded_resources.hooks:
+            lines.append(f"[{primary}]Hooks ({loaded_resources.hooks_count}):[/{primary}]")
+            for hook in loaded_resources.hooks:
+                lines.append(f"  • {hook.hook_type}: {hook.count}")
+            lines.append("")
+
+        if loaded_resources.tools:
+            lines.append(f"[{primary}]Tools ({loaded_resources.tools_count}):[/{primary}]")
+            for tool in loaded_resources.tools:
+                desc = f" - {tool.description}" if tool.description else ""
+                lines.append(f"  • {tool.name}{desc}")
+            lines.append("")
+
+        if not (loaded_resources.skills or loaded_resources.hooks or loaded_resources.tools):
+            lines.append("[dim]No skills, hooks, or tools loaded.[/dim]")
+
+        skills_text = "\n".join(lines)
+
+    skills_widget = Static(skills_text, classes="skills-message")
+    main_display.mount(skills_widget)

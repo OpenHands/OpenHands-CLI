@@ -32,12 +32,19 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.risk import SecurityRisk
+from openhands.sdk.hooks import HookConfig
 from openhands_cli.conversations.store.local import LocalFileStore
-from openhands_cli.locations import get_conversations_dir
+from openhands_cli.locations import get_conversations_dir, get_work_dir
 from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.splash import get_splash_content
-from openhands_cli.tui.core.commands import is_valid_command, show_help
+from openhands_cli.tui.content.splash import (
+    HookInfo,
+    LoadedResourcesInfo,
+    SkillInfo,
+    ToolInfo,
+    get_splash_content,
+)
+from openhands_cli.tui.core.commands import is_valid_command, show_help, show_skills
 from openhands_cli.tui.core.conversation_manager import ConversationManager
 from openhands_cli.tui.core.conversation_runner import ConversationRunner
 from openhands_cli.tui.core.messages import (
@@ -373,8 +380,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         if self.is_ui_initialized:
             return
 
-        # Check if agent has critic configured
+        # Check if agent has critic configured and collect loaded resources info
         has_critic = False
+        loaded_resources = LoadedResourcesInfo()
+        agent = None
         try:
             agent_store = AgentStore()
             agent = agent_store.load_or_create(
@@ -383,15 +392,60 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             )
             if agent:
                 has_critic = agent.critic is not None
+
+                # Collect skills info
+                if agent.agent_context and agent.agent_context.skills:
+                    for skill in agent.agent_context.skills:
+                        loaded_resources.skills.append(
+                            SkillInfo(
+                                name=skill.name,
+                                description=skill.description,
+                                source=skill.source,
+                            )
+                        )
+
+                # Collect tools info
+                if agent.tools:
+                    for tool in agent.tools:
+                        loaded_resources.tools.append(
+                            ToolInfo(
+                                name=tool.name,
+                                description=tool.description,
+                            )
+                        )
         except Exception:
             # If we can't load agent, just continue without critic notice
             pass
+
+        # Collect hooks info
+        try:
+            hook_config = HookConfig.load(working_dir=get_work_dir())
+            hook_types = [
+                ("pre_tool_use", hook_config.pre_tool_use),
+                ("post_tool_use", hook_config.post_tool_use),
+                ("user_prompt_submit", hook_config.user_prompt_submit),
+                ("session_start", hook_config.session_start),
+                ("session_end", hook_config.session_end),
+                ("stop", hook_config.stop),
+            ]
+            for hook_type, hooks in hook_types:
+                if hooks:
+                    loaded_resources.hooks.append(
+                        HookInfo(hook_type=hook_type, count=len(hooks))
+                    )
+        except Exception:
+            # If we can't load hooks, just continue
+            pass
+
+        # Store loaded resources for later use (e.g., /skills command)
+        self._loaded_resources = loaded_resources
 
         # Get structured splash content
         splash_content = get_splash_content(
             conversation_id=self.conversation_id.hex,
             theme=OPENHANDS_THEME,
             has_critic=has_critic,
+            loaded_resources=loaded_resources,
         )
 
         # Update individual splash widgets
@@ -425,9 +479,33 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         else:
             critic_notice_widget.display = False
 
+        # Add loaded resources collapsible if there are any resources
+        if loaded_resources.skills or loaded_resources.hooks or loaded_resources.tools:
+            self._add_loaded_resources_collapsible(loaded_resources)
+
         # Process any queued inputs
         self._process_queued_inputs()
         self.is_ui_initialized = True
+
+    def _add_loaded_resources_collapsible(
+        self, loaded_resources: LoadedResourcesInfo
+    ) -> None:
+        """Add a collapsible widget showing loaded resources to the main display."""
+        summary = loaded_resources.get_summary()
+        details = loaded_resources.get_details(theme=OPENHANDS_THEME)
+
+        # Create collapsible with summary as title and details as content
+        collapsible = Collapsible(
+            details,
+            title=f"📦 Loaded: {summary}",
+            collapsed=True,
+            id="loaded_resources_collapsible",
+            classes="loaded-resources-collapsible",
+        )
+
+        # Mount after the critic notice (or update notice if no critic)
+        critic_notice = self.query_one("#splash_critic_notice", Static)
+        self.main_display.mount(collapsible, after=critic_notice)
 
     def create_conversation_runner(
         self,
@@ -535,6 +613,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self._handle_confirm_command()
         elif command == "/condense":
             self._handle_condense_command()
+        elif command == "/skills":
+            self._handle_skills_command()
         elif command == "/feedback":
             self._handle_feedback_command()
         elif command == "/exit":
@@ -545,6 +625,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 message=f"Unknown command: {command}",
                 severity="error",
             )
+
+    def _handle_skills_command(self) -> None:
+        """Handle the /skills command to display loaded resources."""
+        loaded_resources = getattr(self, "_loaded_resources", None)
+        show_skills(self.main_display, loaded_resources)
+        self.main_display.scroll_end(animate=False)
 
     async def _handle_user_message(self, user_message: str) -> None:
         """Handle regular user messages with the conversation runner."""
