@@ -62,11 +62,11 @@ def is_valid_command(user_input: str) -> bool:
     return user_input in get_valid_commands()
 
 
-def show_help(main_display: VerticalScroll) -> None:
-    """Display help information in the main display.
+def show_help(scroll_view: VerticalScroll) -> None:
+    """Display help information in the scrollable content area.
 
     Args:
-        main_display: The VerticalScroll widget to mount help content to
+        scroll_view: The VerticalScroll widget to mount help content to
     """
     primary = OPENHANDS_THEME.primary
     secondary = OPENHANDS_THEME.secondary
@@ -90,16 +90,16 @@ def show_help(main_display: VerticalScroll) -> None:
   • Press Enter to select a command
 """
     help_widget = Static(help_text, classes="help-message")
-    main_display.mount(help_widget)
+    scroll_view.mount(help_widget)
 
 
 def show_skills(
-    main_display: VerticalScroll, loaded_resources: LoadedResourcesInfo | None
+    scroll_view: VerticalScroll, loaded_resources: LoadedResourcesInfo | None
 ) -> None:
-    """Display loaded skills, hooks, and tools information in the main display.
+    """Display loaded skills, hooks, and tools information in the scroll view.
 
     Args:
-        main_display: The VerticalScroll widget to mount skills content to
+        scroll_view: The VerticalScroll widget to mount skills content to
         loaded_resources: Information about loaded resources, or None if not available
     """
     primary = OPENHANDS_THEME.primary
@@ -154,4 +154,4 @@ def show_skills(
         skills_text = "\n".join(lines)
 
     skills_widget = Static(skills_text, classes="skills-message")
-    main_display.mount(skills_widget)
+    scroll_view.mount(skills_widget)

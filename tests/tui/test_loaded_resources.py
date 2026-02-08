@@ -349,11 +349,12 @@ class TestSkillsCommandInApp:
                 tools=[ToolInfo(name="test_tool")],
             )
 
-            # Mock show_skills to verify it's called
+            # Mock show_skills to verify it's called via InputAreaContainer
             with mock.patch(
-                "openhands_cli.tui.textual_app.show_skills"
+                "openhands_cli.tui.widgets.input_area.show_skills"
             ) as mock_show_skills:
-                oh_app._handle_command("/skills")
+                # Call the command handler on InputAreaContainer
+                oh_app.conversation_state.input_area._command_skills()
 
                 mock_show_skills.assert_called_once()
                 call_args = mock_show_skills.call_args
@@ -379,11 +380,12 @@ class TestSkillsCommandInApp:
             # Explicitly set _loaded_resources to None to test the fallback
             oh_app._loaded_resources = None  # type: ignore
 
-            # Mock show_skills to verify it's called with None
+            # Mock show_skills to verify it's called with None via InputAreaContainer
             with mock.patch(
-                "openhands_cli.tui.textual_app.show_skills"
+                "openhands_cli.tui.widgets.input_area.show_skills"
             ) as mock_show_skills:
-                oh_app._handle_command("/skills")
+                # Call the command handler on InputAreaContainer
+                oh_app.conversation_state.input_area._command_skills()
 
                 mock_show_skills.assert_called_once()
                 call_args = mock_show_skills.call_args

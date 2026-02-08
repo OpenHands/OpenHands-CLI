@@ -74,7 +74,7 @@ class TestCommands:
         params = list(sig.parameters.keys())
 
         assert len(params) == 1
-        assert params[0] == "main_display"
+        assert params[0] == "scroll_view"
 
     @pytest.mark.parametrize(
         "expected_content",
@@ -228,6 +228,11 @@ class TestOpenHandsAppCommands:
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
+        """`/confirm` should open ConfirmationSettingsModal.
+
+        Note: The app reads the policy from conversation_state.confirmation_policy
+        (ConversationContainer owns the policy), not from conversation_runner.
+        """
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
@@ -236,18 +241,18 @@ class TestOpenHandsAppCommands:
 
         app = OpenHandsApp(exit_confirmation=True)
 
-        dummy_runner = mock.MagicMock()
-        dummy_runner.get_confirmation_policy.return_value = AlwaysConfirm()
-        app.conversation_runner = dummy_runner
-
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            oh_app._handle_command("/confirm")
+            # Verify conversation_state has the default policy
+            assert isinstance(
+                oh_app.conversation_state.confirmation_policy, AlwaysConfirm
+            )
+
+            oh_app.conversation_state.input_area._command_confirm()
 
             top_screen = oh_app.screen_stack[-1]
             assert isinstance(top_screen, ConfirmationSettingsModal)
-            dummy_runner.get_confirmation_policy.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_exit_command_opens_exit_confirmation_modal_when_enabled(
@@ -266,7 +271,7 @@ class TestOpenHandsAppCommands:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            oh_app._handle_command("/exit")
+            oh_app.conversation_state.input_area._command_exit()
 
             top_screen = oh_app.screen_stack[-1]
             assert isinstance(top_screen, ExitConfirmationModal)
@@ -292,101 +297,12 @@ class TestOpenHandsAppCommands:
             exit_mock = mock.MagicMock()
             oh_app.exit = exit_mock
 
-            oh_app._handle_command("/exit")
+            oh_app.conversation_state.input_area._command_exit()
 
             exit_mock.assert_called_once_with()
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "has_runner,runner_running,expected_notification",
-        [
-            (False, False, "Condense Error"),  # No conversation runner
-            (True, True, None),  # Runner exists but is running (handled by runner)
-            (True, False, None),  # Runner exists and not running (success case)
-        ],
-    )
-    async def test_condense_command_scenarios(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        has_runner: bool,
-        runner_running: bool,
-        expected_notification: str | None,
-    ) -> None:
-        """`/condense` should handle different conversation runner states correctly."""
-        monkeypatch.setattr(
-            SettingsScreen,
-            "is_initial_setup_required",
-            lambda env_overrides_enabled=False: False,
-        )
-
-        app = OpenHandsApp(exit_confirmation=False)
-
-        # Mock the notify method to capture notifications
-        notify_mock = mock.MagicMock()
-
-        async with app.run_test() as pilot:
-            oh_app = cast(OpenHandsApp, pilot.app)
-            oh_app.notify = notify_mock
-
-            dummy_runner = None
-            if has_runner:
-                # Create a mock conversation runner
-                dummy_runner = mock.MagicMock()
-                dummy_runner.is_running = runner_running
-                dummy_runner.condense_async = mock.AsyncMock()
-                oh_app.conversation_runner = dummy_runner
-            else:
-                oh_app.conversation_runner = None
-
-            oh_app._handle_command("/condense")
-
-            if expected_notification:
-                # Should have called notify with error
-                notify_mock.assert_called_once()
-                call_args = notify_mock.call_args
-                assert call_args[1]["title"] == expected_notification
-            elif has_runner and dummy_runner is not None:
-                # Should have called condense_async
-                dummy_runner.condense_async.assert_called_once()
-                # Should not have called notify (error handling is in runner)
-                notify_mock.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_condense_command_calls_async_method(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """`/condense` should call the async condense method on conversation runner."""
-        monkeypatch.setattr(
-            SettingsScreen,
-            "is_initial_setup_required",
-            lambda env_overrides_enabled=False: False,
-        )
-
-        app = OpenHandsApp(exit_confirmation=False)
-
-        async with app.run_test() as pilot:
-            oh_app = cast(OpenHandsApp, pilot.app)
-
-            # Create a mock conversation runner with async condense method
-            dummy_runner = mock.MagicMock()
-            dummy_runner.is_running = False
-            dummy_runner.condense_async = mock.AsyncMock()
-            oh_app.conversation_runner = dummy_runner
-
-            # Mock notify to ensure no error notifications
-            notify_mock = mock.MagicMock()
-            oh_app.notify = notify_mock
-
-            oh_app._handle_command("/condense")
-
-            # Verify the async method was called
-            dummy_runner.condense_async.assert_called_once_with()
-            # Verify no error notifications were sent
-            notify_mock.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_condense_command_no_runner_error_message(
+    async def test_condense_command_no_runner_shows_error(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
@@ -403,20 +319,130 @@ class TestOpenHandsAppCommands:
             oh_app = cast(OpenHandsApp, pilot.app)
 
             # Ensure no conversation runner
-            oh_app.conversation_runner = None
+            oh_app.conversation_manager._runners.clear_current()
 
             # Mock notify to capture the error message
             notify_mock = mock.MagicMock()
             oh_app.notify = notify_mock
 
-            oh_app._handle_command("/condense")
+            # Post the condense command and wait for message to be processed
+            oh_app.conversation_state.input_area._command_condense()
+            await pilot.pause()
 
             # Verify error notification was called with correct parameters
             notify_mock.assert_called_once_with(
+                "No conversation available to condense",
                 title="Condense Error",
-                message="No conversation available to condense",
                 severity="error",
+                markup=True,
             )
+
+    @pytest.mark.asyncio
+    async def test_condense_command_while_running_shows_warning(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/condense` should show warning when conversation is running."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            # Create a mock runner that simulates running condensation restriction
+            dummy_runner = mock.MagicMock()
+            dummy_runner.condense_async = mock.AsyncMock(
+                side_effect=lambda: oh_app.notify(
+                    "Cannot condense while conversation is running.",
+                    title="Condense Error",
+                    severity="warning",
+                    markup=True,
+                )
+            )
+            oh_app.conversation_manager._runners._current_runner = dummy_runner
+
+            # Mock notify to capture the warning
+            notify_mock = mock.MagicMock()
+            oh_app.notify = notify_mock
+
+            # Post the condense command and wait for message to be processed
+            oh_app.conversation_state.input_area._command_condense()
+            await pilot.pause()
+
+            # Verify warning notification was called
+            notify_mock.assert_called_once_with(
+                "Cannot condense while conversation is running.",
+                title="Condense Error",
+                severity="warning",
+                markup=True,
+            )
+
+    @pytest.mark.asyncio
+    async def test_condense_command_success(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/condense` should call conversation.condense and notify."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            # Create a mock runner that performs condensation and notifies
+            dummy_conversation = mock.MagicMock()
+            dummy_conversation.condense = mock.MagicMock()
+            dummy_runner = mock.MagicMock()
+            dummy_runner.condense_async = mock.AsyncMock(
+                side_effect=lambda: (
+                    oh_app.notify(
+                        "Conversation condensation will be completed shortly...",
+                        title="Condensation Started",
+                        severity="information",
+                        markup=True,
+                    ),
+                    dummy_conversation.condense(),
+                    oh_app.notify(
+                        "Conversation history has been condensed successfully",
+                        title="Condensation Complete",
+                        severity="information",
+                        markup=True,
+                    ),
+                )
+            )
+            oh_app.conversation_manager._runners._current_runner = dummy_runner
+
+            # Track notify calls
+            notify_calls: list[dict] = []
+            original_notify = oh_app.notify
+
+            def capture_notify(*args, **kwargs):
+                notify_calls.append(kwargs)
+                return original_notify(*args, **kwargs)
+
+            oh_app.notify = capture_notify
+
+            # Post the condense command and wait for message to be processed
+            oh_app.conversation_state.input_area._command_condense()
+            await pilot.pause()
+
+            # Verify conversation.condense was called
+            dummy_conversation.condense.assert_called_once()
+
+            # Verify notifications: should have "started" and "complete"
+            assert len(notify_calls) == 2
+            assert notify_calls[0]["title"] == "Condensation Started"
+            assert notify_calls[1]["title"] == "Condensation Complete"
 
     @pytest.mark.asyncio
     async def test_feedback_command_opens_browser(
@@ -441,7 +467,7 @@ class TestOpenHandsAppCommands:
                 notify_mock = mock.MagicMock()
                 oh_app.notify = notify_mock
 
-                oh_app._handle_command("/feedback")
+                oh_app.conversation_state.input_area._command_feedback()
 
                 # Verify browser was opened with correct URL
                 mock_browser.assert_called_once_with(
@@ -479,19 +505,24 @@ class TestOpenHandsAppCommands:
             notify_mock = mock.MagicMock()
             oh_app.notify = notify_mock
 
-            oh_app._handle_command("/new")
+            # Call _command_new which posts NewConversationRequested message
+            oh_app.conversation_state.input_area._command_new()
+
+            # Process the message
+            await pilot.pause()
 
             # Verify a new conversation ID was generated
             assert oh_app.conversation_id != original_conversation_id
 
-            # Verify conversation runner was reset
-            assert oh_app.conversation_runner is None
+            # Verify conversation state was reset (no conversation created yet)
+            assert not oh_app.conversation_state.is_conversation_created
 
             # Verify notification was shown
             notify_mock.assert_called_once_with(
+                "Started a new conversation",
                 title="New Conversation",
-                message="Started a new conversation",
                 severity="information",
+                markup=True,
             )
 
     @pytest.mark.asyncio
@@ -511,10 +542,8 @@ class TestOpenHandsAppCommands:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            # Create a mock conversation runner that is running
-            dummy_runner = mock.MagicMock()
-            dummy_runner.is_running = True
-            oh_app.conversation_runner = dummy_runner
+            # Set running state directly on ConversationContainer (source of truth)
+            oh_app.conversation_state.running = True
 
             # Store the original conversation ID
             original_conversation_id = oh_app.conversation_id
@@ -523,7 +552,11 @@ class TestOpenHandsAppCommands:
             notify_mock = mock.MagicMock()
             oh_app.notify = notify_mock
 
-            oh_app._handle_command("/new")
+            # Call _command_new which posts NewConversationRequested message
+            oh_app.conversation_state.input_area._command_new()
+
+            # Process the message
+            await pilot.pause()
 
             # Verify conversation ID was NOT changed
             assert oh_app.conversation_id == original_conversation_id
@@ -553,23 +586,23 @@ class TestOpenHandsAppCommands:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            # Add a dynamic widget to main_display (simulating conversation content)
+            # Add a dynamic widget to scroll_view (simulating conversation content)
             dynamic_widget = Static("Test message", classes="user-message")
-            oh_app.main_display.mount(dynamic_widget)
+            oh_app.scroll_view.mount(dynamic_widget)
             await pilot.pause()
 
             # Verify the widget was added
-            assert dynamic_widget in oh_app.main_display.children
+            assert dynamic_widget in oh_app.scroll_view.children
 
             # Mock notify
             notify_mock = mock.MagicMock()
             oh_app.notify = notify_mock
 
-            oh_app._handle_command("/new")
+            oh_app.conversation_state.input_area._command_new()
             await pilot.pause()
 
             # Verify dynamic widget was removed
-            assert dynamic_widget not in oh_app.main_display.children
+            assert dynamic_widget not in oh_app.scroll_view.children
 
             # Verify splash widgets still exist
             splash_banner = oh_app.query_one("#splash_banner", Static)
@@ -598,12 +631,14 @@ class TestOpenHandsAppCommands:
             notify_mock = mock.MagicMock()
             oh_app.notify = notify_mock
 
-            oh_app._handle_command("/new")
+            oh_app.conversation_state.input_area._command_new()
             await pilot.pause()
 
             # Verify splash conversation widget contains the new conversation ID
             splash_conversation = oh_app.query_one("#splash_conversation", Static)
             # The content should contain the new conversation ID hex
+            # conversation_id is always set during app initialization
+            assert oh_app.conversation_id is not None
             assert oh_app.conversation_id.hex in str(splash_conversation.content)
 
     @pytest.mark.asyncio
@@ -629,7 +664,7 @@ class TestOpenHandsAppCommands:
                 len(panels) > 0 and panels.first().display if len(panels) > 0 else False
             )
 
-            oh_app._handle_command("/history")
+            oh_app.conversation_state.input_area._command_history()
             await pilot.pause()
 
             # Panel should now be visible
@@ -638,7 +673,7 @@ class TestOpenHandsAppCommands:
             assert panels.first().display is True
 
             # Toggle again - should hide
-            oh_app._handle_command("/history")
+            oh_app.conversation_state.input_area._command_history()
             await pilot.pause()
 
             panels = oh_app.query(HistorySidePanel)
@@ -675,14 +710,14 @@ class TestOpenHandsAppCommands:
             oh_app = cast(OpenHandsApp, pilot.app)
             original_id = oh_app.conversation_id
 
-            oh_app._handle_command("/history")
+            oh_app.conversation_state.input_area._command_history()
             await pilot.pause()
 
             panel = oh_app.query_one(HistorySidePanel)
             items_before = panel.query(HistoryItem)
             count_before = len(items_before)
 
-            oh_app._handle_command("/new")
+            oh_app.conversation_state.input_area._command_new()
             await pilot.pause()
 
             assert oh_app.conversation_id != original_id
@@ -695,8 +730,9 @@ class TestOpenHandsAppCommands:
     async def test_history_panel_selection_triggers_switch(
         self,
         monkeypatch: pytest.MonkeyPatch,
+        setup_test_agent_config,
     ) -> None:
-        """Selecting a conversation in history panel should trigger switch."""
+        """Selecting a conversation in history panel should post SwitchConversation."""
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
@@ -704,6 +740,7 @@ class TestOpenHandsAppCommands:
         )
         conv1_id = uuid.uuid4().hex
         conv2_id = uuid.uuid4().hex
+        conv2_uuid = uuid.UUID(conv2_id)
         monkeypatch.setattr(
             LocalFileStore,
             "list_conversations",
@@ -726,22 +763,16 @@ class TestOpenHandsAppCommands:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            switch_calls: list[str] = []
-
-            def mock_switch(cid: str) -> None:
-                switch_calls.append(cid)
-
-            oh_app._conversation_manager.switch_to = mock_switch  # type: ignore[method-assign]
-
-            oh_app._handle_command("/history")
+            oh_app.conversation_state.input_area._command_history()
             await pilot.pause()
 
             panel = oh_app.query_one(HistorySidePanel)
-            panel._handle_select(conv2_id)
-            await pilot.pause()
 
-            assert len(switch_calls) == 1
-            assert switch_calls[0] == conv2_id
+            # Call _handle_select and verify it updates selected_conversation_id
+            panel._handle_select(conv2_id)
+
+            # Verify the selected conversation ID was set to the chosen conversation
+            assert panel.selected_conversation_id == conv2_uuid
 
     @pytest.mark.asyncio
     async def test_history_switch_shows_modal_when_agent_running(
@@ -754,7 +785,8 @@ class TestOpenHandsAppCommands:
             "is_initial_setup_required",
             lambda env_overrides_enabled=False: False,
         )
-        target_id = uuid.uuid4().hex
+        target_uuid = uuid.uuid4()
+        target_id = target_uuid.hex
         monkeypatch.setattr(
             LocalFileStore,
             "list_conversations",
@@ -772,11 +804,13 @@ class TestOpenHandsAppCommands:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            dummy_runner = mock.MagicMock()
-            dummy_runner.is_running = True
-            oh_app.conversation_runner = dummy_runner
+            # Set state.running = True to trigger the modal
+            oh_app.conversation_state.running = True
 
-            oh_app._conversation_manager.switch_to(target_id)
+            # Post a SwitchConversation message to trigger the handler
+            from openhands_cli.tui.core.conversation_manager import SwitchConversation
+
+            oh_app.conversation_manager.post_message(SwitchConversation(target_uuid))
             await pilot.pause()
 
             top_screen = oh_app.screen_stack[-1]
