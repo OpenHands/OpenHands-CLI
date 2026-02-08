@@ -1,0 +1,1 @@
+{"id":"7d8eb804-218b-4c65-9fd5-acfe6fee4a19","timestamp":"2026-01-28T14:33:54.636706","source":"user","llm_message":{"role":"user","content":[{"cache_prompt":false,"type":"text","text":"once more, don't mark it as high risk this time","enable_truncation":true}],"thinking_blocks":[]},"activated_skills":[],"extended_content":[],"kind":"MessageEvent"}
