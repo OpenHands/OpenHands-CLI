@@ -47,7 +47,7 @@ class ConversationRunner:
         *,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
-        streaming_enabled: bool = True,
+        streaming_enabled: bool = False,
     ):
         """Initialize the conversation runner.
 
@@ -63,6 +63,7 @@ class ConversationRunner:
                                    stored LLM settings.
             critic_disabled: If True, critic functionality will be disabled.
             streaming_enabled: If True, enable token streaming for LLM responses.
+                              Default is False for backward compatibility.
         """
         starting_confirmation_policy = initial_confirmation_policy or AlwaysConfirm()
         self.visualizer = visualizer
