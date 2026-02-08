@@ -8,7 +8,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from openhands.sdk import MessageEvent
-from openhands_cli.locations import CONVERSATIONS_DIR
+from openhands_cli.locations import get_conversations_dir
 from openhands_cli.utils import extract_text_from_message_content
 
 
@@ -25,7 +25,7 @@ class ConversationLister:
 
     def __init__(self):
         """Initialize the conversation lister."""
-        self.conversations_dir = CONVERSATIONS_DIR
+        self.conversations_dir = get_conversations_dir()
 
     def list(self) -> list[ConversationInfo]:
         """List all conversations with their first user prompts and creation dates.

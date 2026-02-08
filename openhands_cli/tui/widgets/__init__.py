@@ -1,5 +1,7 @@
 from openhands_cli.tui.widgets.cloud_indicator import CloudSetupIndicator
+from openhands_cli.tui.widgets.input_area import InputAreaContainer
+from openhands_cli.tui.widgets.main_display import ScrollableContent
 from openhands_cli.tui.widgets.user_input.input_field import InputField
 
 
-__all__ = ["CloudSetupIndicator", "InputField"]
+__all__ = ["CloudSetupIndicator", "InputAreaContainer", "InputField", "ScrollableContent"]

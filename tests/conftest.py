@@ -99,17 +99,17 @@ def setup_test_agent_config(tmp_path_factory):
     # This ensures tests work even if the patch isn't applied early enough
     from openhands_cli import locations
 
-    default_persistence_dir = Path(locations.PERSISTENCE_DIR)
+    default_persistence_dir = Path(locations.get_persistence_dir())
     if not default_persistence_dir.exists():
         default_persistence_dir.mkdir(parents=True, exist_ok=True)
     default_agent_settings = default_persistence_dir / "agent_settings.json"
     if not default_agent_settings.exists():
         default_agent_settings.write_text(agent_settings_json)
 
-    # Patch locations module
+    # Patch locations module functions
     with patch.multiple(
         "openhands_cli.locations",
-        PERSISTENCE_DIR=str(temp_persistence_dir),
-        CONVERSATIONS_DIR=str(conversations_dir),
+        get_persistence_dir=lambda: str(temp_persistence_dir),
+        get_conversations_dir=lambda: str(conversations_dir),
     ):
         yield temp_persistence_dir

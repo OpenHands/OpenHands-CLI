@@ -7,9 +7,8 @@ from openhands.sdk import Agent
 from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands_cli.auth.http_client import AuthHttpError, BaseHttpClient
 from openhands_cli.auth.utils import _p
-from openhands_cli.locations import AGENT_SETTINGS_PATH, PERSISTENCE_DIR
+from openhands_cli.locations import AGENT_SETTINGS_PATH, get_persistence_dir
 from openhands_cli.stores import AgentStore
-from openhands_cli.stores.agent_store import resolve_llm_base_url
 from openhands_cli.theme import OPENHANDS_THEME
 
 
@@ -25,7 +24,9 @@ class UnauthenticatedError(ApiClientError):
     pass
 
 
-SETTINGS_PATH = f"{PERSISTENCE_DIR}/{AGENT_SETTINGS_PATH}"
+def get_settings_path() -> str:
+    """Get the full path to the agent settings file."""
+    return f"{get_persistence_dir()}/{AGENT_SETTINGS_PATH}"
 
 
 class OpenHandsApiClient(BaseHttpClient):
@@ -143,8 +144,7 @@ def _print_settings_summary(settings: dict[str, Any]) -> None:
 
 def _ask_user_consent_for_overwrite(
     existing_agent: Agent,
-    new_settings: dict[str, Any],
-    base_url: str = "https://llm-proxy.app.all-hands.dev/",
+    new_settings: dict[str, str],
     default_model: str = "claude-sonnet-4-5-20250929",
 ) -> bool:
     """Ask user for consent to overwrite existing agent configuration.
@@ -170,6 +170,7 @@ def _ask_user_consent_for_overwrite(
     # Show current vs new settings comparison
     current_model = existing_agent.llm.model
     new_model = new_settings.get("llm_model", default_model)
+    base_url = new_settings.get("llm_base_url", None)
 
     _p(
         f"[{OPENHANDS_THEME.secondary}]Current "
@@ -194,10 +195,12 @@ def _ask_user_consent_for_overwrite(
         f"  • Model: [{OPENHANDS_THEME.accent}]{html.escape(new_model)}"
         f"[/{OPENHANDS_THEME.accent}]"
     )
-    _p(
-        f"  • Base URL: [{OPENHANDS_THEME.accent}]{html.escape(base_url)}"
-        f"[/{OPENHANDS_THEME.accent}]"
-    )
+
+    if base_url:
+        _p(
+            f"  • Base URL: [{OPENHANDS_THEME.accent}]{html.escape(base_url)}"
+            f"[/{OPENHANDS_THEME.accent}]"
+        )
 
     try:
         response = (
@@ -226,16 +229,13 @@ def create_and_save_agent_configuration(
     """
     store = AgentStore()
 
-    base_url = resolve_llm_base_url(settings)
-
-    # First, check if existing configuration exists
-    existing_agent = store.load()
+    # First, check if existing configuration exists on disk
+    existing_agent = store.load_from_disk()
     if existing_agent is not None:
         # Ask for user consent
         if not _ask_user_consent_for_overwrite(
             existing_agent,
             settings,
-            base_url=base_url,
         ):
             raise ValueError("User declined to overwrite existing configuration")
 
@@ -243,7 +243,6 @@ def create_and_save_agent_configuration(
     agent = store.create_and_save_from_settings(
         llm_api_key=llm_api_key,
         settings=settings,
-        base_url=base_url,
     )
 
     _p(
@@ -283,7 +282,7 @@ def create_and_save_agent_configuration(
         )
 
     _p(
-        f"  • Saved to: [{OPENHANDS_THEME.accent}]{SETTINGS_PATH}"
+        f"  • Saved to: [{OPENHANDS_THEME.accent}]{get_settings_path()}"
         f"[/{OPENHANDS_THEME.accent}]"
     )
 

@@ -18,8 +18,8 @@ from openhands.sdk.context import load_project_skills
 from openhands.tools.preset.default import get_default_tools
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
-    PERSISTENCE_DIR,
-    WORK_DIR,
+    get_persistence_dir,
+    get_work_dir,
 )
 from openhands_cli.mcp.mcp_utils import list_enabled_servers
 from openhands_cli.utils import (
@@ -118,7 +118,7 @@ class AgentStore:
     """Single source of truth for persisting/retrieving AgentSpec."""
 
     def __init__(self) -> None:
-        self.file_store = LocalFileStore(root=PERSISTENCE_DIR)
+        self.file_store = LocalFileStore(root=get_persistence_dir())
 
     def load(self, session_id: str | None = None) -> Agent | None:
         try:
@@ -133,11 +133,11 @@ class AgentStore:
             updated_tools = get_default_tools(enable_browser=False)
 
             # Load skills from user directories and project-specific directories
-            skills = load_project_skills(WORK_DIR)
+            skills = load_project_skills(get_work_dir())
 
             system_suffix = "\n".join(
                 [
-                    f"Your current working directory is: {WORK_DIR}",
+                    f"Your current working directory is: {get_work_dir()}",
                     f"User operating system: {get_os_description()}",
                 ]
             )

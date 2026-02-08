@@ -51,16 +51,18 @@ def handle_resume_logic(args) -> str | None:
             return None
 
         # Get the latest conversation ID
-        from openhands_cli.conversations.lister import ConversationLister
+        from openhands_cli.conversations.store.local import LocalFileStore
 
-        lister = ConversationLister()
-        latest_id = lister.get_latest_conversation_id()
+        store = LocalFileStore()
+        conversations = store.list_conversations(limit=1)
 
-        if latest_id is None:
+        if not conversations:
             console.print(
                 "No conversations found to resume.", style=OPENHANDS_THEME.warning
             )
             return None
+
+        latest_id = conversations[0].id
 
         console.print(
             f"Resuming latest conversation: {latest_id}",
@@ -135,6 +137,8 @@ def main() -> None:
                 run_acp_server(
                     initial_confirmation_mode=confirmation_mode,
                     resume_conversation_id=resume_id,
+                    cloud=args.cloud,
+                    cloud_api_url=args.cloud_url,
                 )
             )
 
@@ -180,6 +184,25 @@ def main() -> None:
                 else:
                     resume_id = args.resume
 
+            # Fetch sandbox_id for cloud resume
+            sandbox_id = None
+            if resume_id:
+                import asyncio
+
+                from openhands_cli.cloud.utils import fetch_cloud_sandbox_id
+
+                server_url = getattr(args, "server_url", None) or ""
+                sandbox_id = asyncio.run(
+                    fetch_cloud_sandbox_id(server_url, resume_id)
+                )
+                if sandbox_id is None:
+                    console.print(
+                        "Failed to fetch sandbox for conversation. "
+                        "Please check your authentication and try again.",
+                        style=OPENHANDS_THEME.error,
+                    )
+                    sys.exit(1)
+
             # Use textual-based UI with cloud mode
             from openhands_cli.tui.textual_app import main as textual_main
 
@@ -196,7 +219,8 @@ def main() -> None:
                 json_mode=getattr(args, "json", False)
                 and getattr(args, "headless", False),
                 cloud=True,
-                server_url=args.server_url,
+                server_url=getattr(args, "server_url", None),
+                sandbox_id=sandbox_id,
             )
             if conversation_id is None:
                 # Authentication or other error occurred
@@ -244,19 +268,18 @@ def main() -> None:
                 headless=args.headless,
                 json_mode=json_mode,
             )
-            if conversation_id is None:
-                # Error occurred (shouldn't happen for non-cloud)
-                sys.exit(1)
             console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
-            console.print(
-                f"Conversation ID: {conversation_id.hex}",
-                style=OPENHANDS_THEME.accent,
-            )
-            console.print(
-                f"Hint: run openhands --resume {conversation_id} "
-                "to resume this conversation.",
-                style=OPENHANDS_THEME.secondary,
-            )
+            # Show conversation ID if available (may be None if app exited early)
+            if conversation_id is not None:
+                console.print(
+                    f"Conversation ID: {conversation_id.hex}",
+                    style=OPENHANDS_THEME.accent,
+                )
+                console.print(
+                    f"Hint: run openhands --resume {conversation_id} "
+                    "to resume this conversation.",
+                    style=OPENHANDS_THEME.secondary,
+                )
     except KeyboardInterrupt:
         console.print("\nGoodbye! 👋", style=OPENHANDS_THEME.warning)
     except EOFError:

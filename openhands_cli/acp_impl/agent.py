@@ -65,7 +65,11 @@ from openhands_cli.acp_impl.utils import (
     convert_acp_mcp_servers_to_agent_format,
     convert_acp_prompt_to_message_content,
 )
-from openhands_cli.locations import CONVERSATIONS_DIR, MCP_CONFIG_FILE, WORK_DIR
+from openhands_cli.locations import (
+    MCP_CONFIG_FILE,
+    get_conversations_dir,
+    get_work_dir,
+)
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
 from openhands_cli.setup import MissingAgentSpec, load_agent_specs
 from openhands_cli.utils import extract_text_from_message_content
@@ -285,7 +289,7 @@ class OpenHandsACPAgent(ACPAgent):
 
         # Validate and setup workspace
         if working_dir is None:
-            working_dir = WORK_DIR
+            working_dir = get_work_dir()
         working_path = Path(working_dir)
 
         if not working_path.exists():
@@ -324,7 +328,7 @@ class OpenHandsACPAgent(ACPAgent):
         conversation = Conversation(
             agent=agent,
             workspace=workspace,
-            persistence_dir=CONVERSATIONS_DIR,
+            persistence_dir=get_conversations_dir(),
             conversation_id=UUID(session_id),
             callbacks=[sync_callback],
             token_callbacks=[token_subscriber.on_token] if streaming_enabled else None,

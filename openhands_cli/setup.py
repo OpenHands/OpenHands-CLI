@@ -14,22 +14,26 @@ from openhands.sdk import (
 )
 from openhands.sdk.context import Skill
 from openhands.sdk.event.base import Event
+from openhands.sdk.hooks import HookConfig
 from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
 )
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 
 # Register tools on import
-from openhands.tools.file_editor import FileEditorTool  # noqa: F401
-from openhands.tools.task_tracker import TaskTrackerTool  # noqa: F401
-from openhands.tools.terminal import TerminalTool  # noqa: F401
-from openhands_cli.locations import CONVERSATIONS_DIR, WORK_DIR
+from openhands_cli.locations import get_conversations_dir, get_work_dir
 from openhands_cli.stores import AgentStore
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
 
 class MissingAgentSpec(Exception):
     """Raised when agent specification is not found or invalid."""
+
+    pass
+
+
+class CloudConversationError(Exception):
+    """Raised when there's an error setting up a cloud conversation."""
 
     pass
 
@@ -93,6 +97,7 @@ def setup_conversation(
     confirmation_policy: ConfirmationPolicyBase,
     visualizer: ConversationVisualizer | None = None,
     event_callback: Callable[[Event], None] | None = None,
+    *,
     cloud: bool = False,
     server_url: str | None = None,
     sandbox_id: str | None = None,
@@ -112,6 +117,7 @@ def setup_conversation(
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
+        CloudConversationError: If cloud mode is enabled but authentication fails.
     """
     console = Console()
 
@@ -132,21 +138,28 @@ def setup_conversation(
     # Prepare callbacks list
     callbacks = [event_callback] if event_callback else None
 
+    # Load hooks from ~/.openhands/hooks.json or {working_dir}/.openhands/hooks.json
+    hook_config = HookConfig.load(working_dir=get_work_dir())
+    if not hook_config.is_empty():
+        console.print("✓ Hooks loaded", style="green")
+
     # Create conversation - agent context is now set in AgentStore.load()
     conversation: BaseConversation = Conversation(
         agent=agent,
-        workspace=Workspace(working_dir=WORK_DIR),
+        workspace=Workspace(working_dir=get_work_dir()),
         # Conversation will add /<conversation_id> to this path
-        persistence_dir=CONVERSATIONS_DIR,
+        persistence_dir=get_conversations_dir(),
         conversation_id=conversation_id,
         visualizer=visualizer,
         callbacks=callbacks,
+        hook_config=hook_config,
     )
 
     conversation.set_security_analyzer(LLMSecurityAnalyzer())
     conversation.set_confirmation_policy(confirmation_policy)
 
     console.print(f"✓ Agent initialized with model: {agent.llm.model}", style="green")
+
     return conversation
 
 
@@ -170,13 +183,13 @@ def setup_cloud_conversation(
         sandbox_id: Optional sandbox ID to reclaim an existing sandbox.
 
     Raises:
-        ValueError: If API key is not available.
+        CloudConversationError: If API key is not available.
     """
     import os
 
     from openhands.workspace import OpenHandsCloudWorkspace
+
     from openhands_cli.auth.token_storage import TokenStorage
-    from openhands_cli.cloud.conversation import CloudConversationError
 
     # Get API key from token storage
     store = TokenStorage()
@@ -221,4 +234,5 @@ def setup_cloud_conversation(
 
     conversation.set_security_analyzer(LLMSecurityAnalyzer())
     conversation.set_confirmation_policy(confirmation_policy)
+
     return conversation
