@@ -1,0 +1,44 @@
+---
+name: Weekly Good First Issue Labeling
+
+on:
+    schedule:
+        - cron: 0 12 * * 1
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    issues: write
+
+jobs:
+    label-good-first-issues:
+        if: github.repository == 'OpenHands/OpenHands-CLI'
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v7
+
+            - name: Install dependencies
+              run: |
+                  uv sync --group dev
+
+            - name: Run OpenHands labeler
+              env:
+                  LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+                  LLM_BASE_URL: https://llm-proxy.app.all-hands.dev
+                  LLM_MODEL: litellm_proxy/gpt-5.2
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  uv run openhands --headless --always-approve --override-with-envs \
+                    --file .github/prompts/good-first-issue-labeler.md || echo "OpenHands labeling completed"
