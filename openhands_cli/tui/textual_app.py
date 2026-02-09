@@ -49,7 +49,6 @@ from textual.widgets import Footer, Input, TextArea
 from textual_autocomplete import AutoComplete
 
 from openhands.sdk import BaseConversation
-from openhands.sdk.hooks import HookConfig
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     ConfirmationPolicyBase,
@@ -62,11 +61,8 @@ from openhands_cli.locations import get_conversations_dir, get_work_dir
 from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.resources import (
-    HookInfo,
     LoadedResourcesInfo,
-    MCPInfo,
-    SkillInfo,
-    ToolInfo,
+    collect_loaded_resources,
 )
 from openhands_cli.tui.core import (
     ConversationContainer,
@@ -426,9 +422,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         splash_content = self.query_one("#splash_content", SplashContent)
 
-        # Check if agent has critic configured and collect loaded resources info
+        # Check if agent has critic configured
         has_critic = False
-        loaded_resources = LoadedResourcesInfo()
         agent = None
         try:
             agent_store = AgentStore()
@@ -438,70 +433,15 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             )
             if agent:
                 has_critic = agent.critic is not None
-
-                # Collect skills info
-                if agent.agent_context and agent.agent_context.skills:
-                    for skill in agent.agent_context.skills:
-                        loaded_resources.skills.append(
-                            SkillInfo(
-                                name=skill.name,
-                                description=skill.description,
-                                source=skill.source,
-                            )
-                        )
-
-                # Collect tools info
-                if agent.tools:
-                    for tool in agent.tools:
-                        loaded_resources.tools.append(
-                            ToolInfo(
-                                name=tool.name,
-                            )
-                        )
         except Exception:
             # If we can't load agent, just continue without critic notice
             pass
 
-        # Collect hooks info
-        try:
-            hook_config = HookConfig.load(working_dir=get_work_dir())
-            hook_types = [
-                ("pre_tool_use", hook_config.pre_tool_use),
-                ("post_tool_use", hook_config.post_tool_use),
-                ("user_prompt_submit", hook_config.user_prompt_submit),
-                ("session_start", hook_config.session_start),
-                ("session_end", hook_config.session_end),
-                ("stop", hook_config.stop),
-            ]
-            for hook_type, hooks in hook_types:
-                if hooks:
-                    loaded_resources.hooks.append(
-                        HookInfo(hook_type=hook_type, count=len(hooks))
-                    )
-        except Exception:
-            # If we can't load hooks, just continue
-            pass
-
-        # Collect MCP info
-        try:
-            from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
-
-            from openhands_cli.mcp.mcp_utils import list_enabled_servers
-
-            enabled_servers = list_enabled_servers()
-            for name, server in enabled_servers.items():
-                if isinstance(server, StdioMCPServer):
-                    transport = "stdio"
-                elif isinstance(server, RemoteMCPServer):
-                    transport = server.transport
-                else:
-                    transport = None
-                loaded_resources.mcps.append(
-                    MCPInfo(name=name, transport=transport, enabled=True)
-                )
-        except Exception:
-            # If we can't load MCPs, just continue
-            pass
+        # Collect loaded resources info using the utility function
+        loaded_resources = collect_loaded_resources(
+            agent=agent,
+            working_dir=get_work_dir(),
+        )
 
         # Store loaded resources for later use (e.g., /skills command)
         self._loaded_resources = loaded_resources
@@ -510,12 +450,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         splash_content.initialize(has_critic=has_critic)
 
         # Add loaded resources collapsible if there are any resources
-        if (
-            loaded_resources.skills
-            or loaded_resources.hooks
-            or loaded_resources.tools
-            or loaded_resources.mcps
-        ):
+        if loaded_resources.has_resources():
             self._add_loaded_resources_collapsible(loaded_resources)
 
         # Process any queued inputs

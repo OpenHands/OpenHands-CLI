@@ -12,6 +12,8 @@ from openhands_cli.tui.content.resources import (
     MCPInfo,
     SkillInfo,
     ToolInfo,
+    _get_tool_description,
+    collect_loaded_resources,
 )
 from openhands_cli.tui.core.commands import show_skills
 from openhands_cli.tui.modals import SettingsScreen
@@ -29,6 +31,31 @@ class TestLoadedResourcesInfo:
         assert info.tools_count == 0
         assert info.mcps_count == 0
         assert info.get_summary() == "No resources loaded"
+
+    def test_has_resources_empty(self):
+        """Test has_resources returns False when empty."""
+        info = LoadedResourcesInfo()
+        assert info.has_resources() is False
+
+    def test_has_resources_with_skills(self):
+        """Test has_resources returns True when skills are present."""
+        info = LoadedResourcesInfo(skills=[SkillInfo(name="skill1")])
+        assert info.has_resources() is True
+
+    def test_has_resources_with_hooks(self):
+        """Test has_resources returns True when hooks are present."""
+        info = LoadedResourcesInfo(hooks=[HookInfo(hook_type="pre_tool_use", count=1)])
+        assert info.has_resources() is True
+
+    def test_has_resources_with_tools(self):
+        """Test has_resources returns True when tools are present."""
+        info = LoadedResourcesInfo(tools=[ToolInfo(name="tool1")])
+        assert info.has_resources() is True
+
+    def test_has_resources_with_mcps(self):
+        """Test has_resources returns True when MCPs are present."""
+        info = LoadedResourcesInfo(mcps=[MCPInfo(name="mcp1")])
+        assert info.has_resources() is True
 
     def test_skills_only(self):
         """Test LoadedResourcesInfo with only skills."""
@@ -429,3 +456,81 @@ class TestSkillsCommandInApp:
                 mock_show_skills.assert_called_once()
                 call_args = mock_show_skills.call_args
                 assert call_args[0][1] is None
+
+
+class TestGetToolDescription:
+    """Tests for _get_tool_description function."""
+
+    def test_get_tool_description_terminal(self):
+        """Test getting description for terminal tool."""
+        desc = _get_tool_description("terminal")
+        assert desc is not None
+        assert "bash" in desc.lower() or "command" in desc.lower()
+
+    def test_get_tool_description_file_editor(self):
+        """Test getting description for file_editor tool."""
+        desc = _get_tool_description("file_editor")
+        assert desc is not None
+        assert "file" in desc.lower() or "editor" in desc.lower()
+
+    def test_get_tool_description_unknown(self):
+        """Test getting description for unknown tool returns None."""
+        desc = _get_tool_description("unknown_tool_xyz")
+        assert desc is None
+
+
+class TestCollectLoadedResources:
+    """Tests for collect_loaded_resources function."""
+
+    def test_collect_loaded_resources_no_agent(self):
+        """Test collect_loaded_resources with no agent."""
+        resources = collect_loaded_resources(agent=None, working_dir=None)
+        assert isinstance(resources, LoadedResourcesInfo)
+        # Skills and tools should be empty without an agent
+        assert resources.skills == []
+        assert resources.tools == []
+
+    def test_collect_loaded_resources_with_mock_agent(self):
+        """Test collect_loaded_resources with a mock agent."""
+        # Create a mock agent with tools
+        mock_agent = mock.MagicMock()
+        mock_agent.agent_context = None
+
+        # Create mock tools
+        mock_tool1 = mock.MagicMock()
+        mock_tool1.name = "terminal"
+        mock_tool2 = mock.MagicMock()
+        mock_tool2.name = "file_editor"
+        mock_agent.tools = [mock_tool1, mock_tool2]
+
+        resources = collect_loaded_resources(agent=mock_agent, working_dir=None)
+
+        assert isinstance(resources, LoadedResourcesInfo)
+        assert len(resources.tools) == 2
+        assert resources.tools[0].name == "terminal"
+        assert resources.tools[1].name == "file_editor"
+        # Tool descriptions should be populated
+        assert resources.tools[0].description is not None
+        assert resources.tools[1].description is not None
+
+    def test_collect_loaded_resources_with_skills(self):
+        """Test collect_loaded_resources with skills in agent context."""
+        # Create a mock agent with skills
+        mock_agent = mock.MagicMock()
+        mock_agent.tools = []
+
+        mock_skill = mock.MagicMock()
+        mock_skill.name = "test_skill"
+        mock_skill.description = "A test skill"
+        mock_skill.source = "project"
+
+        mock_agent.agent_context = mock.MagicMock()
+        mock_agent.agent_context.skills = [mock_skill]
+
+        resources = collect_loaded_resources(agent=mock_agent, working_dir=None)
+
+        assert isinstance(resources, LoadedResourcesInfo)
+        assert len(resources.skills) == 1
+        assert resources.skills[0].name == "test_skill"
+        assert resources.skills[0].description == "A test skill"
+        assert resources.skills[0].source == "project"
