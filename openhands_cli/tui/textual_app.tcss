@@ -8,7 +8,15 @@ Screen {
     layout: horizontal;
 }
 
-#main_display {
+#conversation_view {
+    height: 1fr;
+    width: 1fr;
+    layout: vertical;
+    background: $background;
+    color: $foreground;
+}
+
+#scroll_view {
     height: 1fr;
     margin: 1 1 0 1;
     background: $background;
@@ -18,7 +26,7 @@ Screen {
 }
 
 #splash_content {
-    padding: 1;
+    height: auto;
     background: $background;
     color: $foreground;
 }
