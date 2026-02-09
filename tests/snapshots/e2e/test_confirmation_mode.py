@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 def _create_app(conversation_id):
     """Create an OpenHandsApp instance with AlwaysConfirm policy.
 
-    AlwaysConfirm policy requires confirmation for all actions initially,
+    AlwaysConfirm policy requires user confirmation for every action,
     which lets us test the confirmation panel UI. The user can then
     select "Auto LOW/MED" to switch to ConfirmRisky policy.
     """
