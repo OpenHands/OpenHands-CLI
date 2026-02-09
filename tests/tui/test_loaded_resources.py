@@ -1,4 +1,4 @@
-"""Tests for loaded resources (skills, hooks, tools) display functionality."""
+"""Tests for loaded resources (skills, hooks, tools, MCPs) display functionality."""
 
 import unittest.mock as mock
 from typing import cast
@@ -10,6 +10,7 @@ from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.resources import (
     HookInfo,
     LoadedResourcesInfo,
+    MCPInfo,
     SkillInfo,
     ToolInfo,
 )
@@ -27,6 +28,7 @@ class TestLoadedResourcesInfo:
         assert info.skills_count == 0
         assert info.hooks_count == 0
         assert info.tools_count == 0
+        assert info.mcps_count == 0
         assert info.get_summary() == "No resources loaded"
 
     def test_skills_only(self):
@@ -40,6 +42,7 @@ class TestLoadedResourcesInfo:
         assert info.skills_count == 2
         assert info.hooks_count == 0
         assert info.tools_count == 0
+        assert info.mcps_count == 0
         assert "2 skills" in info.get_summary()
 
     def test_hooks_only(self):
@@ -53,6 +56,7 @@ class TestLoadedResourcesInfo:
         assert info.skills_count == 0
         assert info.hooks_count == 3  # Sum of all hook counts
         assert info.tools_count == 0
+        assert info.mcps_count == 0
         assert "3 hooks" in info.get_summary()
 
     def test_tools_only(self):
@@ -66,7 +70,22 @@ class TestLoadedResourcesInfo:
         assert info.skills_count == 0
         assert info.hooks_count == 0
         assert info.tools_count == 2
+        assert info.mcps_count == 0
         assert "2 tools" in info.get_summary()
+
+    def test_mcps_only(self):
+        """Test LoadedResourcesInfo with only MCPs."""
+        info = LoadedResourcesInfo(
+            mcps=[
+                MCPInfo(name="mcp1", transport="stdio"),
+                MCPInfo(name="mcp2", transport="http"),
+            ]
+        )
+        assert info.skills_count == 0
+        assert info.hooks_count == 0
+        assert info.tools_count == 0
+        assert info.mcps_count == 2
+        assert "2 MCPs" in info.get_summary()
 
     def test_all_resources(self):
         """Test LoadedResourcesInfo with all resource types."""
@@ -74,14 +93,17 @@ class TestLoadedResourcesInfo:
             skills=[SkillInfo(name="skill1")],
             hooks=[HookInfo(hook_type="pre_tool_use", count=1)],
             tools=[ToolInfo(name="tool1"), ToolInfo(name="tool2")],
+            mcps=[MCPInfo(name="mcp1", transport="stdio")],
         )
         assert info.skills_count == 1
         assert info.hooks_count == 1
         assert info.tools_count == 2
+        assert info.mcps_count == 1
         summary = info.get_summary()
         assert "1 skill" in summary
         assert "1 hook" in summary
         assert "2 tools" in summary
+        assert "1 MCP" in summary
 
     def test_singular_plural(self):
         """Test that singular/plural forms are correct."""
@@ -96,6 +118,17 @@ class TestLoadedResourcesInfo:
         )
         assert "2 skills" in info_multiple.get_summary()
 
+        # Single MCP
+        info_single_mcp = LoadedResourcesInfo(mcps=[MCPInfo(name="mcp1")])
+        assert "1 MCP" in info_single_mcp.get_summary()
+        assert "MCPs" not in info_single_mcp.get_summary()
+
+        # Multiple MCPs
+        info_multiple_mcps = LoadedResourcesInfo(
+            mcps=[MCPInfo(name="mcp1"), MCPInfo(name="mcp2")]
+        )
+        assert "2 MCPs" in info_multiple_mcps.get_summary()
+
     def test_get_details(self):
         """Test get_details returns formatted string with theme colors."""
         info = LoadedResourcesInfo(
@@ -104,6 +137,7 @@ class TestLoadedResourcesInfo:
             ],
             hooks=[HookInfo(hook_type="pre_tool_use", count=2)],
             tools=[ToolInfo(name="tool1", description="First tool")],
+            mcps=[MCPInfo(name="mcp1", transport="stdio")],
         )
         details = info.get_details(theme=OPENHANDS_THEME)
 
@@ -117,6 +151,9 @@ class TestLoadedResourcesInfo:
         assert "Tools (1):" in details
         assert "tool1" in details
         assert "First tool" in details
+        assert "MCPs (1):" in details
+        assert "mcp1" in details
+        assert "stdio" in details
 
         # Check that theme colors are used
         assert OPENHANDS_THEME.primary in details
@@ -170,6 +207,30 @@ class TestToolInfo:
         assert tool.description == "A test tool"
 
 
+class TestMCPInfo:
+    """Tests for MCPInfo dataclass."""
+
+    def test_mcp_info_basic(self):
+        """Test MCPInfo with basic attributes."""
+        mcp = MCPInfo(name="test_mcp")
+        assert mcp.name == "test_mcp"
+        assert mcp.transport is None
+        assert mcp.enabled is True
+
+    def test_mcp_info_full(self):
+        """Test MCPInfo with all attributes."""
+        mcp = MCPInfo(name="test_mcp", transport="stdio", enabled=True)
+        assert mcp.name == "test_mcp"
+        assert mcp.transport == "stdio"
+        assert mcp.enabled is True
+
+    def test_mcp_info_http_transport(self):
+        """Test MCPInfo with http transport."""
+        mcp = MCPInfo(name="api_mcp", transport="http", enabled=True)
+        assert mcp.name == "api_mcp"
+        assert mcp.transport == "http"
+
+
 class TestShowSkillsCommand:
     """Tests for show_skills command function."""
 
@@ -184,6 +245,7 @@ class TestShowSkillsCommand:
             ],
             hooks=[HookInfo(hook_type="pre_tool_use", count=2)],
             tools=[ToolInfo(name="tool1", description="First tool")],
+            mcps=[MCPInfo(name="mcp1", transport="stdio")],
         )
 
         show_skills(mock_main_display, loaded_resources)
@@ -199,6 +261,8 @@ class TestShowSkillsCommand:
         assert "skill2" in skills_text
         assert "pre_tool_use" in skills_text
         assert "tool1" in skills_text
+        assert "mcp1" in skills_text
+        assert "stdio" in skills_text
 
     def test_show_skills_without_resources(self):
         """Test show_skills with None loaded resources."""
@@ -224,7 +288,7 @@ class TestShowSkillsCommand:
         skills_widget = mock_main_display.mount.call_args[0][0]
         skills_text = skills_widget.content
 
-        assert "No skills, hooks, or tools loaded" in skills_text
+        assert "No skills, hooks, tools, or MCPs loaded" in skills_text
 
     def test_show_skills_uses_theme_colors(self):
         """Test that show_skills uses OpenHands theme colors."""
@@ -241,6 +305,29 @@ class TestShowSkillsCommand:
 
         # Should use OpenHands theme colors
         assert OPENHANDS_THEME.primary in skills_text
+
+    def test_show_skills_with_mcps_only(self):
+        """Test show_skills displays MCPs correctly."""
+        mock_main_display = mock.MagicMock(spec=VerticalScroll)
+
+        loaded_resources = LoadedResourcesInfo(
+            mcps=[
+                MCPInfo(name="api-server", transport="http"),
+                MCPInfo(name="local-tool", transport="stdio"),
+            ],
+        )
+
+        show_skills(mock_main_display, loaded_resources)
+
+        mock_main_display.mount.assert_called_once()
+        skills_widget = mock_main_display.mount.call_args[0][0]
+        skills_text = skills_widget.content
+
+        assert "MCPs (2):" in skills_text
+        assert "api-server" in skills_text
+        assert "http" in skills_text
+        assert "local-tool" in skills_text
+        assert "stdio" in skills_text
 
 
 class TestSkillsCommandInApp:

@@ -64,6 +64,7 @@ from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.resources import (
     HookInfo,
     LoadedResourcesInfo,
+    MCPInfo,
     SkillInfo,
     ToolInfo,
 )
@@ -481,6 +482,26 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             # If we can't load hooks, just continue
             pass
 
+        # Collect MCP info
+        try:
+            from openhands_cli.mcp.mcp_utils import list_enabled_servers
+            from fastmcp.mcp_config import StdioMCPServer, RemoteMCPServer
+
+            enabled_servers = list_enabled_servers()
+            for name, server in enabled_servers.items():
+                if isinstance(server, StdioMCPServer):
+                    transport = "stdio"
+                elif isinstance(server, RemoteMCPServer):
+                    transport = server.transport
+                else:
+                    transport = None
+                loaded_resources.mcps.append(
+                    MCPInfo(name=name, transport=transport, enabled=True)
+                )
+        except Exception:
+            # If we can't load MCPs, just continue
+            pass
+
         # Store loaded resources for later use (e.g., /skills command)
         self._loaded_resources = loaded_resources
 
@@ -488,7 +509,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         splash_content.initialize(has_critic=has_critic)
 
         # Add loaded resources collapsible if there are any resources
-        if loaded_resources.skills or loaded_resources.hooks or loaded_resources.tools:
+        if (
+            loaded_resources.skills
+            or loaded_resources.hooks
+            or loaded_resources.tools
+            or loaded_resources.mcps
+        ):
             self._add_loaded_resources_collapsible(loaded_resources)
 
         # Process any queued inputs

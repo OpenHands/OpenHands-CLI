@@ -96,7 +96,7 @@ def show_help(scroll_view: VerticalScroll) -> None:
 def show_skills(
     scroll_view: VerticalScroll, loaded_resources: LoadedResourcesInfo | None
 ) -> None:
-    """Display loaded skills, hooks, and tools information in the scroll view.
+    """Display loaded skills, hooks, tools, and MCPs information in the scroll view.
 
     Args:
         scroll_view: The VerticalScroll widget to mount skills content to
@@ -146,10 +146,26 @@ def show_skills(
                 lines.append(f"  • {tool.name}{desc}")
             lines.append("")
 
+        if loaded_resources.mcps:
+            lines.append(
+                f"[{primary}]MCPs ({loaded_resources.mcps_count}):[/{primary}]"
+            )
+            for mcp in loaded_resources.mcps:
+                transport = (
+                    f" [{secondary}]({mcp.transport})[/{secondary}]"
+                    if mcp.transport
+                    else ""
+                )
+                lines.append(f"  • {mcp.name}{transport}")
+            lines.append("")
+
         if not (
-            loaded_resources.skills or loaded_resources.hooks or loaded_resources.tools
+            loaded_resources.skills
+            or loaded_resources.hooks
+            or loaded_resources.tools
+            or loaded_resources.mcps
         ):
-            lines.append("[dim]No skills, hooks, or tools loaded.[/dim]")
+            lines.append("[dim]No skills, hooks, tools, or MCPs loaded.[/dim]")
 
         skills_text = "\n".join(lines)
 

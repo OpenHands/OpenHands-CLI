@@ -1,7 +1,7 @@
 """Loaded resources information for OpenHands CLI.
 
-This module contains dataclasses for tracking loaded skills, hooks, and tools
-that are activated in a conversation.
+This module contains dataclasses for tracking loaded skills, hooks, tools,
+and MCPs that are activated in a conversation.
 """
 
 from dataclasses import dataclass, field
@@ -35,12 +35,22 @@ class ToolInfo:
 
 
 @dataclass
+class MCPInfo:
+    """Information about a loaded MCP server."""
+
+    name: str
+    transport: str | None = None
+    enabled: bool = True
+
+
+@dataclass
 class LoadedResourcesInfo:
-    """Information about loaded skills, hooks, and tools for a conversation."""
+    """Information about loaded skills, hooks, tools, and MCPs for a conversation."""
 
     skills: list[SkillInfo] = field(default_factory=list)
     hooks: list[HookInfo] = field(default_factory=list)
     tools: list[ToolInfo] = field(default_factory=list)
+    mcps: list[MCPInfo] = field(default_factory=list)
 
     @property
     def skills_count(self) -> int:
@@ -53,6 +63,10 @@ class LoadedResourcesInfo:
     @property
     def tools_count(self) -> int:
         return len(self.tools)
+
+    @property
+    def mcps_count(self) -> int:
+        return len(self.mcps)
 
     def get_summary(self) -> str:
         """Get a summary string of loaded resources."""
@@ -68,6 +82,10 @@ class LoadedResourcesInfo:
         if self.tools_count > 0:
             parts.append(
                 f"{self.tools_count} tool{'s' if self.tools_count != 1 else ''}"
+            )
+        if self.mcps_count > 0:
+            parts.append(
+                f"{self.mcps_count} MCP{'s' if self.mcps_count != 1 else ''}"
             )
         return ", ".join(parts) if parts else "No resources loaded"
 
@@ -98,5 +116,11 @@ class LoadedResourcesInfo:
             for tool in self.tools:
                 desc = f" - {tool.description}" if tool.description else ""
                 lines.append(f"  • {tool.name}{desc}")
+
+        if self.mcps:
+            lines.append(f"\n[{primary}]MCPs ({self.mcps_count}):[/{primary}]")
+            for mcp in self.mcps:
+                transport = f" [{secondary}]({mcp.transport})[/{secondary}]" if mcp.transport else ""
+                lines.append(f"  • {mcp.name}{transport}")
 
         return "\n".join(lines) if lines else "No resources loaded"
