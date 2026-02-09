@@ -89,18 +89,43 @@ class RemoteConversationRunner(ConversationRunner):
     def _run_conversation_sync(self, message: Message, headless: bool = False) -> None:
         """Run the conversation synchronously in a thread.
 
-        Overrides base class to add workspace health check before sending messages.
+        Overrides base class to add workspace health check before sending messages
+        and handle cloud-specific errors gracefully.
 
         Args:
             message: The message to process
             headless: If True, print status to console
         """
+        import httpx
+
         # Ensure cloud workspace is still alive before sending
         if not self._ensure_workspace_alive():
             return
 
-        self.conversation.send_message(message)
-        self._execute_conversation(headless=headless)
+        try:
+            self.conversation.send_message(message)
+            self._execute_conversation(headless=headless)
+        except httpx.HTTPStatusError as e:
+            self._notification_callback(
+                "Cloud Error",
+                f"Server returned error {e.response.status_code}: {e.response.reason_phrase}",
+                "error",
+            )
+            self._update_run_status(False)
+        except httpx.RequestError as e:
+            self._notification_callback(
+                "Network Error",
+                f"Failed to communicate with cloud server: {e}",
+                "error",
+            )
+            self._update_run_status(False)
+        except Exception as e:
+            self._notification_callback(
+                "Unexpected Error",
+                f"{type(e).__name__}: {e}",
+                "error",
+            )
+            self._update_run_status(False)
 
     def _ensure_workspace_alive(self) -> bool:
         """Check if cloud workspace is alive and restart if needed.
