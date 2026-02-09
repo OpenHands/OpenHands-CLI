@@ -7,7 +7,6 @@ for collecting this information.
 
 from __future__ import annotations
 
-import importlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -38,7 +37,6 @@ class ToolInfo:
     """Information about a loaded tool."""
 
     name: str
-    description: str | None = None
 
 
 @dataclass
@@ -124,8 +122,6 @@ class LoadedResourcesInfo:
             lines.append(f"Tools ({self.tools_count}):")
             for tool in self.tools:
                 lines.append(f"  • {tool.name}")
-                if tool.description:
-                    lines.append(f"      {tool.description}")
 
         if self.mcps:
             if lines:
@@ -137,34 +133,6 @@ class LoadedResourcesInfo:
                     lines.append(f"      ({mcp.transport})")
 
         return "\n".join(lines) if lines else "No resources loaded"
-
-
-def _get_tool_description(tool_name: str) -> str | None:
-    """Get the description for a tool by importing its Action class.
-
-    Args:
-        tool_name: The name of the tool (e.g., 'terminal', 'file_editor')
-
-    Returns:
-        The tool description, or None if not found
-    """
-    # Convert tool_name to module path and Action class name
-    # e.g., 'file_editor' -> 'openhands.tools.file_editor', 'FileEditorAction'
-    module_path = f"openhands.tools.{tool_name}"
-    action_class_name = (
-        "".join(part.capitalize() for part in tool_name.split("_")) + "Action"
-    )
-
-    try:
-        module = importlib.import_module(module_path)
-        action_cls = getattr(module, action_class_name, None)
-        if action_cls:
-            schema = action_cls.model_json_schema()
-            return schema.get("description", action_cls.__doc__)
-    except Exception:
-        pass
-
-    return None
 
 
 def _collect_skills(agent: Agent) -> list[SkillInfo]:
@@ -187,12 +155,7 @@ def _collect_tools(agent: Agent) -> list[ToolInfo]:
     tools = []
     if agent.tools:
         for tool in agent.tools:
-            tools.append(
-                ToolInfo(
-                    name=tool.name,
-                    description=_get_tool_description(tool.name),
-                )
-            )
+            tools.append(ToolInfo(name=tool.name))
     return tools
 
 

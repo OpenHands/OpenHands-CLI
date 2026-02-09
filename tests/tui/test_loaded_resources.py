@@ -12,7 +12,6 @@ from openhands_cli.tui.content.resources import (
     MCPInfo,
     SkillInfo,
     ToolInfo,
-    _get_tool_description,
     collect_loaded_resources,
 )
 from openhands_cli.tui.core.commands import show_skills
@@ -89,7 +88,7 @@ class TestLoadedResourcesInfo:
         """Test LoadedResourcesInfo with only tools."""
         info = LoadedResourcesInfo(
             tools=[
-                ToolInfo(name="tool1", description="First tool"),
+                ToolInfo(name="tool1"),
                 ToolInfo(name="tool2"),
             ]
         )
@@ -162,7 +161,7 @@ class TestLoadedResourcesInfo:
                 SkillInfo(name="skill1", description="First skill", source="project"),
             ],
             hooks=[HookInfo(hook_type="pre_tool_use", count=2)],
-            tools=[ToolInfo(name="tool1", description="First tool")],
+            tools=[ToolInfo(name="tool1")],
             mcps=[MCPInfo(name="mcp1", transport="stdio")],
         )
         details = info.get_details()
@@ -176,7 +175,6 @@ class TestLoadedResourcesInfo:
         assert "pre_tool_use: 2" in details
         assert "Tools (1):" in details
         assert "tool1" in details
-        assert "First tool" in details
         assert "MCPs (1):" in details
         assert "mcp1" in details
         assert "(stdio)" in details
@@ -225,13 +223,6 @@ class TestToolInfo:
         """Test ToolInfo with basic attributes."""
         tool = ToolInfo(name="test_tool")
         assert tool.name == "test_tool"
-        assert tool.description is None
-
-    def test_tool_info_full(self):
-        """Test ToolInfo with all attributes."""
-        tool = ToolInfo(name="test_tool", description="A test tool")
-        assert tool.name == "test_tool"
-        assert tool.description == "A test tool"
 
 
 class TestMCPInfo:
@@ -271,7 +262,7 @@ class TestShowSkillsCommand:
                 SkillInfo(name="skill2", source="project"),
             ],
             hooks=[HookInfo(hook_type="pre_tool_use", count=2)],
-            tools=[ToolInfo(name="tool1", description="First tool")],
+            tools=[ToolInfo(name="tool1")],
             mcps=[MCPInfo(name="mcp1", transport="stdio")],
         )
 
@@ -458,27 +449,6 @@ class TestSkillsCommandInApp:
                 assert call_args[0][1] is None
 
 
-class TestGetToolDescription:
-    """Tests for _get_tool_description function."""
-
-    def test_get_tool_description_terminal(self):
-        """Test getting description for terminal tool."""
-        desc = _get_tool_description("terminal")
-        assert desc is not None
-        assert "bash" in desc.lower() or "command" in desc.lower()
-
-    def test_get_tool_description_file_editor(self):
-        """Test getting description for file_editor tool."""
-        desc = _get_tool_description("file_editor")
-        assert desc is not None
-        assert "file" in desc.lower() or "editor" in desc.lower()
-
-    def test_get_tool_description_unknown(self):
-        """Test getting description for unknown tool returns None."""
-        desc = _get_tool_description("unknown_tool_xyz")
-        assert desc is None
-
-
 class TestCollectLoadedResources:
     """Tests for collect_loaded_resources function."""
 
@@ -509,9 +479,6 @@ class TestCollectLoadedResources:
         assert len(resources.tools) == 2
         assert resources.tools[0].name == "terminal"
         assert resources.tools[1].name == "file_editor"
-        # Tool descriptions should be populated
-        assert resources.tools[0].description is not None
-        assert resources.tools[1].description is not None
 
     def test_collect_loaded_resources_with_skills(self):
         """Test collect_loaded_resources with skills in agent context."""

@@ -127,8 +127,6 @@ No resources information available.
             lines.append(f"Tools ({loaded_resources.tools_count}):")
             for tool in loaded_resources.tools:
                 lines.append(f"  • {tool.name}")
-                if tool.description:
-                    lines.append(f"      {tool.description}")
             lines.append("")
 
         if loaded_resources.mcps:
