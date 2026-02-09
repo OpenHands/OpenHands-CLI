@@ -132,6 +132,7 @@ class TestConfirmationMode:
     6. User types LOW risk action - auto-proceeds (no confirmation with ConfirmRisky)
     """
 
+    # Use `indirect` to pass 'confirmation_mode' to the fixture, not the test
     @pytest.mark.parametrize(
         "mock_llm_with_trajectory", ["confirmation_mode"], indirect=True
     )
