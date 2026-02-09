@@ -302,7 +302,7 @@ class CollapsibleNavigationMixin:
 
     Apps that contain Collapsible widgets can use this mixin to handle
     arrow key navigation between cells. The app must have a container
-    with id="main_display" containing the Collapsible widgets.
+    with id="scroll_view" containing the Collapsible widgets.
 
     Usage:
         class MyApp(CollapsibleNavigationMixin, App):
@@ -320,8 +320,8 @@ class CollapsibleNavigationMixin:
         event.stop()
 
         # Get all collapsibles as a list for index-based navigation
-        main_display = self.query_one("#main_display")
-        collapsibles = list(main_display.query(Collapsible))  # type: ignore[union-attr]
+        scroll_view = self.query_one("#scroll_view")
+        collapsibles = list(scroll_view.query(Collapsible))  # type: ignore[union-attr]
         if not collapsibles:
             return
 
@@ -329,7 +329,7 @@ class CollapsibleNavigationMixin:
         try:
             current_index = collapsibles.index(event.collapsible)
         except ValueError:
-            # Collapsible not in list (shouldn't happen, but be safe)
+            # Collapsible not in list (this shouldn't happen)
             return
 
         # Calculate target index
