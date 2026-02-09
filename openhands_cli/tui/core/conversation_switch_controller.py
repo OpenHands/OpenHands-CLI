@@ -93,6 +93,7 @@ class ConversationSwitchController:
         self, error: Exception, previous_id: uuid.UUID | None
     ) -> None:
         if previous_id is not None:
+            # Try to restore previous runner, ignore if it fails
             self._runners.get_or_create(previous_id)
 
         self._state.set_conversation_id(previous_id)
@@ -109,7 +110,12 @@ class ConversationSwitchController:
         self._state.reset_conversation_state()
 
         self._runners.clear_current()
-        self._runners.get_or_create(target_id)
+        runner = self._runners.get_or_create(target_id)
+
+        # If runner creation failed (e.g., auth error), abort the switch
+        if runner is None:
+            self._state.set_switch_confirmation_target(None)
+            return
 
         self._state.finish_switching(target_id)
         self._state.set_switch_confirmation_target(None)

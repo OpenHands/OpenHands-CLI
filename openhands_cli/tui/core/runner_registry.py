@@ -40,14 +40,30 @@ class RunnerRegistry:
     def clear_current(self) -> None:
         self._current_runner = None
 
-    def get_or_create(self, conversation_id: uuid.UUID) -> ConversationRunner:
+    def get_or_create(self, conversation_id: uuid.UUID) -> ConversationRunner | None:
+        """Get or create a conversation runner.
+
+        Returns:
+            The conversation runner, or None if creation failed (e.g., auth error).
+        """
+        from openhands_cli.setup import CloudConversationError
+
         runner = self._runners.get(conversation_id)
         if runner is None:
-            runner = self._factory.create(
-                conversation_id,
-                message_pump=self._message_pump,
-                notification_callback=self._notification_callback,
-            )
+            try:
+                runner = self._factory.create(
+                    conversation_id,
+                    message_pump=self._message_pump,
+                    notification_callback=self._notification_callback,
+                )
+            except CloudConversationError as e:
+                self._notification_callback(
+                    "Authentication Error",
+                    str(e),
+                    "error",
+                )
+                return None
+
             self._runners[conversation_id] = runner
 
         if runner.conversation is not None:

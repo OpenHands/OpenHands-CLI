@@ -33,6 +33,11 @@ class UserMessageController:
 
         runner = self._runners.get_or_create(self._state.conversation_id)
 
+        # Guard: runner creation failed (e.g., authentication error)
+        # The notification has already been shown by RunnerRegistry
+        if runner is None:
+            return
+
         # Render user message (also dismisses pending feedback widgets)
         runner.visualizer.render_user_message(content)
 

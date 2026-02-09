@@ -185,6 +185,20 @@ def main() -> None:
                     "(and optionally TTY_COMPATIBLE=1)."
                 )
 
+            # Ensure user is authenticated before starting cloud mode
+            from openhands_cli.auth.login_command import run_login_command
+
+            server_url = getattr(args, "server_url", None) or os.getenv(
+                "OPENHANDS_CLOUD_URL", "https://app.all-hands.dev"
+            )
+            if not run_login_command(server_url):
+                console.print(
+                    "Authentication required for cloud mode. "
+                    "Please run 'openhands login' first.",
+                    style=OPENHANDS_THEME.error,
+                )
+                sys.exit(1)
+
             # Handle cloud resume logic
             resume_id = None
             if hasattr(args, "resume") and args.resume is not None:
@@ -205,7 +219,6 @@ def main() -> None:
 
                 from openhands_cli.cloud.utils import fetch_cloud_sandbox_id
 
-                server_url = getattr(args, "server_url", None) or ""
                 sandbox_id = asyncio.run(
                     fetch_cloud_sandbox_id(server_url, resume_id)
                 )
@@ -233,7 +246,7 @@ def main() -> None:
                 json_mode=getattr(args, "json", False)
                 and getattr(args, "headless", False),
                 cloud=True,
-                server_url=getattr(args, "server_url", None),
+                server_url=server_url,
                 sandbox_id=sandbox_id,
             )
             if conversation_id is None:
