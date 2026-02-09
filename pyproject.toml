@@ -4,7 +4,7 @@ requires = [ "hatchling>=1.25" ]
 
 [project]
 name = "openhands"
-version = "1.11.0"
+version = "1.12.0"
 description = "OpenHands CLI - Terminal User Interface for OpenHands AI Agent"
 readme = "README.md"
 license = { text = "MIT" }
@@ -16,9 +16,9 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-  "openhands-sdk==1.10.0",
-  "openhands-tools==1.10.0",
-  "openhands-workspace==1.9.0",
+  "openhands-sdk==1.11.1",
+  "openhands-tools==1.11.1",
+  "openhands-workspace==1.11.1",
   "prompt-toolkit>=3",
   "rich<14.3.0",
   "textual>=0.79.0",

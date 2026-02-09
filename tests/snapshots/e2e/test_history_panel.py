@@ -59,7 +59,10 @@ async def _run_first_conversation(pilot: "Pilot") -> None:
 
     # Ensure consistent scroll position by scrolling to end
     # This makes the snapshot deterministic across different environments
-    await pilot.press("end")
+    # Use scroll_end directly on the scroll view instead of pilot.press("end")
+    # which may be captured by the focused input widget
+    scroll_view = pilot.app.query_one("#scroll_view")
+    scroll_view.scroll_end(animate=False)
     await pilot.wait_for_scheduled_animations()
 
 

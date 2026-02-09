@@ -82,9 +82,7 @@ class LoadedResourcesInfo:
                 f"{self.tools_count} tool{'s' if self.tools_count != 1 else ''}"
             )
         if self.mcps_count > 0:
-            parts.append(
-                f"{self.mcps_count} MCP{'s' if self.mcps_count != 1 else ''}"
-            )
+            parts.append(f"{self.mcps_count} MCP{'s' if self.mcps_count != 1 else ''}")
         return ", ".join(parts) if parts else "No resources loaded"
 
     def get_details(self) -> str:

@@ -484,8 +484,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Collect MCP info
         try:
+            from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
+
             from openhands_cli.mcp.mcp_utils import list_enabled_servers
-            from fastmcp.mcp_config import StdioMCPServer, RemoteMCPServer
 
             enabled_servers = list_enabled_servers()
             for name, server in enabled_servers.items():
