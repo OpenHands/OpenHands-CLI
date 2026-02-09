@@ -586,15 +586,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         return pyperclip_success
 
     def action_pause_conversation(self) -> None:
-        """Esc: close history panel if open, else pause the conversation."""
-        from textual.css.query import NoMatches
-
-        try:
-            self.query_one(HistorySidePanel)
-            self.action_toggle_history()
-            return
-        except NoMatches:
-            pass
+        """Action to handle Esc key binding - pause the running conversation."""
         # Post to ConversationManager to pause
         self.conversation_manager.post_message(PauseConversation())
 

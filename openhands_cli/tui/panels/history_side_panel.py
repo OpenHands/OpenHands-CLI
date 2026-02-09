@@ -258,6 +258,10 @@ class HistorySidePanel(Container):
         if event.button.id == "history-close-btn":
             self.remove()
 
+    def key_escape(self) -> None:
+        """Handle Escape key: close the history panel."""
+        self.remove()
+
     def refresh_content(self) -> None:
         """Reload conversations and render the list."""
         self._local_rows = self._store.list_conversations()
