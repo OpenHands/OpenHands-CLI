@@ -15,6 +15,19 @@ from openhands.sdk.security.confirmation_policy import (
 )
 
 
+# Policy display names for notifications
+POLICY_DISPLAY_NAMES: dict[type[ConfirmationPolicyBase], str] = {
+    NeverConfirm: "Always approve actions (no confirmation)",
+    AlwaysConfirm: "Confirm every action",
+    ConfirmRisky: "Confirm high-risk actions only",
+}
+
+
+def get_policy_display_name(policy: ConfirmationPolicyBase) -> str:
+    """Get a human-readable display name for a confirmation policy."""
+    return POLICY_DISPLAY_NAMES.get(type(policy), "Custom policy")
+
+
 class ConfirmationSettingsModal(ModalScreen):
     """Modal screen for selecting confirmation settings."""
 
@@ -115,9 +128,15 @@ class ConfirmationSettingsModal(ModalScreen):
         else:
             return  # Unknown selection
 
-        # Dismiss the modal and call the callback
+        # Dismiss the modal first
         self.dismiss()
+
+        # Call the callback to set the policy
         self.on_policy_selected(policy)
+
+        # Show notification
+        policy_name = get_policy_display_name(policy)
+        self.app.notify(f"Confirmation policy set to: {policy_name}")
 
     def key_escape(self) -> None:
         """Handle Escape key to close modal without changes."""
