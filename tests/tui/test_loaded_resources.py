@@ -129,7 +129,7 @@ class TestLoadedResourcesInfo:
         assert "2 MCPs" in info_multiple_mcps.get_summary()
 
     def test_get_details(self):
-        """Test get_details returns formatted string with markdown formatting."""
+        """Test get_details returns formatted string as plain text with nested bullets."""
         info = LoadedResourcesInfo(
             skills=[
                 SkillInfo(name="skill1", description="First skill", source="project"),
@@ -144,7 +144,7 @@ class TestLoadedResourcesInfo:
         assert "Skills (1):" in details
         assert "skill1" in details
         assert "First skill" in details
-        assert "project" in details
+        assert "(project)" in details
         assert "Hooks (2):" in details
         assert "pre_tool_use: 2" in details
         assert "Tools (1):" in details
@@ -152,11 +152,11 @@ class TestLoadedResourcesInfo:
         assert "First tool" in details
         assert "MCPs (1):" in details
         assert "mcp1" in details
-        assert "stdio" in details
+        assert "(stdio)" in details
 
-        # Check that markdown formatting is used
-        assert "**Skills" in details
-        assert "*(project)*" in details
+        # Check that plain text formatting is used (no markdown)
+        assert "**" not in details
+        assert "*(" not in details
 
 
 class TestSkillInfo:
@@ -290,8 +290,8 @@ class TestShowSkillsCommand:
 
         assert "No skills, hooks, tools, or MCPs loaded" in skills_text
 
-    def test_show_skills_uses_markdown_formatting(self):
-        """Test that show_skills uses markdown formatting."""
+    def test_show_skills_uses_plain_text_formatting(self):
+        """Test that show_skills uses plain text formatting."""
         mock_main_display = mock.MagicMock(spec=VerticalScroll)
 
         loaded_resources = LoadedResourcesInfo(
@@ -303,8 +303,9 @@ class TestShowSkillsCommand:
         skills_widget = mock_main_display.mount.call_args[0][0]
         skills_text = skills_widget.content
 
-        # Should use markdown formatting
-        assert "**Skills" in skills_text
+        # Should use plain text formatting (no markdown)
+        assert "Skills (1):" in skills_text
+        assert "**" not in skills_text
 
     def test_show_skills_with_mcps_only(self):
         """Test show_skills displays MCPs correctly."""

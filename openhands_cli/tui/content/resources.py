@@ -86,31 +86,41 @@ class LoadedResourcesInfo:
         return ", ".join(parts) if parts else "No resources loaded"
 
     def get_details(self) -> str:
-        """Get detailed information about loaded resources with markdown formatting."""
+        """Get detailed information about loaded resources as plain text."""
         lines = []
 
         if self.skills:
-            lines.append(f"**Skills ({self.skills_count}):**")
+            lines.append(f"Skills ({self.skills_count}):")
             for skill in self.skills:
-                desc = f" - {skill.description}" if skill.description else ""
-                source = f" *({skill.source})*" if skill.source else ""
-                lines.append(f"  • {skill.name}{desc}{source}")
+                lines.append(f"  • {skill.name}")
+                if skill.description:
+                    lines.append(f"      {skill.description}")
+                if skill.source:
+                    lines.append(f"      ({skill.source})")
 
         if self.hooks:
-            lines.append(f"\n**Hooks ({self.hooks_count}):**")
+            if lines:
+                lines.append("")
+            lines.append(f"Hooks ({self.hooks_count}):")
             for hook in self.hooks:
                 lines.append(f"  • {hook.hook_type}: {hook.count}")
 
         if self.tools:
-            lines.append(f"\n**Tools ({self.tools_count}):**")
+            if lines:
+                lines.append("")
+            lines.append(f"Tools ({self.tools_count}):")
             for tool in self.tools:
-                desc = f" - {tool.description}" if tool.description else ""
-                lines.append(f"  • {tool.name}{desc}")
+                lines.append(f"  • {tool.name}")
+                if tool.description:
+                    lines.append(f"      {tool.description}")
 
         if self.mcps:
-            lines.append(f"\n**MCPs ({self.mcps_count}):**")
+            if lines:
+                lines.append("")
+            lines.append(f"MCPs ({self.mcps_count}):")
             for mcp in self.mcps:
-                transport = f" *({mcp.transport})*" if mcp.transport else ""
-                lines.append(f"  • {mcp.name}{transport}")
+                lines.append(f"  • {mcp.name}")
+                if mcp.transport:
+                    lines.append(f"      ({mcp.transport})")
 
         return "\n".join(lines) if lines else "No resources loaded"
