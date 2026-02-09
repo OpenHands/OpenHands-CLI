@@ -100,7 +100,8 @@ def show_skills(
     if loaded_resources is None:
         skills_text = """
 Loaded Resources
-No resources information available.
+No resources information available yet.
+Send a message to start a conversation and load resources.
 """
     else:
         # Build the skills text

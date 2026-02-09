@@ -598,13 +598,57 @@ class ConversationVisualizer(ConversationVisualizerBase):
             border_color=border_color,
         )
 
+    def _create_system_prompt_collapsible(
+        self, event: SystemPromptEvent
+    ) -> Collapsible | None:
+        """Create a collapsible widget showing loaded resources from SystemPromptEvent.
+
+        This extracts skills, tools, MCPs, and hooks information from the
+        SystemPromptEvent and displays them in a collapsible widget.
+
+        Args:
+            event: The SystemPromptEvent containing tools and system prompt
+
+        Returns:
+            A Collapsible widget showing loaded resources, or None if no resources
+        """
+        from openhands_cli.locations import get_work_dir
+        from openhands_cli.tui.content.resources import (
+            collect_resources_from_system_prompt,
+        )
+
+        # Extract resources from the SystemPromptEvent
+        resources = collect_resources_from_system_prompt(
+            event=event,
+            working_dir=get_work_dir(),
+        )
+
+        # Store resources in the app for later use (e.g., /skills command)
+        self._app._loaded_resources = resources
+
+        # Don't show collapsible if no resources
+        if not resources.has_resources():
+            return None
+
+        # Build the collapsible content
+        summary = resources.get_summary()
+        details = resources.get_details()
+
+        return Collapsible(
+            details,
+            title=f"📦 Loaded: {summary}",
+            collapsed=True,
+            id="loaded_resources_collapsible",
+            classes="loaded-resources-collapsible",
+        )
+
     def _create_event_widget(self, event: Event) -> "Widget | None":
         """Create a widget for the event - either plain text or collapsible."""
         content = event.visualize
 
-        # Don't emit system prompt in CLI
+        # Handle SystemPromptEvent - create a collapsible showing loaded resources
         if isinstance(event, SystemPromptEvent):
-            return None
+            return self._create_system_prompt_collapsible(event)
         # Don't emit condensation request events (internal events)
         elif isinstance(event, CondensationRequest):
             return None
@@ -689,11 +733,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         agent_prefix = self._get_agent_prefix()
 
-        # Don't emit system prompt in CLI
-        if isinstance(event, SystemPromptEvent):
-            return None
         # Don't emit condensation request events (internal events)
-        elif isinstance(event, CondensationRequest):
+        if isinstance(event, CondensationRequest):
             return None
         elif isinstance(event, ActionEvent):
             # Build title using new format with agent prefix

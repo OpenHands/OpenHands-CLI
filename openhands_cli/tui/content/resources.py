@@ -2,7 +2,7 @@
 
 This module contains dataclasses for tracking loaded skills, hooks, tools,
 and MCPs that are activated in a conversation, as well as utility functions
-for collecting this information.
+for collecting this information from SystemPromptEvent.
 """
 
 from __future__ import annotations
@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from openhands.sdk import Agent
+    from openhands.sdk.event import SystemPromptEvent
+    from openhands.sdk.tool import ToolDefinition
 
 
 @dataclass
@@ -243,3 +245,111 @@ def collect_loaded_resources(
     resources.mcps = _collect_mcps()
 
     return resources
+
+
+def _is_mcp_tool(tool: ToolDefinition) -> bool:
+    """Check if a tool is an MCP tool.
+
+    Args:
+        tool: The tool definition to check
+
+    Returns:
+        True if the tool is an MCP tool, False otherwise
+    """
+    try:
+        from openhands.sdk.mcp.tool import MCPToolDefinition
+
+        return isinstance(tool, MCPToolDefinition)
+    except ImportError:
+        return False
+
+
+def _get_mcp_server_name(tool: ToolDefinition) -> str | None:
+    """Get the MCP server name from a tool's meta field.
+
+    Args:
+        tool: The tool definition
+
+    Returns:
+        The MCP server name if available, None otherwise
+    """
+    if tool.meta and "mcp_server" in tool.meta:
+        return tool.meta["mcp_server"]
+    return None
+
+
+def collect_resources_from_system_prompt(
+    event: SystemPromptEvent,
+    working_dir: Path | str | None = None,
+) -> LoadedResourcesInfo:
+    """Extract loaded resources information from a SystemPromptEvent.
+
+    This function parses the SystemPromptEvent to extract information about
+    skills, hooks, tools, and MCPs that are activated for the conversation.
+
+    Args:
+        event: The SystemPromptEvent containing tools and system prompt
+        working_dir: The working directory to load hooks from
+
+    Returns:
+        LoadedResourcesInfo containing all extracted resource information
+    """
+    resources = LoadedResourcesInfo()
+
+    # Extract tools and MCPs from the tools list
+    mcp_servers: dict[str, MCPInfo] = {}
+
+    for tool in event.tools:
+        if _is_mcp_tool(tool):
+            # This is an MCP tool - group by server name
+            server_name = _get_mcp_server_name(tool)
+            if server_name and server_name not in mcp_servers:
+                mcp_servers[server_name] = MCPInfo(name=server_name, enabled=True)
+        # Add tool (both MCP and regular tools)
+        resources.tools.append(ToolInfo(name=tool.name))
+
+    # Add MCP servers
+    resources.mcps = list(mcp_servers.values())
+
+    # Extract skills from system prompt text
+    # Skills are typically mentioned in the system prompt
+    resources.skills = _extract_skills_from_system_prompt(event.system_prompt.text)
+
+    # Collect hooks from configuration
+    resources.hooks = _collect_hooks(working_dir)
+
+    return resources
+
+
+def _extract_skills_from_system_prompt(system_prompt: str) -> list[SkillInfo]:
+    """Extract skill information from the system prompt text.
+
+    Skills are typically listed in the system prompt in an <available_skills> section
+    or mentioned in the REPO_CONTEXT section.
+
+    Args:
+        system_prompt: The system prompt text
+
+    Returns:
+        List of SkillInfo objects extracted from the prompt
+    """
+    skills = []
+
+    # Look for <available_skills> section
+    import re
+
+    # Match skill entries in available_skills section
+    # Format: - skill_name: description
+    available_skills_match = re.search(
+        r"<available_skills>(.*?)</available_skills>", system_prompt, re.DOTALL
+    )
+    if available_skills_match:
+        skills_section = available_skills_match.group(1)
+        # Parse skill entries (format: - name: description)
+        skill_pattern = re.compile(r"^\s*-\s*([^:]+):\s*(.+)$", re.MULTILINE)
+        for match in skill_pattern.finditer(skills_section):
+            name = match.group(1).strip()
+            description = match.group(2).strip()
+            skills.append(SkillInfo(name=name, description=description))
+
+    return skills
