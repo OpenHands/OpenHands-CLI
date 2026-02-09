@@ -186,15 +186,20 @@ def main() -> None:
                 )
 
             # Ensure user is authenticated before starting cloud mode
-            from openhands_cli.auth.login_command import run_login_command
+            # Only runs OAuth if token doesn't exist or has expired
+            import asyncio
+
+            from openhands_cli.auth.utils import AuthenticationError, ensure_valid_auth
 
             server_url = getattr(args, "server_url", None) or os.getenv(
                 "OPENHANDS_CLOUD_URL", "https://app.all-hands.dev"
             )
-            if not run_login_command(server_url):
+            try:
+                asyncio.run(ensure_valid_auth(server_url))
+            except AuthenticationError as e:
                 console.print(
-                    "Authentication required for cloud mode. "
-                    "Please run 'openhands login' first.",
+                    f"Authentication failed: {e}. "
+                    "Please run 'openhands login' to authenticate.",
                     style=OPENHANDS_THEME.error,
                 )
                 sys.exit(1)
