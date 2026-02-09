@@ -12,8 +12,6 @@ from textual.containers import VerticalScroll
 from textual.widgets import Static
 from textual_autocomplete import DropdownItem
 
-from openhands_cli.theme import OPENHANDS_THEME
-
 
 if TYPE_CHECKING:
     from openhands_cli.tui.content.resources import LoadedResourcesInfo
@@ -68,23 +66,20 @@ def show_help(scroll_view: VerticalScroll) -> None:
     Args:
         scroll_view: The VerticalScroll widget to mount help content to
     """
-    primary = OPENHANDS_THEME.primary
-    secondary = OPENHANDS_THEME.secondary
+    help_text = """
+**OpenHands CLI Help**
+*Available commands:*
 
-    help_text = f"""
-[bold {primary}]OpenHands CLI Help[/bold {primary}]
-[dim]Available commands:[/dim]
+  **/help** - Display available commands
+  **/new** - Start a new conversation
+  **/history** - Toggle conversation history
+  **/confirm** - Configure confirmation settings
+  **/condense** - Condense conversation history
+  **/skills** - View loaded skills, hooks, and tools
+  **/feedback** - Send anonymous feedback about CLI
+  **/exit** - Exit the application
 
-  [{secondary}]/help[/{secondary}] - Display available commands
-  [{secondary}]/new[/{secondary}] - Start a new conversation
-  [{secondary}]/history[/{secondary}] - Toggle conversation history
-  [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
-  [{secondary}]/condense[/{secondary}] - Condense conversation history
-  [{secondary}]/skills[/{secondary}] - View loaded skills, hooks, and tools
-  [{secondary}]/feedback[/{secondary}] - Send anonymous feedback about CLI
-  [{secondary}]/exit[/{secondary}] - Exit the application
-
-[dim]Tips:[/dim]
+*Tips:*
   • Type / and press Tab to see command suggestions
   • Use arrow keys to navigate through suggestions
   • Press Enter to select a command
@@ -102,60 +97,41 @@ def show_skills(
         scroll_view: The VerticalScroll widget to mount skills content to
         loaded_resources: Information about loaded resources, or None if not available
     """
-    primary = OPENHANDS_THEME.primary
-    secondary = OPENHANDS_THEME.secondary
-
     if loaded_resources is None:
-        skills_text = f"""
-[bold {primary}]Loaded Resources[/bold {primary}]
-[dim]No resources information available.[/dim]
+        skills_text = """
+**Loaded Resources**
+*No resources information available.*
 """
     else:
         # Build the skills text
-        lines = [f"\n[bold {primary}]Loaded Resources[/bold {primary}]"]
-        lines.append(f"[dim]Summary: {loaded_resources.get_summary()}[/dim]\n")
+        lines = ["\n**Loaded Resources**"]
+        lines.append(f"*Summary: {loaded_resources.get_summary()}*\n")
 
         if loaded_resources.skills:
-            lines.append(
-                f"[{primary}]Skills ({loaded_resources.skills_count}):[/{primary}]"
-            )
+            lines.append(f"**Skills ({loaded_resources.skills_count}):**")
             for skill in loaded_resources.skills:
                 desc = f" - {skill.description}" if skill.description else ""
-                source = (
-                    f" [{secondary}]({skill.source})[/{secondary}]"
-                    if skill.source
-                    else ""
-                )
+                source = f" *({skill.source})*" if skill.source else ""
                 lines.append(f"  • {skill.name}{desc}{source}")
             lines.append("")
 
         if loaded_resources.hooks:
-            lines.append(
-                f"[{primary}]Hooks ({loaded_resources.hooks_count}):[/{primary}]"
-            )
+            lines.append(f"**Hooks ({loaded_resources.hooks_count}):**")
             for hook in loaded_resources.hooks:
                 lines.append(f"  • {hook.hook_type}: {hook.count}")
             lines.append("")
 
         if loaded_resources.tools:
-            lines.append(
-                f"[{primary}]Tools ({loaded_resources.tools_count}):[/{primary}]"
-            )
+            lines.append(f"**Tools ({loaded_resources.tools_count}):**")
             for tool in loaded_resources.tools:
                 desc = f" - {tool.description}" if tool.description else ""
                 lines.append(f"  • {tool.name}{desc}")
             lines.append("")
 
         if loaded_resources.mcps:
-            lines.append(
-                f"[{primary}]MCPs ({loaded_resources.mcps_count}):[/{primary}]"
-            )
+            lines.append(f"**MCPs ({loaded_resources.mcps_count}):**")
             for mcp in loaded_resources.mcps:
-                transport = (
-                    f" [{secondary}]({mcp.transport})[/{secondary}]"
-                    if mcp.transport
-                    else ""
-                )
+                transport = f" *({mcp.transport})*" if mcp.transport else ""
                 lines.append(f"  • {mcp.name}{transport}")
             lines.append("")
 
@@ -165,7 +141,7 @@ def show_skills(
             or loaded_resources.tools
             or loaded_resources.mcps
         ):
-            lines.append("[dim]No skills, hooks, tools, or MCPs loaded.[/dim]")
+            lines.append("*No skills, hooks, tools, or MCPs loaded.*")
 
         skills_text = "\n".join(lines)
 

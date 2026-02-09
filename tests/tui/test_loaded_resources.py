@@ -6,7 +6,6 @@ from typing import cast
 import pytest
 from textual.containers import VerticalScroll
 
-from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.resources import (
     HookInfo,
     LoadedResourcesInfo,
@@ -130,7 +129,7 @@ class TestLoadedResourcesInfo:
         assert "2 MCPs" in info_multiple_mcps.get_summary()
 
     def test_get_details(self):
-        """Test get_details returns formatted string with theme colors."""
+        """Test get_details returns formatted string with markdown formatting."""
         info = LoadedResourcesInfo(
             skills=[
                 SkillInfo(name="skill1", description="First skill", source="project"),
@@ -139,7 +138,7 @@ class TestLoadedResourcesInfo:
             tools=[ToolInfo(name="tool1", description="First tool")],
             mcps=[MCPInfo(name="mcp1", transport="stdio")],
         )
-        details = info.get_details(theme=OPENHANDS_THEME)
+        details = info.get_details()
 
         # Check that details contain expected content
         assert "Skills (1):" in details
@@ -155,8 +154,9 @@ class TestLoadedResourcesInfo:
         assert "mcp1" in details
         assert "stdio" in details
 
-        # Check that theme colors are used
-        assert OPENHANDS_THEME.primary in details
+        # Check that markdown formatting is used
+        assert "**Skills" in details
+        assert "*(project)*" in details
 
 
 class TestSkillInfo:
@@ -290,8 +290,8 @@ class TestShowSkillsCommand:
 
         assert "No skills, hooks, tools, or MCPs loaded" in skills_text
 
-    def test_show_skills_uses_theme_colors(self):
-        """Test that show_skills uses OpenHands theme colors."""
+    def test_show_skills_uses_markdown_formatting(self):
+        """Test that show_skills uses markdown formatting."""
         mock_main_display = mock.MagicMock(spec=VerticalScroll)
 
         loaded_resources = LoadedResourcesInfo(
@@ -303,8 +303,8 @@ class TestShowSkillsCommand:
         skills_widget = mock_main_display.mount.call_args[0][0]
         skills_text = skills_widget.content
 
-        # Should use OpenHands theme colors
-        assert OPENHANDS_THEME.primary in skills_text
+        # Should use markdown formatting
+        assert "**Skills" in skills_text
 
     def test_show_skills_with_mcps_only(self):
         """Test show_skills displays MCPs correctly."""

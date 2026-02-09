@@ -117,8 +117,6 @@ class TestCommands:
 
     def test_show_help_uses_theme_colors(self):
         """Test that show_help uses OpenHands theme colors."""
-        from openhands_cli.theme import OPENHANDS_THEME
-
         mock_main_display = mock.MagicMock(spec=VerticalScroll)
 
         show_help(mock_main_display)
@@ -126,18 +124,16 @@ class TestCommands:
         help_widget = mock_main_display.mount.call_args[0][0]
         help_text = help_widget.content
 
-        # Should use OpenHands theme colors
-        assert OPENHANDS_THEME.primary in help_text  # Primary color (yellow)
-        assert OPENHANDS_THEME.secondary in help_text  # Secondary color (white)
+        # Should use markdown formatting instead of theme colors
+        assert "**" in help_text  # Bold markdown
+        assert "*" in help_text  # Italic markdown
 
         # Should not use generic color names
         assert "yellow" not in help_text.lower()
         assert "white" not in help_text.lower()
 
     def test_show_help_formatting(self):
-        """Test that show_help has proper Rich markup formatting."""
-        from openhands_cli.theme import OPENHANDS_THEME
-
+        """Test that show_help has proper markdown formatting."""
         mock_main_display = mock.MagicMock(spec=VerticalScroll)
 
         show_help(mock_main_display)
@@ -145,12 +141,11 @@ class TestCommands:
         help_widget = mock_main_display.mount.call_args[0][0]
         help_text = help_widget.content
 
-        # Check for proper Rich markup with theme colors
-        assert f"[bold {OPENHANDS_THEME.primary}]" in help_text
-        assert f"[/bold {OPENHANDS_THEME.primary}]" in help_text
-        assert f"[{OPENHANDS_THEME.secondary}]" in help_text
-        assert f"[/{OPENHANDS_THEME.secondary}]" in help_text
-        assert "[dim]" in help_text
+        # Check for proper markdown formatting
+        assert "**OpenHands CLI Help**" in help_text
+        assert "*Available commands:*" in help_text
+        assert "**/help**" in help_text
+        assert "*Tips:*" in help_text
 
         # Should start and end with newlines for proper spacing
         assert help_text.startswith("\n")

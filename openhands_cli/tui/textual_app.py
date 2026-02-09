@@ -525,7 +525,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     ) -> None:
         """Add a collapsible widget showing loaded resources to the scroll view."""
         summary = loaded_resources.get_summary()
-        details = loaded_resources.get_details(theme=OPENHANDS_THEME)
+        details = loaded_resources.get_details()
 
         # Create collapsible with summary as title and details as content
         collapsible = Collapsible(

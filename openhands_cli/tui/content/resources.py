@@ -6,8 +6,6 @@ and MCPs that are activated in a conversation.
 
 from dataclasses import dataclass, field
 
-from textual.theme import Theme
-
 
 @dataclass
 class SkillInfo:
@@ -89,38 +87,32 @@ class LoadedResourcesInfo:
             )
         return ", ".join(parts) if parts else "No resources loaded"
 
-    def get_details(self, *, theme: Theme) -> str:
-        """Get detailed information about loaded resources with Rich markup."""
+    def get_details(self) -> str:
+        """Get detailed information about loaded resources with markdown formatting."""
         lines = []
-        primary = theme.primary
-        secondary = theme.secondary
 
         if self.skills:
-            lines.append(f"[{primary}]Skills ({self.skills_count}):[/{primary}]")
+            lines.append(f"**Skills ({self.skills_count}):**")
             for skill in self.skills:
                 desc = f" - {skill.description}" if skill.description else ""
-                source = (
-                    f" [{secondary}]({skill.source})[/{secondary}]"
-                    if skill.source
-                    else ""
-                )
+                source = f" *({skill.source})*" if skill.source else ""
                 lines.append(f"  • {skill.name}{desc}{source}")
 
         if self.hooks:
-            lines.append(f"\n[{primary}]Hooks ({self.hooks_count}):[/{primary}]")
+            lines.append(f"\n**Hooks ({self.hooks_count}):**")
             for hook in self.hooks:
                 lines.append(f"  • {hook.hook_type}: {hook.count}")
 
         if self.tools:
-            lines.append(f"\n[{primary}]Tools ({self.tools_count}):[/{primary}]")
+            lines.append(f"\n**Tools ({self.tools_count}):**")
             for tool in self.tools:
                 desc = f" - {tool.description}" if tool.description else ""
                 lines.append(f"  • {tool.name}{desc}")
 
         if self.mcps:
-            lines.append(f"\n[{primary}]MCPs ({self.mcps_count}):[/{primary}]")
+            lines.append(f"\n**MCPs ({self.mcps_count}):**")
             for mcp in self.mcps:
-                transport = f" [{secondary}]({mcp.transport})[/{secondary}]" if mcp.transport else ""
+                transport = f" *({mcp.transport})*" if mcp.transport else ""
                 lines.append(f"  • {mcp.name}{transport}")
 
         return "\n".join(lines) if lines else "No resources loaded"
