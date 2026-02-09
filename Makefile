@@ -52,7 +52,15 @@ install-dev:
 
 # Run tests
 test:
-	uv run pytest
+	uv run pytest --ignore=tests/snapshots
+
+test-snapshots:
+	uv run pytest tests/snapshots -v
+
+test-binary:
+	uv run pytest tui_e2e
+
+test-all: test test-snapshots
 
 lint:
 	uv run pre-commit run --all-files

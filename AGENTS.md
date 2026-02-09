@@ -32,7 +32,10 @@ This repository uses **uv** for dependency management and running tooling (such 
 - run the browser-served web app (Textual `textual-serve`): `openhands web`
 - run the Docker-based OpenHands GUI server: `openhands serve`
 - run the ACP entrypoint: `uv run openhands-acp`
-- run tests: `make test` (for faster runs: `uv run pytest -m "not integration"`; binary tests: `uv run pytest tui_e2e`)
+- run unit/integration tests: `make test` (for faster runs: `uv run pytest -m "not integration" --ignore=tests/snapshots`)
+- run snapshot tests (Textual UI): `make test-snapshots` (or `uv run pytest tests/snapshots -v`; use `--snapshot-update` when updating snapshots)
+- run binary tests: `make test-binary` (or `uv run pytest tui_e2e`)
+- run unit/integration + snapshot tests together: `make test-all`
 - build PyInstaller binaries: `./build.sh --install-pyinstaller`
 
 ## Development Guidelines
@@ -53,9 +56,12 @@ Prefer modern typing syntax (`X | None` over `Optional[X]`) in new code.
 - Type checking via `pyright` (`uv run pyright`); prefer type hints on new functions and public interfaces.
 
 ## Testing Guidelines
+- Unit/integration tests live under `tests/` (excluding `tests/snapshots`) and run via `make test`.
+- Snapshot tests live under `tests/snapshots/` and run via `make test-snapshots`.
+- Binary tests live under `tui_e2e/` and run via `make test-binary`.
 - Pytest discovery: files `test_*.py`, classes `Test*`, functions `test_*`. Use `@pytest.mark.integration` for costly flows.
 - Match test locations to implementation (`tests/` mirrors `openhands_cli/`); add fixtures in `tests/conftest.py` when shared.
-- Run `make test` before PRs.
+- Run `make test` before PRs; run snapshot/binary tests when relevant to the change.
 
 ### Binary Tests with Mock LLM
 - Binary tests in `tui_e2e/` can use `mock_llm_server.py` for deterministic testing without real LLM calls.
@@ -69,7 +75,8 @@ The CLI uses [pytest-textual-snapshot](https://github.com/Textualize/pytest-text
 
 ```bash
 # Run all snapshot tests
-uv run pytest tests/snapshots/ -v
+make test-snapshots
+# or: uv run pytest tests/snapshots/ -v
 
 # Update snapshots when intentional UI changes are made
 uv run pytest tests/snapshots/ --snapshot-update
@@ -170,16 +177,16 @@ To view the generated SVG snapshots in a browser:
 - Before opening a PR, run this verification flow (and include the exact commands run in the PR description):
   1. `make lint`
   2. `make test`
-  3. If you touched ACP / binary executable code (e.g., `tui_e2e/`, `openhands_cli/acp_impl/`, `openhands_cli/mcp/`, auth/connection flow): `uv run pytest tui_e2e`
-  4. If you touched TUI code (e.g., `openhands_cli/tui/`, widgets, styles, layout): `uv run pytest tests/snapshots -v` (use `--snapshot-update` only for intentional UI changes)
+  3. If you touched ACP / binary executable code (e.g., `tui_e2e/`, `openhands_cli/acp_impl/`, `openhands_cli/mcp/`, auth/connection flow): `make test-binary`
+  4. If you touched TUI code (e.g., `openhands_cli/tui/`, widgets, styles, layout): `make test-snapshots` (use `--snapshot-update` only for intentional UI changes)
 
 #### PR submission checklist
 - [ ] Scope is minimal and focused on one change
 - [ ] Tests added/updated for behavior changes (or PR explains why not)
 - [ ] `make lint`
 - [ ] `make test`
-- [ ] (If ACP/binary executable touched) `uv run pytest tui_e2e`
-- [ ] (If TUI touched) snapshot tests run and snapshots updated/reviewed
+- [ ] (If ACP/binary executable touched) `make test-binary`
+- [ ] (If TUI touched) `make test-snapshots` run and snapshots updated/reviewed
 - [ ] PR description includes: what changed, why, commands run, and UI evidence (snapshots/screenshots)
 
 ## Security & Configuration Tips
