@@ -112,12 +112,11 @@ class RunnerFactory:
         *,
         message_pump: MessagePump,
         notification_callback: NotificationCallback,
-        visualizer: "ConversationVisualizer",
+        visualizer: ConversationVisualizer,
         event_callback: Callable[[Event], None] | None,
     ) -> ConversationRunner:
         """Create a local conversation runner."""
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
-        from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
         return ConversationRunner(
             conversation_id,
@@ -136,7 +135,7 @@ class RunnerFactory:
         *,
         message_pump: MessagePump,
         notification_callback: NotificationCallback,
-        visualizer: "ConversationVisualizer",
+        visualizer: ConversationVisualizer,
         event_callback: Callable[[Event], None] | None,
     ) -> ConversationRunner:
         """Create a remote conversation runner for cloud mode."""

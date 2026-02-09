@@ -208,7 +208,6 @@ def setup_cloud_conversation(
     import os
 
     from openhands.workspace import OpenHandsCloudWorkspace
-
     from openhands_cli.auth.token_storage import TokenStorage
 
     # Get API key from token storage

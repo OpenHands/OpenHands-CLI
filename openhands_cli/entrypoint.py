@@ -219,9 +219,7 @@ def main() -> None:
 
                 from openhands_cli.cloud.utils import fetch_cloud_sandbox_id
 
-                sandbox_id = asyncio.run(
-                    fetch_cloud_sandbox_id(server_url, resume_id)
-                )
+                sandbox_id = asyncio.run(fetch_cloud_sandbox_id(server_url, resume_id))
                 if sandbox_id is None:
                     console.print(
                         "Failed to fetch sandbox for conversation. "
