@@ -24,7 +24,7 @@ class TestLoginCommand:
         with patch(
             "openhands_cli.auth.login_command.fetch_user_data_after_oauth"
         ) as mock_fetch:
-            with patch("openhands_cli.auth.login_command._p") as mock_print:
+            with patch("openhands_cli.auth.login_command.console_print") as mock_print:
                 mock_fetch.return_value = {"llm_api_key": "llm-key", "settings": {}}
 
                 await _fetch_user_data_with_context(
@@ -47,7 +47,7 @@ class TestLoginCommand:
         with patch(
             "openhands_cli.auth.login_command.fetch_user_data_after_oauth"
         ) as mock_fetch:
-            with patch("openhands_cli.auth.login_command._p") as mock_print:
+            with patch("openhands_cli.auth.login_command.console_print") as mock_print:
                 mock_fetch.return_value = {"llm_api_key": "llm-key", "settings": {}}
 
                 await _fetch_user_data_with_context(
@@ -69,7 +69,7 @@ class TestLoginCommand:
         with patch(
             "openhands_cli.auth.login_command.fetch_user_data_after_oauth"
         ) as mock_fetch:
-            with patch("openhands_cli.auth.login_command._p") as mock_print:
+            with patch("openhands_cli.auth.login_command.console_print") as mock_print:
                 from openhands_cli.auth.api_client import ApiClientError
 
                 mock_fetch.side_effect = ApiClientError("API error")
@@ -98,7 +98,7 @@ class TestLoginCommand:
                 with patch(
                     "openhands_cli.auth.login_command._fetch_user_data_with_context"
                 ) as mock_fetch:
-                    with patch("openhands_cli.auth.login_command._p"):
+                    with patch("openhands_cli.auth.login_command.console_print"):
                         mock_storage = MagicMock()
                         mock_storage_class.return_value = mock_storage
                         mock_storage.get_api_key.return_value = "existing-api-key"
@@ -127,7 +127,7 @@ class TestLoginCommand:
                 with patch(
                     "openhands_cli.auth.login_command._fetch_user_data_with_context"
                 ) as mock_fetch:
-                    with patch("openhands_cli.auth.login_command._p"):
+                    with patch("openhands_cli.auth.login_command.console_print"):
                         mock_storage = MagicMock()
                         mock_storage_class.return_value = mock_storage
                         mock_storage.get_api_key.return_value = (
@@ -164,7 +164,7 @@ class TestLoginCommand:
             with patch(
                 "openhands_cli.auth.login_command.authenticate_with_device_flow"
             ) as mock_auth:
-                with patch("openhands_cli.auth.login_command._p") as mock_print:
+                with patch("openhands_cli.auth.login_command.console_print") as mock_print:
                     mock_storage = MagicMock()
                     mock_storage_class.return_value = mock_storage
                     mock_storage.get_api_key.return_value = None
@@ -193,7 +193,7 @@ class TestLoginCommand:
                 with patch(
                     "openhands_cli.auth.login_command._fetch_user_data_with_context"
                 ) as mock_fetch:
-                    with patch("openhands_cli.auth.login_command._p"):
+                    with patch("openhands_cli.auth.login_command.console_print"):
                         mock_storage = MagicMock()
                         mock_storage_class.return_value = mock_storage
                         mock_storage.get_api_key.return_value = None
@@ -230,7 +230,7 @@ class TestLoginCommand:
         server_url = "https://api.example.com"
 
         with patch("openhands_cli.auth.login_command.asyncio.run") as mock_run:
-            with patch("openhands_cli.auth.login_command._p") as mock_print:
+            with patch("openhands_cli.auth.login_command.console_print") as mock_print:
                 mock_run.side_effect = KeyboardInterrupt()
 
                 result = run_login_command(server_url)
@@ -264,7 +264,7 @@ class TestLoginCommand:
                 with patch(
                     "openhands_cli.auth.login_command._fetch_user_data_with_context"
                 ) as mock_fetch:
-                    with patch("openhands_cli.auth.login_command._p") as mock_print:
+                    with patch("openhands_cli.auth.login_command.console_print") as mock_print:
                         mock_storage = MagicMock()
                         mock_storage_class.return_value = mock_storage
                         mock_storage.get_api_key.return_value = None
