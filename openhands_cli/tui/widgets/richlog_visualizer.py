@@ -604,8 +604,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """Create a collapsible widget showing the system prompt from SystemPromptEvent.
 
         This displays the full system prompt content in a collapsible widget,
-        matching ACP's display format. The title shows "System Prompt" and the
-        content shows the full system prompt text.
+        matching ACP's display format. The title shows the number of tools loaded.
 
         Args:
             event: The SystemPromptEvent containing tools and system prompt
@@ -618,9 +617,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Build the collapsible content - show system prompt like ACP does
         content = format_system_prompt_content(event)
 
+        # Get tool count for title
+        tool_count = len(event.tools) if event.tools else 0
+        title = f"{tool_count} tool{'s' if tool_count != 1 else ''} loaded"
+
         return Collapsible(
             content,
-            title="📋 System Prompt",
+            title=title,
             collapsed=True,
             id="system_prompt_collapsible",
             classes="system-prompt-collapsible",
