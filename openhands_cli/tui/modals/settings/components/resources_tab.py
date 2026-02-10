@@ -10,11 +10,13 @@ from textual.containers import Container, VerticalScroll
 from textual.widgets import Static
 
 from openhands.sdk import Agent
-from openhands.sdk.hooks import HookConfig
 from openhands_cli.locations import get_work_dir
 from openhands_cli.stores import AgentStore
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.resources import extract_hook_commands
+from openhands_cli.tui.content.resources import (
+    LoadedResourcesInfo,
+    collect_loaded_resources,
+)
 
 
 class ResourcesTab(Container):
@@ -24,21 +26,20 @@ class ResourcesTab(Container):
         """Initialize the resources tab."""
         super().__init__(**kwargs)
         self._agent: Agent | None = None
-        self._hook_config: HookConfig | None = None
+        self._resources: LoadedResourcesInfo | None = None
         self._load_resources()
 
     def _load_resources(self) -> None:
-        """Load agent and hook configuration."""
+        """Load agent and resource information."""
         try:
             agent_store = AgentStore()
             self._agent = agent_store.load_from_disk()
         except Exception:
             self._agent = None
 
-        try:
-            self._hook_config = HookConfig.load(working_dir=get_work_dir())
-        except Exception:
-            self._hook_config = None
+        self._resources = collect_loaded_resources(
+            agent=self._agent, working_dir=get_work_dir()
+        )
 
     def compose(self) -> ComposeResult:
         """Compose the resources tab content."""
@@ -76,24 +77,13 @@ class ResourcesTab(Container):
         content_widget = self.query_one("#skills_content", Static)
         primary = OPENHANDS_THEME.primary
         secondary = OPENHANDS_THEME.secondary
-        warning = OPENHANDS_THEME.warning
 
-        if not self._agent:
-            content_widget.update(
-                f"[{warning}]Unable to load agent configuration[/{warning}]"
-            )
-            return
-
-        skills = []
-        if self._agent.agent_context and self._agent.agent_context.skills:
-            skills = self._agent.agent_context.skills
-
-        if not skills:
+        if not self._resources or not self._resources.skills:
             content_widget.update(f"[{secondary}]No skills loaded[/{secondary}]")
             return
 
         lines = []
-        for skill in skills:
+        for skill in self._resources.skills:
             desc = f" - {skill.description}" if skill.description else ""
             source = (
                 f" [{secondary}]({skill.source})[/{secondary}]" if skill.source else ""
@@ -107,36 +97,15 @@ class ResourcesTab(Container):
         content_widget = self.query_one("#hooks_content", Static)
         primary = OPENHANDS_THEME.primary
         secondary = OPENHANDS_THEME.secondary
-        warning = OPENHANDS_THEME.warning
 
-        if not self._hook_config:
-            content_widget.update(
-                f"[{warning}]Unable to load hook configuration[/{warning}]"
-            )
-            return
-
-        hook_types = [
-            ("pre_tool_use", self._hook_config.pre_tool_use),
-            ("post_tool_use", self._hook_config.post_tool_use),
-            ("user_prompt_submit", self._hook_config.user_prompt_submit),
-            ("session_start", self._hook_config.session_start),
-            ("session_end", self._hook_config.session_end),
-            ("stop", self._hook_config.stop),
-        ]
-
-        lines = []
-        for hook_type, hook_matchers in hook_types:
-            if hook_matchers:
-                commands = extract_hook_commands(hook_matchers)
-                if commands:
-                    commands_str = ", ".join(commands)
-                    lines.append(
-                        f"[{primary}]•[/{primary}] {hook_type}: {commands_str}"
-                    )
-
-        if not lines:
+        if not self._resources or not self._resources.hooks:
             content_widget.update(f"[{secondary}]No hooks loaded[/{secondary}]")
             return
+
+        lines = []
+        for hook in self._resources.hooks:
+            commands_str = ", ".join(hook.commands)
+            lines.append(f"[{primary}]•[/{primary}] {hook.hook_type}: {commands_str}")
 
         content_widget.update("\n".join(lines))
 
