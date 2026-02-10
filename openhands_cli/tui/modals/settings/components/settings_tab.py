@@ -96,9 +96,11 @@ class SettingsTab(Container):
 
                     # Max Tokens (optional)
                     with Container(classes="form_group"):
-                        yield Label("LLM Max Tokens (optional):", classes="form_label")
+                        yield Label(
+                            "LLM Max Input Tokens (optional):", classes="form_label"
+                        )
                         yield Input(
-                            placeholder="e.g., 2000",
+                            placeholder="e.g., 128000",
                             id="max_tokens_input",
                             classes="form_input",
                             disabled=True,

@@ -211,9 +211,9 @@ class SettingsScreen(ModalScreen):
             self.timeout_input.value = ""
 
         # Max tokens (optional) – show existing value if set
-        max_output = getattr(llm, "max_output_tokens", None)
-        if max_output is not None:
-            self.max_tokens_input.value = str(max_output)
+        max_input = getattr(llm, "max_input_tokens", None)
+        if max_input is not None:
+            self.max_tokens_input.value = str(max_input)
         else:
             self.max_tokens_input.value = ""
 

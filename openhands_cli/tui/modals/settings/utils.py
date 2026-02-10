@@ -35,7 +35,7 @@ class SettingsFormData(BaseModel):
     timeout: int | str | None = None
     max_tokens: int | str | None = None
     max_size: int | str | None = None
-    # New max tokens field (optional). Maps to LLM max_output_tokens.
+    # New max tokens field (optional). Maps to LLM max_input_tokens.
     # New max size for condenser (optional). Maps to LLMSummarizingCondenser max_size.
 
     # Whether the user wants memory condensation enabled
@@ -198,7 +198,7 @@ def save_settings(
             timeout=int(data.timeout)
             if isinstance(data.timeout, str)
             else data.timeout,
-            max_output_tokens=int(data.max_tokens)
+            max_input_tokens=int(data.max_tokens)
             if isinstance(data.max_tokens, str)
             else data.max_tokens,
             **extra_kwargs,
