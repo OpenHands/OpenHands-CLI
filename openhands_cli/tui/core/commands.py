@@ -12,6 +12,7 @@ from textual.containers import VerticalScroll
 from textual.widgets import Static
 from textual_autocomplete import DropdownItem
 
+from openhands_cli.theme import OPENHANDS_THEME
 
 if TYPE_CHECKING:
     from openhands_cli.tui.content.resources import LoadedResourcesInfo
@@ -66,20 +67,23 @@ def show_help(scroll_view: VerticalScroll) -> None:
     Args:
         scroll_view: The VerticalScroll widget to mount help content to
     """
-    help_text = """
-OpenHands CLI Help
-Available commands:
+    primary = OPENHANDS_THEME.primary
+    secondary = OPENHANDS_THEME.secondary
 
-  /help - Display available commands
-  /new - Start a new conversation
-  /history - Toggle conversation history
-  /confirm - Configure confirmation settings
-  /condense - Condense conversation history
-  /skills - View loaded skills, hooks, and MCPs
-  /feedback - Send anonymous feedback about CLI
-  /exit - Exit the application
+    help_text = f"""
+[bold {primary}]OpenHands CLI Help[/bold {primary}]
+[dim]Available commands:[/dim]
 
-Tips:
+  [{secondary}]/help[/{secondary}] - Display available commands
+  [{secondary}]/new[/{secondary}] - Start a new conversation
+  [{secondary}]/history[/{secondary}] - Toggle conversation history
+  [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
+  [{secondary}]/condense[/{secondary}] - Condense conversation history
+  [{secondary}]/skills[/{secondary}] - View loaded skills, hooks, and MCPs
+  [{secondary}]/feedback[/{secondary}] - Send anonymous feedback about CLI
+  [{secondary}]/exit[/{secondary}] - Exit the application
+
+[dim]Tips:[/dim]
   • Type / and press Tab to see command suggestions
   • Use arrow keys to navigate through suggestions
   • Press Enter to select a command
@@ -97,21 +101,23 @@ def show_skills(
         scroll_view: The VerticalScroll widget to mount skills content to
         loaded_resources: Information about loaded resources, or None if not available
     """
+    primary = OPENHANDS_THEME.primary
+
     if loaded_resources is None:
-        skills_text = """
-Loaded Resources
-No resources information available yet.
-Send a message to start a conversation and load resources.
+        skills_text = f"""
+[bold {primary}]Loaded Resources[/bold {primary}]
+[dim]No resources information available yet.
+Send a message to start a conversation and load resources.[/dim]
 """
     else:
         # Build the skills text using the get_details method
-        lines = ["\nLoaded Resources"]
-        lines.append(f"Summary: {loaded_resources.get_summary()}\n")
+        lines = [f"\n[bold {primary}]Loaded Resources[/bold {primary}]"]
+        lines.append(f"[dim]Summary:[/dim] {loaded_resources.get_summary()}\n")
         details = loaded_resources.get_details()
         if details and details != "No resources loaded":
             lines.append(details)
         else:
-            lines.append("No skills, hooks, or MCPs loaded.")
+            lines.append("[dim]No skills, hooks, or MCPs loaded.[/dim]")
         skills_text = "\n".join(lines)
 
     skills_widget = Static(skills_text, classes="skills-message")
