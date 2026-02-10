@@ -598,14 +598,43 @@ class ConversationVisualizer(ConversationVisualizerBase):
             border_color=border_color,
         )
 
+    def _create_system_prompt_collapsible(
+        self, event: SystemPromptEvent
+    ) -> Collapsible:
+        """Create a collapsible widget showing the system prompt from SystemPromptEvent.
+
+        This displays the full system prompt content in a collapsible widget,
+        matching ACP's display format. The title shows "System Prompt" and the
+        content shows the full system prompt text.
+
+        Args:
+            event: The SystemPromptEvent containing tools and system prompt
+
+        Returns:
+            A Collapsible widget showing the system prompt
+        """
+        from openhands_cli.tui.content.resources import format_system_prompt_content
+
+        # Build the collapsible content - show system prompt like ACP does
+        content = format_system_prompt_content(event)
+
+        return Collapsible(
+            content,
+            title="📋 System Prompt",
+            collapsed=True,
+            id="system_prompt_collapsible",
+            classes="system-prompt-collapsible",
+        )
+
     def _create_event_widget(self, event: Event) -> "Widget | None":
         """Create a widget for the event - either plain text or collapsible."""
         content = event.visualize
 
-        # Skip SystemPromptEvent - loaded resources are displayed at startup
-        # in _initialize_main_ui() before the user sends any message
+        # Handle SystemPromptEvent - create a collapsible showing the system prompt
+        # Note: Loaded resources (skills, hooks, tools, MCPs) are displayed at startup
+        # in _initialize_main_ui(). This collapsible shows the full system prompt.
         if isinstance(event, SystemPromptEvent):
-            return None
+            return self._create_system_prompt_collapsible(event)
         # Don't emit condensation request events (internal events)
         elif isinstance(event, CondensationRequest):
             return None
