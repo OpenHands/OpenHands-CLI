@@ -116,7 +116,7 @@ class SettingsFormData(BaseModel):
             if not v.isdigit():
                 return None
             val = int(v)
-            return val if val > 0 else None
+            return val if val > 30 else None
         return None
 
     def resolve_data_fields(self, existing_agent: Agent | None):
