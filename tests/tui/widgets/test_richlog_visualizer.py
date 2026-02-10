@@ -20,6 +20,8 @@ from openhands_cli.tui.widgets.richlog_visualizer import (
     ELLIPSIS,
     MAX_LINE_LENGTH,
     ConversationVisualizer,
+    _get_rejection_title,
+    _is_hook_rejection,
 )
 
 
@@ -1121,3 +1123,120 @@ class TestRenderUserMessage:
         assert isinstance(widget, Static)
         # Check the widget has user-message class (format verification)
         assert "user-message" in widget.classes
+
+
+
+class TestHookRejectionDetection:
+    """Tests for hook rejection detection functionality.
+
+    This test class verifies the detection of hook-originated rejections
+    versus user-initiated rejections based on the rejection_reason field.
+    """
+
+    def test_is_hook_rejection_detects_blocked_by_hook(self):
+        """Test that 'blocked by hook' pattern is detected."""
+        from openhands.sdk.event import UserRejectObservation
+
+        event = UserRejectObservation(
+            tool_name="terminal",
+            tool_call_id="call_1",
+            action_id="action_1",
+            rejection_reason="Blocked by hook",
+        )
+        assert _is_hook_rejection(event) is True
+
+    def test_is_hook_rejection_detects_hook_blocked(self):
+        """Test that 'hook blocked' pattern is detected."""
+        from openhands.sdk.event import UserRejectObservation
+
+        event = UserRejectObservation(
+            tool_name="terminal",
+            tool_call_id="call_1",
+            action_id="action_1",
+            rejection_reason="This action was hook blocked for security reasons",
+        )
+        assert _is_hook_rejection(event) is True
+
+    def test_is_hook_rejection_detects_hook_rejected(self):
+        """Test that 'hook rejected' pattern is detected."""
+        from openhands.sdk.event import UserRejectObservation
+
+        event = UserRejectObservation(
+            tool_name="terminal",
+            tool_call_id="call_1",
+            action_id="action_1",
+            rejection_reason="Action was hook rejected by pre-tool-use hook",
+        )
+        assert _is_hook_rejection(event) is True
+
+    def test_is_hook_rejection_detects_hook_denied(self):
+        """Test that 'hook denied' pattern is detected."""
+        from openhands.sdk.event import UserRejectObservation
+
+        event = UserRejectObservation(
+            tool_name="terminal",
+            tool_call_id="call_1",
+            action_id="action_1",
+            rejection_reason="The operation was hook denied",
+        )
+        assert _is_hook_rejection(event) is True
+
+    def test_is_hook_rejection_case_insensitive(self):
+        """Test that hook detection is case insensitive."""
+        from openhands.sdk.event import UserRejectObservation
+
+        event = UserRejectObservation(
+            tool_name="terminal",
+            tool_call_id="call_1",
+            action_id="action_1",
+            rejection_reason="BLOCKED BY HOOK",
+        )
+        assert _is_hook_rejection(event) is True
+
+    def test_is_hook_rejection_returns_false_for_user_rejection(self):
+        """Test that user rejections are not detected as hook rejections."""
+        from openhands.sdk.event import UserRejectObservation
+
+        event = UserRejectObservation(
+            tool_name="terminal",
+            tool_call_id="call_1",
+            action_id="action_1",
+            rejection_reason="User rejected the action",
+        )
+        assert _is_hook_rejection(event) is False
+
+    def test_is_hook_rejection_returns_false_for_custom_user_reason(self):
+        """Test that custom user rejection reasons are not detected as hooks."""
+        from openhands.sdk.event import UserRejectObservation
+
+        event = UserRejectObservation(
+            tool_name="terminal",
+            tool_call_id="call_1",
+            action_id="action_1",
+            rejection_reason="I don't want to run this command",
+        )
+        assert _is_hook_rejection(event) is False
+
+    def test_get_rejection_title_returns_hook_title(self):
+        """Test that _get_rejection_title returns 'Hook Blocked Action' for hooks."""
+        from openhands.sdk.event import UserRejectObservation
+
+        event = UserRejectObservation(
+            tool_name="terminal",
+            tool_call_id="call_1",
+            action_id="action_1",
+            rejection_reason="Blocked by hook",
+        )
+        assert _get_rejection_title(event) == "Hook Blocked Action"
+
+    def test_get_rejection_title_returns_user_title(self):
+        """Test that _get_rejection_title returns 'User Rejected Action' for users."""
+        from openhands.sdk.event import UserRejectObservation
+
+        event = UserRejectObservation(
+            tool_name="terminal",
+            tool_call_id="call_1",
+            action_id="action_1",
+            rejection_reason="User rejected the action",
+        )
+        assert _get_rejection_title(event) == "User Rejected Action"

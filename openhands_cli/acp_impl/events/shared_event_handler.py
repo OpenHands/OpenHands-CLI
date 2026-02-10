@@ -49,9 +49,33 @@ logger = get_logger(__name__)
 REASONING_HEADER = "**Reasoning**:\n"
 THOUGHT_HEADER = "\n**Thought**:\n"
 
+# Patterns to detect hook-originated rejections
+_HOOK_REJECTION_PATTERNS = [
+    "blocked by hook",
+    "hook rejected",
+    "hook blocked",
+    "hook denied",
+]
+
 
 def _event_visualize_to_plain(event: Event) -> str:
     return str(event.visualize.plain)
+
+
+def _is_hook_rejection(event: UserRejectObservation) -> bool:
+    """Check if a UserRejectObservation was triggered by a hook.
+
+    Hook rejections typically contain patterns like "blocked by hook" or similar
+    in their rejection_reason field.
+
+    Args:
+        event: The UserRejectObservation to check
+
+    Returns:
+        True if this rejection appears to be from a hook, False otherwise
+    """
+    reason = event.rejection_reason.lower()
+    return any(pattern in reason for pattern in _HOOK_REJECTION_PATTERNS)
 
 
 class _ACPContext(Protocol):
@@ -117,11 +141,16 @@ class SharedEventHandler:
     async def handle_user_reject_or_agent_error(
         self, ctx: _ACPContext, event: UserRejectObservation | AgentErrorEvent
     ) -> None:
+        # For hook rejections, prepend a header to make it clear this was a hook block
+        text = _event_visualize_to_plain(event)
+        if isinstance(event, UserRejectObservation) and _is_hook_rejection(event):
+            text = f"**⚡ Hook Blocked Action**\n\n{text}"
+
         await self.send_tool_progress(
             ctx,
             tool_call_id=event.tool_call_id,
             status="failed",
-            text=_event_visualize_to_plain(event),
+            text=text,
             raw_output=event.model_dump(),
         )
 
