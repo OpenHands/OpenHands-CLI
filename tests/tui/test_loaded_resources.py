@@ -392,8 +392,11 @@ class TestSkillsCommandInApp:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            # loaded_resources should be a LoadedResourcesInfo instance on conversation_state
-            assert isinstance(oh_app.conversation_state.loaded_resources, LoadedResourcesInfo)
+            # loaded_resources should be a LoadedResourcesInfo instance
+            # on conversation_state
+            assert isinstance(
+                oh_app.conversation_state.loaded_resources, LoadedResourcesInfo
+            )
 
             # Mock show_skills to verify it's called with LoadedResourcesInfo
             with mock.patch(

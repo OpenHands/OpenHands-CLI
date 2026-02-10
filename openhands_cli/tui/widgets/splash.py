@@ -69,7 +69,7 @@ class SplashContent(Container):
 
     # Reactive property bound from ConversationContainer for loaded resources
     # None indicates resources not yet loaded
-    loaded_resources: var["LoadedResourcesInfo | None"] = var(None)
+    loaded_resources: var[LoadedResourcesInfo | None] = var(None)
 
     # Internal state (not in ConversationContainer - widget owns its initialization)
     _is_initialized: bool = False
@@ -118,8 +118,8 @@ class SplashContent(Container):
 
     def watch_loaded_resources(
         self,
-        old_value: "LoadedResourcesInfo | None",
-        new_value: "LoadedResourcesInfo | None",
+        _old_value: LoadedResourcesInfo | None,
+        new_value: LoadedResourcesInfo | None,
     ) -> None:
         """Handle loaded_resources changes reactively.
 
@@ -133,7 +133,7 @@ class SplashContent(Container):
             self._add_or_update_loaded_resources_collapsible(new_value)
 
     def _add_or_update_loaded_resources_collapsible(
-        self, loaded_resources: "LoadedResourcesInfo"
+        self, loaded_resources: LoadedResourcesInfo
     ) -> None:
         """Add or update the collapsible showing skills, hooks, and MCPs."""
         from openhands_cli.tui.widgets.collapsible import Collapsible

@@ -5,8 +5,9 @@ This test validates the /skills command flow:
 2. The loaded resources (skills, hooks, MCPs) are displayed
 """
 
+from collections.abc import Generator
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 
 import pytest
 from textual.pilot import Pilot
