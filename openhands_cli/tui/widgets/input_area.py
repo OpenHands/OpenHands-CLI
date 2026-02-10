@@ -53,10 +53,10 @@ class InputAreaContainer(Container):
     """
 
     # Reactive property bound from ConversationContainer
-    loaded_resources: var["LoadedResourcesInfo | None"] = var(None)
+    loaded_resources: var[LoadedResourcesInfo | None] = var(None)
 
     @property
-    def scroll_view(self) -> "ScrollableContent":
+    def scroll_view(self) -> ScrollableContent:
         """Get the sibling scrollable content area."""
         from openhands_cli.tui.widgets.main_display import ScrollableContent
 
