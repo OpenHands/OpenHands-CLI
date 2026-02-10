@@ -122,11 +122,3 @@ Footer {
     color: $foreground;
     margin: 0;
 }
-
-.loaded-resources-collapsible {
-    margin-top: 1;
-}
-
-.system-prompt-collapsible {
-    margin-top: 1;
-}

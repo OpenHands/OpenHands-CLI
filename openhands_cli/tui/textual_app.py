@@ -465,14 +465,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         details = loaded_resources.get_details()
 
         # Create collapsible with summary as title and details as content
-        # Use border_color=None to disable the left border for consistency
         collapsible = Collapsible(
             details,
             title=f"Loaded: {summary}",
             collapsed=True,
             id="loaded_resources_collapsible",
-            classes="loaded-resources-collapsible",
-            border_color=None,
+            border_color=OPENHANDS_THEME.accent,
         )
 
         # Mount after the splash content as a normal chat collapsible

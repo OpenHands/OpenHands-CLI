@@ -621,14 +621,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             f"Loaded: {tool_count} tool{'s' if tool_count != 1 else ''}, system prompt"
         )
 
-        return Collapsible(
-            content,
-            title=title,
-            collapsed=True,
-            id="system_prompt_collapsible",
-            classes="system-prompt-collapsible",
-            border_color=None,
-        )
+        return self._make_collapsible(content, title, event)
 
     def _create_event_widget(self, event: Event) -> "Widget | None":
         """Create a widget for the event - either plain text or collapsible."""
