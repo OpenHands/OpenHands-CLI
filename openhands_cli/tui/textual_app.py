@@ -57,10 +57,13 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.conversations.store.local import LocalFileStore
-from openhands_cli.locations import get_conversations_dir
+from openhands_cli.locations import get_conversations_dir, get_work_dir
 from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.resources import LoadedResourcesInfo
+from openhands_cli.tui.content.resources import (
+    LoadedResourcesInfo,
+    collect_loaded_resources,
+)
 from openhands_cli.tui.core import (
     ConversationContainer,
     ConversationFinished,
@@ -409,13 +412,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         This method is responsible for:
         1. Checking if the agent has a critic configured
-        2. Initializing the splash content (one-time setup)
-        3. Processing any queued inputs
-
-        Note: Loaded resources (skills, tools, MCPs, hooks) are now displayed
-        when the SystemPromptEvent is received from the SDK, which happens
-        when the first message is sent. This provides more accurate information
-        as it reflects the actual tools available to the agent.
+        2. Collecting and displaying loaded resources (skills, tools, MCPs, hooks)
+        3. Initializing the splash content (one-time setup)
+        4. Processing any queued inputs
 
         UI lifecycle is owned by OpenHandsApp, not ConversationContainer. The splash
         content initialization is a direct method call, not a reactive
@@ -424,8 +423,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         splash_content = self.query_one("#splash_content", SplashContent)
 
-        # Check if agent has critic configured
+        # Check if agent has critic configured and collect resources
         has_critic = False
+        agent = None
         try:
             agent_store = AgentStore()
             agent = agent_store.load_or_create(
@@ -438,15 +438,44 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             # If we can't load agent, just continue without critic notice
             pass
 
-        # Initialize loaded resources as None - will be populated when
-        # SystemPromptEvent is received
-        self._loaded_resources: LoadedResourcesInfo | None = None
+        # Collect loaded resources info using the utility function
+        loaded_resources = collect_loaded_resources(
+            agent=agent,
+            working_dir=get_work_dir(),
+        )
+
+        # Store loaded resources for later use (e.g., /skills command)
+        self._loaded_resources = loaded_resources
 
         # Initialize splash content - direct call for UI lifecycle
         splash_content.initialize(has_critic=has_critic)
 
+        # Add loaded resources collapsible if there are any resources
+        if loaded_resources.has_resources():
+            self._add_loaded_resources_collapsible(loaded_resources)
+
         # Process any queued inputs
         self._process_queued_inputs()
+
+    def _add_loaded_resources_collapsible(
+        self, loaded_resources: LoadedResourcesInfo
+    ) -> None:
+        """Add a collapsible widget showing loaded resources to the scroll view."""
+        summary = loaded_resources.get_summary()
+        details = loaded_resources.get_details()
+
+        # Create collapsible with summary as title and details as content
+        collapsible = Collapsible(
+            details,
+            title=f"📦 Loaded: {summary}",
+            collapsed=True,
+            id="loaded_resources_collapsible",
+            classes="loaded-resources-collapsible",
+        )
+
+        # Mount after the splash content as a normal chat collapsible
+        splash_content = self.scroll_view.query_one("#splash_content", SplashContent)
+        self.scroll_view.mount(collapsible, after=splash_content)
 
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.
