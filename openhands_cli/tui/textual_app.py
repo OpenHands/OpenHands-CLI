@@ -455,7 +455,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Add loaded resources collapsible if there are skills, hooks, or MCPs
         # (tools are shown separately in the SystemPromptEvent collapsible)
-        if loaded_resources.has_skills_hooks_mcps():
+        if loaded_resources.has_resources(include_tools=False):
             self._add_loaded_resources_collapsible(loaded_resources)
 
         # Process any queued inputs

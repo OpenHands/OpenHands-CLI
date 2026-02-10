@@ -150,10 +150,24 @@ class TestResourcesTab:
 
     @pytest.mark.asyncio
     async def test_hooks_section_shows_hooks_when_present(self):
-        """Verify hooks section shows hook types and counts when present."""
+        """Verify hooks section shows hook types and commands when present."""
+        # Create mock hook definitions with commands
+        mock_hook_def1 = MagicMock()
+        mock_hook_def1.command = "cmd1"
+        mock_hook_def2 = MagicMock()
+        mock_hook_def2.command = "cmd2"
+        mock_hook_def3 = MagicMock()
+        mock_hook_def3.command = "cmd3"
+
+        # Create mock matchers with hooks
+        mock_matcher1 = MagicMock()
+        mock_matcher1.hooks = [mock_hook_def1, mock_hook_def2]
+        mock_matcher2 = MagicMock()
+        mock_matcher2.hooks = [mock_hook_def3]
+
         mock_hook_config = MagicMock()
-        mock_hook_config.pre_tool_use = [MagicMock(), MagicMock()]  # 2 hooks
-        mock_hook_config.post_tool_use = [MagicMock()]  # 1 hook
+        mock_hook_config.pre_tool_use = [mock_matcher1]  # 2 hook commands
+        mock_hook_config.post_tool_use = [mock_matcher2]  # 1 hook command
         mock_hook_config.user_prompt_submit = []
         mock_hook_config.session_start = []
         mock_hook_config.session_end = []
@@ -168,6 +182,9 @@ class TestResourcesTab:
             content = str(hooks_content.render())
             assert "pre_tool_use" in content
             assert "post_tool_use" in content
+            assert "cmd1" in content
+            assert "cmd2" in content
+            assert "cmd3" in content
 
     @pytest.mark.asyncio
     async def test_mcp_section_shows_no_servers_when_empty(self):

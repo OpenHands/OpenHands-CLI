@@ -7,6 +7,7 @@ for collecting this information from the agent configuration.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -17,6 +18,8 @@ from openhands.sdk.event import SystemPromptEvent
 if TYPE_CHECKING:
     from openhands.sdk import Agent
     from openhands.sdk.tool import ToolDefinition
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -33,7 +36,12 @@ class HookInfo:
     """Information about loaded hooks."""
 
     hook_type: str
-    count: int
+    commands: list[str] = field(default_factory=list)
+
+    @property
+    def count(self) -> int:
+        """Return the number of hook commands."""
+        return len(self.commands)
 
 
 @dataclass
@@ -77,16 +85,22 @@ class LoadedResourcesInfo:
     def mcps_count(self) -> int:
         return len(self.mcps)
 
-    def has_resources(self) -> bool:
-        """Check if any resources are loaded."""
-        return bool(self.skills or self.hooks or self.tools or self.mcps)
+    def has_resources(self, *, include_tools: bool = True) -> bool:
+        """Check if any resources are loaded.
 
-    def has_skills_hooks_mcps(self) -> bool:
-        """Check if any skills, hooks, or MCPs are loaded (excluding tools)."""
+        Args:
+            include_tools: Whether to include tools in the check (default: True)
+        """
+        if include_tools:
+            return bool(self.skills or self.hooks or self.tools or self.mcps)
         return bool(self.skills or self.hooks or self.mcps)
 
-    def get_summary(self) -> str:
-        """Get a summary string of loaded resources (skills, hooks, MCPs)."""
+    def get_summary(self, *, include_tools: bool = False) -> str:
+        """Get a summary string of loaded resources.
+
+        Args:
+            include_tools: Whether to include tools in the summary (default: False)
+        """
         parts = []
         if self.skills_count > 0:
             parts.append(
@@ -96,12 +110,20 @@ class LoadedResourcesInfo:
             parts.append(
                 f"{self.hooks_count} hook{'s' if self.hooks_count != 1 else ''}"
             )
+        if include_tools and self.tools_count > 0:
+            parts.append(
+                f"{self.tools_count} tool{'s' if self.tools_count != 1 else ''}"
+            )
         if self.mcps_count > 0:
             parts.append(f"{self.mcps_count} MCP{'s' if self.mcps_count != 1 else ''}")
         return ", ".join(parts) if parts else "No resources loaded"
 
-    def get_details(self) -> str:
-        """Get detailed information about loaded resources (skills, hooks, MCPs)."""
+    def get_details(self, *, include_tools: bool = False) -> str:
+        """Get detailed information about loaded resources.
+
+        Args:
+            include_tools: Whether to include tools in the details (default: False)
+        """
         lines = []
 
         if self.skills:
@@ -118,7 +140,15 @@ class LoadedResourcesInfo:
                 lines.append("")
             lines.append(f"Hooks ({self.hooks_count}):")
             for hook in self.hooks:
-                lines.append(f"  • {hook.hook_type}: {hook.count}")
+                commands_str = ", ".join(hook.commands) if hook.commands else "none"
+                lines.append(f"  • {hook.hook_type}: {commands_str}")
+
+        if include_tools and self.tools:
+            if lines:
+                lines.append("")
+            lines.append(f"Tools ({self.tools_count}):")
+            for tool in self.tools:
+                lines.append(f"  • {tool.name}")
 
         if self.mcps:
             if lines:
@@ -152,7 +182,7 @@ def _collect_tools(agent: Agent) -> list[ToolInfo]:
     tools = []
     if agent.tools:
         for tool in agent.tools:
-            tools.append(ToolInfo(name=tool.name))
+            tools.append(ToolInfo(name=getattr(tool, "name", "Unknown")))
     return tools
 
 
@@ -178,11 +208,17 @@ def _collect_hooks(working_dir: Path | str | None) -> list[HookInfo]:
             ("session_end", hook_config.session_end),
             ("stop", hook_config.stop),
         ]
-        for hook_type, hook_list in hook_types:
-            if hook_list:
-                hooks.append(HookInfo(hook_type=hook_type, count=len(hook_list)))
-    except Exception:
-        pass
+        for hook_type, hook_matchers in hook_types:
+            if hook_matchers:
+                # Collect all hook commands from all matchers
+                commands = []
+                for matcher in hook_matchers:
+                    for hook_def in matcher.hooks:
+                        commands.append(hook_def.command)
+                if commands:
+                    hooks.append(HookInfo(hook_type=hook_type, commands=commands))
+    except Exception as e:
+        logger.debug(f"Failed to collect hooks: {e}")
 
     return hooks
 
@@ -204,8 +240,8 @@ def _collect_mcps() -> list[MCPInfo]:
             else:
                 transport = None
             mcps.append(MCPInfo(name=name, transport=transport, enabled=True))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Failed to collect MCPs: {e}")
 
     return mcps
 

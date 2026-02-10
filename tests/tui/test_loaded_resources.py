@@ -44,7 +44,9 @@ class TestLoadedResourcesInfo:
 
     def test_has_resources_with_hooks(self):
         """Test has_resources returns True when hooks are present."""
-        info = LoadedResourcesInfo(hooks=[HookInfo(hook_type="pre_tool_use", count=1)])
+        info = LoadedResourcesInfo(
+            hooks=[HookInfo(hook_type="pre_tool_use", commands=["cmd1"])]
+        )
         assert info.has_resources() is True
 
     def test_has_resources_with_tools(self):
@@ -75,8 +77,8 @@ class TestLoadedResourcesInfo:
         """Test LoadedResourcesInfo with only hooks."""
         info = LoadedResourcesInfo(
             hooks=[
-                HookInfo(hook_type="pre_tool_use", count=2),
-                HookInfo(hook_type="post_tool_use", count=1),
+                HookInfo(hook_type="pre_tool_use", commands=["cmd1", "cmd2"]),
+                HookInfo(hook_type="post_tool_use", commands=["cmd3"]),
             ]
         )
         assert info.skills_count == 0
@@ -118,7 +120,7 @@ class TestLoadedResourcesInfo:
         """Test LoadedResourcesInfo with all resource types."""
         info = LoadedResourcesInfo(
             skills=[SkillInfo(name="skill1")],
-            hooks=[HookInfo(hook_type="pre_tool_use", count=1)],
+            hooks=[HookInfo(hook_type="pre_tool_use", commands=["cmd1"])],
             tools=[ToolInfo(name="tool1"), ToolInfo(name="tool2")],
             mcps=[MCPInfo(name="mcp1", transport="stdio")],
         )
@@ -129,7 +131,7 @@ class TestLoadedResourcesInfo:
         summary = info.get_summary()
         assert "1 skill" in summary
         assert "1 hook" in summary
-        # get_summary() doesn't include tools (tools are shown in SystemPromptEvent)
+        # get_summary() doesn't include tools by default (tools are shown in SystemPromptEvent)
         assert "tools" not in summary
         assert "1 MCP" in summary
 
@@ -163,7 +165,7 @@ class TestLoadedResourcesInfo:
             skills=[
                 SkillInfo(name="skill1", description="First skill", source="project"),
             ],
-            hooks=[HookInfo(hook_type="pre_tool_use", count=2)],
+            hooks=[HookInfo(hook_type="pre_tool_use", commands=["cmd1", "cmd2"])],
             tools=[ToolInfo(name="tool1")],
             mcps=[MCPInfo(name="mcp1", transport="stdio")],
         )
@@ -175,8 +177,8 @@ class TestLoadedResourcesInfo:
         assert "First skill" in details
         assert "(project)" in details
         assert "Hooks (2):" in details
-        assert "pre_tool_use: 2" in details
-        # get_details() doesn't include tools (tools are shown in SystemPromptEvent)
+        assert "pre_tool_use: cmd1, cmd2" in details
+        # get_details() doesn't include tools by default (tools are shown in SystemPromptEvent)
         assert "Tools" not in details
         assert "MCPs (1):" in details
         assert "mcp1" in details
@@ -214,9 +216,17 @@ class TestHookInfo:
 
     def test_hook_info(self):
         """Test HookInfo dataclass."""
-        hook = HookInfo(hook_type="pre_tool_use", count=3)
+        hook = HookInfo(hook_type="pre_tool_use", commands=["cmd1", "cmd2", "cmd3"])
         assert hook.hook_type == "pre_tool_use"
         assert hook.count == 3
+        assert hook.commands == ["cmd1", "cmd2", "cmd3"]
+
+    def test_hook_info_empty_commands(self):
+        """Test HookInfo with empty commands."""
+        hook = HookInfo(hook_type="stop")
+        assert hook.hook_type == "stop"
+        assert hook.count == 0
+        assert hook.commands == []
 
 
 class TestToolInfo:
@@ -264,7 +274,7 @@ class TestShowSkillsCommand:
                 SkillInfo(name="skill1", description="First skill"),
                 SkillInfo(name="skill2", source="project"),
             ],
-            hooks=[HookInfo(hook_type="pre_tool_use", count=2)],
+            hooks=[HookInfo(hook_type="pre_tool_use", commands=["cmd1", "cmd2"])],
             tools=[ToolInfo(name="tool1")],
             mcps=[MCPInfo(name="mcp1", transport="stdio")],
         )

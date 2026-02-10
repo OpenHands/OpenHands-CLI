@@ -124,12 +124,18 @@ class ResourcesTab(Container):
         ]
 
         lines = []
-        total_hooks = 0
-        for hook_type, hooks in hook_types:
-            if hooks:
-                count = len(hooks)
-                total_hooks += count
-                lines.append(f"[{primary}]•[/{primary}] {hook_type}: {count}")
+        for hook_type, hook_matchers in hook_types:
+            if hook_matchers:
+                # Collect all hook commands from all matchers
+                commands = []
+                for matcher in hook_matchers:
+                    for hook_def in matcher.hooks:
+                        commands.append(hook_def.command)
+                if commands:
+                    commands_str = ", ".join(commands)
+                    lines.append(
+                        f"[{primary}]•[/{primary}] {hook_type}: {commands_str}"
+                    )
 
         if not lines:
             content_widget.update(f"[{secondary}]No hooks loaded[/{secondary}]")

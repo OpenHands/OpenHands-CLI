@@ -104,48 +104,14 @@ No resources information available yet.
 Send a message to start a conversation and load resources.
 """
     else:
-        # Build the skills text
+        # Build the skills text using the get_details method
         lines = ["\nLoaded Resources"]
-        lines.append(f"Summary: {loaded_resources.get_summary()}\n")
-
-        if loaded_resources.skills:
-            lines.append(f"Skills ({loaded_resources.skills_count}):")
-            for skill in loaded_resources.skills:
-                lines.append(f"  • {skill.name}")
-                if skill.description:
-                    lines.append(f"      {skill.description}")
-                if skill.source:
-                    lines.append(f"      ({skill.source})")
-            lines.append("")
-
-        if loaded_resources.hooks:
-            lines.append(f"Hooks ({loaded_resources.hooks_count}):")
-            for hook in loaded_resources.hooks:
-                lines.append(f"  • {hook.hook_type}: {hook.count}")
-            lines.append("")
-
-        if loaded_resources.tools:
-            lines.append(f"Tools ({loaded_resources.tools_count}):")
-            for tool in loaded_resources.tools:
-                lines.append(f"  • {tool.name}")
-            lines.append("")
-
-        if loaded_resources.mcps:
-            lines.append(f"MCPs ({loaded_resources.mcps_count}):")
-            for mcp in loaded_resources.mcps:
-                lines.append(f"  • {mcp.name}")
-                if mcp.transport:
-                    lines.append(f"      ({mcp.transport})")
-            lines.append("")
-
-        if not (
-            loaded_resources.skills
-            or loaded_resources.hooks
-            or loaded_resources.tools
-            or loaded_resources.mcps
-        ):
+        lines.append(f"Summary: {loaded_resources.get_summary(include_tools=True)}\n")
+        details = loaded_resources.get_details(include_tools=True)
+        if details and details != "No resources loaded":
+            lines.append(details)
+        else:
             lines.append("No skills, hooks, tools, or MCPs loaded.")
-
         skills_text = "\n".join(lines)
 
     skills_widget = Static(skills_text, classes="skills-message")
