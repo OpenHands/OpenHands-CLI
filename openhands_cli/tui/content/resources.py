@@ -10,9 +10,11 @@ Note: Tools are not collected here as they are reported in SystemPromptEvent.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import field
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from pydantic.dataclasses import dataclass
 
 
 if TYPE_CHECKING:
