@@ -130,7 +130,8 @@ class TestLoadedResourcesInfo:
         summary = info.get_summary()
         assert "1 skill" in summary
         assert "1 hook" in summary
-        # get_summary() doesn't include tools by default (tools are shown in SystemPromptEvent)
+        # get_summary() doesn't include tools by default
+        # (tools are shown in SystemPromptEvent)
         assert "tools" not in summary
         assert "1 MCP" in summary
 
@@ -177,7 +178,8 @@ class TestLoadedResourcesInfo:
         assert "(project)" in details
         assert "Hooks (2):" in details
         assert "pre_tool_use: cmd1, cmd2" in details
-        # get_details() doesn't include tools by default (tools are shown in SystemPromptEvent)
+        # get_details() doesn't include tools by default
+        # (tools are shown in SystemPromptEvent)
         assert "Tools" not in details
         assert "MCPs (1):" in details
         assert "mcp1" in details
