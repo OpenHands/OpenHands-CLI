@@ -158,7 +158,7 @@ class TestLoadedResourcesInfo:
         assert "2 MCPs" in info_multiple_mcps.get_summary()
 
     def test_get_details(self):
-        """Test get_details returns formatted string as plain text with nested bullets."""
+        """Test get_details returns formatted string with nested bullets."""
         info = LoadedResourcesInfo(
             skills=[
                 SkillInfo(name="skill1", description="First skill", source="project"),
