@@ -358,10 +358,11 @@ class TestSkillsCommandInApp:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            # Set up loaded resources
-            oh_app._loaded_resources = LoadedResourcesInfo(
+            # Set up loaded resources on ConversationContainer
+            test_resources = LoadedResourcesInfo(
                 skills=[SkillInfo(name="test_skill")],
             )
+            oh_app.conversation_state.loaded_resources = test_resources
 
             # Mock show_skills to verify it's called via InputAreaContainer
             with mock.patch(
@@ -372,14 +373,14 @@ class TestSkillsCommandInApp:
 
                 mock_show_skills.assert_called_once()
                 call_args = mock_show_skills.call_args
-                assert call_args[0][1] is oh_app._loaded_resources
+                assert call_args[0][1] is test_resources
 
     @pytest.mark.asyncio
     async def test_loaded_resources_always_initialized(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """_loaded_resources should always be initialized as LoadedResourcesInfo."""
+        """loaded_resources should be initialized on ConversationContainer."""
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
@@ -391,8 +392,8 @@ class TestSkillsCommandInApp:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            # _loaded_resources should always be a LoadedResourcesInfo instance
-            assert isinstance(oh_app._loaded_resources, LoadedResourcesInfo)
+            # loaded_resources should be a LoadedResourcesInfo instance on conversation_state
+            assert isinstance(oh_app.conversation_state.loaded_resources, LoadedResourcesInfo)
 
             # Mock show_skills to verify it's called with LoadedResourcesInfo
             with mock.patch(

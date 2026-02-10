@@ -1,24 +1,25 @@
 """Splash content widget for the OpenHands CLI TUI.
 
 SplashContent encapsulates all splash screen widgets and manages their
-lifecycle through two mechanisms:
+lifecycle through reactive binding:
 
-1. **Reactive binding** (`data_bind`): conversation_id is bound from
-   ConversationContainer for automatic updates when switching conversations.
+1. **Reactive binding** (`data_bind`): conversation_id and loaded_resources
+   are bound from ConversationContainer for automatic updates.
 
 2. **Direct initialization** (`initialize()`): Called by OpenHandsApp during
-   UI setup to populate and show the splash content. This separates UI
-   lifecycle concerns from conversation state.
+   UI setup to populate and show the splash content.
 
 Example:
     # In ConversationContainer.compose():
     yield SplashContent(id="splash_content").data_bind(
         conversation_id=ConversationContainer.conversation_id,
+        loaded_resources=ConversationContainer.loaded_resources,
     )
 
     # In OpenHandsApp._initialize_main_ui():
     splash_content = self.query_one("#splash_content", SplashContent)
-    splash_content.initialize(has_critic=True, loaded_resources=resources)
+    splash_content.initialize(has_critic=True)
+    # Resources are set via: conversation_state.set_loaded_resources(resources)
 """
 
 from __future__ import annotations
@@ -50,20 +51,25 @@ class SplashContent(Container):
     - Instructions header and text
     - Update notice (conditional)
     - Critic notice (conditional)
-    - Loaded resources collapsible (conditional)
+    - Loaded resources collapsible (reactive, shown when resources are set)
 
     Lifecycle:
     - On mount: Content is hidden (waiting for initialization)
     - On initialize(): Content is populated and shown
     - On conversation_id change: Conversation text updates reactively
+    - On loaded_resources change: Resources collapsible is added/updated
 
-    Uses data_bind() for conversation_id to enable reactive updates
-    when switching conversations.
+    Uses data_bind() for conversation_id and loaded_resources to enable
+    reactive updates from ConversationContainer.
     """
 
     # Reactive property bound from ConversationContainer for conversation switching
     # None indicates switching in progress
     conversation_id: var[uuid.UUID | None] = var(None)
+
+    # Reactive property bound from ConversationContainer for loaded resources
+    # None indicates resources not yet loaded
+    loaded_resources: var["LoadedResourcesInfo | None"] = var(None)
 
     # Internal state (not in ConversationContainer - widget owns its initialization)
     _is_initialized: bool = False
@@ -90,51 +96,68 @@ class SplashContent(Container):
         yield Static(id="splash_update_notice", classes="splash-update-notice")
         yield Static(id="splash_critic_notice", classes="splash-critic-notice")
 
-    def initialize(
-        self,
-        *,
-        has_critic: bool = False,
-        loaded_resources: LoadedResourcesInfo | None = None,
-    ) -> None:
+    def initialize(self, *, has_critic: bool = False) -> None:
         """Initialize and show the splash content.
 
         Called by OpenHandsApp during UI setup. This is a one-time
         operation that populates all splash widgets and makes them visible.
 
+        Note: Loaded resources are handled reactively via data_bind to
+        loaded_resources. When ConversationContainer.loaded_resources is set,
+        watch_loaded_resources will automatically add the collapsible.
+
         Args:
             has_critic: Whether the agent has a critic configured.
-            loaded_resources: Optional loaded resources info to display.
         """
         if self._is_initialized:
             return
 
         self._has_critic = has_critic
         self._populate_content()
-
-        # Add loaded resources collapsible if there are resources
-        if loaded_resources and loaded_resources.has_resources():
-            self._add_loaded_resources_collapsible(loaded_resources)
-
         self._is_initialized = True
 
-    def _add_loaded_resources_collapsible(
-        self, loaded_resources: LoadedResourcesInfo
+    def watch_loaded_resources(
+        self,
+        old_value: "LoadedResourcesInfo | None",
+        new_value: "LoadedResourcesInfo | None",
     ) -> None:
-        """Add a collapsible showing skills, hooks, and MCPs."""
+        """Handle loaded_resources changes reactively.
+
+        When resources are set on ConversationContainer, this watcher
+        automatically adds or updates the loaded resources collapsible.
+        """
+        if not self._is_initialized:
+            return
+
+        if new_value and new_value.has_resources():
+            self._add_or_update_loaded_resources_collapsible(new_value)
+
+    def _add_or_update_loaded_resources_collapsible(
+        self, loaded_resources: "LoadedResourcesInfo"
+    ) -> None:
+        """Add or update the collapsible showing skills, hooks, and MCPs."""
         from openhands_cli.tui.widgets.collapsible import Collapsible
 
         summary = loaded_resources.get_summary()
         details = loaded_resources.get_details()
 
-        collapsible = Collapsible(
-            details,
-            title=f"Loaded: {summary}",
-            collapsed=True,
-            id="loaded_resources_collapsible",
-            border_color=OPENHANDS_THEME.accent,
-        )
-
-        self.mount(collapsible)
+        # Check if collapsible already exists
+        existing = self.query("#loaded_resources_collapsible")
+        if existing:
+            # Update existing collapsible
+            collapsible = existing.first(Collapsible)
+            collapsible.update_title(f"Loaded: {summary}")
+            collapsible.update_content(details)
+        else:
+            # Create new collapsible
+            collapsible = Collapsible(
+                details,
+                title=f"Loaded: {summary}",
+                collapsed=True,
+                id="loaded_resources_collapsible",
+                border_color=OPENHANDS_THEME.accent,
+            )
+            self.mount(collapsible)
 
     @property
     def is_initialized(self) -> bool:

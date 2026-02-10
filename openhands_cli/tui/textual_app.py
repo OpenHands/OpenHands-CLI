@@ -60,10 +60,7 @@ from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.locations import get_conversations_dir, get_work_dir
 from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.resources import (
-    LoadedResourcesInfo,
-    collect_loaded_resources,
-)
+from openhands_cli.tui.content.resources import collect_loaded_resources
 from openhands_cli.tui.core import (
     ConversationContainer,
     ConversationFinished,
@@ -203,9 +200,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.mcp_panel: MCPSidePanel | None = None
 
         self.plan_panel: PlanSidePanel = PlanSidePanel(self)
-
-        # Initialize loaded resources with empty state (populated later)
-        self._loaded_resources = LoadedResourcesInfo()
 
         # Register the custom theme
         self.register_theme(OPENHANDS_THEME)
@@ -447,11 +441,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             working_dir=get_work_dir(),
         )
 
-        # Store loaded resources for later use (e.g., /skills command)
-        self._loaded_resources = loaded_resources
+        # Initialize splash content (resources are handled reactively)
+        splash_content.initialize(has_critic=has_critic)
 
-        # Initialize splash content with resources - SplashContent handles its own UI
-        splash_content.initialize(has_critic=has_critic, loaded_resources=loaded_resources)
+        # Set loaded resources on ConversationContainer - triggers reactive update
+        # in SplashContent via data_bind
+        self.conversation_state.set_loaded_resources(loaded_resources)
 
         # Process any queued inputs
         self._process_queued_inputs()
