@@ -37,16 +37,15 @@
 .terminal-r3 { fill: #fee165;font-weight: bold }
 .terminal-r4 { fill: #aaaaaa;font-weight: bold }
 .terminal-r5 { fill: #ffffff }
-.terminal-r6 { fill: #bcbcbc }
-.terminal-r7 { fill: #4e4e4e }
+.terminal-r6 { fill: #4e4e4e }
+.terminal-r7 { fill: #bcbcbc }
 .terminal-r8 { fill: #fee165 }
 .terminal-r9 { fill: #e2e2e2;text-decoration: underline; }
-.terminal-r10 { fill: #706433 }
-.terminal-r11 { fill: #222222 }
-.terminal-r12 { fill: #277dff }
-.terminal-r13 { fill: #121212 }
-.terminal-r14 { fill: #7a7a7a }
-.terminal-r15 { fill: #277dff;font-weight: bold }
+.terminal-r10 { fill: #277dff }
+.terminal-r11 { fill: #706433 }
+.terminal-r12 { fill: #222222 }
+.terminal-r13 { fill: #7a7a7a }
+.terminal-r14 { fill: #277dff;font-weight: bold }
     </style>
 
     <defs>
@@ -214,14 +213,14 @@
 </text><text class="terminal-r2" x="988.2" y="727.6" textLength="12.2" clip-path="url(#terminal-line-29)">▏</text><text class="terminal-r1" x="1464" y="727.6" textLength="12.2" clip-path="url(#terminal-line-29)">
 </text><text class="terminal-r2" x="988.2" y="752" textLength="12.2" clip-path="url(#terminal-line-30)">▏</text><text class="terminal-r1" x="1464" y="752" textLength="12.2" clip-path="url(#terminal-line-30)">
 </text><text class="terminal-r8" x="12.2" y="776.4" textLength="963.8" clip-path="url(#terminal-line-31)">┌─────────────────────────────────────────────────────────────────────────────┐</text><text class="terminal-r2" x="988.2" y="776.4" textLength="12.2" clip-path="url(#terminal-line-31)">▏</text><text class="terminal-r1" x="1464" y="776.4" textLength="12.2" clip-path="url(#terminal-line-31)">
-</text><text class="terminal-r8" x="12.2" y="800.8" textLength="12.2" clip-path="url(#terminal-line-32)">│</text><text class="terminal-r11" x="36.6" y="800.8" textLength="12.2" clip-path="url(#terminal-line-32)">T</text><text class="terminal-r14" x="48.8" y="800.8" textLength="634.4" clip-path="url(#terminal-line-32)">ype&#160;your&#160;message,&#160;@mention&#160;a&#160;file,&#160;or&#160;/&#160;for&#160;commands</text><text class="terminal-r8" x="963.8" y="800.8" textLength="12.2" clip-path="url(#terminal-line-32)">│</text><text class="terminal-r2" x="988.2" y="800.8" textLength="12.2" clip-path="url(#terminal-line-32)">▏</text><text class="terminal-r1" x="1464" y="800.8" textLength="12.2" clip-path="url(#terminal-line-32)">
+</text><text class="terminal-r8" x="12.2" y="800.8" textLength="12.2" clip-path="url(#terminal-line-32)">│</text><text class="terminal-r12" x="36.6" y="800.8" textLength="12.2" clip-path="url(#terminal-line-32)">T</text><text class="terminal-r13" x="48.8" y="800.8" textLength="634.4" clip-path="url(#terminal-line-32)">ype&#160;your&#160;message,&#160;@mention&#160;a&#160;file,&#160;or&#160;/&#160;for&#160;commands</text><text class="terminal-r8" x="963.8" y="800.8" textLength="12.2" clip-path="url(#terminal-line-32)">│</text><text class="terminal-r2" x="988.2" y="800.8" textLength="12.2" clip-path="url(#terminal-line-32)">▏</text><text class="terminal-r1" x="1464" y="800.8" textLength="12.2" clip-path="url(#terminal-line-32)">
 </text><text class="terminal-r8" x="12.2" y="825.2" textLength="963.8" clip-path="url(#terminal-line-33)">└─────────────────────────────────────────────────────────────────────────────┘</text><text class="terminal-r2" x="988.2" y="825.2" textLength="12.2" clip-path="url(#terminal-line-33)">▏</text><text class="terminal-r1" x="1464" y="825.2" textLength="12.2" clip-path="url(#terminal-line-33)">
 </text><text class="terminal-r5" x="12.2" y="849.6" textLength="634.4" clip-path="url(#terminal-line-34)">[Ctrl+L&#160;for&#160;multi-line&#160;•&#160;Ctrl+X&#160;for&#160;custom&#160;editor]&#160;•</text><text class="terminal-r2" x="988.2" y="849.6" textLength="12.2" clip-path="url(#terminal-line-34)">▏</text><text class="terminal-r1" x="1464" y="849.6" textLength="12.2" clip-path="url(#terminal-line-34)">
 </text><text class="terminal-r5" x="12.2" y="874" textLength="414.8" clip-path="url(#terminal-line-35)">/tmp/openhands-e2e-test-workspace&#160;</text><text class="terminal-r5" x="427" y="874" textLength="536.8" clip-path="url(#terminal-line-35)">ctx&#160;100&#160;/&#160;128K&#160;•&#160;$&#160;0.0023&#160;(↑&#160;300&#160;↓&#160;150&#160;cache</text><text class="terminal-r2" x="988.2" y="874" textLength="12.2" clip-path="url(#terminal-line-35)">▏</text><text class="terminal-r1" x="1464" y="874" textLength="12.2" clip-path="url(#terminal-line-35)">
 </text><text class="terminal-r5" x="12.2" y="898.4" textLength="36.6" clip-path="url(#terminal-line-36)">0%)</text><text class="terminal-r2" x="988.2" y="898.4" textLength="12.2" clip-path="url(#terminal-line-36)">▏</text><text class="terminal-r1" x="1464" y="898.4" textLength="12.2" clip-path="url(#terminal-line-36)">
 </text><text class="terminal-r2" x="988.2" y="922.8" textLength="12.2" clip-path="url(#terminal-line-37)">▏</text><text class="terminal-r1" x="1464" y="922.8" textLength="12.2" clip-path="url(#terminal-line-37)">
 </text><text class="terminal-r2" x="988.2" y="947.2" textLength="12.2" clip-path="url(#terminal-line-38)">▏</text><text class="terminal-r1" x="1464" y="947.2" textLength="12.2" clip-path="url(#terminal-line-38)">
-</text><text class="terminal-r15" x="0" y="971.6" textLength="48.8" clip-path="url(#terminal-line-39)">&#160;^x&#160;</text><text class="terminal-r5" x="48.8" y="971.6" textLength="256.2" clip-path="url(#terminal-line-39)">Open&#160;external&#160;editor&#160;</text><text class="terminal-r15" x="305" y="971.6" textLength="48.8" clip-path="url(#terminal-line-39)">&#160;^l&#160;</text><text class="terminal-r5" x="353.8" y="971.6" textLength="378.2" clip-path="url(#terminal-line-39)">Toggle&#160;single/multi-line&#160;input&#160;</text><text class="terminal-r15" x="732" y="971.6" textLength="48.8" clip-path="url(#terminal-line-39)">&#160;^j&#160;</text><text class="terminal-r5" x="780.8" y="971.6" textLength="292.8" clip-path="url(#terminal-line-39)">Submit&#160;multi-line&#160;input&#160;</text><text class="terminal-r15" x="1073.6" y="971.6" textLength="48.8" clip-path="url(#terminal-line-39)">&#160;^q&#160;</text><text class="terminal-r5" x="1122.4" y="971.6" textLength="195.2" clip-path="url(#terminal-line-39)">Quit&#160;the&#160;applica</text><text class="terminal-r7" x="1317.6" y="971.6" textLength="12.2" clip-path="url(#terminal-line-39)">▏</text><text class="terminal-r15" x="1329.8" y="971.6" textLength="24.4" clip-path="url(#terminal-line-39)">^p</text><text class="terminal-r5" x="1354.2" y="971.6" textLength="97.6" clip-path="url(#terminal-line-39)">&#160;palette</text>
+</text><text class="terminal-r14" x="0" y="971.6" textLength="48.8" clip-path="url(#terminal-line-39)">&#160;^x&#160;</text><text class="terminal-r5" x="48.8" y="971.6" textLength="256.2" clip-path="url(#terminal-line-39)">Open&#160;external&#160;editor&#160;</text><text class="terminal-r14" x="305" y="971.6" textLength="48.8" clip-path="url(#terminal-line-39)">&#160;^l&#160;</text><text class="terminal-r5" x="353.8" y="971.6" textLength="378.2" clip-path="url(#terminal-line-39)">Toggle&#160;single/multi-line&#160;input&#160;</text><text class="terminal-r14" x="732" y="971.6" textLength="48.8" clip-path="url(#terminal-line-39)">&#160;^j&#160;</text><text class="terminal-r5" x="780.8" y="971.6" textLength="292.8" clip-path="url(#terminal-line-39)">Submit&#160;multi-line&#160;input&#160;</text><text class="terminal-r14" x="1073.6" y="971.6" textLength="48.8" clip-path="url(#terminal-line-39)">&#160;^q&#160;</text><text class="terminal-r5" x="1122.4" y="971.6" textLength="195.2" clip-path="url(#terminal-line-39)">Quit&#160;the&#160;applica</text><text class="terminal-r6" x="1317.6" y="971.6" textLength="12.2" clip-path="url(#terminal-line-39)">▏</text><text class="terminal-r14" x="1329.8" y="971.6" textLength="24.4" clip-path="url(#terminal-line-39)">^p</text><text class="terminal-r5" x="1354.2" y="971.6" textLength="97.6" clip-path="url(#terminal-line-39)">&#160;palette</text>
     </g>
     </g>
 </svg>
