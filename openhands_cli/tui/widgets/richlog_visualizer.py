@@ -627,6 +627,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             collapsed=True,
             id="system_prompt_collapsible",
             classes="system-prompt-collapsible",
+            border_color=None,
         )
 
     def _create_event_widget(self, event: Event) -> "Widget | None":
