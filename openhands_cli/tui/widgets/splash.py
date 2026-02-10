@@ -18,10 +18,13 @@ Example:
 
     # In OpenHandsApp._initialize_main_ui():
     splash_content = self.query_one("#splash_content", SplashContent)
-    splash_content.initialize(has_critic=True)
+    splash_content.initialize(has_critic=True, loaded_resources=resources)
 """
 
+from __future__ import annotations
+
 import uuid
+from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
 from textual.containers import Container
@@ -30,6 +33,10 @@ from textual.widgets import Static
 
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
+
+
+if TYPE_CHECKING:
+    from openhands_cli.tui.content.resources import LoadedResourcesInfo
 
 
 class SplashContent(Container):
@@ -43,6 +50,7 @@ class SplashContent(Container):
     - Instructions header and text
     - Update notice (conditional)
     - Critic notice (conditional)
+    - Loaded resources collapsible (conditional)
 
     Lifecycle:
     - On mount: Content is hidden (waiting for initialization)
@@ -82,7 +90,12 @@ class SplashContent(Container):
         yield Static(id="splash_update_notice", classes="splash-update-notice")
         yield Static(id="splash_critic_notice", classes="splash-critic-notice")
 
-    def initialize(self, *, has_critic: bool = False) -> None:
+    def initialize(
+        self,
+        *,
+        has_critic: bool = False,
+        loaded_resources: LoadedResourcesInfo | None = None,
+    ) -> None:
         """Initialize and show the splash content.
 
         Called by OpenHandsApp during UI setup. This is a one-time
@@ -90,13 +103,38 @@ class SplashContent(Container):
 
         Args:
             has_critic: Whether the agent has a critic configured.
+            loaded_resources: Optional loaded resources info to display.
         """
         if self._is_initialized:
             return
 
         self._has_critic = has_critic
         self._populate_content()
+
+        # Add loaded resources collapsible if there are resources
+        if loaded_resources and loaded_resources.has_resources():
+            self._add_loaded_resources_collapsible(loaded_resources)
+
         self._is_initialized = True
+
+    def _add_loaded_resources_collapsible(
+        self, loaded_resources: LoadedResourcesInfo
+    ) -> None:
+        """Add a collapsible showing skills, hooks, and MCPs."""
+        from openhands_cli.tui.widgets.collapsible import Collapsible
+
+        summary = loaded_resources.get_summary()
+        details = loaded_resources.get_details()
+
+        collapsible = Collapsible(
+            details,
+            title=f"Loaded: {summary}",
+            collapsed=True,
+            id="loaded_resources_collapsible",
+            border_color=OPENHANDS_THEME.accent,
+        )
+
+        self.mount(collapsible)
 
     @property
     def is_initialized(self) -> bool:

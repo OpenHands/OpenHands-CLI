@@ -450,35 +450,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Store loaded resources for later use (e.g., /skills command)
         self._loaded_resources = loaded_resources
 
-        # Initialize splash content - direct call for UI lifecycle
-        splash_content.initialize(has_critic=has_critic)
-
-        # Add loaded resources collapsible if there are skills, hooks, or MCPs
-        if loaded_resources.has_resources():
-            self._add_loaded_resources_collapsible(loaded_resources)
+        # Initialize splash content with resources - SplashContent handles its own UI
+        splash_content.initialize(has_critic=has_critic, loaded_resources=loaded_resources)
 
         # Process any queued inputs
         self._process_queued_inputs()
-
-    def _add_loaded_resources_collapsible(
-        self, loaded_resources: LoadedResourcesInfo
-    ) -> None:
-        """Add a collapsible showing skills, hooks, and MCPs to the scroll view."""
-        summary = loaded_resources.get_summary()
-        details = loaded_resources.get_details()
-
-        # Create collapsible with summary as title and details as content
-        collapsible = Collapsible(
-            details,
-            title=f"Loaded: {summary}",
-            collapsed=True,
-            id="loaded_resources_collapsible",
-            border_color=OPENHANDS_THEME.accent,
-        )
-
-        # Mount after the splash content as a normal chat collapsible
-        splash_content = self.scroll_view.query_one("#splash_content", SplashContent)
-        self.scroll_view.mount(collapsible, after=splash_content)
 
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.
