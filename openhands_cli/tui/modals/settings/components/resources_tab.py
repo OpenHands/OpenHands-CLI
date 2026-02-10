@@ -14,6 +14,7 @@ from openhands.sdk.hooks import HookConfig
 from openhands_cli.locations import get_work_dir
 from openhands_cli.stores import AgentStore
 from openhands_cli.theme import OPENHANDS_THEME
+from openhands_cli.tui.content.resources import extract_hook_commands
 
 
 class ResourcesTab(Container):
@@ -126,11 +127,7 @@ class ResourcesTab(Container):
         lines = []
         for hook_type, hook_matchers in hook_types:
             if hook_matchers:
-                # Collect all hook commands from all matchers
-                commands = []
-                for matcher in hook_matchers:
-                    for hook_def in matcher.hooks:
-                        commands.append(hook_def.command)
+                commands = extract_hook_commands(hook_matchers)
                 if commands:
                     commands_str = ", ".join(commands)
                     lines.append(

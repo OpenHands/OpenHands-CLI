@@ -139,6 +139,25 @@ def _collect_skills(agent: Agent) -> list[SkillInfo]:
     return skills
 
 
+def extract_hook_commands(hook_matchers: list) -> list[str]:
+    """Extract hook commands from a list of hook matchers.
+
+    This is a shared helper function used by both the resources collection
+    and the resources tab display.
+
+    Args:
+        hook_matchers: List of hook matchers from HookConfig
+
+    Returns:
+        List of command strings from all hooks in all matchers
+    """
+    commands = []
+    for matcher in hook_matchers:
+        for hook_def in matcher.hooks:
+            commands.append(hook_def.command)
+    return commands
+
+
 def _collect_hooks(working_dir: Path | str | None) -> list[HookInfo]:
     """Collect hooks information from the hook configuration.
 
@@ -163,11 +182,7 @@ def _collect_hooks(working_dir: Path | str | None) -> list[HookInfo]:
         ]
         for hook_type, hook_matchers in hook_types:
             if hook_matchers:
-                # Collect all hook commands from all matchers
-                commands = []
-                for matcher in hook_matchers:
-                    for hook_def in matcher.hooks:
-                        commands.append(hook_def.command)
+                commands = extract_hook_commands(hook_matchers)
                 if commands:
                     hooks.append(HookInfo(hook_type=hook_type, commands=commands))
     except (ImportError, AttributeError) as e:
