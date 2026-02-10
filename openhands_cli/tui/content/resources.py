@@ -42,11 +42,6 @@ class HookInfo:
     hook_type: str
     commands: list[str] = field(default_factory=list)
 
-    @property
-    def count(self) -> int:
-        """Return the number of hook commands."""
-        return len(self.commands)
-
 
 @dataclass
 class MCPInfo:
@@ -65,18 +60,6 @@ class LoadedResourcesInfo:
     hooks: list[HookInfo] = field(default_factory=list)
     mcps: list[MCPInfo] = field(default_factory=list)
 
-    @property
-    def skills_count(self) -> int:
-        return len(self.skills)
-
-    @property
-    def hooks_count(self) -> int:
-        return sum(h.count for h in self.hooks)
-
-    @property
-    def mcps_count(self) -> int:
-        return len(self.mcps)
-
     def has_resources(self) -> bool:
         """Check if any resources are loaded."""
         return bool(self.skills or self.hooks or self.mcps)
@@ -84,12 +67,13 @@ class LoadedResourcesInfo:
     def get_summary(self) -> str:
         """Get a summary string of loaded resources."""
         parts = []
-        if self.skills_count > 0:
-            parts.append(_pluralize("skill", self.skills_count))
-        if self.hooks_count > 0:
-            parts.append(_pluralize("hook", self.hooks_count))
-        if self.mcps_count > 0:
-            parts.append(_pluralize("MCP", self.mcps_count))
+        if self.skills:
+            parts.append(_pluralize("skill", len(self.skills)))
+        hooks_count = sum(len(h.commands) for h in self.hooks)
+        if hooks_count > 0:
+            parts.append(_pluralize("hook", hooks_count))
+        if self.mcps:
+            parts.append(_pluralize("MCP", len(self.mcps)))
         return ", ".join(parts) if parts else "No resources loaded"
 
     def get_details(self) -> str:
@@ -97,7 +81,7 @@ class LoadedResourcesInfo:
         lines = []
 
         if self.skills:
-            lines.append(f"Skills ({self.skills_count}):")
+            lines.append(f"Skills ({len(self.skills)}):")
             for skill in self.skills:
                 lines.append(f"  • {skill.name}")
                 if skill.description:
@@ -108,7 +92,8 @@ class LoadedResourcesInfo:
         if self.hooks:
             if lines:
                 lines.append("")
-            lines.append(f"Hooks ({self.hooks_count}):")
+            hooks_count = sum(len(h.commands) for h in self.hooks)
+            lines.append(f"Hooks ({hooks_count}):")
             for hook in self.hooks:
                 commands_str = ", ".join(hook.commands) if hook.commands else "none"
                 lines.append(f"  • {hook.hook_type}: {commands_str}")
@@ -116,7 +101,7 @@ class LoadedResourcesInfo:
         if self.mcps:
             if lines:
                 lines.append("")
-            lines.append(f"MCPs ({self.mcps_count}):")
+            lines.append(f"MCPs ({len(self.mcps)}):")
             for mcp in self.mcps:
                 lines.append(f"  • {mcp.name}")
                 if mcp.transport:

@@ -24,9 +24,9 @@ class TestLoadedResourcesInfo:
     def test_empty_resources(self):
         """Test LoadedResourcesInfo with no resources."""
         info = LoadedResourcesInfo()
-        assert info.skills_count == 0
-        assert info.hooks_count == 0
-        assert info.mcps_count == 0
+        assert len(info.skills) == 0
+        assert len(info.hooks) == 0
+        assert len(info.mcps) == 0
         assert info.get_summary() == "No resources loaded"
 
     def test_has_resources_empty(self):
@@ -59,9 +59,9 @@ class TestLoadedResourcesInfo:
                 SkillInfo(name="skill2", description="Second skill", source="project"),
             ]
         )
-        assert info.skills_count == 2
-        assert info.hooks_count == 0
-        assert info.mcps_count == 0
+        assert len(info.skills) == 2
+        assert len(info.hooks) == 0
+        assert len(info.mcps) == 0
         assert "2 skills" in info.get_summary()
 
     def test_hooks_only(self):
@@ -72,9 +72,10 @@ class TestLoadedResourcesInfo:
                 HookInfo(hook_type="post_tool_use", commands=["cmd3"]),
             ]
         )
-        assert info.skills_count == 0
-        assert info.hooks_count == 3  # Sum of all hook counts
-        assert info.mcps_count == 0
+        assert len(info.skills) == 0
+        # Total hook commands: 2 + 1 = 3
+        assert sum(len(h.commands) for h in info.hooks) == 3
+        assert len(info.mcps) == 0
         assert "3 hooks" in info.get_summary()
 
     def test_mcps_only(self):
@@ -85,9 +86,9 @@ class TestLoadedResourcesInfo:
                 MCPInfo(name="mcp2", transport="http"),
             ]
         )
-        assert info.skills_count == 0
-        assert info.hooks_count == 0
-        assert info.mcps_count == 2
+        assert len(info.skills) == 0
+        assert len(info.hooks) == 0
+        assert len(info.mcps) == 2
         assert "2 MCPs" in info.get_summary()
 
     def test_all_resources(self):
@@ -97,9 +98,9 @@ class TestLoadedResourcesInfo:
             hooks=[HookInfo(hook_type="pre_tool_use", commands=["cmd1"])],
             mcps=[MCPInfo(name="mcp1", transport="stdio")],
         )
-        assert info.skills_count == 1
-        assert info.hooks_count == 1
-        assert info.mcps_count == 1
+        assert len(info.skills) == 1
+        assert sum(len(h.commands) for h in info.hooks) == 1
+        assert len(info.mcps) == 1
         summary = info.get_summary()
         assert "1 skill" in summary
         assert "1 hook" in summary
@@ -185,14 +186,14 @@ class TestHookInfo:
         """Test HookInfo dataclass."""
         hook = HookInfo(hook_type="pre_tool_use", commands=["cmd1", "cmd2", "cmd3"])
         assert hook.hook_type == "pre_tool_use"
-        assert hook.count == 3
+        assert len(hook.commands) == 3
         assert hook.commands == ["cmd1", "cmd2", "cmd3"]
 
     def test_hook_info_empty_commands(self):
         """Test HookInfo with empty commands."""
         hook = HookInfo(hook_type="stop")
         assert hook.hook_type == "stop"
-        assert hook.count == 0
+        assert len(hook.commands) == 0
         assert hook.commands == []
 
 
