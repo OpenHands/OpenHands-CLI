@@ -170,7 +170,7 @@ def _collect_hooks(working_dir: Path | str | None) -> list[HookInfo]:
                         commands.append(hook_def.command)
                 if commands:
                     hooks.append(HookInfo(hook_type=hook_type, commands=commands))
-    except Exception as e:
+    except (ImportError, AttributeError) as e:
         logger.debug(f"Failed to collect hooks: {e}")
 
     return hooks
@@ -193,7 +193,7 @@ def _collect_mcps() -> list[MCPInfo]:
             else:
                 transport = None
             mcps.append(MCPInfo(name=name, transport=transport, enabled=True))
-    except Exception as e:
+    except (ImportError, AttributeError) as e:
         logger.debug(f"Failed to collect MCPs: {e}")
 
     return mcps
