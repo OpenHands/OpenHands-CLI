@@ -6,16 +6,12 @@ and the logic for handling command execution.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from textual.containers import VerticalScroll
 from textual.widgets import Static
 from textual_autocomplete import DropdownItem
 
 from openhands_cli.theme import OPENHANDS_THEME
-
-if TYPE_CHECKING:
-    from openhands_cli.tui.content.resources import LoadedResourcesInfo
+from openhands_cli.tui.content.resources import LoadedResourcesInfo
 
 
 # Available commands with descriptions after the command
@@ -93,32 +89,25 @@ def show_help(scroll_view: VerticalScroll) -> None:
 
 
 def show_skills(
-    scroll_view: VerticalScroll, loaded_resources: LoadedResourcesInfo | None
+    scroll_view: VerticalScroll, loaded_resources: LoadedResourcesInfo
 ) -> None:
     """Display loaded skills, hooks, and MCPs information in the scroll view.
 
     Args:
         scroll_view: The VerticalScroll widget to mount skills content to
-        loaded_resources: Information about loaded resources, or None if not available
+        loaded_resources: Information about loaded resources
     """
     primary = OPENHANDS_THEME.primary
 
-    if loaded_resources is None:
-        skills_text = f"""
-[bold {primary}]Loaded Resources[/bold {primary}]
-[dim]No resources information available yet.
-Send a message to start a conversation and load resources.[/dim]
-"""
+    # Build the skills text using the get_details method
+    lines = [f"\n[bold {primary}]Loaded Resources[/bold {primary}]"]
+    lines.append(f"[dim]Summary:[/dim] {loaded_resources.get_summary()}\n")
+    details = loaded_resources.get_details()
+    if details and details != "No resources loaded":
+        lines.append(details)
     else:
-        # Build the skills text using the get_details method
-        lines = [f"\n[bold {primary}]Loaded Resources[/bold {primary}]"]
-        lines.append(f"[dim]Summary:[/dim] {loaded_resources.get_summary()}\n")
-        details = loaded_resources.get_details()
-        if details and details != "No resources loaded":
-            lines.append(details)
-        else:
-            lines.append("[dim]No skills, hooks, or MCPs loaded.[/dim]")
-        skills_text = "\n".join(lines)
+        lines.append("[dim]No skills, hooks, or MCPs loaded.[/dim]")
+    skills_text = "\n".join(lines)
 
     skills_widget = Static(skills_text, classes="skills-message")
     scroll_view.mount(skills_widget)

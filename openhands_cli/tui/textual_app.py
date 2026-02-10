@@ -204,6 +204,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         self.plan_panel: PlanSidePanel = PlanSidePanel(self)
 
+        # Initialize loaded resources with empty state (populated later)
+        self._loaded_resources = LoadedResourcesInfo()
+
         # Register the custom theme
         self.register_theme(OPENHANDS_THEME)
 

@@ -135,8 +135,7 @@ class InputAreaContainer(Container):
     def _command_skills(self) -> None:
         """Handle the /skills command to display loaded resources."""
         app = cast("OpenHandsApp", self.app)
-        loaded_resources = getattr(app, "_loaded_resources", None)
-        show_skills(self.scroll_view, loaded_resources)
+        show_skills(self.scroll_view, app._loaded_resources)
         self.scroll_view.scroll_end(animate=False)
 
     def _command_feedback(self) -> None:

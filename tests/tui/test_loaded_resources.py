@@ -252,18 +252,6 @@ class TestShowSkillsCommand:
         assert "mcp1" in skills_text
         assert "stdio" in skills_text
 
-    def test_show_skills_without_resources(self):
-        """Test show_skills with None loaded resources."""
-        mock_main_display = mock.MagicMock(spec=VerticalScroll)
-
-        show_skills(mock_main_display, None)
-
-        mock_main_display.mount.assert_called_once()
-        skills_widget = mock_main_display.mount.call_args[0][0]
-        skills_text = skills_widget.content
-
-        assert "No resources information available" in skills_text
-
     def test_show_skills_empty_resources(self):
         """Test show_skills with empty loaded resources."""
         mock_main_display = mock.MagicMock(spec=VerticalScroll)
@@ -387,11 +375,11 @@ class TestSkillsCommandInApp:
                 assert call_args[0][1] is oh_app._loaded_resources
 
     @pytest.mark.asyncio
-    async def test_skills_command_without_loaded_resources(
+    async def test_loaded_resources_always_initialized(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """/skills command should handle missing loaded resources gracefully."""
+        """_loaded_resources should always be initialized as LoadedResourcesInfo."""
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
@@ -403,10 +391,10 @@ class TestSkillsCommandInApp:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            # Explicitly set _loaded_resources to None to test the fallback
-            oh_app._loaded_resources = None  # type: ignore
+            # _loaded_resources should always be a LoadedResourcesInfo instance
+            assert isinstance(oh_app._loaded_resources, LoadedResourcesInfo)
 
-            # Mock show_skills to verify it's called with None via InputAreaContainer
+            # Mock show_skills to verify it's called with LoadedResourcesInfo
             with mock.patch(
                 "openhands_cli.tui.widgets.input_area.show_skills"
             ) as mock_show_skills:
@@ -415,7 +403,7 @@ class TestSkillsCommandInApp:
 
                 mock_show_skills.assert_called_once()
                 call_args = mock_show_skills.call_args
-                assert call_args[0][1] is None
+                assert isinstance(call_args[0][1], LoadedResourcesInfo)
 
 
 class TestCollectLoadedResources:
