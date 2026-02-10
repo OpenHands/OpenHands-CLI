@@ -604,7 +604,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """Create a collapsible widget showing loaded resources from SystemPromptEvent.
 
         This extracts skills, tools, MCPs, and hooks information from the
-        SystemPromptEvent and displays them in a collapsible widget.
+        SystemPromptEvent and displays them in a collapsible widget. The title
+        shows a summary of loaded resources, and the content shows the full
+        system prompt (matching ACP's display format).
 
         Args:
             event: The SystemPromptEvent containing tools and system prompt
@@ -615,6 +617,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         from openhands_cli.locations import get_work_dir
         from openhands_cli.tui.content.resources import (
             collect_resources_from_system_prompt,
+            format_system_prompt_content,
         )
 
         # Extract resources from the SystemPromptEvent
@@ -630,12 +633,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
         if not resources.has_resources():
             return None
 
-        # Build the collapsible content
+        # Build the collapsible content - show system prompt like ACP does
         summary = resources.get_summary()
-        details = resources.get_details()
+        content = format_system_prompt_content(event)
 
         return Collapsible(
-            details,
+            content,
             title=f"📦 Loaded: {summary}",
             collapsed=True,
             id="loaded_resources_collapsible",

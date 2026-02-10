@@ -104,7 +104,9 @@ class SharedEventHandler:
     async def handle_system_prompt(
         self, ctx: _ACPContext, event: SystemPromptEvent
     ) -> None:
-        await self.send_thought(ctx, _event_visualize_to_plain(event))
+        from openhands_cli.tui.content.resources import format_system_prompt_content
+
+        await self.send_thought(ctx, format_system_prompt_content(event))
 
     async def handle_condensation(self, ctx: _ACPContext, event: Condensation) -> None:
         await self.send_thought(ctx, _event_visualize_to_plain(event))

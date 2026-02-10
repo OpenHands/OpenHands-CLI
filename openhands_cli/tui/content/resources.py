@@ -11,9 +11,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from openhands.sdk.event import SystemPromptEvent
+
+
 if TYPE_CHECKING:
     from openhands.sdk import Agent
-    from openhands.sdk.event import SystemPromptEvent
     from openhands.sdk.tool import ToolDefinition
 
 
@@ -353,3 +355,19 @@ def _extract_skills_from_system_prompt(system_prompt: str) -> list[SkillInfo]:
             skills.append(SkillInfo(name=name, description=description))
 
     return skills
+
+
+def format_system_prompt_content(event: SystemPromptEvent) -> str:
+    """Format the SystemPromptEvent content for display.
+
+    This function formats the system prompt content in the same way as ACP does,
+    using the event's visualize.plain property. This ensures consistency between
+    the TUI and ACP implementations.
+
+    Args:
+        event: The SystemPromptEvent to format
+
+    Returns:
+        Formatted string representation of the system prompt
+    """
+    return str(event.visualize.plain)
