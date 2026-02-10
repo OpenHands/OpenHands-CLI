@@ -12,7 +12,6 @@ from openhands_cli.tui.content.resources import (
     MCPInfo,
     SkillInfo,
     ToolInfo,
-    _is_mcp_tool,
     collect_loaded_resources,
 )
 from openhands_cli.tui.core.commands import show_skills
@@ -514,23 +513,3 @@ class TestCollectLoadedResources:
         assert resources.skills[0].name == "test_skill"
         assert resources.skills[0].description == "A test skill"
         assert resources.skills[0].source == "project"
-
-
-class TestIsMcpTool:
-    """Tests for _is_mcp_tool function."""
-
-    def test_is_mcp_tool_with_regular_tool(self):
-        """Test _is_mcp_tool returns False for regular tools."""
-        mock_tool = mock.MagicMock()
-        # Regular tool should return False
-        result = _is_mcp_tool(mock_tool)
-        assert result is False
-
-    def test_is_mcp_tool_with_mcp_tool(self):
-        """Test _is_mcp_tool returns True for MCPToolDefinition."""
-        from openhands.sdk.mcp.tool import MCPToolDefinition
-
-        # Create a mock that is an instance of MCPToolDefinition
-        mock_tool = mock.MagicMock(spec=MCPToolDefinition)
-        result = _is_mcp_tool(mock_tool)
-        assert result is True

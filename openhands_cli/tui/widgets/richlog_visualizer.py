@@ -612,10 +612,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         Returns:
             A Collapsible widget showing the system prompt
         """
-        from openhands_cli.tui.content.resources import format_system_prompt_content
-
         # Build the collapsible content - show system prompt like ACP does
-        content = format_system_prompt_content(event)
+        content = str(event.visualize.plain)
 
         # Get tool count for title
         tool_count = len(event.tools) if event.tools else 0

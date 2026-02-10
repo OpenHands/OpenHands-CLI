@@ -12,12 +12,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from openhands.sdk.event import SystemPromptEvent
-
-
 if TYPE_CHECKING:
     from openhands.sdk import Agent
-    from openhands.sdk.tool import ToolDefinition
 
 logger = logging.getLogger(__name__)
 
@@ -276,50 +272,3 @@ def collect_loaded_resources(
     resources.mcps = _collect_mcps()
 
     return resources
-
-
-def _is_mcp_tool(tool: ToolDefinition) -> bool:
-    """Check if a tool is an MCP tool.
-
-    Args:
-        tool: The tool definition to check
-
-    Returns:
-        True if the tool is an MCP tool, False otherwise
-    """
-    try:
-        from openhands.sdk.mcp.tool import MCPToolDefinition
-
-        return isinstance(tool, MCPToolDefinition)
-    except ImportError:
-        return False
-
-
-def _get_mcp_server_name(tool: ToolDefinition) -> str | None:
-    """Get the MCP server name from a tool's meta field.
-
-    Args:
-        tool: The tool definition
-
-    Returns:
-        The MCP server name if available, None otherwise
-    """
-    if tool.meta and "mcp_server" in tool.meta:
-        return tool.meta["mcp_server"]
-    return None
-
-
-def format_system_prompt_content(event: SystemPromptEvent) -> str:
-    """Format the SystemPromptEvent content for display.
-
-    This function formats the system prompt content in the same way as ACP does,
-    using the event's visualize.plain property. This ensures consistency between
-    the TUI and ACP implementations.
-
-    Args:
-        event: The SystemPromptEvent to format
-
-    Returns:
-        Formatted string representation of the system prompt
-    """
-    return str(event.visualize.plain)
