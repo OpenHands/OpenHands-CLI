@@ -412,12 +412,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         This method is responsible for:
         1. Checking if the agent has a critic configured
-        2. Collecting and displaying loaded resources (skills, hooks, MCPs - not tools)
+        2. Collecting and displaying loaded resources (skills, hooks, MCPs)
         3. Initializing the splash content (one-time setup)
         4. Processing any queued inputs
-
-        Note: Tools are displayed separately in the SystemPromptEvent collapsible
-        after the user sends their first message.
 
         UI lifecycle is owned by OpenHandsApp, not ConversationContainer. The splash
         content initialization is a direct method call, not a reactive
@@ -454,8 +451,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         splash_content.initialize(has_critic=has_critic)
 
         # Add loaded resources collapsible if there are skills, hooks, or MCPs
-        # (tools are shown separately in the SystemPromptEvent collapsible)
-        if loaded_resources.has_resources(include_tools=False):
+        if loaded_resources.has_resources():
             self._add_loaded_resources_collapsible(loaded_resources)
 
         # Process any queued inputs
@@ -464,12 +460,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     def _add_loaded_resources_collapsible(
         self, loaded_resources: LoadedResourcesInfo
     ) -> None:
-        """Add a collapsible showing skills, hooks, and MCPs to the scroll view.
-
-        Note: Tools are excluded here as they are shown in the SystemPromptEvent
-        collapsible after the user sends their first message.
-        """
-        # Get summary and details without tools
+        """Add a collapsible showing skills, hooks, and MCPs to the scroll view."""
         summary = loaded_resources.get_summary()
         details = loaded_resources.get_details()
 

@@ -14,10 +14,9 @@ from openhands_cli.tui.modals.settings.components.resources_tab import Resources
 
 def _create_mock_agent(
     skills: list[Any] | None = None,
-    tools: list[Any] | None = None,
     mcp_config: dict[str, Any] | None = None,
 ) -> MagicMock:
-    """Create a mock Agent with configurable skills, tools, and MCP config."""
+    """Create a mock Agent with configurable skills and MCP config."""
     mock_agent = MagicMock()
 
     # Set up agent_context with skills
@@ -26,9 +25,6 @@ def _create_mock_agent(
         mock_agent.agent_context.skills = skills
     else:
         mock_agent.agent_context = None
-
-    # Set up tools
-    mock_agent.tools = tools or []
 
     # Set up MCP config
     mock_agent.mcp_config = mcp_config or {"mcpServers": {}}
@@ -45,13 +41,6 @@ def _create_mock_skill(
     skill.description = description
     skill.source = source
     return skill
-
-
-def _create_mock_tool(name: str) -> MagicMock:
-    """Create a mock tool."""
-    tool = MagicMock()
-    tool.name = name
-    return tool
 
 
 class _TestApp(App):

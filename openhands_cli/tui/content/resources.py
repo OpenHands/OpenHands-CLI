@@ -1,8 +1,10 @@
 """Loaded resources information for OpenHands CLI.
 
-This module contains dataclasses for tracking loaded skills, hooks, tools,
+This module contains dataclasses for tracking loaded skills, hooks,
 and MCPs that are activated in a conversation, as well as utility functions
 for collecting this information from the agent configuration.
+
+Note: Tools are not collected here as they are reported in SystemPromptEvent.
 """
 
 from __future__ import annotations
@@ -42,13 +44,6 @@ class HookInfo:
 
 
 @dataclass
-class ToolInfo:
-    """Information about a loaded tool."""
-
-    name: str
-
-
-@dataclass
 class MCPInfo:
     """Information about a loaded MCP server."""
 
@@ -59,11 +54,10 @@ class MCPInfo:
 
 @dataclass
 class LoadedResourcesInfo:
-    """Information about loaded skills, hooks, tools, and MCPs for a conversation."""
+    """Information about loaded skills, hooks, and MCPs for a conversation."""
 
     skills: list[SkillInfo] = field(default_factory=list)
     hooks: list[HookInfo] = field(default_factory=list)
-    tools: list[ToolInfo] = field(default_factory=list)
     mcps: list[MCPInfo] = field(default_factory=list)
 
     @property
@@ -75,29 +69,15 @@ class LoadedResourcesInfo:
         return sum(h.count for h in self.hooks)
 
     @property
-    def tools_count(self) -> int:
-        return len(self.tools)
-
-    @property
     def mcps_count(self) -> int:
         return len(self.mcps)
 
-    def has_resources(self, *, include_tools: bool = True) -> bool:
-        """Check if any resources are loaded.
-
-        Args:
-            include_tools: Whether to include tools in the check (default: True)
-        """
-        if include_tools:
-            return bool(self.skills or self.hooks or self.tools or self.mcps)
+    def has_resources(self) -> bool:
+        """Check if any resources are loaded."""
         return bool(self.skills or self.hooks or self.mcps)
 
-    def get_summary(self, *, include_tools: bool = False) -> str:
-        """Get a summary string of loaded resources.
-
-        Args:
-            include_tools: Whether to include tools in the summary (default: False)
-        """
+    def get_summary(self) -> str:
+        """Get a summary string of loaded resources."""
         parts = []
         if self.skills_count > 0:
             parts.append(
@@ -107,20 +87,12 @@ class LoadedResourcesInfo:
             parts.append(
                 f"{self.hooks_count} hook{'s' if self.hooks_count != 1 else ''}"
             )
-        if include_tools and self.tools_count > 0:
-            parts.append(
-                f"{self.tools_count} tool{'s' if self.tools_count != 1 else ''}"
-            )
         if self.mcps_count > 0:
             parts.append(f"{self.mcps_count} MCP{'s' if self.mcps_count != 1 else ''}")
         return ", ".join(parts) if parts else "No resources loaded"
 
-    def get_details(self, *, include_tools: bool = False) -> str:
-        """Get detailed information about loaded resources.
-
-        Args:
-            include_tools: Whether to include tools in the details (default: False)
-        """
+    def get_details(self) -> str:
+        """Get detailed information about loaded resources."""
         lines = []
 
         if self.skills:
@@ -139,13 +111,6 @@ class LoadedResourcesInfo:
             for hook in self.hooks:
                 commands_str = ", ".join(hook.commands) if hook.commands else "none"
                 lines.append(f"  • {hook.hook_type}: {commands_str}")
-
-        if include_tools and self.tools:
-            if lines:
-                lines.append("")
-            lines.append(f"Tools ({self.tools_count}):")
-            for tool in self.tools:
-                lines.append(f"  • {tool.name}")
 
         if self.mcps:
             if lines:
@@ -172,15 +137,6 @@ def _collect_skills(agent: Agent) -> list[SkillInfo]:
                 )
             )
     return skills
-
-
-def _collect_tools(agent: Agent) -> list[ToolInfo]:
-    """Collect tools information from an agent."""
-    tools = []
-    if agent.tools:
-        for tool in agent.tools:
-            tools.append(ToolInfo(name=getattr(tool, "name", "Unknown")))
-    return tools
 
 
 def _collect_hooks(working_dir: Path | str | None) -> list[HookInfo]:
@@ -249,11 +205,13 @@ def collect_loaded_resources(
 ) -> LoadedResourcesInfo:
     """Collect information about loaded resources for a conversation.
 
-    This function gathers information about skills, hooks, tools, and MCPs
+    This function gathers information about skills, hooks, and MCPs
     that are activated for the current conversation.
 
+    Note: Tools are not collected here as they are reported in SystemPromptEvent.
+
     Args:
-        agent: The agent to collect resources from (for skills and tools)
+        agent: The agent to collect resources from (for skills)
         working_dir: The working directory to load hooks from
 
     Returns:
@@ -264,7 +222,6 @@ def collect_loaded_resources(
     # Collect from agent if provided
     if agent:
         resources.skills = _collect_skills(agent)
-        resources.tools = _collect_tools(agent)
 
     # Collect hooks
     resources.hooks = _collect_hooks(working_dir)

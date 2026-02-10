@@ -1,4 +1,4 @@
-"""Tests for loaded resources (skills, hooks, tools, MCPs) display functionality."""
+"""Tests for loaded resources (skills, hooks, MCPs) display functionality."""
 
 import unittest.mock as mock
 from typing import cast
@@ -11,7 +11,6 @@ from openhands_cli.tui.content.resources import (
     LoadedResourcesInfo,
     MCPInfo,
     SkillInfo,
-    ToolInfo,
     collect_loaded_resources,
 )
 from openhands_cli.tui.core.commands import show_skills
@@ -27,7 +26,6 @@ class TestLoadedResourcesInfo:
         info = LoadedResourcesInfo()
         assert info.skills_count == 0
         assert info.hooks_count == 0
-        assert info.tools_count == 0
         assert info.mcps_count == 0
         assert info.get_summary() == "No resources loaded"
 
@@ -48,11 +46,6 @@ class TestLoadedResourcesInfo:
         )
         assert info.has_resources() is True
 
-    def test_has_resources_with_tools(self):
-        """Test has_resources returns True when tools are present."""
-        info = LoadedResourcesInfo(tools=[ToolInfo(name="tool1")])
-        assert info.has_resources() is True
-
     def test_has_resources_with_mcps(self):
         """Test has_resources returns True when MCPs are present."""
         info = LoadedResourcesInfo(mcps=[MCPInfo(name="mcp1")])
@@ -68,7 +61,6 @@ class TestLoadedResourcesInfo:
         )
         assert info.skills_count == 2
         assert info.hooks_count == 0
-        assert info.tools_count == 0
         assert info.mcps_count == 0
         assert "2 skills" in info.get_summary()
 
@@ -82,24 +74,8 @@ class TestLoadedResourcesInfo:
         )
         assert info.skills_count == 0
         assert info.hooks_count == 3  # Sum of all hook counts
-        assert info.tools_count == 0
         assert info.mcps_count == 0
         assert "3 hooks" in info.get_summary()
-
-    def test_tools_only(self):
-        """Test LoadedResourcesInfo with only tools."""
-        info = LoadedResourcesInfo(
-            tools=[
-                ToolInfo(name="tool1"),
-                ToolInfo(name="tool2"),
-            ]
-        )
-        assert info.skills_count == 0
-        assert info.hooks_count == 0
-        assert info.tools_count == 2
-        assert info.mcps_count == 0
-        # get_summary() doesn't include tools (tools are shown in SystemPromptEvent)
-        assert info.get_summary() == "No resources loaded"
 
     def test_mcps_only(self):
         """Test LoadedResourcesInfo with only MCPs."""
@@ -111,7 +87,6 @@ class TestLoadedResourcesInfo:
         )
         assert info.skills_count == 0
         assert info.hooks_count == 0
-        assert info.tools_count == 0
         assert info.mcps_count == 2
         assert "2 MCPs" in info.get_summary()
 
@@ -120,19 +95,14 @@ class TestLoadedResourcesInfo:
         info = LoadedResourcesInfo(
             skills=[SkillInfo(name="skill1")],
             hooks=[HookInfo(hook_type="pre_tool_use", commands=["cmd1"])],
-            tools=[ToolInfo(name="tool1"), ToolInfo(name="tool2")],
             mcps=[MCPInfo(name="mcp1", transport="stdio")],
         )
         assert info.skills_count == 1
         assert info.hooks_count == 1
-        assert info.tools_count == 2
         assert info.mcps_count == 1
         summary = info.get_summary()
         assert "1 skill" in summary
         assert "1 hook" in summary
-        # get_summary() doesn't include tools by default
-        # (tools are shown in SystemPromptEvent)
-        assert "tools" not in summary
         assert "1 MCP" in summary
 
     def test_singular_plural(self):
@@ -166,7 +136,6 @@ class TestLoadedResourcesInfo:
                 SkillInfo(name="skill1", description="First skill", source="project"),
             ],
             hooks=[HookInfo(hook_type="pre_tool_use", commands=["cmd1", "cmd2"])],
-            tools=[ToolInfo(name="tool1")],
             mcps=[MCPInfo(name="mcp1", transport="stdio")],
         )
         details = info.get_details()
@@ -178,9 +147,6 @@ class TestLoadedResourcesInfo:
         assert "(project)" in details
         assert "Hooks (2):" in details
         assert "pre_tool_use: cmd1, cmd2" in details
-        # get_details() doesn't include tools by default
-        # (tools are shown in SystemPromptEvent)
-        assert "Tools" not in details
         assert "MCPs (1):" in details
         assert "mcp1" in details
         assert "(stdio)" in details
@@ -230,15 +196,6 @@ class TestHookInfo:
         assert hook.commands == []
 
 
-class TestToolInfo:
-    """Tests for ToolInfo dataclass."""
-
-    def test_tool_info_basic(self):
-        """Test ToolInfo with basic attributes."""
-        tool = ToolInfo(name="test_tool")
-        assert tool.name == "test_tool"
-
-
 class TestMCPInfo:
     """Tests for MCPInfo dataclass."""
 
@@ -276,7 +233,6 @@ class TestShowSkillsCommand:
                 SkillInfo(name="skill2", source="project"),
             ],
             hooks=[HookInfo(hook_type="pre_tool_use", commands=["cmd1", "cmd2"])],
-            tools=[ToolInfo(name="tool1")],
             mcps=[MCPInfo(name="mcp1", transport="stdio")],
         )
 
@@ -292,7 +248,6 @@ class TestShowSkillsCommand:
         assert "skill1" in skills_text
         assert "skill2" in skills_text
         assert "pre_tool_use" in skills_text
-        assert "tool1" in skills_text
         assert "mcp1" in skills_text
         assert "stdio" in skills_text
 
@@ -320,7 +275,7 @@ class TestShowSkillsCommand:
         skills_widget = mock_main_display.mount.call_args[0][0]
         skills_text = skills_widget.content
 
-        assert "No skills, hooks, tools, or MCPs loaded" in skills_text
+        assert "No skills, hooks, or MCPs loaded" in skills_text
 
     def test_show_skills_uses_plain_text_formatting(self):
         """Test that show_skills uses plain text formatting."""
@@ -381,7 +336,7 @@ class TestSkillsCommandInApp:
         command_strings = [str(cmd.main) for cmd in COMMANDS]
         skills_command = [cmd for cmd in command_strings if cmd.startswith("/skills")]
         assert len(skills_command) == 1
-        assert "View loaded skills, hooks, and tools" in skills_command[0]
+        assert "View loaded skills, hooks, and MCPs" in skills_command[0]
 
     @pytest.mark.asyncio
     async def test_skills_command_in_help(self):
@@ -395,7 +350,7 @@ class TestSkillsCommandInApp:
         help_text = help_widget.content
 
         assert "/skills" in help_text
-        assert "View loaded skills, hooks, and tools" in help_text
+        assert "View loaded skills, hooks, and MCPs" in help_text
 
     @pytest.mark.asyncio
     async def test_skills_command_handler(
@@ -417,7 +372,6 @@ class TestSkillsCommandInApp:
             # Set up loaded resources
             oh_app._loaded_resources = LoadedResourcesInfo(
                 skills=[SkillInfo(name="test_skill")],
-                tools=[ToolInfo(name="test_tool")],
             )
 
             # Mock show_skills to verify it's called via InputAreaContainer
@@ -470,35 +424,13 @@ class TestCollectLoadedResources:
         """Test collect_loaded_resources with no agent."""
         resources = collect_loaded_resources(agent=None, working_dir=None)
         assert isinstance(resources, LoadedResourcesInfo)
-        # Skills and tools should be empty without an agent
+        # Skills should be empty without an agent
         assert resources.skills == []
-        assert resources.tools == []
-
-    def test_collect_loaded_resources_with_mock_agent(self):
-        """Test collect_loaded_resources with a mock agent."""
-        # Create a mock agent with tools
-        mock_agent = mock.MagicMock()
-        mock_agent.agent_context = None
-
-        # Create mock tools
-        mock_tool1 = mock.MagicMock()
-        mock_tool1.name = "terminal"
-        mock_tool2 = mock.MagicMock()
-        mock_tool2.name = "file_editor"
-        mock_agent.tools = [mock_tool1, mock_tool2]
-
-        resources = collect_loaded_resources(agent=mock_agent, working_dir=None)
-
-        assert isinstance(resources, LoadedResourcesInfo)
-        assert len(resources.tools) == 2
-        assert resources.tools[0].name == "terminal"
-        assert resources.tools[1].name == "file_editor"
 
     def test_collect_loaded_resources_with_skills(self):
         """Test collect_loaded_resources with skills in agent context."""
         # Create a mock agent with skills
         mock_agent = mock.MagicMock()
-        mock_agent.tools = []
 
         mock_skill = mock.MagicMock()
         mock_skill.name = "test_skill"

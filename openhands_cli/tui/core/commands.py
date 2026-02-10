@@ -24,7 +24,7 @@ COMMANDS = [
     DropdownItem(main="/history - Toggle conversation history"),
     DropdownItem(main="/confirm - Configure confirmation settings"),
     DropdownItem(main="/condense - Condense conversation history"),
-    DropdownItem(main="/skills - View loaded skills, hooks, and tools"),
+    DropdownItem(main="/skills - View loaded skills, hooks, and MCPs"),
     DropdownItem(main="/feedback - Send anonymous feedback about CLI"),
     DropdownItem(main="/exit - Exit the application"),
 ]
@@ -75,7 +75,7 @@ Available commands:
   /history - Toggle conversation history
   /confirm - Configure confirmation settings
   /condense - Condense conversation history
-  /skills - View loaded skills, hooks, and tools
+  /skills - View loaded skills, hooks, and MCPs
   /feedback - Send anonymous feedback about CLI
   /exit - Exit the application
 
@@ -91,7 +91,7 @@ Tips:
 def show_skills(
     scroll_view: VerticalScroll, loaded_resources: LoadedResourcesInfo | None
 ) -> None:
-    """Display loaded skills, hooks, tools, and MCPs information in the scroll view.
+    """Display loaded skills, hooks, and MCPs information in the scroll view.
 
     Args:
         scroll_view: The VerticalScroll widget to mount skills content to
@@ -106,12 +106,12 @@ Send a message to start a conversation and load resources.
     else:
         # Build the skills text using the get_details method
         lines = ["\nLoaded Resources"]
-        lines.append(f"Summary: {loaded_resources.get_summary(include_tools=True)}\n")
-        details = loaded_resources.get_details(include_tools=True)
+        lines.append(f"Summary: {loaded_resources.get_summary()}\n")
+        details = loaded_resources.get_details()
         if details and details != "No resources loaded":
             lines.append(details)
         else:
-            lines.append("No skills, hooks, tools, or MCPs loaded.")
+            lines.append("No skills, hooks, or MCPs loaded.")
         skills_text = "\n".join(lines)
 
     skills_widget = Static(skills_text, classes="skills-message")
