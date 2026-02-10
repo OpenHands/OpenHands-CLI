@@ -142,6 +142,10 @@ def extract_hook_commands(hook_matchers: list) -> list[str]:
 def _collect_hooks(working_dir: Path | str | None) -> list[HookInfo]:
     """Collect hooks information from the hook configuration.
 
+    Note: This function is purely for UI display (listing configured hooks).
+    Debug-level logging is appropriate here because failures only affect
+    the Resources display, not hook functionality.
+
     Args:
         working_dir: The working directory to load hooks from
 
@@ -173,7 +177,16 @@ def _collect_hooks(working_dir: Path | str | None) -> list[HookInfo]:
 
 
 def _collect_mcps() -> list[MCPInfo]:
-    """Collect MCP server information."""
+    """Collect MCP server information.
+
+    Note: This function is purely for UI display (listing configured servers).
+    It does NOT connect to or load MCP servers - that happens in the SDK's
+    create_mcp_tools() which has proper error handling. Debug-level logging
+    is appropriate here because:
+    1. Import errors are expected if fastmcp isn't installed (optional)
+    2. Failures here only affect the Resources display, not MCP functionality
+    3. Actual MCP errors are shown when servers are loaded, not listed
+    """
     mcps = []
     try:
         from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
