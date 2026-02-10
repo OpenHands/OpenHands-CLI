@@ -195,7 +195,8 @@ class Collapsible(Widget):
         width: 1fr;
         height: auto;
         background: $background;
-        padding-bottom: 1;
+        margin-top: 1;
+        margin-bottom: 1;
         padding-left: 1;
 
         &:focus-within {
