@@ -134,8 +134,11 @@ class InputAreaContainer(Container):
 
     def _command_skills(self) -> None:
         """Handle the /skills command to display loaded resources."""
-        app = cast("OpenHandsApp", self.app)
-        loaded_resources = app.conversation_state.loaded_resources
+        from openhands_cli.tui.core.state import ConversationContainer
+
+        # Parent is ConversationContainer which owns loaded_resources
+        conversation_container = cast(ConversationContainer, self.parent)
+        loaded_resources = conversation_container.loaded_resources
         if loaded_resources:
             show_skills(self.scroll_view, loaded_resources)
             self.scroll_view.scroll_end(animate=False)
