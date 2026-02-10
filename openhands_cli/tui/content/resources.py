@@ -126,17 +126,12 @@ class LoadedResourcesInfo:
 
 def _collect_skills(agent: Agent) -> list[SkillInfo]:
     """Collect skills information from an agent."""
-    skills = []
-    if agent.agent_context and agent.agent_context.skills:
-        for skill in agent.agent_context.skills:
-            skills.append(
-                SkillInfo(
-                    name=skill.name,
-                    description=skill.description,
-                    source=skill.source,
-                )
-            )
-    return skills
+    if not (agent.agent_context and agent.agent_context.skills):
+        return []
+    return [
+        SkillInfo(name=s.name, description=s.description, source=s.source)
+        for s in agent.agent_context.skills
+    ]
 
 
 def extract_hook_commands(hook_matchers: list) -> list[str]:
