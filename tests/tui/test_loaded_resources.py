@@ -97,7 +97,8 @@ class TestLoadedResourcesInfo:
         assert info.hooks_count == 0
         assert info.tools_count == 2
         assert info.mcps_count == 0
-        assert "2 tools" in info.get_summary()
+        # get_summary() doesn't include tools (tools are shown in SystemPromptEvent)
+        assert info.get_summary() == "No resources loaded"
 
     def test_mcps_only(self):
         """Test LoadedResourcesInfo with only MCPs."""
@@ -128,7 +129,8 @@ class TestLoadedResourcesInfo:
         summary = info.get_summary()
         assert "1 skill" in summary
         assert "1 hook" in summary
-        assert "2 tools" in summary
+        # get_summary() doesn't include tools (tools are shown in SystemPromptEvent)
+        assert "tools" not in summary
         assert "1 MCP" in summary
 
     def test_singular_plural(self):
@@ -174,8 +176,8 @@ class TestLoadedResourcesInfo:
         assert "(project)" in details
         assert "Hooks (2):" in details
         assert "pre_tool_use: 2" in details
-        assert "Tools (1):" in details
-        assert "tool1" in details
+        # get_details() doesn't include tools (tools are shown in SystemPromptEvent)
+        assert "Tools" not in details
         assert "MCPs (1):" in details
         assert "mcp1" in details
         assert "(stdio)" in details

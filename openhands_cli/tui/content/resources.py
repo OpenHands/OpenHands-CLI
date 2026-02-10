@@ -85,12 +85,8 @@ class LoadedResourcesInfo:
         """Check if any skills, hooks, or MCPs are loaded (excluding tools)."""
         return bool(self.skills or self.hooks or self.mcps)
 
-    def get_summary(self, include_tools: bool = True) -> str:
-        """Get a summary string of loaded resources.
-
-        Args:
-            include_tools: Whether to include tools in the summary.
-        """
+    def get_summary(self) -> str:
+        """Get a summary string of loaded resources (skills, hooks, MCPs)."""
         parts = []
         if self.skills_count > 0:
             parts.append(
@@ -100,20 +96,12 @@ class LoadedResourcesInfo:
             parts.append(
                 f"{self.hooks_count} hook{'s' if self.hooks_count != 1 else ''}"
             )
-        if include_tools and self.tools_count > 0:
-            parts.append(
-                f"{self.tools_count} tool{'s' if self.tools_count != 1 else ''}"
-            )
         if self.mcps_count > 0:
             parts.append(f"{self.mcps_count} MCP{'s' if self.mcps_count != 1 else ''}")
         return ", ".join(parts) if parts else "No resources loaded"
 
-    def get_details(self, include_tools: bool = True) -> str:
-        """Get detailed information about loaded resources as plain text.
-
-        Args:
-            include_tools: Whether to include tools in the details.
-        """
+    def get_details(self) -> str:
+        """Get detailed information about loaded resources (skills, hooks, MCPs)."""
         lines = []
 
         if self.skills:
@@ -131,13 +119,6 @@ class LoadedResourcesInfo:
             lines.append(f"Hooks ({self.hooks_count}):")
             for hook in self.hooks:
                 lines.append(f"  • {hook.hook_type}: {hook.count}")
-
-        if include_tools and self.tools:
-            if lines:
-                lines.append("")
-            lines.append(f"Tools ({self.tools_count}):")
-            for tool in self.tools:
-                lines.append(f"  • {tool.name}")
 
         if self.mcps:
             if lines:

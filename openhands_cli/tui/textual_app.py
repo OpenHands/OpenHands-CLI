@@ -470,8 +470,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         collapsible after the user sends their first message.
         """
         # Get summary and details without tools
-        summary = loaded_resources.get_summary(include_tools=False)
-        details = loaded_resources.get_details(include_tools=False)
+        summary = loaded_resources.get_summary()
+        details = loaded_resources.get_details()
 
         # Create collapsible with summary as title and details as content
         collapsible = Collapsible(
