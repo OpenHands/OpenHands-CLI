@@ -619,7 +619,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         # Get tool count for title
         tool_count = len(event.tools) if event.tools else 0
-        title = f"{tool_count} tool{'s' if tool_count != 1 else ''} loaded"
+        title = f"Loaded: {tool_count} tool{'s' if tool_count != 1 else ''}, system prompt"
 
         return Collapsible(
             content,
