@@ -12,10 +12,8 @@ from openhands_cli.tui.content.resources import (
     MCPInfo,
     SkillInfo,
     ToolInfo,
-    _extract_skills_from_system_prompt,
     _is_mcp_tool,
     collect_loaded_resources,
-    collect_resources_from_system_prompt,
 )
 from openhands_cli.tui.core.commands import show_skills
 from openhands_cli.tui.modals import SettingsScreen
@@ -504,137 +502,6 @@ class TestCollectLoadedResources:
         assert resources.skills[0].name == "test_skill"
         assert resources.skills[0].description == "A test skill"
         assert resources.skills[0].source == "project"
-
-
-class TestCollectResourcesFromSystemPrompt:
-    """Tests for collect_resources_from_system_prompt function."""
-
-    def test_collect_resources_with_tools(self):
-        """Test extracting tools from SystemPromptEvent."""
-        from openhands.sdk.llm import TextContent
-
-        # Create mock SystemPromptEvent
-        mock_event = mock.MagicMock()
-        mock_event.system_prompt = TextContent(text="Test system prompt")
-
-        # Create mock tools
-        mock_tool1 = mock.MagicMock()
-        mock_tool1.name = "terminal"
-        mock_tool1.description = "Execute bash commands"
-        mock_tool1.meta = None
-
-        mock_tool2 = mock.MagicMock()
-        mock_tool2.name = "file_editor"
-        mock_tool2.description = "Edit files"
-        mock_tool2.meta = None
-
-        mock_event.tools = [mock_tool1, mock_tool2]
-
-        # Mock _is_mcp_tool to return False for regular tools
-        with mock.patch(
-            "openhands_cli.tui.content.resources._is_mcp_tool", return_value=False
-        ):
-            resources = collect_resources_from_system_prompt(
-                event=mock_event, working_dir=None
-            )
-
-        assert isinstance(resources, LoadedResourcesInfo)
-        assert len(resources.tools) == 2
-        assert resources.tools[0].name == "terminal"
-        assert resources.tools[1].name == "file_editor"
-
-    def test_collect_resources_with_mcp_tools(self):
-        """Test extracting MCP tools from SystemPromptEvent."""
-        from openhands.sdk.llm import TextContent
-
-        # Create mock SystemPromptEvent
-        mock_event = mock.MagicMock()
-        mock_event.system_prompt = TextContent(text="Test system prompt")
-
-        # Create mock MCP tool
-        mock_mcp_tool = mock.MagicMock()
-        mock_mcp_tool.name = "mcp_search"
-        mock_mcp_tool.description = "Search using MCP"
-        mock_mcp_tool.meta = {"mcp_server": "search-server"}
-
-        mock_event.tools = [mock_mcp_tool]
-
-        # Mock _is_mcp_tool to return True for MCP tools
-        with mock.patch(
-            "openhands_cli.tui.content.resources._is_mcp_tool", return_value=True
-        ):
-            resources = collect_resources_from_system_prompt(
-                event=mock_event, working_dir=None
-            )
-
-        assert isinstance(resources, LoadedResourcesInfo)
-        assert len(resources.tools) == 1
-        assert resources.tools[0].name == "mcp_search"
-        assert len(resources.mcps) == 1
-        assert resources.mcps[0].name == "search-server"
-
-    def test_collect_resources_with_skills_in_prompt(self):
-        """Test extracting skills from system prompt text."""
-        from openhands.sdk.llm import TextContent
-
-        system_prompt_text = """
-You are an AI assistant.
-
-<available_skills>
-- code_review: Review code for best practices
-- testing: Write unit tests for code
-</available_skills>
-
-Please help the user.
-"""
-        mock_event = mock.MagicMock()
-        mock_event.system_prompt = TextContent(text=system_prompt_text)
-        mock_event.tools = []
-
-        resources = collect_resources_from_system_prompt(
-            event=mock_event, working_dir=None
-        )
-
-        assert isinstance(resources, LoadedResourcesInfo)
-        assert len(resources.skills) == 2
-        assert resources.skills[0].name == "code_review"
-        assert resources.skills[0].description == "Review code for best practices"
-        assert resources.skills[1].name == "testing"
-        assert resources.skills[1].description == "Write unit tests for code"
-
-
-class TestExtractSkillsFromSystemPrompt:
-    """Tests for _extract_skills_from_system_prompt function."""
-
-    def test_extract_skills_with_available_skills_section(self):
-        """Test extracting skills from available_skills section."""
-        system_prompt = """
-<available_skills>
-- skill1: Description of skill 1
-- skill2: Description of skill 2
-</available_skills>
-"""
-        skills = _extract_skills_from_system_prompt(system_prompt)
-        assert len(skills) == 2
-        assert skills[0].name == "skill1"
-        assert skills[0].description == "Description of skill 1"
-        assert skills[1].name == "skill2"
-        assert skills[1].description == "Description of skill 2"
-
-    def test_extract_skills_no_skills_section(self):
-        """Test extracting skills when no available_skills section exists."""
-        system_prompt = "You are an AI assistant. Help the user."
-        skills = _extract_skills_from_system_prompt(system_prompt)
-        assert len(skills) == 0
-
-    def test_extract_skills_empty_section(self):
-        """Test extracting skills from empty available_skills section."""
-        system_prompt = """
-<available_skills>
-</available_skills>
-"""
-        skills = _extract_skills_from_system_prompt(system_prompt)
-        assert len(skills) == 0
 
 
 class TestIsMcpTool:
