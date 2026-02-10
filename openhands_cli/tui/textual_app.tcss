@@ -126,8 +126,11 @@ Footer {
 .loaded-resources-collapsible {
     padding-left: 0;
     margin-top: 1;
+    border: none;
 }
 
 .system-prompt-collapsible {
     padding-left: 0;
+    border: none;
+    margin-top: 1;
 }
