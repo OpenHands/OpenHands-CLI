@@ -21,6 +21,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _pluralize(word: str, count: int) -> str:
+    """Return a pluralized string with count, e.g., '1 skill' or '3 skills'."""
+    return f"{count} {word}{'s' if count != 1 else ''}"
+
+
 @dataclass
 class SkillInfo:
     """Information about a loaded skill."""
@@ -80,15 +85,11 @@ class LoadedResourcesInfo:
         """Get a summary string of loaded resources."""
         parts = []
         if self.skills_count > 0:
-            parts.append(
-                f"{self.skills_count} skill{'s' if self.skills_count != 1 else ''}"
-            )
+            parts.append(_pluralize("skill", self.skills_count))
         if self.hooks_count > 0:
-            parts.append(
-                f"{self.hooks_count} hook{'s' if self.hooks_count != 1 else ''}"
-            )
+            parts.append(_pluralize("hook", self.hooks_count))
         if self.mcps_count > 0:
-            parts.append(f"{self.mcps_count} MCP{'s' if self.mcps_count != 1 else ''}")
+            parts.append(_pluralize("MCP", self.mcps_count))
         return ", ".join(parts) if parts else "No resources loaded"
 
     def get_details(self) -> str:
