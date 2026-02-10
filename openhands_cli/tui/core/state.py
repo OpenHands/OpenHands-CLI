@@ -177,7 +177,9 @@ class ConversationContainer(Container):
             )
 
         # Input area docked to bottom
-        with InputAreaContainer(id="input_area"):
+        with InputAreaContainer(id="input_area").data_bind(
+            loaded_resources=ConversationContainer.loaded_resources,
+        ):
             yield WorkingStatusLine().data_bind(
                 running=ConversationContainer.running,
                 elapsed_seconds=ConversationContainer.elapsed_seconds,

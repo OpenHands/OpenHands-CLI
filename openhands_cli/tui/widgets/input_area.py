@@ -15,18 +15,25 @@ Widget Hierarchy:
 Message Flow:
     - SlashCommandSubmitted → InputAreaContainer posts operation messages
     - All messages bubble up to ConversationManager (ancestor)
+
+Data Binding:
+    - loaded_resources: Bound from ConversationContainer for /skills command
 """
+
+from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
 from textual import on
 from textual.containers import Container
+from textual.reactive import var
 
 from openhands_cli.tui.core.commands import show_help, show_skills
 from openhands_cli.tui.messages import SlashCommandSubmitted
 
 
 if TYPE_CHECKING:
+    from openhands_cli.tui.content.resources import LoadedResourcesInfo
     from openhands_cli.tui.textual_app import OpenHandsApp
     from openhands_cli.tui.widgets.main_display import ScrollableContent
 
@@ -40,7 +47,13 @@ class InputAreaContainer(Container):
 
     UserInputSubmitted messages from InputField also bubble up to
     ConversationManager automatically.
+
+    Reactive Properties:
+        loaded_resources: Bound from ConversationContainer, used by /skills command.
     """
+
+    # Reactive property bound from ConversationContainer
+    loaded_resources: var["LoadedResourcesInfo | None"] = var(None)
 
     @property
     def scroll_view(self) -> "ScrollableContent":
@@ -134,13 +147,9 @@ class InputAreaContainer(Container):
 
     def _command_skills(self) -> None:
         """Handle the /skills command to display loaded resources."""
-        from openhands_cli.tui.core.state import ConversationContainer
-
-        # Parent is ConversationContainer which owns loaded_resources
-        conversation_container = cast(ConversationContainer, self.parent)
-        loaded_resources = conversation_container.loaded_resources
-        if loaded_resources:
-            show_skills(self.scroll_view, loaded_resources)
+        # loaded_resources is bound from ConversationContainer via data_bind
+        if self.loaded_resources:
+            show_skills(self.scroll_view, self.loaded_resources)
             self.scroll_view.scroll_end(animate=False)
 
     def _command_feedback(self) -> None:
