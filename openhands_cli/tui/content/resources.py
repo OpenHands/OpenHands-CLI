@@ -116,10 +116,12 @@ def _collect_skills(agent: Agent) -> list[SkillInfo]:
     """Collect skills information from an agent."""
     if not (agent.agent_context and agent.agent_context.skills):
         return []
-    return [
+    skills = [
         SkillInfo(name=s.name, description=s.description, source=s.source)
         for s in agent.agent_context.skills
     ]
+    # Sort by name for deterministic ordering across environments
+    return sorted(skills, key=lambda s: s.name)
 
 
 def extract_hook_commands(hook_matchers: list) -> list[str]:
