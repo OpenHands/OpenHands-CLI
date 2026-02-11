@@ -215,7 +215,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """
         if not self._name:
             return False
-        return self._name != DEFAULT_AGENT_NAME
+        return self._name.strip() != DEFAULT_AGENT_NAME
 
     def _get_agent_prefix(self) -> str:
         """Get the agent name prefix for titles when in delegation context.
