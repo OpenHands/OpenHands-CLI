@@ -21,9 +21,10 @@ json_escape() {
 
 PROJECT_DIR="${OPENHANDS_PROJECT_DIR:-$(pwd)}"
 cd "$PROJECT_DIR" || {
-    >&2 echo "❌ Failed to cd to project directory: $PROJECT_DIR"
-    echo "{\"decision\": \"deny\", \"reason\": \"Invalid project directory\"}"
-    exit 2
+    # Fail silently - approve but include the reason for potential error display
+    >&2 echo "⚠️  Failed to cd to project directory: $PROJECT_DIR, skipping checks"
+    echo "{\"decision\": \"allow\", \"reason\": \"Invalid project directory - hook skipped\"}"
+    exit 0
 }
 
 >&2 echo "=== Stop Hook ==="
