@@ -176,7 +176,7 @@ class CollapsibleContents(Container):
     CollapsibleContents {
         width: 100%;
         height: auto;
-        padding: 1 0 0 0;
+        padding: 1 0 0 2;
     }
     """
 
