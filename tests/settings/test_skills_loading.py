@@ -68,7 +68,7 @@ class TestSkillsLoading:
         assert loaded_agent.agent_context is not None
 
         # Verify that project skills were loaded into the agent context
-        # Should have exactly 3 project skills from .openhands/skills
+        # Should have exactly 3 project skills from .agents/skills
         # Plus any user skills that might be loaded via load_user_skills=True
         # Plus public skills from the GitHub repository
         all_skills = loaded_agent.agent_context.skills
