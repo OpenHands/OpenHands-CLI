@@ -382,14 +382,14 @@ class TestEventSymbolColor:
         symbol_color = _get_event_symbol_color(error_event)
         assert symbol_color == OPENHANDS_THEME.error
 
-    def test_action_event_has_accent_symbol_color(self, visualizer, mock_cli_settings):
-        """Test that action events get the accent color for their symbol."""
-        from openhands_cli.theme import OPENHANDS_THEME
+    def test_action_event_has_default_symbol_color(self, visualizer, mock_cli_settings):
+        """Test that action events get the default (white) color for their symbol."""
         from openhands_cli.tui.widgets.richlog_visualizer import _get_event_symbol_color
 
         action_event = create_terminal_action_event("ls -la", "List files")
         symbol_color = _get_event_symbol_color(action_event)
-        assert symbol_color == OPENHANDS_THEME.accent
+        # Action events use the default white color for a cleaner look
+        assert symbol_color == "#ffffff"
 
     def test_collapsible_receives_symbol_color(self, visualizer, mock_cli_settings):
         """Test that collapsibles are created with the correct symbol color."""
