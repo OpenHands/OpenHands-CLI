@@ -1121,3 +1121,133 @@ class TestRenderUserMessage:
         assert isinstance(widget, Static)
         # Check the widget has user-message class (format verification)
         assert "user-message" in widget.classes
+
+
+class TestHookRejectionDetection:
+    """Tests for hook rejection detection using rejection_source field.
+
+    Note: These tests use model_copy() to add rejection_source field since the
+    SDK version with this field may not be installed yet. The _is_hook_rejection
+    function uses getattr() for backwards compatibility.
+    """
+
+    def test_is_hook_rejection_with_hook_source(self):
+        """Test _is_hook_rejection returns True for hook rejections."""
+        from openhands.sdk.event import UserRejectObservation
+        from openhands_cli.tui.widgets.richlog_visualizer import _is_hook_rejection
+
+        # Create base event and add rejection_source via model_copy
+        base_event = UserRejectObservation(
+            action_id="test_action_id",
+            tool_name="terminal",
+            tool_call_id="call_1",
+            rejection_reason="Blocked by security hook",
+        )
+        # Simulate SDK with rejection_source field
+        event = base_event.model_copy(update={"rejection_source": "hook"})
+        assert _is_hook_rejection(event) is True
+
+    def test_is_hook_rejection_with_user_source(self):
+        """Test _is_hook_rejection returns False for user rejections."""
+        from openhands.sdk.event import UserRejectObservation
+        from openhands_cli.tui.widgets.richlog_visualizer import _is_hook_rejection
+
+        base_event = UserRejectObservation(
+            action_id="test_action_id",
+            tool_name="terminal",
+            tool_call_id="call_1",
+            rejection_reason="User rejected the action",
+        )
+        event = base_event.model_copy(update={"rejection_source": "user"})
+        assert _is_hook_rejection(event) is False
+
+    def test_is_hook_rejection_with_no_source_field(self):
+        """Test _is_hook_rejection returns False when rejection_source not present."""
+        from openhands.sdk.event import UserRejectObservation
+        from openhands_cli.tui.widgets.richlog_visualizer import _is_hook_rejection
+
+        # Event without rejection_source field (older SDK version)
+        event = UserRejectObservation(
+            action_id="test_action_id",
+            tool_name="terminal",
+            tool_call_id="call_1",
+            rejection_reason="User rejected the action",
+        )
+        # getattr with default should return "user", so not a hook rejection
+        assert _is_hook_rejection(event) is False
+
+    def test_is_hook_rejection_with_agent_error_event(self):
+        """Test _is_hook_rejection returns False for AgentErrorEvent."""
+        from openhands.sdk.event import AgentErrorEvent
+        from openhands_cli.tui.widgets.richlog_visualizer import _is_hook_rejection
+
+        event = AgentErrorEvent(
+            error="Something went wrong",
+            tool_name="terminal",
+            tool_call_id="call_1",
+        )
+        assert _is_hook_rejection(event) is False
+
+    def test_get_rejection_title_for_hook(self):
+        """Test _get_rejection_title returns correct title for hook rejection."""
+        from openhands.sdk.event import UserRejectObservation
+        from openhands_cli.tui.widgets.richlog_visualizer import _get_rejection_title
+
+        base_event = UserRejectObservation(
+            action_id="test_action_id",
+            tool_name="terminal",
+            tool_call_id="call_1",
+            rejection_reason="Blocked by hook",
+        )
+        event = base_event.model_copy(update={"rejection_source": "hook"})
+        assert _get_rejection_title(event) == "Hook Blocked Action"
+
+    def test_get_rejection_title_for_user(self):
+        """Test _get_rejection_title returns correct title for user rejection."""
+        from openhands.sdk.event import UserRejectObservation
+        from openhands_cli.tui.widgets.richlog_visualizer import _get_rejection_title
+
+        base_event = UserRejectObservation(
+            action_id="test_action_id",
+            tool_name="terminal",
+            tool_call_id="call_1",
+            rejection_reason="User rejected",
+        )
+        event = base_event.model_copy(update={"rejection_source": "user"})
+        assert _get_rejection_title(event) == "User Rejected Action"
+
+    def test_get_rejection_icon_for_hook(self):
+        """Test _get_rejection_icon returns hook icon for hook rejection."""
+        from openhands.sdk.event import UserRejectObservation
+        from openhands_cli.tui.widgets.richlog_visualizer import (
+            ERROR_ICON,
+            HOOK_ICON,
+            _get_rejection_icon,
+        )
+
+        base_event = UserRejectObservation(
+            action_id="test_action_id",
+            tool_name="terminal",
+            tool_call_id="call_1",
+            rejection_reason="Blocked by hook",
+        )
+        event = base_event.model_copy(update={"rejection_source": "hook"})
+        expected_icon = f"{HOOK_ICON} {ERROR_ICON}"
+        assert _get_rejection_icon(event) == expected_icon
+
+    def test_get_rejection_icon_for_user(self):
+        """Test _get_rejection_icon returns error icon for user rejection."""
+        from openhands.sdk.event import UserRejectObservation
+        from openhands_cli.tui.widgets.richlog_visualizer import (
+            ERROR_ICON,
+            _get_rejection_icon,
+        )
+
+        base_event = UserRejectObservation(
+            action_id="test_action_id",
+            tool_name="terminal",
+            tool_call_id="call_1",
+            rejection_reason="User rejected",
+        )
+        event = base_event.model_copy(update={"rejection_source": "user"})
+        assert _get_rejection_icon(event) == ERROR_ICON
