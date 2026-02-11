@@ -20,7 +20,11 @@ json_escape() {
 }
 
 PROJECT_DIR="${OPENHANDS_PROJECT_DIR:-$(pwd)}"
-cd "$PROJECT_DIR" || exit 1
+cd "$PROJECT_DIR" || {
+    >&2 echo "❌ Failed to cd to project directory: $PROJECT_DIR"
+    echo "{\"decision\": \"deny\", \"reason\": \"Invalid project directory\"}"
+    exit 2
+}
 
 >&2 echo "=== Stop Hook ==="
 >&2 echo "Project directory: $PROJECT_DIR"
