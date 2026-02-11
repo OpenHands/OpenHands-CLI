@@ -59,9 +59,9 @@ def _get_event_symbol_color(event: Event) -> str:
     DEFAULT_COLOR = "#ffffff"
 
     if isinstance(event, ActionEvent):
-        return OPENHANDS_THEME.accent or DEFAULT_COLOR
+        return DEFAULT_COLOR
     elif isinstance(event, ObservationEvent):
-        return OPENHANDS_THEME.accent or DEFAULT_COLOR
+        return DEFAULT_COLOR
     elif isinstance(event, UserRejectObservation):
         return OPENHANDS_THEME.error or DEFAULT_COLOR
     elif isinstance(event, MessageEvent):
