@@ -155,7 +155,6 @@ class SplashContent(Container):
                 title=f"Loaded: {summary}",
                 collapsed=True,
                 id="loaded_resources_collapsible",
-                border_color=OPENHANDS_THEME.accent,
             )
             self.mount(collapsible)
 

@@ -364,16 +364,6 @@ class TestConversationErrorEventHandling:
             # collapsed=False when default_cells_expanded=True
             assert not collapsible.collapsed
 
-        # Verify error border color
-        from openhands_cli.theme import OPENHANDS_THEME
-        from openhands_cli.tui.widgets.richlog_visualizer import (
-            _get_event_border_color,
-        )
-
-        expected_color = OPENHANDS_THEME.error or "#ff6b6b"
-        actual_color = _get_event_border_color(error_event)
-        assert actual_color == expected_color
-
 
 class TestDefaultCellsExpandedSetting:
     """Tests for the default_cells_expanded setting in ConversationVisualizer."""
