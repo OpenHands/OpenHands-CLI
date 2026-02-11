@@ -31,6 +31,22 @@ cd "$PROJECT_DIR" || {
 >&2 echo ""
 
 # --------------------------
+# Check if pre-commit is available
+# --------------------------
+if command -v uv &> /dev/null; then
+    # Check if pre-commit is available via uv
+    if ! uv run pre-commit --version &> /dev/null; then
+        >&2 echo "❌ pre-commit is not installed"
+        echo "{\"decision\": \"deny\", \"reason\": \"pre-commit not installed\", \"additionalContext\": \"Install with: pip install pre-commit\"}"
+        exit 2
+    fi
+elif ! command -v pre-commit &> /dev/null; then
+    >&2 echo "❌ pre-commit is not installed"
+    echo "{\"decision\": \"deny\", \"reason\": \"pre-commit not installed\", \"additionalContext\": \"Install with: pip install pre-commit\"}"
+    exit 2
+fi
+
+# --------------------------
 # Run pre-commit on all files
 # --------------------------
 >&2 echo "=== Running pre-commit run --all-files ==="
