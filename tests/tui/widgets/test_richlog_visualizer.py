@@ -1,6 +1,6 @@
 """Tests for ConversationVisualizer and Chinese character markup handling."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from unittest.mock import patch
 
 import pytest
@@ -15,6 +15,8 @@ from openhands.sdk.event import ActionEvent
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.llm import MessageToolCall
 from openhands.tools.terminal.definition import TerminalAction
+from openhands_cli.tui.textual_app import OpenHandsApp
+
 from openhands_cli.stores import CliSettings
 from openhands_cli.tui.widgets.richlog_visualizer import (
     ELLIPSIS,
@@ -1140,31 +1142,37 @@ class TestDefaultAgentPrefixBehavior:
 
     def test_is_non_default_agent_returns_false_for_default_agent(self):
         """_is_non_default_agent returns False for 'OpenHands Agent'."""
-        app = App()
+        app: OpenHandsApp = cast(OpenHandsApp, App())
         container = VerticalScroll()
         visualizer = ConversationVisualizer(
-            container, app, name="OpenHands Agent"  # type: ignore[arg-type]
+            container,
+            app,
+            name="OpenHands Agent",
         )
 
         assert visualizer._is_non_default_agent() is False
 
     def test_is_non_default_agent_returns_true_for_non_default_agent(self):
         """_is_non_default_agent returns True for non-default agents."""
-        app = App()
+        app: OpenHandsApp = cast(OpenHandsApp, App())
         container = VerticalScroll()
         visualizer = ConversationVisualizer(
-            container, app, name="Child Agent"  # type: ignore[arg-type]
+            container,
+            app,
+            name="Child Agent",
         )
 
         assert visualizer._is_non_default_agent() is True
 
     def test_is_non_default_agent_handles_whitespace(self):
         """_is_non_default_agent handles whitespace in agent name."""
-        app = App()
+        app: OpenHandsApp = cast(OpenHandsApp, App())
         container = VerticalScroll()
         # Name with extra whitespace should still match default
         visualizer = ConversationVisualizer(
-            container, app, name="  OpenHands Agent  "  # type: ignore[arg-type]
+            container,
+            app,
+            name="  OpenHands Agent  ",
         )
 
         assert visualizer._is_non_default_agent() is False
@@ -1176,20 +1184,24 @@ class TestDefaultAgentPrefixBehavior:
 
     def test_get_agent_prefix_returns_empty_for_default_agent(self):
         """_get_agent_prefix returns empty string for default agent."""
-        app = App()
+        app: OpenHandsApp = cast(OpenHandsApp, App())
         container = VerticalScroll()
         visualizer = ConversationVisualizer(
-            container, app, name="OpenHands Agent"  # type: ignore[arg-type]
+            container,
+            app,
+            name="OpenHands Agent",
         )
 
         assert visualizer._get_agent_prefix() == ""
 
     def test_get_agent_prefix_returns_prefix_for_non_default_agent(self):
         """_get_agent_prefix returns formatted prefix for non-default agents."""
-        app = App()
+        app: OpenHandsApp = cast(OpenHandsApp, App())
         container = VerticalScroll()
         visualizer = ConversationVisualizer(
-            container, app, name="child_agent"  # type: ignore[arg-type]
+            container,
+            app,
+            name="child_agent",
         )
 
         assert visualizer._get_agent_prefix() == "(Child Agent) "
@@ -1200,10 +1212,12 @@ class TestDefaultAgentPrefixBehavior:
 
         from openhands.sdk.tool.builtins.finish import FinishAction
 
-        app = App()
+        app: OpenHandsApp = cast(OpenHandsApp, App())
         container = VerticalScroll()
         visualizer = ConversationVisualizer(
-            container, app, name="OpenHands Agent"  # type: ignore[arg-type]
+            container,
+            app,
+            name="OpenHands Agent",
         )
 
         action = FinishAction(message="Task completed successfully")
@@ -1223,6 +1237,7 @@ class TestDefaultAgentPrefixBehavior:
         assert widget is not None
         assert isinstance(widget, Markdown)
         markdown_content = widget._initial_markdown
+        assert markdown_content is not None
         # Should NOT contain agent header
         assert "**OpenHands Agent:**" not in markdown_content
         # Should contain the message
@@ -1234,10 +1249,12 @@ class TestDefaultAgentPrefixBehavior:
 
         from openhands.sdk.tool.builtins.finish import FinishAction
 
-        app = App()
+        app: OpenHandsApp = cast(OpenHandsApp, App())
         container = VerticalScroll()
         visualizer = ConversationVisualizer(
-            container, app, name="lodging_expert"  # type: ignore[arg-type]
+            container,
+            app,
+            name="lodging_expert",
         )
 
         action = FinishAction(message="Found the best hotel")
@@ -1257,6 +1274,7 @@ class TestDefaultAgentPrefixBehavior:
         assert widget is not None
         assert isinstance(widget, Markdown)
         markdown_content = widget._initial_markdown
+        assert markdown_content is not None
         # Should contain agent header
         assert "**Lodging Expert Agent:**" in markdown_content
         # Should contain the message
@@ -1264,10 +1282,12 @@ class TestDefaultAgentPrefixBehavior:
 
     def test_action_title_no_prefix_for_default_agent(self, mock_cli_settings):
         """Action titles should not have agent prefix for default agent."""
-        app = App()
+        app: OpenHandsApp = cast(OpenHandsApp, App())
         container = VerticalScroll()
         visualizer = ConversationVisualizer(
-            container, app, name="OpenHands Agent"  # type: ignore[arg-type]
+            container,
+            app,
+            name="OpenHands Agent",
         )
 
         event = create_terminal_action_event("ls -la", "List files")
@@ -1282,10 +1302,12 @@ class TestDefaultAgentPrefixBehavior:
 
     def test_action_title_has_prefix_for_non_default_agent(self, mock_cli_settings):
         """Action titles should have agent prefix for non-default agents."""
-        app = App()
+        app: OpenHandsApp = cast(OpenHandsApp, App())
         container = VerticalScroll()
         visualizer = ConversationVisualizer(
-            container, app, name="code_reviewer"  # type: ignore[arg-type]
+            container,
+            app,
+            name="code_reviewer",
         )
 
         event = create_terminal_action_event("git diff", "Check changes")
