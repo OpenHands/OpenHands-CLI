@@ -161,8 +161,7 @@ class CollapsibleTitle(Container, can_focus=True):
 
         # Apply color to symbol if specified
         if self.symbol_color:
-            styled_symbol = Text(symbol, style=self.symbol_color)
-            content = Content.assemble(styled_symbol, " ", self.label)
+            content = Content.assemble((symbol, self.symbol_color), " ", self.label)
         else:
             content = Content.assemble(symbol, " ", self.label)
 
