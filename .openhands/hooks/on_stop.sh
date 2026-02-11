@@ -33,17 +33,21 @@ cd "$PROJECT_DIR" || {
 # --------------------------
 # Check if pre-commit is available
 # --------------------------
+PRECOMMIT_AVAILABLE=false
 if command -v uv &> /dev/null; then
     # Check if pre-commit is available via uv
-    if ! uv run pre-commit --version &> /dev/null; then
-        >&2 echo "❌ pre-commit is not installed"
-        echo "{\"decision\": \"deny\", \"reason\": \"pre-commit not installed\", \"additionalContext\": \"Install with: pip install pre-commit\"}"
-        exit 2
+    if uv run pre-commit --version &> /dev/null; then
+        PRECOMMIT_AVAILABLE=true
     fi
-elif ! command -v pre-commit &> /dev/null; then
-    >&2 echo "❌ pre-commit is not installed"
-    echo "{\"decision\": \"deny\", \"reason\": \"pre-commit not installed\", \"additionalContext\": \"Install with: pip install pre-commit\"}"
-    exit 2
+elif command -v pre-commit &> /dev/null; then
+    PRECOMMIT_AVAILABLE=true
+fi
+
+if [ "$PRECOMMIT_AVAILABLE" = false ]; then
+    # Fail silently - approve but include the reason for potential error display
+    >&2 echo "⚠️  pre-commit is not installed, skipping checks"
+    echo "{\"decision\": \"allow\", \"reason\": \"pre-commit not installed - hook skipped\"}"
+    exit 0
 fi
 
 # --------------------------
