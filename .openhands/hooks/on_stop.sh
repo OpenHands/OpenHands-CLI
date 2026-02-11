@@ -8,6 +8,17 @@
 
 set -o pipefail
 
+# Escape a string for JSON (fallback when jq is not available)
+json_escape() {
+    local str="$1"
+    str="${str//\\/\\\\}"      # Escape backslashes first
+    str="${str//\"/\\\"}"      # Escape double quotes
+    str="${str//$'\n'/\\n}"    # Escape newlines
+    str="${str//$'\r'/\\r}"    # Escape carriage returns
+    str="${str//$'\t'/\\t}"    # Escape tabs
+    echo "\"$str\""
+}
+
 PROJECT_DIR="${OPENHANDS_PROJECT_DIR:-$(pwd)}"
 cd "$PROJECT_DIR" || exit 1
 
@@ -32,7 +43,12 @@ fi
 if [ $PRECOMMIT_EXIT -ne 0 ]; then
     >&2 echo "⚠️  pre-commit found issues (exit code: $PRECOMMIT_EXIT)"
     >&2 echo "=== BLOCKING STOP: Issues found ==="
-    ESCAPED_OUTPUT=$(echo "$PRECOMMIT_OUTPUT" | jq -Rs .)
+    # Use jq if available, otherwise fall back to bash-based escaping
+    if command -v jq &> /dev/null; then
+        ESCAPED_OUTPUT=$(echo "$PRECOMMIT_OUTPUT" | jq -Rs .)
+    else
+        ESCAPED_OUTPUT=$(json_escape "$PRECOMMIT_OUTPUT")
+    fi
     echo "{\"decision\": \"deny\", \"reason\": \"pre-commit failed\", \"additionalContext\": $ESCAPED_OUTPUT}"
     exit 2
 fi
