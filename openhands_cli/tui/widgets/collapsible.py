@@ -177,7 +177,7 @@ class CollapsibleContents(Container):
     CollapsibleContents {
         width: 100%;
         height: auto;
-        padding: 1 0 0 3;
+        padding: 1 0 0 0;
     }
     """
 
@@ -203,7 +203,6 @@ class Collapsible(Widget):
         background: $background;
         margin-top: 1;
         margin-bottom: 1;
-        padding-left: 1;
 
         &:focus-within {
             background-tint: $foreground 3%;
