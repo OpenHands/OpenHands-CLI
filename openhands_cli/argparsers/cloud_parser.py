@@ -14,7 +14,7 @@ def add_cloud_parser(subparsers: argparse._SubParsersAction) -> argparse.Argumen
         The cloud argument parser
     """
     cloud_parser = subparsers.add_parser(
-        "cloud", help="Create a new conversation in OpenHands Cloud"
+        "cloud", help="Create or resume a conversation in OpenHands Cloud"
     )
 
     # Task and file arguments (same as main parser)
@@ -30,6 +30,20 @@ def add_cloud_parser(subparsers: argparse._SubParsersAction) -> argparse.Argumen
         "--file",
         type=str,
         help="Path to a file whose contents will seed the initial conversation",
+    )
+
+    # Resume argument
+    cloud_parser.add_argument(
+        "-r",
+        "--resume",
+        type=str,
+        nargs="?",
+        const="",
+        default=None,
+        help=(
+            "Resume a cloud conversation by ID. "
+            "Use without value to list conversations."
+        ),
     )
 
     # Server URL argument

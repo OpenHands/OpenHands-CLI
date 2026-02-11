@@ -174,15 +174,92 @@ def main() -> None:
 
             handle_mcp_command(args)
         elif args.command == "cloud":
-            # Validate cloud mode requirements
-            if not args.task and not args.file:
-                parser.error(
-                    "cloud subcommand requires either --task or --file to be specified"
+            compat_result = check_terminal_compatibility(console=console)
+            if not compat_result.is_tty:
+                print(
+                    "OpenHands CLI terminal UI may not work correctly in this "
+                    f"environment: {compat_result.reason}"
+                )
+                print(
+                    "To override Rich's detection, you can set TTY_INTERACTIVE=1 "
+                    "(and optionally TTY_COMPATIBLE=1)."
                 )
 
-            from openhands_cli.cloud.command import handle_cloud_command
+            # Ensure user is authenticated before starting cloud mode
+            # Only runs OAuth if token doesn't exist or has expired
+            import asyncio
 
-            handle_cloud_command(args)
+            from openhands_cli.auth.utils import AuthenticationError, ensure_valid_auth
+
+            server_url = getattr(args, "server_url", None) or os.getenv(
+                "OPENHANDS_CLOUD_URL", "https://app.all-hands.dev"
+            )
+            try:
+                asyncio.run(ensure_valid_auth(server_url))
+            except AuthenticationError as e:
+                console.print(
+                    f"Authentication failed: {e}. "
+                    "Please run 'openhands login' to authenticate.",
+                    style=OPENHANDS_THEME.error,
+                )
+                sys.exit(1)
+
+            # Handle cloud resume logic
+            resume_id = None
+            if hasattr(args, "resume") and args.resume is not None:
+                if args.resume == "":
+                    # Show conversation list (TODO: implement cloud conversation list)
+                    console.print(
+                        "Listing cloud conversations is not yet supported.",
+                        style=OPENHANDS_THEME.warning,
+                    )
+                    return
+                else:
+                    resume_id = args.resume
+
+            # Fetch sandbox_id for cloud resume
+            sandbox_id = None
+            if resume_id:
+                import asyncio
+
+                from openhands_cli.cloud.utils import fetch_cloud_sandbox_id
+
+                sandbox_id = asyncio.run(fetch_cloud_sandbox_id(server_url, resume_id))
+                if sandbox_id is None:
+                    console.print(
+                        "Failed to fetch sandbox for conversation. "
+                        "Please check your authentication and try again.",
+                        style=OPENHANDS_THEME.error,
+                    )
+                    sys.exit(1)
+
+            # Use textual-based UI with cloud mode
+            from openhands_cli.tui.textual_app import main as textual_main
+
+            queued_inputs = create_seeded_instructions_from_args(args)
+            conversation_id = textual_main(
+                resume_conversation_id=resume_id,
+                queued_inputs=queued_inputs,
+                always_approve=getattr(args, "always_approve", False),
+                llm_approve=getattr(args, "llm_approve", False),
+                exit_without_confirmation=getattr(
+                    args, "exit_without_confirmation", False
+                ),
+                headless=getattr(args, "headless", False),
+                json_mode=getattr(args, "json", False)
+                and getattr(args, "headless", False),
+                cloud=True,
+                server_url=server_url,
+                sandbox_id=sandbox_id,
+            )
+            if conversation_id is None:
+                # Authentication or other error occurred
+                sys.exit(1)
+            console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
+            console.print(
+                f"Conversation ID: {conversation_id.hex}",
+                style=OPENHANDS_THEME.accent,
+            )
 
         elif args.command == "view":
             from openhands_cli.conversations.viewer import view_conversation

@@ -40,6 +40,8 @@ class ConversationRunner:
 
     ConversationContainer is used only for reading state (is_confirmation_active)
     and updating running status.
+
+    For cloud-based conversations, use RemoteConversationRunner instead.
     """
 
     def __init__(

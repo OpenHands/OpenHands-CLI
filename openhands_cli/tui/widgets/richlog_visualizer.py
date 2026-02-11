@@ -14,6 +14,7 @@ from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBas
 from openhands.sdk.event import (
     ActionEvent,
     AgentErrorEvent,
+    ConversationStateUpdateEvent,
     MessageEvent,
     ObservationEvent,
     PauseEvent,
@@ -251,6 +252,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
+        # Skip ConversationStateUpdateEvent (internal state management)
+        if isinstance(event, ConversationStateUpdateEvent):
+            return
+
         # Check for TaskTrackerObservation to update/open the plan panel
         if isinstance(event, ObservationEvent) and isinstance(
             event.observation, TaskTrackerObservation

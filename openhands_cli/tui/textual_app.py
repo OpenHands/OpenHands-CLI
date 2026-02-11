@@ -128,6 +128,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         json_mode: bool = False,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
+        cloud: bool = False,
+        server_url: str | None = None,
+        sandbox_id: str | None = None,
         **kwargs,
     ):
         """Initialize the app with custom OpenHands theme.
@@ -144,6 +147,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             env_overrides_enabled: If True, environment variables will override
                                    stored LLM settings.
             critic_disabled: If True, critic functionality will be disabled.
+            cloud: If True, use OpenHands Cloud for remote execution.
+            server_url: The OpenHands Cloud server URL (used when cloud=True).
+            sandbox_id: Optional sandbox ID to reclaim an existing sandbox.
         """
         super().__init__(**kwargs)
 
@@ -169,6 +175,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             json_mode=json_mode,
             env_overrides_enabled=env_overrides_enabled,
             critic_disabled=critic_disabled,
+            cloud=cloud,
+            server_url=server_url,
+            sandbox_id=sandbox_id,
         )
 
         self.conversation_manager = ConversationManager(
@@ -648,6 +657,9 @@ def main(
     json_mode: bool = False,
     env_overrides_enabled: bool = False,
     critic_disabled: bool = False,
+    cloud: bool = False,
+    server_url: str | None = None,
+    sandbox_id: str | None = None,
 ) -> uuid.UUID | None:
     """Run the textual app.
 
@@ -662,6 +674,9 @@ def main(
         env_overrides_enabled: If True, environment variables will override
             stored LLM settings.
         critic_disabled: If True, critic functionality will be disabled.
+        cloud: If True, use OpenHands Cloud for remote execution.
+        server_url: The OpenHands Cloud server URL (used when cloud=True).
+        sandbox_id: Optional sandbox ID to reclaim an existing sandbox.
 
     Raises:
         MissingEnvironmentVariablesError: If env_overrides_enabled is True but
@@ -671,12 +686,14 @@ def main(
 
     # Determine if envs are required to be configured
     # Raise error before textual app is run to avoid traceback
-    try:
-        SettingsScreen.is_initial_setup_required(
-            env_overrides_enabled=env_overrides_enabled
-        )
-    except MissingEnvironmentVariablesError as e:
-        raise e
+    # Skip this check for cloud mode since it uses cloud authentication
+    if not cloud:
+        try:
+            SettingsScreen.is_initial_setup_required(
+                env_overrides_enabled=env_overrides_enabled
+            )
+        except MissingEnvironmentVariablesError as e:
+            raise e
 
     # Determine initial confirmation policy from CLI arguments
     # If headless mode is enabled, always use NeverConfirm (auto-approve all actions)
@@ -697,6 +714,9 @@ def main(
         json_mode=json_mode,
         env_overrides_enabled=env_overrides_enabled,
         critic_disabled=critic_disabled,
+        cloud=cloud,
+        server_url=server_url,
+        sandbox_id=sandbox_id,
     )
 
     app.run(headless=headless)
