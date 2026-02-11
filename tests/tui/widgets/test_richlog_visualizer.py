@@ -365,6 +365,49 @@ class TestConversationErrorEventHandling:
             assert not collapsible.collapsed
 
 
+class TestEventSymbolColor:
+    """Tests for event-based symbol coloring in collapsibles."""
+
+    def test_error_event_has_error_symbol_color(self, visualizer, mock_cli_settings):
+        """Test that error events get the error color for their symbol."""
+        from openhands_cli.theme import OPENHANDS_THEME
+        from openhands_cli.tui.widgets.richlog_visualizer import _get_event_symbol_color
+
+        error_event = ConversationErrorEvent(
+            source="agent",
+            code="test_error",
+            detail="Test error message",
+        )
+
+        symbol_color = _get_event_symbol_color(error_event)
+        assert symbol_color == OPENHANDS_THEME.error
+
+    def test_action_event_has_accent_symbol_color(self, visualizer, mock_cli_settings):
+        """Test that action events get the accent color for their symbol."""
+        from openhands_cli.theme import OPENHANDS_THEME
+        from openhands_cli.tui.widgets.richlog_visualizer import _get_event_symbol_color
+
+        action_event = create_terminal_action_event("ls -la", "List files")
+        symbol_color = _get_event_symbol_color(action_event)
+        assert symbol_color == OPENHANDS_THEME.accent
+
+    def test_collapsible_receives_symbol_color(self, visualizer, mock_cli_settings):
+        """Test that collapsibles are created with the correct symbol color."""
+        from openhands_cli.theme import OPENHANDS_THEME
+
+        error_event = ConversationErrorEvent(
+            source="agent",
+            code="test_error",
+            detail="Test error message",
+        )
+
+        with mock_cli_settings(visualizer=visualizer, default_cells_expanded=True):
+            collapsible = visualizer._create_event_collapsible(error_event)
+            assert collapsible is not None
+            # The CollapsibleTitle should have the error color
+            assert collapsible._title.symbol_color == OPENHANDS_THEME.error
+
+
 class TestDefaultCellsExpandedSetting:
     """Tests for the default_cells_expanded setting in ConversationVisualizer."""
 

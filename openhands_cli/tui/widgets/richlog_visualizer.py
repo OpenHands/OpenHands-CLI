@@ -31,6 +31,7 @@ from openhands.tools.task_tracker.definition import TaskTrackerObservation
 from openhands.tools.terminal.definition import TerminalAction
 from openhands_cli.shared.delegate_formatter import format_delegate_title
 from openhands_cli.stores import CliSettings
+from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
 )
@@ -51,6 +52,33 @@ if TYPE_CHECKING:
     from textual.widget import Widget
 
     from openhands_cli.tui.textual_app import OpenHandsApp
+
+
+def _get_event_symbol_color(event: Event) -> str:
+    """Get the color for the collapse/expand symbol based on event type."""
+    DEFAULT_COLOR = "#ffffff"
+
+    if isinstance(event, ActionEvent):
+        return OPENHANDS_THEME.accent or DEFAULT_COLOR
+    elif isinstance(event, ObservationEvent):
+        return OPENHANDS_THEME.accent or DEFAULT_COLOR
+    elif isinstance(event, UserRejectObservation):
+        return OPENHANDS_THEME.error or DEFAULT_COLOR
+    elif isinstance(event, MessageEvent):
+        if event.llm_message and event.llm_message.role == "user":
+            return OPENHANDS_THEME.primary
+        else:
+            return OPENHANDS_THEME.accent or DEFAULT_COLOR
+    elif isinstance(event, AgentErrorEvent):
+        return OPENHANDS_THEME.error or DEFAULT_COLOR
+    elif isinstance(event, ConversationErrorEvent):
+        return OPENHANDS_THEME.error or DEFAULT_COLOR
+    elif isinstance(event, PauseEvent):
+        return OPENHANDS_THEME.primary
+    elif isinstance(event, Condensation):
+        return "#727987"
+    else:
+        return DEFAULT_COLOR
 
 
 class ConversationVisualizer(ConversationVisualizerBase):
@@ -546,6 +574,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self,
         content: str | Text,
         title: str,
+        event: Event | None = None,
         collapsed: bool | None = None,
     ) -> Collapsible:
         """Create a Collapsible widget with standard settings.
@@ -553,6 +582,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         Args:
             content: The content to display (string or Rich Text object).
             title: The title for the collapsible header.
+            event: The event used to determine symbol color (None for default).
             collapsed: Override the default collapsed state. If None, uses default.
 
         Returns:
@@ -560,10 +590,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """
         if collapsed is None:
             collapsed = self._default_collapsed
+        symbol_color = _get_event_symbol_color(event) if event else "#888888"
         return Collapsible(
             content,
             title=title,
             collapsed=collapsed,
+            symbol_color=symbol_color,
         )
 
     def _create_system_prompt_collapsible(
@@ -589,7 +621,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             f"Loaded: {tool_count} tool{'s' if tool_count != 1 else ''}, system prompt"
         )
 
-        return self._make_collapsible(content, title)
+        return self._make_collapsible(content, title, event)
 
     def _create_event_widget(self, event: Event) -> "Widget | None":
         """Create a widget for the event - either plain text or collapsible."""
@@ -693,7 +725,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             content_string = self._escape_rich_markup(str(content))
 
             # Action events default to collapsed since we have summary in title
-            collapsible = self._make_collapsible(content_string, title)
+            collapsible = self._make_collapsible(content_string, title, event)
 
             # Store for pairing with observation
             self._pending_actions[event.tool_call_id] = (event, collapsible)
@@ -704,30 +736,36 @@ class ConversationVisualizer(ConversationVisualizerBase):
             # (shouldn't happen normally, but handle gracefully)
             title = self._extract_meaningful_title(event, "Observation")
             return self._make_collapsible(
-                self._escape_rich_markup(str(content)), f"{agent_prefix}{title}"
+                self._escape_rich_markup(str(content)), f"{agent_prefix}{title}", event
             )
         elif isinstance(event, UserRejectObservation):
             title = self._extract_meaningful_title(event, "User Rejected Action")
             return self._make_collapsible(
-                self._escape_rich_markup(str(content)), f"{agent_prefix}{title}"
+                self._escape_rich_markup(str(content)), f"{agent_prefix}{title}", event
             )
         elif isinstance(event, AgentErrorEvent):
             title = self._extract_meaningful_title(event, "Agent Error")
             content_string = self._escape_rich_markup(str(content))
-            return self._make_collapsible(content_string, f"{agent_prefix}{title}")
+            return self._make_collapsible(
+                content_string, f"{agent_prefix}{title}", event
+            )
         elif isinstance(event, ConversationErrorEvent):
             title = self._extract_meaningful_title(event, "Conversation Error")
             content_string = self._escape_rich_markup(str(content))
-            return self._make_collapsible(content_string, f"{agent_prefix}{title}")
+            return self._make_collapsible(
+                content_string, f"{agent_prefix}{title}", event
+            )
         elif isinstance(event, PauseEvent):
             title = self._extract_meaningful_title(event, "User Paused")
             return self._make_collapsible(
-                self._escape_rich_markup(str(content)), f"{agent_prefix}{title}"
+                self._escape_rich_markup(str(content)), f"{agent_prefix}{title}", event
             )
         elif isinstance(event, Condensation):
             title = self._extract_meaningful_title(event, "Condensation")
             content_string = self._escape_rich_markup(str(content))
-            return self._make_collapsible(content_string, f"{agent_prefix}{title}")
+            return self._make_collapsible(
+                content_string, f"{agent_prefix}{title}", event
+            )
         else:
             # Fallback for unknown event types
             title = self._extract_meaningful_title(
@@ -736,4 +774,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
             content_string = (
                 f"{self._escape_rich_markup(str(content))}\n\nSource: {event.source}"
             )
-            return self._make_collapsible(content_string, f"{agent_prefix}{title}")
+            return self._make_collapsible(
+                content_string, f"{agent_prefix}{title}", event
+            )
