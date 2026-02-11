@@ -46,6 +46,9 @@ AGENT_MESSAGE_PADDING = (1, 0, 1, 1)  # top, right, bottom, left
 MAX_LINE_LENGTH = 70
 ELLIPSIS = "..."
 
+# Default agent name - don't show prefix for this agent
+DEFAULT_AGENT_NAME = "OpenHands Agent"
+
 
 if TYPE_CHECKING:
     from textual.containers import VerticalScroll
@@ -204,15 +207,25 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return formatted_name
         return f"{formatted_name} Agent"
 
+    def _is_non_default_agent(self) -> bool:
+        """Check if the current agent is NOT the default OpenHands Agent.
+
+        Returns:
+            True if name is set and is different from the default agent name.
+        """
+        if not self._name:
+            return False
+        return self._name != DEFAULT_AGENT_NAME
+
     def _get_agent_prefix(self) -> str:
         """Get the agent name prefix for titles when in delegation context.
 
         Returns:
-            Formatted agent name in parentheses like "(Agent Name) " if name is set,
-            empty string otherwise.
+            Formatted agent name in parentheses like "(Agent Name) " if name is set
+            and is NOT the default agent, empty string otherwise.
         """
-        agent_name = self._get_formatted_agent_name()
-        if agent_name:
+        if self._is_non_default_agent():
+            agent_name = self._get_formatted_agent_name()
             return f"({agent_name}) "
         return ""
 
@@ -643,9 +656,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 # For finish action, render as markdown with padding to align
                 # User message has "padding: 0 1" and starts with "> ", so text
                 # starts at position 3 (1 padding + 2 for "> ")
-                # In delegation context, add agent header
+                # In delegation context (non-default agent), add agent header
                 message = str(action.message)
-                if self._name:
+                if self._is_non_default_agent():
                     agent_name = self._get_formatted_agent_name()
                     message = f"**{agent_name}:**\n\n{message}"
                 widget = Markdown(message)
@@ -669,7 +682,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
             # Case 1: Delegation message (both sender and name are set)
             # Format with arrow notation showing sender → receiver
-            if event.sender and self._name:
+            # Only show prefix if this is NOT the default main agent
+            if event.sender and self._is_non_default_agent():
                 message_content = str(content)
                 agent_name = self._get_formatted_agent_name()
                 event_sender = self._format_agent_name_with_suffix(event.sender)

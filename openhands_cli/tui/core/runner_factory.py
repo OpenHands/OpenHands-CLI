@@ -13,6 +13,9 @@ from textual.message_pump import MessagePump
 from textual.notifications import SeverityLevel
 
 from openhands.sdk.event.base import Event
+from openhands_cli.tui.widgets.richlog_visualizer import (
+    DEFAULT_AGENT_NAME,
+)
 
 
 if TYPE_CHECKING:
@@ -60,7 +63,7 @@ class RunnerFactory:
         visualizer = ConversationVisualizer(
             self._scroll_view_provider(),
             app,
-            name="OpenHands Agent",
+            name=DEFAULT_AGENT_NAME,
         )
 
         event_callback: Callable[[Event], None] | None = (
