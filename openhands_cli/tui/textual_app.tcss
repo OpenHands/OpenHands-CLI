@@ -39,6 +39,12 @@ Screen {
     color: $primary;
 }
 
+.image-preview {
+    padding: 0 1;
+    margin-bottom: 1;
+    background: $background;
+}
+
 .help-message, .error-message, .status-message {
     padding: 0 1;
     background: $background;

@@ -1,8 +1,9 @@
 """Conversation runner with confirmation mode support."""
 
 import asyncio
+import base64
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING
 
 from rich.console import Console
@@ -13,6 +14,7 @@ from textual.notifications import SeverityLevel
 from openhands.sdk import (
     BaseConversation,
     ConversationExecutionStatus,
+    ImageContent,
     Message,
     TextContent,
 )
@@ -91,14 +93,14 @@ class ConversationRunner:
     def is_confirmation_mode_active(self) -> bool:
         return self._state.is_confirmation_active
 
-    async def queue_message(self, user_input: str) -> None:
+    async def queue_message(
+        self, user_input: str, *, image_data: bytes | None = None
+    ) -> None:
         """Queue a message for a running conversation"""
         assert self.conversation is not None, "Conversation should be running"
-        assert user_input
-        message = Message(
-            role="user",
-            content=[TextContent(text=user_input)],
-        )
+        assert user_input or image_data
+        content_blocks = self._build_content_blocks(user_input, image_data)
+        message = Message(role="user", content=content_blocks)
 
         # This doesn't block - it just adds the message to the queue
         # The running conversation will process it when ready
@@ -107,23 +109,41 @@ class ConversationRunner:
         await loop.run_in_executor(None, self.conversation.send_message, message)
 
     async def process_message_async(
-        self, user_input: str, headless: bool = False
+        self,
+        user_input: str,
+        headless: bool = False,
+        *,
+        image_data: bytes | None = None,
     ) -> None:
         """Process a user message asynchronously to keep UI unblocked.
 
         Args:
             user_input: The user's message text
+            headless: If True, print status to console
+            image_data: Optional PNG image bytes to include in the message
         """
         # Create message from user input
-        message = Message(
-            role="user",
-            content=[TextContent(text=user_input)],
-        )
+        content_blocks = self._build_content_blocks(user_input, image_data)
+        message = Message(role="user", content=content_blocks)
 
         # Run conversation processing in a separate thread to avoid blocking UI
         await asyncio.get_event_loop().run_in_executor(
             None, self._run_conversation_sync, message, headless
         )
+
+    @staticmethod
+    def _build_content_blocks(
+        text: str, image_data: bytes | None = None
+    ) -> Sequence[TextContent | ImageContent]:
+        """Build message content blocks from text and optional image data."""
+        blocks: list[TextContent | ImageContent] = []
+        if text:
+            blocks.append(TextContent(text=text))
+        if image_data:
+            b64_data = base64.b64encode(image_data).decode("utf-8")
+            data_uri = f"data:image/png;base64,{b64_data}"
+            blocks.append(ImageContent(image_urls=[data_uri]))
+        return blocks
 
     def _run_conversation_sync(self, message: Message, headless: bool = False) -> None:
         """Run the conversation synchronously in a thread.

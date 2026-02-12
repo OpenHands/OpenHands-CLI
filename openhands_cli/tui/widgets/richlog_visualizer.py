@@ -307,13 +307,16 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Automatically scroll to the bottom to show the newly added widget
         self._container.scroll_end(animate=False)
 
-    def render_user_message(self, content: str) -> None:
+    def render_user_message(
+        self, content: str, *, image_data: bytes | None = None
+    ) -> None:
         """Render a user message to the UI.
 
         Dismisses any pending feedback widgets before rendering the user message.
 
         Args:
             content: The user's message text to display.
+            image_data: Optional PNG image bytes to display as a preview.
         """
         from textual.widgets import Static
 
@@ -327,6 +330,21 @@ class ConversationVisualizer(ConversationVisualizerBase):
             f"> {content}", classes="user-message", markup=False
         )
         self._run_on_main_thread(self._add_widget_to_ui, user_message_widget)
+
+        # Display image preview if image data is provided
+        if image_data is not None:
+            self._render_image_preview(image_data)
+
+    def _render_image_preview(self, image_data: bytes) -> None:
+        """Render an image preview as colored block characters."""
+        from textual.widgets import Static
+
+        from openhands_cli.tui.utils.clipboard_image import image_to_rich_text
+
+        preview = image_to_rich_text(image_data, width=40, height=20)
+        if preview is not None:
+            preview_widget = Static(preview, classes="image-preview")
+            self._run_on_main_thread(self._add_widget_to_ui, preview_widget)
 
     def _update_widget_in_ui(
         self, collapsible: Collapsible, new_title: str, new_content: str

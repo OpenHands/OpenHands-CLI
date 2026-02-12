@@ -50,9 +50,10 @@ if TYPE_CHECKING:
 class SendMessage(Message):
     """Request to send a user message to the current conversation."""
 
-    def __init__(self, content: str) -> None:
+    def __init__(self, content: str, image_data: bytes | None = None) -> None:
         super().__init__()
         self.content = content
+        self.image_data = image_data
 
 
 class CreateConversation(Message):
@@ -195,13 +196,17 @@ class ConversationManager(Container):
     async def _on_user_input_submitted(self, event: UserInputSubmitted) -> None:
         """Handle UserInputSubmitted from InputField."""
         event.stop()
-        await self._message_controller.handle_user_message(event.content)
+        await self._message_controller.handle_user_message(
+            event.content, image_data=event.image_data
+        )
 
     @on(SendMessage)
     async def _on_send_message(self, event: SendMessage) -> None:
         """Handle SendMessage posted directly to ConversationManager."""
         event.stop()
-        await self._message_controller.handle_user_message(event.content)
+        await self._message_controller.handle_user_message(
+            event.content, image_data=event.image_data
+        )
 
     @on(CreateConversation)
     def _on_create_conversation(self, event: CreateConversation) -> None:

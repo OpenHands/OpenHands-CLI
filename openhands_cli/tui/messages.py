@@ -27,6 +27,7 @@ class UserInputSubmitted(Message):
     """
 
     content: str
+    image_data: bytes | None = None
 
 
 @dataclass

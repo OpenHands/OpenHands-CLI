@@ -80,6 +80,8 @@ class InputAreaContainer(Container):
                 self._command_new()
             case "history":
                 self._command_history()
+            case "image":
+                self._command_image()
             case "confirm":
                 self._command_confirm()
             case "condense":
@@ -115,6 +117,32 @@ class InputAreaContainer(Container):
 
         app = cast("OpenHandsApp", self.app)
         app.action_toggle_history()
+
+    def _command_image(self) -> None:
+        """Handle the /image command to attach image from clipboard."""
+        from openhands_cli.tui.utils.clipboard_image import (
+            get_image_size_display,
+            read_image_from_clipboard,
+        )
+        from openhands_cli.tui.widgets.user_input.input_field import InputField
+
+        image_data = read_image_from_clipboard()
+        if image_data is None:
+            self.app.notify(
+                title="Image Paste",
+                message="No image found on clipboard",
+                severity="warning",
+            )
+            return
+
+        input_field = self.query_one(InputField)
+        input_field.set_pending_image(image_data)
+        size_str = get_image_size_display(image_data)
+        self.app.notify(
+            title="Image Paste",
+            message=f"Image attached ({size_str}). Press Enter to send, Esc to remove.",
+            severity="information",
+        )
 
     def _command_confirm(self) -> None:
         """Handle the /confirm command to show confirmation settings modal."""

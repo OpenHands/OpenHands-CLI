@@ -29,7 +29,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 8
+        assert len(COMMANDS) == 9
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -182,7 +182,7 @@ class TestCommands:
         assert "/help" in command_names
         assert "/new" in command_names
         assert "/skills" in command_names
-        assert len(COMMANDS) == 8
+        assert len(COMMANDS) == 9
 
     def test_all_commands_included_in_help(self):
         """Test that all commands from COMMANDS list are included in help text.

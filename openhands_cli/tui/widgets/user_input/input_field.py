@@ -12,7 +12,7 @@ from textual.containers import Container
 from textual.message import Message
 from textual.reactive import reactive
 from textual.signal import Signal
-from textual.widgets import TextArea
+from textual.widgets import Static, TextArea
 
 from openhands_cli.tui.core.commands import COMMANDS, is_valid_command
 from openhands_cli.tui.messages import SlashCommandSubmitted, UserInputSubmitted
@@ -81,6 +81,9 @@ class InputField(Container):
         Binding(
             "ctrl+x", "open_external_editor", "Open external editor", priority=True
         ),
+        Binding(
+            "ctrl+v", "paste_with_image", "Paste (with image support)", priority=True
+        ),
     ]
 
     # Reactive properties bound from ConversationContainer
@@ -127,6 +130,16 @@ class InputField(Container):
             background: $background;
         }
 
+        #image-indicator {
+            layer: base;
+            width: 100%;
+            height: 1;
+            background: $surface;
+            color: $text;
+            padding: 0 1;
+            display: none;
+        }
+
         AutoCompleteDropdown {
             layer: autocomplete;
             offset-x: 1;
@@ -148,6 +161,8 @@ class InputField(Container):
         super().__init__(**kwargs)
         self.placeholder = placeholder
         self.multiline_mode_status = Signal(self, "multiline_mode_status")
+        self._pending_image: bytes | None = None
+        self._image_indicator = Static("", id="image-indicator", markup=True)
         self.single_line_widget = SingleLineInputWithWrapping(
             placeholder=self.placeholder,
             id="single_line_input",
@@ -168,6 +183,7 @@ class InputField(Container):
 
     def compose(self):
         """Create the input widgets."""
+        yield self._image_indicator
         yield self.single_line_widget
         yield self.multiline_widget
         yield self.autocomplete
@@ -294,8 +310,55 @@ class InputField(Container):
 
         self.autocomplete.update_candidates()
 
+    def set_pending_image(self, image_data: bytes) -> None:
+        """Set pending image data and show the indicator."""
+        from openhands_cli.tui.utils.clipboard_image import (
+            get_image_dimensions,
+            get_image_size_display,
+        )
+
+        self._pending_image = image_data
+        size_str = get_image_size_display(image_data)
+        dims = get_image_dimensions(image_data)
+        dims_str = f" {dims[0]}x{dims[1]}," if dims else ""
+        self._image_indicator.update(
+            f"[bold green]Image attached[/bold green] ({dims_str} {size_str}) "
+            f"[dim]- Esc to remove[/dim]"
+        )
+        self._image_indicator.display = True
+
+    def clear_pending_image(self) -> None:
+        """Clear pending image data and hide the indicator."""
+        self._pending_image = None
+        self._image_indicator.update("")
+        self._image_indicator.display = False
+
+    def action_paste_with_image(self) -> None:
+        """Handle Ctrl+V: check clipboard for image, fall back to text paste."""
+        from openhands_cli.tui.utils.clipboard_image import read_image_from_clipboard
+
+        image_data = read_image_from_clipboard()
+        if image_data is not None:
+            self.set_pending_image(image_data)
+            self.app.notify(
+                "Image attached from clipboard. Press Enter to send.",
+                severity="information",
+                timeout=3,
+            )
+        else:
+            # No image on clipboard - fall through to normal text paste
+            self.active_input_widget.action_paste()
+
     def on_key(self, event: events.Key) -> None:
-        """Handle key events for autocomplete navigation."""
+        """Handle key events for autocomplete navigation and image removal."""
+        # Escape clears pending image
+        if event.key == "escape" and self._pending_image is not None:
+            self.clear_pending_image()
+            self.app.notify("Image removed", severity="information", timeout=2)
+            event.stop()
+            event.prevent_default()
+            return
+
         if self.is_multiline_mode:
             return
 
@@ -334,37 +397,50 @@ class InputField(Container):
         """Submit content from multiline mode (Ctrl+J)."""
         if self.is_multiline_mode:
             content = self._get_current_text().strip()
-            if content:
-                self._clear_current()
-                self.action_toggle_input_mode()
-                # Use the same submission logic as single-line mode
-                if is_valid_command(content):
-                    command = content[1:]  # Remove leading "/"
-                    self.post_message(SlashCommandSubmitted(command=command))
-                else:
-                    self.post_message(UserInputSubmitted(content=content))
+            image_data = self._pending_image
+
+            if not content and image_data is None:
+                return
+
+            self._clear_current()
+            self.clear_pending_image()
+            self.action_toggle_input_mode()
+
+            # Slash commands only when no image is attached
+            if is_valid_command(content) and image_data is None:
+                command = content[1:]  # Remove leading "/"
+                self.post_message(SlashCommandSubmitted(command=command))
+            else:
+                self.post_message(
+                    UserInputSubmitted(content=content, image_data=image_data)
+                )
 
     def _submit_current_content(self) -> None:
         """Submit current content and clear input.
 
         Posts different messages based on content type:
         - SlashCommandSubmitted for valid slash commands
-        - UserInputSubmitted for regular user input
+        - UserInputSubmitted for regular user input (optionally with image)
         """
         content = self._get_current_text().strip()
-        if not content:
+        image_data = self._pending_image
+
+        if not content and image_data is None:
             return
 
         self._clear_current()
+        self.clear_pending_image()
 
-        # Check if this is a valid slash command
-        if is_valid_command(content):
+        # Slash commands only when no image is attached
+        if is_valid_command(content) and image_data is None:
             # Extract command name (without the leading slash)
             command = content[1:]  # Remove leading "/"
             self.post_message(SlashCommandSubmitted(command=command))
         else:
-            # Regular user input
-            self.post_message(UserInputSubmitted(content=content))
+            # Regular user input (optionally with image)
+            self.post_message(
+                UserInputSubmitted(content=content, image_data=image_data)
+            )
 
     @on(SingleLineInputWithWrapping.MultiLinePasteDetected)
     def _on_paste_detected(
