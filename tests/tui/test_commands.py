@@ -12,7 +12,12 @@ from textual_autocomplete import DropdownItem
 from openhands.sdk.security.confirmation_policy import AlwaysConfirm
 from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.conversations.store.local import LocalFileStore
-from openhands_cli.tui.core.commands import COMMANDS, is_valid_command, show_help
+from openhands_cli.tui.core.commands import (
+    COMMANDS,
+    is_valid_command,
+    show_agents,
+    show_help,
+)
 from openhands_cli.tui.modals import SettingsScreen
 from openhands_cli.tui.modals.confirmation_modal import (
     ConfirmationSettingsModal,
@@ -29,7 +34,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 8
+        assert len(COMMANDS) == 9
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -47,6 +52,7 @@ class TestCommands:
             ("/confirm", "Configure confirmation settings"),
             ("/condense", "Condense conversation history"),
             ("/skills", "View loaded skills, hooks, and MCPs"),
+            ("/agents", "View available and active sub-agents"),
             ("/feedback", "Send anonymous feedback about CLI"),
             ("/exit", "Exit the application"),
         ],
@@ -86,6 +92,7 @@ class TestCommands:
             "/confirm",
             "/condense",
             "/skills",
+            "/agents",
             "/feedback",
             "/exit",
             "Display available commands",
@@ -94,6 +101,7 @@ class TestCommands:
             "Configure confirmation settings",
             "Condense conversation history",
             "View loaded skills, hooks, and MCPs",
+            "View available and active sub-agents",
             "Send anonymous feedback about CLI",
             "Exit the application",
             "Tips:",
@@ -160,6 +168,7 @@ class TestCommands:
             ("/confirm", True),
             ("/condense", True),
             ("/skills", True),
+            ("/agents", True),
             ("/feedback", True),
             ("/exit", True),
             ("/help extra", False),
@@ -182,7 +191,8 @@ class TestCommands:
         assert "/help" in command_names
         assert "/new" in command_names
         assert "/skills" in command_names
-        assert len(COMMANDS) == 8
+        assert "/agents" in command_names
+        assert len(COMMANDS) == 9
 
     def test_all_commands_included_in_help(self):
         """Test that all commands from COMMANDS list are included in help text.
@@ -213,6 +223,105 @@ class TestCommands:
             f"The following commands are defined in COMMANDS but missing from "
             f"help text: {missing_commands}"
         )
+
+
+class TestShowAgents:
+    """Tests for the show_agents display function."""
+
+    def test_show_agents_no_runner(self):
+        """show_agents with no runner should display available types and no active agents."""
+        mock_scroll = mock.MagicMock(spec=VerticalScroll)
+
+        show_agents(mock_scroll, runner=None)
+
+        mock_scroll.mount.assert_called_once()
+        widget = mock_scroll.mount.call_args[0][0]
+        content = widget.content
+
+        assert "Sub-Agents" in content
+        assert "Available Agent Types" in content
+        assert "Active Sub-Agents" in content
+        assert "No active sub-agents" in content
+        # Default agent should always be listed
+        assert "default" in content
+
+    def test_show_agents_with_mock_runner_no_delegate(self):
+        """show_agents with runner but no delegate tool shows no active agents."""
+        mock_scroll = mock.MagicMock(spec=VerticalScroll)
+
+        mock_runner = mock.MagicMock()
+        mock_runner.conversation.agent.tools_map = {}
+
+        show_agents(mock_scroll, runner=mock_runner)
+
+        widget = mock_scroll.mount.call_args[0][0]
+        content = widget.content
+
+        assert "Available Agent Types" in content
+        assert "No active sub-agents" in content
+
+    def test_show_agents_with_active_sub_agents(self):
+        """show_agents with active sub-agents should list them."""
+        mock_scroll = mock.MagicMock(spec=VerticalScroll)
+
+        mock_executor = mock.MagicMock()
+        mock_executor._sub_agents = {
+            "researcher": mock.MagicMock(),
+            "security_expert": mock.MagicMock(),
+        }
+
+        mock_delegate_tool = mock.MagicMock()
+        mock_delegate_tool.executor = mock_executor
+
+        mock_runner = mock.MagicMock()
+        mock_runner.conversation.agent.tools_map = {"delegate": mock_delegate_tool}
+
+        show_agents(mock_scroll, runner=mock_runner)
+
+        widget = mock_scroll.mount.call_args[0][0]
+        content = widget.content
+
+        assert "researcher" in content
+        assert "security_expert" in content
+
+    def test_show_agents_mounts_with_correct_css_class(self):
+        """show_agents should mount widget with agents-message CSS class."""
+        mock_scroll = mock.MagicMock(spec=VerticalScroll)
+
+        show_agents(mock_scroll, runner=None)
+
+        widget = mock_scroll.mount.call_args[0][0]
+        assert "agents-message" in widget.classes
+
+    def test_show_agents_displays_custom_registered_agent(self):
+        """show_agents should display custom agents registered via register_agent."""
+        from openhands.tools.delegate.registration import (
+            _reset_registry_for_tests,
+            register_agent,
+        )
+
+        # Register a custom agent
+        register_agent(
+            name="security_auditor",
+            factory_func=lambda llm: mock.MagicMock(),
+            description="Performs security audits on code",
+        )
+
+        try:
+            mock_scroll = mock.MagicMock(spec=VerticalScroll)
+            show_agents(mock_scroll, runner=None)
+
+            widget = mock_scroll.mount.call_args[0][0]
+            content = widget.content
+
+            # Custom agent should appear in Available Agent Types section
+            assert "security_auditor" in content
+            assert "Performs security audits on code" in content
+            # Default agent should still be listed
+            assert "default" in content
+        finally:
+            # Clean up the registry to avoid cross-test contamination
+            _reset_registry_for_tests()
 
 
 class TestOpenHandsAppCommands:
@@ -810,3 +919,30 @@ class TestOpenHandsAppCommands:
 
             top_screen = oh_app.screen_stack[-1]
             assert isinstance(top_screen, SwitchConversationModal)
+
+    @pytest.mark.asyncio
+    async def test_agents_command_displays_agents(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """`/agents` should call show_agents and display agent information."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            with mock.patch(
+                "openhands_cli.tui.widgets.input_area.show_agents"
+            ) as mock_show:
+                oh_app.conversation_state.input_area._command_agents()
+
+                mock_show.assert_called_once()
+                # First arg is scroll_view, second is runner
+                call_args = mock_show.call_args
+                assert call_args[0][0] is oh_app.conversation_state.input_area.scroll_view

@@ -6,12 +6,17 @@ and the logic for handling command execution.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from textual.containers import VerticalScroll
 from textual.widgets import Static
 from textual_autocomplete import DropdownItem
 
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.resources import LoadedResourcesInfo
+
+if TYPE_CHECKING:
+    from openhands_cli.tui.core.conversation_runner import ConversationRunner
 
 
 # Available commands with descriptions after the command
@@ -22,6 +27,7 @@ COMMANDS = [
     DropdownItem(main="/confirm - Configure confirmation settings"),
     DropdownItem(main="/condense - Condense conversation history"),
     DropdownItem(main="/skills - View loaded skills, hooks, and MCPs"),
+    DropdownItem(main="/agents - View available and active sub-agents"),
     DropdownItem(main="/feedback - Send anonymous feedback about CLI"),
     DropdownItem(main="/exit - Exit the application"),
 ]
@@ -76,6 +82,7 @@ def show_help(scroll_view: VerticalScroll) -> None:
   [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
   [{secondary}]/condense[/{secondary}] - Condense conversation history
   [{secondary}]/skills[/{secondary}] - View loaded skills, hooks, and MCPs
+  [{secondary}]/agents[/{secondary}] - View available and active sub-agents
   [{secondary}]/feedback[/{secondary}] - Send anonymous feedback about CLI
   [{secondary}]/exit[/{secondary}] - Exit the application
 
@@ -111,3 +118,75 @@ def show_skills(
 
     skills_widget = Static(skills_text, classes="skills-message")
     scroll_view.mount(skills_widget)
+
+
+def show_agents(
+    scroll_view: VerticalScroll, runner: ConversationRunner | None = None
+) -> None:
+    """Display available agent types and active sub-agents.
+
+    Args:
+        scroll_view: The VerticalScroll widget to mount content to
+        runner: The current conversation runner (for active sub-agent info)
+    """
+    from openhands.tools.delegate.registration import get_factory_info
+
+    primary = OPENHANDS_THEME.primary
+    secondary = OPENHANDS_THEME.secondary
+
+    lines = [f"\n[bold {primary}]Sub-Agents[/bold {primary}]"]
+
+    # Section 1: Available agent types from the global registry
+    lines.append(f"\n[bold {secondary}]Available Agent Types[/bold {secondary}]")
+    factory_info = get_factory_info()
+    for info_line in factory_info.splitlines():
+        # Convert markdown bold to Rich markup
+        info_line = info_line.replace("**", "")
+        if info_line.startswith("- "):
+            lines.append(f"  {info_line}")
+        elif not info_line.startswith("Available agent"):
+            lines.append(info_line)
+
+    # Section 2: Active sub-agents from the current conversation
+    lines.append(f"\n[bold {secondary}]Active Sub-Agents[/bold {secondary}]")
+    active_agents = _get_active_sub_agents(runner)
+    if active_agents:
+        for agent_id, agent_type in active_agents:
+            type_label = f" [{secondary}]({agent_type})[/{secondary}]" if agent_type else ""
+            lines.append(f"  - {agent_id}{type_label}")
+    else:
+        lines.append("  [dim]No active sub-agents in this session.[/dim]")
+
+    agents_text = "\n".join(lines) + "\n"
+    agents_widget = Static(agents_text, classes="agents-message")
+    scroll_view.mount(agents_widget)
+
+
+def _get_active_sub_agents(
+    runner: ConversationRunner | None,
+) -> list[tuple[str, str]]:
+    """Get active sub-agents from the conversation runner's delegate executor.
+
+    Returns:
+        List of (agent_id, agent_type) tuples, or empty list if unavailable.
+    """
+    if runner is None or runner.conversation is None:
+        return []
+
+    try:
+        agent = runner.conversation.agent
+        delegate_tool = agent.tools_map.get("delegate")
+        if delegate_tool is None or delegate_tool.executor is None:
+            return []
+
+        executor = delegate_tool.executor
+        sub_agents = getattr(executor, "_sub_agents", {})
+        if not sub_agents:
+            return []
+
+        results = []
+        for agent_id in sub_agents:
+            results.append((agent_id, ""))
+        return results
+    except Exception:
+        return []
