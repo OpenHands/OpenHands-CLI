@@ -328,6 +328,19 @@ class ConversationVisualizer(ConversationVisualizerBase):
         )
         self._run_on_main_thread(self._add_widget_to_ui, user_message_widget)
 
+    def render_error_message(self, content: str) -> None:
+        """Render an error message to the UI.
+
+        Args:
+            content: The error message text to display.
+        """
+        from textual.widgets import Static
+
+        error_widget = Static(
+            f"[bold red]Error:[/bold red] {content}", classes="error-message"
+        )
+        self._run_on_main_thread(self._add_widget_to_ui, error_widget)
+
     def _update_widget_in_ui(
         self, collapsible: Collapsible, new_title: str, new_content: str
     ) -> None:

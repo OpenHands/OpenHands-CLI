@@ -349,6 +349,7 @@ class InputField(Container):
 
         Posts different messages based on content type:
         - SlashCommandSubmitted for valid slash commands
+        - AgentDelegationRequested for @agent-name delegation syntax
         - UserInputSubmitted for regular user input
         """
         content = self._get_current_text().strip()
@@ -362,6 +363,20 @@ class InputField(Container):
             # Extract command name (without the leading slash)
             command = content[1:]  # Remove leading "/"
             self.post_message(SlashCommandSubmitted(command=command))
+        # Check for @agent-name delegation syntax
+        elif content.startswith("@"):
+            parts = content.split(maxsplit=1)
+            if len(parts) == 2:
+                agent_name = parts[0][1:]  # Remove @ prefix
+                message = parts[1]
+                from openhands_cli.tui.messages import AgentDelegationRequested
+
+                self.post_message(
+                    AgentDelegationRequested(agent_name=agent_name, content=message)
+                )
+            else:
+                # Invalid format: @agent-name with no message - treat as regular input
+                self.post_message(UserInputSubmitted(content=content))
         else:
             # Regular user input
             self.post_message(UserInputSubmitted(content=content))

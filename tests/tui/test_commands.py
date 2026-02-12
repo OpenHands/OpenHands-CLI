@@ -946,3 +946,142 @@ class TestOpenHandsAppCommands:
                 # First arg is scroll_view, second is runner
                 call_args = mock_show.call_args
                 assert call_args[0][0] is oh_app.conversation_state.input_area.scroll_view
+
+
+class TestAgentDelegation:
+    """Tests for @agent-name delegation syntax."""
+
+    def test_delegation_message_parsing(self):
+        """AgentDelegationRequested should be posted for @agent-name message syntax."""
+        from openhands_cli.tui.messages import AgentDelegationRequested
+        from openhands_cli.tui.widgets.user_input.input_field import InputField
+
+        field = InputField()
+
+        # Mock the post_message to capture what's posted
+        posted_messages = []
+
+        def capture_post(msg):
+            posted_messages.append(msg)
+
+        field.post_message = capture_post
+
+        # Simulate submitting @agent-name message
+        # Set text directly on the active input widget
+        field.single_line_widget.text = "@security_expert review auth.py"
+        field._submit_current_content()
+
+        # Should post AgentDelegationRequested
+        assert len(posted_messages) == 1
+        msg = posted_messages[0]
+        assert isinstance(msg, AgentDelegationRequested)
+        assert msg.agent_name == "security_expert"
+        assert msg.content == "review auth.py"
+
+    def test_delegation_invalid_format_no_message(self):
+        """@agent-name without message should be treated as regular input."""
+        from openhands_cli.tui.messages import UserInputSubmitted
+        from openhands_cli.tui.widgets.user_input.input_field import InputField
+
+        field = InputField()
+
+        posted_messages = []
+
+        def capture_post(msg):
+            posted_messages.append(msg)
+
+        field.post_message = capture_post
+
+        # Simulate submitting @agent-name without message
+        field.single_line_widget.text = "@security_expert"
+        field._submit_current_content()
+
+        # Should post UserInputSubmitted (fallback to regular message)
+        assert len(posted_messages) == 1
+        msg = posted_messages[0]
+        assert isinstance(msg, UserInputSubmitted)
+        assert msg.content == "@security_expert"
+
+    def test_delegation_validation_unknown_agent(self):
+        """handle_agent_delegation should show error for unknown agent."""
+        from openhands_cli.tui.core.runner_registry import RunnerRegistry
+        from openhands_cli.tui.core.state import ConversationContainer
+        from openhands_cli.tui.core.user_message_controller import (
+            UserMessageController,
+        )
+
+        # Create mock components
+        mock_state = mock.MagicMock(spec=ConversationContainer)
+        mock_state.conversation_id = uuid.uuid4()
+
+        mock_runner = mock.MagicMock()
+        mock_runner.visualizer = mock.MagicMock()
+
+        mock_runners = mock.MagicMock(spec=RunnerRegistry)
+        mock_runners.get_or_create.return_value = mock_runner
+
+        controller = UserMessageController(
+            state=mock_state,
+            runners=mock_runners,
+            run_worker=mock.MagicMock(),
+            headless_mode=False,
+        )
+
+        # Test delegation with unknown agent
+        import asyncio
+
+        asyncio.run(controller.handle_agent_delegation("unknown_agent", "do something"))
+
+        # Should call render_error_message
+        mock_runner.visualizer.render_error_message.assert_called_once()
+        error_msg = mock_runner.visualizer.render_error_message.call_args[0][0]
+        assert "unknown_agent" in error_msg.lower()
+        assert "available" in error_msg.lower() or "default" in error_msg.lower()
+
+    def test_delegation_valid_agent(self):
+        """handle_agent_delegation should process valid agent delegation."""
+        from openhands_cli.tui.core.runner_registry import RunnerRegistry
+        from openhands_cli.tui.core.state import ConversationContainer
+        from openhands_cli.tui.core.user_message_controller import (
+            UserMessageController,
+        )
+
+        # Create mock components
+        mock_state = mock.MagicMock(spec=ConversationContainer)
+        mock_state.conversation_id = uuid.uuid4()
+
+        mock_runner = mock.MagicMock()
+        mock_runner.visualizer = mock.MagicMock()
+        mock_runner.is_running = False
+
+        mock_runners = mock.MagicMock(spec=RunnerRegistry)
+        mock_runners.get_or_create.return_value = mock_runner
+
+        mock_run_worker = mock.MagicMock()
+
+        controller = UserMessageController(
+            state=mock_state,
+            runners=mock_runners,
+            run_worker=mock_run_worker,
+            headless_mode=False,
+        )
+
+        # Test delegation with valid "default" agent (always available)
+        import asyncio
+
+        asyncio.run(controller.handle_agent_delegation("default", "analyze this code"))
+
+        # Should render user message
+        mock_runner.visualizer.render_user_message.assert_called_once_with(
+            "@default analyze this code"
+        )
+
+        # Should update conversation title
+        mock_state.set_conversation_title.assert_called_once_with(
+            "@default analyze this code"
+        )
+
+        # Should spawn worker for process_delegation_async
+        mock_run_worker.assert_called_once()
+        call_args = mock_run_worker.call_args
+        assert call_args[1]["name"] == "process_delegation"
