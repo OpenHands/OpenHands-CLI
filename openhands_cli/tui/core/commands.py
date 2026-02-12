@@ -188,5 +188,15 @@ def _get_active_sub_agents(
             return []
 
         return list(sub_agents.keys())
-    except Exception:
+    except AttributeError as e:
+        # Expected: conversation/agent/tools_map access on objects that don't have these attrs
+        import logging
+
+        logging.debug(f"Failed to get active sub-agents (expected if no conversation): {e}")
+        return []
+    except Exception as e:
+        # Unexpected error - log it so we know something is wrong
+        import logging
+
+        logging.warning(f"Unexpected error getting active sub-agents: {e}", exc_info=True)
         return []
