@@ -261,13 +261,21 @@ class TestShowAgents:
         assert "No active sub-agents" in content
 
     def test_show_agents_with_active_sub_agents(self):
-        """show_agents with active sub-agents should list them."""
+        """show_agents with active sub-agents should list them.
+
+        Note: _sub_agents is dict[str, LocalConversation] in reality, but since
+        _get_active_sub_agents() only calls .keys(), we just need a dict with
+        the right keys. This test verifies the display logic, not the conversation
+        objects themselves.
+        """
         mock_scroll = mock.MagicMock(spec=VerticalScroll)
 
+        # Real structure: dict[str, LocalConversation]
+        # We only need dict keys for this test since _get_active_sub_agents() calls .keys()
         mock_executor = mock.MagicMock()
         mock_executor._sub_agents = {
-            "researcher": mock.MagicMock(),
-            "security_expert": mock.MagicMock(),
+            "researcher_1": None,  # Explicit None since we don't use the values
+            "security_expert_1": None,
         }
 
         mock_delegate_tool = mock.MagicMock()
@@ -281,8 +289,8 @@ class TestShowAgents:
         widget = mock_scroll.mount.call_args[0][0]
         content = widget.content
 
-        assert "researcher" in content
-        assert "security_expert" in content
+        assert "researcher_1" in content
+        assert "security_expert_1" in content
 
     def test_show_agents_mounts_with_correct_css_class(self):
         """show_agents should mount widget with agents-message CSS class."""
@@ -925,7 +933,7 @@ class TestOpenHandsAppCommands:
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """`/agents` should call show_agents and display agent information."""
+        """`/agents` should display agent information in the scroll view."""
         monkeypatch.setattr(
             SettingsScreen,
             "is_initial_setup_required",
@@ -937,15 +945,34 @@ class TestOpenHandsAppCommands:
         async with app.run_test() as pilot:
             oh_app = cast(OpenHandsApp, pilot.app)
 
-            with mock.patch(
-                "openhands_cli.tui.widgets.input_area.show_agents"
-            ) as mock_show:
-                oh_app.conversation_state.input_area._command_agents()
+            # Get the scroll view before calling the command
+            scroll_view = oh_app.conversation_state.input_area.scroll_view
+            initial_widget_count = len(scroll_view.children)
 
-                mock_show.assert_called_once()
-                # First arg is scroll_view, second is runner
-                call_args = mock_show.call_args
-                assert call_args[0][0] is oh_app.conversation_state.input_area.scroll_view
+            # Call the actual command (no mocking)
+            oh_app.conversation_state.input_area._command_agents()
+
+            # Verify a new widget was mounted
+            assert len(scroll_view.children) > initial_widget_count
+
+            # Find the agents message widget
+            agents_widgets = [
+                w for w in scroll_view.children if "agents-message" in w.classes
+            ]
+            assert len(agents_widgets) == 1
+
+            # Verify the widget was properly mounted
+            from textual.widgets import Static
+
+            agents_widget = agents_widgets[0]
+            assert isinstance(agents_widget, Static)
+
+            # The important thing is that the real code path executed:
+            # - show_agents() was called
+            # - It accessed the agent registry
+            # - It created and mounted a widget
+            # - The widget has the correct CSS class
+            # If show_agents() crashes, this test will fail
 
 
 class TestAgentDelegation:
