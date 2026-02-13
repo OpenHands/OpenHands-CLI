@@ -35,7 +35,12 @@ if TYPE_CHECKING:
 @pytest.fixture
 def visualizer():
     """Create a ConversationVisualizer with mock app and container."""
+    from unittest.mock import MagicMock
+
+    # Create mock app with conversation_state.cells_collapsed_override
     app = App()
+    app.conversation_state = MagicMock()  # type: ignore[attr-defined]
+    app.conversation_state.cells_collapsed_override = None  # type: ignore[attr-defined]
     container = VerticalScroll()
     return ConversationVisualizer(container, app)  # type: ignore[arg-type]
 
@@ -439,6 +444,41 @@ class TestDefaultCellsExpandedSetting:
         # Test with default_cells_expanded=False
         with mock_cli_settings(visualizer=visualizer, default_cells_expanded=False):
             assert visualizer._default_collapsed is True
+
+    def test_cells_collapsed_override_takes_precedence(
+        self, visualizer, mock_cli_settings
+    ):
+        """Test that cells_collapsed_override overrides cli_settings."""
+        # With default_cells_expanded=True (cells start expanded by default)
+        with mock_cli_settings(visualizer=visualizer, default_cells_expanded=True):
+            # Without override, should be False (not collapsed)
+            assert visualizer._default_collapsed is False
+
+            # Set override to True (collapse all new cells)
+            visualizer._app.conversation_state.cells_collapsed_override = True
+            assert visualizer._default_collapsed is True
+
+            # Set override to False (expand all new cells)
+            visualizer._app.conversation_state.cells_collapsed_override = False
+            assert visualizer._default_collapsed is False
+
+            # Clear override - should fall back to settings
+            visualizer._app.conversation_state.cells_collapsed_override = None
+            assert visualizer._default_collapsed is False
+
+    def test_cells_collapsed_override_with_opposite_setting(
+        self, visualizer, mock_cli_settings
+    ):
+        """Test override works when opposite of settings."""
+        # With default_cells_expanded=False (cells start collapsed by default)
+        with mock_cli_settings(visualizer=visualizer, default_cells_expanded=False):
+            # Without override, should be True (collapsed)
+            visualizer._app.conversation_state.cells_collapsed_override = None
+            assert visualizer._default_collapsed is True
+
+            # Override to expand all new cells
+            visualizer._app.conversation_state.cells_collapsed_override = False
+            assert visualizer._default_collapsed is False
 
 
 class TestCliSettingsCaching:

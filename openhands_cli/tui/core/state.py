@@ -126,6 +126,15 @@ class ConversationContainer(Container):
     loaded_resources: var["LoadedResourcesInfo | None"] = var(None)
     """Loaded skills, hooks, and MCPs for the current conversation."""
 
+    # ---- Session-level Cell Collapse State ----
+    cells_collapsed_override: var[bool | None] = var(None)
+    """Session-level override for default cell collapse state.
+
+    When None, uses the user's cli_settings.default_cells_expanded preference.
+    When True, all new cells start collapsed (set by Ctrl+O collapse all).
+    When False, all new cells start expanded (set by Ctrl+O expand all).
+    """
+
     def __init__(
         self,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,

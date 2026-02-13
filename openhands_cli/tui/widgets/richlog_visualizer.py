@@ -564,10 +564,20 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     @property
     def _default_collapsed(self) -> bool:
-        """Get the default collapsed state for new cells based on settings.
+        """Get the default collapsed state for new cells.
+
+        Checks (in order):
+        1. Session-level override from Ctrl+O toggle (cells_collapsed_override)
+        2. User's cli_settings.default_cells_expanded preference
 
         Returns True if cells should start collapsed, False if expanded.
         """
+        # Check session-level override first (set by Ctrl+O)
+        if hasattr(self._app, "conversation_state"):
+            override = self._app.conversation_state.cells_collapsed_override
+            if override is not None:
+                return override
+        # Fall back to user's setting
         return not self.cli_settings.default_cells_expanded
 
     def _make_collapsible(

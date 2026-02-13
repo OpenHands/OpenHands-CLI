@@ -482,6 +482,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         Collapses all cells if any are expanded, otherwise expands all cells.
         This provides a quick way to minimize or maximize all content at once.
+
+        Also sets a session-level override so new cells follow the same state.
         """
         collapsibles = self.scroll_view.query(Collapsible)
 
@@ -490,6 +492,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         for collapsible in collapsibles:
             collapsible.collapsed = any_expanded
+
+        # Set session-level override so new cells follow the same state
+        self.conversation_state.cells_collapsed_override = any_expanded
 
     def on_key(self, event: events.Key) -> None:
         """Handle keyboard navigation.

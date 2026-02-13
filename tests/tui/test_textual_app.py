@@ -109,6 +109,82 @@ class TestHistoryIntegration:
         )
 
 
+class TestToggleCells:
+    """Tests for Ctrl+O toggle cells functionality."""
+
+    def test_action_toggle_cells_sets_override_when_collapsing(self):
+        """Toggling cells to collapsed sets cells_collapsed_override=True."""
+        from openhands_cli.tui.core.state import ConversationContainer
+
+        app = OpenHandsApp.__new__(OpenHandsApp)
+        app.conversation_state = Mock(spec=ConversationContainer)
+        app.conversation_state.cells_collapsed_override = None
+
+        # Mock scroll_view with one expanded collapsible
+        mock_collapsible = Mock()
+        mock_collapsible.collapsed = False  # Currently expanded
+
+        mock_scroll_view = Mock()
+        mock_scroll_view.query.return_value = [mock_collapsible]
+        app.scroll_view = mock_scroll_view
+
+        app.action_toggle_cells()
+
+        # All cells should be collapsed
+        assert mock_collapsible.collapsed is True
+        # Override should be set to True (collapsed)
+        assert app.conversation_state.cells_collapsed_override is True
+
+    def test_action_toggle_cells_sets_override_when_expanding(self):
+        """Toggling cells to expanded sets cells_collapsed_override=False."""
+        from openhands_cli.tui.core.state import ConversationContainer
+
+        app = OpenHandsApp.__new__(OpenHandsApp)
+        app.conversation_state = Mock(spec=ConversationContainer)
+        app.conversation_state.cells_collapsed_override = None
+
+        # Mock scroll_view with all collapsed collapsibles
+        mock_collapsible = Mock()
+        mock_collapsible.collapsed = True  # Currently collapsed
+
+        mock_scroll_view = Mock()
+        mock_scroll_view.query.return_value = [mock_collapsible]
+        app.scroll_view = mock_scroll_view
+
+        app.action_toggle_cells()
+
+        # All cells should be expanded
+        assert mock_collapsible.collapsed is False
+        # Override should be set to False (expanded)
+        assert app.conversation_state.cells_collapsed_override is False
+
+    def test_action_toggle_cells_with_mixed_states_collapses_all(self):
+        """When some cells are expanded and some collapsed, collapse all."""
+        from openhands_cli.tui.core.state import ConversationContainer
+
+        app = OpenHandsApp.__new__(OpenHandsApp)
+        app.conversation_state = Mock(spec=ConversationContainer)
+        app.conversation_state.cells_collapsed_override = None
+
+        # Mock scroll_view with mixed collapsed states
+        mock_expanded = Mock()
+        mock_expanded.collapsed = False
+        mock_collapsed = Mock()
+        mock_collapsed.collapsed = True
+
+        mock_scroll_view = Mock()
+        mock_scroll_view.query.return_value = [mock_expanded, mock_collapsed]
+        app.scroll_view = mock_scroll_view
+
+        app.action_toggle_cells()
+
+        # All cells should be collapsed (since at least one was expanded)
+        assert mock_expanded.collapsed is True
+        assert mock_collapsed.collapsed is True
+        # Override should be set to True (collapsed)
+        assert app.conversation_state.cells_collapsed_override is True
+
+
 class TestInputAreaContainerCommands:
     """Tests for InputAreaContainer command methods."""
 
