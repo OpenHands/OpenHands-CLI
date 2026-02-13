@@ -173,6 +173,11 @@ def main() -> None:
             from openhands_cli.mcp.mcp_commands import handle_mcp_command
 
             handle_mcp_command(args)
+        elif args.command == "plugin":
+            # Import plugin command handler only when needed
+            from openhands_cli.plugin.commands import handle_plugin_command
+
+            handle_plugin_command(args)
         elif args.command == "cloud":
             # Validate cloud mode requirements
             if not args.task and not args.file:

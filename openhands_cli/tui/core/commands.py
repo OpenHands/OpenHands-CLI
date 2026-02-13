@@ -22,6 +22,7 @@ COMMANDS = [
     DropdownItem(main="/confirm - Configure confirmation settings"),
     DropdownItem(main="/condense - Condense conversation history"),
     DropdownItem(main="/skills - View loaded skills, hooks, and MCPs"),
+    DropdownItem(main="/plugin - Manage installed plugins"),
     DropdownItem(main="/feedback - Send anonymous feedback about CLI"),
     DropdownItem(main="/exit - Exit the application"),
 ]
@@ -76,6 +77,7 @@ def show_help(scroll_view: VerticalScroll) -> None:
   [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
   [{secondary}]/condense[/{secondary}] - Condense conversation history
   [{secondary}]/skills[/{secondary}] - View loaded skills, hooks, and MCPs
+  [{secondary}]/plugin[/{secondary}] - Manage installed plugins
   [{secondary}]/feedback[/{secondary}] - Send anonymous feedback about CLI
   [{secondary}]/exit[/{secondary}] - Exit the application
 
@@ -111,3 +113,73 @@ def show_skills(
 
     skills_widget = Static(skills_text, classes="skills-message")
     scroll_view.mount(skills_widget)
+
+
+def show_plugins(scroll_view: VerticalScroll) -> None:
+    """Display installed plugins and plugin management help.
+
+    Args:
+        scroll_view: The VerticalScroll widget to mount plugins content to
+    """
+    from openhands.sdk.plugin import (
+        get_installed_plugins_dir,
+        list_installed_plugins,
+    )
+
+    primary = OPENHANDS_THEME.primary
+    secondary = OPENHANDS_THEME.secondary
+
+    lines = [f"\n[bold {primary}]Installed Plugins[/bold {primary}]"]
+
+    # Get installed plugins
+    try:
+        installed_plugins = list_installed_plugins()
+        plugins_dir = get_installed_plugins_dir()
+
+        if installed_plugins:
+            lines.append(f"[dim]Location:[/dim] {plugins_dir}\n")
+            for plugin_info in installed_plugins:
+                lines.append(
+                    f"  [{secondary}]{plugin_info.name}[/{secondary}] "
+                    f"v{plugin_info.version}"
+                )
+                if plugin_info.description:
+                    lines.append(f"    [dim]{plugin_info.description}[/dim]")
+                lines.append(f"    [dim]Source: {plugin_info.source}[/dim]")
+                if plugin_info.resolved_ref:
+                    lines.append(f"    [dim]Ref: {plugin_info.resolved_ref[:8]}[/dim]")
+                lines.append("")
+        else:
+            lines.append("[dim]No plugins installed.[/dim]\n")
+
+    except Exception as e:
+        lines.append(f"[red]Error loading plugins: {e}[/red]\n")
+
+    # Add usage instructions
+    lines.append(f"[bold {primary}]Plugin Management[/bold {primary}]")
+    lines.append("[dim]Use the following commands in your terminal:[/dim]\n")
+    lines.append(
+        f"  [{secondary}]Install:[/{secondary}] "
+        "openhands plugin install github:owner/repo"
+    )
+    lines.append(
+        f"  [{secondary}]Uninstall:[/{secondary}] "
+        "openhands plugin uninstall plugin-name"
+    )
+    lines.append(
+        f"  [{secondary}]List:[/{secondary}] "
+        "openhands plugin list"
+    )
+    lines.append(
+        f"  [{secondary}]Update:[/{secondary}] "
+        "openhands plugin update plugin-name"
+    )
+    lines.append("")
+    lines.append("[dim]Supported sources:[/dim]")
+    lines.append("  • github:owner/repo - GitHub repository")
+    lines.append("  • https://github.com/owner/repo - Git URL")
+    lines.append("  • /local/path - Local directory")
+
+    plugins_text = "\n".join(lines)
+    plugins_widget = Static(plugins_text, classes="plugins-message")
+    scroll_view.mount(plugins_widget)
