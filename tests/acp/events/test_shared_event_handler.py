@@ -1,7 +1,6 @@
 """Tests for ACP shared event handler hook rejection detection."""
 
 from openhands.sdk.event import AgentErrorEvent, UserRejectObservation
-
 from openhands_cli.acp_impl.events.shared_event_handler import (
     HOOK_BLOCKED_HEADER,
     _is_hook_rejection,
