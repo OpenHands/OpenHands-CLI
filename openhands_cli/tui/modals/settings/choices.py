@@ -10,7 +10,9 @@ def get_provider_options() -> list[tuple[str, str]]:
 
     Sorted alphabetically.
     """
-    providers = sorted(set(VERIFIED_MODELS.keys()) | set(UNVERIFIED_MODELS_EXCLUDING_BEDROCK.keys()))
+    providers = sorted(
+        set(VERIFIED_MODELS.keys()) | set(UNVERIFIED_MODELS_EXCLUDING_BEDROCK.keys())
+    )
     return [(provider, provider) for provider in providers]
 
 
