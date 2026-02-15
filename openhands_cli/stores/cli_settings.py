@@ -10,7 +10,7 @@ from pydantic import BaseModel
 class CliSettings(BaseModel):
     """Model for CLI-level settings."""
 
-    default_cells_expanded: bool = True
+    default_cells_expanded: bool = False
     auto_open_plan_panel: bool = True
     enable_critic: bool = True
 

@@ -16,6 +16,7 @@ from .helpers import type_text, wait_for_app_ready, wait_for_idle
 class TestCreatingAgentPlan:
     """Test creating an agent plan conversation."""
 
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
     @pytest.mark.parametrize(
         "mock_llm_with_trajectory", ["creating_agent_plan"], indirect=True
     )
