@@ -364,15 +364,48 @@ class TestConversationErrorEventHandling:
             # collapsed=False when default_cells_expanded=True
             assert not collapsible.collapsed
 
-        # Verify error border color
+
+class TestEventSymbolColor:
+    """Tests for event-based symbol coloring in collapsibles."""
+
+    def test_error_event_has_error_symbol_color(self, visualizer, mock_cli_settings):
+        """Test that error events get the error color for their symbol."""
         from openhands_cli.theme import OPENHANDS_THEME
-        from openhands_cli.tui.widgets.richlog_visualizer import (
-            _get_event_border_color,
+        from openhands_cli.tui.widgets.richlog_visualizer import _get_event_symbol_color
+
+        error_event = ConversationErrorEvent(
+            source="agent",
+            code="test_error",
+            detail="Test error message",
         )
 
-        expected_color = OPENHANDS_THEME.error or "#ff6b6b"
-        actual_color = _get_event_border_color(error_event)
-        assert actual_color == expected_color
+        symbol_color = _get_event_symbol_color(error_event)
+        assert symbol_color == OPENHANDS_THEME.error
+
+    def test_action_event_has_default_symbol_color(self, visualizer, mock_cli_settings):
+        """Test that action events get the default (white) color for their symbol."""
+        from openhands_cli.tui.widgets.richlog_visualizer import _get_event_symbol_color
+
+        action_event = create_terminal_action_event("ls -la", "List files")
+        symbol_color = _get_event_symbol_color(action_event)
+        # Action events use the default white color for a cleaner look
+        assert symbol_color == "#ffffff"
+
+    def test_collapsible_receives_symbol_color(self, visualizer, mock_cli_settings):
+        """Test that collapsibles are created with the correct symbol color."""
+        from openhands_cli.theme import OPENHANDS_THEME
+
+        error_event = ConversationErrorEvent(
+            source="agent",
+            code="test_error",
+            detail="Test error message",
+        )
+
+        with mock_cli_settings(visualizer=visualizer, default_cells_expanded=True):
+            collapsible = visualizer._create_event_collapsible(error_event)
+            assert collapsible is not None
+            # The CollapsibleTitle should have the error color
+            assert collapsible._title.symbol_color == OPENHANDS_THEME.error
 
 
 class TestDefaultCellsExpandedSetting:
