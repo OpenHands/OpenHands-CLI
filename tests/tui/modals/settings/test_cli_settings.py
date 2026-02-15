@@ -11,7 +11,7 @@ from openhands_cli.stores import CliSettings
 class TestCliSettings:
     def test_defaults(self):
         cfg = CliSettings()
-        assert cfg.default_cells_expanded is True
+        assert cfg.default_cells_expanded is False
         assert cfg.auto_open_plan_panel is True
 
     @pytest.mark.parametrize("value", [True, False])
@@ -56,16 +56,16 @@ class TestCliSettings:
         [
             (json.dumps({"default_cells_expanded": True}), True),
             (json.dumps({"default_cells_expanded": False}), False),
-            (json.dumps({}), True),  # missing field -> default
-            ("not json", True),  # JSONDecodeError -> defaults
+            (json.dumps({}), False),  # missing field -> default
+            ("not json", False),  # JSONDecodeError -> defaults
             (
                 json.dumps({"default_cells_expanded": "nope"}),
-                True,
+                False,
             ),  # ValidationError -> caught -> defaults
             (
                 json.dumps({"unknown_field": True}),
-                True,
-            ),  # extra ignored; still default True
+                False,
+            ),  # extra ignored; still default False
         ],
     )
     def test_load_various_inputs(
