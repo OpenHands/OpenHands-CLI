@@ -24,6 +24,15 @@ from openhands_cli.tui.widgets.user_input.single_line_input import (
 )
 
 
+class MultilineInput(TextArea):
+    """A multiline TextArea with ctrl+a bound to select all."""
+
+    BINDINGS: ClassVar = [
+        # Override default ctrl+a (cursor_line_start) to select all instead
+        Binding("ctrl+a", "select_all", "Select all", show=False),
+    ]
+
+
 def get_external_editor() -> str:
     """Get the user's preferred external editor from environment variables.
 
@@ -152,7 +161,7 @@ class InputField(Container):
             placeholder=self.placeholder,
             id="single_line_input",
         )
-        self.multiline_widget = TextArea(
+        self.multiline_widget = MultilineInput(
             id="multiline_input",
             soft_wrap=True,
             show_line_numbers=False,
