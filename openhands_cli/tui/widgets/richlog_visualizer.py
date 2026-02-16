@@ -40,11 +40,37 @@ from openhands_cli.tui.widgets.collapsible import (
 # Icons for different event types
 SUCCESS_ICON = "✓"
 ERROR_ICON = "✗"
+HOOK_ICON = "⚡"  # Icon for hook-blocked actions
 AGENT_MESSAGE_PADDING = (1, 0, 1, 1)  # top, right, bottom, left
 
 # Maximum line length for truncating titles/commands in collapsed view
 MAX_LINE_LENGTH = 70
 ELLIPSIS = "..."
+
+
+def _is_hook_rejection(event: UserRejectObservation | AgentErrorEvent) -> bool:
+    """Check if a rejection event originated from a hook.
+
+    Uses the rejection_source field when available (SDK >= X.Y.Z),
+    otherwise returns False for backwards compatibility.
+    """
+    if isinstance(event, UserRejectObservation):
+        return getattr(event, "rejection_source", "user") == "hook"
+    return False
+
+
+def _get_rejection_title(event: UserRejectObservation | AgentErrorEvent) -> str:
+    """Get the appropriate title for a rejection event."""
+    if _is_hook_rejection(event):
+        return "Hook Blocked Action"
+    return "User Rejected Action"
+
+
+def _get_rejection_icon(event: UserRejectObservation | AgentErrorEvent) -> str:
+    """Get the appropriate icon for a rejection event."""
+    if _is_hook_rejection(event):
+        return f"{HOOK_ICON} {ERROR_ICON}"
+    return ERROR_ICON
 
 
 if TYPE_CHECKING:
@@ -349,9 +375,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         action_event, collapsible = self._pending_actions.pop(tool_call_id)
 
-        # Determine success/error status
+        # Determine success/error status and icon
         is_error = isinstance(event, UserRejectObservation | AgentErrorEvent)
-        status_icon = ERROR_ICON if is_error else SUCCESS_ICON
+        if is_error:
+            status_icon = _get_rejection_icon(event)
+        else:
+            status_icon = SUCCESS_ICON
 
         # Build the new title with status icon
         new_title = self._build_action_title(action_event)
@@ -739,7 +768,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 self._escape_rich_markup(str(content)), f"{agent_prefix}{title}", event
             )
         elif isinstance(event, UserRejectObservation):
-            title = self._extract_meaningful_title(event, "User Rejected Action")
+            default_title = _get_rejection_title(event)
+            title = self._extract_meaningful_title(event, default_title)
             return self._make_collapsible(
                 self._escape_rich_markup(str(content)), f"{agent_prefix}{title}", event
             )

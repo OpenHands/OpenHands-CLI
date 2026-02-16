@@ -4,14 +4,14 @@ These tests verify the visual appearance of action events, including
 proper padding alignment with user messages.
 """
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 from unittest.mock import MagicMock
 
 from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
 from textual.widgets import Static
 
-from openhands.sdk.event import ActionEvent
+from openhands.sdk.event import ActionEvent, UserRejectObservation
 from openhands.sdk.llm import MessageToolCall
 from openhands.sdk.tool.builtins.finish import FinishAction
 from openhands.sdk.tool.builtins.think import ThinkAction
@@ -121,6 +121,20 @@ def _create_think_action_event(thought: str) -> ActionEvent:
     )
 
 
+def _create_user_reject_observation(
+    rejection_reason: str,
+    rejection_source: Literal["user", "hook"] = "user",
+) -> UserRejectObservation:
+    """Create a UserRejectObservation event for testing."""
+    return UserRejectObservation(
+        action_id="test_action_id",
+        tool_name="terminal",
+        tool_call_id="test_tool_call_id",
+        rejection_reason=rejection_reason,
+        rejection_source=rejection_source,
+    )
+
+
 class TestVisualizerSnapshots:
     """Snapshot tests for the ConversationVisualizer."""
 
@@ -139,5 +153,43 @@ class TestVisualizerSnapshots:
         events = [
             _create_think_action_event("First, let me think about this..."),
             _create_finish_action_event("Done! Here's the result."),
+        ]
+        assert snap_compare(VisualizerTestApp(events), terminal_size=(80, 16))
+
+
+class TestRejectionEventSnapshots:
+    """Snapshot tests for rejection events (user and hook rejections)."""
+
+    def test_user_rejection_display(self, snap_compare):
+        """Verify user rejection shows 'User Rejected Action' title."""
+        events = [
+            _create_user_reject_observation(
+                rejection_reason="I don't want to run this command",
+                rejection_source="user",
+            )
+        ]
+        assert snap_compare(VisualizerTestApp(events), terminal_size=(80, 12))
+
+    def test_hook_rejection_display(self, snap_compare):
+        """Verify hook rejection shows 'Hook Blocked Action' title with ⚡ icon."""
+        events = [
+            _create_user_reject_observation(
+                rejection_reason="Blocked by security hook: dangerous command detected",
+                rejection_source="hook",
+            )
+        ]
+        assert snap_compare(VisualizerTestApp(events), terminal_size=(80, 12))
+
+    def test_user_and_hook_rejections_comparison(self, snap_compare):
+        """Verify visual difference between user and hook rejections."""
+        events = [
+            _create_user_reject_observation(
+                rejection_reason="User chose not to proceed",
+                rejection_source="user",
+            ),
+            _create_user_reject_observation(
+                rejection_reason="Hook blocked: rm -rf detected",
+                rejection_source="hook",
+            ),
         ]
         assert snap_compare(VisualizerTestApp(events), terminal_size=(80, 16))
