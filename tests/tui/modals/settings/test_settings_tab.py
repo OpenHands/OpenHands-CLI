@@ -67,8 +67,8 @@ class TestSettingsTab:
             # API key disabled until later steps
             assert api_key.disabled is True
 
-            # Memory condensation defaults off + disabled until later steps
-            assert memory.value is False
+            # Memory condensation defaults on + disabled until later steps
+            assert memory.value is True
             assert memory.disabled is True
 
     @pytest.mark.asyncio
