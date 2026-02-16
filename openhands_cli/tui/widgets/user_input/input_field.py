@@ -29,7 +29,7 @@ class MultilineInput(TextArea):
 
     BINDINGS: ClassVar = [
         # Override default ctrl+a (cursor_line_start) to select all instead
-        Binding("ctrl+a", "select_all", "Select all", show=False),
+        Binding("ctrl+a", "select_all", "Select all", show=True),
     ]
 
 
