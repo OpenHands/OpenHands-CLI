@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import OptionList
 from textual.widgets.option_list import Option
@@ -61,7 +62,7 @@ class AutoCompleteDropdown(Container):
         self._current_completion_type = CompletionType.NONE
         self._completion_items: list[CompletionItem] = []
 
-    def compose(self):
+    def compose(self) -> ComposeResult:
         """Create the option list for autocomplete."""
         yield OptionList()
 

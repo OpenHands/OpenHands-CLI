@@ -29,6 +29,7 @@ import time
 import uuid
 from typing import TYPE_CHECKING, Any
 
+from textual.app import ComposeResult
 from textual.containers import Container
 from textual.message import Message
 from textual.reactive import var
@@ -142,7 +143,7 @@ class ConversationContainer(Container):
         if initial_confirmation_policy is not None:
             self.confirmation_policy = initial_confirmation_policy
 
-    def compose(self):
+    def compose(self) -> ComposeResult:
         """Compose UI widgets that bind to reactive state.
 
         ConversationContainer composes all widgets that need to bind to its reactive
