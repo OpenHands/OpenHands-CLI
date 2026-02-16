@@ -47,9 +47,12 @@ async def _type_large_text(pilot: "Pilot") -> None:
     # Type a large text that wraps to multiple lines
     await type_text(
         pilot,
-        "This is a large amount of text that should wrap to multiple lines when typed into the input area. "
-        "It contains multiple sentences to ensure we have enough content to demonstrate the select all functionality. "
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        "This is a large amount of text that should wrap to multiple "
+        "lines when typed into the input area. "
+        "It contains multiple sentences to ensure we have enough content "
+        "to demonstrate the select all functionality. "
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. "
+        "Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
     )
 
 
@@ -94,16 +97,12 @@ class TestSelectAllFunctionality:
     def test_phase2_large_text_typed(self, snap_compare, mock_llm_setup):
         """Phase 2: User types a large amount of text."""
         app = _create_app(mock_llm_setup["conversation_id"])
-        assert snap_compare(
-            app, terminal_size=(120, 40), run_before=_type_large_text
-        )
+        assert snap_compare(app, terminal_size=(120, 40), run_before=_type_large_text)
 
     def test_phase3_all_text_selected(self, snap_compare, mock_llm_setup):
         """Phase 3: User presses Ctrl+A to select all text."""
         app = _create_app(mock_llm_setup["conversation_id"])
-        assert snap_compare(
-            app, terminal_size=(120, 40), run_before=_select_all_text
-        )
+        assert snap_compare(app, terminal_size=(120, 40), run_before=_select_all_text)
 
     def test_phase4_text_deleted(self, snap_compare, mock_llm_setup):
         """Phase 4: User presses Delete to delete all selected text."""
