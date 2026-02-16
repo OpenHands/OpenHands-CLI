@@ -154,7 +154,7 @@ class SettingsScreen(ModalScreen):
         self.mode_select.value = "basic"
         self.provider_select.value = Select.BLANK
         self.model_select.value = Select.BLANK
-        self.memory_select.value = False
+        self.memory_select.value = True
 
     def _load_current_settings(self) -> None:
         """Load current settings into the form."""
