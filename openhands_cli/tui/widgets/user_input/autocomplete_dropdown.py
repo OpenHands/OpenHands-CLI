@@ -63,7 +63,7 @@ class AutoCompleteDropdown(Container):
         self._completion_items: list[CompletionItem] = []
 
     def compose(self) -> ComposeResult:
-        """Create the option list for autocomplete."""
+        """Create the options list for autocomplete."""
         yield OptionList()
 
     def _detect_completion_type(self, text: str) -> CompletionType:
