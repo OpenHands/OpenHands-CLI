@@ -13,6 +13,7 @@ class CliSettings(BaseModel):
     default_cells_expanded: bool = False
     auto_open_plan_panel: bool = True
     enable_critic: bool = True
+    enable_telemetry: bool = True
 
     @classmethod
     def get_config_path(cls) -> Path:

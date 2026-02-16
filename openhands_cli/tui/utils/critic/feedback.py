@@ -5,28 +5,15 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, ClassVar
 
-
-try:
-    from posthog import Posthog
-
-    POSTHOG_AVAILABLE = True
-except Exception:  # pragma: no cover - optional dependency
-    Posthog = None  # type: ignore[assignment]
-    POSTHOG_AVAILABLE = False
 from textual import events, on
 from textual.containers import Horizontal
 from textual.widgets import Button, Static
 
+from openhands_cli.shared.telemetry import get_telemetry_client
+
 
 if TYPE_CHECKING:
-    from posthog import Posthog as PosthogClient
-
     from openhands.sdk.critic.result import CriticResult
-
-
-# PostHog configuration
-POSTHOG_API_KEY = "phc_QkAtbXVsh3Ja0Pw4IK696cxYEmr20Bx1kbnI7QtOCqg"
-POSTHOG_HOST = "https://us.i.posthog.com"
 
 
 def send_critic_inference_event(
@@ -44,38 +31,17 @@ def send_critic_inference_event(
         conversation_id: The conversation ID for tracking
         agent_model: The agent's model name (e.g., "claude-sonnet-4-5-20250929")
     """
-    if not POSTHOG_AVAILABLE or Posthog is None:
-        return
+    event_ids = None
+    if critic_result.metadata and "event_ids" in critic_result.metadata:
+        event_ids = critic_result.metadata["event_ids"]
 
-    try:
-        posthog = Posthog(
-            project_api_key=POSTHOG_API_KEY,
-            host=POSTHOG_HOST,
-        )
-
-        properties = {
-            "critic_score": critic_result.score,
-            "critic_success": critic_result.success,
-            "conversation_id": conversation_id,
-        }
-
-        # Add agent model if available
-        if agent_model:
-            properties["agent_model"] = agent_model
-
-        # Add event_ids from metadata if available for reproducibility
-        if critic_result.metadata and "event_ids" in critic_result.metadata:
-            properties["event_ids"] = critic_result.metadata["event_ids"]
-
-        posthog.capture(
-            distinct_id=conversation_id,
-            event="critic_inference",
-            properties=properties,
-        )
-        posthog.flush()
-    except Exception:
-        # Silently fail if PostHog submission fails
-        pass
+    get_telemetry_client().track_critic_inference(
+        conversation_id=conversation_id,
+        critic_score=critic_result.score,
+        critic_success=critic_result.success,
+        agent_model=agent_model,
+        event_ids=event_ids,
+    )
 
 
 class CriticFeedbackWidget(Static, can_focus=True):
@@ -149,14 +115,6 @@ class CriticFeedbackWidget(Static, can_focus=True):
         self.conversation_id = conversation_id or str(uuid.uuid4())
         self.agent_model = agent_model
         self._feedback_submitted = False
-
-        self._posthog: PosthogClient | None = None
-        if POSTHOG_AVAILABLE and Posthog is not None:
-            # Initialize PostHog client
-            self._posthog = Posthog(
-                project_api_key=POSTHOG_API_KEY,
-                host=POSTHOG_HOST,
-            )
 
     def compose(self):
         """Compose the widget with prompt and buttons."""
@@ -236,37 +194,22 @@ class CriticFeedbackWidget(Static, can_focus=True):
         self._feedback_submitted = True
 
         # Don't send analytics for dismiss
-        if feedback_type != "dismiss" and self._posthog is not None:
-            try:
-                # Build properties dict with base fields
-                properties = {
-                    "feedback_type": feedback_type,
-                    "critic_score": self.critic_result.score,
-                    "critic_success": self.critic_result.success,
-                    "conversation_id": self.conversation_id,
-                }
+        if feedback_type != "dismiss":
+            event_ids = None
+            if (
+                self.critic_result.metadata
+                and "event_ids" in self.critic_result.metadata
+            ):
+                event_ids = self.critic_result.metadata["event_ids"]
 
-                # Add agent model if available
-                if self.agent_model:
-                    properties["agent_model"] = self.agent_model
-
-                # Add event_ids from metadata if available for reproducibility
-                if (
-                    self.critic_result.metadata
-                    and "event_ids" in self.critic_result.metadata
-                ):
-                    properties["event_ids"] = self.critic_result.metadata["event_ids"]
-
-                self._posthog.capture(
-                    distinct_id=self.conversation_id,
-                    event="critic_feedback",
-                    properties=properties,
-                )
-                # Flush to ensure the event is sent
-                self._posthog.flush()
-            except Exception:
-                # Silently fail if PostHog submission fails
-                pass
+            get_telemetry_client().track_critic_feedback(
+                conversation_id=self.conversation_id,
+                feedback_type=feedback_type,
+                critic_score=self.critic_result.score,
+                critic_success=self.critic_result.success,
+                agent_model=self.agent_model,
+                event_ids=event_ids,
+            )
 
         # Update to show feedback was recorded or clear for dismiss
         prompt = self.query_one("#feedback-prompt", Static)

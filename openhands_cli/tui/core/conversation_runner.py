@@ -22,6 +22,7 @@ from openhands.sdk.conversation.state import (
 )
 from openhands.sdk.event.base import Event
 from openhands_cli.setup import setup_conversation
+from openhands_cli.shared.telemetry import get_telemetry_client
 from openhands_cli.tui.core.events import ShowConfirmationPanel
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.user_actions.types import UserConfirmation
@@ -67,6 +68,7 @@ class ConversationRunner:
                 stored LLM settings.
             critic_disabled: If True, critic functionality will be disabled.
         """
+        self._conversation_id = conversation_id
         self.visualizer = visualizer
 
         # Create conversation with policy from state
@@ -188,6 +190,8 @@ class ConversationRunner:
             )
         finally:
             self._update_run_status(False)
+            # Track LLM metrics after conversation run completes
+            self._track_llm_metrics()
 
     def _request_confirmation(self) -> None:
         """Post ShowConfirmationPanel message for pending actions."""
@@ -261,6 +265,45 @@ class ConversationRunner:
         """Update the running status via ConversationContainer."""
         self._running = is_running
         self._state.set_running(is_running)
+
+    def _track_llm_metrics(self) -> None:
+        """Track LLM metrics after a conversation run completes."""
+        try:
+            conversation_id = str(self._conversation_id)
+            agent_model = self._get_agent_model()
+
+            # Get combined metrics from conversation stats
+            combined_metrics = None
+            if self.visualizer and self.visualizer.conversation_stats:
+                combined_metrics = (
+                    self.visualizer.conversation_stats.get_combined_metrics()
+                )
+
+            get_telemetry_client().track_llm_metrics(
+                conversation_id=conversation_id,
+                combined_metrics=combined_metrics,
+                agent_model=agent_model,
+            )
+        except Exception:
+            # Silently fail if telemetry tracking fails
+            pass
+
+    def _get_agent_model(self) -> str | None:
+        """Get the agent's model name from the conversation.
+
+        Returns:
+            The agent model name or None if not available.
+        """
+        try:
+            if (
+                self.conversation
+                and hasattr(self.conversation, "agent")
+                and self.conversation.agent  # type: ignore[union-attr]
+            ):
+                return self.conversation.agent.llm.model  # type: ignore[union-attr]
+        except Exception:
+            pass
+        return None
 
     def pause_runner_without_blocking(self):
         if self.is_running:
