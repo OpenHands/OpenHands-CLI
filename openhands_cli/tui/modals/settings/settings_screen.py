@@ -152,8 +152,8 @@ class SettingsScreen(ModalScreen):
         self.custom_model_input.value = ""
         self.base_url_input.value = ""
         self.mode_select.value = "basic"
-        self.provider_select.value = Select.BLANK
-        self.model_select.value = Select.BLANK
+        self.provider_select.clear()
+        self.model_select.clear()
         self.memory_select.value = True
 
     def _load_current_settings(self) -> None:
