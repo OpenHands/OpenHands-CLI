@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from textual import events, on
+from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container
 from textual.message import Message
@@ -166,7 +167,7 @@ class InputField(Container):
             self.single_line_widget
         )
 
-    def compose(self):
+    def compose(self) -> ComposeResult:
         """Create the input widgets."""
         yield self.single_line_widget
         yield self.multiline_widget

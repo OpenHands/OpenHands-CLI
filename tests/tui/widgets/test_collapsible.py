@@ -34,7 +34,6 @@ async def test_collapsible_initial_render() -> None:
         collapsed=True,
         collapsed_symbol="▶",
         expanded_symbol="▼",
-        border_color="red",
     )
 
     app = CollapsibleTestApp(collapsible)
@@ -54,9 +53,7 @@ async def test_toggle_updates_title_and_css_class() -> None:
     """Toggling collapsed updates the '-collapsed'
     CSS class and title.collapsed state."""
 
-    collapsible = Collapsible(
-        "some content", title="Title", collapsed=True, border_color="red"
-    )
+    collapsible = Collapsible("some content", title="Title", collapsed=True)
 
     app = CollapsibleTestApp(collapsible)
 
@@ -94,15 +91,9 @@ class MultiCollapsibleTestApp(CollapsibleNavigationMixin, App):
         from textual.containers import VerticalScroll
 
         with VerticalScroll(id="scroll_view"):
-            yield Collapsible(
-                "Content 1", title="Cell 1", collapsed=True, border_color="red"
-            )
-            yield Collapsible(
-                "Content 2", title="Cell 2", collapsed=True, border_color="blue"
-            )
-            yield Collapsible(
-                "Content 3", title="Cell 3", collapsed=True, border_color="green"
-            )
+            yield Collapsible("Content 1", title="Cell 1", collapsed=True)
+            yield Collapsible("Content 2", title="Cell 2", collapsed=True)
+            yield Collapsible("Content 3", title="Cell 3", collapsed=True)
 
 
 @pytest.mark.asyncio

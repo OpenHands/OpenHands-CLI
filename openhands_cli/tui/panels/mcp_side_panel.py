@@ -4,7 +4,7 @@ import json
 from typing import Any
 
 from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
-from textual.app import App
+from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.widgets import Static
@@ -65,7 +65,7 @@ class MCPSidePanel(VerticalScroll):
         panel = cls(agent=agent)
         content_area.mount(panel)
 
-    def compose(self):
+    def compose(self) -> ComposeResult:
         """Compose the MCP side panel content."""
         yield Static("MCP Servers", classes="mcp-header")
         yield Static("", id="mcp-content")

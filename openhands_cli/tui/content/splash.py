@@ -40,7 +40,10 @@ def get_openhands_banner() -> str:
 
 
 def get_splash_content(
-    conversation_id: str, *, theme: Theme, has_critic: bool = False
+    conversation_id: str,
+    *,
+    theme: Theme,
+    has_critic: bool = False,
 ) -> dict:
     """Get structured splash screen content for native Textual widgets.
 

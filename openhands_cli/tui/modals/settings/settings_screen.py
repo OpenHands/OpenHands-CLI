@@ -152,9 +152,9 @@ class SettingsScreen(ModalScreen):
         self.custom_model_input.value = ""
         self.base_url_input.value = ""
         self.mode_select.value = "basic"
-        self.provider_select.value = Select.BLANK
-        self.model_select.value = Select.BLANK
-        self.memory_select.value = False
+        self.provider_select.clear()
+        self.model_select.clear()
+        self.memory_select.value = True
 
     def _load_current_settings(self) -> None:
         """Load current settings into the form."""
@@ -213,7 +213,7 @@ class SettingsScreen(ModalScreen):
             self.model_select.set_options(model_options)
 
             # Try to preserve the current selection if it's still valid
-            if current_selection and current_selection != Select.BLANK:
+            if current_selection and not isinstance(current_selection, NoSelection):
                 # Check if the current selection is still in the new options
                 option_values = [option[1] for option in model_options]
                 if current_selection in option_values:
@@ -273,11 +273,13 @@ class SettingsScreen(ModalScreen):
 
                     # Model select: enabled when provider is selected
                     self.model_select.disabled = not (
-                        provider and provider != Select.BLANK
+                        provider and not isinstance(provider, NoSelection)
                     )
 
                     # API Key: enabled when model is selected
-                    self.api_key_input.disabled = not (model and model != Select.BLANK)
+                    self.api_key_input.disabled = not (
+                        model and not isinstance(model, NoSelection)
+                    )
                 except Exception:
                     pass
 
@@ -384,10 +386,12 @@ class SettingsScreen(ModalScreen):
         base_url = self.base_url_input.value
         form_data = SettingsFormData(
             mode=mode,
-            provider=None if provider_value is Select.BLANK else str(provider_value),
-            model=None if model is Select.BLANK else str(model),
-            custom_model=None if custom_model is Select.BLANK else str(custom_model),
-            base_url=None if base_url is Select.BLANK else str(base_url),
+            provider=(
+                None if isinstance(provider_value, NoSelection) else str(provider_value)
+            ),
+            model=None if isinstance(model, NoSelection) else str(model),
+            custom_model=None if not custom_model else str(custom_model),
+            base_url=None if not base_url else str(base_url),
             api_key_input=self.api_key_input.value,
             memory_condensation_enabled=bool(self.memory_select.value),
         )

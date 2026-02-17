@@ -47,6 +47,9 @@ AGENT_MESSAGE_PADDING = (1, 0, 1, 1)  # top, right, bottom, left
 MAX_LINE_LENGTH = 70
 ELLIPSIS = "..."
 
+# Default agent name - don't show prefix for this agent
+DEFAULT_AGENT_NAME = "OpenHands Agent"
+
 
 if TYPE_CHECKING:
     from textual.containers import VerticalScroll
@@ -55,14 +58,14 @@ if TYPE_CHECKING:
     from openhands_cli.tui.textual_app import OpenHandsApp
 
 
-def _get_event_border_color(event: Event) -> str:
+def _get_event_symbol_color(event: Event) -> str:
+    """Get the color for the collapse/expand symbol based on event type."""
     DEFAULT_COLOR = "#ffffff"
 
-    """Get the CSS border color for an event type."""
     if isinstance(event, ActionEvent):
-        return OPENHANDS_THEME.accent or DEFAULT_COLOR
+        return DEFAULT_COLOR
     elif isinstance(event, ObservationEvent):
-        return OPENHANDS_THEME.accent or DEFAULT_COLOR
+        return DEFAULT_COLOR
     elif isinstance(event, UserRejectObservation):
         return OPENHANDS_THEME.error or DEFAULT_COLOR
     elif isinstance(event, MessageEvent):
@@ -237,15 +240,25 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return formatted_name
         return f"{formatted_name} Agent"
 
+    def _is_non_default_agent(self) -> bool:
+        """Check if the current agent is NOT the default OpenHands Agent.
+
+        Returns:
+            True if name is set and is different from the default agent name.
+        """
+        if not self._name:
+            return False
+        return self._name.strip() != DEFAULT_AGENT_NAME
+
     def _get_agent_prefix(self) -> str:
         """Get the agent name prefix for titles when in delegation context.
 
         Returns:
-            Formatted agent name in parentheses like "(Agent Name) " if name is set,
-            empty string otherwise.
+            Formatted agent name in parentheses like "(Agent Name) " if name is set
+            and is NOT the default agent, empty string otherwise.
         """
-        agent_name = self._get_formatted_agent_name()
-        if agent_name:
+        if self._is_non_default_agent():
+            agent_name = self._get_formatted_agent_name()
             return f"({agent_name}) "
         return ""
 
@@ -622,7 +635,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self,
         content: str | Text,
         title: str,
-        event: Event | None,
+        event: Event | None = None,
         collapsed: bool | None = None,
     ) -> Collapsible:
         """Create a Collapsible widget with standard settings.
@@ -630,7 +643,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         Args:
             content: The content to display (string or Rich Text object).
             title: The title for the collapsible header.
-            event: The event used to determine border color (None for default).
+            event: The event used to determine symbol color (None for default).
             collapsed: Override the default collapsed state. If None, uses default.
 
         Returns:
@@ -638,21 +651,48 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """
         if collapsed is None:
             collapsed = self._default_collapsed
-        border_color = _get_event_border_color(event) if event else "#888888"
+        symbol_color = _get_event_symbol_color(event) if event else "#888888"
         return Collapsible(
             content,
             title=title,
             collapsed=collapsed,
-            border_color=border_color,
+            symbol_color=symbol_color,
         )
+
+    def _create_system_prompt_collapsible(
+        self, event: SystemPromptEvent
+    ) -> Collapsible:
+        """Create a collapsible widget showing the system prompt from SystemPromptEvent.
+
+        This displays the full system prompt content in a collapsible widget,
+        matching ACP's display format. The title shows the number of tools loaded.
+
+        Args:
+            event: The SystemPromptEvent containing tools and system prompt
+
+        Returns:
+            A Collapsible widget showing the system prompt
+        """
+        # Build the collapsible content - show system prompt like ACP does
+        content = str(event.visualize.plain)
+
+        # Get tool count for title
+        tool_count = len(event.tools) if event.tools else 0
+        title = (
+            f"Loaded: {tool_count} tool{'s' if tool_count != 1 else ''}, system prompt"
+        )
+
+        return self._make_collapsible(content, title, event)
 
     def _create_event_widget(self, event: Event) -> "Widget | None":
         """Create a widget for the event - either plain text or collapsible."""
         content = event.visualize
 
-        # Don't emit system prompt in CLI
+        # Handle SystemPromptEvent - create a collapsible showing the system prompt
+        # Note: Loaded resources (skills, hooks, tools, MCPs) are displayed at startup
+        # in _initialize_main_ui(). This collapsible shows the full system prompt.
         if isinstance(event, SystemPromptEvent):
-            return None
+            return self._create_system_prompt_collapsible(event)
         # Don't emit condensation request events (internal events)
         elif isinstance(event, CondensationRequest):
             return None
@@ -664,9 +704,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 # For finish action, render as markdown with padding to align
                 # User message has "padding: 0 1" and starts with "> ", so text
                 # starts at position 3 (1 padding + 2 for "> ")
-                # In delegation context, add agent header
+                # In delegation context (non-default agent), add agent header
                 message = str(action.message)
-                if self._name:
+                if self._is_non_default_agent():
                     agent_name = self._get_formatted_agent_name()
                     message = f"**{agent_name}:**\n\n{message}"
                 widget = Markdown(message)
@@ -690,7 +730,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
             # Case 1: Delegation message (both sender and name are set)
             # Format with arrow notation showing sender → receiver
-            if event.sender and self._name:
+            # Only show prefix if this is NOT the default main agent
+            if event.sender and self._is_non_default_agent():
                 message_content = str(content)
                 agent_name = self._get_formatted_agent_name()
                 event_sender = self._format_agent_name_with_suffix(event.sender)
@@ -737,11 +778,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         agent_prefix = self._get_agent_prefix()
 
-        # Don't emit system prompt in CLI
-        if isinstance(event, SystemPromptEvent):
-            return None
         # Don't emit condensation request events (internal events)
-        elif isinstance(event, CondensationRequest):
+        if isinstance(event, CondensationRequest):
             return None
         elif isinstance(event, ActionEvent):
             # Build title using new format with agent prefix

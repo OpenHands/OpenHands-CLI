@@ -29,6 +29,7 @@ import time
 import uuid
 from typing import TYPE_CHECKING, Any
 
+from textual.app import ComposeResult
 from textual.containers import Container
 from textual.message import Message
 from textual.reactive import var
@@ -46,6 +47,7 @@ if TYPE_CHECKING:
 
     from openhands.sdk.conversation.base import ConversationStateProtocol
     from openhands.sdk.event import ActionEvent
+    from openhands_cli.tui.content.resources import LoadedResourcesInfo
     from openhands_cli.tui.widgets.input_area import InputAreaContainer
     from openhands_cli.tui.widgets.main_display import ScrollableContent
 
@@ -128,6 +130,10 @@ class ConversationContainer(Container):
     critic_threshold: var[float] = var(0.5)
     """Critic score threshold for triggering iterative refinement."""
 
+    # ---- Loaded Resources ----
+    loaded_resources: var["LoadedResourcesInfo | None"] = var(None)
+    """Loaded skills, hooks, and MCPs for the current conversation."""
+
     def __init__(
         self,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
@@ -150,7 +156,7 @@ class ConversationContainer(Container):
         self.iterative_refinement = iterative_refinement
         self.critic_threshold = critic_threshold
 
-    def compose(self):
+    def compose(self) -> ComposeResult:
         """Compose UI widgets that bind to reactive state.
 
         ConversationContainer composes all widgets that need to bind to its reactive
@@ -181,10 +187,13 @@ class ConversationContainer(Container):
         ):
             yield SplashContent(id="splash_content").data_bind(
                 conversation_id=ConversationContainer.conversation_id,
+                loaded_resources=ConversationContainer.loaded_resources,
             )
 
         # Input area docked to bottom
-        with InputAreaContainer(id="input_area"):
+        with InputAreaContainer(id="input_area").data_bind(
+            loaded_resources=ConversationContainer.loaded_resources,
+        ):
             yield WorkingStatusLine().data_bind(
                 running=ConversationContainer.running,
                 elapsed_seconds=ConversationContainer.elapsed_seconds,
@@ -369,6 +378,10 @@ class ConversationContainer(Container):
     def set_switch_confirmation_target(self, target_id: uuid.UUID | None) -> None:
         """Set pending switch confirmation target. Thread-safe."""
         self._schedule_update("switch_confirmation_target", target_id)
+
+    def set_loaded_resources(self, resources: "LoadedResourcesInfo") -> None:
+        """Set loaded resources (skills, hooks, MCPs). Thread-safe."""
+        self._schedule_update("loaded_resources", resources)
 
     # ---- Conversation Attachment (for metrics) ----
 

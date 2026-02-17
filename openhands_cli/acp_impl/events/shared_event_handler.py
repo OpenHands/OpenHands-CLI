@@ -104,7 +104,7 @@ class SharedEventHandler:
     async def handle_system_prompt(
         self, ctx: _ACPContext, event: SystemPromptEvent
     ) -> None:
-        await self.send_thought(ctx, _event_visualize_to_plain(event))
+        await self.send_thought(ctx, str(event.visualize.plain))
 
     async def handle_condensation(self, ctx: _ACPContext, event: Condensation) -> None:
         await self.send_thought(ctx, _event_visualize_to_plain(event))

@@ -17,9 +17,10 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
+from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.css.query import NoMatches
-from textual.widgets import Static
+from textual.widgets import Button, Static
 
 from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.conversations.store.local import LocalFileStore
@@ -178,9 +179,11 @@ class HistorySidePanel(Container):
         )
         content_area.mount(panel)
 
-    def compose(self):
+    def compose(self) -> ComposeResult:
         """Compose the history side panel content."""
-        yield Static("Conversations", classes="history-header", id="history-header")
+        with Horizontal(classes="history-header-row"):
+            yield Static("Conversations", classes="history-header", id="history-header")
+            yield Button("✕", id="history-close-btn", classes="history-close-btn")
         yield VerticalScroll(id="history-list")
 
     def on_mount(self):
@@ -250,6 +253,15 @@ class HistorySidePanel(Container):
             current_state_id = self._oh_app.conversation_state.conversation_id
             if current_state_id == self.current_conversation_id:
                 self.select_current_conversation()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle close button: remove panel (same as /history again)."""
+        if event.button.id == "history-close-btn":
+            self.remove()
+
+    def key_escape(self) -> None:
+        """Handle Escape key: close the history panel."""
+        self.remove()
 
     def refresh_content(self) -> None:
         """Reload conversations and render the list."""

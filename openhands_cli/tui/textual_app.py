@@ -57,9 +57,10 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.conversations.store.local import LocalFileStore
-from openhands_cli.locations import get_conversations_dir
+from openhands_cli.locations import get_conversations_dir, get_work_dir
 from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
+from openhands_cli.tui.content.resources import collect_loaded_resources
 from openhands_cli.tui.core import (
     ConversationContainer,
     ConversationFinished,
@@ -421,8 +422,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         This method is responsible for:
         1. Checking if the agent has a critic configured
-        2. Initializing the splash content (one-time setup)
-        3. Processing any queued inputs
+        2. Collecting and displaying loaded resources (skills, hooks, MCPs)
+        3. Initializing the splash content (one-time setup)
+        4. Processing any queued inputs
 
         UI lifecycle is owned by OpenHandsApp, not ConversationContainer. The splash
         content initialization is a direct method call, not a reactive
@@ -431,8 +433,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         splash_content = self.query_one("#splash_content", SplashContent)
 
-        # Check if agent has critic configured
+        # Check if agent has critic configured and collect resources
         has_critic = False
+        agent = None
         try:
             agent_store = AgentStore()
             agent = agent_store.load_or_create(
@@ -445,8 +448,18 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             # If we can't load agent, just continue without critic notice
             pass
 
-        # Initialize splash content - direct call for UI lifecycle
+        # Collect loaded resources info using the utility function
+        loaded_resources = collect_loaded_resources(
+            agent=agent,
+            working_dir=get_work_dir(),
+        )
+
+        # Initialize splash content (resources are handled reactively)
         splash_content.initialize(has_critic=has_critic)
+
+        # Set loaded resources on ConversationContainer - triggers reactive update
+        # in SplashContent via data_bind
+        self.conversation_state.set_loaded_resources(loaded_resources)
 
         # Process any queued inputs
         self._process_queued_inputs()
