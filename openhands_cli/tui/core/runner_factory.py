@@ -13,7 +13,6 @@ from textual.message_pump import MessagePump
 from textual.notifications import SeverityLevel
 
 from openhands.sdk.event.base import Event
-from openhands_cli.stores import CliSettings
 from openhands_cli.tui.widgets.richlog_visualizer import (
     DEFAULT_AGENT_NAME,
 )
@@ -62,23 +61,11 @@ class RunnerFactory:
 
         app = self._app_provider()
 
-        # Load CLI settings to get iterative refinement configuration
-        cli_settings = CliSettings.load()
-        iterative_refinement = cli_settings.enable_iterative_refinement
-        critic_threshold = cli_settings.critic_threshold
-
-        # Create refinement callback if iterative refinement is enabled
-        refinement_callback = None
-        if iterative_refinement:
-            refinement_callback = app._queue_refinement_message
-
+        # Visualizer reads cli_settings directly when needed via self.cli_settings
         visualizer = ConversationVisualizer(
             self._scroll_view_provider(),
             app,
             name=DEFAULT_AGENT_NAME,
-            refinement_callback=refinement_callback,
-            iterative_refinement_enabled=iterative_refinement,
-            critic_threshold=critic_threshold,
         )
 
         event_callback: Callable[[Event], None] | None = (

@@ -5,7 +5,6 @@ This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 
 import re
 import threading
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from rich.text import Text
@@ -97,30 +96,19 @@ class ConversationVisualizer(ConversationVisualizerBase):
         container: "VerticalScroll",
         app: "OpenHandsApp",
         name: str | None = None,
-        refinement_callback: "Callable[[str], None] | None" = None,
-        iterative_refinement_enabled: bool = False,
-        critic_threshold: float = 0.5,
     ):
         """Initialize the visualizer.
 
         Args:
             container: The Textual VerticalScroll container to add widgets to
             app: The Textual app instance for thread-safe UI updates
-            skip_user_messages: If True, skip displaying user messages
             name: Agent name to display in panel titles for delegation context.
                   When set, titles will be prefixed with the agent name.
-            refinement_callback: Optional callback to send refinement messages to
-                  the agent when iterative refinement is triggered.
-            iterative_refinement_enabled: Whether iterative refinement is enabled.
-            critic_threshold: Threshold for triggering iterative refinement.
         """
         super().__init__()
         self._container = container
         self._app = app
         self._name = name
-        self._refinement_callback = refinement_callback
-        self._iterative_refinement_enabled = iterative_refinement_enabled
-        self._critic_threshold = critic_threshold
         # Store the main thread ID for thread safety checks
         self._main_thread_id = threading.get_ident()
         # Cache CLI settings to avoid repeated file system reads
@@ -135,26 +123,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         return self._cli_settings
 
     def reload_configuration(self) -> None:
+        """Reload CLI settings from disk."""
         self._cli_settings = CliSettings.load()
-
-    def set_refinement_callback(self, callback: Callable[[str], None] | None) -> None:
-        """Set the refinement callback for iterative refinement.
-
-        Args:
-            callback: Callback function that takes a message string to send
-                      to the agent for refinement.
-        """
-        self._refinement_callback = callback
-
-    def set_iterative_refinement(self, enabled: bool, threshold: float) -> None:
-        """Update iterative refinement settings.
-
-        Args:
-            enabled: Whether iterative refinement is enabled.
-            threshold: Threshold for triggering refinement.
-        """
-        self._iterative_refinement_enabled = enabled
-        self._critic_threshold = threshold
 
     def create_sub_visualizer(self, agent_id: str) -> "ConversationVisualizer":
         """Create a visualizer for a sub-agent during delegation.
@@ -173,9 +143,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
             container=self._container,
             app=self._app,
             name=agent_id,
-            refinement_callback=self._refinement_callback,
-            iterative_refinement_enabled=self._iterative_refinement_enabled,
-            critic_threshold=self._critic_threshold,
         )
 
     @staticmethod
@@ -350,23 +317,36 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 self._run_on_main_thread(self._add_widget_to_ui, feedback_widget)
 
                 # Check if iterative refinement should be triggered
-                if self._refinement_callback and should_trigger_refinement(
+                # Read settings directly from cli_settings for current configuration
+                if should_trigger_refinement(
                     critic_result=critic_result,
-                    threshold=self._critic_threshold,
-                    enabled=self._iterative_refinement_enabled,
+                    threshold=self.cli_settings.critic_threshold,
+                    enabled=self.cli_settings.enable_iterative_refinement,
                 ):
-                    # Build and send refinement message
+                    # Build and send refinement message directly to conversation
                     refinement_message = build_refinement_message(
                         critic_result=critic_result,
-                        threshold=self._critic_threshold,
+                        threshold=self.cli_settings.critic_threshold,
                     )
-                    self._refinement_callback(refinement_message)
+                    self._send_refinement_message(refinement_message)
 
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
         self._container.mount(widget)
         # Automatically scroll to the bottom to show the newly added widget
         self._container.scroll_end(animate=False)
+
+    def _send_refinement_message(self, message: str) -> None:
+        """Send a refinement message to the agent via ConversationManager.
+
+        This is called when iterative refinement is triggered due to a low
+        critic score. The message is posted directly to the conversation.
+        """
+        from openhands_cli.tui.core.conversation_manager import SendMessage
+
+        self._app.call_from_thread(
+            self._app.conversation_manager.post_message, SendMessage(message)
+        )
 
     def render_user_message(self, content: str) -> None:
         """Render a user message to the UI.

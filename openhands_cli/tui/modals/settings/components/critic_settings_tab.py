@@ -117,11 +117,12 @@ class CriticSettingsTab(Container):
                 value=self.cli_settings.enable_iterative_refinement,
             )
 
+            default_pct = int(DEFAULT_CRITIC_THRESHOLD * 100)
             yield ThresholdInput(
                 label="Refinement Threshold",
                 description=(
                     f"The critic score threshold (1-100%) below which iterative "
-                    f"refinement is triggered. Default: {int(DEFAULT_CRITIC_THRESHOLD * 100)}%. "
+                    f"refinement is triggered. Default: {default_pct}%. "
                     "Lower values mean refinement only triggers for very low scores."
                 ),
                 input_id="critic_threshold_input",
@@ -138,11 +139,12 @@ class CriticSettingsTab(Container):
             except Exception:
                 pass
 
-    def get_critic_settings(self) -> dict:
-        """Get the current critic settings from the form.
+    def get_critic_settings(self) -> CliSettings:
+        """Get the current critic settings from the form as a CliSettings object.
 
         Returns:
-            Dictionary with critic-related settings
+            CliSettings with only critic-related fields set (other fields use defaults).
+            Caller should use model_copy to merge with existing settings.
         """
         enable_critic_switch = self.query_one("#enable_critic_switch", Switch)
         enable_refinement_switch = self.query_one(
@@ -157,8 +159,12 @@ class CriticSettingsTab(Container):
         except (ValueError, TypeError):
             threshold = DEFAULT_CRITIC_THRESHOLD
 
-        return {
-            "enable_critic": enable_critic_switch.value,
-            "enable_iterative_refinement": enable_refinement_switch.value,
-            "critic_threshold": threshold,
-        }
+        return CliSettings(
+            # Preserve current non-critic settings from loaded settings
+            default_cells_expanded=self.cli_settings.default_cells_expanded,
+            auto_open_plan_panel=self.cli_settings.auto_open_plan_panel,
+            # Apply critic settings from form
+            enable_critic=enable_critic_switch.value,
+            enable_iterative_refinement=enable_refinement_switch.value,
+            critic_threshold=threshold,
+        )

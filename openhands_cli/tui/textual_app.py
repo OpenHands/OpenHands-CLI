@@ -451,29 +451,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Process any queued inputs
         self._process_queued_inputs()
 
-    def _queue_refinement_message(self, message: str) -> None:
-        """Queue a refinement message to be sent to the agent.
-
-        This is called from the visualizer when iterative refinement is triggered.
-
-        Args:
-            message: The refinement message to send to the agent
-        """
-        # Display the refinement message in the UI as a system message
-        from textual.widgets import Static
-
-        refinement_widget = Static(
-            f"[bold yellow]🔄 Iterative Refinement[/bold yellow]\n{message}",
-            classes="refinement-message",
-        )
-        self.call_from_thread(self.scroll_view.mount, refinement_widget)
-        self.call_from_thread(lambda: self.scroll_view.scroll_end(animate=False))
-
-        # Queue the message to the running conversation via ConversationManager
-        self.call_from_thread(
-            self.conversation_manager.post_message, SendMessage(message)
-        )
-
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.
 

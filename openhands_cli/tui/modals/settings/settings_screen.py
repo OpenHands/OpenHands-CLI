@@ -22,7 +22,7 @@ from textual.widgets import (
 )
 from textual.widgets._select import NoSelection
 
-from openhands_cli.stores import AgentStore, CliSettings
+from openhands_cli.stores import AgentStore
 from openhands_cli.tui.modals.settings.choices import (
     get_model_options,
 )
@@ -414,22 +414,21 @@ class SettingsScreen(ModalScreen):
                 cli_settings_component = cli_settings_tab.query_one(CliSettingsTab)
                 cli_settings = cli_settings_component.get_cli_settings()
 
-                # Get Critic settings from Critic tab and merge
+                # Get Critic settings from Critic tab and merge using model_copy
                 critic_settings_tab = self.query_one("#critic_settings_tab", TabPane)
                 critic_settings_component = critic_settings_tab.query_one(
                     CriticSettingsTab
                 )
                 critic_settings = critic_settings_component.get_critic_settings()
 
-                # Create merged CliSettings with critic settings
-                merged_settings = CliSettings(
-                    default_cells_expanded=cli_settings.default_cells_expanded,
-                    auto_open_plan_panel=cli_settings.auto_open_plan_panel,
-                    enable_critic=critic_settings["enable_critic"],
-                    enable_iterative_refinement=critic_settings[
-                        "enable_iterative_refinement"
-                    ],
-                    critic_threshold=critic_settings["critic_threshold"],
+                # Merge settings: CLI settings + critic settings overrides
+                refinement = critic_settings.enable_iterative_refinement
+                merged_settings = cli_settings.model_copy(
+                    update={
+                        "enable_critic": critic_settings.enable_critic,
+                        "enable_iterative_refinement": refinement,
+                        "critic_threshold": critic_settings.critic_threshold,
+                    }
                 )
 
                 merged_settings.save()

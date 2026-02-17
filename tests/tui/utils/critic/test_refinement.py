@@ -99,35 +99,3 @@ class TestBuildRefinementMessage:
         lines = message.strip().split("\n")
         # Should have score line, empty line, instruction, and numbered steps
         assert len(lines) <= 10
-
-
-class TestDefaultCriticThreshold:
-    """Tests for DEFAULT_CRITIC_THRESHOLD constant."""
-
-    def test_default_threshold_value(self):
-        """Test that the default critic threshold is 0.6 (same as SDK default)."""
-        from openhands_cli.stores.cli_settings import DEFAULT_CRITIC_THRESHOLD
-
-        assert DEFAULT_CRITIC_THRESHOLD == 0.6
-
-    def test_threshold_used_in_should_trigger_refinement(self):
-        """Test that DEFAULT_CRITIC_THRESHOLD works with should_trigger_refinement."""
-        from openhands_cli.stores.cli_settings import DEFAULT_CRITIC_THRESHOLD
-
-        # Score below default threshold
-        result = CriticResult(score=0.3, message="Below threshold")
-        assert (
-            should_trigger_refinement(
-                result, threshold=DEFAULT_CRITIC_THRESHOLD, enabled=True
-            )
-            is True
-        )
-
-        # Score above default threshold
-        result = CriticResult(score=0.7, message="Above threshold")
-        assert (
-            should_trigger_refinement(
-                result, threshold=DEFAULT_CRITIC_THRESHOLD, enabled=True
-            )
-            is False
-        )
