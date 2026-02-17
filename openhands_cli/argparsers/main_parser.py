@@ -11,7 +11,6 @@ from openhands_cli.argparsers.serve_parser import add_serve_parser
 from openhands_cli.argparsers.util import (
     add_confirmation_mode_args,
     add_env_override_args,
-    add_iterative_refinement_args,
     add_resume_args,
 )
 from openhands_cli.argparsers.view_parser import add_view_parser
@@ -104,9 +103,6 @@ def create_main_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Exit the application without showing confirmation dialog",
     )
-
-    # Iterative refinement options
-    add_iterative_refinement_args(parser)
 
     # Environment variable override option
     add_env_override_args(parser)

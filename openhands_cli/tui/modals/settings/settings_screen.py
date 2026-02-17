@@ -22,12 +22,13 @@ from textual.widgets import (
 )
 from textual.widgets._select import NoSelection
 
-from openhands_cli.stores import AgentStore
+from openhands_cli.stores import AgentStore, CliSettings
 from openhands_cli.tui.modals.settings.choices import (
     get_model_options,
 )
 from openhands_cli.tui.modals.settings.components import (
     CliSettingsTab,
+    CriticSettingsTab,
     SettingsTab,
 )
 from openhands_cli.tui.modals.settings.utils import SettingsFormData, save_settings
@@ -112,6 +113,10 @@ class SettingsScreen(ModalScreen):
                 if not self.is_initial_setup:
                     with TabPane("CLI Settings", id="cli_settings_tab"):
                         yield CliSettingsTab()
+
+                    # Critic Settings Tab - only show if not first-time setup
+                    with TabPane("Critic", id="critic_settings_tab"):
+                        yield CriticSettingsTab()
 
             # Buttons
             with Horizontal(id="button_container"):
@@ -401,14 +406,36 @@ class SettingsScreen(ModalScreen):
             self._show_message(result.error_message or "Unknown error", is_error=True)
             return
 
-        # Save CLI settings if not in initial setup mode
+        # Save CLI and Critic settings if not in initial setup mode
         if not self.is_initial_setup:
             try:
+                # Get CLI settings from CLI tab
                 cli_settings_tab = self.query_one("#cli_settings_tab", TabPane)
                 cli_settings_component = cli_settings_tab.query_one(CliSettingsTab)
                 cli_settings = cli_settings_component.get_cli_settings()
 
-                cli_settings.save()
+                # Get Critic settings from Critic tab and merge
+                critic_settings_tab = self.query_one("#critic_settings_tab", TabPane)
+                critic_settings_component = critic_settings_tab.query_one(
+                    CriticSettingsTab
+                )
+                critic_settings = critic_settings_component.get_critic_settings()
+
+                # Create merged CliSettings with critic settings
+                merged_settings = CliSettings(
+                    default_cells_expanded=cli_settings.default_cells_expanded,
+                    auto_open_plan_panel=cli_settings.auto_open_plan_panel,
+                    enable_critic=critic_settings["enable_critic"],
+                    enable_iterative_refinement=critic_settings[
+                        "enable_iterative_refinement"
+                    ],
+                    critic_threshold=critic_settings["critic_threshold"],
+                )
+
+                merged_settings.save()
+
+                # Refresh status line to reflect new settings
+                self._refresh_status_line()
             except Exception as e:
                 self._show_message(
                     f"Settings saved, but CLI settings failed: {str(e)}", is_error=True
@@ -430,6 +457,16 @@ class SettingsScreen(ModalScreen):
                     f"Error occurred when saving settings: {e}", severity="error"
                 )
         self.dismiss(True)
+
+    def _refresh_status_line(self) -> None:
+        """Refresh the status line to reflect updated settings."""
+        try:
+            from openhands_cli.tui.widgets.status_line import WorkingStatusLine
+
+            status_line = self.app.query_one(WorkingStatusLine)
+            status_line.reload_settings()
+        except Exception:
+            pass  # Status line may not exist in all contexts
 
     @staticmethod
     def is_initial_setup_required(env_overrides_enabled: bool = False) -> bool:

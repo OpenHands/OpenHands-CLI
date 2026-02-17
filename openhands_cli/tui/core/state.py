@@ -123,13 +123,6 @@ class ConversationContainer(Container):
     metrics: var[Metrics | None] = var(None)
     """Combined metrics from conversation stats."""
 
-    # ---- Iterative Refinement ----
-    iterative_refinement: var[bool] = var(False)
-    """Whether iterative refinement mode is enabled."""
-
-    critic_threshold: var[float] = var(0.5)
-    """Critic score threshold for triggering iterative refinement."""
-
     # ---- Loaded Resources ----
     loaded_resources: var["LoadedResourcesInfo | None"] = var(None)
     """Loaded skills, hooks, and MCPs for the current conversation."""
@@ -137,8 +130,6 @@ class ConversationContainer(Container):
     def __init__(
         self,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
-        iterative_refinement: bool = False,
-        critic_threshold: float = 0.5,
         **kwargs,
     ) -> None:
         # Initialize internal state BEFORE calling super().__init__
@@ -151,10 +142,6 @@ class ConversationContainer(Container):
 
         if initial_confirmation_policy is not None:
             self.confirmation_policy = initial_confirmation_policy
-
-        # Initialize iterative refinement settings
-        self.iterative_refinement = iterative_refinement
-        self.critic_threshold = critic_threshold
 
     def compose(self) -> ComposeResult:
         """Compose UI widgets that bind to reactive state.
@@ -197,8 +184,6 @@ class ConversationContainer(Container):
             yield WorkingStatusLine().data_bind(
                 running=ConversationContainer.running,
                 elapsed_seconds=ConversationContainer.elapsed_seconds,
-                iterative_refinement=ConversationContainer.iterative_refinement,
-                critic_threshold=ConversationContainer.critic_threshold,
             )
             yield InputField(
                 placeholder="Type your message, @mention a file, or / for commands"

@@ -8,6 +8,7 @@ from textual.widgets import Static
 
 from openhands.sdk.llm.utils.metrics import Metrics
 from openhands_cli.locations import get_work_dir
+from openhands_cli.stores import CliSettings
 from openhands_cli.utils import abbreviate_number, format_cost
 
 
@@ -17,6 +18,8 @@ class WorkingStatusLine(Static):
     This widget uses data_bind() to bind to ConversationContainer reactive properties.
     When ConversationContainer.running or ConversationContainer.elapsed_seconds change,
     this widget's corresponding properties are automatically updated.
+
+    Iterative refinement status is loaded from CliSettings on mount.
     """
 
     DEFAULT_CSS = """
@@ -32,17 +35,16 @@ class WorkingStatusLine(Static):
     running: var[bool] = var(False)
     elapsed_seconds: var[int] = var(0)
 
-    # Reactive properties for iterative refinement (bound from ConversationContainer)
-    iterative_refinement: var[bool] = var(False)
-    critic_threshold: var[float] = var(0.5)
-
     def __init__(self, **kwargs) -> None:
         super().__init__("", id="working_status_line", markup=True, **kwargs)
         self._timer: Timer | None = None
         self._working_frame: int = 0
+        # Load CLI settings for iterative refinement status
+        self._cli_settings: CliSettings | None = None
 
     def on_mount(self) -> None:
         """Initialize the working status line and start animation timer."""
+        self._cli_settings = CliSettings.load()
         self._update_text()
         # Start animation timer for spinner (animates only when working)
         self._timer = self.set_interval(0.1, self._on_tick)
@@ -53,18 +55,15 @@ class WorkingStatusLine(Static):
             self._timer.stop()
             self._timer = None
 
+    def reload_settings(self) -> None:
+        """Reload CLI settings and update display."""
+        self._cli_settings = CliSettings.load()
+        self._update_text()
+
     # ----- Reactive Watchers -----
 
     def watch_running(self, _running: bool) -> None:
         """React to running state changes from ConversationContainer."""
-        self._update_text()
-
-    def watch_iterative_refinement(self, _value: bool) -> None:
-        """React to iterative refinement state changes."""
-        self._update_text()
-
-    def watch_critic_threshold(self, _value: float) -> None:
-        """React to critic threshold changes."""
         self._update_text()
 
     # ----- Internal helpers -----
@@ -87,9 +86,9 @@ class WorkingStatusLine(Static):
         return f"{working_indicator} ({self.elapsed_seconds}s • ESC: pause)"
 
     def _get_refinement_indicator(self) -> str:
-        """Return the iterative refinement indicator if enabled."""
-        if self.iterative_refinement:
-            threshold = self.critic_threshold * 100
+        """Return the iterative refinement indicator if enabled in settings."""
+        if self._cli_settings and self._cli_settings.enable_iterative_refinement:
+            threshold = self._cli_settings.critic_threshold * 100
             return (
                 f"[bold cyan]🔄 Refinement[/bold cyan] [dim](< {threshold:.0f}%)[/dim]"
             )
@@ -99,7 +98,7 @@ class WorkingStatusLine(Static):
         """Rebuild the working status text with refinement indicator."""
         parts = []
 
-        # Add refinement indicator (always show when enabled)
+        # Add refinement indicator (always show when enabled in settings)
         refinement_indicator = self._get_refinement_indicator()
         if refinement_indicator:
             parts.append(refinement_indicator)

@@ -75,32 +75,21 @@ class CliSettingsTab(Container):
                 value=self.cli_settings.auto_open_plan_panel,
             )
 
-            yield SettingsSwitch(
-                label="Enable Critic (Experimental)",
-                description=(
-                    "When enabled and using OpenHands LLM provider, an experimental "
-                    "critic model predicts task success likelihood in real-time. "
-                    "Use --iterative-refinement flag or Ctrl+R to enable automatic "
-                    "agent feedback when critic score is low. "
-                    "We collect anonymized data (IDs, critic response, feedback) to "
-                    "evaluate accuracy. See: https://openhands.dev/privacy"
-                ),
-                switch_id="enable_critic_switch",
-                value=self.cli_settings.enable_critic,
-            )
-
     def get_cli_settings(self) -> CliSettings:
-        """Get the current CLI settings from the form."""
+        """Get the current CLI settings from the form (excludes critic settings)."""
         default_cells_expanded_switch = self.query_one(
             "#default_cells_expanded_switch", Switch
         )
         auto_open_plan_panel_switch = self.query_one(
             "#auto_open_plan_panel_switch", Switch
         )
-        enable_critic_switch = self.query_one("#enable_critic_switch", Switch)
 
+        # Return only the settings managed by this tab
+        # Critic settings are managed by CriticSettingsTab
         return CliSettings(
             default_cells_expanded=default_cells_expanded_switch.value,
             auto_open_plan_panel=auto_open_plan_panel_switch.value,
-            enable_critic=enable_critic_switch.value,
+            enable_critic=self.cli_settings.enable_critic,
+            enable_iterative_refinement=self.cli_settings.enable_iterative_refinement,
+            critic_threshold=self.cli_settings.critic_threshold,
         )

@@ -1,10 +1,6 @@
 import argparse
 
 
-# Default threshold for iterative refinement (50%)
-DEFAULT_CRITIC_THRESHOLD = 0.5
-
-
 def add_confirmation_mode_args(
     parser_or_group: argparse.ArgumentParser | argparse._MutuallyExclusiveGroup,
 ) -> None:
@@ -25,33 +21,6 @@ def add_confirmation_mode_args(
         help=(
             "Enable LLM-based security analyzer "
             "(only confirm LLM-predicted high-risk actions)"
-        ),
-    )
-
-
-def add_iterative_refinement_args(parser: argparse.ArgumentParser) -> None:
-    """Add iterative refinement arguments to a parser.
-
-    Args:
-        parser: The argument parser to add iterative refinement arguments to
-    """
-    parser.add_argument(
-        "--iterative-refinement",
-        action="store_true",
-        help=(
-            "Enable iterative refinement mode. When the critic model predicts "
-            "task success probability below the threshold, a message is sent "
-            "to the agent to review and improve its work."
-        ),
-    )
-    parser.add_argument(
-        "--critic-threshold",
-        type=float,
-        default=DEFAULT_CRITIC_THRESHOLD,
-        help=(
-            f"Critic score threshold for iterative refinement (0.0-1.0). "
-            f"Default: {DEFAULT_CRITIC_THRESHOLD}. "
-            "Refinement is triggered when score is below this threshold."
         ),
     )
 

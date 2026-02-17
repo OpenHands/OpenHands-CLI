@@ -7,12 +7,18 @@ from pathlib import Path
 from pydantic import BaseModel
 
 
+# Default threshold for iterative refinement (60% - same as SDK default)
+DEFAULT_CRITIC_THRESHOLD = 0.6
+
+
 class CliSettings(BaseModel):
     """Model for CLI-level settings."""
 
     default_cells_expanded: bool = False
     auto_open_plan_panel: bool = True
     enable_critic: bool = True
+    enable_iterative_refinement: bool = False
+    critic_threshold: float = DEFAULT_CRITIC_THRESHOLD
 
     @classmethod
     def get_config_path(cls) -> Path:

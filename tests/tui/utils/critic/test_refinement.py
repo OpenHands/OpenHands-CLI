@@ -51,9 +51,6 @@ class TestBuildRefinementMessage:
         result = CriticResult(score=0.3, message="Low score")
         message = build_refinement_message(result, threshold=0.5)
 
-        # Check header
-        assert "Iterative Refinement Triggered" in message
-
         # Check score mentioned
         assert "30.0%" in message
 
@@ -61,90 +58,25 @@ class TestBuildRefinementMessage:
         assert "50%" in message
 
         # Check instruction to review
-        assert "Please review the user's original requirements" in message
+        assert "Please review your work carefully" in message
 
-    def test_includes_categorized_features(self):
-        """Test that categorized features from metadata are included."""
-        categorized = {
-            "agent_behavioral_issues": [
-                {"display_name": "Incomplete Task", "probability": 0.8},
-                {"display_name": "Missing Tests", "probability": 0.6},
-            ],
-            "infrastructure_issues": [
-                {"display_name": "Build Failed", "probability": 0.7},
-            ],
-        }
-        result = CriticResult(
-            score=0.4,
-            message="Issues detected",
-            metadata={"categorized_features": categorized},
-        )
+    def test_includes_review_instructions(self):
+        """Test that message includes review instructions."""
+        result = CriticResult(score=0.4, message="Issues detected")
         message = build_refinement_message(result, threshold=0.5)
 
-        # Check that issues are mentioned
-        assert "Incomplete Task" in message
-        assert "80%" in message
-        assert "Missing Tests" in message
-        assert "60%" in message
-        assert "Build Failed" in message
-        assert "70%" in message
+        # Check for review steps
+        assert "requirements" in message.lower()
+        assert "complete and correct" in message.lower()
 
-    def test_includes_user_followup_patterns(self):
-        """Test that user followup patterns are included if present."""
-        categorized = {
-            "user_followup_patterns": [
-                {"display_name": "Clarification Needed", "probability": 0.9},
-            ],
-        }
-        result = CriticResult(
-            score=0.3,
-            message="Follow-up needed",
-            metadata={"categorized_features": categorized},
-        )
-        message = build_refinement_message(result, threshold=0.5)
-
-        assert "Clarification Needed" in message
-        assert "90%" in message
-
-    def test_handles_missing_categorized_features(self):
-        """Test that message works without categorized features."""
+    def test_handles_missing_metadata(self):
+        """Test that message works without metadata."""
         result = CriticResult(score=0.3, message="Simple message")
         message = build_refinement_message(result, threshold=0.5)
 
         # Should still have basic structure
-        assert "Iterative Refinement Triggered" in message
         assert "30.0%" in message
-
-        # Should not crash and should include instructions
         assert "Please review" in message
-
-    def test_handles_empty_categorized_features(self):
-        """Test that message works with empty categorized features."""
-        result = CriticResult(
-            score=0.3,
-            message="Empty features",
-            metadata={"categorized_features": {}},
-        )
-        message = build_refinement_message(result, threshold=0.5)
-
-        # Should still have basic structure without crashing
-        assert "Iterative Refinement Triggered" in message
-
-    def test_feature_uses_name_fallback(self):
-        """Test that 'name' is used as fallback when 'display_name' is missing."""
-        categorized = {
-            "agent_behavioral_issues": [
-                {"name": "raw_feature_name", "probability": 0.7},
-            ],
-        }
-        result = CriticResult(
-            score=0.3,
-            message="Feature name fallback",
-            metadata={"categorized_features": categorized},
-        )
-        message = build_refinement_message(result, threshold=0.5)
-
-        assert "raw_feature_name" in message
 
     def test_threshold_formatting(self):
         """Test various threshold values are formatted correctly."""
@@ -158,19 +90,29 @@ class TestBuildRefinementMessage:
         message = build_refinement_message(result, threshold=1.0)
         assert "100%" in message
 
+    def test_message_is_concise(self):
+        """Test that the message follows SDK pattern of being concise."""
+        result = CriticResult(score=0.4, message="Test")
+        message = build_refinement_message(result, threshold=0.6)
+
+        # Message should be relatively short (SDK style is concise)
+        lines = message.strip().split("\n")
+        # Should have score line, empty line, instruction, and numbered steps
+        assert len(lines) <= 10
+
 
 class TestDefaultCriticThreshold:
     """Tests for DEFAULT_CRITIC_THRESHOLD constant."""
 
     def test_default_threshold_value(self):
-        """Test that the default critic threshold is 0.5."""
-        from openhands_cli.argparsers.util import DEFAULT_CRITIC_THRESHOLD
+        """Test that the default critic threshold is 0.6 (same as SDK default)."""
+        from openhands_cli.stores.cli_settings import DEFAULT_CRITIC_THRESHOLD
 
-        assert DEFAULT_CRITIC_THRESHOLD == 0.5
+        assert DEFAULT_CRITIC_THRESHOLD == 0.6
 
     def test_threshold_used_in_should_trigger_refinement(self):
         """Test that DEFAULT_CRITIC_THRESHOLD works with should_trigger_refinement."""
-        from openhands_cli.argparsers.util import DEFAULT_CRITIC_THRESHOLD
+        from openhands_cli.stores.cli_settings import DEFAULT_CRITIC_THRESHOLD
 
         # Score below default threshold
         result = CriticResult(score=0.3, message="Below threshold")

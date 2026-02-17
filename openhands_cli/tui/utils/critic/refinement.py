@@ -1,4 +1,9 @@
-"""Iterative refinement utilities for critic-based agent improvement."""
+"""Iterative refinement utilities for critic-based agent improvement.
+
+This module provides the follow-up prompt logic for iterative refinement,
+following the pattern established in the OpenHands SDK:
+https://docs.openhands.dev/sdk/guides/critic#iterative-refinement-with-a-critic
+"""
 
 from __future__ import annotations
 
@@ -13,7 +18,10 @@ def build_refinement_message(
     critic_result: CriticResult,
     threshold: float,
 ) -> str:
-    """Build a refinement message to send to the agent when critic score is low.
+    """Build a follow-up message to send to the agent when critic score is low.
+
+    This follows the SDK's iterative refinement pattern, providing a concise
+    message that prompts the agent to review and improve its work.
 
     Args:
         critic_result: The critic result with score and metadata
@@ -22,94 +30,24 @@ def build_refinement_message(
     Returns:
         A formatted message string to send to the agent
     """
-    score_percentage = critic_result.score * 100
-    threshold_percentage = threshold * 100
+    score_percent = critic_result.score * 100
+    threshold_percent = threshold * 100
 
-    # Build the base message with context about the critic model
+    # Build a concise follow-up message similar to the SDK's default pattern
+    score_line = (
+        f"Your solution scored {score_percent:.1f}% "
+        f"(threshold: {threshold_percent:.0f}%)."
+    )
     lines = [
-        "⚠️ **Iterative Refinement Triggered**",
+        score_line,
         "",
-        "A **critic model** (a separate AI trained to evaluate task completion) "
-        "has analyzed your recent work and predicted the probability that the "
-        "user will be satisfied with the current state of the task.",
-        "",
-        f"**Predicted success probability: {score_percentage:.1f}%** "
-        f"(threshold: {threshold_percentage:.0f}%)",
-        "",
-        "This low score suggests there may be incomplete work, missing "
-        "requirements, or issues that need to be addressed.",
-        "",
+        "Please review your work carefully:",
+        "1. Check that all requirements from the original request are met",
+        "2. Verify your implementation is complete and correct",
+        "3. Fix any issues and try again",
     ]
 
-    # Add detailed breakdown if categorized features are available
-    if critic_result.metadata and "categorized_features" in critic_result.metadata:
-        categorized = critic_result.metadata["categorized_features"]
-        rubric_details = _format_rubric_details(categorized)
-        if rubric_details:
-            lines.append("**Detailed probability breakdown:**")
-            lines.append("")
-            lines.extend(rubric_details)
-            lines.append("")
-
-    # Add the refinement instruction
-    lines.extend(
-        [
-            "**Please review the user's original requirements and your current "
-            "changes.**",
-            "",
-            "Ensure you have:",
-            "1. Fully addressed all aspects of the user's request",
-            "2. Verified your implementation is complete and correct",
-            "3. Resolved any potential issues identified above",
-            "",
-            "If you believe the task is complete, use the finish tool to explain "
-            "what was accomplished. Otherwise, continue working on the remaining "
-            "items.",
-        ]
-    )
-
     return "\n".join(lines)
-
-
-def _format_rubric_details(categorized: dict) -> list[str]:
-    """Format categorized features into readable rubric details.
-
-    Args:
-        categorized: Dict containing categorized features from critic metadata
-
-    Returns:
-        List of formatted detail lines
-    """
-    details = []
-
-    # Agent behavioral issues
-    agent_issues = categorized.get("agent_behavioral_issues", [])
-    if agent_issues:
-        details.append("- **Potential Issues:**")
-        for feature in agent_issues:
-            name = feature.get("display_name", feature.get("name", "Unknown"))
-            prob = feature.get("probability", 0.0)
-            details.append(f"  - {name}: {prob * 100:.0f}% likelihood")
-
-    # Infrastructure issues
-    infra_issues = categorized.get("infrastructure_issues", [])
-    if infra_issues:
-        details.append("- **Infrastructure:**")
-        for feature in infra_issues:
-            name = feature.get("display_name", feature.get("name", "Unknown"))
-            prob = feature.get("probability", 0.0)
-            details.append(f"  - {name}: {prob * 100:.0f}% likelihood")
-
-    # User follow-up patterns (might indicate incomplete work)
-    user_patterns = categorized.get("user_followup_patterns", [])
-    if user_patterns:
-        details.append("- **Likely Follow-up Needed:**")
-        for feature in user_patterns:
-            name = feature.get("display_name", feature.get("name", "Unknown"))
-            prob = feature.get("probability", 0.0)
-            details.append(f"  - {name}: {prob * 100:.0f}% likelihood")
-
-    return details
 
 
 def should_trigger_refinement(
