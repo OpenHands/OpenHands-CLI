@@ -95,9 +95,10 @@ def get_splash_content(
         content["critic_notice"] = (
             f"\n[{primary_color}]Experimental Feature: "
             "Critic + Iterative Refinement Mode[/]\n"
-            "[dim]A free critic predicts task success. Enable Iterative Refinement "
-            "in settings to auto-prompt the agent when work appears incomplete. "
-            "Anonymized data collected for improvement. Disable in settings.[/dim]"
+            "[dim]Using OpenHands provider enables a free critic to predict task "
+            "success. Enable Iterative Refinement in settings to auto-prompt the "
+            "agent when work appears incomplete. "
+            "Anonymized data collected. Disable in settings.[/dim]"
         )
 
     return content
