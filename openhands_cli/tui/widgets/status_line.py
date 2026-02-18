@@ -99,7 +99,7 @@ class WorkingStatusLine(Static):
         if self._cli_settings.critic.enable_iterative_refinement:
             threshold = self._cli_settings.critic.critic_threshold * 100
             return (
-                f"[bold] Iterative Refinement [/bold] "
+                f"[bold] Iterative Refinement Enabled [/bold] "
                 f"[dim](score < {threshold:.0f}%)[/dim]"
             )
         return ""
