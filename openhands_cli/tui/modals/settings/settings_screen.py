@@ -102,10 +102,11 @@ class SettingsScreen(ModalScreen):
             "default_cells_expanded": cli_settings.default_cells_expanded,
             "auto_open_plan_panel": cli_settings.auto_open_plan_panel,
         }
+        critic = cli_settings.critic
         critic_initial = {
-            "enable_critic": cli_settings.enable_critic,
-            "enable_iterative_refinement": cli_settings.enable_iterative_refinement,
-            "critic_threshold": cli_settings.critic_threshold,
+            "enable_critic": critic.enable_critic,
+            "enable_iterative_refinement": critic.enable_iterative_refinement,
+            "critic_threshold": critic.critic_threshold,
         }
 
         with Container(id="settings_container"):
@@ -430,10 +431,17 @@ class SettingsScreen(ModalScreen):
 
                 # Load base settings and merge fields from both tabs
                 base_settings = CliSettings.load()
+
+                # Update the nested critic settings
+
+                updated_critic = base_settings.critic.model_copy(
+                    update=critic_tab.get_updated_fields()
+                )
+
                 merged_settings = base_settings.model_copy(
                     update={
                         **cli_tab.get_updated_fields(),
-                        **critic_tab.get_updated_fields(),
+                        "critic": updated_critic,
                     }
                 )
 

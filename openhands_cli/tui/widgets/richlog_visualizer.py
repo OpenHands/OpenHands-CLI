@@ -283,7 +283,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
             # Add critic collapsible if present (for MessageEvent and ActionEvent)
             critic_result = getattr(event, "critic_result", None)
-            if critic_result is not None and self.cli_settings.enable_critic:
+            critic_settings = self.cli_settings.critic
+            if critic_result is not None and critic_settings.enable_critic:
                 from openhands_cli.tui.utils.critic import (
                     build_refinement_message,
                     create_critic_collapsible,
@@ -320,13 +321,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 # Read settings directly from cli_settings for current configuration
                 if should_trigger_refinement(
                     critic_result=critic_result,
-                    threshold=self.cli_settings.critic_threshold,
-                    enabled=self.cli_settings.enable_iterative_refinement,
+                    threshold=critic_settings.critic_threshold,
+                    enabled=critic_settings.enable_iterative_refinement,
                 ):
                     # Build and send refinement message directly to conversation
                     refinement_message = build_refinement_message(
                         critic_result=critic_result,
-                        threshold=self.cli_settings.critic_threshold,
+                        threshold=critic_settings.critic_threshold,
                     )
                     self._send_refinement_message(refinement_message)
 

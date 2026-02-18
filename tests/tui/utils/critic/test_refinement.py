@@ -9,7 +9,7 @@ from textual.containers import VerticalScroll
 from openhands.sdk import Message, TextContent
 from openhands.sdk.critic.result import CriticResult
 from openhands.sdk.event import MessageEvent
-from openhands_cli.stores import CliSettings
+from openhands_cli.stores import CliSettings, CriticSettings
 from openhands_cli.tui.utils.critic.refinement import (
     build_refinement_message,
     should_trigger_refinement,
@@ -147,9 +147,11 @@ class TestRefinementIntegration:
         """
         # Set up CLI settings with refinement enabled
         settings = CliSettings(
-            enable_critic=True,
-            enable_iterative_refinement=True,
-            critic_threshold=0.6,  # 60%
+            critic=CriticSettings(
+                enable_critic=True,
+                enable_iterative_refinement=True,
+                critic_threshold=0.6,  # 60%
+            )
         )
         monkeypatch.setattr(CliSettings, "load", lambda: settings)
 
@@ -210,9 +212,11 @@ class TestRefinementIntegration:
     ):
         """Test that high critic scores do NOT trigger refinement messages."""
         settings = CliSettings(
-            enable_critic=True,
-            enable_iterative_refinement=True,
-            critic_threshold=0.6,
+            critic=CriticSettings(
+                enable_critic=True,
+                enable_iterative_refinement=True,
+                critic_threshold=0.6,
+            )
         )
         monkeypatch.setattr(CliSettings, "load", lambda: settings)
 
@@ -260,9 +264,11 @@ class TestRefinementIntegration:
     ):
         """Test that refinement is not triggered when disabled in settings."""
         settings = CliSettings(
-            enable_critic=True,
-            enable_iterative_refinement=False,  # Disabled
-            critic_threshold=0.6,
+            critic=CriticSettings(
+                enable_critic=True,
+                enable_iterative_refinement=False,  # Disabled
+                critic_threshold=0.6,
+            )
         )
         monkeypatch.setattr(CliSettings, "load", lambda: settings)
 
@@ -308,9 +314,11 @@ class TestRefinementIntegration:
     def test_critic_disabled_does_not_trigger(self, mock_app, container, monkeypatch):
         """Test that refinement is not triggered when critic is disabled."""
         settings = CliSettings(
-            enable_critic=False,  # Critic disabled
-            enable_iterative_refinement=True,
-            critic_threshold=0.6,
+            critic=CriticSettings(
+                enable_critic=False,  # Critic disabled
+                enable_iterative_refinement=True,
+                critic_threshold=0.6,
+            )
         )
         monkeypatch.setattr(CliSettings, "load", lambda: settings)
 

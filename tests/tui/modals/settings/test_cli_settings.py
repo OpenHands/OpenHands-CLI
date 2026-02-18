@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from openhands_cli.stores import CliSettings
+from openhands_cli.stores import CliSettings, CriticSettings
 
 
 class TestCliSettings:
@@ -13,6 +13,9 @@ class TestCliSettings:
         cfg = CliSettings()
         assert cfg.default_cells_expanded is False
         assert cfg.auto_open_plan_panel is True
+        assert cfg.critic.enable_critic is True
+        assert cfg.critic.enable_iterative_refinement is False
+        assert cfg.critic.critic_threshold == 0.6
 
     @pytest.mark.parametrize("value", [True, False])
     def test_default_cells_expanded_accepts_bool(self, value: bool):
@@ -105,9 +108,11 @@ class TestCliSettings:
         cfg = CliSettings(
             default_cells_expanded=False,
             auto_open_plan_panel=False,
-            enable_critic=False,
-            enable_iterative_refinement=False,
-            critic_threshold=0.6,
+            critic=CriticSettings(
+                enable_critic=False,
+                enable_iterative_refinement=False,
+                critic_threshold=0.6,
+            ),
         )
 
         with patch.object(CliSettings, "get_config_path", return_value=config_path):
@@ -117,9 +122,11 @@ class TestCliSettings:
             {
                 "default_cells_expanded": False,
                 "auto_open_plan_panel": False,
-                "enable_critic": False,
-                "enable_iterative_refinement": False,
-                "critic_threshold": 0.6,
+                "critic": {
+                    "enable_critic": False,
+                    "enable_iterative_refinement": False,
+                    "critic_threshold": 0.6,
+                },
             },
             indent=2,
         )

@@ -11,14 +11,20 @@ from pydantic import BaseModel
 DEFAULT_CRITIC_THRESHOLD = 0.6
 
 
+class CriticSettings(BaseModel):
+    """Model for critic-related settings."""
+
+    enable_critic: bool = True
+    enable_iterative_refinement: bool = False
+    critic_threshold: float = DEFAULT_CRITIC_THRESHOLD
+
+
 class CliSettings(BaseModel):
     """Model for CLI-level settings."""
 
     default_cells_expanded: bool = False
     auto_open_plan_panel: bool = True
-    enable_critic: bool = True
-    enable_iterative_refinement: bool = False
-    critic_threshold: float = DEFAULT_CRITIC_THRESHOLD
+    critic: CriticSettings = CriticSettings()
 
     @classmethod
     def get_config_path(cls) -> Path:

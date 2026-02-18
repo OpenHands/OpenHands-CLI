@@ -87,8 +87,8 @@ class WorkingStatusLine(Static):
 
     def _get_refinement_indicator(self) -> str:
         """Return the iterative refinement indicator if enabled in settings."""
-        if self._cli_settings and self._cli_settings.enable_iterative_refinement:
-            threshold = self._cli_settings.critic_threshold * 100
+        if self._cli_settings and self._cli_settings.critic.enable_iterative_refinement:
+            threshold = self._cli_settings.critic.critic_threshold * 100
             return (
                 f"[bold cyan]🔄 Refinement[/bold cyan] [dim](< {threshold:.0f}%)[/dim]"
             )
