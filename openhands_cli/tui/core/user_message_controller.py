@@ -26,7 +26,9 @@ class UserMessageController:
         self._run_worker = run_worker
         self._headless_mode = headless_mode
 
-    async def handle_user_message(self, content: str) -> None:
+    async def handle_user_message(
+        self, content: str, *, is_refinement: bool = False
+    ) -> None:
         # Guard: no conversation_id means switching in progress
         if self._state.conversation_id is None:
             return
@@ -34,10 +36,12 @@ class UserMessageController:
         runner = self._runners.get_or_create(self._state.conversation_id)
 
         # Render user message (also dismisses pending feedback widgets)
-        runner.visualizer.render_user_message(content)
+        # For refinement messages, don't reset the iteration counter
+        runner.visualizer.render_user_message(content, is_refinement=is_refinement)
 
-        # Update conversation title (for history panel)
-        self._state.set_conversation_title(content)
+        # Update conversation title (for history panel) - skip for refinement messages
+        if not is_refinement:
+            self._state.set_conversation_title(content)
 
         if runner.is_running:
             await runner.queue_message(content)

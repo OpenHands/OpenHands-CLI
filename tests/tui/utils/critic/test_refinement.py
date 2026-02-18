@@ -58,27 +58,30 @@ class TestBuildRefinementMessage:
     """Tests for build_refinement_message function."""
 
     def test_basic_message_structure(self):
-        """Test that message has expected structure and content."""
+        """Test that message has expected structure and content (SDK format)."""
         result = CriticResult(score=0.3, message="Low score")
         message = build_refinement_message(result, threshold=0.5)
 
-        # Check score mentioned
+        # Check score mentioned (SDK format: "predicted success likelihood")
         assert "30.0%" in message
 
-        # Check threshold mentioned
-        assert "50%" in message
+        # Check iteration format (SDK style: "iteration X/Y")
+        assert "iteration 1/3" in message
 
-        # Check instruction to review
-        assert "Please review your work carefully" in message
+        # Check the task appears incomplete message (SDK style)
+        assert "The task appears incomplete" in message
+
+        # Check instruction to review (SDK style)
+        assert "Please review what you've done" in message
 
     def test_includes_review_instructions(self):
-        """Test that message includes review instructions."""
+        """Test that message includes review instructions (SDK format)."""
         result = CriticResult(score=0.4, message="Issues detected")
         message = build_refinement_message(result, threshold=0.5)
 
-        # Check for review steps
-        assert "requirements" in message.lower()
-        assert "complete and correct" in message.lower()
+        # Check for SDK-style review instructions
+        assert "verify each requirement is met" in message
+        assert "List what's working and what needs fixing" in message
 
     def test_handles_missing_metadata(self):
         """Test that message works without metadata."""
@@ -89,17 +92,17 @@ class TestBuildRefinementMessage:
         assert "30.0%" in message
         assert "Please review" in message
 
-    def test_threshold_formatting(self):
-        """Test various threshold values are formatted correctly."""
+    def test_score_formatting(self):
+        """Test various score values are formatted correctly."""
+        # Test low score
         result = CriticResult(score=0.2, message="Test")
-
-        # Test decimal threshold
         message = build_refinement_message(result, threshold=0.75)
-        assert "75%" in message
+        assert "20.0%" in message
 
-        # Test integer-like threshold
+        # Test higher score
+        result = CriticResult(score=0.55, message="Test")
         message = build_refinement_message(result, threshold=1.0)
-        assert "100%" in message
+        assert "55.0%" in message
 
     def test_message_is_concise(self):
         """Test that the message follows SDK pattern of being concise."""
@@ -108,8 +111,8 @@ class TestBuildRefinementMessage:
 
         # Message should be relatively short (SDK style is concise)
         lines = message.strip().split("\n")
-        # Should have score line, iteration line, empty line, instruction, and steps
-        assert len(lines) <= 10
+        # SDK format has about 4-5 lines
+        assert len(lines) <= 6
 
     def test_iteration_info_included(self):
         """Test that iteration info is included in the message."""
@@ -118,9 +121,8 @@ class TestBuildRefinementMessage:
             result, threshold=0.5, iteration=2, max_iterations=3
         )
 
-        # Check iteration info is present
-        assert "2/3" in message
-        assert "Refinement attempt" in message
+        # Check iteration info is present (SDK format: "iteration X/Y")
+        assert "iteration 2/3" in message
 
     def test_default_iteration_values(self):
         """Test default iteration values (1/3)."""
@@ -128,7 +130,7 @@ class TestBuildRefinementMessage:
         message = build_refinement_message(result, threshold=0.5)
 
         # Check default iteration info
-        assert "1/3" in message
+        assert "iteration 1/3" in message
 
     def test_custom_max_iterations(self):
         """Test custom max iterations value."""
@@ -137,7 +139,7 @@ class TestBuildRefinementMessage:
             result, threshold=0.5, iteration=1, max_iterations=5
         )
 
-        assert "1/5" in message
+        assert "iteration 1/5" in message
 
 
 class TestRefinementIntegration:
@@ -558,3 +560,82 @@ class TestRefinementIntegration:
             "After user message, refinement should trigger again"
         )
         assert visualizer._refinement_iteration == 1
+
+    def test_refinement_message_does_not_reset_counter(
+        self, mock_app, container, monkeypatch
+    ):
+        """Test that refinement messages (is_refinement=True) don't reset counter.
+
+        This is crucial for correct iteration tracking: when a refinement message
+        is sent, it should NOT reset the iteration counter.
+        """
+        settings = CliSettings(
+            critic=CriticSettings(
+                enable_critic=True,
+                enable_iterative_refinement=True,
+                critic_threshold=0.6,
+                max_refinement_iterations=3,
+            )
+        )
+        monkeypatch.setattr(CliSettings, "load", lambda: settings)
+
+        visualizer = ConversationVisualizer(
+            container,
+            mock_app,  # type: ignore[arg-type]
+            name="OpenHands Agent",
+        )
+        visualizer._cli_settings = None
+        visualizer._run_on_main_thread = MagicMock()
+
+        def create_low_score_event(text: str):
+            message = Message(
+                role="assistant",
+                content=[TextContent(text=text)],
+            )
+            event = MessageEvent(llm_message=message, source="agent")
+            return event.model_copy(
+                update={
+                    "critic_result": CriticResult(
+                        score=0.3,
+                        message="Low score",
+                    )
+                }
+            )
+
+        # First iteration
+        visualizer.on_event(create_low_score_event("First response"))
+        assert visualizer._refinement_iteration == 1
+
+        # Simulate a refinement message (is_refinement=True)
+        # This should NOT reset the counter
+        visualizer.render_user_message(
+            "The task appears incomplete (iteration 1/3...)",
+            is_refinement=True,
+        )
+
+        # Counter should still be 1 (not reset to 0)
+        assert visualizer._refinement_iteration == 1, (
+            "Refinement message should not reset the iteration counter"
+        )
+
+        # Second iteration (agent response to refinement message)
+        visualizer.on_event(create_low_score_event("Second response"))
+        assert visualizer._refinement_iteration == 2
+
+        # Third iteration
+        visualizer.on_event(create_low_score_event("Third response"))
+        assert visualizer._refinement_iteration == 3
+
+        # Fourth response should NOT increment (max reached)
+        mock_app.call_from_thread.reset_mock()
+        visualizer.on_event(create_low_score_event("Fourth response"))
+
+        # Counter should still be 3 (hit max, no increment)
+        assert visualizer._refinement_iteration == 3
+
+        # No refinement message should be sent
+        calls = mock_app.call_from_thread.call_args_list
+        send_message_calls = [
+            c for c in calls if len(c[0]) >= 2 and isinstance(c[0][1], SendMessage)
+        ]
+        assert len(send_message_calls) == 0

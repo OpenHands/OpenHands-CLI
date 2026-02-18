@@ -16,18 +16,20 @@ if TYPE_CHECKING:
 
 def build_refinement_message(
     critic_result: CriticResult,
-    threshold: float,
+    threshold: float,  # noqa: ARG001 - kept for API compatibility
     iteration: int = 1,
     max_iterations: int = 3,
 ) -> str:
     """Build a follow-up message to send to the agent when critic score is low.
 
-    This follows the SDK's iterative refinement pattern, providing a concise
-    message that prompts the agent to review and improve its work.
+    This follows the SDK's iterative refinement pattern
+    (see CriticBase.get_followup_prompt), providing a concise message that
+    prompts the agent to review and improve its work.
 
     Args:
         critic_result: The critic result with score and metadata
         threshold: The threshold below which refinement is triggered
+            (unused, kept for API compatibility)
         iteration: Current refinement iteration (1-indexed)
         max_iterations: Maximum number of refinement iterations allowed
 
@@ -35,25 +37,14 @@ def build_refinement_message(
         A formatted message string to send to the agent
     """
     score_percent = critic_result.score * 100
-    threshold_percent = threshold * 100
 
-    # Build a concise follow-up message similar to the SDK's default pattern
-    score_line = (
-        f"Your solution scored {score_percent:.1f}% "
-        f"(threshold: {threshold_percent:.0f}%)."
+    # Use the same prompt format as the SDK's CriticBase.get_followup_prompt
+    return (
+        f"The task appears incomplete (iteration {iteration}/{max_iterations}, "
+        f"predicted success likelihood: {score_percent:.1f}%).\n\n"
+        "Please review what you've done and verify each requirement is met.\n"
+        "List what's working and what needs fixing, then complete the task.\n"
     )
-    iteration_line = f"Refinement attempt {iteration}/{max_iterations}."
-    lines = [
-        score_line,
-        iteration_line,
-        "",
-        "Please review your work carefully:",
-        "1. Check that all requirements from the original request are met",
-        "2. Verify your implementation is complete and correct",
-        "3. Fix any issues and try again",
-    ]
-
-    return "\n".join(lines)
 
 
 def should_trigger_refinement(

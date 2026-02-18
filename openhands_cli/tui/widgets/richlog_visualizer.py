@@ -359,17 +359,21 @@ class ConversationVisualizer(ConversationVisualizerBase):
         from openhands_cli.tui.core.conversation_manager import SendMessage
 
         self._app.call_from_thread(
-            self._app.conversation_manager.post_message, SendMessage(message)
+            self._app.conversation_manager.post_message,
+            SendMessage(message, is_refinement=True),
         )
 
-    def render_user_message(self, content: str) -> None:
+    def render_user_message(self, content: str, *, is_refinement: bool = False) -> None:
         """Render a user message to the UI.
 
         Dismisses any pending feedback widgets before rendering the user message.
-        Resets the refinement loop prevention flag so refinement can trigger again.
+        Resets the refinement loop counter only for non-refinement messages,
+        so refinement can trigger again on the next user turn.
 
         Args:
             content: The user's message text to display.
+            is_refinement: If True, this is a refinement message sent automatically
+                by the system. The iteration counter will NOT be reset.
         """
         from textual.widgets import Static
 
@@ -379,8 +383,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
         for widget in self._container.query(CriticFeedbackWidget):
             widget.remove()
 
-        # Reset refinement counter - user message means new turn, allow refinement again
-        self._refinement_iteration = 0
+        # Reset refinement counter only for real user messages
+        # Keep counter for refinement messages to track iteration properly
+        if not is_refinement:
+            self._refinement_iteration = 0
 
         user_message_widget = Static(
             f"> {content}", classes="user-message", markup=False
