@@ -115,6 +115,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._cli_settings: CliSettings | None = None
         # Track pending actions by tool_call_id for action-observation pairing
         self._pending_actions: dict[str, tuple[ActionEvent, Collapsible]] = {}
+        # Track refinement state to prevent infinite loops
+        # When True, the next response should not trigger another refinement
+        self._refinement_sent: bool = False
 
     @property
     def cli_settings(self) -> CliSettings:
@@ -318,8 +321,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 self._run_on_main_thread(self._add_widget_to_ui, feedback_widget)
 
                 # Check if iterative refinement should be triggered
+                # Skip if we already sent a refinement (prevents infinite loops)
                 # Read settings directly from cli_settings for current configuration
-                if should_trigger_refinement(
+                if not self._refinement_sent and should_trigger_refinement(
                     critic_result=critic_result,
                     threshold=critic_settings.critic_threshold,
                     enabled=critic_settings.enable_iterative_refinement,
@@ -330,6 +334,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
                         threshold=critic_settings.critic_threshold,
                     )
                     self._send_refinement_message(refinement_message)
+                    # Mark that refinement was sent - don't trigger again until
+                    # user sends a new message
+                    self._refinement_sent = True
 
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
@@ -353,6 +360,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """Render a user message to the UI.
 
         Dismisses any pending feedback widgets before rendering the user message.
+        Resets the refinement loop prevention flag so refinement can trigger again.
 
         Args:
             content: The user's message text to display.
@@ -364,6 +372,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Dismiss pending feedback widgets (user chose to continue instead of rating)
         for widget in self._container.query(CriticFeedbackWidget):
             widget.remove()
+
+        # Reset refinement flag - user message means new turn, allow refinement again
+        self._refinement_sent = False
 
         user_message_widget = Static(
             f"> {content}", classes="user-message", markup=False

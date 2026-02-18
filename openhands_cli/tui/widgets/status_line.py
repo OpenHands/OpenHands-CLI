@@ -40,11 +40,11 @@ class WorkingStatusLine(Static):
         self._timer: Timer | None = None
         self._working_frame: int = 0
         # Load CLI settings for iterative refinement status
-        self._cli_settings: CliSettings | None = None
+        # Loaded eagerly to avoid None checks throughout the code
+        self._cli_settings: CliSettings = CliSettings.load()
 
     def on_mount(self) -> None:
         """Initialize the working status line and start animation timer."""
-        self._cli_settings = CliSettings.load()
         self._update_text()
         # Start animation timer for spinner (animates only when working)
         self._timer = self.set_interval(0.1, self._on_tick)
@@ -56,7 +56,15 @@ class WorkingStatusLine(Static):
             self._timer = None
 
     def reload_settings(self) -> None:
-        """Reload CLI settings and update display."""
+        """Reload CLI settings and update display.
+
+        Called when the user saves settings from the settings modal.
+        This updates the status line display to reflect the new settings.
+
+        Note: Settings changes take effect immediately for the status display.
+        For conversation behavior (like refinement triggering), the visualizer
+        has its own cached settings snapshot that may be stale until it reloads.
+        """
         self._cli_settings = CliSettings.load()
         self._update_text()
 
@@ -87,7 +95,7 @@ class WorkingStatusLine(Static):
 
     def _get_refinement_indicator(self) -> str:
         """Return the iterative refinement indicator if enabled in settings."""
-        if self._cli_settings and self._cli_settings.critic.enable_iterative_refinement:
+        if self._cli_settings.critic.enable_iterative_refinement:
             threshold = self._cli_settings.critic.critic_threshold * 100
             return (
                 f"[bold cyan]🔄 Refinement[/bold cyan] [dim](< {threshold:.0f}%)[/dim]"
