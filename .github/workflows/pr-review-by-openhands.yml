@@ -2,16 +2,12 @@
 name: PR Review by OpenHands
 
 on:
-    # Use pull_request_target to allow fork PRs to access secrets when triggered by maintainers
-    # Security: This workflow runs when:
-    #   1. A new PR is opened (non-draft), OR
-    #   2. A draft PR is marked as ready for review, OR
-    #   3. A maintainer adds the 'review-this' label, OR
-    #   4. A maintainer requests openhands-agent or all-hands-bot as a reviewer
-    # Only users with write access can add labels or request reviews, ensuring security.
-    # The PR code is explicitly checked out for review, but secrets are only accessible
-    # because the workflow runs in the base repository context
-    pull_request_target:
+    # Security note:
+    # - This workflow uses the PR code as input to an LLM-powered reviewer.
+    # - To avoid running in the base-repo context for forked PRs (which would expose
+    #   secrets to untrusted contributors via prompt injection), we run on pull_request
+    #   and explicitly skip forks.
+    pull_request:
         types: [opened, ready_for_review, labeled, review_requested]
 
 permissions:
@@ -28,19 +24,23 @@ jobs:
         #   4. openhands-agent or all-hands-bot is requested as a reviewer
         # Note: FIRST_TIME_CONTRIBUTOR PRs require manual trigger via label/reviewer request
         if: |
-            (github.event.action == 'opened' && github.event.pull_request.draft == false && github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR') ||
-            (github.event.action == 'ready_for_review' && github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR') ||
-            github.event.label.name == 'review-this' ||
-            github.event.requested_reviewer.login == 'openhands-agent' ||
-            github.event.requested_reviewer.login == 'all-hands-bot'
+            !github.event.pull_request.head.repo.fork && (
+              (github.event.action == 'opened' && github.event.pull_request.draft == false && github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR') ||
+              (github.event.action == 'ready_for_review' && github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR') ||
+              github.event.label.name == 'review-this' ||
+              github.event.requested_reviewer.login == 'openhands-agent' ||
+              github.event.requested_reviewer.login == 'all-hands-bot'
+            )
         concurrency:
             group: pr-review-${{ github.event.pull_request.number }}
             cancel-in-progress: true
         runs-on: ubuntu-24.04
         steps:
             - name: Run PR Review
-              uses: OpenHands/software-agent-sdk/.github/actions/pr-review@main
+              uses: OpenHands/software-agent-sdk/.github/actions/pr-review@a2b442e02a214d92018ff0cbcb2c19b9382e644e
               with:
+                  # Keep the action and SDK pinned to the same commit for supply-chain safety.
+                  sdk-version: a2b442e02a214d92018ff0cbcb2c19b9382e644e
                   llm-model: litellm_proxy/claude-sonnet-4-5-20250929
                   llm-base-url: https://llm-proxy.app.all-hands.dev
                   # Review style: roasted (other option: standard)

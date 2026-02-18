@@ -12,7 +12,7 @@ on:
         branches: ['**']
 
 permissions:
-    contents: write     # needed to create releases or upload assets
+    contents: read
 
 # Cancel previous runs if a new commit is pushed
 concurrency:
@@ -95,6 +95,9 @@ jobs:
         name: Create GitHub Release
         runs-on: blacksmith-2vcpu-ubuntu-2404
         needs: build-binary
+        permissions:
+            contents: write
+
         if: startsWith(github.ref, 'refs/tags/')
         steps:
             - name: Checkout repository
