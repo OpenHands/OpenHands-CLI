@@ -193,6 +193,13 @@ To view the generated SVG snapshots in a browser:
 - Do not embed API keys or endpoints in code; rely on runtime configuration/env vars when integrating new services.
 - When packaging, verify no sensitive files are included in `dist/`; adjust `openhands-cli.spec` if new assets are added.
 
+### GitHub Actions / AI workflow security
+- Treat **issue/PR titles, bodies, comments, and code diffs** as *untrusted input* when used in LLM-driven workflows.
+- Avoid running LLM agents with shell/file-write tools in workflows that can be influenced by untrusted users.
+- Be cautious with GitHub Actions **cache scope**: caches are shared across default-branch workflows. Prefer disabling caches (e.g. `astral-sh/setup-uv enable-cache: false`) in privileged workflows, or isolating cache keys to prevent cross-workflow pivots.
+- Avoid interpolating LLM-generated content into shell heredocs/commands; append it as data (e.g. `cat file >> out.md`).
+
+
 ## TUI State Management Architecture
 
 The TUI uses a reactive state management pattern with clear separation of concerns. Key files are in `openhands_cli/tui/core/`.
