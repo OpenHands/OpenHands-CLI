@@ -7,7 +7,10 @@ from textual.containers import Container, Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.widgets import Input, Label, Static, Switch
 
-from openhands_cli.stores.cli_settings import DEFAULT_CRITIC_THRESHOLD
+from openhands_cli.stores.cli_settings import (
+    DEFAULT_CRITIC_THRESHOLD,
+    DEFAULT_ISSUE_THRESHOLD,
+)
 
 from .cli_settings_tab import SettingsSwitch
 
@@ -89,8 +92,8 @@ class CriticSettingsTab(Container):
 
         Args:
             initial_settings: Optional dict with initial values for
-                'enable_critic', 'enable_iterative_refinement', and 'critic_threshold'.
-                If not provided, uses defaults.
+                'enable_critic', 'enable_iterative_refinement', 'critic_threshold',
+                and 'issue_threshold'. If not provided, uses defaults.
         """
         super().__init__(**kwargs)
         self._initial_settings = initial_settings or {}
@@ -103,6 +106,9 @@ class CriticSettingsTab(Container):
         )
         threshold = self._initial_settings.get(
             "critic_threshold", DEFAULT_CRITIC_THRESHOLD
+        )
+        issue_threshold = self._initial_settings.get(
+            "issue_threshold", DEFAULT_ISSUE_THRESHOLD
         )
 
         with VerticalScroll(id="critic_settings_content"):
@@ -124,10 +130,10 @@ class CriticSettingsTab(Container):
             yield SettingsSwitch(
                 label="Enable Iterative Refinement",
                 description=(
-                    "When enabled, if the critic predicts a low success probability, "
-                    "a follow-up message is automatically sent to the agent asking it "
-                    "to review and improve its work. This helps the agent self-correct "
-                    "when initial attempts may be incomplete."
+                    "When enabled, if the critic predicts a low success probability "
+                    "OR detects a specific issue (e.g., insufficient testing) above "
+                    "the issue threshold, a follow-up message is automatically sent "
+                    "to the agent asking it to review and improve its work."
                 ),
                 switch_id="enable_iterative_refinement_switch",
                 value=enable_refinement,
@@ -137,8 +143,8 @@ class CriticSettingsTab(Container):
             yield ThresholdInput(
                 label="Refinement Threshold",
                 description=(
-                    f"The critic score threshold (1-100%) below which iterative "
-                    f"refinement is triggered. Default: {default_pct}%. "
+                    f"The overall critic score threshold (1-100%) below which "
+                    f"iterative refinement is triggered. Default: {default_pct}%. "
                     "Lower values mean refinement only triggers for very low scores."
                 ),
                 input_id="critic_threshold_input",
@@ -146,12 +152,29 @@ class CriticSettingsTab(Container):
                 disabled=not enable_refinement,
             )
 
+            issue_default_pct = int(DEFAULT_ISSUE_THRESHOLD * 100)
+            yield ThresholdInput(
+                label="Issue Detection Threshold",
+                description=(
+                    f"The threshold (1-100%) for individual issue detection. "
+                    f"Default: {issue_default_pct}%. When any specific issue "
+                    "(e.g., Insufficient Testing, Loop Behavior) has probability "
+                    "above this threshold, refinement is triggered even if the "
+                    "overall score is acceptable."
+                ),
+                input_id="issue_threshold_input",
+                value=issue_threshold,
+                disabled=not enable_refinement,
+            )
+
     def on_switch_changed(self, event: Switch.Changed) -> None:
-        """Handle switch changes to enable/disable threshold input."""
+        """Handle switch changes to enable/disable threshold inputs."""
         if event.switch.id == "enable_iterative_refinement_switch":
             try:
                 threshold_input = self.query_one("#critic_threshold_input", Input)
                 threshold_input.disabled = not event.value
+                issue_threshold_input = self.query_one("#issue_threshold_input", Input)
+                issue_threshold_input.disabled = not event.value
             except NoMatches:
                 # Widget not yet mounted or was removed; safe to ignore during
                 # composition lifecycle
@@ -162,23 +185,31 @@ class CriticSettingsTab(Container):
 
         Returns:
             Dict with 'enable_critic', 'enable_iterative_refinement',
-            and 'critic_threshold' values.
+            'critic_threshold', and 'issue_threshold' values.
         """
         enable_critic_switch = self.query_one("#enable_critic_switch", Switch)
         enable_refinement_switch = self.query_one(
             "#enable_iterative_refinement_switch", Switch
         )
         threshold_input = self.query_one("#critic_threshold_input", Input)
+        issue_threshold_input = self.query_one("#issue_threshold_input", Input)
 
-        # Parse threshold value (convert from percentage to 0-1 range)
+        # Parse threshold values (convert from percentage to 0-1 range)
         try:
             threshold_percent = int(threshold_input.value)
             threshold = max(0.0, min(1.0, threshold_percent / 100.0))
         except (ValueError, TypeError):
             threshold = DEFAULT_CRITIC_THRESHOLD
 
+        try:
+            issue_threshold_percent = int(issue_threshold_input.value)
+            issue_threshold = max(0.0, min(1.0, issue_threshold_percent / 100.0))
+        except (ValueError, TypeError):
+            issue_threshold = DEFAULT_ISSUE_THRESHOLD
+
         return {
             "enable_critic": enable_critic_switch.value,
             "enable_iterative_refinement": enable_refinement_switch.value,
             "critic_threshold": threshold,
+            "issue_threshold": issue_threshold,
         }

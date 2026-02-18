@@ -107,6 +107,7 @@ class SettingsScreen(ModalScreen):
             "enable_critic": critic.enable_critic,
             "enable_iterative_refinement": critic.enable_iterative_refinement,
             "critic_threshold": critic.critic_threshold,
+            "issue_threshold": critic.issue_threshold,
         }
 
         with Container(id="settings_container"):

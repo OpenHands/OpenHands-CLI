@@ -324,14 +324,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 # Skip if we've reached max iterations (prevents infinite loops)
                 # Read settings directly from cli_settings for current configuration
                 max_iterations = critic_settings.max_refinement_iterations
-                if (
-                    self._refinement_iteration < max_iterations
-                    and should_trigger_refinement(
-                        critic_result=critic_result,
-                        threshold=critic_settings.critic_threshold,
-                        enabled=critic_settings.enable_iterative_refinement,
-                    )
-                ):
+                should_refine, triggered_issues = should_trigger_refinement(
+                    critic_result=critic_result,
+                    threshold=critic_settings.critic_threshold,
+                    enabled=critic_settings.enable_iterative_refinement,
+                    issue_threshold=critic_settings.issue_threshold,
+                )
+                if self._refinement_iteration < max_iterations and should_refine:
                     # Increment iteration count
                     self._refinement_iteration += 1
 
@@ -341,6 +340,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
                         threshold=critic_settings.critic_threshold,
                         iteration=self._refinement_iteration,
                         max_iterations=max_iterations,
+                        issue_threshold=critic_settings.issue_threshold,
+                        triggered_issues=triggered_issues,
                     )
                     self._send_refinement_message(refinement_message)
 

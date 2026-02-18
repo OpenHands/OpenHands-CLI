@@ -10,6 +10,11 @@ from pydantic import BaseModel
 # Default threshold for iterative refinement (60% - same as SDK default)
 DEFAULT_CRITIC_THRESHOLD = 0.6
 
+# Default threshold for individual issue detection (75%)
+# When any specific issue (e.g., insufficient_testing) has probability >= this,
+# refinement is triggered even if overall score is above the critic threshold
+DEFAULT_ISSUE_THRESHOLD = 0.75
+
 # Default maximum number of refinement iterations per user turn
 DEFAULT_MAX_REFINEMENT_ITERATIONS = 3
 
@@ -20,6 +25,7 @@ class CriticSettings(BaseModel):
     enable_critic: bool = True
     enable_iterative_refinement: bool = False
     critic_threshold: float = DEFAULT_CRITIC_THRESHOLD
+    issue_threshold: float = DEFAULT_ISSUE_THRESHOLD
     max_refinement_iterations: int = DEFAULT_MAX_REFINEMENT_ITERATIONS
 
 

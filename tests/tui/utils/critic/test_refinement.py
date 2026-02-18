@@ -13,6 +13,7 @@ from openhands_cli.stores import CliSettings, CriticSettings
 from openhands_cli.tui.core.conversation_manager import SendMessage
 from openhands_cli.tui.utils.critic.refinement import (
     build_refinement_message,
+    get_high_probability_issues,
     should_trigger_refinement,
 )
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
@@ -24,34 +25,203 @@ class TestShouldTriggerRefinement:
     def test_disabled_returns_false(self):
         """When disabled, should always return False regardless of score."""
         result = CriticResult(score=0.1, message="Low score")
-        assert not should_trigger_refinement(result, threshold=0.5, enabled=False)
+        should_trigger, issues = should_trigger_refinement(
+            result, threshold=0.5, enabled=False
+        )
+        assert not should_trigger
+        assert issues == []
 
     def test_none_result_returns_false(self):
         """When critic result is None, should return False."""
-        assert not should_trigger_refinement(None, threshold=0.5, enabled=True)
+        should_trigger, issues = should_trigger_refinement(
+            None, threshold=0.5, enabled=True
+        )
+        assert not should_trigger
+        assert issues == []
 
     def test_score_below_threshold_returns_true(self):
         """When score is below threshold and enabled, should return True."""
         result = CriticResult(score=0.3, message="Low score")
-        assert should_trigger_refinement(result, threshold=0.5, enabled=True)
+        should_trigger, _ = should_trigger_refinement(
+            result, threshold=0.5, enabled=True
+        )
+        assert should_trigger
 
     def test_score_at_threshold_returns_false(self):
         """When score equals threshold, should return False (not below)."""
         result = CriticResult(score=0.5, message="At threshold")
-        assert not should_trigger_refinement(result, threshold=0.5, enabled=True)
+        should_trigger, _ = should_trigger_refinement(
+            result, threshold=0.5, enabled=True
+        )
+        assert not should_trigger
 
     def test_score_above_threshold_returns_false(self):
         """When score is above threshold, should return False."""
         result = CriticResult(score=0.8, message="Good score")
-        assert not should_trigger_refinement(result, threshold=0.5, enabled=True)
+        should_trigger, _ = should_trigger_refinement(
+            result, threshold=0.5, enabled=True
+        )
+        assert not should_trigger
 
     def test_custom_threshold(self):
         """Custom threshold should be respected."""
         result = CriticResult(score=0.6, message="Medium score")
         # Should NOT trigger with default threshold of 0.5
-        assert not should_trigger_refinement(result, threshold=0.5, enabled=True)
+        should_trigger1, _ = should_trigger_refinement(
+            result, threshold=0.5, enabled=True
+        )
+        assert not should_trigger1
         # Should trigger with higher threshold of 0.7
-        assert should_trigger_refinement(result, threshold=0.7, enabled=True)
+        should_trigger2, _ = should_trigger_refinement(
+            result, threshold=0.7, enabled=True
+        )
+        assert should_trigger2
+
+    def test_high_probability_issue_triggers_refinement(self):
+        """When an issue has probability above issue_threshold, trigger refinement."""
+        result = CriticResult(
+            score=0.8,  # High score - would NOT trigger normally
+            message="Good score but has issue",
+            metadata={
+                "categorized_features": {
+                    "agent_behavioral_issues": [
+                        {
+                            "name": "insufficient_testing",
+                            "display_name": "Insufficient Testing",
+                            "probability": 0.80,  # Above 0.75 threshold
+                        }
+                    ]
+                }
+            },
+        )
+        should_trigger, issues = should_trigger_refinement(
+            result, threshold=0.5, enabled=True, issue_threshold=0.75
+        )
+        assert should_trigger
+        assert len(issues) == 1
+        assert issues[0]["name"] == "insufficient_testing"
+
+    def test_issue_below_threshold_does_not_trigger(self):
+        """When issue probability is below issue_threshold, don't trigger."""
+        result = CriticResult(
+            score=0.8,  # High score
+            message="Good score",
+            metadata={
+                "categorized_features": {
+                    "agent_behavioral_issues": [
+                        {
+                            "name": "insufficient_testing",
+                            "display_name": "Insufficient Testing",
+                            "probability": 0.50,  # Below 0.75 threshold
+                        }
+                    ]
+                }
+            },
+        )
+        should_trigger, issues = should_trigger_refinement(
+            result, threshold=0.5, enabled=True, issue_threshold=0.75
+        )
+        assert not should_trigger
+        assert issues == []
+
+    def test_multiple_high_probability_issues(self):
+        """Multiple issues above threshold should all be returned."""
+        result = CriticResult(
+            score=0.8,
+            message="Good score but has issues",
+            metadata={
+                "categorized_features": {
+                    "agent_behavioral_issues": [
+                        {
+                            "name": "insufficient_testing",
+                            "display_name": "Insufficient Testing",
+                            "probability": 0.80,
+                        },
+                        {
+                            "name": "loop_behavior",
+                            "display_name": "Loop Behavior",
+                            "probability": 0.85,
+                        },
+                        {
+                            "name": "scope_creep",
+                            "display_name": "Scope Creep",
+                            "probability": 0.50,  # Below threshold
+                        },
+                    ]
+                }
+            },
+        )
+        should_trigger, issues = should_trigger_refinement(
+            result, threshold=0.5, enabled=True, issue_threshold=0.75
+        )
+        assert should_trigger
+        assert len(issues) == 2
+        # Issues should be sorted by probability (highest first)
+        assert issues[0]["name"] == "loop_behavior"
+        assert issues[1]["name"] == "insufficient_testing"
+
+    def test_infrastructure_issues_also_checked(self):
+        """Infrastructure issues should also trigger refinement."""
+        result = CriticResult(
+            score=0.8,
+            message="Good score but infra issue",
+            metadata={
+                "categorized_features": {
+                    "agent_behavioral_issues": [],
+                    "infrastructure_issues": [
+                        {
+                            "name": "infrastructure_agent_caused_issue",
+                            "display_name": "Infrastructure Agent Caused Issue",
+                            "probability": 0.90,
+                        }
+                    ],
+                }
+            },
+        )
+        should_trigger, issues = should_trigger_refinement(
+            result, threshold=0.5, enabled=True, issue_threshold=0.75
+        )
+        assert should_trigger
+        assert len(issues) == 1
+        assert issues[0]["name"] == "infrastructure_agent_caused_issue"
+
+
+class TestGetHighProbabilityIssues:
+    """Tests for get_high_probability_issues function."""
+
+    def test_no_metadata_returns_empty(self):
+        """When there's no metadata, return empty list."""
+        result = CriticResult(score=0.5, message="Test")
+        issues = get_high_probability_issues(result, issue_threshold=0.75)
+        assert issues == []
+
+    def test_no_categorized_features_returns_empty(self):
+        """When there are no categorized features, return empty list."""
+        result = CriticResult(score=0.5, message="Test", metadata={})
+        issues = get_high_probability_issues(result, issue_threshold=0.75)
+        assert issues == []
+
+    def test_filters_by_threshold(self):
+        """Only issues at or above threshold should be returned."""
+        result = CriticResult(
+            score=0.5,
+            message="Test",
+            metadata={
+                "categorized_features": {
+                    "agent_behavioral_issues": [
+                        {"name": "a", "probability": 0.80},
+                        {"name": "b", "probability": 0.74},  # Just below
+                        {"name": "c", "probability": 0.75},  # At threshold
+                    ]
+                }
+            },
+        )
+        issues = get_high_probability_issues(result, issue_threshold=0.75)
+        assert len(issues) == 2
+        names = [i["name"] for i in issues]
+        assert "a" in names
+        assert "c" in names
+        assert "b" not in names
 
 
 class TestBuildRefinementMessage:
@@ -104,14 +274,14 @@ class TestBuildRefinementMessage:
         message = build_refinement_message(result, threshold=1.0)
         assert "55.0%" in message
 
-    def test_message_is_concise(self):
+    def test_message_is_concise_without_issues(self):
         """Test that the message follows SDK pattern of being concise."""
         result = CriticResult(score=0.4, message="Test")
         message = build_refinement_message(result, threshold=0.6)
 
         # Message should be relatively short (SDK style is concise)
         lines = message.strip().split("\n")
-        # SDK format has about 4-5 lines
+        # Without issues, should have 5 lines max
         assert len(lines) <= 6
 
     def test_iteration_info_included(self):
@@ -140,6 +310,89 @@ class TestBuildRefinementMessage:
         )
 
         assert "iteration 1/5" in message
+
+    def test_message_includes_triggered_issues(self):
+        """Test that triggered issues are included in the message."""
+        result = CriticResult(
+            score=0.8,
+            message="Good score but has issues",
+            metadata={
+                "categorized_features": {
+                    "agent_behavioral_issues": [
+                        {
+                            "name": "insufficient_testing",
+                            "display_name": "Insufficient Testing",
+                            "probability": 0.80,
+                        }
+                    ]
+                }
+            },
+        )
+        triggered_issues = [
+            {
+                "name": "insufficient_testing",
+                "display_name": "Insufficient Testing",
+                "probability": 0.80,
+            }
+        ]
+        message = build_refinement_message(
+            result,
+            threshold=0.5,
+            triggered_issues=triggered_issues,
+        )
+
+        assert "**Detected issues requiring attention:**" in message
+        assert "Insufficient Testing (80%)" in message
+
+    def test_message_extracts_issues_if_not_provided(self):
+        """Test that issues are extracted from metadata if not provided."""
+        result = CriticResult(
+            score=0.8,
+            message="Good score but has issues",
+            metadata={
+                "categorized_features": {
+                    "agent_behavioral_issues": [
+                        {
+                            "name": "insufficient_testing",
+                            "display_name": "Insufficient Testing",
+                            "probability": 0.80,
+                        }
+                    ]
+                }
+            },
+        )
+        message = build_refinement_message(
+            result,
+            threshold=0.5,
+            issue_threshold=0.75,
+        )
+
+        assert "**Detected issues requiring attention:**" in message
+        assert "Insufficient Testing (80%)" in message
+
+    def test_message_with_multiple_issues(self):
+        """Test that multiple issues are all listed."""
+        triggered_issues = [
+            {
+                "name": "loop_behavior",
+                "display_name": "Loop Behavior",
+                "probability": 0.85,
+            },
+            {
+                "name": "insufficient_testing",
+                "display_name": "Insufficient Testing",
+                "probability": 0.80,
+            },
+        ]
+        result = CriticResult(score=0.8, message="Test")
+        message = build_refinement_message(
+            result,
+            threshold=0.5,
+            triggered_issues=triggered_issues,
+        )
+
+        assert "Loop Behavior (85%)" in message
+        assert "Insufficient Testing (80%)" in message
 
 
 class TestRefinementIntegration:
@@ -639,3 +892,134 @@ class TestRefinementIntegration:
             c for c in calls if len(c[0]) >= 2 and isinstance(c[0][1], SendMessage)
         ]
         assert len(send_message_calls) == 0
+
+    def test_high_probability_issue_triggers_refinement(
+        self, mock_app, container, monkeypatch
+    ):
+        """Test that high-probability issues trigger refinement even with good score.
+
+        When an issue (e.g., insufficient_testing) has probability >= issue_threshold,
+        refinement should be triggered even if overall score is above critic_threshold.
+        """
+        settings = CliSettings(
+            critic=CriticSettings(
+                enable_critic=True,
+                enable_iterative_refinement=True,
+                critic_threshold=0.5,  # Overall score threshold
+                issue_threshold=0.75,  # Issue detection threshold
+            )
+        )
+        monkeypatch.setattr(CliSettings, "load", lambda: settings)
+
+        visualizer = ConversationVisualizer(
+            container,
+            mock_app,  # type: ignore[arg-type]
+            name="OpenHands Agent",
+        )
+        visualizer._cli_settings = None
+        visualizer._run_on_main_thread = MagicMock()
+
+        # Create event with HIGH overall score but a specific issue detected
+        message = Message(
+            role="assistant",
+            content=[TextContent(text="Task completed")],
+        )
+        event = MessageEvent(llm_message=message, source="agent")
+        event = event.model_copy(
+            update={
+                "critic_result": CriticResult(
+                    score=0.8,  # 80% - ABOVE threshold
+                    message="High success probability",
+                    metadata={
+                        "categorized_features": {
+                            "agent_behavioral_issues": [
+                                {
+                                    "name": "insufficient_testing",
+                                    "display_name": "Insufficient Testing",
+                                    "probability": 0.80,  # Above 75% issue threshold
+                                }
+                            ]
+                        }
+                    },
+                )
+            }
+        )
+
+        visualizer.on_event(event)
+
+        # Verify refinement WAS triggered due to high-probability issue
+        calls = mock_app.call_from_thread.call_args_list
+        send_message_calls = [
+            c for c in calls if len(c[0]) >= 2 and isinstance(c[0][1], SendMessage)
+        ]
+
+        assert len(send_message_calls) == 1, (
+            "Refinement should be triggered for high-probability issue"
+        )
+
+        # Verify the message mentions the issue
+        send_message = send_message_calls[0][0][1]
+        assert "Insufficient Testing" in send_message.content, (
+            f"Refinement message should mention the issue, "
+            f"got: {send_message.content[:200]}..."
+        )
+
+    def test_issue_below_threshold_does_not_trigger(
+        self, mock_app, container, monkeypatch
+    ):
+        """Test that issues below threshold don't trigger refinement."""
+        settings = CliSettings(
+            critic=CriticSettings(
+                enable_critic=True,
+                enable_iterative_refinement=True,
+                critic_threshold=0.5,
+                issue_threshold=0.75,  # High threshold
+            )
+        )
+        monkeypatch.setattr(CliSettings, "load", lambda: settings)
+
+        visualizer = ConversationVisualizer(
+            container,
+            mock_app,  # type: ignore[arg-type]
+            name="OpenHands Agent",
+        )
+        visualizer._cli_settings = None
+        visualizer._run_on_main_thread = MagicMock()
+
+        # Create event with high score AND issue below threshold
+        message = Message(
+            role="assistant",
+            content=[TextContent(text="Task completed")],
+        )
+        event = MessageEvent(llm_message=message, source="agent")
+        event = event.model_copy(
+            update={
+                "critic_result": CriticResult(
+                    score=0.8,  # High score
+                    message="Good",
+                    metadata={
+                        "categorized_features": {
+                            "agent_behavioral_issues": [
+                                {
+                                    "name": "insufficient_testing",
+                                    "display_name": "Insufficient Testing",
+                                    "probability": 0.50,  # BELOW 75% threshold
+                                }
+                            ]
+                        }
+                    },
+                )
+            }
+        )
+
+        visualizer.on_event(event)
+
+        # Verify refinement was NOT triggered
+        calls = mock_app.call_from_thread.call_args_list
+        send_message_calls = [
+            c for c in calls if len(c[0]) >= 2 and isinstance(c[0][1], SendMessage)
+        ]
+
+        assert len(send_message_calls) == 0, (
+            "No refinement should be triggered when issue is below threshold"
+        )
