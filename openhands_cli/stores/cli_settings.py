@@ -4,15 +4,16 @@ import json
 import os
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
-# Default threshold for iterative refinement (60% - same as SDK default)
+# Refinement triggers when predicted success probability falls below this threshold
+# Default: 0.6 (60%) - agent is prompted to review work when critic scores < 60%
 DEFAULT_CRITIC_THRESHOLD = 0.6
 
-# Default threshold for individual issue detection (75%)
-# When any specific issue (e.g., insufficient_testing) has probability >= this,
-# refinement is triggered even if overall score is above the critic threshold
+# Individual issue detection threshold - refinement triggers when any specific
+# issue (e.g., insufficient_testing) has probability >= this value
+# Default: 0.75 (75%) - even if overall score is good
 DEFAULT_ISSUE_THRESHOLD = 0.75
 
 # Default maximum number of refinement iterations per user turn
@@ -27,6 +28,22 @@ class CriticSettings(BaseModel):
     critic_threshold: float = DEFAULT_CRITIC_THRESHOLD
     issue_threshold: float = DEFAULT_ISSUE_THRESHOLD
     max_refinement_iterations: int = DEFAULT_MAX_REFINEMENT_ITERATIONS
+
+    @field_validator("critic_threshold", "issue_threshold")
+    @classmethod
+    def validate_threshold(cls, v: float) -> float:
+        """Validate that threshold is between 0.0 and 1.0."""
+        if not 0.0 <= v <= 1.0:
+            raise ValueError(f"Threshold must be between 0.0 and 1.0, got {v}")
+        return v
+
+    @field_validator("max_refinement_iterations")
+    @classmethod
+    def validate_max_iterations(cls, v: int) -> int:
+        """Validate that max iterations is between 1 and 10."""
+        if not 1 <= v <= 10:
+            raise ValueError(f"Max iterations must be between 1 and 10, got {v}")
+        return v
 
 
 class CliSettings(BaseModel):

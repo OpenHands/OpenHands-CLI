@@ -18,6 +18,23 @@ from .cli_settings_tab import SettingsSwitch
 class ThresholdInput(Container):
     """Input component for critic threshold with label and description."""
 
+    DEFAULT_CSS = """
+    ThresholdInput .validation_error {
+        color: $error;
+        display: none;
+        margin-top: 0;
+        height: auto;
+    }
+
+    ThresholdInput.invalid .validation_error {
+        display: block;
+    }
+
+    ThresholdInput.invalid .threshold_input {
+        border: tall $error;
+    }
+    """
+
     def __init__(
         self,
         label: str,
@@ -57,6 +74,29 @@ class ThresholdInput(Container):
             )
             yield Label("%", classes="threshold_suffix")
         yield Static(self._description, classes="form_help threshold_help")
+        yield Static("Value must be between 1 and 100", classes="validation_error")
+
+    def validate_input(self, value: str) -> bool:
+        """Validate the input value and update visual state.
+
+        Args:
+            value: The input value to validate
+
+        Returns:
+            True if valid, False otherwise
+        """
+        try:
+            int_value = int(value)
+            is_valid = 1 <= int_value <= 100
+        except (ValueError, TypeError):
+            is_valid = False
+
+        if is_valid:
+            self.remove_class("invalid")
+        else:
+            self.add_class("invalid")
+
+        return is_valid
 
 
 class CriticSettingsTab(Container):
@@ -180,6 +220,19 @@ class CriticSettingsTab(Container):
                 # composition lifecycle
                 pass
 
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Handle input changes to validate threshold values."""
+        if event.input.id in ("critic_threshold_input", "issue_threshold_input"):
+            try:
+                # Find the parent ThresholdInput container and validate
+                threshold_container = event.input.ancestors_with_self
+                for ancestor in threshold_container:
+                    if isinstance(ancestor, ThresholdInput):
+                        ancestor.validate_input(event.value)
+                        break
+            except NoMatches:
+                pass
+
     def get_updated_fields(self) -> dict[str, Any]:
         """Return only the fields this tab manages.
 
@@ -194,18 +247,13 @@ class CriticSettingsTab(Container):
         threshold_input = self.query_one("#critic_threshold_input", Input)
         issue_threshold_input = self.query_one("#issue_threshold_input", Input)
 
-        # Parse threshold values (convert from percentage to 0-1 range)
-        try:
-            threshold_percent = int(threshold_input.value)
-            threshold = max(0.0, min(1.0, threshold_percent / 100.0))
-        except (ValueError, TypeError):
-            threshold = DEFAULT_CRITIC_THRESHOLD
-
-        try:
-            issue_threshold_percent = int(issue_threshold_input.value)
-            issue_threshold = max(0.0, min(1.0, issue_threshold_percent / 100.0))
-        except (ValueError, TypeError):
-            issue_threshold = DEFAULT_ISSUE_THRESHOLD
+        # Parse and validate threshold values (convert from percentage to 0-1 range)
+        threshold = self._parse_threshold(
+            threshold_input.value, DEFAULT_CRITIC_THRESHOLD
+        )
+        issue_threshold = self._parse_threshold(
+            issue_threshold_input.value, DEFAULT_ISSUE_THRESHOLD
+        )
 
         return {
             "enable_critic": enable_critic_switch.value,
@@ -213,3 +261,21 @@ class CriticSettingsTab(Container):
             "critic_threshold": threshold,
             "issue_threshold": issue_threshold,
         }
+
+    def _parse_threshold(self, value: str, default: float) -> float:
+        """Parse a threshold value from percentage string to float.
+
+        Args:
+            value: The input value as percentage string (e.g., "60")
+            default: Default value to use if parsing fails
+
+        Returns:
+            Float between 0.0 and 1.0
+        """
+        try:
+            threshold_percent = int(value)
+            if not 1 <= threshold_percent <= 100:
+                return default
+            return threshold_percent / 100.0
+        except (ValueError, TypeError):
+            return default

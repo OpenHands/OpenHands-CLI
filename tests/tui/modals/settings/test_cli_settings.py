@@ -4,8 +4,84 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
 from openhands_cli.stores import CliSettings, CriticSettings
+
+
+class TestCriticSettingsValidation:
+    """Tests for CriticSettings field validators."""
+
+    def test_valid_critic_threshold(self):
+        """Verify valid critic_threshold values are accepted."""
+        settings = CriticSettings(critic_threshold=0.5)
+        assert settings.critic_threshold == 0.5
+
+    def test_valid_critic_threshold_boundaries(self):
+        """Verify boundary values for critic_threshold are accepted."""
+        settings_min = CriticSettings(critic_threshold=0.0)
+        settings_max = CriticSettings(critic_threshold=1.0)
+        assert settings_min.critic_threshold == 0.0
+        assert settings_max.critic_threshold == 1.0
+
+    def test_invalid_critic_threshold_too_high(self):
+        """Verify critic_threshold > 1.0 raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            CriticSettings(critic_threshold=1.5)
+        assert "Threshold must be between 0.0 and 1.0" in str(exc_info.value)
+
+    def test_invalid_critic_threshold_negative(self):
+        """Verify negative critic_threshold raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            CriticSettings(critic_threshold=-0.1)
+        assert "Threshold must be between 0.0 and 1.0" in str(exc_info.value)
+
+    def test_valid_issue_threshold(self):
+        """Verify valid issue_threshold values are accepted."""
+        settings = CriticSettings(issue_threshold=0.75)
+        assert settings.issue_threshold == 0.75
+
+    def test_invalid_issue_threshold_too_high(self):
+        """Verify issue_threshold > 1.0 raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            CriticSettings(issue_threshold=5.0)
+        assert "Threshold must be between 0.0 and 1.0" in str(exc_info.value)
+
+    def test_invalid_issue_threshold_negative(self):
+        """Verify negative issue_threshold raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            CriticSettings(issue_threshold=-0.5)
+        assert "Threshold must be between 0.0 and 1.0" in str(exc_info.value)
+
+    def test_valid_max_refinement_iterations(self):
+        """Verify valid max_refinement_iterations values are accepted."""
+        settings = CriticSettings(max_refinement_iterations=5)
+        assert settings.max_refinement_iterations == 5
+
+    def test_valid_max_refinement_iterations_boundaries(self):
+        """Verify boundary values for max_refinement_iterations are accepted."""
+        settings_min = CriticSettings(max_refinement_iterations=1)
+        settings_max = CriticSettings(max_refinement_iterations=10)
+        assert settings_min.max_refinement_iterations == 1
+        assert settings_max.max_refinement_iterations == 10
+
+    def test_invalid_max_refinement_iterations_too_high(self):
+        """Verify max_refinement_iterations > 10 raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            CriticSettings(max_refinement_iterations=100)
+        assert "Max iterations must be between 1 and 10" in str(exc_info.value)
+
+    def test_invalid_max_refinement_iterations_zero(self):
+        """Verify max_refinement_iterations = 0 raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            CriticSettings(max_refinement_iterations=0)
+        assert "Max iterations must be between 1 and 10" in str(exc_info.value)
+
+    def test_invalid_max_refinement_iterations_negative(self):
+        """Verify negative max_refinement_iterations raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            CriticSettings(max_refinement_iterations=-1)
+        assert "Max iterations must be between 1 and 10" in str(exc_info.value)
 
 
 class TestCliSettings:
