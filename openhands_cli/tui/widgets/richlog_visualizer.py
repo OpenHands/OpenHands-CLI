@@ -115,9 +115,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._cli_settings: CliSettings | None = None
         # Track pending actions by tool_call_id for action-observation pairing
         self._pending_actions: dict[str, tuple[ActionEvent, Collapsible]] = {}
-        # Track refinement state to prevent infinite loops
-        # When True, the next response should not trigger another refinement
-        self._refinement_sent: bool = False
+        # Track refinement iteration count to prevent infinite loops
+        # Resets to 0 when user sends a new message
+        self._refinement_iteration: int = 0
 
     @property
     def cli_settings(self) -> CliSettings:
@@ -321,22 +321,28 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 self._run_on_main_thread(self._add_widget_to_ui, feedback_widget)
 
                 # Check if iterative refinement should be triggered
-                # Skip if we already sent a refinement (prevents infinite loops)
+                # Skip if we've reached max iterations (prevents infinite loops)
                 # Read settings directly from cli_settings for current configuration
-                if not self._refinement_sent and should_trigger_refinement(
-                    critic_result=critic_result,
-                    threshold=critic_settings.critic_threshold,
-                    enabled=critic_settings.enable_iterative_refinement,
+                max_iterations = critic_settings.max_refinement_iterations
+                if (
+                    self._refinement_iteration < max_iterations
+                    and should_trigger_refinement(
+                        critic_result=critic_result,
+                        threshold=critic_settings.critic_threshold,
+                        enabled=critic_settings.enable_iterative_refinement,
+                    )
                 ):
+                    # Increment iteration count
+                    self._refinement_iteration += 1
+
                     # Build and send refinement message directly to conversation
                     refinement_message = build_refinement_message(
                         critic_result=critic_result,
                         threshold=critic_settings.critic_threshold,
+                        iteration=self._refinement_iteration,
+                        max_iterations=max_iterations,
                     )
                     self._send_refinement_message(refinement_message)
-                    # Mark that refinement was sent - don't trigger again until
-                    # user sends a new message
-                    self._refinement_sent = True
 
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
@@ -373,8 +379,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         for widget in self._container.query(CriticFeedbackWidget):
             widget.remove()
 
-        # Reset refinement flag - user message means new turn, allow refinement again
-        self._refinement_sent = False
+        # Reset refinement counter - user message means new turn, allow refinement again
+        self._refinement_iteration = 0
 
         user_message_widget = Static(
             f"> {content}", classes="user-message", markup=False

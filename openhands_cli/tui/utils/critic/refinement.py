@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 def build_refinement_message(
     critic_result: CriticResult,
     threshold: float,
+    iteration: int = 1,
+    max_iterations: int = 3,
 ) -> str:
     """Build a follow-up message to send to the agent when critic score is low.
 
@@ -26,6 +28,8 @@ def build_refinement_message(
     Args:
         critic_result: The critic result with score and metadata
         threshold: The threshold below which refinement is triggered
+        iteration: Current refinement iteration (1-indexed)
+        max_iterations: Maximum number of refinement iterations allowed
 
     Returns:
         A formatted message string to send to the agent
@@ -38,8 +42,10 @@ def build_refinement_message(
         f"Your solution scored {score_percent:.1f}% "
         f"(threshold: {threshold_percent:.0f}%)."
     )
+    iteration_line = f"Refinement attempt {iteration}/{max_iterations}."
     lines = [
         score_line,
+        iteration_line,
         "",
         "Please review your work carefully:",
         "1. Check that all requirements from the original request are met",

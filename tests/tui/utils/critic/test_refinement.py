@@ -107,8 +107,36 @@ class TestBuildRefinementMessage:
 
         # Message should be relatively short (SDK style is concise)
         lines = message.strip().split("\n")
-        # Should have score line, empty line, instruction, and numbered steps
+        # Should have score line, iteration line, empty line, instruction, and steps
         assert len(lines) <= 10
+
+    def test_iteration_info_included(self):
+        """Test that iteration info is included in the message."""
+        result = CriticResult(score=0.3, message="Low score")
+        message = build_refinement_message(
+            result, threshold=0.5, iteration=2, max_iterations=3
+        )
+
+        # Check iteration info is present
+        assert "2/3" in message
+        assert "Refinement attempt" in message
+
+    def test_default_iteration_values(self):
+        """Test default iteration values (1/3)."""
+        result = CriticResult(score=0.3, message="Low score")
+        message = build_refinement_message(result, threshold=0.5)
+
+        # Check default iteration info
+        assert "1/3" in message
+
+    def test_custom_max_iterations(self):
+        """Test custom max iterations value."""
+        result = CriticResult(score=0.3, message="Low score")
+        message = build_refinement_message(
+            result, threshold=0.5, iteration=1, max_iterations=5
+        )
+
+        assert "1/5" in message
 
 
 class TestRefinementIntegration:
@@ -360,22 +388,18 @@ class TestRefinementIntegration:
             "No SendMessage should be posted when critic is disabled"
         )
 
-    def test_refinement_loop_prevention(self, mock_app, container, monkeypatch):
-        """Test that refinement only triggers once per user turn.
+    def test_refinement_max_iterations_limit(self, mock_app, container, monkeypatch):
+        """Test that refinement stops after max iterations.
 
-        This prevents infinite loops where:
-        1. Agent responds with low score
-        2. Refinement message sent
-        3. Agent responds to refinement with low score
-        4. Another refinement sent (BAD - infinite loop)
-
-        The _refinement_sent flag should prevent step 4.
+        With max_refinement_iterations=3 (default), the agent should receive
+        at most 3 refinement messages before the loop stops.
         """
         settings = CliSettings(
             critic=CriticSettings(
                 enable_critic=True,
                 enable_iterative_refinement=True,
                 critic_threshold=0.6,
+                max_refinement_iterations=3,
             )
         )
         monkeypatch.setattr(CliSettings, "load", lambda: settings)
@@ -388,23 +412,94 @@ class TestRefinementIntegration:
         visualizer._cli_settings = None
         visualizer._run_on_main_thread = MagicMock()
 
-        # First agent response with low score
-        message1 = Message(
-            role="assistant",
-            content=[TextContent(text="First response")],
-        )
-        event1 = MessageEvent(llm_message=message1, source="agent")
-        event1 = event1.model_copy(
-            update={
-                "critic_result": CriticResult(
-                    score=0.3,  # Low score
-                    message="Low score",
-                )
-            }
-        )
-        visualizer.on_event(event1)
+        def create_low_score_event(text: str):
+            message = Message(
+                role="assistant",
+                content=[TextContent(text=text)],
+            )
+            event = MessageEvent(llm_message=message, source="agent")
+            return event.model_copy(
+                update={
+                    "critic_result": CriticResult(
+                        score=0.3,  # Low score
+                        message="Low score",
+                    )
+                }
+            )
 
-        # Should have triggered one refinement
+        # First 3 responses should all trigger refinement
+        for i in range(3):
+            mock_app.call_from_thread.reset_mock()
+            visualizer.on_event(create_low_score_event(f"Response {i + 1}"))
+
+            calls = mock_app.call_from_thread.call_args_list
+            send_message_calls = [
+                c
+                for c in calls
+                if len(c[0]) >= 2
+                and hasattr(c[0][1], "__class__")
+                and c[0][1].__class__.__name__ == "SendMessage"
+            ]
+            assert len(send_message_calls) == 1, (
+                f"Response {i + 1} should trigger refinement (iteration {i + 1}/3)"
+            )
+
+        # Verify iteration counter is at max
+        assert visualizer._refinement_iteration == 3
+
+        # 4th response should NOT trigger refinement (max reached)
+        mock_app.call_from_thread.reset_mock()
+        visualizer.on_event(create_low_score_event("Response 4"))
+
+        calls = mock_app.call_from_thread.call_args_list
+        send_message_calls = [
+            c
+            for c in calls
+            if len(c[0]) >= 2
+            and hasattr(c[0][1], "__class__")
+            and c[0][1].__class__.__name__ == "SendMessage"
+        ]
+        assert len(send_message_calls) == 0, (
+            "4th response should NOT trigger refinement (max iterations reached)"
+        )
+
+    def test_refinement_custom_max_iterations(self, mock_app, container, monkeypatch):
+        """Test that custom max_refinement_iterations is respected."""
+        settings = CliSettings(
+            critic=CriticSettings(
+                enable_critic=True,
+                enable_iterative_refinement=True,
+                critic_threshold=0.6,
+                max_refinement_iterations=1,  # Only 1 iteration allowed
+            )
+        )
+        monkeypatch.setattr(CliSettings, "load", lambda: settings)
+
+        visualizer = ConversationVisualizer(
+            container,
+            mock_app,  # type: ignore[arg-type]
+            name="OpenHands Agent",
+        )
+        visualizer._cli_settings = None
+        visualizer._run_on_main_thread = MagicMock()
+
+        def create_low_score_event(text: str):
+            message = Message(
+                role="assistant",
+                content=[TextContent(text=text)],
+            )
+            event = MessageEvent(llm_message=message, source="agent")
+            return event.model_copy(
+                update={
+                    "critic_result": CriticResult(
+                        score=0.3,
+                        message="Low score",
+                    )
+                }
+            )
+
+        # First response should trigger refinement
+        visualizer.on_event(create_low_score_event("First response"))
         calls1 = mock_app.call_from_thread.call_args_list
         send_message_calls1 = [
             c
@@ -413,30 +508,12 @@ class TestRefinementIntegration:
             and hasattr(c[0][1], "__class__")
             and c[0][1].__class__.__name__ == "SendMessage"
         ]
-        assert len(send_message_calls1) == 1, (
-            "First low score should trigger refinement"
-        )
+        assert len(send_message_calls1) == 1, "First response should trigger refinement"
 
-        # Clear call history for cleaner assertion
+        # Clear and check second response doesn't trigger (max=1)
         mock_app.call_from_thread.reset_mock()
+        visualizer.on_event(create_low_score_event("Second response"))
 
-        # Second agent response (responding to refinement) with still-low score
-        message2 = Message(
-            role="assistant",
-            content=[TextContent(text="Second response after refinement")],
-        )
-        event2 = MessageEvent(llm_message=message2, source="agent")
-        event2 = event2.model_copy(
-            update={
-                "critic_result": CriticResult(
-                    score=0.3,  # Still low
-                    message="Still low score",
-                )
-            }
-        )
-        visualizer.on_event(event2)
-
-        # Should NOT trigger another refinement (loop prevention)
         calls2 = mock_app.call_from_thread.call_args_list
         send_message_calls2 = [
             c
@@ -446,16 +523,17 @@ class TestRefinementIntegration:
             and c[0][1].__class__.__name__ == "SendMessage"
         ]
         assert len(send_message_calls2) == 0, (
-            "Second low score should NOT trigger refinement (loop prevention)"
+            "Second response should NOT trigger refinement (max=1 reached)"
         )
 
     def test_refinement_resets_on_user_message(self, mock_app, container, monkeypatch):
-        """Test that refinement can trigger again after user sends a message."""
+        """Test that refinement counter resets after user sends a message."""
         settings = CliSettings(
             critic=CriticSettings(
                 enable_critic=True,
                 enable_iterative_refinement=True,
                 critic_threshold=0.6,
+                max_refinement_iterations=2,  # Use small number for testing
             )
         )
         monkeypatch.setattr(CliSettings, "load", lambda: settings)
@@ -468,51 +546,41 @@ class TestRefinementIntegration:
         visualizer._cli_settings = None
         visualizer._run_on_main_thread = MagicMock()
 
-        # First agent response with low score
-        message1 = Message(
-            role="assistant",
-            content=[TextContent(text="First response")],
-        )
-        event1 = MessageEvent(llm_message=message1, source="agent")
-        event1 = event1.model_copy(
-            update={
-                "critic_result": CriticResult(
-                    score=0.3,
-                    message="Low score",
-                )
-            }
-        )
-        visualizer.on_event(event1)
+        def create_low_score_event(text: str):
+            message = Message(
+                role="assistant",
+                content=[TextContent(text=text)],
+            )
+            event = MessageEvent(llm_message=message, source="agent")
+            return event.model_copy(
+                update={
+                    "critic_result": CriticResult(
+                        score=0.3,
+                        message="Low score",
+                    )
+                }
+            )
 
-        # Should have triggered refinement
-        assert visualizer._refinement_sent is True
+        # Exhaust refinement iterations
+        visualizer.on_event(create_low_score_event("First response"))
+        visualizer.on_event(create_low_score_event("Second response"))
 
-        # User sends a new message (resets the flag)
+        # Should have reached max iterations
+        assert visualizer._refinement_iteration == 2
+
+        # User sends a new message (resets the counter)
         visualizer.render_user_message("Please try again with a different approach")
 
-        # Flag should be reset
-        assert visualizer._refinement_sent is False
+        # Counter should be reset
+        assert visualizer._refinement_iteration == 0
 
         # Clear call history
         mock_app.call_from_thread.reset_mock()
 
         # Another agent response with low score
-        message2 = Message(
-            role="assistant",
-            content=[TextContent(text="New attempt")],
-        )
-        event2 = MessageEvent(llm_message=message2, source="agent")
-        event2 = event2.model_copy(
-            update={
-                "critic_result": CriticResult(
-                    score=0.3,
-                    message="Low score",
-                )
-            }
-        )
-        visualizer.on_event(event2)
+        visualizer.on_event(create_low_score_event("New attempt"))
 
-        # Should trigger refinement again (new user turn)
+        # Should trigger refinement again (new user turn, counter reset)
         calls = mock_app.call_from_thread.call_args_list
         send_message_calls = [
             c
@@ -524,3 +592,4 @@ class TestRefinementIntegration:
         assert len(send_message_calls) == 1, (
             "After user message, refinement should trigger again"
         )
+        assert visualizer._refinement_iteration == 1

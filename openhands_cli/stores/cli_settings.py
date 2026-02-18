@@ -10,6 +10,9 @@ from pydantic import BaseModel
 # Default threshold for iterative refinement (60% - same as SDK default)
 DEFAULT_CRITIC_THRESHOLD = 0.6
 
+# Default maximum number of refinement iterations per user turn
+DEFAULT_MAX_REFINEMENT_ITERATIONS = 3
+
 
 class CriticSettings(BaseModel):
     """Model for critic-related settings."""
@@ -17,6 +20,7 @@ class CriticSettings(BaseModel):
     enable_critic: bool = True
     enable_iterative_refinement: bool = False
     critic_threshold: float = DEFAULT_CRITIC_THRESHOLD
+    max_refinement_iterations: int = DEFAULT_MAX_REFINEMENT_ITERATIONS
 
 
 class CliSettings(BaseModel):
@@ -59,6 +63,7 @@ class CliSettings(BaseModel):
                 "enable_critic",
                 "enable_iterative_refinement",
                 "critic_threshold",
+                "max_refinement_iterations",
             ]
 
             for field in fields_to_migrate:

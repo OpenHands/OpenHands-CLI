@@ -16,6 +16,7 @@ class TestCliSettings:
         assert cfg.critic.enable_critic is True
         assert cfg.critic.enable_iterative_refinement is False
         assert cfg.critic.critic_threshold == 0.6
+        assert cfg.critic.max_refinement_iterations == 3
 
     @pytest.mark.parametrize("value", [True, False])
     def test_default_cells_expanded_accepts_bool(self, value: bool):
@@ -112,6 +113,7 @@ class TestCliSettings:
                 enable_critic=False,
                 enable_iterative_refinement=False,
                 critic_threshold=0.6,
+                max_refinement_iterations=3,
             ),
         )
 
@@ -126,6 +128,7 @@ class TestCliSettings:
                     "enable_critic": False,
                     "enable_iterative_refinement": False,
                     "critic_threshold": 0.6,
+                    "max_refinement_iterations": 3,
                 },
             },
             indent=2,
