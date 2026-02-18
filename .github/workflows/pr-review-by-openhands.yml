@@ -3,30 +3,26 @@ name: PR Review by OpenHands
 
 on:
     # Security note:
-    # - This workflow uses the PR code as input to an LLM-powered reviewer.
-    # - To avoid running in the base-repo context for forked PRs (which would expose
-    #   secrets to untrusted contributors via prompt injection), we run on pull_request
-    #   and explicitly skip forks.
-    pull_request:
+    # - We intentionally run a tool-using reviewer agent on PRs (including forks).
+    # - This workflow uses pull_request_target so we can access the LLM API key.
+    # - Risk is reduced by:
+    #   - minimal GITHUB_TOKEN permissions (no contents write, no actions)
+    #   - disabling dependency/tool caches
+    #   - running with an OpenHands pre_tool_use terminal guard hook
+    #   - keeping secrets in-memory and removing them from env before tool use
+    pull_request_target:
         types: [opened, ready_for_review, labeled, review_requested]
 
 permissions:
     contents: read
     pull-requests: write
-    issues: write
 
 jobs:
     pr-review:
-        # Run when one of the following conditions is met:
-        #   1. A new non-draft PR is opened by a trusted contributor, OR
-        #   2. A draft PR is converted to ready for review by a trusted contributor, OR
-        #   3. 'review-this' label is added, OR
-        #   4. openhands-agent or all-hands-bot is requested as a reviewer
-        # Note: FIRST_TIME_CONTRIBUTOR PRs require manual trigger via label/reviewer request
         if: |
-            !github.event.pull_request.head.repo.fork && (
-              (github.event.action == 'opened' && github.event.pull_request.draft == false && github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR') ||
-              (github.event.action == 'ready_for_review' && github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR') ||
+            github.repository == 'OpenHands/OpenHands-CLI' && (
+              (github.event.action == 'opened' && github.event.pull_request.draft == false) ||
+              github.event.action == 'ready_for_review' ||
               github.event.label.name == 'review-this' ||
               github.event.requested_reviewer.login == 'openhands-agent' ||
               github.event.requested_reviewer.login == 'all-hands-bot'
@@ -35,16 +31,46 @@ jobs:
             group: pr-review-${{ github.event.pull_request.number }}
             cancel-in-progress: true
         runs-on: ubuntu-24.04
+        timeout-minutes: 25
+
         steps:
-            - name: Run PR Review
-              uses: OpenHands/software-agent-sdk/.github/actions/pr-review@a2b442e02a214d92018ff0cbcb2c19b9382e644e
+            - name: Checkout base repository (trusted)
+              uses: actions/checkout@v5
               with:
-                  # Keep the action and SDK pinned to the same commit for supply-chain safety.
-                  sdk-version: a2b442e02a214d92018ff0cbcb2c19b9382e644e
-                  llm-model: litellm_proxy/claude-sonnet-4-5-20250929
-                  llm-base-url: https://llm-proxy.app.all-hands.dev
-                  # Review style: roasted (other option: standard)
-                  review-style: roasted
-                  llm-api-key: ${{ secrets.LLM_API_KEY }}
-                  github-token: ${{ secrets.ALLHANDS_BOT_GITHUB_PAT }}
-                  lmnr-api-key: ${{ secrets.LMNR_SKILLS_API_KEY }}
+                  fetch-depth: 0
+
+            - name: Checkout PR repository (untrusted)
+              uses: actions/checkout@v5
+              with:
+                  repository: ${{ github.event.pull_request.head.repo.full_name }}
+                  ref: ${{ github.event.pull_request.head.sha }}
+                  fetch-depth: 0
+                  persist-credentials: false
+                  path: pr-repo
+
+            - name: Set up Python
+              uses: actions/setup-python@v6
+              with:
+                  python-version: '3.12'
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v7
+              with:
+                  enable-cache: false
+
+            - name: Install base dependencies
+              run: uv sync --frozen --group dev
+
+            - name: Run PR review agent
+              env:
+                  # Secrets are passed only to this trusted runner script and then
+                  # removed from the environment before tool execution.
+                  LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+                  LLM_BASE_URL: https://llm-proxy.app.all-hands.dev
+                  LLM_MODEL: litellm_proxy/claude-sonnet-4-5-20250929
+                  GITHUB_TOKEN: ${{ github.token }}
+                  REPO_NAME: ${{ github.repository }}
+                  PR_NUMBER: ${{ github.event.pull_request.number }}
+                  PR_WORKSPACE: ${{ github.workspace }}/pr-repo
+                  REVIEW_STYLE: roasted
+              run: uv run python .github/scripts/pr_review_agent_runner.py
