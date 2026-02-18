@@ -93,9 +93,11 @@ def get_splash_content(
     # Add critic notification if enabled
     if has_critic:
         content["critic_notice"] = (
-            f"\n[{primary_color}]Experimental Critic Feature Enabled[/]\n"
-            "[dim]Predicts task success and supports Iterative Refinement mode. "
-            "Configure in settings.[/dim]"
+            f"\n[{primary_color}]Experimental Feature: "
+            "Critic + Iterative Refinement Mode[/]\n"
+            "[dim]Free critic predicts task success. "
+            "Enable Iterative Refinement in settings to auto-improve incomplete work. "
+            "Anonymized data collected. Disable in settings.[/dim]"
         )
 
     return content
