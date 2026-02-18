@@ -63,11 +63,6 @@ def get_high_probability_issues(
         if issue.get("probability", 0) >= issue_threshold:
             high_prob_issues.append(issue)
 
-    # Check infrastructure issues
-    for issue in categorized.get("infrastructure_issues", []):
-        if issue.get("probability", 0) >= issue_threshold:
-            high_prob_issues.append(issue)
-
     # Sort by probability (highest first)
     high_prob_issues.sort(key=lambda x: x.get("probability", 0), reverse=True)
 
