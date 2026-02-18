@@ -145,9 +145,7 @@ class TestCriticSettingsTabSnapshots:
 
         async def enable_refinement(pilot):
             # Find and toggle the refinement switch
-            switch = pilot.app.query_one(
-                "#enable_iterative_refinement_switch", Switch
-            )
+            switch = pilot.app.query_one("#enable_iterative_refinement_switch", Switch)
             switch.value = True
             await pilot.pause()
 
