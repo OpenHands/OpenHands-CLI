@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from typing import Any
 
 import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Switch
 
-from openhands_cli.stores import CliSettings
 from openhands_cli.tui.modals.settings.components.cli_settings_tab import (
     CliSettingsTab,
 )
@@ -17,33 +16,33 @@ from openhands_cli.tui.modals.settings.components.cli_settings_tab import (
 class _TestApp(App):
     """Small Textual app to mount the tab under test."""
 
-    def __init__(self, cfg: CliSettings):
+    def __init__(self, initial_settings: dict[str, Any] | None = None):
         super().__init__()
-        self.cfg = cfg
+        self.initial_settings = initial_settings
 
     def compose(self) -> ComposeResult:
-        with patch.object(CliSettings, "load", return_value=self.cfg) as _:
-            yield CliSettingsTab()
+        yield CliSettingsTab(initial_settings=self.initial_settings)
 
 
 class TestCliSettingsTab:
-    @pytest.mark.parametrize("default_cells_expanded", [True, False])
-    def test_init_calls_load_and_stores_config(self, default_cells_expanded: bool):
-        cfg = CliSettings(default_cells_expanded=default_cells_expanded)
+    def test_init_accepts_initial_settings(self):
+        """Verify tab accepts initial_settings dict."""
+        initial = {"default_cells_expanded": True, "auto_open_plan_panel": False}
+        tab = CliSettingsTab(initial_settings=initial)
+        assert tab._initial_settings == initial
 
-        with patch.object(CliSettings, "load", return_value=cfg) as mock_load:
-            tab = CliSettingsTab()
-
-        mock_load.assert_called_once()
-        assert tab.cli_settings == cfg
+    def test_init_defaults_to_empty_dict(self):
+        """Verify tab defaults to empty dict when no initial_settings provided."""
+        tab = CliSettingsTab()
+        assert tab._initial_settings == {}
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("initial_value", [True, False])
     async def test_compose_renders_default_cells_expanded_switch(
         self, initial_value: bool
     ):
-        cfg = CliSettings(default_cells_expanded=initial_value)
-        app = _TestApp(cfg)
+        initial = {"default_cells_expanded": initial_value}
+        app = _TestApp(initial_settings=initial)
 
         async with app.run_test():
             tab = app.query_one(CliSettingsTab)
@@ -58,11 +57,11 @@ class TestCliSettingsTab:
             (True, False),
         ],
     )
-    async def test_get_cli_settings_reflects_default_cells_expanded(
+    async def test_get_updated_fields_reflects_default_cells_expanded(
         self, initial_value: bool, new_value: bool
     ):
-        cfg = CliSettings(default_cells_expanded=initial_value)
-        app = _TestApp(cfg)
+        initial = {"default_cells_expanded": initial_value}
+        app = _TestApp(initial_settings=initial)
 
         async with app.run_test():
             tab = app.query_one(CliSettingsTab)
@@ -71,9 +70,9 @@ class TestCliSettingsTab:
             # simulate user change
             switch.value = new_value
 
-            result = tab.get_cli_settings()
-            assert isinstance(result, CliSettings)
-            assert result.default_cells_expanded is new_value
+            result = tab.get_updated_fields()
+            assert isinstance(result, dict)
+            assert result["default_cells_expanded"] is new_value
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("initial_value", [True, False])
@@ -81,8 +80,8 @@ class TestCliSettingsTab:
         self, initial_value: bool
     ):
         """Verify the auto_open_plan_panel switch is rendered with correct value."""
-        cfg = CliSettings(auto_open_plan_panel=initial_value)
-        app = _TestApp(cfg)
+        initial = {"auto_open_plan_panel": initial_value}
+        app = _TestApp(initial_settings=initial)
 
         async with app.run_test():
             tab = app.query_one(CliSettingsTab)
@@ -97,12 +96,12 @@ class TestCliSettingsTab:
             (True, False),
         ],
     )
-    async def test_get_cli_settings_reflects_auto_open_plan_panel(
+    async def test_get_updated_fields_reflects_auto_open_plan_panel(
         self, initial_value: bool, new_value: bool
     ):
-        """Verify get_cli_settings() captures auto_open_plan_panel switch state."""
-        cfg = CliSettings(auto_open_plan_panel=initial_value)
-        app = _TestApp(cfg)
+        """Verify get_updated_fields() captures auto_open_plan_panel switch state."""
+        initial = {"auto_open_plan_panel": initial_value}
+        app = _TestApp(initial_settings=initial)
 
         async with app.run_test():
             tab = app.query_one(CliSettingsTab)
@@ -111,6 +110,22 @@ class TestCliSettingsTab:
             # simulate user change
             switch.value = new_value
 
-            result = tab.get_cli_settings()
-            assert isinstance(result, CliSettings)
-            assert result.auto_open_plan_panel is new_value
+            result = tab.get_updated_fields()
+            assert isinstance(result, dict)
+            assert result["auto_open_plan_panel"] is new_value
+
+    @pytest.mark.asyncio
+    async def test_get_updated_fields_returns_only_managed_fields(self):
+        """Verify get_updated_fields() returns only the fields this tab manages."""
+        initial = {"default_cells_expanded": True, "auto_open_plan_panel": False}
+        app = _TestApp(initial_settings=initial)
+
+        async with app.run_test():
+            tab = app.query_one(CliSettingsTab)
+            result = tab.get_updated_fields()
+
+            # Should only contain the 2 fields this tab manages
+            assert set(result.keys()) == {
+                "default_cells_expanded",
+                "auto_open_plan_panel",
+            }

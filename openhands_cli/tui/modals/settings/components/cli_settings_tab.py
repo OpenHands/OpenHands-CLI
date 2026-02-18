@@ -1,10 +1,10 @@
 """CLI Settings tab component for the settings modal."""
 
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.widgets import Label, Static, Switch
-
-from openhands_cli.stores import CliSettings
 
 
 class SettingsSwitch(Container):
@@ -43,10 +43,16 @@ class SettingsSwitch(Container):
 class CliSettingsTab(Container):
     """CLI Settings tab component containing CLI-specific settings."""
 
-    def __init__(self, **kwargs):
-        """Initialize the CLI settings tab."""
+    def __init__(self, initial_settings: dict[str, Any] | None = None, **kwargs):
+        """Initialize the CLI settings tab.
+
+        Args:
+            initial_settings: Optional dict with initial values for
+                'default_cells_expanded' and 'auto_open_plan_panel'.
+                If not provided, defaults to False for both.
+        """
         super().__init__(**kwargs)
-        self.cli_settings = CliSettings.load()
+        self._initial_settings = initial_settings or {}
 
     def compose(self) -> ComposeResult:
         """Compose the CLI settings tab content."""
@@ -61,7 +67,7 @@ class CliSettingsTab(Container):
                     "only the title. Use Ctrl+O to toggle all cells at any time."
                 ),
                 switch_id="default_cells_expanded_switch",
-                value=self.cli_settings.default_cells_expanded,
+                value=self._initial_settings.get("default_cells_expanded", False),
             )
 
             yield SettingsSwitch(
@@ -72,24 +78,20 @@ class CliSettingsTab(Container):
                     "You can toggle it anytime via the command palette."
                 ),
                 switch_id="auto_open_plan_panel_switch",
-                value=self.cli_settings.auto_open_plan_panel,
+                value=self._initial_settings.get("auto_open_plan_panel", False),
             )
 
-    def get_cli_settings(self) -> CliSettings:
-        """Get the current CLI settings from the form (excludes critic settings)."""
-        default_cells_expanded_switch = self.query_one(
-            "#default_cells_expanded_switch", Switch
-        )
-        auto_open_plan_panel_switch = self.query_one(
-            "#auto_open_plan_panel_switch", Switch
-        )
+    def get_updated_fields(self) -> dict[str, Any]:
+        """Return only the fields this tab manages.
 
-        # Return only the settings managed by this tab
-        # Critic settings are managed by CriticSettingsTab
-        return CliSettings(
-            default_cells_expanded=default_cells_expanded_switch.value,
-            auto_open_plan_panel=auto_open_plan_panel_switch.value,
-            enable_critic=self.cli_settings.enable_critic,
-            enable_iterative_refinement=self.cli_settings.enable_iterative_refinement,
-            critic_threshold=self.cli_settings.critic_threshold,
-        )
+        Returns:
+            Dict with 'default_cells_expanded' and 'auto_open_plan_panel' values.
+        """
+        return {
+            "default_cells_expanded": self.query_one(
+                "#default_cells_expanded_switch", Switch
+            ).value,
+            "auto_open_plan_panel": self.query_one(
+                "#auto_open_plan_panel_switch", Switch
+            ).value,
+        }

@@ -1,10 +1,11 @@
 """Critic Settings tab component for the settings modal."""
 
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.widgets import Input, Label, Static, Switch
 
-from openhands_cli.stores import CliSettings
 from openhands_cli.stores.cli_settings import DEFAULT_CRITIC_THRESHOLD
 
 from .cli_settings_tab import SettingsSwitch
@@ -82,13 +83,27 @@ class CriticSettingsTab(Container):
     }
     """
 
-    def __init__(self, **kwargs):
-        """Initialize the Critic settings tab."""
+    def __init__(self, initial_settings: dict[str, Any] | None = None, **kwargs):
+        """Initialize the Critic settings tab.
+
+        Args:
+            initial_settings: Optional dict with initial values for
+                'enable_critic', 'enable_iterative_refinement', and 'critic_threshold'.
+                If not provided, uses defaults.
+        """
         super().__init__(**kwargs)
-        self.cli_settings = CliSettings.load()
+        self._initial_settings = initial_settings or {}
 
     def compose(self) -> ComposeResult:
         """Compose the Critic settings tab content."""
+        enable_critic = self._initial_settings.get("enable_critic", False)
+        enable_refinement = self._initial_settings.get(
+            "enable_iterative_refinement", False
+        )
+        threshold = self._initial_settings.get(
+            "critic_threshold", DEFAULT_CRITIC_THRESHOLD
+        )
+
         with VerticalScroll(id="critic_settings_content"):
             yield Static("Critic Settings (Experimental)", classes="form_section_title")
 
@@ -102,7 +117,7 @@ class CriticSettingsTab(Container):
                     "evaluate accuracy. See: https://openhands.dev/privacy"
                 ),
                 switch_id="enable_critic_switch",
-                value=self.cli_settings.enable_critic,
+                value=enable_critic,
             )
 
             yield SettingsSwitch(
@@ -114,7 +129,7 @@ class CriticSettingsTab(Container):
                     "when initial attempts may be incomplete."
                 ),
                 switch_id="enable_iterative_refinement_switch",
-                value=self.cli_settings.enable_iterative_refinement,
+                value=enable_refinement,
             )
 
             default_pct = int(DEFAULT_CRITIC_THRESHOLD * 100)
@@ -126,8 +141,8 @@ class CriticSettingsTab(Container):
                     "Lower values mean refinement only triggers for very low scores."
                 ),
                 input_id="critic_threshold_input",
-                value=self.cli_settings.critic_threshold,
-                disabled=not self.cli_settings.enable_iterative_refinement,
+                value=threshold,
+                disabled=not enable_refinement,
             )
 
     def on_switch_changed(self, event: Switch.Changed) -> None:
@@ -139,12 +154,12 @@ class CriticSettingsTab(Container):
             except Exception:
                 pass
 
-    def get_critic_settings(self) -> CliSettings:
-        """Get the current critic settings from the form as a CliSettings object.
+    def get_updated_fields(self) -> dict[str, Any]:
+        """Return only the fields this tab manages.
 
         Returns:
-            CliSettings with only critic-related fields set (other fields use defaults).
-            Caller should use model_copy to merge with existing settings.
+            Dict with 'enable_critic', 'enable_iterative_refinement',
+            and 'critic_threshold' values.
         """
         enable_critic_switch = self.query_one("#enable_critic_switch", Switch)
         enable_refinement_switch = self.query_one(
@@ -159,12 +174,8 @@ class CriticSettingsTab(Container):
         except (ValueError, TypeError):
             threshold = DEFAULT_CRITIC_THRESHOLD
 
-        return CliSettings(
-            # Preserve current non-critic settings from loaded settings
-            default_cells_expanded=self.cli_settings.default_cells_expanded,
-            auto_open_plan_panel=self.cli_settings.auto_open_plan_panel,
-            # Apply critic settings from form
-            enable_critic=enable_critic_switch.value,
-            enable_iterative_refinement=enable_refinement_switch.value,
-            critic_threshold=threshold,
-        )
+        return {
+            "enable_critic": enable_critic_switch.value,
+            "enable_iterative_refinement": enable_refinement_switch.value,
+            "critic_threshold": threshold,
+        }

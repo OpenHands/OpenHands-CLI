@@ -22,7 +22,7 @@ from textual.widgets import (
 )
 from textual.widgets._select import NoSelection
 
-from openhands_cli.stores import AgentStore
+from openhands_cli.stores import AgentStore, CliSettings
 from openhands_cli.tui.modals.settings.choices import (
     get_model_options,
 )
@@ -96,6 +96,18 @@ class SettingsScreen(ModalScreen):
 
     def compose(self) -> ComposeResult:
         """Create the settings form with tabs."""
+        # Load CLI settings once for initializing both tabs
+        cli_settings = CliSettings.load()
+        cli_initial = {
+            "default_cells_expanded": cli_settings.default_cells_expanded,
+            "auto_open_plan_panel": cli_settings.auto_open_plan_panel,
+        }
+        critic_initial = {
+            "enable_critic": cli_settings.enable_critic,
+            "enable_iterative_refinement": cli_settings.enable_iterative_refinement,
+            "critic_threshold": cli_settings.critic_threshold,
+        }
+
         with Container(id="settings_container"):
             yield Static("Settings", id="settings_title")
 
@@ -112,11 +124,11 @@ class SettingsScreen(ModalScreen):
                 # CLI Settings Tab - only show if not first-time setup
                 if not self.is_initial_setup:
                     with TabPane("CLI Settings", id="cli_settings_tab"):
-                        yield CliSettingsTab()
+                        yield CliSettingsTab(initial_settings=cli_initial)
 
                     # Critic Settings Tab - only show if not first-time setup
                     with TabPane("Critic", id="critic_settings_tab"):
-                        yield CriticSettingsTab()
+                        yield CriticSettingsTab(initial_settings=critic_initial)
 
             # Buttons
             with Horizontal(id="button_container"):
@@ -409,25 +421,19 @@ class SettingsScreen(ModalScreen):
         # Save CLI and Critic settings if not in initial setup mode
         if not self.is_initial_setup:
             try:
-                # Get CLI settings from CLI tab
+                # Get updated fields from each tab
                 cli_settings_tab = self.query_one("#cli_settings_tab", TabPane)
-                cli_settings_component = cli_settings_tab.query_one(CliSettingsTab)
-                cli_settings = cli_settings_component.get_cli_settings()
+                cli_tab = cli_settings_tab.query_one(CliSettingsTab)
 
-                # Get Critic settings from Critic tab and merge using model_copy
                 critic_settings_tab = self.query_one("#critic_settings_tab", TabPane)
-                critic_settings_component = critic_settings_tab.query_one(
-                    CriticSettingsTab
-                )
-                critic_settings = critic_settings_component.get_critic_settings()
+                critic_tab = critic_settings_tab.query_one(CriticSettingsTab)
 
-                # Merge settings: CLI settings + critic settings overrides
-                refinement = critic_settings.enable_iterative_refinement
-                merged_settings = cli_settings.model_copy(
+                # Load base settings and merge fields from both tabs
+                base_settings = CliSettings.load()
+                merged_settings = base_settings.model_copy(
                     update={
-                        "enable_critic": critic_settings.enable_critic,
-                        "enable_iterative_refinement": refinement,
-                        "critic_threshold": critic_settings.critic_threshold,
+                        **cli_tab.get_updated_fields(),
+                        **critic_tab.get_updated_fields(),
                     }
                 )
 
