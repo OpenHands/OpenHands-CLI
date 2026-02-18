@@ -76,7 +76,6 @@ def get_high_probability_issues(
 
 def build_refinement_message(
     critic_result: CriticResult,
-    threshold: float,  # noqa: ARG001 - kept for API compatibility
     iteration: int = 1,
     max_iterations: int = 3,
     *,
@@ -94,7 +93,6 @@ def build_refinement_message(
 
     Args:
         critic_result: The critic result with score and metadata
-        threshold: The overall score threshold (unused, kept for API compatibility)
         iteration: Current refinement iteration (1-indexed)
         max_iterations: Maximum number of refinement iterations allowed
         issue_threshold: Threshold for highlighting specific issues

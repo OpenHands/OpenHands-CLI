@@ -230,7 +230,7 @@ class TestBuildRefinementMessage:
     def test_basic_message_structure(self):
         """Test that message has expected structure and content (SDK format)."""
         result = CriticResult(score=0.3, message="Low score")
-        message = build_refinement_message(result, threshold=0.5)
+        message = build_refinement_message(result)
 
         # Check score mentioned (SDK format: "predicted success likelihood")
         assert "30.0%" in message
@@ -247,7 +247,7 @@ class TestBuildRefinementMessage:
     def test_includes_review_instructions(self):
         """Test that message includes review instructions (SDK format)."""
         result = CriticResult(score=0.4, message="Issues detected")
-        message = build_refinement_message(result, threshold=0.5)
+        message = build_refinement_message(result)
 
         # Check for SDK-style review instructions
         assert "verify each requirement is met" in message
@@ -256,7 +256,7 @@ class TestBuildRefinementMessage:
     def test_handles_missing_metadata(self):
         """Test that message works without metadata."""
         result = CriticResult(score=0.3, message="Simple message")
-        message = build_refinement_message(result, threshold=0.5)
+        message = build_refinement_message(result)
 
         # Should still have basic structure
         assert "30.0%" in message
@@ -266,18 +266,18 @@ class TestBuildRefinementMessage:
         """Test various score values are formatted correctly."""
         # Test low score
         result = CriticResult(score=0.2, message="Test")
-        message = build_refinement_message(result, threshold=0.75)
+        message = build_refinement_message(result)
         assert "20.0%" in message
 
         # Test higher score
         result = CriticResult(score=0.55, message="Test")
-        message = build_refinement_message(result, threshold=1.0)
+        message = build_refinement_message(result)
         assert "55.0%" in message
 
     def test_message_is_concise_without_issues(self):
         """Test that the message follows SDK pattern of being concise."""
         result = CriticResult(score=0.4, message="Test")
-        message = build_refinement_message(result, threshold=0.6)
+        message = build_refinement_message(result)
 
         # Message should be relatively short (SDK style is concise)
         lines = message.strip().split("\n")
@@ -287,9 +287,7 @@ class TestBuildRefinementMessage:
     def test_iteration_info_included(self):
         """Test that iteration info is included in the message."""
         result = CriticResult(score=0.3, message="Low score")
-        message = build_refinement_message(
-            result, threshold=0.5, iteration=2, max_iterations=3
-        )
+        message = build_refinement_message(result, iteration=2, max_iterations=3)
 
         # Check iteration info is present (SDK format: "iteration X/Y")
         assert "iteration 2/3" in message
@@ -297,7 +295,7 @@ class TestBuildRefinementMessage:
     def test_default_iteration_values(self):
         """Test default iteration values (1/3)."""
         result = CriticResult(score=0.3, message="Low score")
-        message = build_refinement_message(result, threshold=0.5)
+        message = build_refinement_message(result)
 
         # Check default iteration info
         assert "iteration 1/3" in message
@@ -305,9 +303,7 @@ class TestBuildRefinementMessage:
     def test_custom_max_iterations(self):
         """Test custom max iterations value."""
         result = CriticResult(score=0.3, message="Low score")
-        message = build_refinement_message(
-            result, threshold=0.5, iteration=1, max_iterations=5
-        )
+        message = build_refinement_message(result, iteration=1, max_iterations=5)
 
         assert "iteration 1/5" in message
 
@@ -337,7 +333,6 @@ class TestBuildRefinementMessage:
         ]
         message = build_refinement_message(
             result,
-            threshold=0.5,
             triggered_issues=triggered_issues,
         )
 
@@ -363,7 +358,6 @@ class TestBuildRefinementMessage:
         )
         message = build_refinement_message(
             result,
-            threshold=0.5,
             issue_threshold=0.75,
         )
 
@@ -387,7 +381,6 @@ class TestBuildRefinementMessage:
         result = CriticResult(score=0.8, message="Test")
         message = build_refinement_message(
             result,
-            threshold=0.5,
             triggered_issues=triggered_issues,
         )
 

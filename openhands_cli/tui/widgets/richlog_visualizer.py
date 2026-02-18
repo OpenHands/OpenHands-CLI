@@ -337,7 +337,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
                     # Build and send refinement message directly to conversation
                     refinement_message = build_refinement_message(
                         critic_result=critic_result,
-                        threshold=critic_settings.critic_threshold,
                         iteration=self._refinement_iteration,
                         max_iterations=max_iterations,
                         issue_threshold=critic_settings.issue_threshold,
