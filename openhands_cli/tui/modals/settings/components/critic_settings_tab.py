@@ -4,6 +4,7 @@ from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
+from textual.css.query import NoMatches
 from textual.widgets import Input, Label, Static, Switch
 
 from openhands_cli.stores.cli_settings import DEFAULT_CRITIC_THRESHOLD
@@ -151,7 +152,9 @@ class CriticSettingsTab(Container):
             try:
                 threshold_input = self.query_one("#critic_threshold_input", Input)
                 threshold_input.disabled = not event.value
-            except Exception:
+            except NoMatches:
+                # Widget not yet mounted or was removed; safe to ignore during
+                # composition lifecycle
                 pass
 
     def get_updated_fields(self) -> dict[str, Any]:

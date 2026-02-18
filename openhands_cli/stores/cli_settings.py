@@ -13,6 +13,10 @@ DEFAULT_CRITIC_THRESHOLD = 0.6
 # Default maximum number of refinement iterations per user turn
 DEFAULT_MAX_REFINEMENT_ITERATIONS = 3
 
+# Schema version for settings format. Increment when making breaking changes.
+# Version 2: Introduced nested CriticSettings structure (previously flat)
+SETTINGS_SCHEMA_VERSION = 2
+
 
 class CriticSettings(BaseModel):
     """Model for critic-related settings."""
@@ -26,6 +30,7 @@ class CriticSettings(BaseModel):
 class CliSettings(BaseModel):
     """Model for CLI-level settings."""
 
+    schema_version: int = SETTINGS_SCHEMA_VERSION
     default_cells_expanded: bool = False
     auto_open_plan_panel: bool = True
     critic: CriticSettings = CriticSettings()
@@ -97,11 +102,15 @@ class CliSettings(BaseModel):
             with open(config_path) as f:
                 data = json.load(f)
 
-            # Check if migration is needed
-            needs_migration = "enable_critic" in data and "critic" not in data
+            # Check if migration is needed using schema version
+            # Files with schema_version >= 2 are already in the new format
+            stored_version = data.get("schema_version", 1)
+            needs_migration = stored_version < SETTINGS_SCHEMA_VERSION
 
             # Migrate legacy format if needed
-            data = cls._migrate_legacy_settings(data)
+            if needs_migration:
+                data = cls._migrate_legacy_settings(data)
+                data["schema_version"] = SETTINGS_SCHEMA_VERSION
 
             settings = cls.model_validate(data)
 

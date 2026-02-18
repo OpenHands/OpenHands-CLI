@@ -122,6 +122,7 @@ class TestCliSettings:
 
         assert config_path.read_text() == json.dumps(
             {
+                "schema_version": 2,
                 "default_cells_expanded": False,
                 "auto_open_plan_panel": False,
                 "critic": {
@@ -197,8 +198,9 @@ class TestCliSettingsMigration:
     def test_new_format_not_migrated(self, tmp_path: Path):
         """Test that new nested format is loaded without migration."""
         config_path = tmp_path / "cli_config.json"
-        # Write new nested format
+        # Write new nested format with schema_version = 2 (current version)
         new_data = {
+            "schema_version": 2,
             "default_cells_expanded": True,
             "critic": {
                 "enable_critic": False,
@@ -219,7 +221,5 @@ class TestCliSettingsMigration:
             assert cfg.critic.critic_threshold == 0.5
 
             # File should not have been rewritten (no migration needed)
-            # Note: we can't easily test this since save() always writes,
-            # but we can verify the content is equivalent
             saved_data = json.loads(config_path.read_text())
             assert saved_data == new_data

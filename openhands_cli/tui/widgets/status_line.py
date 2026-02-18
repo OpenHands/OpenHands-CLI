@@ -61,9 +61,10 @@ class WorkingStatusLine(Static):
         Called when the user saves settings from the settings modal.
         This updates the status line display to reflect the new settings.
 
-        Note: Settings changes take effect immediately for the status display.
-        For conversation behavior (like refinement triggering), the visualizer
-        has its own cached settings snapshot that may be stale until it reloads.
+        Note: This design accepts eventual consistency - status indicator updates
+        immediately while conversation behavior uses its own cached settings.
+        This is acceptable since refinement loop prevention ensures at most one
+        refinement per turn regardless of settings timing.
         """
         self._cli_settings = CliSettings.load()
         self._update_text()
