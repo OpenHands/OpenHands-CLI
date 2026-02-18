@@ -160,8 +160,13 @@ class TestShouldTriggerRefinement:
         assert issues[0]["name"] == "loop_behavior"
         assert issues[1]["name"] == "insufficient_testing"
 
-    def test_infrastructure_issues_also_checked(self):
-        """Infrastructure issues should also trigger refinement."""
+    def test_infrastructure_issues_not_checked_for_refinement(self):
+        """Infrastructure issues alone do not trigger refinement.
+
+        The refinement logic only checks agent_behavioral_issues,
+        not infrastructure_issues, since infrastructure issues are
+        typically not actionable by agent refinement.
+        """
         result = CriticResult(
             score=0.8,
             message="Good score but infra issue",
@@ -181,9 +186,9 @@ class TestShouldTriggerRefinement:
         should_trigger, issues = should_trigger_refinement(
             result, threshold=0.5, enabled=True, issue_threshold=0.75
         )
-        assert should_trigger
-        assert len(issues) == 1
-        assert issues[0]["name"] == "infrastructure_agent_caused_issue"
+        # Infrastructure issues alone don't trigger refinement when score is good
+        assert not should_trigger
+        assert len(issues) == 0
 
 
 class TestGetHighProbabilityIssues:
