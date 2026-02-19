@@ -102,13 +102,6 @@ class SettingsScreen(ModalScreen):
             "default_cells_expanded": cli_settings.default_cells_expanded,
             "auto_open_plan_panel": cli_settings.auto_open_plan_panel,
         }
-        critic = cli_settings.critic
-        critic_initial = {
-            "enable_critic": critic.enable_critic,
-            "enable_iterative_refinement": critic.enable_iterative_refinement,
-            "critic_threshold": critic.critic_threshold,
-            "issue_threshold": critic.issue_threshold,
-        }
 
         with Container(id="settings_container"):
             yield Static("Settings", id="settings_title")
@@ -130,7 +123,7 @@ class SettingsScreen(ModalScreen):
 
                     # Critic Settings Tab - only show if not first-time setup
                     with TabPane("Critic", id="critic_settings_tab"):
-                        yield CriticSettingsTab(initial_settings=critic_initial)
+                        yield CriticSettingsTab(initial_settings=cli_settings.critic)
 
             # Buttons
             with Horizontal(id="button_container"):

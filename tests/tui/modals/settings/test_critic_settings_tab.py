@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Input, Switch
@@ -11,6 +9,7 @@ from textual.widgets import Input, Switch
 from openhands_cli.stores.cli_settings import (
     DEFAULT_CRITIC_THRESHOLD,
     DEFAULT_ISSUE_THRESHOLD,
+    CriticSettings,
 )
 from openhands_cli.tui.modals.settings.components.critic_settings_tab import (
     CriticSettingsTab,
@@ -21,7 +20,7 @@ from openhands_cli.tui.modals.settings.components.critic_settings_tab import (
 class _TestApp(App):
     """Small Textual app to mount the tab under test."""
 
-    def __init__(self, initial_settings: dict[str, Any] | None = None):
+    def __init__(self, initial_settings: CriticSettings | None = None):
         super().__init__()
         self.initial_settings = initial_settings
 
@@ -31,26 +30,26 @@ class _TestApp(App):
 
 class TestCriticSettingsTab:
     def test_init_accepts_initial_settings(self):
-        """Verify tab accepts initial_settings dict."""
-        initial = {
-            "enable_critic": True,
-            "enable_iterative_refinement": True,
-            "critic_threshold": 0.7,
-            "issue_threshold": 0.8,
-        }
+        """Verify tab accepts initial_settings CriticSettings object."""
+        initial = CriticSettings(
+            enable_critic=True,
+            enable_iterative_refinement=True,
+            critic_threshold=0.7,
+            issue_threshold=0.8,
+        )
         tab = CriticSettingsTab(initial_settings=initial)
         assert tab._initial_settings == initial
 
-    def test_init_defaults_to_empty_dict(self):
-        """Verify tab defaults to empty dict when no initial_settings provided."""
+    def test_init_defaults_to_critic_settings(self):
+        """Verify tab defaults to CriticSettings when no initial_settings provided."""
         tab = CriticSettingsTab()
-        assert tab._initial_settings == {}
+        assert isinstance(tab._initial_settings, CriticSettings)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("initial_value", [True, False])
     async def test_compose_renders_enable_critic_switch(self, initial_value: bool):
         """Verify the enable_critic switch is rendered with correct value."""
-        initial = {"enable_critic": initial_value}
+        initial = CriticSettings(enable_critic=initial_value)
         app = _TestApp(initial_settings=initial)
 
         async with app.run_test():
@@ -62,7 +61,7 @@ class TestCriticSettingsTab:
     @pytest.mark.parametrize("initial_value", [True, False])
     async def test_compose_renders_enable_refinement_switch(self, initial_value: bool):
         """Verify the enable_iterative_refinement switch is rendered correctly."""
-        initial = {"enable_iterative_refinement": initial_value}
+        initial = CriticSettings(enable_iterative_refinement=initial_value)
         app = _TestApp(initial_settings=initial)
 
         async with app.run_test():
@@ -73,7 +72,7 @@ class TestCriticSettingsTab:
     @pytest.mark.asyncio
     async def test_threshold_inputs_disabled_when_refinement_off(self):
         """Verify threshold inputs are disabled when refinement is off."""
-        initial = {"enable_iterative_refinement": False}
+        initial = CriticSettings(enable_iterative_refinement=False)
         app = _TestApp(initial_settings=initial)
 
         async with app.run_test():
@@ -86,7 +85,7 @@ class TestCriticSettingsTab:
     @pytest.mark.asyncio
     async def test_threshold_inputs_enabled_when_refinement_on(self):
         """Verify threshold inputs are enabled when refinement is on."""
-        initial = {"enable_iterative_refinement": True}
+        initial = CriticSettings(enable_iterative_refinement=True)
         app = _TestApp(initial_settings=initial)
 
         async with app.run_test():
@@ -99,7 +98,7 @@ class TestCriticSettingsTab:
     @pytest.mark.asyncio
     async def test_toggle_refinement_enables_threshold_inputs(self):
         """Verify toggling refinement on enables the threshold inputs."""
-        initial = {"enable_iterative_refinement": False}
+        initial = CriticSettings(enable_iterative_refinement=False)
         app = _TestApp(initial_settings=initial)
 
         async with app.run_test() as pilot:
@@ -125,7 +124,7 @@ class TestCriticSettingsTab:
     @pytest.mark.asyncio
     async def test_toggle_refinement_disables_threshold_inputs(self):
         """Verify toggling refinement off disables the threshold inputs."""
-        initial = {"enable_iterative_refinement": True}
+        initial = CriticSettings(enable_iterative_refinement=True)
         app = _TestApp(initial_settings=initial)
 
         async with app.run_test() as pilot:
@@ -151,12 +150,12 @@ class TestCriticSettingsTab:
     @pytest.mark.asyncio
     async def test_get_updated_fields_returns_all_fields(self):
         """Verify get_updated_fields() returns all critic settings fields."""
-        initial = {
-            "enable_critic": True,
-            "enable_iterative_refinement": True,
-            "critic_threshold": 0.6,
-            "issue_threshold": 0.75,
-        }
+        initial = CriticSettings(
+            enable_critic=True,
+            enable_iterative_refinement=True,
+            critic_threshold=0.6,
+            issue_threshold=0.75,
+        )
         app = _TestApp(initial_settings=initial)
 
         async with app.run_test():
@@ -173,7 +172,7 @@ class TestCriticSettingsTab:
     @pytest.mark.asyncio
     async def test_get_updated_fields_reflects_switch_changes(self):
         """Verify get_updated_fields() captures switch changes."""
-        initial = {"enable_critic": False, "enable_iterative_refinement": False}
+        initial = CriticSettings(enable_critic=False, enable_iterative_refinement=False)
         app = _TestApp(initial_settings=initial)
 
         async with app.run_test():
@@ -194,7 +193,7 @@ class TestCriticSettingsTab:
     @pytest.mark.asyncio
     async def test_get_updated_fields_parses_valid_threshold(self):
         """Verify get_updated_fields() correctly parses valid threshold values."""
-        initial = {"enable_iterative_refinement": True}
+        initial = CriticSettings(enable_iterative_refinement=True)
         app = _TestApp(initial_settings=initial)
 
         async with app.run_test():
@@ -213,7 +212,7 @@ class TestCriticSettingsTab:
     @pytest.mark.asyncio
     async def test_get_updated_fields_uses_default_for_invalid_threshold(self):
         """Verify get_updated_fields() uses default for invalid threshold values."""
-        initial = {"enable_iterative_refinement": True}
+        initial = CriticSettings(enable_iterative_refinement=True)
         app = _TestApp(initial_settings=initial)
 
         async with app.run_test():
@@ -232,7 +231,7 @@ class TestCriticSettingsTab:
     @pytest.mark.asyncio
     async def test_get_updated_fields_uses_default_for_out_of_range_threshold(self):
         """Verify get_updated_fields() uses default for out-of-range values."""
-        initial = {"enable_iterative_refinement": True}
+        initial = CriticSettings(enable_iterative_refinement=True)
         app = _TestApp(initial_settings=initial)
 
         async with app.run_test():

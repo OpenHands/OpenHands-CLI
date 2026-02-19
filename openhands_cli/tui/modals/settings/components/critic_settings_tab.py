@@ -10,6 +10,7 @@ from textual.widgets import Input, Label, Static, Switch
 from openhands_cli.stores.cli_settings import (
     DEFAULT_CRITIC_THRESHOLD,
     DEFAULT_ISSUE_THRESHOLD,
+    CriticSettings,
 )
 
 from .cli_settings_tab import SettingsSwitch
@@ -127,29 +128,22 @@ class CriticSettingsTab(Container):
     }
     """
 
-    def __init__(self, initial_settings: dict[str, Any] | None = None, **kwargs):
+    def __init__(self, initial_settings: CriticSettings | None = None, **kwargs):
         """Initialize the Critic settings tab.
 
         Args:
-            initial_settings: Optional dict with initial values for
-                'enable_critic', 'enable_iterative_refinement', 'critic_threshold',
-                and 'issue_threshold'. If not provided, uses defaults.
+            initial_settings: Optional CriticSettings object with initial values.
+                If not provided, uses defaults.
         """
         super().__init__(**kwargs)
-        self._initial_settings = initial_settings or {}
+        self._initial_settings = initial_settings or CriticSettings()
 
     def compose(self) -> ComposeResult:
         """Compose the Critic settings tab content."""
-        enable_critic = self._initial_settings.get("enable_critic", False)
-        enable_refinement = self._initial_settings.get(
-            "enable_iterative_refinement", False
-        )
-        threshold = self._initial_settings.get(
-            "critic_threshold", DEFAULT_CRITIC_THRESHOLD
-        )
-        issue_threshold = self._initial_settings.get(
-            "issue_threshold", DEFAULT_ISSUE_THRESHOLD
-        )
+        enable_critic = self._initial_settings.enable_critic
+        enable_refinement = self._initial_settings.enable_iterative_refinement
+        threshold = self._initial_settings.critic_threshold
+        issue_threshold = self._initial_settings.issue_threshold
 
         with VerticalScroll(id="critic_settings_content"):
             yield Static("Critic Settings (Experimental)", classes="form_section_title")

@@ -18,6 +18,7 @@ from textual.widgets import Footer, Input, Switch
 from openhands_cli.stores.cli_settings import (
     DEFAULT_CRITIC_THRESHOLD,
     DEFAULT_ISSUE_THRESHOLD,
+    CriticSettings,
 )
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.modals.settings.components.critic_settings_tab import (
@@ -44,12 +45,12 @@ class TestCriticSettingsTabSnapshots:
 
             def compose(self) -> ComposeResult:
                 yield CriticSettingsTab(
-                    initial_settings={
-                        "enable_critic": True,
-                        "enable_iterative_refinement": False,
-                        "critic_threshold": DEFAULT_CRITIC_THRESHOLD,
-                        "issue_threshold": DEFAULT_ISSUE_THRESHOLD,
-                    }
+                    initial_settings=CriticSettings(
+                        enable_critic=True,
+                        enable_iterative_refinement=False,
+                        critic_threshold=DEFAULT_CRITIC_THRESHOLD,
+                        issue_threshold=DEFAULT_ISSUE_THRESHOLD,
+                    )
                 )
                 yield Footer()
 
@@ -74,12 +75,12 @@ class TestCriticSettingsTabSnapshots:
 
             def compose(self) -> ComposeResult:
                 yield CriticSettingsTab(
-                    initial_settings={
-                        "enable_critic": True,
-                        "enable_iterative_refinement": True,
-                        "critic_threshold": 0.7,
-                        "issue_threshold": 0.8,
-                    }
+                    initial_settings=CriticSettings(
+                        enable_critic=True,
+                        enable_iterative_refinement=True,
+                        critic_threshold=0.7,
+                        issue_threshold=0.8,
+                    )
                 )
                 yield Footer()
 
@@ -104,12 +105,12 @@ class TestCriticSettingsTabSnapshots:
 
             def compose(self) -> ComposeResult:
                 yield CriticSettingsTab(
-                    initial_settings={
-                        "enable_critic": False,
-                        "enable_iterative_refinement": False,
-                        "critic_threshold": DEFAULT_CRITIC_THRESHOLD,
-                        "issue_threshold": DEFAULT_ISSUE_THRESHOLD,
-                    }
+                    initial_settings=CriticSettings(
+                        enable_critic=False,
+                        enable_iterative_refinement=False,
+                        critic_threshold=DEFAULT_CRITIC_THRESHOLD,
+                        issue_threshold=DEFAULT_ISSUE_THRESHOLD,
+                    )
                 )
                 yield Footer()
 
@@ -134,12 +135,12 @@ class TestCriticSettingsTabSnapshots:
 
             def compose(self) -> ComposeResult:
                 yield CriticSettingsTab(
-                    initial_settings={
-                        "enable_critic": True,
-                        "enable_iterative_refinement": False,
-                        "critic_threshold": DEFAULT_CRITIC_THRESHOLD,
-                        "issue_threshold": DEFAULT_ISSUE_THRESHOLD,
-                    }
+                    initial_settings=CriticSettings(
+                        enable_critic=True,
+                        enable_iterative_refinement=False,
+                        critic_threshold=DEFAULT_CRITIC_THRESHOLD,
+                        issue_threshold=DEFAULT_ISSUE_THRESHOLD,
+                    )
                 )
                 yield Footer()
 
@@ -171,12 +172,12 @@ class TestCriticSettingsTabSnapshots:
 
             def compose(self) -> ComposeResult:
                 yield CriticSettingsTab(
-                    initial_settings={
-                        "enable_critic": True,
-                        "enable_iterative_refinement": True,
-                        "critic_threshold": DEFAULT_CRITIC_THRESHOLD,
-                        "issue_threshold": DEFAULT_ISSUE_THRESHOLD,
-                    }
+                    initial_settings=CriticSettings(
+                        enable_critic=True,
+                        enable_iterative_refinement=True,
+                        critic_threshold=DEFAULT_CRITIC_THRESHOLD,
+                        issue_threshold=DEFAULT_ISSUE_THRESHOLD,
+                    )
                 )
                 yield Footer()
 
