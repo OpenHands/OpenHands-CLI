@@ -6,6 +6,8 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.widgets import Label, Static, Switch
 
+from openhands_cli.stores.cli_settings import CliSettings
+
 
 class SettingsSwitch(Container):
     """Reusable switch component for settings forms."""
@@ -43,16 +45,15 @@ class SettingsSwitch(Container):
 class CliSettingsTab(Container):
     """CLI Settings tab component containing CLI-specific settings."""
 
-    def __init__(self, initial_settings: dict[str, Any] | None = None, **kwargs):
+    def __init__(self, initial_settings: CliSettings | None = None, **kwargs):
         """Initialize the CLI settings tab.
 
         Args:
-            initial_settings: Optional dict with initial values for
-                'default_cells_expanded' and 'auto_open_plan_panel'.
-                If not provided, defaults to False for both.
+            initial_settings: Optional CliSettings object with initial values.
+                If not provided, uses defaults.
         """
         super().__init__(**kwargs)
-        self._initial_settings = initial_settings or {}
+        self._initial_settings = initial_settings or CliSettings()
 
     def compose(self) -> ComposeResult:
         """Compose the CLI settings tab content."""
@@ -67,7 +68,7 @@ class CliSettingsTab(Container):
                     "only the title. Use Ctrl+O to toggle all cells at any time."
                 ),
                 switch_id="default_cells_expanded_switch",
-                value=self._initial_settings.get("default_cells_expanded", False),
+                value=self._initial_settings.default_cells_expanded,
             )
 
             yield SettingsSwitch(
@@ -78,7 +79,7 @@ class CliSettingsTab(Container):
                     "You can toggle it anytime via the command palette."
                 ),
                 switch_id="auto_open_plan_panel_switch",
-                value=self._initial_settings.get("auto_open_plan_panel", False),
+                value=self._initial_settings.auto_open_plan_panel,
             )
 
     def get_updated_fields(self) -> dict[str, Any]:

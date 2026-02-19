@@ -98,10 +98,6 @@ class SettingsScreen(ModalScreen):
         """Create the settings form with tabs."""
         # Load CLI settings once for initializing both tabs
         cli_settings = CliSettings.load()
-        cli_initial = {
-            "default_cells_expanded": cli_settings.default_cells_expanded,
-            "auto_open_plan_panel": cli_settings.auto_open_plan_panel,
-        }
 
         with Container(id="settings_container"):
             yield Static("Settings", id="settings_title")
@@ -119,7 +115,7 @@ class SettingsScreen(ModalScreen):
                 # CLI Settings Tab - only show if not first-time setup
                 if not self.is_initial_setup:
                     with TabPane("CLI Settings", id="cli_settings_tab"):
-                        yield CliSettingsTab(initial_settings=cli_initial)
+                        yield CliSettingsTab(initial_settings=cli_settings)
 
                     # Critic Settings Tab - only show if not first-time setup
                     with TabPane("Critic", id="critic_settings_tab"):
