@@ -131,7 +131,6 @@ def should_trigger_refinement(
     critic_result: CriticResult | None,
     threshold: float,
     *,
-    enabled: bool = True,
     issue_threshold: float = 0.75,
 ) -> tuple[bool, list[dict[str, Any]]]:
     """Check if iterative refinement should be triggered.
@@ -143,7 +142,6 @@ def should_trigger_refinement(
     Args:
         critic_result: The critic result (may be None if critic is disabled)
         threshold: The overall score threshold below which refinement is triggered
-        enabled: Whether iterative refinement is enabled
         issue_threshold: Threshold for individual issue detection
 
     Returns:
@@ -151,9 +149,6 @@ def should_trigger_refinement(
         - should_trigger: True if refinement should be triggered
         - triggered_issues: List of issues that triggered refinement (may be empty)
     """
-    if not enabled:
-        return False, []
-
     if critic_result is None:
         return False, []
 

@@ -375,7 +375,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         should_refine, triggered_issues = should_trigger_refinement(
             critic_result=critic_result,
             threshold=critic_settings.critic_threshold,
-            enabled=True,  # Already checked above
             issue_threshold=critic_settings.issue_threshold,
         )
 

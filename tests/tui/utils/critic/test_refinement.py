@@ -22,59 +22,38 @@ from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 class TestShouldTriggerRefinement:
     """Tests for should_trigger_refinement function."""
 
-    def test_disabled_returns_false(self):
-        """When disabled, should always return False regardless of score."""
-        result = CriticResult(score=0.1, message="Low score")
-        should_trigger, issues = should_trigger_refinement(
-            result, threshold=0.5, enabled=False
-        )
-        assert not should_trigger
-        assert issues == []
-
     def test_none_result_returns_false(self):
         """When critic result is None, should return False."""
-        should_trigger, issues = should_trigger_refinement(
-            None, threshold=0.5, enabled=True
-        )
+        should_trigger, issues = should_trigger_refinement(None, threshold=0.5)
         assert not should_trigger
         assert issues == []
 
     def test_score_below_threshold_returns_true(self):
-        """When score is below threshold and enabled, should return True."""
+        """When score is below threshold, should return True."""
         result = CriticResult(score=0.3, message="Low score")
-        should_trigger, _ = should_trigger_refinement(
-            result, threshold=0.5, enabled=True
-        )
+        should_trigger, _ = should_trigger_refinement(result, threshold=0.5)
         assert should_trigger
 
     def test_score_at_threshold_returns_false(self):
         """When score equals threshold, should return False (not below)."""
         result = CriticResult(score=0.5, message="At threshold")
-        should_trigger, _ = should_trigger_refinement(
-            result, threshold=0.5, enabled=True
-        )
+        should_trigger, _ = should_trigger_refinement(result, threshold=0.5)
         assert not should_trigger
 
     def test_score_above_threshold_returns_false(self):
         """When score is above threshold, should return False."""
         result = CriticResult(score=0.8, message="Good score")
-        should_trigger, _ = should_trigger_refinement(
-            result, threshold=0.5, enabled=True
-        )
+        should_trigger, _ = should_trigger_refinement(result, threshold=0.5)
         assert not should_trigger
 
     def test_custom_threshold(self):
         """Custom threshold should be respected."""
         result = CriticResult(score=0.6, message="Medium score")
         # Should NOT trigger with default threshold of 0.5
-        should_trigger1, _ = should_trigger_refinement(
-            result, threshold=0.5, enabled=True
-        )
+        should_trigger1, _ = should_trigger_refinement(result, threshold=0.5)
         assert not should_trigger1
         # Should trigger with higher threshold of 0.7
-        should_trigger2, _ = should_trigger_refinement(
-            result, threshold=0.7, enabled=True
-        )
+        should_trigger2, _ = should_trigger_refinement(result, threshold=0.7)
         assert should_trigger2
 
     def test_high_probability_issue_triggers_refinement(self):
@@ -95,7 +74,7 @@ class TestShouldTriggerRefinement:
             },
         )
         should_trigger, issues = should_trigger_refinement(
-            result, threshold=0.5, enabled=True, issue_threshold=0.75
+            result, threshold=0.5, issue_threshold=0.75
         )
         assert should_trigger
         assert len(issues) == 1
@@ -119,7 +98,7 @@ class TestShouldTriggerRefinement:
             },
         )
         should_trigger, issues = should_trigger_refinement(
-            result, threshold=0.5, enabled=True, issue_threshold=0.75
+            result, threshold=0.5, issue_threshold=0.75
         )
         assert not should_trigger
         assert issues == []
@@ -152,7 +131,7 @@ class TestShouldTriggerRefinement:
             },
         )
         should_trigger, issues = should_trigger_refinement(
-            result, threshold=0.5, enabled=True, issue_threshold=0.75
+            result, threshold=0.5, issue_threshold=0.75
         )
         assert should_trigger
         assert len(issues) == 2
@@ -184,7 +163,7 @@ class TestShouldTriggerRefinement:
             },
         )
         should_trigger, issues = should_trigger_refinement(
-            result, threshold=0.5, enabled=True, issue_threshold=0.75
+            result, threshold=0.5, issue_threshold=0.75
         )
         # Infrastructure issues alone don't trigger refinement when score is good
         assert not should_trigger
