@@ -25,7 +25,7 @@ Widget Hierarchy::
     └── Footer
 
 Message Flow:
-    InputField → UserInputSubmitted → bubbles → ConversationManager
+    InputField → SendMessage → bubbles → ConversationManager
     InputAreaContainer → CreateConversation/etc → bubbles → ConversationManager
     HistorySidePanel → SwitchConversation → bubbles → ConversationManager
 
@@ -236,7 +236,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             └── Footer
 
         Message Flow:
-            InputField → UserInputSubmitted → bubbles → ConversationManager
+            InputField → SendMessage → bubbles → ConversationManager
             InputField → SlashCommand → InputAreaContainer → CreateConversation
                 → bubbles → ConversationManager
 

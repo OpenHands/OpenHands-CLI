@@ -30,8 +30,8 @@ class UserMessageController:
     async def handle_user_message(self, content: str) -> None:
         """Handle a user-initiated message (starts a new user turn).
 
-        This resets the refinement iteration counter and updates the
-        conversation title. For system-generated refinement messages,
+        Note: The refinement iteration counter is reset by ConversationManager
+        before calling this method. For system-generated refinement messages,
         use handle_refinement_message() instead.
 
         Args:
@@ -43,7 +43,7 @@ class UserMessageController:
 
         runner = self._runners.get_or_create(self._state.conversation_id)
 
-        # Render user message - this resets the refinement iteration counter
+        # Render user message to UI
         runner.visualizer.render_user_message(content)
 
         # Update conversation title (for history panel)

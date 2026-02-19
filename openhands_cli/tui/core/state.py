@@ -132,6 +132,10 @@ class ConversationContainer(Container):
     critic_settings: var[CriticSettings] = var(CriticSettings())
     """Critic settings for iterative refinement. UI components bind to this."""
 
+    # ---- Refinement State ----
+    refinement_iteration: var[int] = var(0)
+    """Current refinement iteration within a user turn. Resets on new user message."""
+
     def __init__(
         self,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
@@ -382,6 +386,15 @@ class ConversationContainer(Container):
         """Set critic settings for iterative refinement. Thread-safe."""
         self._schedule_update("critic_settings", settings)
 
+    def set_refinement_iteration(self, iteration: int) -> None:
+        """Set the current refinement iteration. Thread-safe.
+
+        This is managed by RefinementController:
+        - Incremented when refinement is triggered
+        - Reset to 0 when user sends a new message
+        """
+        self._schedule_update("refinement_iteration", iteration)
+
     # ---- Conversation Attachment (for metrics) ----
 
     def attach_conversation_state(
@@ -410,7 +423,7 @@ class ConversationContainer(Container):
         """Reset state for a new conversation.
 
         Resets: running, elapsed_seconds, metrics, conversation_title,
-                pending_action_count, internal state.
+                pending_action_count, refinement_iteration, internal state.
         Preserves: confirmation_policy (persists across conversations),
                    conversation_id (set explicitly when switching).
 
@@ -421,6 +434,7 @@ class ConversationContainer(Container):
         self.metrics = None
         self.conversation_title = None
         self.pending_action_count = 0
+        self.refinement_iteration = 0
         self.switch_confirmation_target = None
         self._conversation_start_time = None
         self._conversation_state = None
