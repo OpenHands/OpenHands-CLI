@@ -63,8 +63,47 @@ class CliSettings(BaseModel):
         return Path(persistence_dir) / "cli_config.json"
 
     @classmethod
+    def _migrate_legacy_settings(cls, data: dict) -> tuple[dict, bool]:
+        """Migrate legacy settings format to current format.
+
+        Handles migration from old format where `enable_critic` was at the top level
+        to new format where critic settings are nested under `critic`.
+
+        Args:
+            data: Raw settings data from config file
+
+        Returns:
+            Tuple of (migrated settings data, bool indicating if migration occurred)
+        """
+        migrated = False
+
+        # Check for legacy top-level enable_critic (pre-nested format)
+        if "enable_critic" in data and "critic" not in data:
+            # Migrate enable_critic to nested critic.enable_critic
+            data["critic"] = {"enable_critic": data.pop("enable_critic")}
+            migrated = True
+
+        # Also migrate other legacy top-level critic fields if present
+        legacy_critic_fields = [
+            "enable_iterative_refinement",
+            "critic_threshold",
+            "issue_threshold",
+            "max_refinement_iterations",
+        ]
+        for field in legacy_critic_fields:
+            if field in data:
+                if "critic" not in data:
+                    data["critic"] = {}
+                data["critic"][field] = data.pop(field)
+                migrated = True
+
+        return data, migrated
+
+    @classmethod
     def load(cls) -> "CliSettings":
         """Load CLI settings from file.
+
+        Automatically migrates legacy settings format if detected.
 
         Returns:
             CliSettings instance with loaded settings, or defaults if file doesn't
@@ -79,7 +118,16 @@ class CliSettings(BaseModel):
             with open(config_path) as f:
                 data = json.load(f)
 
-            return cls.model_validate(data)
+            # Migrate legacy settings format if needed
+            migrated_data, was_migrated = cls._migrate_legacy_settings(data)
+
+            settings = cls.model_validate(migrated_data)
+
+            # Save migrated settings back to disk if migration occurred
+            if was_migrated:
+                settings.save()
+
+            return settings
         except (json.JSONDecodeError, ValueError):
             # If file is corrupted, return defaults
             return cls()

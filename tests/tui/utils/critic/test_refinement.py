@@ -10,7 +10,7 @@ from openhands.sdk import Message, TextContent
 from openhands.sdk.critic.result import CriticResult
 from openhands.sdk.event import MessageEvent
 from openhands_cli.stores import CliSettings, CriticSettings
-from openhands_cli.tui.core.conversation_manager import SendMessage
+from openhands_cli.tui.core.conversation_manager import SendRefinementMessage
 from openhands_cli.tui.utils.critic.refinement import (
     build_refinement_message,
     get_high_probability_issues,
@@ -425,7 +425,7 @@ class TestRefinementIntegration:
         3. A MessageEvent has a critic_result with score below threshold
 
         The visualizer will call _send_refinement_message, which posts a
-        SendMessage to the ConversationManager.
+        SendRefinementMessage to the ConversationManager.
         """
         # Set up CLI settings with refinement enabled
         settings = CliSettings(
@@ -467,14 +467,16 @@ class TestRefinementIntegration:
         visualizer.on_event(event)
 
         # Verify that call_from_thread was called to send refinement message
-        # Find the call that posts a SendMessage
+        # Find the call that posts a SendRefinementMessage
         calls = mock_app.call_from_thread.call_args_list
         send_message_calls = [
-            c for c in calls if len(c[0]) >= 2 and isinstance(c[0][1], SendMessage)
+            c
+            for c in calls
+            if len(c[0]) >= 2 and isinstance(c[0][1], SendRefinementMessage)
         ]
 
         assert len(send_message_calls) == 1, (
-            "Expected exactly one SendMessage call for refinement, "
+            "Expected exactly one SendRefinementMessage call for refinement, "
             f"got {len(send_message_calls)}"
         )
 
@@ -526,11 +528,13 @@ class TestRefinementIntegration:
         # Verify no SendMessage was posted
         calls = mock_app.call_from_thread.call_args_list
         send_message_calls = [
-            c for c in calls if len(c[0]) >= 2 and isinstance(c[0][1], SendMessage)
+            c
+            for c in calls
+            if len(c[0]) >= 2 and isinstance(c[0][1], SendRefinementMessage)
         ]
 
         assert len(send_message_calls) == 0, (
-            "No SendMessage should be posted for high critic scores"
+            "No SendRefinementMessage should be posted for high critic scores"
         )
 
     def test_refinement_disabled_does_not_trigger(
@@ -574,11 +578,13 @@ class TestRefinementIntegration:
         # Verify no SendMessage was posted
         calls = mock_app.call_from_thread.call_args_list
         send_message_calls = [
-            c for c in calls if len(c[0]) >= 2 and isinstance(c[0][1], SendMessage)
+            c
+            for c in calls
+            if len(c[0]) >= 2 and isinstance(c[0][1], SendRefinementMessage)
         ]
 
         assert len(send_message_calls) == 0, (
-            "No SendMessage should be posted when refinement is disabled"
+            "No SendRefinementMessage should be posted when refinement is disabled"
         )
 
     def test_critic_disabled_does_not_trigger(self, mock_app, container, monkeypatch):
@@ -619,11 +625,13 @@ class TestRefinementIntegration:
         # Verify no SendMessage was posted (critic disabled = no critic processing)
         calls = mock_app.call_from_thread.call_args_list
         send_message_calls = [
-            c for c in calls if len(c[0]) >= 2 and isinstance(c[0][1], SendMessage)
+            c
+            for c in calls
+            if len(c[0]) >= 2 and isinstance(c[0][1], SendRefinementMessage)
         ]
 
         assert len(send_message_calls) == 0, (
-            "No SendMessage should be posted when critic is disabled"
+            "No SendRefinementMessage should be posted when critic is disabled"
         )
 
     def test_refinement_max_iterations_limit(self, mock_app, container, monkeypatch):
@@ -672,7 +680,9 @@ class TestRefinementIntegration:
 
             calls = mock_app.call_from_thread.call_args_list
             send_message_calls = [
-                c for c in calls if len(c[0]) >= 2 and isinstance(c[0][1], SendMessage)
+                c
+                for c in calls
+                if len(c[0]) >= 2 and isinstance(c[0][1], SendRefinementMessage)
             ]
             assert len(send_message_calls) == 1, (
                 f"Response {i + 1} should trigger refinement (iteration {i + 1}/3)"
@@ -687,7 +697,9 @@ class TestRefinementIntegration:
 
         calls = mock_app.call_from_thread.call_args_list
         send_message_calls = [
-            c for c in calls if len(c[0]) >= 2 and isinstance(c[0][1], SendMessage)
+            c
+            for c in calls
+            if len(c[0]) >= 2 and isinstance(c[0][1], SendRefinementMessage)
         ]
         assert len(send_message_calls) == 0, (
             "4th response should NOT trigger refinement (max iterations reached)"
@@ -732,7 +744,9 @@ class TestRefinementIntegration:
         visualizer.on_event(create_low_score_event("First response"))
         calls1 = mock_app.call_from_thread.call_args_list
         send_message_calls1 = [
-            c for c in calls1 if len(c[0]) >= 2 and isinstance(c[0][1], SendMessage)
+            c
+            for c in calls1
+            if len(c[0]) >= 2 and isinstance(c[0][1], SendRefinementMessage)
         ]
         assert len(send_message_calls1) == 1, "First response should trigger refinement"
 
@@ -742,7 +756,9 @@ class TestRefinementIntegration:
 
         calls2 = mock_app.call_from_thread.call_args_list
         send_message_calls2 = [
-            c for c in calls2 if len(c[0]) >= 2 and isinstance(c[0][1], SendMessage)
+            c
+            for c in calls2
+            if len(c[0]) >= 2 and isinstance(c[0][1], SendRefinementMessage)
         ]
         assert len(send_message_calls2) == 0, (
             "Second response should NOT trigger refinement (max=1 reached)"
@@ -805,7 +821,9 @@ class TestRefinementIntegration:
         # Should trigger refinement again (new user turn, counter reset)
         calls = mock_app.call_from_thread.call_args_list
         send_message_calls = [
-            c for c in calls if len(c[0]) >= 2 and isinstance(c[0][1], SendMessage)
+            c
+            for c in calls
+            if len(c[0]) >= 2 and isinstance(c[0][1], SendRefinementMessage)
         ]
         assert len(send_message_calls) == 1, (
             "After user message, refinement should trigger again"
@@ -815,10 +833,11 @@ class TestRefinementIntegration:
     def test_refinement_message_does_not_reset_counter(
         self, mock_app, container, monkeypatch
     ):
-        """Test that refinement messages (is_refinement=True) don't reset counter.
+        """Test that render_refinement_message() doesn't reset counter.
 
         This is crucial for correct iteration tracking: when a refinement message
-        is sent, it should NOT reset the iteration counter.
+        is sent via render_refinement_message(), it should NOT reset the iteration
+        counter, unlike render_user_message() which starts a new user turn.
         """
         settings = CliSettings(
             critic=CriticSettings(
@@ -857,11 +876,10 @@ class TestRefinementIntegration:
         visualizer.on_event(create_low_score_event("First response"))
         assert visualizer._refinement_iteration == 1
 
-        # Simulate a refinement message (is_refinement=True)
-        # This should NOT reset the counter
-        visualizer.render_user_message(
+        # Simulate a refinement message using the dedicated method
+        # This should NOT reset the counter (unlike render_user_message)
+        visualizer.render_refinement_message(
             "The task appears incomplete (iteration 1/3...)",
-            is_refinement=True,
         )
 
         # Counter should still be 1 (not reset to 0)
@@ -887,7 +905,9 @@ class TestRefinementIntegration:
         # No refinement message should be sent
         calls = mock_app.call_from_thread.call_args_list
         send_message_calls = [
-            c for c in calls if len(c[0]) >= 2 and isinstance(c[0][1], SendMessage)
+            c
+            for c in calls
+            if len(c[0]) >= 2 and isinstance(c[0][1], SendRefinementMessage)
         ]
         assert len(send_message_calls) == 0
 
@@ -948,7 +968,9 @@ class TestRefinementIntegration:
         # Verify refinement WAS triggered due to high-probability issue
         calls = mock_app.call_from_thread.call_args_list
         send_message_calls = [
-            c for c in calls if len(c[0]) >= 2 and isinstance(c[0][1], SendMessage)
+            c
+            for c in calls
+            if len(c[0]) >= 2 and isinstance(c[0][1], SendRefinementMessage)
         ]
 
         assert len(send_message_calls) == 1, (
@@ -1015,7 +1037,9 @@ class TestRefinementIntegration:
         # Verify refinement was NOT triggered
         calls = mock_app.call_from_thread.call_args_list
         send_message_calls = [
-            c for c in calls if len(c[0]) >= 2 and isinstance(c[0][1], SendMessage)
+            c
+            for c in calls
+            if len(c[0]) >= 2 and isinstance(c[0][1], SendRefinementMessage)
         ]
 
         assert len(send_message_calls) == 0, (

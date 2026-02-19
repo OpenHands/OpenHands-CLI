@@ -221,3 +221,106 @@ class TestCliSettings:
             with patch("builtins.open", side_effect=PermissionError("Access denied")):
                 with pytest.raises(PermissionError):
                     cfg.save()
+
+
+class TestCliSettingsMigration:
+    """Tests for legacy settings migration."""
+
+    def test_migrate_legacy_enable_critic_at_top_level(self, tmp_path: Path):
+        """Test migration of enable_critic from top-level to nested critic object."""
+        config_path = tmp_path / "cli_config.json"
+        # Old format with enable_critic at top level
+        legacy_config = {
+            "default_cells_expanded": True,
+            "enable_critic": False,  # Legacy top-level field
+        }
+        config_path.write_text(json.dumps(legacy_config))
+
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
+            cfg = CliSettings.load()
+
+        # Should have migrated to nested critic.enable_critic
+        assert cfg.critic.enable_critic is False
+        assert cfg.default_cells_expanded is True
+
+        # Verify migration saved the new format
+        saved_data = json.loads(config_path.read_text())
+        assert "enable_critic" not in saved_data
+        assert "critic" in saved_data
+        assert saved_data["critic"]["enable_critic"] is False
+
+    def test_migrate_multiple_legacy_critic_fields(self, tmp_path: Path):
+        """Test migration of multiple legacy critic fields at top level."""
+        config_path = tmp_path / "cli_config.json"
+        legacy_config = {
+            "default_cells_expanded": False,
+            "enable_critic": True,
+            "enable_iterative_refinement": True,
+            "critic_threshold": 0.7,
+            "issue_threshold": 0.8,
+            "max_refinement_iterations": 5,
+        }
+        config_path.write_text(json.dumps(legacy_config))
+
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
+            cfg = CliSettings.load()
+
+        # All fields should be migrated to nested critic object
+        assert cfg.critic.enable_critic is True
+        assert cfg.critic.enable_iterative_refinement is True
+        assert cfg.critic.critic_threshold == 0.7
+        assert cfg.critic.issue_threshold == 0.8
+        assert cfg.critic.max_refinement_iterations == 5
+
+    def test_no_migration_needed_for_new_format(self, tmp_path: Path):
+        """Test that new format configs are not modified."""
+        config_path = tmp_path / "cli_config.json"
+        new_config = {
+            "default_cells_expanded": True,
+            "critic": {
+                "enable_critic": False,
+                "enable_iterative_refinement": True,
+                "critic_threshold": 0.5,
+            },
+        }
+        config_path.write_text(json.dumps(new_config))
+
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
+            cfg = CliSettings.load()
+
+        assert cfg.critic.enable_critic is False
+        assert cfg.critic.enable_iterative_refinement is True
+        assert cfg.critic.critic_threshold == 0.5
+
+    def test_migrate_partial_legacy_fields(self, tmp_path: Path):
+        """Test migration when only some legacy fields are present."""
+        config_path = tmp_path / "cli_config.json"
+        legacy_config = {
+            "default_cells_expanded": True,
+            "critic_threshold": 0.4,  # Only threshold, not enable_critic
+        }
+        config_path.write_text(json.dumps(legacy_config))
+
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
+            cfg = CliSettings.load()
+
+        # Should migrate critic_threshold and use default for enable_critic
+        assert cfg.critic.critic_threshold == 0.4
+        assert cfg.critic.enable_critic is True  # Default value
+
+    def test_migration_preserves_other_settings(self, tmp_path: Path):
+        """Test that migration preserves non-critic settings."""
+        config_path = tmp_path / "cli_config.json"
+        legacy_config = {
+            "default_cells_expanded": True,
+            "auto_open_plan_panel": False,
+            "enable_critic": False,
+        }
+        config_path.write_text(json.dumps(legacy_config))
+
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
+            cfg = CliSettings.load()
+
+        assert cfg.default_cells_expanded is True
+        assert cfg.auto_open_plan_panel is False
+        assert cfg.critic.enable_critic is False

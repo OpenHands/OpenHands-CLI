@@ -54,6 +54,7 @@ if TYPE_CHECKING:
     from textual.containers import VerticalScroll
     from textual.widget import Widget
 
+    from openhands.sdk.critic.result import CriticResult
     from openhands_cli.tui.textual_app import OpenHandsApp
 
 
@@ -286,63 +287,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
             # Add critic collapsible if present (for MessageEvent and ActionEvent)
             critic_result = getattr(event, "critic_result", None)
-            critic_settings = self.cli_settings.critic
-            if critic_result is not None and critic_settings.enable_critic:
-                from openhands_cli.tui.utils.critic import (
-                    build_refinement_message,
-                    create_critic_collapsible,
-                    send_critic_inference_event,
-                    should_trigger_refinement,
-                )
-                from openhands_cli.tui.utils.critic.feedback import (
-                    CriticFeedbackWidget,
-                )
-
-                # Get agent model for tracking
-                agent_model = self._get_agent_model()
-                conversation_id = str(self._app.conversation_id)
-
-                # Send critic inference event to PostHog
-                send_critic_inference_event(
-                    critic_result=critic_result,
-                    conversation_id=conversation_id,
-                    agent_model=agent_model,
-                )
-
-                critic_widget = create_critic_collapsible(critic_result)
-                self._run_on_main_thread(self._add_widget_to_ui, critic_widget)
-
-                # Add feedback widget after critic collapsible
-                feedback_widget = CriticFeedbackWidget(
-                    critic_result=critic_result,
-                    conversation_id=conversation_id,
-                    agent_model=agent_model,
-                )
-                self._run_on_main_thread(self._add_widget_to_ui, feedback_widget)
-
-                # Check if iterative refinement should be triggered
-                # Skip if we've reached max iterations (prevents infinite loops)
-                # Read settings directly from cli_settings for current configuration
-                max_iterations = critic_settings.max_refinement_iterations
-                should_refine, triggered_issues = should_trigger_refinement(
-                    critic_result=critic_result,
-                    threshold=critic_settings.critic_threshold,
-                    enabled=critic_settings.enable_iterative_refinement,
-                    issue_threshold=critic_settings.issue_threshold,
-                )
-                if self._refinement_iteration < max_iterations and should_refine:
-                    # Increment iteration count
-                    self._refinement_iteration += 1
-
-                    # Build and send refinement message directly to conversation
-                    refinement_message = build_refinement_message(
-                        critic_result=critic_result,
-                        iteration=self._refinement_iteration,
-                        max_iterations=max_iterations,
-                        issue_threshold=critic_settings.issue_threshold,
-                        triggered_issues=triggered_issues,
-                    )
-                    self._send_refinement_message(refinement_message)
+            if critic_result is not None:
+                self._handle_critic_result(critic_result)
 
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
@@ -350,48 +296,172 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Automatically scroll to the bottom to show the newly added widget
         self._container.scroll_end(animate=False)
 
+    def _handle_critic_result(self, critic_result: "CriticResult") -> None:
+        """Handle a critic result by displaying widgets and triggering refinement.
+
+        This method is responsible for:
+        1. Displaying the critic score collapsible (if enabled)
+        2. Displaying the feedback widget
+        3. Sending telemetry
+        4. Triggering iterative refinement if needed
+
+        Args:
+            critic_result: The critic evaluation result to handle.
+        """
+        from openhands_cli.tui.utils.critic import (
+            create_critic_collapsible,
+            send_critic_inference_event,
+        )
+        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
+
+        critic_settings = self.cli_settings.critic
+
+        # Skip display if critic is disabled
+        if not critic_settings.enable_critic:
+            return
+
+        # Get agent model for tracking
+        agent_model = self._get_agent_model()
+        conversation_id = str(self._app.conversation_id)
+
+        # Send critic inference event to PostHog
+        send_critic_inference_event(
+            critic_result=critic_result,
+            conversation_id=conversation_id,
+            agent_model=agent_model,
+        )
+
+        # Display critic score collapsible
+        critic_widget = create_critic_collapsible(critic_result)
+        self._run_on_main_thread(self._add_widget_to_ui, critic_widget)
+
+        # Add feedback widget after critic collapsible
+        feedback_widget = CriticFeedbackWidget(
+            critic_result=critic_result,
+            conversation_id=conversation_id,
+            agent_model=agent_model,
+        )
+        self._run_on_main_thread(self._add_widget_to_ui, feedback_widget)
+
+        # Check and trigger refinement if needed
+        self._check_and_trigger_refinement(critic_result)
+
+    def _check_and_trigger_refinement(self, critic_result: "CriticResult") -> None:
+        """Check if refinement should trigger and send message if needed.
+
+        This method encapsulates the iterative refinement logic:
+        1. Check if refinement is enabled
+        2. Check if max iterations haven't been reached
+        3. Check if critic score is below threshold
+        4. Build and send refinement message if all conditions met
+
+        Args:
+            critic_result: The critic evaluation result to check.
+        """
+        from openhands_cli.tui.utils.critic import (
+            build_refinement_message,
+            should_trigger_refinement,
+        )
+
+        critic_settings = self.cli_settings.critic
+
+        if not critic_settings.enable_iterative_refinement:
+            return
+
+        max_iterations = critic_settings.max_refinement_iterations
+        if self._refinement_iteration >= max_iterations:
+            return
+
+        should_refine, triggered_issues = should_trigger_refinement(
+            critic_result=critic_result,
+            threshold=critic_settings.critic_threshold,
+            enabled=True,  # Already checked above
+            issue_threshold=critic_settings.issue_threshold,
+        )
+
+        if not should_refine:
+            return
+
+        # Increment iteration count and send refinement message
+        self._refinement_iteration += 1
+        refinement_message = build_refinement_message(
+            critic_result=critic_result,
+            iteration=self._refinement_iteration,
+            max_iterations=max_iterations,
+            issue_threshold=critic_settings.issue_threshold,
+            triggered_issues=triggered_issues,
+        )
+        self._send_refinement_message(refinement_message)
+
     def _send_refinement_message(self, message: str) -> None:
         """Send a refinement message to the agent via ConversationManager.
 
         This is called when iterative refinement is triggered due to a low
         critic score. The message is posted directly to the conversation.
+        Uses render_refinement_message to display without resetting iteration counter.
         """
-        from openhands_cli.tui.core.conversation_manager import SendMessage
+        from openhands_cli.tui.core.conversation_manager import SendRefinementMessage
 
         self._app.call_from_thread(
             self._app.conversation_manager.post_message,
-            SendMessage(message, is_refinement=True),
+            SendRefinementMessage(message),
         )
 
-    def render_user_message(self, content: str, *, is_refinement: bool = False) -> None:
-        """Render a user message to the UI.
+    def _dismiss_pending_feedback_widgets(self) -> None:
+        """Dismiss any pending feedback widgets.
 
-        Dismisses any pending feedback widgets before rendering the user message.
-        Resets the refinement loop counter only for non-refinement messages,
-        so refinement can trigger again on the next user turn.
-
-        Args:
-            content: The user's message text to display.
-            is_refinement: If True, this is a refinement message sent automatically
-                by the system. The iteration counter will NOT be reset.
+        Called when a new user turn starts - user chose to continue
+        instead of rating the critic feedback.
         """
-        from textual.widgets import Static
-
         from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
 
-        # Dismiss pending feedback widgets (user chose to continue instead of rating)
         for widget in self._container.query(CriticFeedbackWidget):
             widget.remove()
 
-        # Reset refinement counter only for real user messages
-        # Keep counter for refinement messages to track iteration properly
-        if not is_refinement:
-            self._refinement_iteration = 0
+    def _render_message_widget(self, content: str) -> None:
+        """Render a message widget to the UI (shared logic).
+
+        Args:
+            content: The message text to display.
+        """
+        from textual.widgets import Static
 
         user_message_widget = Static(
             f"> {content}", classes="user-message", markup=False
         )
         self._run_on_main_thread(self._add_widget_to_ui, user_message_widget)
+
+    def render_user_message(self, content: str) -> None:
+        """Render a user message and start a new user turn.
+
+        This is the entry point for user-initiated messages. It:
+        1. Dismisses any pending feedback widgets
+        2. Resets the refinement iteration counter (new user turn)
+        3. Renders the message to the UI
+
+        Use render_refinement_message() for system-generated refinement messages
+        that should preserve the iteration counter.
+
+        Args:
+            content: The user's message text to display.
+        """
+        self._dismiss_pending_feedback_widgets()
+        self._refinement_iteration = 0
+        self._render_message_widget(content)
+
+    def render_refinement_message(self, content: str) -> None:
+        """Render a refinement message without resetting the iteration counter.
+
+        This is used for system-generated refinement messages that are part of
+        the current refinement loop. Unlike render_user_message(), this does NOT
+        reset the iteration counter, allowing refinement to continue tracking
+        iterations within the same user turn.
+
+        Args:
+            content: The refinement message text to display.
+        """
+        self._dismiss_pending_feedback_widgets()
+        self._render_message_widget(content)
 
     def _update_widget_in_ui(
         self, collapsible: Collapsible, new_title: str, new_content: str

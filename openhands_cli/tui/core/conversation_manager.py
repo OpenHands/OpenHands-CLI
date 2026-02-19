@@ -48,12 +48,27 @@ if TYPE_CHECKING:
 
 
 class SendMessage(Message):
-    """Request to send a user message to the current conversation."""
+    """Request to send a user message to the current conversation.
 
-    def __init__(self, content: str, *, is_refinement: bool = False) -> None:
+    This starts a new user turn and resets the refinement iteration counter.
+    Use SendRefinementMessage for system-generated refinement messages.
+    """
+
+    def __init__(self, content: str) -> None:
         super().__init__()
         self.content = content
-        self.is_refinement = is_refinement
+
+
+class SendRefinementMessage(Message):
+    """Request to send a refinement message to the current conversation.
+
+    Unlike SendMessage, this preserves the refinement iteration counter,
+    allowing the iterative refinement loop to track progress correctly.
+    """
+
+    def __init__(self, content: str) -> None:
+        super().__init__()
+        self.content = content
 
 
 class CreateConversation(Message):
@@ -202,9 +217,17 @@ class ConversationManager(Container):
     async def _on_send_message(self, event: SendMessage) -> None:
         """Handle SendMessage posted directly to ConversationManager."""
         event.stop()
-        await self._message_controller.handle_user_message(
-            event.content, is_refinement=event.is_refinement
-        )
+        await self._message_controller.handle_user_message(event.content)
+
+    @on(SendRefinementMessage)
+    async def _on_send_refinement_message(self, event: SendRefinementMessage) -> None:
+        """Handle SendRefinementMessage for iterative refinement.
+
+        Unlike SendMessage, this uses render_refinement_message which
+        preserves the iteration counter for proper refinement tracking.
+        """
+        event.stop()
+        await self._message_controller.handle_refinement_message(event.content)
 
     @on(CreateConversation)
     def _on_create_conversation(self, event: CreateConversation) -> None:
