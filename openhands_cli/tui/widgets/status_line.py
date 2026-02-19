@@ -8,7 +8,7 @@ from textual.widgets import Static
 
 from openhands.sdk.llm.utils.metrics import Metrics
 from openhands_cli.locations import get_work_dir
-from openhands_cli.stores import CliSettings
+from openhands_cli.stores import CriticSettings
 from openhands_cli.utils import abbreviate_number, format_cost
 
 
@@ -16,10 +16,8 @@ class WorkingStatusLine(Static):
     """Status line showing conversation timer and working indicator (above input).
 
     This widget uses data_bind() to bind to ConversationContainer reactive properties.
-    When ConversationContainer.running or ConversationContainer.elapsed_seconds change,
+    When ConversationContainer.running, elapsed_seconds, or critic_settings change,
     this widget's corresponding properties are automatically updated.
-
-    Iterative refinement status is loaded from CliSettings on mount.
     """
 
     DEFAULT_CSS = """
@@ -34,14 +32,12 @@ class WorkingStatusLine(Static):
     # Reactive properties bound via data_bind() to ConversationContainer
     running: var[bool] = var(False)
     elapsed_seconds: var[int] = var(0)
+    critic_settings: var[CriticSettings] = var(CriticSettings())
 
     def __init__(self, **kwargs) -> None:
         super().__init__("", id="working_status_line", markup=True, **kwargs)
         self._timer: Timer | None = None
         self._working_frame: int = 0
-        # Load CLI settings for iterative refinement status
-        # Loaded eagerly to avoid None checks throughout the code
-        self._cli_settings: CliSettings = CliSettings.load()
 
     def on_mount(self) -> None:
         """Initialize the working status line and start animation timer."""
@@ -55,24 +51,14 @@ class WorkingStatusLine(Static):
             self._timer.stop()
             self._timer = None
 
-    def reload_settings(self) -> None:
-        """Reload CLI settings and update display.
-
-        Called when the user saves settings from the settings modal.
-        This updates the status line display to reflect the new settings.
-
-        Note: This design accepts eventual consistency - status indicator updates
-        immediately while conversation behavior uses its own cached settings.
-        This is acceptable since refinement loop prevention ensures at most one
-        refinement per turn regardless of settings timing.
-        """
-        self._cli_settings = CliSettings.load()
-        self._update_text()
-
     # ----- Reactive Watchers -----
 
     def watch_running(self, _running: bool) -> None:
         """React to running state changes from ConversationContainer."""
+        self._update_text()
+
+    def watch_critic_settings(self, _settings: CriticSettings) -> None:
+        """React to critic settings changes from ConversationContainer."""
         self._update_text()
 
     # ----- Internal helpers -----
@@ -96,8 +82,8 @@ class WorkingStatusLine(Static):
 
     def _get_refinement_indicator(self) -> str:
         """Return the iterative refinement indicator if enabled in settings."""
-        if self._cli_settings.critic.enable_iterative_refinement:
-            threshold = self._cli_settings.critic.critic_threshold * 100
+        if self.critic_settings.enable_iterative_refinement:
+            threshold = self.critic_settings.critic_threshold * 100
             return (
                 f"[bold] Iterative Refinement Enabled [/bold] "
                 f"[dim](retry @ score < {threshold:.0f}%)[/dim]"

@@ -22,7 +22,7 @@ from textual.widgets import (
 )
 from textual.widgets._select import NoSelection
 
-from openhands_cli.stores import AgentStore, CliSettings
+from openhands_cli.stores import AgentStore, CliSettings, CriticSettings
 from openhands_cli.tui.modals.settings.choices import (
     get_model_options,
 )
@@ -448,8 +448,8 @@ class SettingsScreen(ModalScreen):
 
                 merged_settings.save()
 
-                # Refresh status line to reflect new settings
-                self._refresh_status_line()
+                # Update reactive state to refresh UI components
+                self._update_critic_settings(updated_critic)
             except Exception as e:
                 self._show_message(
                     f"Settings saved, but CLI settings failed: {str(e)}", is_error=True
@@ -472,15 +472,18 @@ class SettingsScreen(ModalScreen):
                 )
         self.dismiss(True)
 
-    def _refresh_status_line(self) -> None:
-        """Refresh the status line to reflect updated settings."""
-        try:
-            from openhands_cli.tui.widgets.status_line import WorkingStatusLine
+    def _update_critic_settings(self, critic_settings: CriticSettings) -> None:
+        """Update reactive critic settings in ConversationContainer.
 
-            status_line = self.app.query_one(WorkingStatusLine)
-            status_line.reload_settings()
+        This triggers automatic UI updates for all components bound to critic_settings.
+        """
+        try:
+            from openhands_cli.tui.core.state import ConversationContainer
+
+            container = self.app.query_one(ConversationContainer)
+            container.set_critic_settings(critic_settings)
         except Exception:
-            pass  # Status line may not exist in all contexts
+            pass  # Container may not exist in all contexts
 
     @staticmethod
     def is_initial_setup_required(env_overrides_enabled: bool = False) -> bool:

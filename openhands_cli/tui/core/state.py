@@ -40,6 +40,7 @@ from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
     NeverConfirm,
 )
+from openhands_cli.stores import CriticSettings
 
 
 if TYPE_CHECKING:
@@ -127,9 +128,14 @@ class ConversationContainer(Container):
     loaded_resources: var["LoadedResourcesInfo | None"] = var(None)
     """Loaded skills, hooks, and MCPs for the current conversation."""
 
+    # ---- Critic Settings ----
+    critic_settings: var[CriticSettings] = var(CriticSettings())
+    """Critic settings for iterative refinement. UI components bind to this."""
+
     def __init__(
         self,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
+        initial_critic_settings: CriticSettings | None = None,
         **kwargs,
     ) -> None:
         # Initialize internal state BEFORE calling super().__init__
@@ -142,6 +148,9 @@ class ConversationContainer(Container):
 
         if initial_confirmation_policy is not None:
             self.confirmation_policy = initial_confirmation_policy
+
+        if initial_critic_settings is not None:
+            self.critic_settings = initial_critic_settings
 
     def compose(self) -> ComposeResult:
         """Compose UI widgets that bind to reactive state.
@@ -184,6 +193,7 @@ class ConversationContainer(Container):
             yield WorkingStatusLine().data_bind(
                 running=ConversationContainer.running,
                 elapsed_seconds=ConversationContainer.elapsed_seconds,
+                critic_settings=ConversationContainer.critic_settings,
             )
             yield InputField(
                 placeholder="Type your message, @mention a file, or / for commands"
@@ -367,6 +377,10 @@ class ConversationContainer(Container):
     def set_loaded_resources(self, resources: "LoadedResourcesInfo") -> None:
         """Set loaded resources (skills, hooks, MCPs). Thread-safe."""
         self._schedule_update("loaded_resources", resources)
+
+    def set_critic_settings(self, settings: CriticSettings) -> None:
+        """Set critic settings for iterative refinement. Thread-safe."""
+        self._schedule_update("critic_settings", settings)
 
     # ---- Conversation Attachment (for metrics) ----
 

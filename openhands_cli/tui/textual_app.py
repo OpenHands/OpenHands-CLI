@@ -58,7 +58,11 @@ from openhands.sdk.security.confirmation_policy import (
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.locations import get_conversations_dir, get_work_dir
-from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
+from openhands_cli.stores import (
+    AgentStore,
+    CliSettings,
+    MissingEnvironmentVariablesError,
+)
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.resources import collect_loaded_resources
 from openhands_cli.tui.core import (
@@ -147,9 +151,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """
         super().__init__(**kwargs)
 
+        # Load CLI settings for initial critic settings
+        cli_settings = CliSettings.load()
+
         # ConversationContainer holds reactive state for UI binding
         self.conversation_state = ConversationContainer(
             initial_confirmation_policy=initial_confirmation_policy or AlwaysConfirm(),
+            initial_critic_settings=cli_settings.critic,
         )
 
         # Store exit confirmation setting
