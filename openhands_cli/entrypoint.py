@@ -212,6 +212,7 @@ def main() -> None:
             from openhands_cli.tui.textual_app import main as textual_main
 
             queued_inputs = create_seeded_instructions_from_args(args)
+
             conversation_id = textual_main(
                 resume_conversation_id=resume_id,
                 queued_inputs=queued_inputs,

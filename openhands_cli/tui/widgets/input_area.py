@@ -45,7 +45,7 @@ class InputAreaContainer(Container):
     that bubble up to ConversationManager, which is an ancestor in the
     widget hierarchy.
 
-    UserInputSubmitted messages from InputField also bubble up to
+    SendMessage messages from InputField also bubble up to
     ConversationManager automatically.
 
     Reactive Properties:

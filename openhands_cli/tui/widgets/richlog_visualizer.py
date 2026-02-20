@@ -54,6 +54,7 @@ if TYPE_CHECKING:
     from textual.containers import VerticalScroll
     from textual.widget import Widget
 
+    from openhands.sdk.critic.result import CriticResult
     from openhands_cli.tui.textual_app import OpenHandsApp
 
 
@@ -102,7 +103,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         Args:
             container: The Textual VerticalScroll container to add widgets to
             app: The Textual app instance for thread-safe UI updates
-            skip_user_messages: If True, skip displaying user messages
             name: Agent name to display in panel titles for delegation context.
                   When set, titles will be prefixed with the agent name.
         """
@@ -124,6 +124,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         return self._cli_settings
 
     def reload_configuration(self) -> None:
+        """Reload CLI settings from disk."""
         self._cli_settings = CliSettings.load()
 
     def create_sub_visualizer(self, agent_id: str) -> "ConversationVisualizer":
@@ -283,36 +284,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
             # Add critic collapsible if present (for MessageEvent and ActionEvent)
             critic_result = getattr(event, "critic_result", None)
-            if critic_result is not None and self.cli_settings.enable_critic:
-                from openhands_cli.tui.utils.critic import (
-                    create_critic_collapsible,
-                    send_critic_inference_event,
-                )
-                from openhands_cli.tui.utils.critic.feedback import (
-                    CriticFeedbackWidget,
-                )
-
-                # Get agent model for tracking
-                agent_model = self._get_agent_model()
-                conversation_id = str(self._app.conversation_id)
-
-                # Send critic inference event to PostHog
-                send_critic_inference_event(
-                    critic_result=critic_result,
-                    conversation_id=conversation_id,
-                    agent_model=agent_model,
-                )
-
-                critic_widget = create_critic_collapsible(critic_result)
-                self._run_on_main_thread(self._add_widget_to_ui, critic_widget)
-
-                # Add feedback widget after critic collapsible
-                feedback_widget = CriticFeedbackWidget(
-                    critic_result=critic_result,
-                    conversation_id=conversation_id,
-                    agent_model=agent_model,
-                )
-                self._run_on_main_thread(self._add_widget_to_ui, feedback_widget)
+            if critic_result is not None:
+                self._handle_critic_result(critic_result)
 
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
@@ -320,26 +293,116 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Automatically scroll to the bottom to show the newly added widget
         self._container.scroll_end(animate=False)
 
-    def render_user_message(self, content: str) -> None:
-        """Render a user message to the UI.
+    def _handle_critic_result(self, critic_result: "CriticResult") -> None:
+        """Handle a critic result by displaying widgets and notifying controller.
 
-        Dismisses any pending feedback widgets before rendering the user message.
+        This method is responsible for presentation only:
+        1. Displaying the critic score collapsible (if enabled)
+        2. Displaying the feedback widget
+        3. Sending telemetry
+        4. Posting CriticResultReceived for RefinementController to handle
+
+        Business logic (refinement triggering) is handled by RefinementController.
 
         Args:
-            content: The user's message text to display.
+            critic_result: The critic evaluation result to handle.
         """
-        from textual.widgets import Static
-
+        from openhands_cli.tui.messages import CriticResultReceived
+        from openhands_cli.tui.utils.critic import (
+            create_critic_collapsible,
+            send_critic_inference_event,
+        )
         from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
 
-        # Dismiss pending feedback widgets (user chose to continue instead of rating)
+        critic_settings = self.cli_settings.critic
+
+        # Skip display if critic is disabled
+        if not critic_settings.enable_critic:
+            return
+
+        # Get agent model for tracking
+        agent_model = self._get_agent_model()
+        conversation_id = str(self._app.conversation_id)
+
+        # Send critic inference event to PostHog
+        send_critic_inference_event(
+            critic_result=critic_result,
+            conversation_id=conversation_id,
+            agent_model=agent_model,
+        )
+
+        # Display critic score collapsible
+        critic_widget = create_critic_collapsible(critic_result)
+        self._run_on_main_thread(self._add_widget_to_ui, critic_widget)
+
+        # Add feedback widget after critic collapsible
+        feedback_widget = CriticFeedbackWidget(
+            critic_result=critic_result,
+            conversation_id=conversation_id,
+            agent_model=agent_model,
+        )
+        self._run_on_main_thread(self._add_widget_to_ui, feedback_widget)
+
+        # Notify RefinementController to evaluate and potentially trigger refinement
+        self._app.call_from_thread(
+            self._app.conversation_manager.post_message,
+            CriticResultReceived(critic_result),
+        )
+
+    def _dismiss_pending_feedback_widgets(self) -> None:
+        """Dismiss any pending feedback widgets.
+
+        Called when a new user turn starts - user chose to continue
+        instead of rating the critic feedback.
+        """
+        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
+
         for widget in self._container.query(CriticFeedbackWidget):
             widget.remove()
+
+    def _render_message_widget(self, content: str) -> None:
+        """Render a message widget to the UI (shared logic).
+
+        Args:
+            content: The message text to display.
+        """
+        from textual.widgets import Static
 
         user_message_widget = Static(
             f"> {content}", classes="user-message", markup=False
         )
         self._run_on_main_thread(self._add_widget_to_ui, user_message_widget)
+
+    def render_user_message(self, content: str) -> None:
+        """Render a user message to the UI.
+
+        This is the entry point for user-initiated messages. It:
+        1. Dismisses any pending feedback widgets
+        2. Renders the message to the UI
+
+        Note: The refinement iteration counter is reset by UserMessageController,
+        not here. This keeps the visualizer focused on presentation.
+
+        Use render_refinement_message() for system-generated refinement messages.
+
+        Args:
+            content: The user's message text to display.
+        """
+        self._dismiss_pending_feedback_widgets()
+        self._render_message_widget(content)
+
+    def render_refinement_message(self, content: str) -> None:
+        """Render a system-generated refinement message to the UI.
+
+        This is used for refinement messages that are part of the current
+        refinement loop. Unlike render_user_message(), this is only for display
+        purposes - iteration tracking is managed by RefinementController.
+
+        Args:
+            content: The refinement message text to display.
+        """
+        self._dismiss_pending_feedback_widgets()
+        self._render_message_widget(content)
 
     def _update_widget_in_ui(
         self, collapsible: Collapsible, new_title: str, new_content: str

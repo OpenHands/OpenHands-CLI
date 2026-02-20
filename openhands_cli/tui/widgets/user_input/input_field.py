@@ -16,7 +16,7 @@ from textual.signal import Signal
 from textual.widgets import TextArea
 
 from openhands_cli.tui.core.commands import COMMANDS, is_valid_command
-from openhands_cli.tui.messages import SlashCommandSubmitted, UserInputSubmitted
+from openhands_cli.tui.messages import SendMessage, SlashCommandSubmitted
 from openhands_cli.tui.widgets.user_input.autocomplete_dropdown import (
     AutoCompleteDropdown,
 )
@@ -352,14 +352,14 @@ class InputField(Container):
                     command = content[1:]  # Remove leading "/"
                     self.post_message(SlashCommandSubmitted(command=command))
                 else:
-                    self.post_message(UserInputSubmitted(content=content))
+                    self.post_message(SendMessage(content=content))
 
     def _submit_current_content(self) -> None:
         """Submit current content and clear input.
 
         Posts different messages based on content type:
         - SlashCommandSubmitted for valid slash commands
-        - UserInputSubmitted for regular user input
+        - SendMessage for regular user input
         """
         content = self._get_current_text().strip()
         if not content:
@@ -374,7 +374,7 @@ class InputField(Container):
             self.post_message(SlashCommandSubmitted(command=command))
         else:
             # Regular user input
-            self.post_message(UserInputSubmitted(content=content))
+            self.post_message(SendMessage(content=content))
 
     @on(SingleLineInputWithWrapping.MultiLinePasteDetected)
     def _on_paste_detected(

@@ -1,10 +1,12 @@
 """CLI Settings tab component for the settings modal."""
 
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.widgets import Label, Static, Switch
 
-from openhands_cli.stores import CliSettings
+from openhands_cli.stores.cli_settings import CliSettings
 
 
 class SettingsSwitch(Container):
@@ -43,10 +45,15 @@ class SettingsSwitch(Container):
 class CliSettingsTab(Container):
     """CLI Settings tab component containing CLI-specific settings."""
 
-    def __init__(self, **kwargs):
-        """Initialize the CLI settings tab."""
+    def __init__(self, initial_settings: CliSettings | None = None, **kwargs):
+        """Initialize the CLI settings tab.
+
+        Args:
+            initial_settings: Optional CliSettings object with initial values.
+                If not provided, uses defaults.
+        """
         super().__init__(**kwargs)
-        self.cli_settings = CliSettings.load()
+        self._initial_settings = initial_settings or CliSettings()
 
     def compose(self) -> ComposeResult:
         """Compose the CLI settings tab content."""
@@ -61,7 +68,7 @@ class CliSettingsTab(Container):
                     "only the title. Use Ctrl+O to toggle all cells at any time."
                 ),
                 switch_id="default_cells_expanded_switch",
-                value=self.cli_settings.default_cells_expanded,
+                value=self._initial_settings.default_cells_expanded,
             )
 
             yield SettingsSwitch(
@@ -72,33 +79,20 @@ class CliSettingsTab(Container):
                     "You can toggle it anytime via the command palette."
                 ),
                 switch_id="auto_open_plan_panel_switch",
-                value=self.cli_settings.auto_open_plan_panel,
+                value=self._initial_settings.auto_open_plan_panel,
             )
 
-            yield SettingsSwitch(
-                label="Enable Critic (Experimental)",
-                description=(
-                    "When enabled and using OpenHands LLM provider, an experimental "
-                    "critic model predicts task success likelihood in real-time. "
-                    "We collect anonymized data (IDs, critic response, feedback) to "
-                    "evaluate accuracy. See: https://openhands.dev/privacy"
-                ),
-                switch_id="enable_critic_switch",
-                value=self.cli_settings.enable_critic,
-            )
+    def get_updated_fields(self) -> dict[str, Any]:
+        """Return only the fields this tab manages.
 
-    def get_cli_settings(self) -> CliSettings:
-        """Get the current CLI settings from the form."""
-        default_cells_expanded_switch = self.query_one(
-            "#default_cells_expanded_switch", Switch
-        )
-        auto_open_plan_panel_switch = self.query_one(
-            "#auto_open_plan_panel_switch", Switch
-        )
-        enable_critic_switch = self.query_one("#enable_critic_switch", Switch)
-
-        return CliSettings(
-            default_cells_expanded=default_cells_expanded_switch.value,
-            auto_open_plan_panel=auto_open_plan_panel_switch.value,
-            enable_critic=enable_critic_switch.value,
-        )
+        Returns:
+            Dict with 'default_cells_expanded' and 'auto_open_plan_panel' values.
+        """
+        return {
+            "default_cells_expanded": self.query_one(
+                "#default_cells_expanded_switch", Switch
+            ).value,
+            "auto_open_plan_panel": self.query_one(
+                "#auto_open_plan_panel_switch", Switch
+            ).value,
+        }
