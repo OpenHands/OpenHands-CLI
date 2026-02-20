@@ -2,7 +2,7 @@
 name: PR Review by OpenHands
 
 on:
-    # TEMPORARY MITIGATION (Clinejection-class risk):
+    # MITIGATION:
     # This workflow runs a tool-using LLM agent (bash, repo checkout) on attacker-controlled
     # PR content (title/body/diff). Using `pull_request_target` would expose secrets in the
     # base-repo context, which is a known risky pattern:
