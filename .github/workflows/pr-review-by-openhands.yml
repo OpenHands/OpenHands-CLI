@@ -9,7 +9,6 @@ on:
     # https://adnanthekhan.com/posts/clinejection/
     #
 # For now, we run on `pull_request` and block fork PRs entirely (see condition below).
-# We intend to restore `pull_request_target` once the workflow is properly sandboxed/guarded.
     # `pull_request_target` once the workflow is properly sandboxed/guarded.
     pull_request:
         types: [opened, ready_for_review, labeled, review_requested]
