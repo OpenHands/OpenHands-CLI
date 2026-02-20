@@ -40,13 +40,9 @@ def test_no_user_skills_flag_wires_through_to_textual_main():
     )
 
     with (
-        patch(
-            "openhands_cli.entrypoint.create_main_parser", return_value=mock_parser
-        ),
+        patch("openhands_cli.entrypoint.create_main_parser", return_value=mock_parser),
         patch("openhands_cli.entrypoint.check_and_warn_env_vars"),
-        patch(
-            "openhands_cli.entrypoint.check_terminal_compatibility"
-        ) as mock_compat,
+        patch("openhands_cli.entrypoint.check_terminal_compatibility") as mock_compat,
         patch("openhands_cli.tui.textual_app.main") as mocked_textual_main,
     ):
         mock_compat.return_value = MagicMock(is_tty=True)
