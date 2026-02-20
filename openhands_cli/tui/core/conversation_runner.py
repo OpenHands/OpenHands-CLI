@@ -106,6 +106,18 @@ class ConversationRunner:
         # Run send_message in the same thread pool, not on the UI loop
         await loop.run_in_executor(None, self.conversation.send_message, message)
 
+    async def queue_delegation(self, agent_name: str, content: str) -> None:
+        """Queue a delegation request while runner is busy.
+
+        Args:
+            agent_name: Name of the agent to delegate to
+            content: Task description
+        """
+        # For now, we just queue it as a regular message with the @agent-name prefix
+        # The delegate tool will handle it if the agent re-processes this
+        delegation_msg = f"@{agent_name} {content}"
+        await self.queue_message(delegation_msg)
+
     async def process_message_async(
         self, user_input: str, headless: bool = False
     ) -> None:
@@ -134,6 +146,96 @@ class ConversationRunner:
         """
         self.conversation.send_message(message)
         self._execute_conversation(headless=headless)
+
+    async def process_delegation_async(
+        self, agent_name: str, content: str, headless: bool = False
+    ) -> None:
+        """Process agent delegation asynchronously to keep UI unblocked.
+
+        Args:
+            agent_name: Name of the agent to delegate to
+            content: Task description for the agent
+            headless: If True, print status to console
+        """
+        # Run delegation processing in a separate thread to avoid blocking UI
+        await asyncio.get_event_loop().run_in_executor(
+            None, self._process_delegation_sync, agent_name, content, headless
+        )
+
+    def _process_delegation_sync(
+        self, agent_name: str, content: str, headless: bool = False
+    ) -> None:
+        """Synchronously process delegation (runs in thread).
+
+        Args:
+            agent_name: Name of the agent to delegate to
+            content: Task description
+            headless: If True, print status to console
+        """
+        if self.conversation is None:
+            return
+
+        # Get delegate tool
+        agent = self.conversation.agent
+        delegate_tool = agent.tools_map.get("delegate")
+
+        if not delegate_tool or not delegate_tool.executor:
+            self.visualizer.render_error_message(
+                "Delegation is not available in this conversation."
+            )
+            return
+
+        from openhands.tools.delegate.definition import DelegateAction
+
+        executor = delegate_tool.executor
+        sub_agents = getattr(executor, "_sub_agents", {})
+
+        # Generate unique agent ID (e.g., "security_expert_1")
+        agent_id = self._generate_agent_id(agent_name, sub_agents)
+
+        try:
+            # Step 1: Spawn agent if not already spawned
+            if agent_id not in sub_agents:
+                spawn_action = DelegateAction(
+                    command="spawn", ids=[agent_id], agent_types=[agent_name]
+                )
+                spawn_obs = delegate_tool(spawn_action, self.conversation)
+
+                if spawn_obs.error:
+                    self.visualizer.render_error_message(
+                        f"Failed to spawn {agent_name}: {spawn_obs.content}"
+                    )
+                    return
+
+            # Step 2: Delegate task
+            delegate_action = DelegateAction(
+                command="delegate", tasks={agent_id: content}
+            )
+            delegate_obs = delegate_tool(delegate_action, self.conversation)
+
+            if delegate_obs.error:
+                self.visualizer.render_error_message(
+                    f"Delegation failed: {delegate_obs.content}"
+                )
+            # Success - observation will be rendered by normal event flow
+
+        except Exception as e:
+            self.visualizer.render_error_message(f"Delegation error: {str(e)}")
+
+    def _generate_agent_id(self, agent_name: str, existing: dict) -> str:
+        """Generate unique agent ID (e.g., security_expert_1).
+
+        Args:
+            agent_name: Base name for the agent
+            existing: Dictionary of existing agent IDs
+
+        Returns:
+            Unique agent ID
+        """
+        counter = 1
+        while f"{agent_name}_{counter}" in existing:
+            counter += 1
+        return f"{agent_name}_{counter}"
 
     def _execute_conversation(
         self,

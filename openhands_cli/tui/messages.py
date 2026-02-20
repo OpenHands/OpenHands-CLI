@@ -53,3 +53,15 @@ class NewConversationRequested(Message):
     """
 
     pass
+
+
+@dataclass
+class AgentDelegationRequested(Message):
+    """Message sent when user requests to delegate to a specific agent using @agent-name syntax.
+
+    Format: @agent-name task description
+    Example: @security_expert review this code for SQL injection
+    """
+
+    agent_name: str
+    content: str

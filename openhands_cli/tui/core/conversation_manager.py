@@ -34,7 +34,7 @@ from openhands_cli.tui.core.events import ConfirmationDecision, ShowConfirmation
 from openhands_cli.tui.core.runner_factory import RunnerFactory
 from openhands_cli.tui.core.runner_registry import RunnerRegistry
 from openhands_cli.tui.core.user_message_controller import UserMessageController
-from openhands_cli.tui.messages import UserInputSubmitted
+from openhands_cli.tui.messages import AgentDelegationRequested, UserInputSubmitted
 
 
 if TYPE_CHECKING:
@@ -202,6 +202,16 @@ class ConversationManager(Container):
         """Handle SendMessage posted directly to ConversationManager."""
         event.stop()
         await self._message_controller.handle_user_message(event.content)
+
+    @on(AgentDelegationRequested)
+    async def _on_agent_delegation_requested(
+        self, event: AgentDelegationRequested
+    ) -> None:
+        """Handle @agent-name delegation request from InputField."""
+        event.stop()
+        await self._message_controller.handle_agent_delegation(
+            event.agent_name, event.content
+        )
 
     @on(CreateConversation)
     def _on_create_conversation(self, event: CreateConversation) -> None:
