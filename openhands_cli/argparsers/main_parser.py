@@ -8,7 +8,12 @@ from openhands_cli.argparsers.auth_parser import add_login_parser, add_logout_pa
 from openhands_cli.argparsers.cloud_parser import add_cloud_parser
 from openhands_cli.argparsers.mcp_parser import add_mcp_parser
 from openhands_cli.argparsers.serve_parser import add_serve_parser
-from openhands_cli.argparsers.utils import add_confirmation_mode_args
+from openhands_cli.argparsers.util import (
+    add_confirmation_mode_args,
+    add_env_override_args,
+    add_resume_args,
+)
+from openhands_cli.argparsers.view_parser import add_view_parser
 from openhands_cli.argparsers.web_parser import add_web_parser
 
 
@@ -30,11 +35,10 @@ def create_main_parser() -> argparse.ArgumentParser:
 
             Examples:
                 openhands                           # Start textual UI mode
-                openhands --exp                     # Start textual UI (same as default)
                 openhands --headless                # Start textual UI in headless mode
                 openhands --headless --json -t "Fix bug"  # Headless with JSON output
                 openhands --resume conversation-id  # Resume conversation
-                openhands --always-approve          # Auto-approve all actions
+                openhands --yolo                    # Auto-approve all actions
                 openhands --llm-approve             # LLM-based approval mode
                 openhands cloud -t "Fix bug"        # Create cloud conversation
                 openhands serve                     # Launch GUI server
@@ -72,24 +76,7 @@ def create_main_parser() -> argparse.ArgumentParser:
     )
 
     # CLI arguments at top level (default mode)
-    parser.add_argument(
-        "--resume",
-        type=str,
-        nargs="?",
-        const="",
-        help="Conversation ID to resume. If no ID provided, shows list of recent "
-        "conversations",
-    )
-    parser.add_argument(
-        "--last",
-        action="store_true",
-        help="Resume the most recent conversation (use with --resume)",
-    )
-    parser.add_argument(
-        "--exp",
-        action="store_true",
-        help="Use textual-based UI (now default, flag kept for compatibility)",
-    )
+    add_resume_args(parser)
     parser.add_argument(
         "--headless",
         action="store_true",
@@ -116,6 +103,9 @@ def create_main_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Exit the application without showing confirmation dialog",
     )
+
+    # Environment variable override option
+    add_env_override_args(parser)
 
     # User skills toggle: default on, disable with --no-user-skills
     parser.add_argument(
@@ -147,5 +137,8 @@ def create_main_parser() -> argparse.ArgumentParser:
     # Add authentication subcommands
     add_login_parser(subparsers)
     add_logout_parser(subparsers)
+
+    # Add view subcommand
+    add_view_parser(subparsers)
 
     return parser

@@ -11,7 +11,7 @@ from acp.schema import (
     TextContentBlock,
 )
 
-from openhands_cli.acp_impl.agent import OpenHandsACPAgent
+from openhands_cli.acp_impl.agent import LocalOpenHandsACPAgent
 
 
 @pytest.fixture
@@ -24,52 +24,36 @@ def mock_connection():
 @pytest.fixture
 def acp_agent(mock_connection):
     """Create an OpenHands ACP agent instance."""
-    return OpenHandsACPAgent(mock_connection, "always-ask")
+    return LocalOpenHandsACPAgent(mock_connection, "always-ask")
 
 
 @pytest.mark.asyncio
-async def test_initialize_with_configured_agent(acp_agent):
-    """Test agent initialization when agent is configured."""
-    # Mock load_agent_specs to succeed
-    with patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load:
-        mock_agent = MagicMock()
-        mock_load.return_value = mock_agent
+async def test_initialize(acp_agent):
+    """Test agent initialization always returns auth method."""
+    response = await acp_agent.initialize(
+        protocol_version=1,
+        client_info=Implementation(name="test-client", version="1.0.0"),
+    )
 
-        response = await acp_agent.initialize(
-            protocol_version=1,
-            client_info=Implementation(name="test-client", version="1.0.0"),
-        )
-
-        assert response.protocol_version == 1
-        assert isinstance(response.agent_capabilities, AgentCapabilities)
-        assert response.agent_capabilities.load_session is True
-        assert len(response.auth_methods) == 0  # No auth needed when configured
-
-
-@pytest.mark.asyncio
-async def test_initialize_without_configured_agent(acp_agent):
-    """Test agent initialization when agent is not configured."""
-    from openhands_cli.setup import MissingAgentSpec
-
-    # Mock load_agent_specs to raise MissingAgentSpec
-    with patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load:
-        mock_load.side_effect = MissingAgentSpec("Not configured")
-
-        response = await acp_agent.initialize(
-            protocol_version=1,
-            client_info=Implementation(name="test-client", version="1.0.0"),
-        )
-
-        assert response.protocol_version == 1
-        assert len(response.auth_methods) == 0  # No auth methods for now
+    assert response.protocol_version == 1
+    assert isinstance(response.agent_capabilities, AgentCapabilities)
+    assert response.agent_capabilities.load_session is True
+    # Auth method is always returned for OAuth authentication
+    assert len(response.auth_methods) == 1
+    assert response.auth_methods[0].id == "oauth"
+    assert response.auth_methods[0].field_meta == {"type": "agent"}
 
 
 @pytest.mark.asyncio
 async def test_authenticate(acp_agent):
     """Test authentication."""
-    response = await acp_agent.authenticate(method_id="test-method")
+    with patch(
+        "openhands_cli.auth.login_command.login_command",
+        new_callable=AsyncMock,
+    ):
+        response = await acp_agent.authenticate(method_id="oauth")
 
-    assert response is not None
+        assert response is not None
 
 
 @pytest.mark.asyncio
@@ -77,8 +61,8 @@ async def test_new_session_success(acp_agent, tmp_path):
     """Test creating a new session successfully."""
     # Mock the CLI utilities
     with (
-        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-        patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+        patch("openhands_cli.acp_impl.agent.local_agent.load_agent_specs") as mock_load,
+        patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
     ):
         # Mock agent
         mock_agent = MagicMock()
@@ -104,14 +88,40 @@ async def test_new_session_success(acp_agent, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_new_session_raises_auth_required_when_not_authenticated(
+    mock_connection, tmp_path
+):
+    """Test that new_session raises auth_required when user is not authenticated."""
+    from acp import RequestError
+
+    from openhands_cli.setup import MissingAgentSpec
+
+    # Create agent and mock _is_authenticated to return False
+    agent = LocalOpenHandsACPAgent(mock_connection, "always-ask")
+
+    with patch(
+        "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+    ) as mock_load:
+        mock_load.side_effect = MissingAgentSpec("Not configured")
+
+        with pytest.raises(RequestError) as exc_info:
+            await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+
+        assert "Authentication required" in str(exc_info.value.data)
+
+
+@pytest.mark.asyncio
 async def test_new_session_agent_not_configured(acp_agent, tmp_path):
     """Test creating a new session when agent is not configured."""
     from acp import RequestError
 
     from openhands_cli.setup import MissingAgentSpec
 
-    # Mock load_agent_specs to raise MissingAgentSpec
-    with patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load:
+    # Mock load_agent_specs to raise MissingAgentSpec - this will make
+    # _is_authenticated return False, which raises auth_required
+    with patch(
+        "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+    ) as mock_load:
         mock_load.side_effect = MissingAgentSpec("Not configured")
 
         with pytest.raises(RequestError):
@@ -127,11 +137,19 @@ async def test_new_session_with_malformed_mcp_json(acp_agent, tmp_path, monkeypa
 
     request = NewSessionRequest(cwd=str(tmp_path), mcp_servers=[])
 
-    # Mock load_agent_specs to raise MCPConfigurationError
-    with patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load:
-        mock_load.side_effect = MCPConfigurationError(
-            "Invalid JSON: trailing characters at line 20 column 1"
-        )
+    # Mock load_agent_specs:
+    # - First call (from _is_authenticated): return success
+    # - Second call (from _setup_conversation): raise MCPConfigurationError
+    with patch(
+        "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+    ) as mock_load:
+        mock_agent = MagicMock()
+        mock_load.side_effect = [
+            mock_agent,  # First call succeeds (auth check)
+            MCPConfigurationError(
+                "Invalid JSON: trailing characters at line 20 column 1"
+            ),  # Second call fails
+        ]
 
         # Should raise RequestError with helpful message
         with pytest.raises(RequestError) as exc_info:
@@ -158,11 +176,19 @@ async def test_new_session_with_malformed_mcp_json_integration(
 
     request = NewSessionRequest(cwd=str(tmp_path), mcp_servers=[])
 
-    # Mock load_agent_specs to propagate the MCPConfigurationError
-    with patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load_specs:
-        mock_load_specs.side_effect = MCPConfigurationError(
-            "Invalid JSON: trailing characters at line 20 column 1"
-        )
+    # Mock load_agent_specs:
+    # - First call (from _is_authenticated): return success
+    # - Second call (from _setup_conversation): raise MCPConfigurationError
+    with patch(
+        "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+    ) as mock_load_specs:
+        mock_agent = MagicMock()
+        mock_load_specs.side_effect = [
+            mock_agent,  # First call succeeds (auth check)
+            MCPConfigurationError(
+                "Invalid JSON: trailing characters at line 20 column 1"
+            ),  # Second call fails
+        ]
 
         # RequestError raised when creating session with malformed mcp.json
         with pytest.raises(RequestError) as exc_info:
@@ -185,8 +211,8 @@ async def test_new_session_creates_working_directory(acp_agent, tmp_path):
     new_dir = tmp_path / "subdir" / "workdir"
 
     with (
-        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-        patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+        patch("openhands_cli.acp_impl.agent.local_agent.load_agent_specs") as mock_load,
+        patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
     ):
         mock_agent = MagicMock()
         mock_agent.llm.model = "test-model"
@@ -252,13 +278,15 @@ async def test_prompt_success(acp_agent, mock_connection):
     callbacks_holder = []
 
     # Create a real newSession to set up callbacks
-    with patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load:
+    with patch(
+        "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+    ) as mock_load:
         # Mock agent specs
         mock_agent = MagicMock()
         mock_agent.llm.model = "test-model"
         mock_load.return_value = MagicMock(agent=mock_agent)
 
-        with patch("openhands_cli.acp_impl.agent.Conversation") as MockConv:
+        with patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as MockConv:
             # Capture the callbacks parameter
             def capture_callbacks(*args, **kwargs):
                 if "callbacks" in kwargs:
@@ -298,21 +326,6 @@ async def test_prompt_success(acp_agent, mock_connection):
 
         await asyncio.sleep(0.1)
         mock_connection.session_update.assert_called()
-
-
-@pytest.mark.asyncio
-async def test_cancel(acp_agent):
-    """Test cancelling an operation."""
-    session_id = "test-session"
-
-    # Create mock conversation
-    mock_conversation = MagicMock()
-    acp_agent._active_sessions[session_id] = mock_conversation
-
-    await acp_agent.cancel(session_id=session_id)
-
-    # Verify pause was called
-    mock_conversation.pause.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -432,13 +445,15 @@ async def test_prompt_with_image(acp_agent, mock_connection):
     callbacks_holder = []
 
     # Create a real newSession to set up callbacks
-    with patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load:
+    with patch(
+        "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+    ) as mock_load:
         # Mock agent specs
         mock_agent = MagicMock()
         mock_agent.llm.model = "test-model"
         mock_load.return_value = MagicMock(agent=mock_agent)
 
-        with patch("openhands_cli.acp_impl.agent.Conversation") as MockConv:
+        with patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as MockConv:
             # Capture the callbacks parameter
             def capture_callbacks(*args, **kwargs):
                 if "callbacks" in kwargs:
@@ -495,7 +510,9 @@ async def test_initialize_reports_image_capability(acp_agent):
     """Test that initialization reports image capability."""
     from acp.schema import Implementation
 
-    with patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load:
+    with patch(
+        "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+    ) as mock_load:
         mock_agent = MagicMock()
         mock_load.return_value = mock_agent
 
@@ -522,8 +539,8 @@ async def test_new_session_with_mcp_servers(acp_agent, tmp_path):
     )
 
     with (
-        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-        patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+        patch("openhands_cli.acp_impl.agent.local_agent.load_agent_specs") as mock_load,
+        patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
     ):
         mock_agent = MagicMock()
         mock_agent.llm.model = "test-model"
@@ -539,9 +556,13 @@ async def test_new_session_with_mcp_servers(acp_agent, tmp_path):
         # Verify session was created
         assert response.session_id is not None
 
-        # Verify load_agent_specs was called with transformed MCP servers dict
-        mock_load.assert_called_once()
-        call_kwargs = mock_load.call_args[1]
+        # Verify load_agent_specs was called twice:
+        # - First call: _is_authenticated check (no args)
+        # - Second call: _setup_conversation with mcp_servers
+        assert mock_load.call_count == 2
+
+        # Check the second call has the transformed MCP servers dict
+        call_kwargs = mock_load.call_args_list[1][1]
         assert "mcp_servers" in call_kwargs
         mcp_servers_dict = call_kwargs["mcp_servers"]
 
@@ -558,8 +579,8 @@ async def test_new_session_with_mcp_servers(acp_agent, tmp_path):
 async def test_new_session_includes_modes(acp_agent, tmp_path):
     """Test that new_session returns modes in response."""
     with (
-        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-        patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+        patch("openhands_cli.acp_impl.agent.local_agent.load_agent_specs") as mock_load,
+        patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
     ):
         mock_agent = MagicMock()
         mock_agent.llm.model = "test-model"
@@ -581,142 +602,149 @@ async def test_new_session_includes_modes(acp_agent, tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_load_session_includes_modes(acp_agent, tmp_path):
-    """Test that load_session returns modes in response."""
-    session_id = "12345678-1234-5678-1234-567812345678"
+async def test_new_session_with_resume_conversation_id(mock_connection, tmp_path):
+    """Test that new_session uses resume_conversation_id when provided."""
+    resume_id = "12345678-1234-1234-1234-123456789abc"
+    agent = LocalOpenHandsACPAgent(mock_connection, "always-ask", resume_id)
 
     with (
-        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-        patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
-    ):
-        mock_agent = MagicMock()
-        mock_agent.llm.model = "test-model"
-        mock_load.return_value = mock_agent
-
-        # Mock conversation with empty events (empty session)
-        mock_conversation = MagicMock()
-        mock_conversation.state.events = []
-        mock_conv.return_value = mock_conversation
-
-        response = await acp_agent.load_session(
-            session_id=session_id, cwd=str(tmp_path), mcp_servers=[]
-        )
-
-        # Verify modes are included
-        assert response.modes is not None
-        assert response.modes.current_mode_id == "always-ask"  # Default
-        assert len(response.modes.available_modes) == 3
-
-
-@pytest.mark.asyncio
-async def test_set_session_mode_success(acp_agent, tmp_path):
-    """Test setting session mode successfully."""
-    # First create a session
-    from openhands.sdk.security.confirmation_policy import AlwaysConfirm, NeverConfirm
-
-    with (
-        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-        patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+        patch("openhands_cli.acp_impl.agent.local_agent.load_agent_specs") as mock_load,
+        patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
     ):
         mock_agent = MagicMock()
         mock_agent.llm.model = "test-model"
         mock_load.return_value = mock_agent
 
         mock_conversation = MagicMock()
-        mock_conversation.state.confirmation_policy = AlwaysConfirm()
-        mock_conversation.state.events = []
-
-        # Set up set_confirmation_policy to actually update the policy
-        def set_policy_side_effect(new_policy):
-            mock_conversation.state.confirmation_policy = new_policy
-
-        mock_conversation.set_confirmation_policy = MagicMock(
-            side_effect=set_policy_side_effect
-        )
-        mock_conversation.set_security_analyzer = MagicMock()
         mock_conv.return_value = mock_conversation
 
-        # Create session and get its ID
-        session_response = await acp_agent.new_session(
-            cwd=str(tmp_path), mcp_servers=[]
-        )
-        session_id = session_response.session_id
+        # First new_session should use the resume_conversation_id
+        response = await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
 
-        # Now set the mode - this should update the policy
-        response = await acp_agent.set_session_mode(
-            mode_id="always-approve", session_id=session_id
-        )
+        # Verify the session ID is the resume_conversation_id
+        assert response.session_id == resume_id
 
-        assert response is not None
-
-        # Verify set_confirmation_policy was called with a NeverConfirm policy
-        mock_conversation.set_confirmation_policy.assert_called()
-        # Get the last call (called once for initial, once for mode change)
-        calls = mock_conversation.set_confirmation_policy.call_args_list
-        last_policy = calls[-1][0][0]
-        assert isinstance(last_policy, NeverConfirm)
-
-        # Verify session update was sent
-        acp_agent._conn.session_update.assert_called()
-        call_args = acp_agent._conn.session_update.call_args
-        assert call_args[1]["session_id"] == session_id
-        update = call_args[1]["update"]
-        assert update.current_mode_id == "always-approve"
+        # Verify the resume_conversation_id is cleared after first use
+        assert agent._resume_conversation_id is None
 
 
 @pytest.mark.asyncio
-async def test_set_session_mode_invalid(acp_agent):
-    """Test setting session mode with invalid mode ID."""
-    from acp import RequestError
-
-    session_id = "12345678-1234-5678-1234-567812345678"
-
-    with pytest.raises(RequestError):
-        await acp_agent.set_session_mode(mode_id="invalid", session_id=session_id)
-
-
-@pytest.mark.asyncio
-async def test_set_session_mode_updates_existing_conversation(acp_agent, tmp_path):
-    """Test that setting mode updates existing conversation's confirmation policy."""
-    from openhands.sdk.security.confirmation_policy import AlwaysConfirm, NeverConfirm
+async def test_new_session_resume_id_only_used_once(mock_connection, tmp_path):
+    """Test that resume_conversation_id is only used for the first new_session call."""
+    resume_id = "12345678-1234-1234-1234-123456789abc"
+    agent = LocalOpenHandsACPAgent(mock_connection, "always-ask", resume_id)
 
     with (
-        patch("openhands_cli.acp_impl.agent.load_agent_specs") as mock_load,
-        patch("openhands_cli.acp_impl.agent.Conversation") as mock_conv,
+        patch("openhands_cli.acp_impl.agent.local_agent.load_agent_specs") as mock_load,
+        patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
     ):
         mock_agent = MagicMock()
         mock_agent.llm.model = "test-model"
         mock_load.return_value = mock_agent
 
         mock_conversation = MagicMock()
-        mock_conversation.state.confirmation_policy = AlwaysConfirm()
-        mock_conversation.state.events = []
-
-        # Set up set_confirmation_policy to actually update the policy
-        def set_policy_side_effect(new_policy):
-            mock_conversation.state.confirmation_policy = new_policy
-
-        mock_conversation.set_confirmation_policy = MagicMock(
-            side_effect=set_policy_side_effect
-        )
-        mock_conversation.set_security_analyzer = MagicMock()
         mock_conv.return_value = mock_conversation
 
-        # Create session
-        response = await acp_agent.new_session(cwd=str(tmp_path), mcp_servers=[])
-        session_id = response.session_id
+        # First new_session should use the resume_conversation_id
+        response1 = await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+        assert response1.session_id == resume_id
 
-        # Conversation should be cached
-        assert session_id in acp_agent._active_sessions
+        # Second new_session should generate a new UUID
+        response2 = await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+        assert response2.session_id != resume_id
 
-        # Change mode to always-approve
-        await acp_agent.set_session_mode(
-            mode_id="always-approve", session_id=session_id
+        # Verify it's a valid UUID
+        UUID(response2.session_id)
+
+
+@pytest.mark.asyncio
+async def test_new_session_replays_historic_events_on_resume(mock_connection, tmp_path):
+    """Test that new_session replays historic events when resuming a conversation."""
+    resume_id = "12345678-1234-1234-1234-123456789abc"
+    agent = LocalOpenHandsACPAgent(mock_connection, "always-ask", resume_id)
+
+    with (
+        patch("openhands_cli.acp_impl.agent.local_agent.load_agent_specs") as mock_load,
+        patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
+        patch(
+            "openhands_cli.acp_impl.agent.base_agent.EventSubscriber"
+        ) as mock_subscriber_class,
+    ):
+        mock_agent = MagicMock()
+        mock_agent.llm.model = "test-model"
+        mock_load.return_value = mock_agent
+
+        # Create mock events
+        from openhands.sdk import Message, TextContent
+        from openhands.sdk.event.llm_convertible.message import MessageEvent
+
+        mock_event1 = MessageEvent(
+            source="user",
+            llm_message=Message(role="user", content=[TextContent(text="Hello")]),
+        )
+        mock_event2 = MessageEvent(
+            source="agent",
+            llm_message=Message(
+                role="assistant", content=[TextContent(text="Hi there!")]
+            ),
         )
 
-        # Verify set_confirmation_policy was called with a NeverConfirm policy
-        mock_conversation.set_confirmation_policy.assert_called()
-        # Get the last call (called once for initial mode, once for mode change)
-        calls = mock_conversation.set_confirmation_policy.call_args_list
-        last_policy = calls[-1][0][0]
-        assert isinstance(last_policy, NeverConfirm)
+        # Mock conversation with historic events
+        mock_conversation = MagicMock()
+        mock_conversation.state.events = [mock_event1, mock_event2]
+        mock_conv.return_value = mock_conversation
+
+        # Mock EventSubscriber
+        mock_subscriber = AsyncMock()
+        mock_subscriber_class.return_value = mock_subscriber
+
+        # Call new_session with resume
+        response = await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+
+        # Verify the session ID is the resume_conversation_id
+        assert response.session_id == resume_id
+
+        # Verify EventSubscriber was created for replaying events
+        mock_subscriber_class.assert_called_with(resume_id, mock_connection)
+
+        # Verify all historic events were replayed
+        assert mock_subscriber.call_count == 2
+        mock_subscriber.assert_any_call(mock_event1)
+        mock_subscriber.assert_any_call(mock_event2)
+
+
+@pytest.mark.asyncio
+async def test_new_session_no_replay_for_new_conversation(mock_connection, tmp_path):
+    """Test that new_session does NOT replay events for new conversations."""
+    # No resume_conversation_id provided
+    agent = LocalOpenHandsACPAgent(mock_connection, "always-ask")
+
+    with (
+        patch("openhands_cli.acp_impl.agent.local_agent.load_agent_specs") as mock_load,
+        patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
+        patch(
+            "openhands_cli.acp_impl.agent.base_agent.EventSubscriber"
+        ) as mock_subscriber_class,
+    ):
+        mock_agent = MagicMock()
+        mock_agent.llm.model = "test-model"
+        mock_load.return_value = mock_agent
+
+        # Mock conversation with no events (new conversation)
+        mock_conversation = MagicMock()
+        mock_conversation.state.events = []
+        mock_conv.return_value = mock_conversation
+
+        # Mock EventSubscriber
+        mock_subscriber = AsyncMock()
+        mock_subscriber_class.return_value = mock_subscriber
+
+        # Call new_session without resume
+        response = await agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+
+        # Verify a new UUID was generated (not the resume ID)
+        UUID(response.session_id)  # Should be a valid UUID
+
+        # Verify EventSubscriber was NOT called for replaying events
+        # (it may be created for _send_available_commands, but not called with events)
+        mock_subscriber.assert_not_called()

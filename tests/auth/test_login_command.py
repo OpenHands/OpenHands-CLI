@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from openhands_cli.auth.device_flow import DeviceTokenResponse
 from openhands_cli.auth.login_command import (
     _fetch_user_data_with_context,
     login_command,
@@ -85,26 +86,32 @@ class TestLoginCommand:
 
     @pytest.mark.asyncio
     async def test_login_command_existing_token(self):
-        """Test login command when user already has a token."""
+        """Test login command when user already has a valid token."""
         server_url = "https://api.example.com"
 
         with patch(
             "openhands_cli.auth.login_command.TokenStorage"
         ) as mock_storage_class:
             with patch(
-                "openhands_cli.auth.login_command._fetch_user_data_with_context"
-            ) as mock_fetch:
-                with patch("openhands_cli.auth.login_command._p"):
-                    mock_storage = MagicMock()
-                    mock_storage_class.return_value = mock_storage
-                    mock_storage.get_api_key.return_value = "existing-api-key"
+                "openhands_cli.auth.login_command.is_token_valid", return_value=True
+            ):
+                with patch(
+                    "openhands_cli.auth.login_command._fetch_user_data_with_context"
+                ) as mock_fetch:
+                    with patch("openhands_cli.auth.login_command._p"):
+                        mock_storage = MagicMock()
+                        mock_storage_class.return_value = mock_storage
+                        mock_storage.get_api_key.return_value = "existing-api-key"
 
-                    result = await login_command(server_url)
+                        result = await login_command(server_url)
 
-                    assert result is True
-                    mock_fetch.assert_called_once_with(
-                        server_url, "existing-api-key", already_logged_in=True
-                    )
+                        assert result is True
+                        mock_fetch.assert_called_once_with(
+                            server_url,
+                            "existing-api-key",
+                            already_logged_in=True,
+                            skip_settings_sync=False,
+                        )
 
     @pytest.mark.asyncio
     async def test_login_command_new_login_success(self):
@@ -127,10 +134,10 @@ class TestLoginCommand:
                             None  # No existing token
                         )
 
-                        mock_auth.return_value = {
-                            "access_token": "new-api-key",
-                            "token_type": "Bearer",
-                        }
+                        mock_auth.return_value = DeviceTokenResponse(
+                            access_token="new-api-key",
+                            token_type="Bearer",
+                        )
 
                         result = await login_command(server_url)
 
@@ -140,7 +147,10 @@ class TestLoginCommand:
                             "new-api-key"
                         )
                         mock_fetch.assert_called_once_with(
-                            server_url, "new-api-key", already_logged_in=False
+                            server_url,
+                            "new-api-key",
+                            already_logged_in=False,
+                            skip_settings_sync=False,
                         )
 
     @pytest.mark.asyncio
@@ -170,33 +180,8 @@ class TestLoginCommand:
                     assert any("Authentication failed" in call for call in print_calls)
 
     @pytest.mark.asyncio
-    async def test_login_command_no_access_token(self):
-        """Test login command when OAuth response has no access token."""
-        server_url = "https://api.example.com"
-
-        with patch(
-            "openhands_cli.auth.login_command.TokenStorage"
-        ) as mock_storage_class:
-            with patch(
-                "openhands_cli.auth.login_command.authenticate_with_device_flow"
-            ) as mock_auth:
-                with patch("openhands_cli.auth.login_command._p") as mock_print:
-                    mock_storage = MagicMock()
-                    mock_storage_class.return_value = mock_storage
-                    mock_storage.get_api_key.return_value = None
-
-                    mock_auth.return_value = {"token_type": "Bearer"}  # No access_token
-
-                    result = await login_command(server_url)
-
-                    assert result is True  # Still considered successful
-                    mock_storage.store_api_key.assert_not_called()
-                    print_calls = [call[0][0] for call in mock_print.call_args_list]
-                    assert any("No access token found" in call for call in print_calls)
-
-    @pytest.mark.asyncio
-    async def test_login_command_empty_access_token(self):
-        """Test login command when OAuth response has empty access token."""
+    async def test_login_command_with_expires_in(self):
+        """Test login command with token that has expiration."""
         server_url = "https://api.example.com"
 
         with patch(
@@ -213,16 +198,20 @@ class TestLoginCommand:
                         mock_storage_class.return_value = mock_storage
                         mock_storage.get_api_key.return_value = None
 
-                        mock_auth.return_value = {
-                            "access_token": "",
-                            "token_type": "Bearer",
-                        }
+                        mock_auth.return_value = DeviceTokenResponse(
+                            access_token="new-api-key",
+                            token_type="Bearer",
+                            expires_in=3600,
+                        )
 
                         result = await login_command(server_url)
 
                         assert result is True
-                        mock_storage.store_api_key.assert_not_called()
-                        mock_fetch.assert_not_called()
+                        mock_auth.assert_called_once_with(server_url)
+                        mock_storage.store_api_key.assert_called_once_with(
+                            "new-api-key"
+                        )
+                        mock_fetch.assert_called_once()
 
     def test_run_login_command_success(self):
         """Test synchronous wrapper for login command - success case."""
@@ -280,24 +269,28 @@ class TestLoginCommand:
                         mock_storage_class.return_value = mock_storage
                         mock_storage.get_api_key.return_value = None
 
-                        mock_auth.return_value = {
-                            "access_token": "new-api-key",
-                            "token_type": "Bearer",
-                            "expires_in": 3600,
-                        }
+                        mock_auth.return_value = DeviceTokenResponse(
+                            access_token="new-api-key",
+                            token_type="Bearer",
+                            expires_in=3600,
+                        )
 
                         result = await login_command(server_url)
 
                         assert result is True
 
                         # Verify the complete flow
-                        mock_storage.get_api_key.assert_called_once()
+                        # get_api_key called twice: at start + after re-reading
+                        assert mock_storage.get_api_key.call_count == 2
                         mock_auth.assert_called_once_with(server_url)
                         mock_storage.store_api_key.assert_called_once_with(
                             "new-api-key"
                         )
                         mock_fetch.assert_called_once_with(
-                            server_url, "new-api-key", already_logged_in=False
+                            server_url,
+                            "new-api-key",
+                            already_logged_in=False,
+                            skip_settings_sync=False,
                         )
 
                         # Verify success messages

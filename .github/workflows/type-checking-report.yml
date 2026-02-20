@@ -1,0 +1,218 @@
+---
+# Weekly workflow that generates a code quality report using OpenHands CLI
+# The agent analyzes the codebase for type hints, state management, separation of concerns,
+# and code duplication, then creates a GitHub issue and optionally opens PRs for quick fixes
+name: Weekly Code Quality Report
+
+on:
+    schedule:
+        # Run weekly on Monday at 9:00 AM UTC
+        - cron: 0 9 * * 1
+    workflow_dispatch:
+        inputs:
+            create_issue:
+                description: Create a GitHub issue with the report
+                required: false
+                default: true
+                type: boolean
+            auto_fix_low_hanging:
+                description: Automatically open PRs for low-hanging improvements
+                required: false
+                default: true
+                type: boolean
+
+permissions:
+    contents: write
+    issues: write
+    pull-requests: write
+
+jobs:
+    code-quality-report:
+        name: Generate Code Quality Report
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+        if: github.repository == 'OpenHands/OpenHands-CLI'
+        outputs:
+            issue_number: ${{ steps.create_issue.outputs.issue_number }}
+            report_generated: ${{ steps.generate_report.outputs.report_generated }}
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v7
+
+            - name: Install dependencies
+              run: |
+                  uv sync --group dev
+
+            - name: Run pyright type checker
+              id: pyright
+              continue-on-error: true
+              run: |
+                  echo "Running pyright type checker..."
+                  uv run pyright --outputjson > pyright_output.json 2>&1 || true
+                  echo "Pyright completed"
+
+            - name: Generate code quality report with OpenHands
+              id: generate_report
+              env:
+                  LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+                  LLM_BASE_URL: https://llm-proxy.app.all-hands.dev
+                  LLM_MODEL: litellm_proxy/claude-opus-4-5-20251101
+              run: |
+                  # Run OpenHands CLI in headless mode with the prompt file
+                  uv run openhands --headless --always-approve --override-with-envs \
+                    --file .github/prompts/code-quality-analysis.md || echo "OpenHands analysis completed"
+
+                  # Check if report was generated
+                  if [ -f "code_quality_report.md" ]; then
+                    echo "report_generated=true" >> $GITHUB_OUTPUT
+                    echo "Report generated successfully"
+                  else
+                    echo "report_generated=false" >> $GITHUB_OUTPUT
+                    echo "Report was not generated, creating fallback report from pyright output"
+
+                    # Create a fallback report from pyright output
+                    cat > code_quality_report.md << 'FALLBACK_EOF'
+                  # Code Quality Report
+
+                  ## Summary
+
+                  This report was auto-generated from pyright static analysis.
+                  Full analysis could not be completed.
+
+                  ## Pyright Analysis Results
+
+                  FALLBACK_EOF
+
+                    if [ -f "pyright_output.json" ]; then
+                      echo '```json' >> code_quality_report.md
+                      cat pyright_output.json >> code_quality_report.md
+                      echo '```' >> code_quality_report.md
+                    else
+                      echo "No pyright output available." >> code_quality_report.md
+                    fi
+                  fi
+
+            - name: Upload report artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: code-quality-report
+                  path: code_quality_report.md
+                  if-no-files-found: warn
+
+            - name: Create GitHub Issue
+              id: create_issue
+              if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.create_issue) }}
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  # Get current date for the issue title
+                  REPORT_DATE=$(date +"%Y-%m-%d")
+
+                  # Read the report content
+                  if [ -f "code_quality_report.md" ]; then
+                    REPORT_CONTENT=$(cat code_quality_report.md)
+                  else
+                    REPORT_CONTENT="No report was generated. Please check the workflow logs."
+                  fi
+
+                  # Create the issue body
+                  cat > /tmp/issue_body.md << EOF
+                  ## Weekly Code Quality Report - ${REPORT_DATE}
+
+                  This is an automated report generated by the weekly code quality workflow.
+
+                  ${REPORT_CONTENT}
+
+                  ---
+
+                  **Workflow Run:** [View Details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+                  **Categories Analyzed:**
+                  - 🔍 Type checking and type hints
+                  - 📦 State management patterns
+                  - 🔀 Separation of concerns
+                  - 🔁 Code duplication between ACP and TUI
+
+                  **Next Steps:**
+                  - Review the findings above
+                  - PRs for low-hanging fruit may be automatically created
+                  - Create specific issues for larger refactoring items
+                  EOF
+
+                  # Create the issue using GitHub CLI and capture the issue number
+                  ISSUE_URL=$(gh issue create \
+                    --title "🔍 Code Quality Report - ${REPORT_DATE}" \
+                    --body-file /tmp/issue_body.md)
+
+                  # Extract issue number from URL
+                  ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
+                  echo "issue_number=${ISSUE_NUMBER}" >> $GITHUB_OUTPUT
+                  echo "Created issue #${ISSUE_NUMBER}"
+
+    auto-fix-low-hanging:
+        name: Auto-fix Low-Hanging Improvements
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+        needs: code-quality-report
+        if: |
+            needs.code-quality-report.outputs.report_generated == 'true' &&
+            (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.auto_fix_low_hanging))
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v7
+
+            - name: Install dependencies
+              run: |
+                  uv sync --group dev
+
+            - name: Download report artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: code-quality-report
+                  path: .
+
+            - name: Configure git
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+            - name: Auto-fix low-hanging improvements with OpenHands
+              env:
+                  LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+                  LLM_BASE_URL: https://llm-proxy.app.all-hands.dev
+                  LLM_MODEL: litellm_proxy/claude-opus-4-5-20251101
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  ISSUE_NUMBER: ${{ needs.code-quality-report.outputs.issue_number }}
+                  REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+              run: |
+                  # Run OpenHands CLI in headless mode with the prompt file
+                  uv run openhands --headless --always-approve --override-with-envs \
+                    --file .github/prompts/auto-fix-low-hanging.md || echo "OpenHands auto-fix completed"
+
+            - name: Upload auto-fix summary
+              uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: auto-fix-summary
+                  path: auto_fix_summary.md
+                  if-no-files-found: ignore

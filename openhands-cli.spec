@@ -21,7 +21,7 @@ from PyInstaller.utils.hooks import (
 project_root = Path.cwd()
 
 a = Analysis(
-    ['openhands_cli/simple_main.py'],
+    ['openhands_cli/entrypoint.py'],
     pathex=[str(project_root)],
     binaries=[],
     datas=[
@@ -34,11 +34,13 @@ a = Analysis(
         *collect_data_files('mcp'),
         # Include all data files from openhands.sdk (templates, configs, etc.)
         *collect_data_files('openhands.sdk'),
+        *collect_data_files('openhands.tools'),
         # Include all data files from openhands_cli package
         *collect_data_files('openhands_cli'),
         # Include package metadata for importlib.metadata
         *copy_metadata('fastmcp'),
         *copy_metadata('agent-client-protocol'),
+        *copy_metadata('posthog'),
     ],
     hiddenimports=[
         # Explicitly include modules that might not be detected automatically
@@ -51,6 +53,8 @@ a = Analysis(
         *collect_submodules('tiktoken_ext'),
         *collect_submodules('litellm'),
         *collect_submodules('fastmcp'),
+        # Include PostHog for critic feedback analytics
+        'posthog',
         # Include Agent Client Protocol (ACP) for 'openhands acp' command
         *collect_submodules('acp'),
         # Include mcp but exclude CLI parts that require typer
@@ -86,7 +90,6 @@ a = Analysis(
         'fastmcp.cli',
         'boto3',
         'botocore',
-        'posthog',
         'browser-use',
         'openhands.tools.browser_use'
     ],

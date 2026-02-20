@@ -10,6 +10,7 @@ from openhands_cli.auth.api_client import (
     ApiClientError,
     OpenHandsApiClient,
     UnauthenticatedError,
+    _ask_user_consent_for_overwrite,
     create_and_save_agent_configuration,
     fetch_user_data_after_oauth,
 )
@@ -149,7 +150,12 @@ class TestHelperFunctions:
     def test_create_and_save_agent_configuration(self):
         """Test agent creation and saving from settings."""
         llm_api_key = "test-llm-key"
-        settings = {"llm_model": "gpt-4o", "agent": "CodeActAgent", "language": "en"}
+        settings = {
+            "llm_model": "gpt-4o",
+            "llm_base_url": "https://llm-proxy.eval.all-hands.dev/",
+            "agent": "CodeActAgent",
+            "language": "en",
+        }
 
         with patch("openhands_cli.auth.api_client.AgentStore") as mock_store_class:
             with patch("openhands_cli.auth.api_client._p") as mock_print:
@@ -164,7 +170,7 @@ class TestHelperFunctions:
                 mock_agent.condenser = MagicMock()
 
                 mock_store.create_and_save_from_settings.return_value = mock_agent
-                mock_store.load.return_value = None  # No existing agent
+                mock_store.load_from_disk.return_value = None  # No existing agent
                 mock_store_class.return_value = mock_store
 
                 create_and_save_agent_configuration(llm_api_key, settings)
@@ -308,3 +314,34 @@ class TestHelperFunctions:
 
                 with pytest.raises(ApiClientError, match="API error"):
                     await fetch_user_data_after_oauth(server_url, api_key)
+
+    def test_ask_user_consent_for_overwrite_no_base_url_print(self):
+        """Test that Base URL print statement doesn't occur when base_url is None."""
+        # Create a mock agent with None base_url
+        mock_agent = MagicMock()
+        mock_llm = MagicMock()
+        mock_llm.model = "gpt-4o"
+        mock_llm.base_url = None  # This is the key test condition
+        mock_agent.llm = mock_llm
+
+        # New settings also doesn't have llm_base_url
+        new_settings = {"llm_model": "claude-sonnet-4-5-20250929"}
+
+        with patch("openhands_cli.auth.api_client._p") as mock_print:
+            with patch("builtins.input", return_value="n"):  # User says no
+                result = _ask_user_consent_for_overwrite(mock_agent, new_settings)
+
+                # Verify the function returns False (user declined)
+                assert result is False
+
+                # Check all the print calls
+                print_calls = [call.args[0] for call in mock_print.call_args_list]
+
+                # Count Base URL prints - should be 0 when both base_urls are None
+                all_base_url_prints = [
+                    call for call in print_calls if "Base URL" in call
+                ]
+                assert len(all_base_url_prints) == 0, (
+                    f"Expected no Base URL prints when both base_urls are None, "
+                    f"but found {len(all_base_url_prints)}: {all_base_url_prints}"
+                )
