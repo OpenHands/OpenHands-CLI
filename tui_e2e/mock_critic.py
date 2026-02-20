@@ -8,7 +8,7 @@ Usage:
     from tui_e2e.mock_critic import MockCritic
     from tui_e2e.trajectory import load_trajectory
 
-    trajectory = load_trajectory("tests/trajectories/cli447_hi_followup_iterative_case_a")
+    trajectory = load_trajectory("tests/trajectories/cli447_hi_followup...")
     mock_critic = MockCritic(trajectory.get_critic_results())
 
     # The mock critic will return results in order
@@ -61,8 +61,8 @@ class MockCritic(CriticBase):
 
     def evaluate(
         self,
-        events: Sequence["LLMConvertibleEvent"],
-        git_patch: str | None = None,
+        events: Sequence[LLMConvertibleEvent],  # noqa: ARG002
+        git_patch: str | None = None,  # noqa: ARG002
     ) -> CriticResult:
         """Return the next critic result from the trajectory.
 
