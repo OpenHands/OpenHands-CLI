@@ -33,7 +33,6 @@ build: check-uv-version
 	@$(ECHO) "$(GREEN)Pre-commit hooks installed successfully.$(RESET)"
 	@$(ECHO) "$(GREEN)Build complete! Development environment is ready.$(RESET)"
 
-# Default target
 help:
 	@echo "OpenHands CLI: Lightweight OpenHands CLI in a binary executable"
 	@echo ""
@@ -62,7 +61,6 @@ install-dev:
 	uv sync --group dev
 	@$(ECHO) "$(GREEN)Dev dependencies installed successfully.$(RESET)"
 
-# Run tests
 test:
 	@$(ECHO) "$(YELLOW)Run tests...$(RESET)"
 	uv run pytest --ignore=tests/snapshots
@@ -84,7 +82,7 @@ lint:
 	@$(ECHO) "$(YELLOW)Linting code with uv format...$(RESET)"
 	uv run ruff check openhands_cli/ --fix
 	@$(ECHO) "$(GREEN)Code linted successfully.$(RESET)"
-# Format code
+
 format:
 	@$(ECHO) "$(YELLOW)Formatting code with uv format...$(RESET)"
 	uv run ruff format openhands_cli/
