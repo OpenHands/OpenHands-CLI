@@ -60,6 +60,8 @@ class RunnerFactory:
         from openhands_cli.utils import json_callback
 
         app = self._app_provider()
+
+        # Visualizer reads cli_settings directly when needed via self.cli_settings
         visualizer = ConversationVisualizer(
             self._scroll_view_provider(),
             app,
