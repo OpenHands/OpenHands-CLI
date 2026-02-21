@@ -8,7 +8,6 @@ on:
     # base-repo context, which is a known risky pattern:
     # https://adnanthekhan.com/posts/clinejection/
     #
-    # `pull_request_target` once the workflow is properly sandboxed/guarded.
     pull_request:
         types: [opened, ready_for_review, labeled, review_requested]
 
