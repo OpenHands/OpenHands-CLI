@@ -32,6 +32,7 @@ def load_agent_specs(
     *,
     env_overrides_enabled: bool = False,
     critic_disabled: bool = False,
+    user_skills: bool = True,
 ) -> Agent:
     """Load agent specifications.
 
@@ -55,6 +56,7 @@ def load_agent_specs(
         session_id=conversation_id,
         env_overrides_enabled=env_overrides_enabled,
         critic_disabled=critic_disabled,
+        user_skills=user_skills,
     )
     if not agent:
         raise MissingAgentSpec(
@@ -98,6 +100,7 @@ def setup_conversation(
     *,
     env_overrides_enabled: bool = False,
     critic_disabled: bool = False,
+    user_skills: bool = True,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
@@ -122,6 +125,7 @@ def setup_conversation(
         str(conversation_id),
         env_overrides_enabled=env_overrides_enabled,
         critic_disabled=critic_disabled,
+        user_skills=user_skills,
     )
 
     # Prepare callbacks list

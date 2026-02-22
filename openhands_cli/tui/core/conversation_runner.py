@@ -53,6 +53,7 @@ class ConversationRunner:
         *,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
+        user_skills: bool = True,
     ):
         """Initialize the conversation runner.
 
@@ -66,6 +67,8 @@ class ConversationRunner:
             env_overrides_enabled: If True, environment variables will override
                 stored LLM settings.
             critic_disabled: If True, critic functionality will be disabled.
+            user_skills: If True, load user skills from ~/.openhands (default).
+                If False, skip loading user skills.
         """
         self.visualizer = visualizer
 
@@ -77,6 +80,7 @@ class ConversationRunner:
             event_callback=event_callback,
             env_overrides_enabled=env_overrides_enabled,
             critic_disabled=critic_disabled,
+            user_skills=user_skills,
         )
 
         self._running = False

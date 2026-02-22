@@ -223,6 +223,7 @@ def main() -> None:
                 json_mode=json_mode,
                 env_overrides_enabled=env_overrides_enabled,
                 critic_disabled=critic_disabled,
+                user_skills=args.user_skills,
             )
             console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
             # Show conversation ID if available (may be None if app exited early)

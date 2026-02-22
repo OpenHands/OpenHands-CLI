@@ -310,6 +310,7 @@ class AgentStore:
         *,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
+        user_skills: bool = True,
     ) -> Agent | None:
         """Load an Agent and apply runtime configuration.
 
@@ -330,6 +331,8 @@ class AgentStore:
                 LLM metadata tagging.
             env_overrides_enabled: Whether env overrides are enabled.
             critic_disabled: If True, do not configure a critic.
+            user_skills: If True, load user skills from ~/.openhands (default).
+                If False, skip loading user skills.
 
         Returns:
             A fully configured Agent, or None if no persisted agent exists and
@@ -355,6 +358,7 @@ class AgentStore:
             agent,
             session_id,
             critic_disabled=critic_disabled,
+            user_skills=user_skills,
         )
 
     def _resolve_tools(self, session_id: str | None) -> list[Tool]:
@@ -378,7 +382,7 @@ class AgentStore:
             }
         )
 
-    def _build_agent_context(self) -> AgentContext:
+    def _build_agent_context(self, *, user_skills: bool = True) -> AgentContext:
         skills = load_project_skills(get_work_dir())
         system_suffix = "\n".join(
             [
@@ -389,7 +393,7 @@ class AgentStore:
         return AgentContext(
             skills=skills,
             system_message_suffix=system_suffix,
-            load_user_skills=True,
+            load_user_skills=user_skills,
             load_public_skills=True,
         )
 
@@ -413,13 +417,14 @@ class AgentStore:
         session_id: str | None = None,
         *,
         critic_disabled: bool = False,
+        user_skills: bool = True,
     ) -> Agent:
         updated_tools = self._resolve_tools(session_id)
         updated_llm = self._with_llm_metadata(
             agent.llm, session_id=session_id, llm_type="agent"
         )
 
-        agent_context = self._build_agent_context()
+        agent_context = self._build_agent_context(user_skills=user_skills)
 
         enabled_servers = list_enabled_servers()
         mcp_config = {"mcpServers": enabled_servers} if enabled_servers else {}

@@ -272,7 +272,9 @@ def patch_deterministic_paths(monkeypatch: pytest.MonkeyPatch) -> None:
         from openhands.sdk.context import AgentContext
         from openhands_cli.stores.agent_store import AgentStore
 
-        def patched_build_agent_context(self) -> AgentContext:
+        def patched_build_agent_context(
+            self, *, user_skills: bool = True
+        ) -> AgentContext:
             from openhands.sdk.context.skills.skill import load_project_skills
             from openhands_cli.locations import get_work_dir
             from openhands_cli.utils import get_os_description
@@ -285,6 +287,8 @@ def patch_deterministic_paths(monkeypatch: pytest.MonkeyPatch) -> None:
                 ]
             )
             # Disable user/public skills for deterministic tests
+            # Note: we ignore the user_skills argument and always disable both
+            # for deterministic snapshot testing
             return AgentContext(
                 skills=skills,
                 system_message_suffix=system_suffix,
