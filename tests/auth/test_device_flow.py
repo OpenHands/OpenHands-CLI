@@ -336,7 +336,7 @@ class TestDeviceFlowClient:
                     token_type="Bearer",
                 )
 
-                with patch("openhands_cli.auth.device_flow._p") as mock_print:
+                with patch("openhands_cli.auth.device_flow.console_print") as mock_print:
                     with patch("webbrowser.open") as mock_browser:
                         result = await client.authenticate()
 
@@ -374,7 +374,7 @@ class TestDeviceFlowClient:
                     token_type="Bearer",
                 )
 
-                with patch("openhands_cli.auth.device_flow._p"):
+                with patch("openhands_cli.auth.device_flow.console_print"):
                     with patch("webbrowser.open") as mock_browser:
                         mock_browser.side_effect = Exception("Browser not available")
 
@@ -401,7 +401,7 @@ class TestDeviceFlowClient:
         with patch.object(client, "start_device_flow") as mock_start:
             mock_start.side_effect = DeviceFlowError("Failed to start")
 
-            with patch("openhands_cli.auth.device_flow._p"):
+            with patch("openhands_cli.auth.device_flow.console_print"):
                 with pytest.raises(DeviceFlowError, match="Failed to start"):
                     await client.authenticate()
 
@@ -423,7 +423,7 @@ class TestDeviceFlowClient:
             with patch.object(client, "poll_for_token") as mock_poll:
                 mock_poll.side_effect = DeviceFlowError("Polling failed")
 
-                with patch("openhands_cli.auth.device_flow._p"):
+                with patch("openhands_cli.auth.device_flow.console_print"):
                     with pytest.raises(DeviceFlowError, match="Polling failed"):
                         await client.authenticate()
 
