@@ -45,7 +45,7 @@ def handle_resume_logic(args: argparse.Namespace) -> str | None:
         args: Parsed command line arguments
 
     Returns:
-        Conversation ID to resume, or None if should show conversation list or exit
+        Conversation ID to resume, or None if it should show conversation list or exit
     """
     # Check if --last flag is used
     if args.last:
