@@ -106,19 +106,22 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
 
     # Get the current version for the Docker image
     version = get_openhands_version()
-    runtime_image = f"docker.openhands.dev/openhands/runtime:{version}-nikolaik"
+    # Agent server image repository and tag (used by sandbox service)
+    agent_server_image_repository = "docker.openhands.dev/openhands/runtime"
+    agent_server_image_tag = f"{version}-nikolaik"
+    agent_server_image = f"{agent_server_image_repository}:{agent_server_image_tag}"
     app_image = f"docker.openhands.dev/openhands/openhands:{version}"
 
     print_formatted_text(HTML("<grey>Pulling required Docker images...</grey>"))
 
-    # Pull the runtime image first
-    pull_cmd = ["docker", "pull", runtime_image]
+    # Pull the agent server image first
+    pull_cmd = ["docker", "pull", agent_server_image]
     print_formatted_text(HTML(_format_docker_command_for_logging(pull_cmd)))
     try:
         subprocess.run(pull_cmd, check=True)
     except subprocess.CalledProcessError:
         print_formatted_text(
-            HTML("<ansired>❌ Failed to pull runtime image.</ansired>")
+            HTML("<ansired>❌ Failed to pull agent server image.</ansired>")
         )
         sys.exit(1)
 
@@ -133,6 +136,8 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
     print_formatted_text("")
 
     # Build the Docker command
+    # Note: OpenHands 1.2+ uses AGENT_SERVER_IMAGE_REPOSITORY and AGENT_SERVER_IMAGE_TAG
+    # instead of the deprecated SANDBOX_RUNTIME_CONTAINER_IMAGE
     docker_cmd = [
         "docker",
         "run",
@@ -140,7 +145,9 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
         "--rm",
         "--pull=always",
         "-e",
-        f"SANDBOX_RUNTIME_CONTAINER_IMAGE={runtime_image}",
+        f"AGENT_SERVER_IMAGE_REPOSITORY={agent_server_image_repository}",
+        "-e",
+        f"AGENT_SERVER_IMAGE_TAG={agent_server_image_tag}",
         "-e",
         "LOG_ALL_EVENTS=true",
         "-v",
