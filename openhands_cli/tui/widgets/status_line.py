@@ -248,14 +248,11 @@ class InfoStatusLine(Static):
     def _format_sandbox_display(self) -> str:
         """Format the sandbox ID display for cloud mode.
 
-        Returns a shortened sandbox ID with cloud indicator, or empty string
-        for local mode.
+        Returns the sandbox ID with cloud indicator, or empty string for local mode.
         """
         if not self.sandbox_id:
             return ""
-        # Show first 8 characters of sandbox ID for brevity
-        short_id = self.sandbox_id[:8] if len(self.sandbox_id) > 8 else self.sandbox_id
-        return f"☁ {short_id}"
+        return f"☁ {self.sandbox_id}"
 
     def _update_text(self) -> None:
         """Rebuild the info status text with metrics right-aligned in grey."""
