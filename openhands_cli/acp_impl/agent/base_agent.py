@@ -228,15 +228,17 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         """Initialize the ACP protocol."""
         logger.info(f"Initializing ACP with protocol version: {protocol_version}")
 
-        # Always configure auth method
-        auth_methods = [
-            AuthMethod(
-                description="Authenticate through agent",
-                id="oauth",
-                name="OAuth with OpenHands Cloud",
-                field_meta={"type": "agent"},
-            ),
-        ]
+        # Only advertise auth methods if not already authenticated
+        auth_methods: list[AuthMethod] = []
+        if not await self._is_authenticated():
+            auth_methods = [
+                AuthMethod(
+                    description="Authenticate through agent",
+                    id="oauth",
+                    name="OAuth with OpenHands Cloud",
+                    field_meta={"type": "agent"},
+                ),
+            ]
 
         return InitializeResponse(
             protocol_version=protocol_version,

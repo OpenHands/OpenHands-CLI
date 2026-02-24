@@ -72,15 +72,35 @@ class TestInitialize:
     """Tests for the initialize method."""
 
     @pytest.mark.asyncio
-    async def test_initialize_auth_methods(self, test_agent):
-        """Test initialize always returns auth method."""
+    async def test_initialize_no_auth_methods_when_authenticated(self, test_agent):
+        """Test initialize returns empty auth_methods when already authenticated."""
+        # test_agent._is_authenticated() returns True by default
         response = await test_agent.initialize(
             protocol_version=1,
             client_info=Implementation(name="test", version="1.0"),
         )
 
         assert response.protocol_version == 1
-        # Auth methods are always returned
+        # Auth methods should be empty when already authenticated
+        assert len(response.auth_methods) == 0
+
+    @pytest.mark.asyncio
+    async def test_initialize_auth_methods_when_not_authenticated(self, mock_connection):
+        """Test initialize returns auth methods when not authenticated."""
+
+        class UnauthenticatedTestAgent(ConcreteTestAgent):
+            async def _is_authenticated(self) -> bool:
+                return False
+
+        agent = UnauthenticatedTestAgent(mock_connection)
+
+        response = await agent.initialize(
+            protocol_version=1,
+            client_info=Implementation(name="test", version="1.0"),
+        )
+
+        assert response.protocol_version == 1
+        # Auth methods should be returned when not authenticated
         assert len(response.auth_methods) == 1
         assert response.auth_methods[0].id == "oauth"
         assert response.auth_methods[0].field_meta == {"type": "agent"}
