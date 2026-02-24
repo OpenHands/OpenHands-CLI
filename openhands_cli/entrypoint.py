@@ -4,6 +4,7 @@ Simple main entry point for OpenHands CLI.
 This is a simplified version that demonstrates the TUI functionality.
 """
 
+import argparse
 import logging
 import os
 import sys
@@ -37,14 +38,14 @@ if debug_env != "1" and debug_env != "true":
     warnings.filterwarnings("ignore")
 
 
-def handle_resume_logic(args) -> str | None:
+def handle_resume_logic(args: argparse.Namespace) -> str | None:
     """Handle resume logic and return the conversation ID to resume.
 
     Args:
         args: Parsed command line arguments
 
     Returns:
-        Conversation ID to resume, or None if should show conversation list or exit
+        Conversation ID to resume, or None if it should show conversation list or exit
     """
     # Check if --last flag is used
     if args.last:

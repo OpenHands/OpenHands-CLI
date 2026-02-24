@@ -63,7 +63,7 @@ class _ACPContext(Protocol):
 class SharedEventHandler:
     """Shared event-to-ACP behavior used by multiple subscribers."""
 
-    def _meta(self, ctx: _ACPContext):
+    def _meta(self, ctx: _ACPContext) -> dict[str, dict[str, int | float | str]] | None:
         return get_metadata(ctx.conversation)
 
     async def send_thought(self, ctx: _ACPContext, text: str) -> None:
