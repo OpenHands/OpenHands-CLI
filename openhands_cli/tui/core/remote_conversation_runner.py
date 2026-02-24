@@ -119,6 +119,8 @@ class RemoteConversationRunner(ConversationRunner):
 
         try:
             self.conversation.send_message(message)
+            # Update sandbox_id after message is sent (sandbox starts on first message)
+            self._update_sandbox_id_from_workspace()
             self._execute_conversation(headless=headless)
         except httpx.HTTPStatusError as e:
             status_code = e.response.status_code
