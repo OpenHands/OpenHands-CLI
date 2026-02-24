@@ -39,6 +39,23 @@ class SettingsFormData(BaseModel):
     def strip_strings(cls, v: str | None) -> str | None:
         return v.strip() if isinstance(v, str) else v
 
+    @staticmethod
+    def _is_vertex_provider(provider: str | None) -> bool:
+        return provider in {"vertex_ai", "vertex_ai_beta"}
+
+    @staticmethod
+    def _is_vertex_model(model: str | None) -> bool:
+        if not model:
+            return False
+        lowered = model.lower()
+        return lowered.startswith("vertex_ai/") or lowered.startswith("vertex_ai_beta/")
+
+    def _requires_api_key(self) -> bool:
+        if self.mode == "basic":
+            return not self._is_vertex_provider(self.provider)
+        # Advanced mode: infer from custom model prefix.
+        return not self._is_vertex_model(self.custom_model)
+
     def resolve_data_fields(self, existing_agent: Agent | None):
         # Check advance mode requirements
         if self.mode == "advanced":
@@ -71,7 +88,7 @@ class SettingsFormData(BaseModel):
             )
             self.api_key_input = existing_llm_api_key
 
-        if not self.api_key_input:
+        if not self.api_key_input and self._requires_api_key():
             raise Exception("API Key is required")
 
     def get_full_model_name(self):

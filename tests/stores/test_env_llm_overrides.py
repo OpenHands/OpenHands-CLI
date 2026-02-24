@@ -15,6 +15,7 @@ from openhands_cli.stores.agent_store import (
     MissingEnvironmentVariablesError,
     apply_llm_overrides,
     check_and_warn_env_vars,
+    model_requires_api_key,
 )
 
 
@@ -192,6 +193,20 @@ class TestLLMEnvOverrides:
         assert overrides.api_key is not None
         assert overrides.api_key.get_secret_value() == "explicit-key"
         assert overrides.model == "explicit-model"
+
+    @pytest.mark.parametrize(
+        "model,expected",
+        [
+            ("openai/gpt-4o", True),
+            ("anthropic/claude-sonnet-4-5-20250929", True),
+            ("vertex_ai/gemini-2.5-pro", False),
+            ("vertex_ai_beta/gemini-2.5-pro", False),
+            (None, True),
+        ],
+    )
+    def test_model_requires_api_key(self, model: str | None, expected: bool) -> None:
+        """Vertex models should not require LLM_API_KEY."""
+        assert model_requires_api_key(model) is expected
 
 
 class TestApplyLlmOverrides:
@@ -533,6 +548,37 @@ class TestAgentCreationFromEnvVars:
 
             assert ENV_LLM_API_KEY in exc_info.value.missing_vars
             assert ENV_LLM_MODEL not in exc_info.value.missing_vars
+
+    def test_agent_created_for_vertex_model_without_api_key(self, tmp_path) -> None:
+        """Vertex model should be creatable from env without LLM_API_KEY."""
+        from openhands_cli.stores import AgentStore
+
+        conversations_dir = tmp_path / "conversations"
+        conversations_dir.mkdir(exist_ok=True)
+
+        env_vars = {
+            ENV_LLM_MODEL: "vertex_ai/gemini-2.5-pro",
+            # Intentionally omit LLM_API_KEY.
+        }
+
+        with (
+            patch(
+                "openhands_cli.stores.agent_store.get_persistence_dir",
+                return_value=str(tmp_path),
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_conversations_dir",
+                return_value=str(conversations_dir),
+            ),
+            patch.dict(os.environ, env_vars, clear=False),
+        ):
+            os.environ.pop(ENV_LLM_API_KEY, None)
+            store = AgentStore()
+            agent = store.load_or_create(env_overrides_enabled=True)
+
+            assert agent is not None
+            assert agent.llm.model == "vertex_ai/gemini-2.5-pro"
+            assert agent.llm.api_key is None
 
     def test_agent_raises_error_when_both_api_key_and_model_not_set(
         self, tmp_path
