@@ -29,7 +29,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 7
+        assert len(COMMANDS) == 8
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -46,6 +46,7 @@ class TestCommands:
             ("/history", "Toggle conversation history"),
             ("/confirm", "Configure confirmation settings"),
             ("/condense", "Condense conversation history"),
+            ("/skills", "View loaded skills, hooks, and MCPs"),
             ("/feedback", "Send anonymous feedback about CLI"),
             ("/exit", "Exit the application"),
         ],
@@ -84,6 +85,7 @@ class TestCommands:
             "/history",
             "/confirm",
             "/condense",
+            "/skills",
             "/feedback",
             "/exit",
             "Display available commands",
@@ -91,6 +93,7 @@ class TestCommands:
             "Toggle conversation history",
             "Configure confirmation settings",
             "Condense conversation history",
+            "View loaded skills, hooks, and MCPs",
             "Send anonymous feedback about CLI",
             "Exit the application",
             "Tips:",
@@ -112,10 +115,8 @@ class TestCommands:
 
         assert expected_content in help_text
 
-    def test_show_help_uses_theme_colors(self):
-        """Test that show_help uses OpenHands theme colors."""
-        from openhands_cli.theme import OPENHANDS_THEME
-
+    def test_show_help_uses_plain_text(self):
+        """Test that show_help uses plain text formatting."""
         mock_main_display = mock.MagicMock(spec=VerticalScroll)
 
         show_help(mock_main_display)
@@ -123,18 +124,16 @@ class TestCommands:
         help_widget = mock_main_display.mount.call_args[0][0]
         help_text = help_widget.content
 
-        # Should use OpenHands theme colors
-        assert OPENHANDS_THEME.primary in help_text  # Primary color (yellow)
-        assert OPENHANDS_THEME.secondary in help_text  # Secondary color (white)
+        # Should use plain text formatting (no markdown)
+        assert "**" not in help_text
+        assert "*(" not in help_text
 
         # Should not use generic color names
         assert "yellow" not in help_text.lower()
         assert "white" not in help_text.lower()
 
     def test_show_help_formatting(self):
-        """Test that show_help has proper Rich markup formatting."""
-        from openhands_cli.theme import OPENHANDS_THEME
-
+        """Test that show_help has proper plain text formatting."""
         mock_main_display = mock.MagicMock(spec=VerticalScroll)
 
         show_help(mock_main_display)
@@ -142,12 +141,11 @@ class TestCommands:
         help_widget = mock_main_display.mount.call_args[0][0]
         help_text = help_widget.content
 
-        # Check for proper Rich markup with theme colors
-        assert f"[bold {OPENHANDS_THEME.primary}]" in help_text
-        assert f"[/bold {OPENHANDS_THEME.primary}]" in help_text
-        assert f"[{OPENHANDS_THEME.secondary}]" in help_text
-        assert f"[/{OPENHANDS_THEME.secondary}]" in help_text
-        assert "[dim]" in help_text
+        # Check for proper plain text formatting
+        assert "OpenHands CLI Help" in help_text
+        assert "Available commands:" in help_text
+        assert "/help" in help_text
+        assert "Tips:" in help_text
 
         # Should start and end with newlines for proper spacing
         assert help_text.startswith("\n")
@@ -161,6 +159,7 @@ class TestCommands:
             ("/history", True),
             ("/confirm", True),
             ("/condense", True),
+            ("/skills", True),
             ("/feedback", True),
             ("/exit", True),
             ("/help extra", False),
@@ -182,7 +181,8 @@ class TestCommands:
         assert "/history" in command_names
         assert "/help" in command_names
         assert "/new" in command_names
-        assert len(COMMANDS) == 7
+        assert "/skills" in command_names
+        assert len(COMMANDS) == 8
 
     def test_all_commands_included_in_help(self):
         """Test that all commands from COMMANDS list are included in help text.

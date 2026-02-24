@@ -1569,7 +1569,7 @@ wheels = [
 
 [[package]]
 name = "openhands"
-version = "1.11.0"
+version = "1.12.2"
 source = { editable = "." }
 dependencies = [
     { name = "agent-client-protocol" },
@@ -1601,6 +1601,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-forked" },
     { name = "pytest-httpserver" },
+    { name = "pytest-rerunfailures" },
     { name = "pytest-textual-snapshot" },
     { name = "pytest-xdist" },
     { name = "ruff" },
@@ -1611,15 +1612,15 @@ dev = [
 requires-dist = [
     { name = "agent-client-protocol", specifier = ">=0.7.0,<0.8.0" },
     { name = "httpx", specifier = ">=0.25.0" },
-    { name = "openhands-sdk", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=00fa2ffa189602c9d49cbe784ea606c5c7877762" },
-    { name = "openhands-tools", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=00fa2ffa189602c9d49cbe784ea606c5c7877762" },
-    { name = "openhands-workspace", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-workspace&rev=00fa2ffa189602c9d49cbe784ea606c5c7877762" },
+    { name = "openhands-sdk", specifier = "==1.11.4" },
+    { name = "openhands-tools", specifier = "==1.11.4" },
+    { name = "openhands-workspace", specifier = "==1.11.1" },
     { name = "prompt-toolkit", specifier = ">=3" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyperclip", specifier = ">=1.9.0" },
     { name = "rich", specifier = "<14.3.0" },
     { name = "streamingjson", specifier = ">=0.0.2" },
-    { name = "textual", specifier = ">=0.79.0" },
+    { name = "textual", specifier = ">=8.0.0,<9.0.0" },
     { name = "textual-autocomplete", specifier = ">=4.0.6" },
     { name = "textual-serve", specifier = ">=1.1.3" },
     { name = "typer", specifier = ">=0.17.4" },
@@ -1638,6 +1639,7 @@ dev = [
     { name = "pytest-cov", specifier = ">=5.0.0" },
     { name = "pytest-forked", specifier = ">=1.6.0" },
     { name = "pytest-httpserver", specifier = ">=1.1.3" },
+    { name = "pytest-rerunfailures", specifier = ">=14.0" },
     { name = "pytest-textual-snapshot", specifier = ">=1.1.0" },
     { name = "pytest-xdist", specifier = ">=3.6.1" },
     { name = "ruff", specifier = ">=0.12.10" },
@@ -1663,8 +1665,8 @@ dependencies = [
 
 [[package]]
 name = "openhands-sdk"
-version = "1.11.1"
-source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=00fa2ffa189602c9d49cbe784ea606c5c7877762#00fa2ffa189602c9d49cbe784ea606c5c7877762" }
+version = "1.11.4"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "deprecation" },
     { name = "fastmcp" },
@@ -1678,11 +1680,15 @@ dependencies = [
     { name = "tenacity" },
     { name = "websockets" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/09/2a/35d8b42588930b7cc0eb86ab2973ebd57fba5138322f8216609775195280/openhands_sdk-1.11.4.tar.gz", hash = "sha256:4088744f6b8856eeab22d3bc17e47d1736ea7ced945c2fa126bd7d48c14bb313", size = 283486, upload-time = "2026-02-11T16:36:43.679Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7a/e2/6da3bf3a22d0d9b6df22372473ace6fa0fc8e2322f218b62d69d4f082f80/openhands_sdk-1.11.4-py3-none-any.whl", hash = "sha256:9f4607c5d94b56fbcd533207026ee892779dd50e29bce79277ff82454a4f76d5", size = 360358, upload-time = "2026-02-11T16:36:50.078Z" },
+]
 
 [[package]]
 name = "openhands-tools"
-version = "1.11.1"
-source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=00fa2ffa189602c9d49cbe784ea606c5c7877762#00fa2ffa189602c9d49cbe784ea606c5c7877762" }
+version = "1.11.4"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bashlex" },
     { name = "binaryornot" },
@@ -1693,6 +1699,10 @@ dependencies = [
     { name = "openhands-sdk" },
     { name = "pydantic" },
     { name = "tom-swe" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/02/e5/38d8147da150fccdfb7b6f9ea531e07d1a89446350fe40a2e765dcab3337/openhands_tools-1.11.4.tar.gz", hash = "sha256:80671b1ea8c85a5247a75ea2340ae31d76363e9c723b104699a9a77e66d2043c", size = 93044, upload-time = "2026-02-11T16:36:48.941Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/09/3a/d96ac02ab3eff615f466cc2d2b8fb58ceb4f5b1e6efaa8b069460e91c1de/openhands_tools-1.11.4-py3-none-any.whl", hash = "sha256:efd721b73e87a0dac69171a76931363fa59fcde98107ca86081ee7bf0253673a", size = 128899, upload-time = "2026-02-11T16:36:51.132Z" },
 ]
 
 [[package]]
@@ -4673,6 +4683,19 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-rerunfailures"
+version = "16.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/de/04/71e9520551fc8fe2cf5c1a1842e4e600265b0815f2016b7c27ec85688682/pytest_rerunfailures-16.1.tar.gz", hash = "sha256:c38b266db8a808953ebd71ac25c381cb1981a78ff9340a14bcb9f1b9bff1899e", size = 30889, upload-time = "2025-10-10T07:06:01.238Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/54/60eabb34445e3db3d3d874dc1dfa72751bfec3265bd611cb13c8b290adea/pytest_rerunfailures-16.1-py3-none-any.whl", hash = "sha256:5d11b12c0ca9a1665b5054052fcc1084f8deadd9328962745ef6b04e26382e86", size = 14093, upload-time = "2025-10-10T07:06:00.019Z" },
+]
+
+[[package]]
 name = "pytest-textual-snapshot"
 version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -5112,7 +5135,7 @@ wheels = [
 
 [[package]]
 name = "textual"
-version = "6.6.0"
+version = "8.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markdown-it-py", extra = ["linkify"] },
@@ -5122,9 +5145,9 @@ dependencies = [
     { name = "rich" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f6/2f/f0b408f227edca21d1996c1cd0b65309f0cbff44264aa40aded3ff9ce2e1/textual-6.6.0.tar.gz", hash = "sha256:53345166d6b0f9fd028ed0217d73b8f47c3a26679a18ba3b67616dcacb470eec", size = 1579327, upload-time = "2025-11-10T17:50:00.038Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f7/08/1e1f705825359590ddfaeda57653bd518c4ff7a96bb2c3239ba1b6fc4c51/textual-8.0.0.tar.gz", hash = "sha256:ce48f83a3d686c0fac0e80bf9136e1f8851c653aa6a4502e43293a151df18809", size = 1595895, upload-time = "2026-02-16T17:12:14.215Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/53/b3/95ab646b0c908823d71e49ab8b5949ec9f33346cee3897d1af6be28a8d91/textual-6.6.0-py3-none-any.whl", hash = "sha256:5a9484bd15ee8a6fd8ac4ed4849fb25ee56bed2cecc7b8a83c4cd7d5f19515e5", size = 712606, upload-time = "2025-11-10T17:49:58.391Z" },
+    { url = "https://files.pythonhosted.org/packages/d3/be/e191c2a15da20530fde03564564e3e4b4220eb9d687d4014957e5c6a5e85/textual-8.0.0-py3-none-any.whl", hash = "sha256:8908f4ebe93a6b4f77ca7262197784a52162bc88b05f4ecf50ac93a92d49bb8f", size = 718904, upload-time = "2026-02-16T17:12:11.962Z" },
 ]
 
 [[package]]

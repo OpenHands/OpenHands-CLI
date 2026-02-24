@@ -101,7 +101,7 @@ class SettingsTab(Container):
                     yield Label("Memory Condensation:", classes="form_label")
                     yield Select(
                         [("Enabled", True), ("Disabled", False)],
-                        value=False,
+                        value=True,
                         id="memory_condensation_select",
                         classes="form_select",
                         disabled=True,  # Disabled until API key is entered

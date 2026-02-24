@@ -15,18 +15,25 @@ Widget Hierarchy:
 Message Flow:
     - SlashCommandSubmitted → InputAreaContainer posts operation messages
     - All messages bubble up to ConversationManager (ancestor)
+
+Data Binding:
+    - loaded_resources: Bound from ConversationContainer for /skills command
 """
+
+from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
 from textual import on
 from textual.containers import Container
+from textual.reactive import var
 
-from openhands_cli.tui.core.commands import show_help
+from openhands_cli.tui.core.commands import show_help, show_skills
 from openhands_cli.tui.messages import SlashCommandSubmitted
 
 
 if TYPE_CHECKING:
+    from openhands_cli.tui.content.resources import LoadedResourcesInfo
     from openhands_cli.tui.textual_app import OpenHandsApp
     from openhands_cli.tui.widgets.main_display import ScrollableContent
 
@@ -38,12 +45,18 @@ class InputAreaContainer(Container):
     that bubble up to ConversationManager, which is an ancestor in the
     widget hierarchy.
 
-    UserInputSubmitted messages from InputField also bubble up to
+    SendMessage messages from InputField also bubble up to
     ConversationManager automatically.
+
+    Reactive Properties:
+        loaded_resources: Bound from ConversationContainer, used by /skills command.
     """
 
+    # Reactive property bound from ConversationContainer
+    loaded_resources: var[LoadedResourcesInfo | None] = var(None)
+
     @property
-    def scroll_view(self) -> "ScrollableContent":
+    def scroll_view(self) -> ScrollableContent:
         """Get the sibling scrollable content area."""
         from openhands_cli.tui.widgets.main_display import ScrollableContent
 
@@ -71,6 +84,8 @@ class InputAreaContainer(Container):
                 self._command_confirm()
             case "condense":
                 self._command_condense()
+            case "skills":
+                self._command_skills()
             case "feedback":
                 self._command_feedback()
             case "exit":
@@ -129,6 +144,13 @@ class InputAreaContainer(Container):
 
         # Message bubbles up to ConversationManager (ancestor)
         self.post_message(CondenseConversation())
+
+    def _command_skills(self) -> None:
+        """Handle the /skills command to display loaded resources."""
+        # loaded_resources is bound from ConversationContainer via data_bind
+        if self.loaded_resources:
+            show_skills(self.scroll_view, self.loaded_resources)
+            self.scroll_view.scroll_end(animate=False)
 
     def _command_feedback(self) -> None:
         """Handle the /feedback command to open feedback form in browser."""

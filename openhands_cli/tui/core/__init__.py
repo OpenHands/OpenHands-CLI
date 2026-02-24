@@ -5,7 +5,6 @@ from openhands_cli.tui.core.conversation_manager import (
     ConversationManager,
     CreateConversation,
     PauseConversation,
-    SendMessage,
     SetConfirmationPolicy,
     SwitchConfirmed,
     SwitchConversation,
@@ -22,6 +21,7 @@ from openhands_cli.tui.core.state import (
     ConversationContainer,
     ConversationFinished,
 )
+from openhands_cli.tui.messages import SendMessage
 
 
 __all__ = [
