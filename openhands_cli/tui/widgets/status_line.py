@@ -135,6 +135,8 @@ class InfoStatusLine(Static):
     running: var[bool] = var(False)
     # Metrics object from conversation stats (bound from ConversationContainer)
     metrics: var[Metrics | None] = var(None)
+    # Sandbox ID for cloud conversations (None for local mode)
+    sandbox_id: var[str | None] = var(None)
 
     # Local UI state - updated via Signal subscription to InputField
     is_multiline_mode: var[bool] = var(False)
@@ -173,6 +175,10 @@ class InfoStatusLine(Static):
 
     def watch_metrics(self, _value: Metrics | None) -> None:
         """React to metrics changes from ConversationContainer."""
+        self._update_text()
+
+    def watch_sandbox_id(self, _value: str | None) -> None:
+        """React to sandbox_id changes from ConversationContainer."""
         self._update_text()
 
     # ----- Internal helpers -----
@@ -239,9 +245,29 @@ class InfoStatusLine(Static):
         )
         return f"{ctx_display} • {cost_display} ({token_details})"
 
+    def _format_sandbox_display(self) -> str:
+        """Format the sandbox ID display for cloud mode.
+
+        Returns a shortened sandbox ID with cloud indicator, or empty string
+        for local mode.
+        """
+        if not self.sandbox_id:
+            return ""
+        # Show first 8 characters of sandbox ID for brevity
+        short_id = self.sandbox_id[:8] if len(self.sandbox_id) > 8 else self.sandbox_id
+        return f"☁ {short_id}"
+
     def _update_text(self) -> None:
         """Rebuild the info status text with metrics right-aligned in grey."""
-        left_part = f"{self.mode_indicator} • {self.work_dir_display}"
+        # Build left part: mode indicator, work directory, and optional sandbox ID
+        left_parts = [self.mode_indicator, self.work_dir_display]
+
+        # Add sandbox ID for cloud conversations
+        sandbox_display = self._format_sandbox_display()
+        if sandbox_display:
+            left_parts.append(sandbox_display)
+
+        left_part = " • ".join(left_parts)
         metrics_display = self._format_metrics_display()
 
         # Calculate available width for spacing (account for padding of 2 chars)

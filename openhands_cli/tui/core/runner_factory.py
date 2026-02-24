@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from openhands_cli.tui.core.state import ConversationContainer
     from openhands_cli.tui.textual_app import OpenHandsApp
     from openhands_cli.tui.widgets.main_display import ScrollableContent
+    from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
 
 NotificationCallback = Callable[[str, str, SeverityLevel], None]

@@ -86,6 +86,21 @@ class RemoteConversationRunner(ConversationRunner):
             sandbox_id=sandbox_id,
         )
 
+        # Extract and store sandbox_id from the workspace for display
+        self._update_sandbox_id_from_workspace()
+
+    def _update_sandbox_id_from_workspace(self) -> None:
+        """Extract sandbox_id from workspace and update state."""
+        try:
+            conversation = cast(RemoteConversation, self.conversation)
+            workspace = conversation.workspace
+            if workspace and hasattr(workspace, "sandbox_id") and workspace.sandbox_id:
+                self._sandbox_id = workspace.sandbox_id
+                self._state.set_sandbox_id(workspace.sandbox_id)
+        except Exception:
+            # Sandbox ID extraction is not critical, fail silently
+            pass
+
     def _run_conversation_sync(self, message: Message, headless: bool = False) -> None:
         """Run the conversation synchronously in a thread.
 
@@ -106,9 +121,11 @@ class RemoteConversationRunner(ConversationRunner):
             self.conversation.send_message(message)
             self._execute_conversation(headless=headless)
         except httpx.HTTPStatusError as e:
+            status_code = e.response.status_code
+            reason = e.response.reason_phrase
             self._notification_callback(
                 "Cloud Error",
-                f"Server returned error {e.response.status_code}: {e.response.reason_phrase}",
+                f"Server returned error {status_code}: {reason}",
                 "error",
             )
             self._update_run_status(False)
@@ -162,6 +179,8 @@ class RemoteConversationRunner(ConversationRunner):
                 server_url=self._server_url,
                 sandbox_id=self._sandbox_id,
             )
+            # Update sandbox_id in case it changed after reconnection
+            self._update_sandbox_id_from_workspace()
             self._notification_callback(
                 "Workspace Reconnected",
                 "Cloud workspace has been reconnected successfully.",

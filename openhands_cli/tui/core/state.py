@@ -136,6 +136,10 @@ class ConversationContainer(Container):
     refinement_iteration: var[int] = var(0)
     """Current refinement iteration within a user turn. Resets on new user message."""
 
+    # ---- Cloud Mode State ----
+    sandbox_id: var[str | None] = var(None)
+    """Sandbox ID for cloud conversations. None for local conversations."""
+
     def __init__(
         self,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
@@ -208,6 +212,7 @@ class ConversationContainer(Container):
             yield InfoStatusLine().data_bind(
                 running=ConversationContainer.running,
                 metrics=ConversationContainer.metrics,
+                sandbox_id=ConversationContainer.sandbox_id,
             )
 
     @property
@@ -395,6 +400,13 @@ class ConversationContainer(Container):
         """
         self._schedule_update("refinement_iteration", iteration)
 
+    def set_sandbox_id(self, sandbox_id: str | None) -> None:
+        """Set the sandbox ID for cloud conversations. Thread-safe.
+
+        Set to a sandbox ID string for cloud mode, or None for local mode.
+        """
+        self._schedule_update("sandbox_id", sandbox_id)
+
     # ---- Conversation Attachment (for metrics) ----
 
     def attach_conversation_state(
@@ -423,7 +435,8 @@ class ConversationContainer(Container):
         """Reset state for a new conversation.
 
         Resets: running, elapsed_seconds, metrics, conversation_title,
-                pending_action_count, refinement_iteration, internal state.
+                pending_action_count, refinement_iteration, sandbox_id,
+                internal state.
         Preserves: confirmation_policy (persists across conversations),
                    conversation_id (set explicitly when switching).
 
@@ -435,6 +448,7 @@ class ConversationContainer(Container):
         self.conversation_title = None
         self.pending_action_count = 0
         self.refinement_iteration = 0
+        self.sandbox_id = None
         self.switch_confirmation_target = None
         self._conversation_start_time = None
         self._conversation_state = None
