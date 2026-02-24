@@ -121,7 +121,7 @@ class RemoteConversationRunner(ConversationRunner):
             self.conversation.send_message(message)
             # Update sandbox_id after message is sent (sandbox starts on first message)
             self._update_sandbox_id_from_workspace()
-            self._execute_conversation(headless=headless)
+            self._execute_remote_conversation(headless=headless)
         except httpx.HTTPStatusError as e:
             status_code = e.response.status_code
             reason = e.response.reason_phrase
@@ -144,6 +144,100 @@ class RemoteConversationRunner(ConversationRunner):
                 f"{type(e).__name__}: {e}",
                 "error",
             )
+            self._update_run_status(False)
+
+    def _execute_remote_conversation(self, headless: bool = False) -> None:
+        """Execute the remote conversation with proper status handling.
+
+        Unlike local conversations where run() returns when the agent finishes,
+        RemoteConversation.run() waits for terminal statuses (FINISHED, ERROR,
+        STUCK). For interactive CLI use, we need to return when the agent goes
+        IDLE (waiting for more input) after processing the current message.
+
+        This method uses non-blocking run and polls for both terminal and IDLE
+        statuses.
+        """
+        import time
+
+        from rich.console import Console
+
+        from openhands.sdk import ConversationExecutionStatus
+        from openhands.sdk.conversation.exceptions import ConversationRunError
+
+        self._update_run_status(True)
+
+        try:
+            conversation = cast(RemoteConversation, self.conversation)
+
+            if headless:
+                console = Console()
+                console.print("Agent is working")
+
+            # Use non-blocking run to trigger the agent on the server
+            conversation.run(blocking=False)
+
+            # Poll until agent finishes processing (IDLE) or hits terminal status
+            poll_interval = 1.0
+            timeout = 3600.0
+            start_time = time.monotonic()
+
+            while True:
+                elapsed = time.monotonic() - start_time
+                if elapsed > timeout:
+                    raise ConversationRunError(
+                        conversation._id,
+                        TimeoutError(f"Run timed out after {timeout} seconds."),
+                    )
+
+                # Get current status from conversation state
+                status = conversation.state.execution_status
+
+                # Return on IDLE (agent finished current turn, waiting for input)
+                if status == ConversationExecutionStatus.IDLE:
+                    break
+
+                # Return on terminal statuses
+                if status in (
+                    ConversationExecutionStatus.FINISHED,
+                    ConversationExecutionStatus.PAUSED,
+                    ConversationExecutionStatus.WAITING_FOR_CONFIRMATION,
+                ):
+                    break
+
+                # Handle error states
+                if status == ConversationExecutionStatus.ERROR:
+                    raise ConversationRunError(
+                        conversation._id,
+                        RuntimeError("Remote conversation ended with error"),
+                    )
+
+                if status == ConversationExecutionStatus.STUCK:
+                    raise ConversationRunError(
+                        conversation._id,
+                        RuntimeError("Remote conversation got stuck"),
+                    )
+
+                # Still running, wait before next poll
+                time.sleep(poll_interval)
+
+            if headless:
+                console.print("Agent finished")
+
+            # Check if confirmation needed
+            if (
+                self.is_confirmation_mode_active
+                and conversation.state.execution_status
+                == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
+            ):
+                self._request_confirmation()
+
+        except ConversationRunError as e:
+            self._notification_callback("Conversation Error", str(e), "error")
+        except Exception as e:
+            self._notification_callback(
+                "Unexpected Error", f"{type(e).__name__}: {e}", "error"
+            )
+        finally:
             self._update_run_status(False)
 
     def _ensure_workspace_alive(self) -> bool:
