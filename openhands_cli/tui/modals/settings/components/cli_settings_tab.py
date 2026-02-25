@@ -76,7 +76,7 @@ class CliSettingsTab(Container):
                 description=(
                     "When enabled, the plan panel will automatically open on the "
                     "right side when the agent first uses the task tracker. "
-                    "You can toggle it anytime via the command palette."
+                    "You can toggle it anytime via settings."
                 ),
                 switch_id="auto_open_plan_panel_switch",
                 value=self._initial_settings.auto_open_plan_panel,
