@@ -498,7 +498,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         Implements progressive stopping behavior:
         1. If agent is running and not yet paused → pause
         2. If agent is still running after pause → interrupt
-        3. If agent is not running → proceed with quit
+        3. If agent is not running → notify user to use /exit or Ctrl+Q
         """
         if self.conversation_state.running:
             if not self._pause_attempted:
@@ -509,8 +509,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 # Second Ctrl+C while still running: force interrupt
                 self.conversation_manager.post_message(InterruptConversation())
         else:
-            # Agent is not running: proceed with quit
-            self.conversation_state.input_area._command_exit()
+            # Agent is not running: notify user how to quit
+            self.notify(
+                "Agent is already stopped. Use /exit or Ctrl+Q to quit.",
+                title="Agent Stopped",
+                severity="information",
+            )
 
     def action_toggle_cells(self) -> None:
         """Action to handle Ctrl+O key binding.
