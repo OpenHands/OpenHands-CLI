@@ -42,9 +42,7 @@ class DebugLogger:
         Args:
             event: The stream event containing direction and message data
         """
-        direction = (
-            ">>>" if event.direction == StreamDirection.INCOMING else "<<<"
-        )
+        direction = ">>>" if event.direction == StreamDirection.INCOMING else "<<<"
         entry = {
             "ts": datetime.now(UTC).isoformat(),
             "dir": direction,

@@ -147,9 +147,7 @@ async def test_run_acp_server_debug_disabled_by_default(mock_acp_dependencies):
     """Test that debug logging is disabled by default (no observers)."""
     from openhands_cli.acp_impl.agent.launcher import run_acp_server
 
-    with patch(
-        "openhands_cli.acp_impl.agent.local_agent.LocalOpenHandsACPAgent"
-    ):
+    with patch("openhands_cli.acp_impl.agent.local_agent.LocalOpenHandsACPAgent"):
         try:
             await run_acp_server(cloud=False)
         except asyncio.CancelledError:
@@ -170,9 +168,7 @@ async def test_run_acp_server_debug_enabled_creates_observer(
     from openhands_cli.acp_impl.agent.launcher import run_acp_server
 
     with (
-        patch(
-            "openhands_cli.acp_impl.agent.local_agent.LocalOpenHandsACPAgent"
-        ),
+        patch("openhands_cli.acp_impl.agent.local_agent.LocalOpenHandsACPAgent"),
         patch(
             "openhands_cli.acp_impl.debug_logger.get_persistence_dir",
             return_value=str(temp_debug_dir),
@@ -203,9 +199,7 @@ async def test_run_acp_server_debug_enabled_cloud_mode(
     from openhands_cli.acp_impl.agent.launcher import run_acp_server
 
     with (
-        patch(
-            "openhands_cli.acp_impl.agent.launcher.OpenHandsCloudACPAgent"
-        ),
+        patch("openhands_cli.acp_impl.agent.launcher.OpenHandsCloudACPAgent"),
         patch(
             "openhands_cli.acp_impl.debug_logger.get_persistence_dir",
             return_value=str(temp_debug_dir),
