@@ -213,13 +213,32 @@ class ConversationRunner:
         if self._running:
             self._notification_callback(
                 "Pausing conversation",
-                "Pausing conversation, this make take a few seconds...",
+                "Pausing conversation, this may take a few seconds...",
                 "information",
             )
             await asyncio.to_thread(self.conversation.pause)
         else:
             self._notification_callback(
-                "No running converastion", "No running conversation to pause", "warning"
+                "No running conversation", "No running conversation to pause", "warning"
+            )
+
+    async def interrupt(self) -> None:
+        """Interrupt the running conversation immediately.
+
+        Unlike pause(), interrupt() attempts to cancel ongoing LLM calls immediately.
+        """
+        if self._running:
+            self._notification_callback(
+                "Interrupting conversation",
+                "Interrupting agent immediately...",
+                "warning",
+            )
+            await asyncio.to_thread(self.conversation.interrupt)
+        else:
+            self._notification_callback(
+                "No running conversation",
+                "No running conversation to interrupt",
+                "warning",
             )
 
     async def condense_async(self) -> None:

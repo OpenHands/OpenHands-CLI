@@ -69,6 +69,7 @@ from openhands_cli.tui.core import (
     ConversationContainer,
     ConversationFinished,
     ConversationManager,
+    InterruptConversation,
     PauseConversation,
     RequestSwitchConfirmation,
     SendMessage,
@@ -99,7 +100,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
-        ("ctrl+c", "request_quit", "Quit the application"),
+        ("ctrl+c", "stop_or_quit", "Stop agent or quit"),
         ("ctrl+d", "request_quit", "Quit the application"),
     ]
 
@@ -198,6 +199,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Store queued inputs (copy to prevent mutating caller's list)
         self.pending_inputs = list(queued_inputs) if queued_inputs else []
+
+        # Track if pause has been attempted (for Ctrl+C → pause → interrupt flow)
+        self._pause_attempted = False
 
         # Callback for reloading visualizer configuration after settings changes
         self._reload_visualizer = (
@@ -336,6 +340,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     @on(ConversationFinished)
     def on_conversation_finished(self, _event: ConversationFinished) -> None:
         """Handle conversation finished."""
+        # Reset pause tracking for next conversation run
+        self._pause_attempted = False
+
         if self.headless_mode:
             self._print_conversation_summary()
             self.exit()
@@ -484,6 +491,26 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         Delegates to InputAreaContainer's _command_exit() for consistent behavior.
         """
         self.conversation_state.input_area._command_exit()
+
+    def action_stop_or_quit(self) -> None:
+        """Action to handle Ctrl+C key binding.
+
+        Implements progressive stopping behavior:
+        1. If agent is running and not yet paused → pause
+        2. If agent is still running after pause → interrupt
+        3. If agent is not running → proceed with quit
+        """
+        if self.conversation_state.running:
+            if not self._pause_attempted:
+                # First Ctrl+C while running: attempt graceful pause
+                self._pause_attempted = True
+                self.conversation_manager.post_message(PauseConversation())
+            else:
+                # Second Ctrl+C while still running: force interrupt
+                self.conversation_manager.post_message(InterruptConversation())
+        else:
+            # Agent is not running: proceed with quit
+            self.conversation_state.input_area._command_exit()
 
     def action_toggle_cells(self) -> None:
         """Action to handle Ctrl+O key binding.
