@@ -42,9 +42,7 @@ async def run_acp_server(
 
     # Setup debug observer if enabled
     debug_logger = DebugLogger() if debug else None
-    observers = [debug_logger] if debug_logger else None
-    if debug_logger:
-        logger.info(f"Debug logging enabled: {debug_logger.log_file}")
+    observers = [debug_logger] if (debug_logger and debug_logger.enabled) else []
 
     reader, writer = await stdio_streams()
 
