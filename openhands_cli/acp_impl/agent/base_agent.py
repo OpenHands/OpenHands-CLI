@@ -435,8 +435,6 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
 
             logger.info(f"Created new {self.agent_type} session {session_id}")
 
-            await self.send_available_commands(session_id)
-
             current_mode = get_confirmation_mode_from_conversation(conversation)
 
             response = NewSessionResponse(
@@ -452,6 +450,12 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                 subscriber = EventSubscriber(session_id, self._conn)
                 for event in conversation.state.events:
                     await subscriber(event)
+
+            # Schedule available commands notification to be sent after the response.
+            # This ensures the client receives the NewSessionResponse (with sessionId)
+            # before any session/update notifications, per the ACP spec.
+            # Fire-and-forget: notification failure is non-fatal.
+            asyncio.create_task(self.send_available_commands(session_id))
 
             return response
 
