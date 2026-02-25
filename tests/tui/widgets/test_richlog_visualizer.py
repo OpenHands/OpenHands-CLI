@@ -1351,3 +1351,134 @@ class TestDefaultAgentPrefixBehavior:
         assert "(Code Reviewer Agent)" in title
         # Should contain the command
         assert "git diff" in title
+
+
+class TestAutoscrolling:
+    """Tests for autoscrolling behavior when adding or updating widgets.
+
+    The TUI should only autoscroll when the user is already at the bottom.
+    If the user has scrolled up to read old messages, autoscroll should be disabled.
+    """
+
+    def test_add_widget_scrolls_when_at_bottom(self, visualizer, mock_cli_settings):
+        """Test that adding a widget scrolls to end when already at bottom."""
+        from unittest.mock import Mock, PropertyMock
+
+        from textual.widgets import Static
+
+        # Mock container that's at the end
+        with patch.object(
+            type(visualizer._container),
+            "is_vertical_scroll_end",
+            new_callable=PropertyMock,
+            return_value=True,
+        ):
+            visualizer._container.scroll_end = Mock()
+            visualizer._container.mount = Mock()
+
+            widget = Static("New message")
+
+            with mock_cli_settings(visualizer=visualizer):
+                visualizer._add_widget_to_ui(widget)
+
+            # Should have called scroll_end since we're at the bottom
+            visualizer._container.scroll_end.assert_called_once_with(animate=False)
+
+    def test_add_widget_no_scroll_when_not_at_bottom(
+        self, visualizer, mock_cli_settings
+    ):
+        """Test that adding a widget doesn't scroll when not at bottom."""
+        from unittest.mock import Mock, PropertyMock
+
+        from textual.widgets import Static
+
+        # Mock container that's NOT at the end (user scrolled up)
+        with patch.object(
+            type(visualizer._container),
+            "is_vertical_scroll_end",
+            new_callable=PropertyMock,
+            return_value=False,
+        ):
+            visualizer._container.scroll_end = Mock()
+            visualizer._container.mount = Mock()
+
+            widget = Static("New message")
+
+            with mock_cli_settings(visualizer=visualizer):
+                visualizer._add_widget_to_ui(widget)
+
+            # Should NOT have called scroll_end since we're not at the bottom
+            visualizer._container.scroll_end.assert_not_called()
+
+    def test_update_widget_scrolls_when_at_bottom(self, visualizer, mock_cli_settings):
+        """Test that updating a widget scrolls to end when already at bottom."""
+        from unittest.mock import Mock, PropertyMock
+
+        from openhands_cli.tui.widgets.collapsible import Collapsible
+
+        # Mock container that's at the end
+        with patch.object(
+            type(visualizer._container),
+            "is_vertical_scroll_end",
+            new_callable=PropertyMock,
+            return_value=True,
+        ):
+            visualizer._container.scroll_end = Mock()
+
+            # Create a mock collapsible
+            collapsible = Mock(spec=Collapsible)
+
+            with mock_cli_settings(visualizer=visualizer):
+                visualizer._update_widget_in_ui(collapsible, "New Title", "New Content")
+
+            # Should have called scroll_end since we're at the bottom
+            visualizer._container.scroll_end.assert_called_once_with(animate=False)
+
+    def test_update_widget_no_scroll_when_not_at_bottom(
+        self, visualizer, mock_cli_settings
+    ):
+        """Test that updating a widget doesn't scroll when not at bottom."""
+        from unittest.mock import Mock, PropertyMock
+
+        from openhands_cli.tui.widgets.collapsible import Collapsible
+
+        # Mock container that's NOT at the end (user scrolled up)
+        with patch.object(
+            type(visualizer._container),
+            "is_vertical_scroll_end",
+            new_callable=PropertyMock,
+            return_value=False,
+        ):
+            visualizer._container.scroll_end = Mock()
+
+            # Create a mock collapsible
+            collapsible = Mock(spec=Collapsible)
+
+            with mock_cli_settings(visualizer=visualizer):
+                visualizer._update_widget_in_ui(collapsible, "New Title", "New Content")
+
+            # Should NOT have called scroll_end since we're not at the bottom
+            visualizer._container.scroll_end.assert_not_called()
+
+    def test_on_event_respects_scroll_position(self, visualizer, mock_cli_settings):
+        """Test that on_event respects current scroll position."""
+        from unittest.mock import Mock, PropertyMock
+
+        # Mock container that's NOT at the end
+        with patch.object(
+            type(visualizer._container),
+            "is_vertical_scroll_end",
+            new_callable=PropertyMock,
+            return_value=False,
+        ):
+            visualizer._container.scroll_end = Mock()
+            visualizer._container.mount = Mock()
+
+            # Create a terminal action event
+            event = create_terminal_action_event("echo 'test'", "Test command")
+
+            with mock_cli_settings(visualizer=visualizer):
+                visualizer.on_event(event)
+
+            # Should NOT have called scroll_end since we're not at the bottom
+            visualizer._container.scroll_end.assert_not_called()

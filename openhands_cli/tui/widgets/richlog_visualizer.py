@@ -290,8 +290,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
         self._container.mount(widget)
-        # Automatically scroll to the bottom to show the newly added widget
-        self._container.scroll_end(animate=False)
+        # Automatically scroll to the bottom only if already at the end
+        # This allows users to scroll up to read/copy old messages without interruption
+        if self._container.is_vertical_scroll_end:
+            self._container.scroll_end(animate=False)
 
     def _handle_critic_result(self, critic_result: "CriticResult") -> None:
         """Handle a critic result by displaying widgets and notifying controller.
@@ -410,7 +412,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """Update an existing widget in the UI (must be called from main thread)."""
         collapsible.update_title(new_title)
         collapsible.update_content(new_content)
-        self._container.scroll_end(animate=False)
+        # Automatically scroll to the bottom only if already at the end
+        # This allows users to scroll up to read/copy old messages without interruption
+        if self._container.is_vertical_scroll_end:
+            self._container.scroll_end(animate=False)
 
     def _handle_observation_event(
         self, event: ObservationEvent | UserRejectObservation | AgentErrorEvent
