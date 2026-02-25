@@ -19,6 +19,7 @@ COMMANDS = [
     DropdownItem(main="/help - Display available commands"),
     DropdownItem(main="/new - Start a new conversation"),
     DropdownItem(main="/history - Toggle conversation history"),
+    DropdownItem(main="/settings - Open settings"),
     DropdownItem(main="/confirm - Configure confirmation settings"),
     DropdownItem(main="/condense - Condense conversation history"),
     DropdownItem(main="/skills - View loaded skills, hooks, and MCPs"),
@@ -73,6 +74,7 @@ def show_help(scroll_view: VerticalScroll) -> None:
   [{secondary}]/help[/{secondary}] - Display available commands
   [{secondary}]/new[/{secondary}] - Start a new conversation
   [{secondary}]/history[/{secondary}] - Toggle conversation history
+  [{secondary}]/settings[/{secondary}] - Open settings
   [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
   [{secondary}]/condense[/{secondary}] - Condense conversation history
   [{secondary}]/skills[/{secondary}] - View loaded skills, hooks, and MCPs
