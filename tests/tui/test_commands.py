@@ -29,7 +29,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 8
+        assert len(COMMANDS) == 9
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -44,6 +44,7 @@ class TestCommands:
             ("/help", "Display available commands"),
             ("/new", "Start a new conversation"),
             ("/history", "Toggle conversation history"),
+            ("/settings", "Open settings"),
             ("/confirm", "Configure confirmation settings"),
             ("/condense", "Condense conversation history"),
             ("/skills", "View loaded skills, hooks, and MCPs"),
@@ -83,6 +84,7 @@ class TestCommands:
             "/help",
             "/new",
             "/history",
+            "/settings",
             "/confirm",
             "/condense",
             "/skills",
@@ -91,6 +93,7 @@ class TestCommands:
             "Display available commands",
             "Start a new conversation",
             "Toggle conversation history",
+            "Open settings",
             "Configure confirmation settings",
             "Condense conversation history",
             "View loaded skills, hooks, and MCPs",
@@ -157,6 +160,7 @@ class TestCommands:
             ("/help", True),
             ("/new", True),
             ("/history", True),
+            ("/settings", True),
             ("/confirm", True),
             ("/condense", True),
             ("/skills", True),
@@ -181,8 +185,9 @@ class TestCommands:
         assert "/history" in command_names
         assert "/help" in command_names
         assert "/new" in command_names
+        assert "/settings" in command_names
         assert "/skills" in command_names
-        assert len(COMMANDS) == 8
+        assert len(COMMANDS) == 9
 
     def test_all_commands_included_in_help(self):
         """Test that all commands from COMMANDS list are included in help text.
