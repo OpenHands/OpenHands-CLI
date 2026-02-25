@@ -3,6 +3,7 @@
 import json
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from acp.connection import StreamDirection, StreamEvent
@@ -30,17 +31,18 @@ class TestDebugLogger:
         assert log_dir.exists()
         assert debug_logger.log_dir == log_dir
 
-    def test_init_creates_log_file_with_timestamp(self, temp_log_dir: Path):
-        """Test that DebugLogger creates a timestamped log file."""
+    def test_init_creates_log_file_with_utc_timestamp(self, temp_log_dir: Path):
+        """Test that DebugLogger creates a UTC timestamped log file."""
         debug_logger = DebugLogger(log_dir=temp_log_dir)
 
         assert debug_logger.log_file.parent == temp_log_dir
         assert debug_logger.log_file.name.endswith("_acp.jsonl")
-        # Check format: YYYYMMDD_HHMMSS_acp.jsonl
+        # Check format: YYYYMMDD_HHMMSSZ_acp.jsonl (UTC with Z suffix)
         name_parts = debug_logger.log_file.stem.split("_")
         assert len(name_parts) == 3
         assert len(name_parts[0]) == 8  # YYYYMMDD
-        assert len(name_parts[1]) == 6  # HHMMSS
+        assert name_parts[1].endswith("Z")  # HHMMSSZ (UTC indicator)
+        assert len(name_parts[1]) == 7  # HHMMSSZ
         assert name_parts[2] == "acp"
 
     @pytest.mark.asyncio
@@ -51,6 +53,7 @@ class TestDebugLogger:
         event = StreamEvent(direction=StreamDirection.INCOMING, message=message)
 
         await debug_logger(event)
+        debug_logger.close()
 
         assert debug_logger.log_file.exists()
         with open(debug_logger.log_file) as f:
@@ -68,6 +71,7 @@ class TestDebugLogger:
         event = StreamEvent(direction=StreamDirection.OUTGOING, message=message)
 
         await debug_logger(event)
+        debug_logger.close()
 
         with open(debug_logger.log_file) as f:
             content = f.read()
@@ -97,6 +101,7 @@ class TestDebugLogger:
 
         for msg in messages:
             await debug_logger(msg)
+        debug_logger.close()
 
         with open(debug_logger.log_file) as f:
             lines = f.readlines()
@@ -117,6 +122,7 @@ class TestDebugLogger:
         )
 
         await debug_logger(event)
+        debug_logger.close()
 
         with open(debug_logger.log_file) as f:
             entry = json.loads(f.read())
@@ -126,9 +132,34 @@ class TestDebugLogger:
         assert "T" in ts  # ISO format separator
         assert "+" in ts or ts.endswith("Z") or ":00" in ts  # timezone indicator
 
-    def test_uses_default_persistence_dir(self):
+    def test_uses_default_persistence_dir(self, temp_log_dir: Path):
         """Test that DebugLogger uses default persistence dir when none provided."""
-        debug_logger = DebugLogger()
+        with patch(
+            "openhands_cli.acp_impl.debug_logger.get_persistence_dir",
+            return_value=str(temp_log_dir),
+        ):
+            debug_logger = DebugLogger()
 
-        # Should use ~/.openhands/acp-debug/ by default
-        assert "acp-debug" in str(debug_logger.log_dir)
+            # Should use the mocked persistence dir with acp-debug subdirectory
+            assert debug_logger.log_dir == temp_log_dir / "acp-debug"
+            assert "acp-debug" in str(debug_logger.log_dir)
+
+    def test_close_handles_unopened_file(self, temp_log_dir: Path):
+        """Test that close() is safe to call even if no writes occurred."""
+        debug_logger = DebugLogger(log_dir=temp_log_dir)
+        # Should not raise even if file was never opened
+        debug_logger.close()
+
+    @pytest.mark.asyncio
+    async def test_close_flushes_and_closes_file(self, temp_log_dir: Path):
+        """Test that close() properly closes the file handle."""
+        debug_logger = DebugLogger(log_dir=temp_log_dir)
+        event = StreamEvent(
+            direction=StreamDirection.INCOMING,
+            message={"jsonrpc": "2.0", "method": "test"},
+        )
+        await debug_logger(event)
+
+        assert debug_logger._file_handle is not None
+        debug_logger.close()
+        assert debug_logger._file_handle is None
