@@ -154,6 +154,7 @@ def main() -> None:
                     resume_conversation_id=resume_id,
                     cloud=args.cloud,
                     cloud_api_url=args.cloud_url,
+                    debug=args.debug,
                 )
             )
 

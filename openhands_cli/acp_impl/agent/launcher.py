@@ -19,6 +19,7 @@ async def run_acp_server(
     streaming_enabled: bool = False,
     cloud: bool = False,
     cloud_api_url: str = "https://app.all-hands.dev",
+    debug: bool = False,
 ) -> None:
     """Run the OpenHands ACP server.
 
@@ -27,6 +28,9 @@ async def run_acp_server(
         resume_conversation_id: Optional conversation ID to resume when a new
             session is created
         streaming_enabled: Whether to enable token streaming for LLM outputs
+        cloud: Whether to use OpenHands Cloud instead of local workspace
+        cloud_api_url: OpenHands Cloud API URL
+        debug: Whether to enable debug logging of all ACP protocol messages
     """
     logger.info(
         f"Starting OpenHands ACP server with confirmation mode: "
@@ -35,7 +39,21 @@ async def run_acp_server(
     if resume_conversation_id:
         logger.info(f"Will resume conversation: {resume_conversation_id}")
 
+    # Setup debug observer if enabled
+    observers = []
+    if debug:
+        from openhands_cli.acp_impl.debug_logger import DebugLogger
+
+        debug_logger = DebugLogger()
+        observers.append(debug_logger)
+        logger.info(f"Debug logging enabled: {debug_logger.log_file}")
+
     reader, writer = await stdio_streams()
+
+    # Prepare connection kwargs (pass observers if any)
+    connection_kwargs = {}
+    if observers:
+        connection_kwargs["observers"] = observers
 
     if not cloud:
         from openhands_cli.acp_impl.agent.local_agent import LocalOpenHandsACPAgent
@@ -48,7 +66,7 @@ async def run_acp_server(
                 streaming_enabled,
             )
 
-        AgentSideConnection(create_local_agent, writer, reader)
+        AgentSideConnection(create_local_agent, writer, reader, **connection_kwargs)
 
     else:
 
@@ -60,7 +78,7 @@ async def run_acp_server(
                 resume_conversation_id=resume_conversation_id,
             )
 
-        AgentSideConnection(create_agent, writer, reader)
+        AgentSideConnection(create_agent, writer, reader, **connection_kwargs)
 
     # Keep the server running
     await asyncio.Event().wait()

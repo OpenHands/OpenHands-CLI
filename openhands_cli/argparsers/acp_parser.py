@@ -46,4 +46,14 @@ def add_acp_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentP
         help="OpenHands Cloud API URL",
     )
 
+    # Debug logging option
+    acp_parser.add_argument(
+        "--debug",
+        action="store_true",
+        default=False,
+        help=(
+            "Enable debug logging of all ACP protocol messages to ~/.openhands/acp-debug/"
+        ),
+    )
+
     return acp_parser
