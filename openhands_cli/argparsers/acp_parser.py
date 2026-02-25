@@ -51,9 +51,7 @@ def add_acp_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentP
         "--debug",
         action="store_true",
         default=False,
-        help=(
-            "Enable debug logging of all ACP protocol messages to ~/.openhands/acp-debug/"
-        ),
+        help="Enable debug logging of ACP protocol messages to ~/.openhands/acp-debug/",
     )
 
     return acp_parser
