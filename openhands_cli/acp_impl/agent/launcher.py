@@ -1,4 +1,5 @@
 import asyncio
+import atexit
 import logging
 
 from acp import Client, stdio_streams
@@ -43,6 +44,10 @@ async def run_acp_server(
     # Setup debug observer if enabled
     debug_logger = DebugLogger() if debug else None
     observers = [debug_logger] if (debug_logger and debug_logger.enabled) else []
+
+    # Register cleanup for debug logger file handle
+    if debug_logger:
+        atexit.register(debug_logger.close)
 
     reader, writer = await stdio_streams()
 
