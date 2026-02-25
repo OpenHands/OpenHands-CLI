@@ -79,9 +79,13 @@ class DebugLogger:
 
     def _write_line(self, line: str) -> None:
         """Write a line to the log file (runs in thread pool)."""
-        f = self._get_file_handle()
-        f.write(line)
-        f.flush()
+        try:
+            f = self._get_file_handle()
+            f.write(line)
+            f.flush()
+        except OSError:
+            # Silently ignore write failures - debug logging should not break the agent
+            pass
 
     def close(self) -> None:
         """Close the log file handle."""
