@@ -28,7 +28,7 @@ from textual import on
 from textual.containers import Container
 from textual.reactive import var
 
-from openhands_cli.tui.core.commands import show_help, show_skills
+from openhands_cli.tui.core.commands import show_agents, show_help, show_skills
 from openhands_cli.tui.messages import SlashCommandSubmitted
 
 
@@ -86,6 +86,8 @@ class InputAreaContainer(Container):
                 self._command_condense()
             case "skills":
                 self._command_skills()
+            case "agents":
+                self._command_agents()
             case "feedback":
                 self._command_feedback()
             case "exit":
@@ -151,6 +153,13 @@ class InputAreaContainer(Container):
         if self.loaded_resources:
             show_skills(self.scroll_view, self.loaded_resources)
             self.scroll_view.scroll_end(animate=False)
+
+    def _command_agents(self) -> None:
+        """Handle the /agents command to display available and active sub-agents."""
+        app = cast("OpenHandsApp", self.app)
+        runner = app.conversation_manager.current_runner
+        show_agents(self.scroll_view, runner)
+        self.scroll_view.scroll_end(animate=False)
 
     def _command_feedback(self) -> None:
         """Handle the /feedback command to open feedback form in browser."""

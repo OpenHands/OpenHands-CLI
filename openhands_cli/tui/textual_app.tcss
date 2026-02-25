@@ -39,7 +39,7 @@ Screen {
     color: $primary;
 }
 
-.help-message, .error-message, .status-message {
+.help-message, .error-message, .status-message, .agents-message {
     padding: 0 1;
     background: $background;
     color: $foreground;
