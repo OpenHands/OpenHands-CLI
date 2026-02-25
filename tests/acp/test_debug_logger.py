@@ -179,7 +179,9 @@ class TestDebugLoggerErrorHandling:
 
     def test_init_handles_mkdir_disk_full_error(self, temp_log_dir: Path):
         """Test that DebugLogger gracefully handles disk full errors on mkdir."""
-        with patch.object(Path, "mkdir", side_effect=OSError("No space left on device")):
+        with patch.object(
+            Path, "mkdir", side_effect=OSError("No space left on device")
+        ):
             debug_logger = DebugLogger(log_dir=temp_log_dir / "full-disk")
 
             assert debug_logger.enabled is False
