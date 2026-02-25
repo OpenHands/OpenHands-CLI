@@ -199,8 +199,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Store queued inputs (copy to prevent mutating caller's list)
         self.pending_inputs = list(queued_inputs) if queued_inputs else []
 
-        # Track pause/interrupt state for Ctrl+C progressive stopping
-        self._pause_attempted = False
+        # Track if interrupt is in progress to prevent duplicate calls
         self._interrupt_in_progress = False
 
         # Callback for reloading visualizer configuration after settings changes
@@ -340,8 +339,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     @on(ConversationFinished)
     def on_conversation_finished(self, _event: ConversationFinished) -> None:
         """Handle conversation finished."""
-        # Reset pause/interrupt tracking for next conversation run
-        self._pause_attempted = False
+        # Reset interrupt tracking for next conversation run
         self._interrupt_in_progress = False
 
         if self.headless_mode:
@@ -496,28 +494,23 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     def action_stop_or_quit(self) -> None:
         """Action to handle Ctrl+C key binding.
 
-        Implements progressive stopping behavior:
-        1. If agent is running and not yet paused → pause
-        2. If agent is still running after pause → interrupt (once)
-        3. If agent is not running → notify user to use /exit or Ctrl+Q
+        Behavior:
+        - If agent is running → interrupt immediately
+        - If agent is not running → notify user to use /exit or Ctrl+Q
 
         Note: We call interrupt() directly instead of posting a message to
         minimize latency - the SDK's interrupt() is designed for immediate
         cancellation and is thread-safe.
         """
         if self.conversation_state.running:
-            if not self._pause_attempted:
-                # First Ctrl+C while running: attempt graceful pause
-                self._pause_attempted = True
-                self.conversation_manager.post_message(PauseConversation())
-            elif not self._interrupt_in_progress:
-                # Second Ctrl+C while still running: force interrupt immediately
+            if not self._interrupt_in_progress:
+                # Interrupt immediately on first Ctrl+C
                 self._interrupt_in_progress = True
                 runner = self.conversation_manager.current_runner
                 if runner:
                     self.notify(
-                        "Interrupting agent immediately...",
-                        title="Interrupting",
+                        "Interrupting agent...",
+                        title="Ctrl+C",
                         severity="warning",
                     )
                     # Call interrupt() directly for minimal latency
