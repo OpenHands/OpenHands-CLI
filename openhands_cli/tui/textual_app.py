@@ -69,7 +69,6 @@ from openhands_cli.tui.core import (
     ConversationContainer,
     ConversationFinished,
     ConversationManager,
-    InterruptConversation,
     PauseConversation,
     RequestSwitchConfirmation,
     SendMessage,
@@ -501,6 +500,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         1. If agent is running and not yet paused → pause
         2. If agent is still running after pause → interrupt (once)
         3. If agent is not running → notify user to use /exit or Ctrl+Q
+
+        Note: We call interrupt() directly instead of posting a message to
+        minimize latency - the SDK's interrupt() is designed for immediate
+        cancellation and is thread-safe.
         """
         if self.conversation_state.running:
             if not self._pause_attempted:
@@ -508,9 +511,17 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 self._pause_attempted = True
                 self.conversation_manager.post_message(PauseConversation())
             elif not self._interrupt_in_progress:
-                # Second Ctrl+C while still running: force interrupt (only once)
+                # Second Ctrl+C while still running: force interrupt immediately
                 self._interrupt_in_progress = True
-                self.conversation_manager.post_message(InterruptConversation())
+                runner = self.conversation_manager.current_runner
+                if runner:
+                    self.notify(
+                        "Interrupting agent immediately...",
+                        title="Interrupting",
+                        severity="warning",
+                    )
+                    # Call interrupt() directly for minimal latency
+                    runner.conversation.interrupt()
             # else: interrupt already in progress, ignore additional Ctrl+C
         else:
             # Agent is not running: notify user how to quit
