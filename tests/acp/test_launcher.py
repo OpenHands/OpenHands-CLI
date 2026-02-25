@@ -144,7 +144,7 @@ async def test_run_acp_server_cloud_agent_params(
 
 @pytest.mark.asyncio
 async def test_run_acp_server_debug_disabled_by_default(mock_acp_dependencies):
-    """Test that debug logging is disabled by default (observers=None)."""
+    """Test that debug logging is disabled by default (no observers)."""
     from openhands_cli.acp_impl.agent.launcher import run_acp_server
 
     with patch("openhands_cli.acp_impl.agent.local_agent.LocalOpenHandsACPAgent"):
@@ -155,9 +155,9 @@ async def test_run_acp_server_debug_disabled_by_default(mock_acp_dependencies):
 
         mock_conn = mock_acp_dependencies["connection"]
         assert mock_conn.called
-        # Check that observers is None (no debug logger)
+        # Check that observers is empty (no debug logger)
         call_kwargs = mock_conn.call_args[1]
-        assert call_kwargs.get("observers") is None
+        assert call_kwargs.get("observers") == []
 
 
 @pytest.mark.asyncio
