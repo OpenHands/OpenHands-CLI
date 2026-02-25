@@ -3,7 +3,7 @@
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from acp.connection import StreamDirection, StreamEvent
@@ -163,3 +163,78 @@ class TestDebugLogger:
         assert debug_logger._file_handle is not None
         debug_logger.close()
         assert debug_logger._file_handle is None
+
+
+class TestDebugLoggerErrorHandling:
+    """Tests for graceful degradation when filesystem operations fail."""
+
+    def test_init_handles_mkdir_permission_error(self, temp_log_dir: Path):
+        """Test that DebugLogger gracefully handles permission errors on mkdir."""
+        with patch.object(Path, "mkdir", side_effect=OSError("Permission denied")):
+            debug_logger = DebugLogger(log_dir=temp_log_dir / "readonly")
+
+            # Should be disabled but not crash
+            assert debug_logger.enabled is False
+            assert debug_logger._enabled is False
+
+    def test_init_handles_mkdir_disk_full_error(self, temp_log_dir: Path):
+        """Test that DebugLogger gracefully handles disk full errors on mkdir."""
+        with patch.object(Path, "mkdir", side_effect=OSError("No space left on device")):
+            debug_logger = DebugLogger(log_dir=temp_log_dir / "full-disk")
+
+            assert debug_logger.enabled is False
+
+    @pytest.mark.asyncio
+    async def test_call_skips_logging_when_disabled(self, temp_log_dir: Path):
+        """Test that __call__ is a no-op when logger is disabled."""
+        with patch.object(Path, "mkdir", side_effect=OSError("Permission denied")):
+            debug_logger = DebugLogger(log_dir=temp_log_dir / "disabled")
+
+        event = StreamEvent(
+            direction=StreamDirection.INCOMING,
+            message={"jsonrpc": "2.0", "method": "test"},
+        )
+
+        # Should not raise even when disabled
+        await debug_logger(event)
+        # File should not be opened
+        assert debug_logger._file_handle is None
+
+    @pytest.mark.asyncio
+    async def test_write_handles_disk_full_mid_session(self, temp_log_dir: Path):
+        """Test that write failures mid-session don't crash the agent."""
+        debug_logger = DebugLogger(log_dir=temp_log_dir)
+
+        # First write succeeds
+        event = StreamEvent(
+            direction=StreamDirection.INCOMING,
+            message={"jsonrpc": "2.0", "method": "initialize"},
+        )
+        await debug_logger(event)
+
+        # Mock the file handle to raise on write
+        mock_handle = MagicMock()
+        mock_handle.write.side_effect = OSError("No space left on device")
+        debug_logger._file_handle = mock_handle
+
+        # Second write should silently fail
+        event2 = StreamEvent(
+            direction=StreamDirection.INCOMING,
+            message={"jsonrpc": "2.0", "method": "test"},
+        )
+        # Should not raise
+        await debug_logger(event2)
+
+    @pytest.mark.asyncio
+    async def test_write_handles_file_open_failure(self, temp_log_dir: Path):
+        """Test graceful handling when file cannot be opened."""
+        debug_logger = DebugLogger(log_dir=temp_log_dir)
+
+        # Mock open to raise
+        with patch("builtins.open", side_effect=OSError("Permission denied")):
+            event = StreamEvent(
+                direction=StreamDirection.INCOMING,
+                message={"jsonrpc": "2.0", "method": "test"},
+            )
+            # Should not raise
+            await debug_logger(event)
