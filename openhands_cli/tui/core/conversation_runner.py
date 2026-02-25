@@ -222,10 +222,12 @@ class ConversationRunner:
                 "No running conversation", "No running conversation to pause", "warning"
             )
 
-    async def interrupt(self) -> None:
+    def interrupt(self) -> None:
         """Interrupt the running conversation immediately.
 
         Unlike pause(), interrupt() attempts to cancel ongoing LLM calls immediately.
+        This method is synchronous and non-blocking - it signals the interrupt
+        and returns immediately without waiting for completion.
         """
         if self._running:
             self._notification_callback(
@@ -233,7 +235,9 @@ class ConversationRunner:
                 "Interrupting agent immediately...",
                 "warning",
             )
-            await asyncio.to_thread(self.conversation.interrupt)
+            # Fire-and-forget: don't await, just trigger the interrupt
+            # The SDK's interrupt() is designed to be thread-safe
+            self.conversation.interrupt()
         else:
             self._notification_callback(
                 "No running conversation",

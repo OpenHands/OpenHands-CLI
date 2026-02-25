@@ -262,7 +262,7 @@ class ConversationManager(Container):
         await runner.pause()
 
     @on(InterruptConversation)
-    async def _on_interrupt_conversation(self, event: InterruptConversation) -> None:
+    def _on_interrupt_conversation(self, event: InterruptConversation) -> None:
         """Handle request to interrupt the current conversation immediately."""
         event.stop()
 
@@ -271,7 +271,7 @@ class ConversationManager(Container):
             self.notify("No running conversation to interrupt", severity="error")
             return
 
-        await runner.interrupt()
+        runner.interrupt()
 
     @on(CondenseConversation)
     async def _on_condense_conversation(self, event: CondenseConversation) -> None:

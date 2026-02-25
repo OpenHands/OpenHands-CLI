@@ -200,8 +200,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Store queued inputs (copy to prevent mutating caller's list)
         self.pending_inputs = list(queued_inputs) if queued_inputs else []
 
-        # Track if pause has been attempted (for Ctrl+C → pause → interrupt flow)
+        # Track pause/interrupt state for Ctrl+C progressive stopping
         self._pause_attempted = False
+        self._interrupt_in_progress = False
 
         # Callback for reloading visualizer configuration after settings changes
         self._reload_visualizer = (
@@ -340,8 +341,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     @on(ConversationFinished)
     def on_conversation_finished(self, _event: ConversationFinished) -> None:
         """Handle conversation finished."""
-        # Reset pause tracking for next conversation run
+        # Reset pause/interrupt tracking for next conversation run
         self._pause_attempted = False
+        self._interrupt_in_progress = False
 
         if self.headless_mode:
             self._print_conversation_summary()
@@ -497,7 +499,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         Implements progressive stopping behavior:
         1. If agent is running and not yet paused → pause
-        2. If agent is still running after pause → interrupt
+        2. If agent is still running after pause → interrupt (once)
         3. If agent is not running → notify user to use /exit or Ctrl+Q
         """
         if self.conversation_state.running:
@@ -505,9 +507,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 # First Ctrl+C while running: attempt graceful pause
                 self._pause_attempted = True
                 self.conversation_manager.post_message(PauseConversation())
-            else:
-                # Second Ctrl+C while still running: force interrupt
+            elif not self._interrupt_in_progress:
+                # Second Ctrl+C while still running: force interrupt (only once)
+                self._interrupt_in_progress = True
                 self.conversation_manager.post_message(InterruptConversation())
+            # else: interrupt already in progress, ignore additional Ctrl+C
         else:
             # Agent is not running: notify user how to quit
             self.notify(
