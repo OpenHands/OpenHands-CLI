@@ -453,8 +453,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
 
             # Schedule available commands notification to be sent after the response.
             # This ensures the client receives the NewSessionResponse (with sessionId)
-            # before any session/update notifications, which is required by the ACP spec.
-            # See: https://agentclientprotocol.com/protocol/slash-commands
+            # before any session/update notifications, per the ACP spec.
             asyncio.create_task(self.send_available_commands(session_id))
 
             return response
