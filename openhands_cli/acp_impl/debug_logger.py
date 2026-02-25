@@ -33,11 +33,25 @@ class DebugLogger:
             log_dir: Directory to store log files. Defaults to ~/.openhands/acp-debug/
         """
         self.log_dir = log_dir or Path(get_persistence_dir()) / "acp-debug"
-        self.log_dir.mkdir(parents=True, exist_ok=True)
+        self._file_handle: TextIO | None = None
+        self._enabled = True
+
+        try:
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            logger.warning(f"Failed to create ACP debug log directory: {e}")
+            self._enabled = False
+            self.log_file = self.log_dir / "disabled.jsonl"  # Placeholder
+            return
+
         timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%SZ")
         self.log_file = self.log_dir / f"{timestamp}_acp.jsonl"
-        self._file_handle: TextIO | None = None
         logger.info(f"ACP debug logging enabled: {self.log_file}")
+
+    @property
+    def enabled(self) -> bool:
+        """Whether debug logging is enabled and working."""
+        return self._enabled
 
     def _get_file_handle(self) -> TextIO:
         """Get or create the file handle for writing logs."""
@@ -51,6 +65,9 @@ class DebugLogger:
         Args:
             event: The stream event containing direction and message data
         """
+        if not self._enabled:
+            return
+
         direction = ">>>" if event.direction == StreamDirection.INCOMING else "<<<"
         entry = {
             "ts": datetime.now(UTC).isoformat(),
