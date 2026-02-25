@@ -8,6 +8,7 @@ from openhands_cli.acp_impl.agent.remote_agent import (
     OpenHandsCloudACPAgent,
 )
 from openhands_cli.acp_impl.confirmation import ConfirmationMode
+from openhands_cli.acp_impl.debug_logger import DebugLogger
 
 
 logger = logging.getLogger(__name__)
@@ -40,20 +41,12 @@ async def run_acp_server(
         logger.info(f"Will resume conversation: {resume_conversation_id}")
 
     # Setup debug observer if enabled
-    observers = []
-    if debug:
-        from openhands_cli.acp_impl.debug_logger import DebugLogger
-
-        debug_logger = DebugLogger()
-        observers.append(debug_logger)
+    debug_logger = DebugLogger() if debug else None
+    observers = [debug_logger] if debug_logger else None
+    if debug_logger:
         logger.info(f"Debug logging enabled: {debug_logger.log_file}")
 
     reader, writer = await stdio_streams()
-
-    # Prepare connection kwargs (pass observers if any)
-    connection_kwargs = {}
-    if observers:
-        connection_kwargs["observers"] = observers
 
     if not cloud:
         from openhands_cli.acp_impl.agent.local_agent import LocalOpenHandsACPAgent
@@ -66,7 +59,7 @@ async def run_acp_server(
                 streaming_enabled,
             )
 
-        AgentSideConnection(create_local_agent, writer, reader, **connection_kwargs)
+        AgentSideConnection(create_local_agent, writer, reader, observers=observers)
 
     else:
 
@@ -78,7 +71,7 @@ async def run_acp_server(
                 resume_conversation_id=resume_conversation_id,
             )
 
-        AgentSideConnection(create_agent, writer, reader, **connection_kwargs)
+        AgentSideConnection(create_agent, writer, reader, observers=observers)
 
     # Keep the server running
     await asyncio.Event().wait()
