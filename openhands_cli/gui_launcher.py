@@ -106,26 +106,13 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
 
     # Get the current version for the Docker image
     version = get_openhands_version()
-    # Agent server image repository and tag (used by sandbox service)
-    agent_server_image_repository = "docker.openhands.dev/openhands/runtime"
-    agent_server_image_tag = f"{version}-nikolaik"
-    agent_server_image = f"{agent_server_image_repository}:{agent_server_image_tag}"
     app_image = f"docker.openhands.dev/openhands/openhands:{version}"
 
-    print_formatted_text(HTML("<grey>Pulling required Docker images...</grey>"))
+    # Note: We intentionally do NOT set AGENT_SERVER_IMAGE_REPOSITORY/TAG env vars.
+    # The OpenHands app image has a built-in default agent-server image that is
+    # tested and compatible with that specific app version. Setting these env vars
+    # could cause version mismatches between the app and agent server.
 
-    # Pull the agent server image first
-    pull_cmd = ["docker", "pull", agent_server_image]
-    print_formatted_text(HTML(_format_docker_command_for_logging(pull_cmd)))
-    try:
-        subprocess.run(pull_cmd, check=True)
-    except subprocess.CalledProcessError:
-        print_formatted_text(
-            HTML("<ansired>❌ Failed to pull agent server image.</ansired>")
-        )
-        sys.exit(1)
-
-    print_formatted_text("")
     print_formatted_text(
         HTML("<ansigreen>✅ Starting OpenHands GUI server...</ansigreen>")
     )
@@ -136,18 +123,12 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
     print_formatted_text("")
 
     # Build the Docker command
-    # Note: OpenHands 1.2+ uses AGENT_SERVER_IMAGE_REPOSITORY and AGENT_SERVER_IMAGE_TAG
-    # instead of the deprecated SANDBOX_RUNTIME_CONTAINER_IMAGE
     docker_cmd = [
         "docker",
         "run",
         "-it",
         "--rm",
         "--pull=always",
-        "-e",
-        f"AGENT_SERVER_IMAGE_REPOSITORY={agent_server_image_repository}",
-        "-e",
-        f"AGENT_SERVER_IMAGE_TAG={agent_server_image_tag}",
         "-e",
         "LOG_ALL_EVENTS=true",
         "-v",
