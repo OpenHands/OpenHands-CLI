@@ -94,7 +94,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     # Key bindings
     BINDINGS: ClassVar = [
-        ("ctrl+p", "command_palette", "Settings"),
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+o", "toggle_cells", "Toggle Cells"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
