@@ -169,7 +169,9 @@ class DeviceFlowClient(BaseHttpClient):
         try:
             auth_response = await self.start_device_flow()
         except DeviceFlowError as e:
-            console_print(f"[{OPENHANDS_THEME.error}]Error: {e}[/{OPENHANDS_THEME.error}]")
+            console_print(
+                f"[{OPENHANDS_THEME.error}]Error: {e}[/{OPENHANDS_THEME.error}]"
+            )
             raise
 
         # Step 2: Use verification_uri_complete if available, otherwise construct URL
@@ -221,7 +223,9 @@ class DeviceFlowClient(BaseHttpClient):
             )
             return token_response
         except DeviceFlowError as e:
-            console_print(f"[{OPENHANDS_THEME.error}]Error: {e}[/{OPENHANDS_THEME.error}]")
+            console_print(
+                f"[{OPENHANDS_THEME.error}]Error: {e}[/{OPENHANDS_THEME.error}]"
+            )
             raise
 
 

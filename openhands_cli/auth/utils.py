@@ -4,7 +4,13 @@ from rich.console import Console
 
 from openhands_cli.theme import OPENHANDS_THEME
 
-__all__ = ["AuthenticationError", "console_print", "ensure_valid_auth", "is_token_valid"]
+
+__all__ = [
+    "AuthenticationError",
+    "console_print",
+    "ensure_valid_auth",
+    "is_token_valid",
+]
 
 # Create a console instance for printing
 _console = Console()

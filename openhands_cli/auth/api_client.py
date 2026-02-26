@@ -260,7 +260,9 @@ def create_and_save_agent_configuration(
 
     llm = agent.llm
 
-    console_print(f"  • Model: [{OPENHANDS_THEME.accent}]{llm.model}[/{OPENHANDS_THEME.accent}]")
+    console_print(
+        f"  • Model: [{OPENHANDS_THEME.accent}]{llm.model}[/{OPENHANDS_THEME.accent}]"
+    )
     console_print(
         f"  • Base URL: [{OPENHANDS_THEME.accent}]{llm.base_url}"
         f"[/{OPENHANDS_THEME.accent}]"
@@ -269,7 +271,9 @@ def create_and_save_agent_configuration(
         f"  • Usage ID: [{OPENHANDS_THEME.accent}]{llm.usage_id}"
         f"[/{OPENHANDS_THEME.accent}]"
     )
-    console_print(f"  • API Key: [{OPENHANDS_THEME.accent}]✓ Set[/{OPENHANDS_THEME.accent}]")
+    console_print(
+        f"  • API Key: [{OPENHANDS_THEME.accent}]✓ Set[/{OPENHANDS_THEME.accent}]"
+    )
 
     tools_count = len(agent.tools)
     console_print(
@@ -298,7 +302,9 @@ async def fetch_user_data_after_oauth(
     """Fetch user data after OAuth and optionally create & save an Agent."""
     client = OpenHandsApiClient(server_url, api_key)
 
-    console_print(f"[{OPENHANDS_THEME.accent}]Fetching user data...[/{OPENHANDS_THEME.accent}]")
+    console_print(
+        f"[{OPENHANDS_THEME.accent}]Fetching user data...[/{OPENHANDS_THEME.accent}]"
+    )
 
     try:
         # Fetch LLM API key
