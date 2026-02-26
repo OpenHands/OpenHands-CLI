@@ -13,10 +13,10 @@ from acp.schema import (
 
 from openhands.sdk import ImageContent, TextContent
 from openhands_cli.acp_impl.utils.resources import (
-    ACP_CACHE_DIR,
     SUPPORTED_IMAGE_MIME_TYPES,
     _convert_image_to_supported_format,
     convert_resources_to_content,
+    get_acp_cache_dir,
 )
 
 
@@ -49,7 +49,7 @@ def _convert_image_block(block: ACPImageContentBlock) -> TextContent | ImageCont
 
     # Conversion failed - save to disk and return explanatory text
     filename = f"image_{uuid4().hex}"
-    target = ACP_CACHE_DIR / filename
+    target = get_acp_cache_dir() / filename
     target.write_bytes(data)
     supported = ", ".join(sorted(SUPPORTED_IMAGE_MIME_TYPES))
 

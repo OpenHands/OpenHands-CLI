@@ -18,7 +18,7 @@ ScrollableContent handles:
 - Clearing dynamic content when conversation_id changes
 - Mounting InlineConfirmationPanel when pending_action_count becomes > 0
 
-Message handling (UserInputSubmitted) is done by ConversationManager.
+Message handling (SendMessage) is done by ConversationManager.
 """
 
 import uuid
