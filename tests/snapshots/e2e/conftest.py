@@ -265,6 +265,39 @@ def patch_deterministic_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     except (ImportError, AttributeError):
         pass  # If the module doesn't exist, skip patching
 
+    # Patch AgentStore._build_agent_context to disable public skills loading
+    # This ensures deterministic snapshots by not loading skills from the
+    # public skills repository, which varies between environments
+    try:
+        from openhands.sdk.context import AgentContext
+        from openhands_cli.stores.agent_store import AgentStore
+
+        def patched_build_agent_context(self) -> AgentContext:
+            from openhands.sdk.context.skills.skill import load_project_skills
+            from openhands_cli.locations import get_work_dir
+            from openhands_cli.utils import get_os_description
+
+            skills = load_project_skills(get_work_dir())
+            system_suffix = "\n".join(
+                [
+                    f"Your current working directory is: {get_work_dir()}",
+                    f"User operating system: {get_os_description()}",
+                ]
+            )
+            # Disable user/public skills for deterministic tests
+            return AgentContext(
+                skills=skills,
+                system_message_suffix=system_suffix,
+                load_user_skills=False,
+                load_public_skills=False,
+            )
+
+        monkeypatch.setattr(
+            AgentStore, "_build_agent_context", patched_build_agent_context
+        )
+    except (ImportError, AttributeError):
+        pass  # If the module doesn't exist, skip patching
+
 
 def cleanup_work_dir() -> None:
     """Clean up the fixed work directory."""
@@ -401,3 +434,119 @@ def first_time_user_setup(
         "work_dir": e2e_test_environment.work_dir,
         "conversation_id": e2e_test_environment.conversation_id,
     }
+
+
+@pytest.fixture
+def mock_llm_with_critic(
+    e2e_test_environment: E2ETestEnvironment,
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Generator[dict[str, Any], None, None]:
+    """Fixture that sets up mock LLM server AND mock critic from a trajectory.
+
+    This fixture is specifically designed for testing iterative refinement flows.
+    It:
+    1. Sets up a mock LLM server that replays agent responses from the trajectory
+    2. Sets up a mock critic that replays critic scores from the trajectory
+    3. Patches the AgentStore to inject the mock critic into loaded agents
+
+    Usage:
+        @pytest.mark.parametrize("mock_llm_with_critic",
+                                 ["cli447_hi_followup_iterative_case_a"], indirect=True)
+        def test_iterative_refinement(self, mock_llm_with_critic):
+            ...
+
+    Returns a dict including:
+        - conversation_id: UUID for the conversation
+        - trajectory: The loaded Trajectory object
+        - trajectory_name: Name of the trajectory directory
+        - mock_critic: The MockCritic instance for inspection
+        - critic_scores: List of critic scores from the trajectory
+    """
+    from tui_e2e.mock_critic import create_mock_critic_from_trajectory
+
+    trajectory_name = getattr(request, "param", "simple_echo_hello_world")
+
+    trajectory = load_trajectory(get_trajectories_dir() / trajectory_name)
+    server = MockLLMServer(trajectory=trajectory)
+    base_url = server.start()
+
+    # Create mock critic from trajectory
+    mock_critic = create_mock_critic_from_trajectory(trajectory)
+
+    # Create agent config
+    create_test_agent_config(
+        e2e_test_environment.persistence_dir,
+        model="openai/gpt-4o",
+        base_url=base_url,
+        expose_secrets=True,
+    )
+
+    # Patch CliSettings.load() to return settings with iterative refinement enabled
+    try:
+        from openhands_cli.stores.cli_settings import CliSettings, CriticSettings
+
+        original_load = CliSettings.load
+
+        @classmethod
+        def patched_load(cls):
+            settings = original_load()
+            # Enable iterative refinement with a threshold that triggers refinement
+            # on the low scores from the trajectory (typically < 0.5 for first message)
+            settings = settings.model_copy(
+                update={
+                    "critic": CriticSettings(
+                        enable_critic=True,
+                        enable_iterative_refinement=True,
+                        critic_threshold=0.9,  # High threshold to trigger refinement
+                        max_refinement_iterations=3,
+                    )
+                }
+            )
+            return settings
+
+        monkeypatch.setattr(CliSettings, "load", patched_load)
+    except (ImportError, AttributeError):
+        pass  # Skip patching if module doesn't exist
+
+    # Patch AgentStore to inject mock critic into loaded agents
+    try:
+        from openhands_cli.stores.agent_store import AgentStore
+
+        original_load_or_create = AgentStore.load_or_create
+
+        def patched_load_or_create(
+            self,
+            session_id: str | None = None,
+            *,
+            env_overrides_enabled: bool = False,
+            critic_disabled: bool = False,
+        ):
+            agent = original_load_or_create(
+                self,
+                session_id=session_id,
+                env_overrides_enabled=env_overrides_enabled,
+                critic_disabled=critic_disabled,
+            )
+            if agent is not None and not critic_disabled:
+                # Inject mock critic using model_copy
+                agent = agent.model_copy(update={"critic": mock_critic})
+            return agent
+
+        monkeypatch.setattr(AgentStore, "load_or_create", patched_load_or_create)
+    except (ImportError, AttributeError):
+        pass  # Skip patching if module doesn't exist
+
+    yield {
+        "persistence_dir": e2e_test_environment.persistence_dir,
+        "conversations_dir": e2e_test_environment.conversations_dir,
+        "mock_server_url": base_url,
+        "work_dir": e2e_test_environment.work_dir,
+        "trajectory": trajectory,
+        "trajectory_name": trajectory_name,
+        "conversation_id": e2e_test_environment.conversation_id,
+        "mock_critic": mock_critic,
+        "critic_scores": trajectory.get_critic_scores(),
+    }
+
+    server.stop()

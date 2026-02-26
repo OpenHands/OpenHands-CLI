@@ -27,7 +27,7 @@ class MockLocations:
 def save_test_agent(
     persistence_dir: Path,
     *,
-    model: str = "gpt-4",
+    model: str = "openai/gpt-4o-mini",
     api_key: str = "test-key",
     tools: list | None = None,
     mcp_config: dict | None = None,
@@ -40,7 +40,7 @@ def save_test_agent(
 
     Args:
         persistence_dir: Directory where agent_settings.json will be saved
-        model: LLM model identifier (default: gpt-4)
+        model: LLM model identifier (default: openai/gpt-4o-mini)
         api_key: Mock API key (default: test-key)
         tools: List of tools (default: empty list)
         mcp_config: MCP configuration dict (default: empty dict)

@@ -1,6 +1,6 @@
 """Tests for ConversationVisualizer and Chinese character markup handling."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from unittest.mock import patch
 
 import pytest
@@ -16,6 +16,7 @@ from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.llm import MessageToolCall
 from openhands.tools.terminal.definition import TerminalAction
 from openhands_cli.stores import CliSettings
+from openhands_cli.tui.textual_app import OpenHandsApp
 from openhands_cli.tui.widgets.richlog_visualizer import (
     ELLIPSIS,
     MAX_LINE_LENGTH,
@@ -364,15 +365,48 @@ class TestConversationErrorEventHandling:
             # collapsed=False when default_cells_expanded=True
             assert not collapsible.collapsed
 
-        # Verify error border color
+
+class TestEventSymbolColor:
+    """Tests for event-based symbol coloring in collapsibles."""
+
+    def test_error_event_has_error_symbol_color(self, visualizer, mock_cli_settings):
+        """Test that error events get the error color for their symbol."""
         from openhands_cli.theme import OPENHANDS_THEME
-        from openhands_cli.tui.widgets.richlog_visualizer import (
-            _get_event_border_color,
+        from openhands_cli.tui.widgets.richlog_visualizer import _get_event_symbol_color
+
+        error_event = ConversationErrorEvent(
+            source="agent",
+            code="test_error",
+            detail="Test error message",
         )
 
-        expected_color = OPENHANDS_THEME.error or "#ff6b6b"
-        actual_color = _get_event_border_color(error_event)
-        assert actual_color == expected_color
+        symbol_color = _get_event_symbol_color(error_event)
+        assert symbol_color == OPENHANDS_THEME.error
+
+    def test_action_event_has_default_symbol_color(self, visualizer, mock_cli_settings):
+        """Test that action events get the default (white) color for their symbol."""
+        from openhands_cli.tui.widgets.richlog_visualizer import _get_event_symbol_color
+
+        action_event = create_terminal_action_event("ls -la", "List files")
+        symbol_color = _get_event_symbol_color(action_event)
+        # Action events use the default white color for a cleaner look
+        assert symbol_color == "#ffffff"
+
+    def test_collapsible_receives_symbol_color(self, visualizer, mock_cli_settings):
+        """Test that collapsibles are created with the correct symbol color."""
+        from openhands_cli.theme import OPENHANDS_THEME
+
+        error_event = ConversationErrorEvent(
+            source="agent",
+            code="test_error",
+            detail="Test error message",
+        )
+
+        with mock_cli_settings(visualizer=visualizer, default_cells_expanded=True):
+            collapsible = visualizer._create_event_collapsible(error_event)
+            assert collapsible is not None
+            # The CollapsibleTitle should have the error color
+            assert collapsible._title.symbol_color == OPENHANDS_THEME.error
 
 
 class TestDefaultCellsExpandedSetting:
@@ -1121,3 +1155,199 @@ class TestRenderUserMessage:
         assert isinstance(widget, Static)
         # Check the widget has user-message class (format verification)
         assert "user-message" in widget.classes
+
+
+class TestDefaultAgentPrefixBehavior:
+    """Tests for hiding agent prefix for the default OpenHands Agent.
+
+    The default agent ("OpenHands Agent") should not show prefixes in:
+    - Tool call titles (via _get_agent_prefix)
+    - FinishAction messages (no "**OpenHands Agent:**" header)
+
+    Non-default agents (sub-agents in delegation) should show prefixes.
+    """
+
+    def test_is_non_default_agent_returns_false_for_no_name(self, visualizer):
+        """_is_non_default_agent returns False when no name is set."""
+        assert visualizer._name is None
+        assert visualizer._is_non_default_agent() is False
+
+    def test_is_non_default_agent_returns_false_for_default_agent(self):
+        """_is_non_default_agent returns False for 'OpenHands Agent'."""
+        app: OpenHandsApp = cast(OpenHandsApp, App())
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,
+            name="OpenHands Agent",
+        )
+
+        assert visualizer._is_non_default_agent() is False
+
+    def test_is_non_default_agent_returns_true_for_non_default_agent(self):
+        """_is_non_default_agent returns True for non-default agents."""
+        app: OpenHandsApp = cast(OpenHandsApp, App())
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,
+            name="Child Agent",
+        )
+
+        assert visualizer._is_non_default_agent() is True
+
+    def test_is_non_default_agent_handles_whitespace(self):
+        """_is_non_default_agent handles whitespace in agent name."""
+        app: OpenHandsApp = cast(OpenHandsApp, App())
+        container = VerticalScroll()
+        # Name with extra whitespace should still match default
+        visualizer = ConversationVisualizer(
+            container,
+            app,
+            name="  OpenHands Agent  ",
+        )
+
+        assert visualizer._is_non_default_agent() is False
+
+    def test_get_agent_prefix_returns_empty_for_no_name(self, visualizer):
+        """_get_agent_prefix returns empty string when no name is set."""
+        assert visualizer._name is None
+        assert visualizer._get_agent_prefix() == ""
+
+    def test_get_agent_prefix_returns_empty_for_default_agent(self):
+        """_get_agent_prefix returns empty string for default agent."""
+        app: OpenHandsApp = cast(OpenHandsApp, App())
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,
+            name="OpenHands Agent",
+        )
+
+        assert visualizer._get_agent_prefix() == ""
+
+    def test_get_agent_prefix_returns_prefix_for_non_default_agent(self):
+        """_get_agent_prefix returns formatted prefix for non-default agents."""
+        app: OpenHandsApp = cast(OpenHandsApp, App())
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,
+            name="child_agent",
+        )
+
+        assert visualizer._get_agent_prefix() == "(Child Agent) "
+
+    def test_finish_action_no_header_for_default_agent(self, mock_cli_settings):
+        """FinishAction should not add agent header for default agent."""
+        from textual.widgets import Markdown
+
+        from openhands.sdk.tool.builtins.finish import FinishAction
+
+        app: OpenHandsApp = cast(OpenHandsApp, App())
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,
+            name="OpenHands Agent",
+        )
+
+        action = FinishAction(message="Task completed successfully")
+        tool_call = create_tool_call("call_finish", "finish")
+        event = ActionEvent(
+            thought=[TextContent(text="Finishing task")],
+            action=action,
+            tool_name="finish",
+            tool_call_id="call_finish",
+            tool_call=tool_call,
+            llm_response_id="response_finish",
+        )
+
+        with mock_cli_settings(visualizer=visualizer):
+            widget = visualizer._create_event_widget(event)
+
+        assert widget is not None
+        assert isinstance(widget, Markdown)
+        markdown_content = widget._initial_markdown
+        assert markdown_content is not None
+        # Should NOT contain agent header
+        assert "**OpenHands Agent:**" not in markdown_content
+        # Should contain the message
+        assert "Task completed successfully" in markdown_content
+
+    def test_finish_action_adds_header_for_non_default_agent(self, mock_cli_settings):
+        """FinishAction should add agent header for non-default agents."""
+        from textual.widgets import Markdown
+
+        from openhands.sdk.tool.builtins.finish import FinishAction
+
+        app: OpenHandsApp = cast(OpenHandsApp, App())
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,
+            name="lodging_expert",
+        )
+
+        action = FinishAction(message="Found the best hotel")
+        tool_call = create_tool_call("call_finish", "finish")
+        event = ActionEvent(
+            thought=[TextContent(text="Finishing task")],
+            action=action,
+            tool_name="finish",
+            tool_call_id="call_finish",
+            tool_call=tool_call,
+            llm_response_id="response_finish",
+        )
+
+        with mock_cli_settings(visualizer=visualizer):
+            widget = visualizer._create_event_widget(event)
+
+        assert widget is not None
+        assert isinstance(widget, Markdown)
+        markdown_content = widget._initial_markdown
+        assert markdown_content is not None
+        # Should contain agent header
+        assert "**Lodging Expert Agent:**" in markdown_content
+        # Should contain the message
+        assert "Found the best hotel" in markdown_content
+
+    def test_action_title_no_prefix_for_default_agent(self, mock_cli_settings):
+        """Action titles should not have agent prefix for default agent."""
+        app: OpenHandsApp = cast(OpenHandsApp, App())
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,
+            name="OpenHands Agent",
+        )
+
+        event = create_terminal_action_event("ls -la", "List files")
+
+        with mock_cli_settings(visualizer=visualizer):
+            title = visualizer._build_action_title(event)
+
+        # Should NOT contain agent prefix
+        assert "(OpenHands Agent)" not in title
+        # Should contain the command
+        assert "ls -la" in title
+
+    def test_action_title_has_prefix_for_non_default_agent(self, mock_cli_settings):
+        """Action titles should have agent prefix for non-default agents."""
+        app: OpenHandsApp = cast(OpenHandsApp, App())
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,
+            name="code_reviewer",
+        )
+
+        event = create_terminal_action_event("git diff", "Check changes")
+
+        with mock_cli_settings(visualizer=visualizer):
+            title = visualizer._build_action_title(event)
+
+        # Should contain agent prefix
+        assert "(Code Reviewer Agent)" in title
+        # Should contain the command
+        assert "git diff" in title

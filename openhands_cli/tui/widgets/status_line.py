@@ -8,6 +8,7 @@ from textual.widgets import Static
 
 from openhands.sdk.llm.utils.metrics import Metrics
 from openhands_cli.locations import get_work_dir
+from openhands_cli.stores import CriticSettings
 from openhands_cli.utils import abbreviate_number, format_cost
 
 
@@ -15,7 +16,7 @@ class WorkingStatusLine(Static):
     """Status line showing conversation timer and working indicator (above input).
 
     This widget uses data_bind() to bind to ConversationContainer reactive properties.
-    When ConversationContainer.running or ConversationContainer.elapsed_seconds change,
+    When ConversationContainer.running, elapsed_seconds, or critic_settings change,
     this widget's corresponding properties are automatically updated.
     """
 
@@ -28,11 +29,13 @@ class WorkingStatusLine(Static):
     }
     """
 
+    # Reactive properties bound via data_bind() to ConversationContainer
     running: var[bool] = var(False)
     elapsed_seconds: var[int] = var(0)
+    critic_settings: var[CriticSettings] = var(CriticSettings())
 
     def __init__(self, **kwargs) -> None:
-        super().__init__("", id="working_status_line", markup=False, **kwargs)
+        super().__init__("", id="working_status_line", markup=True, **kwargs)
         self._timer: Timer | None = None
         self._working_frame: int = 0
 
@@ -54,6 +57,10 @@ class WorkingStatusLine(Static):
         """React to running state changes from ConversationContainer."""
         self._update_text()
 
+    def watch_critic_settings(self, _settings: CriticSettings) -> None:
+        """React to critic settings changes from ConversationContainer."""
+        self._update_text()
+
     # ----- Internal helpers -----
 
     def _on_tick(self) -> None:
@@ -73,10 +80,35 @@ class WorkingStatusLine(Static):
 
         return f"{working_indicator} ({self.elapsed_seconds}s • ESC: pause)"
 
+    def _get_refinement_indicator(self) -> str:
+        """Return the iterative refinement indicator if enabled in settings."""
+        if self.critic_settings.enable_iterative_refinement:
+            threshold = self.critic_settings.critic_threshold * 100
+            return (
+                f"[bold] Iterative Refinement Enabled [/bold] "
+                f"[dim](retry @ score < {threshold:.0f}%)[/dim]"
+            )
+        return ""
+
     def _update_text(self) -> None:
-        """Rebuild the working status text."""
+        """Rebuild the working status text with refinement indicator."""
+        parts = []
+
+        # Add refinement indicator (always show when enabled in settings)
+        refinement_indicator = self._get_refinement_indicator()
+        if refinement_indicator:
+            parts.append(refinement_indicator)
+
+        # Add working text (timer, etc.)
         working_text = self._get_working_text()
-        self.update(working_text if working_text else " ")
+        if working_text:
+            parts.append(working_text)
+
+        # Join parts with separator
+        if parts:
+            self.update(" • ".join(parts))
+        else:
+            self.update(" ")
 
 
 class InfoStatusLine(Static):
