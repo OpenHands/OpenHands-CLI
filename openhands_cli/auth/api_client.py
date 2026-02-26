@@ -351,7 +351,9 @@ async def fetch_user_data_after_oauth(
             except ValueError as e:
                 # User declined to overwrite existing configuration
                 console_print("\n")
-                console_print(f"[{OPENHANDS_THEME.warning}]{e}[/{OPENHANDS_THEME.warning}]")
+                console_print(
+                    f"[{OPENHANDS_THEME.warning}]{e}[/{OPENHANDS_THEME.warning}]"
+                )
                 console_print(
                     f"[{OPENHANDS_THEME.secondary}]Keeping existing "
                     f"agent configuration.[/{OPENHANDS_THEME.secondary}]"

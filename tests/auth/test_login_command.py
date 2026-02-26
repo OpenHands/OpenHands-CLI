@@ -164,7 +164,9 @@ class TestLoginCommand:
             with patch(
                 "openhands_cli.auth.login_command.authenticate_with_device_flow"
             ) as mock_auth:
-                with patch("openhands_cli.auth.login_command.console_print") as mock_print:
+                with patch(
+                    "openhands_cli.auth.login_command.console_print"
+                ) as mock_print:
                     mock_storage = MagicMock()
                     mock_storage_class.return_value = mock_storage
                     mock_storage.get_api_key.return_value = None
@@ -264,7 +266,9 @@ class TestLoginCommand:
                 with patch(
                     "openhands_cli.auth.login_command._fetch_user_data_with_context"
                 ) as mock_fetch:
-                    with patch("openhands_cli.auth.login_command.console_print") as mock_print:
+                    with patch(
+                        "openhands_cli.auth.login_command.console_print"
+                    ) as mock_print:
                         mock_storage = MagicMock()
                         mock_storage_class.return_value = mock_storage
                         mock_storage.get_api_key.return_value = None

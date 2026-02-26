@@ -336,7 +336,9 @@ class TestDeviceFlowClient:
                     token_type="Bearer",
                 )
 
-                with patch("openhands_cli.auth.device_flow.console_print") as mock_print:
+                with patch(
+                    "openhands_cli.auth.device_flow.console_print"
+                ) as mock_print:
                     with patch("webbrowser.open") as mock_browser:
                         result = await client.authenticate()
 
