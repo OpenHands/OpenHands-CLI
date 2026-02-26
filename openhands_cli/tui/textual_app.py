@@ -43,6 +43,7 @@ from typing import ClassVar
 
 from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
+from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.screen import Screen
 from textual.widgets import Footer, Input, TextArea
@@ -94,6 +95,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     # Key bindings
     BINDINGS: ClassVar = [
+        Binding("ctrl+p", "command_palette", "Settings", show=False, priority=True),
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+o", "toggle_cells", "Toggle Cells"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
