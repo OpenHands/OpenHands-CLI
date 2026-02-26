@@ -94,6 +94,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     # Key bindings
     BINDINGS: ClassVar = [
+        ("ctrl+p", "command_palette", "Settings"),
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+o", "toggle_cells", "Toggle Cells"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
@@ -102,9 +103,6 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         ("ctrl+c", "request_quit", "Quit the application"),
         ("ctrl+d", "request_quit", "Quit the application"),
     ]
-
-    # Command palette display name
-    COMMAND_PALETTE_DISPLAY: ClassVar[str] = "settings"
 
     input_field: getters.query_one[InputField] = getters.query_one(InputField)
     scroll_view: getters.query_one[ScrollableContent] = getters.query_one(
