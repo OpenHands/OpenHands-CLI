@@ -4,6 +4,7 @@ Simple main entry point for OpenHands CLI.
 This is a simplified version that demonstrates the TUI functionality.
 """
 
+import argparse
 import logging
 import os
 import sys
@@ -37,14 +38,14 @@ if debug_env != "1" and debug_env != "true":
     warnings.filterwarnings("ignore")
 
 
-def handle_resume_logic(args) -> str | None:
+def handle_resume_logic(args: argparse.Namespace) -> str | None:
     """Handle resume logic and return the conversation ID to resume.
 
     Args:
         args: Parsed command line arguments
 
     Returns:
-        Conversation ID to resume, or None if should show conversation list or exit
+        Conversation ID to resume, or None if it should show conversation list or exit
     """
     # Check if --last flag is used
     if args.last:
@@ -212,6 +213,7 @@ def main() -> None:
             from openhands_cli.tui.textual_app import main as textual_main
 
             queued_inputs = create_seeded_instructions_from_args(args)
+
             conversation_id = textual_main(
                 resume_conversation_id=resume_id,
                 queued_inputs=queued_inputs,
@@ -224,15 +226,17 @@ def main() -> None:
                 critic_disabled=critic_disabled,
             )
             console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
-            console.print(
-                f"Conversation ID: {conversation_id.hex}",
-                style=OPENHANDS_THEME.accent,
-            )
-            console.print(
-                f"Hint: run openhands --resume {conversation_id} "
-                "to resume this conversation.",
-                style=OPENHANDS_THEME.secondary,
-            )
+            # Show conversation ID if available (may be None if app exited early)
+            if conversation_id is not None:
+                console.print(
+                    f"Conversation ID: {conversation_id.hex}",
+                    style=OPENHANDS_THEME.accent,
+                )
+                console.print(
+                    f"Hint: run openhands --resume {conversation_id} "
+                    "to resume this conversation.",
+                    style=OPENHANDS_THEME.secondary,
+                )
     except KeyboardInterrupt:
         console.print("\nGoodbye! 👋", style=OPENHANDS_THEME.warning)
     except EOFError:
