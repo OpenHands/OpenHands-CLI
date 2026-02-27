@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import OptionList
@@ -25,16 +26,15 @@ class AutoCompleteDropdown(Container):
 
     DEFAULT_CSS = """
     AutoCompleteDropdown {
-        layer: autocomplete;
-        width: auto;
-        min-width: 30;
-        max-width: 60;
+        width: 100%;
         height: auto;
         max-height: 12;
         display: none;
         background: $surface;
-        border: solid $primary;
-        padding: 0;
+        border-top: solid $primary;
+        border-left: solid $primary;
+        border-right: solid $primary;
+        padding: 0 1;
         margin: 0;
 
         OptionList {
@@ -106,10 +106,28 @@ class AutoCompleteDropdown(Container):
 
         self._completion_items = items
         self.option_list.clear_options()
+
+        # Find the longest command name for alignment
+        max_cmd_len = 0
         for item in items:
-            self.option_list.add_option(
-                Option(item.display_text, id=item.completion_value)
-            )
+            if (
+                item.completion_type == CompletionType.COMMAND
+                and " - " in item.display_text
+            ):
+                cmd_name = item.display_text.split(" - ", 1)[0]
+                max_cmd_len = max(max_cmd_len, len(cmd_name))
+
+        for item in items:
+            prompt: str | Text = item.display_text
+            if (
+                item.completion_type == CompletionType.COMMAND
+                and " - " in item.display_text
+            ):
+                cmd_name, description = item.display_text.split(" - ", 1)
+                prompt = Text()
+                prompt.append(cmd_name.ljust(max_cmd_len + 3), style="bold")
+                prompt.append(description, style="dim")
+            self.option_list.add_option(Option(prompt, id=item.completion_value))
 
         self.display = True
         self.option_list.highlighted = 0
