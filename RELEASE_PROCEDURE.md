@@ -29,20 +29,23 @@ Wait for the CI workflow to finish. It will automatically:
 
 ### 4. Tag the Release
 
-Tag the latest commit on the PR branch with the version number.
+Tag the latest commit on the version bump PR branch (e.g., `bump-1.13.0`) with the version number.
+
+> **Note:** This project uses tags **without** a `v` prefix (e.g., `1.13.0`, not `v1.13.0`).
 
 **Using command line:**
 ```bash
-git tag <version>
+git checkout bump-1.13.0  # checkout the PR branch
+git tag 1.13.0
 git push origin --tags
 ```
 
 **Using GitHub Desktop:**
-1. Checkout to the release branch
+1. Checkout to the version bump branch (e.g., `bump-1.13.0`)
 2. Click the "History" tab
 3. Right-click the latest commit
 4. Click "Create tag"
-5. Enter the release version (e.g., `v1.13.0`)
+5. Enter the release version (e.g., `1.13.0`) — no `v` prefix
 6. Push changes
 
 ### 5. Merge the PR
