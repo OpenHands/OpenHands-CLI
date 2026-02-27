@@ -96,6 +96,10 @@ class NullLoginCallback:
         pass
 
 
+# Module-level singleton for silent operation
+_NULL_CALLBACK = NullLoginCallback()
+
+
 async def run_login_flow(
     server_url: str | None = None,
     callback: LoginProgressCallback | None = None,
@@ -137,9 +141,9 @@ async def run_login_flow(
     if server_url is None:
         server_url = os.getenv("OPENHANDS_CLOUD_URL", "https://app.all-hands.dev")
 
-    # Use null callback if none provided
+    # Use null callback singleton if none provided
     if callback is None:
-        callback = NullLoginCallback()
+        callback = _NULL_CALLBACK
 
     token_storage = TokenStorage()
 
