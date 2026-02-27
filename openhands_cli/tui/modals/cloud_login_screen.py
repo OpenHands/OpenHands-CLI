@@ -16,6 +16,7 @@ from textual.worker import Worker, WorkerState
 
 from openhands_cli.auth.login_service import run_login_flow
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -291,12 +292,12 @@ class CloudLoginScreen(ModalScreen[bool]):
                 try:
                     on_success()
                 except Exception as e:
-                    logger.error(f"Error in login success callback: {e}", exc_info=True)
+                    logger.error(f"Error in success callback: {e}", exc_info=True)
             elif on_cancelled:
                 try:
                     on_cancelled()
                 except Exception as e:
-                    logger.error(f"Error in login cancelled callback: {e}", exc_info=True)
+                    logger.error(f"Error in cancelled callback: {e}", exc_info=True)
 
         elif event.state == WorkerState.ERROR:
             self._update_status(f"Error: {event.worker.error}")
