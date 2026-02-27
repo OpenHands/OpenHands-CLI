@@ -17,6 +17,11 @@ This repo contains the current CLI UX, including the Textual TUI and a browser-s
 - Tooling & packaging: `Makefile` for common tasks, `build.sh`/`build.py` for PyInstaller artifacts, `openhands-cli.spec` for the frozen binary, `uv.lock` for resolved deps.
 - `.agents/skills/`: agent guidance for this repo.
 
+
+## Persistence Notes
+- `agent_settings.json` (in `OPENHANDS_PERSISTENCE_DIR`) is persisted by `AgentStore` as a **CLI-owned versioned schema** (not a full SDK `Agent` dump). Only user-facing fields are stored; everything else is reconstructed from current SDK/CLI defaults on load.
+- Legacy `agent_settings.json` files containing a full `Agent` dump are still supported and are migrated in-place when loaded.
+
 ## Setup, Build, and Development Commands
 This repository uses **uv** for dependency management and running tooling (such as in `Makefile`, CI workflows, and `uv.lock`). Avoid using `pip install ...` directly if possible.
 
