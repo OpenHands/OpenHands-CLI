@@ -127,6 +127,22 @@ ENV_LLM_BASE_URL = "LLM_BASE_URL"
 ENV_LLM_MODEL = "LLM_MODEL"
 
 
+def model_requires_api_key(model: str | None) -> bool:
+    """Return whether an LLM model requires an API key env var.
+
+    Vertex AI models are authenticated via GCP credentials (ADC/service account),
+    so LLM_API_KEY should not be mandatory for those model prefixes.
+    """
+    if not model:
+        # Be conservative when unknown.
+        return True
+
+    lowered = model.lower()
+    return not (
+        lowered.startswith("vertex_ai/") or lowered.startswith("vertex_ai_beta/")
+    )
+
+
 class MissingEnvironmentVariablesError(Exception):
     """Raised when required environment variables are missing for headless mode.
 
@@ -218,10 +234,12 @@ class LLMEnvOverrides(BaseModel):
 
     def require_for_headless(self) -> None:
         missing: list[str] = []
-        if self.api_key is None:
-            missing.append(ENV_LLM_API_KEY)
         if self.model is None:
             missing.append(ENV_LLM_MODEL)
+        if self.api_key is None and (
+            self.model is None or model_requires_api_key(self.model)
+        ):
+            missing.append(ENV_LLM_API_KEY)
         if missing:
             raise MissingEnvironmentVariablesError(missing)
 
@@ -280,12 +298,14 @@ class AgentStore:
 
         # In env override mode, require enough info to create an agent.
         overrides.require_for_headless()
-        assert overrides.api_key is not None
         assert overrides.model is not None
 
+        api_key = None
+        if overrides.api_key is not None:
+            api_key = overrides.api_key.get_secret_value()
         llm = LLM(
             model=overrides.model,
-            api_key=overrides.api_key.get_secret_value(),
+            api_key=api_key,
             base_url=overrides.base_url,
             usage_id="agent",
         )

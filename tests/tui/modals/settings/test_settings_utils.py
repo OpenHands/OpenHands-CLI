@@ -243,6 +243,40 @@ def test_missing_api_key_errors_when_no_existing_agent() -> None:
     assert "API Key is required" in str(exc.value)
 
 
+def test_vertex_basic_mode_does_not_require_api_key() -> None:
+    """Vertex provider should allow auth via GCP credentials without API key."""
+    data = settings_utils.SettingsFormData(
+        mode="basic",
+        provider="vertex_ai",
+        model="gemini-2.5-pro",
+        custom_model=None,
+        base_url=None,
+        api_key_input=None,
+        memory_condensation_enabled=True,
+    )
+
+    # Should not raise
+    data.resolve_data_fields(existing_agent=None)
+    assert data.api_key_input is None
+
+
+def test_vertex_advanced_mode_does_not_require_api_key() -> None:
+    """Advanced mode should also allow Vertex models with no API key."""
+    data = settings_utils.SettingsFormData(
+        mode="advanced",
+        provider=None,
+        model=None,
+        custom_model="vertex_ai/gemini-2.5-pro",
+        base_url="https://aiplatform.googleapis.com/",
+        api_key_input=None,
+        memory_condensation_enabled=True,
+    )
+
+    # Should not raise
+    data.resolve_data_fields(existing_agent=None)
+    assert data.api_key_input is None
+
+
 def test_save_settings_wraps_errors_into_result(deps: FakeAgentStore) -> None:
     """save_settings should surface resolver errors as success=False."""
     # Invalid: advanced mode with missing custom_model/base_url
