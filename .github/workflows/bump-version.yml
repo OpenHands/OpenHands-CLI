@@ -116,13 +116,13 @@ jobs:
                   FAILED=0
                   for file in $(git diff --name-only -- 'tests/snapshots/' 2>/dev/null); do
                     if [[ "$file" == *.svg ]]; then
-                      LINES_CHANGED=$(git diff --numstat "$file" | awk '{print $1 + $2}')
-                      if [ "$LINES_CHANGED" != "2" ]; then
-                        echo "❌ Error: $file has $LINES_CHANGED diff lines (expected 2: +1 -1)"
+                      DIFF_LINES=$(git diff --numstat "$file" | awk '{print $1 + $2}')
+                      if [ "$DIFF_LINES" != "2" ]; then
+                        echo "❌ Error: $file has $DIFF_LINES diff lines (expected 2: +1 -1)"
                         git diff "$file" | head -20
                         FAILED=1
                       else
-                        echo "✅ $file: 1 line changed"
+                        echo "✅ $file: 2 diff lines (+1 -1)"
                       fi
                     fi
                   done
@@ -131,7 +131,7 @@ jobs:
                     echo "❌ Some snapshot files have unexpected changes. Only version string should change."
                     exit 1
                   fi
-                  echo "✅ All snapshot files have exactly 1 line changed"
+                  echo "✅ All snapshot files have exactly 1 line changed (2 diff lines each)"
 
             - name: Commit and push changes
               run: |
