@@ -68,8 +68,25 @@ jobs:
                   echo "Updated version line:"
                   grep '^version = ' pyproject.toml
 
+                  # Verify exactly one line changed in pyproject.toml
+                  PYPROJECT_DIFF=$(git diff pyproject.toml)
+                  LINES_CHANGED=$(git diff --numstat pyproject.toml | awk '{print $1 + $2}')
+                  echo "Lines changed in pyproject.toml: $LINES_CHANGED"
+
+                  if [ "$LINES_CHANGED" != "2" ]; then
+                    echo "❌ Error: Expected exactly 1 line change (2 diff lines: +1 -1) in pyproject.toml, got $LINES_CHANGED"
+                    echo "Diff:"
+                    echo "$PYPROJECT_DIFF"
+                    exit 1
+                  fi
+                  echo "✅ Verified: pyproject.toml has exactly one line changed"
+
+                  # Capture the diff for PR description (escape for JSON)
+                  PYPROJECT_DIFF_ESCAPED=$(echo "$PYPROJECT_DIFF" | sed 's/"/\\"/g' | tr '\n' ' ' | sed 's/  */ /g')
+
                   echo "current_version=$CURRENT_VERSION" >> $GITHUB_ENV
                   echo "branch_name=$BRANCH_NAME" >> $GITHUB_ENV
+                  echo "pyproject_diff_escaped=$PYPROJECT_DIFF_ESCAPED" >> $GITHUB_ENV
 
             - name: Install dependencies
               run: uv sync --group dev
@@ -83,13 +100,51 @@ jobs:
                   # Ensure lock file is up to date
                   uv lock
 
+            - name: Update snapshot tests
+              run: |
+                  # Update snapshot tests to reflect the new version
+                  # The version appears in the splash screen SVG snapshots
+                  echo "Updating snapshot tests for version ${{ inputs.version }}..."
+                  uv run pytest tests/snapshots/ --snapshot-update -v || true
+
+                  # List the updated snapshot files
+                  echo "Updated snapshot files:"
+                  git status --short tests/snapshots/
+
+            - name: Verify snapshot diffs
+              run: |
+                  # Verify each updated snapshot file has exactly 1 line changed
+                  # (only the version string should change)
+                  echo "Verifying snapshot file diffs..."
+
+                  FAILED=0
+                  for file in $(git diff --name-only -- 'tests/snapshots/' 2>/dev/null); do
+                    if [[ "$file" == *.svg ]]; then
+                      LINES_CHANGED=$(git diff --numstat "$file" | awk '{print $1 + $2}')
+                      if [ "$LINES_CHANGED" != "2" ]; then
+                        echo "❌ Error: $file has $LINES_CHANGED diff lines (expected 2: +1 -1)"
+                        git diff "$file" | head -20
+                        FAILED=1
+                      else
+                        echo "✅ $file: 1 line changed"
+                      fi
+                    fi
+                  done
+
+                  if [ "$FAILED" = "1" ]; then
+                    echo "❌ Some snapshot files have unexpected changes. Only version string should change."
+                    exit 1
+                  fi
+                  echo "✅ All snapshot files have exactly 1 line changed"
+
             - name: Commit and push changes
               run: |
                   VERSION="${{ inputs.version }}"
                   BRANCH_NAME="${{ env.branch_name }}"
 
-                  # Stage all changes (pyproject.toml and uv.lock)
+                  # Stage all changes (pyproject.toml, uv.lock, and snapshot files)
                   git add pyproject.toml uv.lock
+                  git add tests/snapshots/
 
                   # Check if there are changes to commit
                   if git diff --cached --quiet; then
@@ -97,10 +152,15 @@ jobs:
                     exit 1
                   fi
 
+                  # Count updated snapshot files and export for PR description
+                  SNAPSHOT_COUNT=$(git diff --cached --name-only -- 'tests/snapshots/' | wc -l)
+                  echo "snapshot_count=$SNAPSHOT_COUNT" >> $GITHUB_ENV
+
                   # Commit changes
                   git commit -m "Bump version to $VERSION" \
                              -m "- Updated version in pyproject.toml from ${{ env.current_version }} to $VERSION" \
-                             -m "- Regenerated uv.lock file"
+                             -m "- Regenerated uv.lock file" \
+                             -m "- Updated $SNAPSHOT_COUNT snapshot test(s) with new version (each with exactly 1 line diff)"
 
                   # Push branch
                   git push origin "$BRANCH_NAME"
@@ -131,6 +191,7 @@ jobs:
               run: |
                   VERSION="${{ inputs.version }}"
                   BRANCH_NAME="${{ env.branch_name }}"
+                  SNAPSHOT_COUNT="${{ env.snapshot_count }}"
 
                   # Create draft PR using GitHub API
                   PR_RESPONSE=$(curl -s -X POST \
@@ -141,7 +202,7 @@ jobs:
                       "title": "Bump version to '"$VERSION"'",
                       "head": "'"$BRANCH_NAME"'",
                       "base": "main",
-                      "body": "## Summary\n\nThis PR bumps the project version to **'"$VERSION"'**.\n\n## Changes\n\n- Updated `version` in `pyproject.toml` from `'"${{ env.current_version }}"'` to `'"$VERSION"'`\n- Regenerated `uv.lock` file\n\n## Triggered by\n\nManual workflow dispatch by @'"${{ github.actor }}"'",
+                      "body": "## Summary\n\nThis PR bumps the project version to **'"$VERSION"'**.\n\n## Changes\n\n### pyproject.toml (exactly 1 line changed ✅)\n```diff\n-version = \"'"${{ env.current_version }}"'\"\n+version = \"'"$VERSION"'\"\n```\n\n### Other changes\n- Regenerated `uv.lock` file\n- Updated '"$SNAPSHOT_COUNT"' snapshot test file(s) (each with exactly 1 line diff ✅)\n\n## Triggered by\n\nManual workflow dispatch by @'"${{ github.actor }}"'",
                       "draft": true
                     }')
 
