@@ -81,12 +81,8 @@ jobs:
                   fi
                   echo "✅ Verified: pyproject.toml has exactly one line changed"
 
-                  # Capture the diff for PR description (escape for JSON)
-                  PYPROJECT_DIFF_ESCAPED=$(echo "$PYPROJECT_DIFF" | sed 's/"/\\"/g' | tr '\n' ' ' | sed 's/  */ /g')
-
                   echo "current_version=$CURRENT_VERSION" >> $GITHUB_ENV
                   echo "branch_name=$BRANCH_NAME" >> $GITHUB_ENV
-                  echo "pyproject_diff_escaped=$PYPROJECT_DIFF_ESCAPED" >> $GITHUB_ENV
 
             - name: Install dependencies
               run: uv sync --group dev
