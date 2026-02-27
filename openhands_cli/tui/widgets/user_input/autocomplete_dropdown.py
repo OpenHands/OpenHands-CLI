@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Final
 
 from rich.text import Text
 from textual.app import ComposeResult
@@ -23,6 +24,9 @@ class AutoCompleteDropdown(Container):
     with TextArea instead of Input widgets. It handles both command (/)
     and file path (@) completions.
     """
+
+    # Min spaces between command name and description
+    DESCRIPTION_GAP: Final[int] = 3
 
     DEFAULT_CSS = """
     AutoCompleteDropdown {
@@ -125,7 +129,9 @@ class AutoCompleteDropdown(Container):
             ):
                 cmd_name, description = item.display_text.split(" - ", 1)
                 prompt = Text()
-                prompt.append(cmd_name.ljust(max_cmd_len + 3), style="bold")
+                # Pad command name so descriptions align, with a gap between
+                padding = max_cmd_len + self.DESCRIPTION_GAP
+                prompt.append(cmd_name.ljust(padding), style="bold")
                 prompt.append(description, style="dim")
             self.option_list.add_option(Option(prompt, id=item.completion_value))
 
