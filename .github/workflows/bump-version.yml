@@ -70,11 +70,11 @@ jobs:
 
                   # Verify exactly one line changed in pyproject.toml
                   PYPROJECT_DIFF=$(git diff pyproject.toml)
-                  LINES_CHANGED=$(git diff --numstat pyproject.toml | awk '{print $1 + $2}')
-                  echo "Lines changed in pyproject.toml: $LINES_CHANGED"
+                  DIFF_LINES=$(git diff --numstat pyproject.toml | awk '{print $1 + $2}')
+                  echo "Diff lines in pyproject.toml: $DIFF_LINES (expecting 2: +1 -1)"
 
-                  if [ "$LINES_CHANGED" != "2" ]; then
-                    echo "❌ Error: Expected exactly 1 line change (2 diff lines: +1 -1) in pyproject.toml, got $LINES_CHANGED"
+                  if [ "$DIFF_LINES" != "2" ]; then
+                    echo "❌ Error: Expected exactly 1 line change (2 diff lines: +1 -1) in pyproject.toml, got $DIFF_LINES"
                     echo "Diff:"
                     echo "$PYPROJECT_DIFF"
                     exit 1
