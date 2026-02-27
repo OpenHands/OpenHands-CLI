@@ -157,19 +157,11 @@ class CloudLoginScreen(ModalScreen[bool]):
 
     def _update_status(self, message: str) -> None:
         """Update the status message in the UI."""
-        self.call_from_thread(self._set_status, message)
-
-    def _set_status(self, message: str) -> None:
-        """Set the status message (must be called from main thread)."""
         status = self.query_one("#login_status", Static)
         status.update(message)
 
     def _show_verification_url(self, url: str, user_code: str) -> None:
         """Show the verification URL to the user."""
-        self.call_from_thread(self._set_verification_url, url, user_code)
-
-    def _set_verification_url(self, url: str, user_code: str) -> None:
-        """Set the verification URL (must be called from main thread)."""
         url_widget = self.query_one("#login_url", Static)
         url_widget.update(f"[bold]{url}[/bold]")
         url_widget.remove_class("hidden")
@@ -184,10 +176,6 @@ class CloudLoginScreen(ModalScreen[bool]):
 
     def _update_instructions(self, message: str) -> None:
         """Update the instructions message."""
-        self.call_from_thread(self._set_instructions, message)
-
-    def _set_instructions(self, message: str) -> None:
-        """Set the instructions (must be called from main thread)."""
         instructions = self.query_one("#login_instructions", Static)
         instructions.update(message)
 
