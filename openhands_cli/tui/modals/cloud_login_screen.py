@@ -4,6 +4,7 @@ This screen handles the OAuth device flow login within the TUI,
 displaying status messages and the verification URL to the user.
 """
 
+import logging
 from collections.abc import Callable
 from typing import ClassVar
 
@@ -14,6 +15,8 @@ from textual.widgets import Button, Label, LoadingIndicator, Rule, Static
 from textual.worker import Worker, WorkerState
 
 from openhands_cli.auth.login_service import run_login_flow
+
+logger = logging.getLogger(__name__)
 
 
 class TuiLoginCallback:
@@ -287,13 +290,13 @@ class CloudLoginScreen(ModalScreen[bool]):
             if on_success:
                 try:
                     on_success()
-                except Exception:
-                    pass  # Screen is dismissed, can't notify
+                except Exception as e:
+                    logger.error(f"Error in login success callback: {e}", exc_info=True)
             elif on_cancelled:
                 try:
                     on_cancelled()
-                except Exception:
-                    pass  # Screen is dismissed, can't notify
+                except Exception as e:
+                    logger.error(f"Error in login cancelled callback: {e}", exc_info=True)
 
         elif event.state == WorkerState.ERROR:
             self._update_status(f"Error: {event.worker.error}")
@@ -322,5 +325,5 @@ class CloudLoginScreen(ModalScreen[bool]):
         if on_cancelled:
             try:
                 on_cancelled()
-            except Exception:
-                pass  # Screen is dismissed, can't notify
+            except Exception as e:
+                logger.error(f"Error in cancel callback: {e}", exc_info=True)
