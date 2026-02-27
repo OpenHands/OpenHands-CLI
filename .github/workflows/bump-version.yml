@@ -64,22 +64,13 @@ jobs:
                   # Update version in pyproject.toml
                   sed -i "s/^version = \"$CURRENT_VERSION\"/version = \"$VERSION\"/" pyproject.toml
 
-                  # Verify the change was made
-                  echo "Updated version line:"
-                  grep '^version = ' pyproject.toml
-
-                  # Verify exactly one line changed in pyproject.toml
-                  PYPROJECT_DIFF=$(git diff pyproject.toml)
-                  DIFF_LINES=$(git diff --numstat pyproject.toml | awk '{print $1 + $2}')
-                  echo "Diff lines in pyproject.toml: $DIFF_LINES (expecting 2: +1 -1)"
-
-                  if [ "$DIFF_LINES" != "2" ]; then
-                    echo "❌ Error: Expected exactly 1 line change (2 diff lines: +1 -1) in pyproject.toml, got $DIFF_LINES"
-                    echo "Diff:"
-                    echo "$PYPROJECT_DIFF"
+                  # Verify the version field has the expected value
+                  ACTUAL_VERSION=$(grep "^version = " pyproject.toml | sed -E 's/version = "(.+)"/\1/')
+                  if [ "$ACTUAL_VERSION" != "$VERSION" ]; then
+                    echo "❌ Error: Version in pyproject.toml is $ACTUAL_VERSION, expected $VERSION"
                     exit 1
                   fi
-                  echo "✅ Verified: pyproject.toml has exactly one line changed"
+                  echo "✅ Verified: pyproject.toml version is $VERSION"
 
                   echo "current_version=$CURRENT_VERSION" >> $GITHUB_ENV
                   echo "branch_name=$BRANCH_NAME" >> $GITHUB_ENV
