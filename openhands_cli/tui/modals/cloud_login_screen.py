@@ -20,13 +20,117 @@ class CloudLoginScreen(ModalScreen[bool]):
     """Screen for handling cloud login via OAuth device flow.
 
     Shows the login status and verification URL to the user.
+
+    Attributes:
+        auto_start_login: If True (default), automatically start the login
+            flow when the screen is mounted. Set to False in subclasses
+            for testing purposes.
     """
 
     BINDINGS: ClassVar = [
         ("escape", "cancel", "Cancel"),
     ]
 
-    CSS_PATH = "cloud_login_screen.tcss"
+    auto_start_login: ClassVar[bool] = True
+
+    DEFAULT_CSS = """
+    CloudLoginScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.8);
+    }
+
+    #cloud_login_container {
+        padding: 2 4;
+        width: 80;
+        height: auto;
+        min-width: 60;
+        border: dashed $primary 80%;
+        background: $surface 90%;
+    }
+
+    #login_title {
+        width: 100%;
+        height: auto;
+        content-align: center middle;
+        text-align: center;
+        text-style: bold;
+        color: $primary;
+        padding: 1 0;
+    }
+
+    #title_rule {
+        margin: 0 0 1 0;
+        color: $primary 50%;
+    }
+
+    #login_content {
+        width: 100%;
+        height: auto;
+        align: center middle;
+        padding: 1 2;
+    }
+
+    #login_spinner {
+        width: 100%;
+        height: 3;
+        content-align: center middle;
+    }
+
+    #login_spinner.hidden {
+        display: none;
+    }
+
+    #login_status {
+        width: 100%;
+        height: auto;
+        content-align: center middle;
+        text-align: center;
+        color: $foreground;
+        margin: 1 0;
+    }
+
+    #login_url {
+        width: 100%;
+        height: auto;
+        content-align: center middle;
+        text-align: center;
+        color: $primary;
+        margin: 1 0;
+        padding: 1 2;
+        background: $surface;
+        border: solid $primary 50%;
+    }
+
+    #login_url.hidden {
+        display: none;
+    }
+
+    #login_instructions {
+        width: 100%;
+        height: auto;
+        content-align: center middle;
+        text-align: center;
+        color: $foreground 80%;
+        margin: 1 0;
+    }
+
+    #login_instructions.hidden {
+        display: none;
+    }
+
+    #login_actions {
+        width: 100%;
+        height: auto;
+        align: center middle;
+        padding: 1 2;
+        margin-top: 1;
+    }
+
+    #cancel_button {
+        width: 40%;
+        height: 3;
+    }
+    """
 
     def __init__(
         self,
@@ -65,7 +169,8 @@ class CloudLoginScreen(ModalScreen[bool]):
 
     def on_mount(self) -> None:
         """Start the login process when the screen is mounted."""
-        self._start_login()
+        if self.auto_start_login:
+            self._start_login()
 
     def _start_login(self) -> None:
         """Start the cloud login worker."""
@@ -186,17 +291,25 @@ class CloudLoginScreen(ModalScreen[bool]):
 
         if event.state == WorkerState.SUCCESS:
             success = event.worker.result
-            self.dismiss(success)
-            if success and self.on_login_success:
+            # Store callbacks before dismissing
+            on_success = self.on_login_success if success else None
+            on_cancelled = self.on_login_cancelled if not success else None
+
+            # Dismiss the screen first
+            if self.is_mounted:
+                self.dismiss(success)
+
+            # Then call the appropriate callback
+            if on_success:
                 try:
-                    self.on_login_success()
-                except Exception as e:
-                    self.notify(f"Error after login: {e}", severity="error")
-            elif not success and self.on_login_cancelled:
+                    on_success()
+                except Exception:
+                    pass  # Screen is dismissed, can't notify
+            elif on_cancelled:
                 try:
-                    self.on_login_cancelled()
-                except Exception as e:
-                    self.notify(f"Error: {e}", severity="error")
+                    on_cancelled()
+                except Exception:
+                    pass  # Screen is dismissed, can't notify
 
         elif event.state == WorkerState.ERROR:
             self._update_status(f"Error: {event.worker.error}")
@@ -216,9 +329,14 @@ class CloudLoginScreen(ModalScreen[bool]):
         if self._login_worker and self._login_worker.is_running:
             self._login_worker.cancel()
 
-        self.dismiss(False)
-        if self.on_login_cancelled:
+        # Store callback before dismissing
+        on_cancelled = self.on_login_cancelled
+
+        if self.is_mounted:
+            self.dismiss(False)
+
+        if on_cancelled:
             try:
-                self.on_login_cancelled()
-            except Exception as e:
-                self.notify(f"Error during cancel: {e}", severity="error")
+                on_cancelled()
+            except Exception:
+                pass  # Screen is dismissed, can't notify
