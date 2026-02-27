@@ -75,7 +75,7 @@ from openhands_cli.tui.core import (
 )
 from openhands_cli.tui.core.conversation_manager import SwitchConfirmed
 from openhands_cli.tui.core.runner_factory import RunnerFactory
-from openhands_cli.tui.modals import SettingsScreen
+from openhands_cli.tui.modals import SettingsScreen, WelcomeModal
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.history_side_panel import HistorySidePanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
@@ -312,7 +312,24 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self._initialize_main_ui()
 
     def _show_initial_settings(self) -> None:
-        """Show settings screen for first-time users."""
+        """Show welcome modal for first-time users to choose setup method."""
+        welcome_modal = WelcomeModal(
+            on_llm_settings=self._show_llm_settings_screen,
+            on_cloud_login=self._handle_cloud_login,
+            on_cancelled=self._handle_welcome_modal_cancelled,
+        )
+        self.push_screen(welcome_modal)
+
+    def _handle_welcome_modal_cancelled(self) -> None:
+        """Handle when welcome modal is cancelled - show exit confirmation."""
+        exit_modal = ExitConfirmationModal(
+            on_exit_confirmed=lambda: self.app.exit(),
+            on_exit_cancelled=self._show_initial_settings,
+        )
+        self.app.push_screen(exit_modal)
+
+    def _show_llm_settings_screen(self) -> None:
+        """Show the LLM settings screen for manual configuration."""
         settings_screen = SettingsScreen(
             on_settings_saved=[
                 self._initialize_main_ui,
@@ -323,10 +340,27 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         )
         self.push_screen(settings_screen)
 
+    def _handle_cloud_login(self) -> None:
+        """Handle cloud login flow for first-time setup."""
+        import os
+
+        from openhands_cli.auth.login_command import run_login_command
+
+        server_url = os.getenv("OPENHANDS_CLOUD_URL", "https://app.all-hands.dev")
+        success = run_login_command(server_url)
+
+        if success:
+            # Cloud login successful, initialize the main UI
+            self._initialize_main_ui()
+            self._reload_visualizer()
+        else:
+            # Cloud login failed or was cancelled, show welcome modal again
+            self._show_initial_settings()
+
     def _handle_initial_setup_cancelled(self) -> None:
-        """Handle when initial setup is cancelled - show settings again."""
-        # For first-time users, cancelling should loop back to settings
-        # This creates the loop until they either save settings or exit
+        """Handle when initial setup is cancelled - show welcome modal again."""
+        # For first-time users, cancelling should loop back to welcome modal
+        # This creates the loop until they either complete setup or exit
         exit_modal = ExitConfirmationModal(
             on_exit_confirmed=lambda: self.app.exit(),
             on_exit_cancelled=self._show_initial_settings,
