@@ -105,7 +105,7 @@ jobs:
                   # Update snapshot tests to reflect the new version
                   # The version appears in the splash screen SVG snapshots
                   echo "Updating snapshot tests for version ${{ inputs.version }}..."
-                  uv run pytest tests/snapshots/ --snapshot-update -v || true
+                  uv run pytest tests/snapshots/ --snapshot-update -v
 
                   # List the updated snapshot files
                   echo "Updated snapshot files:"
