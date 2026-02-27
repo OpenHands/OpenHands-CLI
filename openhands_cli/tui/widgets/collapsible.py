@@ -74,12 +74,14 @@ class CollapsibleTitle(Container, can_focus=True):
         collapsed_symbol: str,
         expanded_symbol: str,
         collapsed: bool,
+        symbol_color: str | None = None,
     ) -> None:
         # Initialize _title_static first to avoid AttributeError in watchers
         self._title_static: Static | None = None
         super().__init__()
         self.collapsed_symbol = collapsed_symbol
         self.expanded_symbol = expanded_symbol
+        self.symbol_color = symbol_color
 
         # Set reactive properties after _title_static is initialized
         self.label = Content.from_text(label)
@@ -155,10 +157,13 @@ class CollapsibleTitle(Container, can_focus=True):
             return
 
         assert isinstance(self.label, Content)
-        if self.collapsed:
-            content = Content.assemble(self.collapsed_symbol, " ", self.label)
+        symbol = self.collapsed_symbol if self.collapsed else self.expanded_symbol
+
+        # Apply color to symbol if specified
+        if self.symbol_color:
+            content = Content.assemble((symbol, self.symbol_color), " ", self.label)
         else:
-            content = Content.assemble(self.expanded_symbol, " ", self.label)
+            content = Content.assemble(symbol, " ", self.label)
 
         self._title_static.update(content)
 
@@ -171,7 +176,7 @@ class CollapsibleContents(Container):
     CollapsibleContents {
         width: 100%;
         height: auto;
-        padding: 1 0 0 3;
+        padding: 1 0 0 2;
     }
     """
 
@@ -195,8 +200,8 @@ class Collapsible(Widget):
         width: 1fr;
         height: auto;
         background: $background;
-        padding-bottom: 1;
-        padding-left: 1;
+        margin-top: 1;
+        margin-bottom: 1;
 
         &:focus-within {
             background-tint: $foreground 3%;
@@ -216,7 +221,7 @@ class Collapsible(Widget):
         collapsed: bool = True,
         collapsed_symbol: str = "▶",
         expanded_symbol: str = "▼",
-        border_color: str | None = "$secondary",
+        symbol_color: str | None = None,
         name: str | None = None,
         id: str | None = None,
         classes: str | None = None,
@@ -230,7 +235,7 @@ class Collapsible(Widget):
             collapsed: Default status of the contents.
             collapsed_symbol: Collapsed symbol before the title.
             expanded_symbol: Expanded symbol before the title.
-            border_color: CSS color for the left border. None to disable border.
+            symbol_color: CSS color for the collapse/expand symbol. None for default.
             name: The name of the collapsible.
             id: The ID of the collapsible in the DOM.
             classes: The CSS classes of the collapsible.
@@ -242,6 +247,7 @@ class Collapsible(Widget):
             collapsed_symbol=collapsed_symbol,
             expanded_symbol=expanded_symbol,
             collapsed=collapsed,
+            symbol_color=symbol_color,
         )
         self.title = title
         # Pass the original content to Static with markup=False to prevent
@@ -250,9 +256,6 @@ class Collapsible(Widget):
         self._content_widget = Static(content, markup=False)
         self.collapsed = collapsed
         self._watch_collapsed(collapsed)
-        if border_color is not None:
-            # Use "tall" for a thin vertical line, with gray color
-            self.styles.border_left = ("tall", "gray")
 
     def update_title(self, new_title: str | Text) -> None:
         """Update the title of the collapsible.
@@ -302,7 +305,7 @@ class CollapsibleNavigationMixin:
 
     Apps that contain Collapsible widgets can use this mixin to handle
     arrow key navigation between cells. The app must have a container
-    with id="main_display" containing the Collapsible widgets.
+    with id="scroll_view" containing the Collapsible widgets.
 
     Usage:
         class MyApp(CollapsibleNavigationMixin, App):
@@ -320,8 +323,8 @@ class CollapsibleNavigationMixin:
         event.stop()
 
         # Get all collapsibles as a list for index-based navigation
-        main_display = self.query_one("#main_display")
-        collapsibles = list(main_display.query(Collapsible))  # type: ignore[union-attr]
+        scroll_view = self.query_one("#scroll_view")
+        collapsibles = list(scroll_view.query(Collapsible))  # type: ignore[union-attr]
         if not collapsibles:
             return
 
@@ -329,7 +332,7 @@ class CollapsibleNavigationMixin:
         try:
             current_index = collapsibles.index(event.collapsible)
         except ValueError:
-            # Collapsible not in list (shouldn't happen, but be safe)
+            # Collapsible not in list (this shouldn't happen)
             return
 
         # Calculate target index

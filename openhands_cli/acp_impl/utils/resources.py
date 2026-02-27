@@ -35,8 +35,17 @@ RESOURCE_SKILL = Skill(
     trigger=None,
 )
 
-ACP_CACHE_DIR = Path.home() / ".openhands" / "cache" / "acp"
-ACP_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+_ACP_CACHE_DIR: Path | None = None
+
+
+def get_acp_cache_dir() -> Path:
+    """Get the ACP cache directory, creating it lazily if needed."""
+    global _ACP_CACHE_DIR
+    if _ACP_CACHE_DIR is None:
+        _ACP_CACHE_DIR = Path.home() / ".openhands" / "cache" / "acp"
+        _ACP_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    return _ACP_CACHE_DIR
+
 
 # LLM API supported image MIME types (Anthropic/Claude compatible)
 SUPPORTED_IMAGE_MIME_TYPES = {
@@ -145,7 +154,7 @@ def _materialize_embedded_resource(
             ext = mimetypes.guess_extension(mime_type) or ""
 
         filename = f"embedded_resource_{uuid4().hex}{ext}"
-        target = ACP_CACHE_DIR / filename
+        target = get_acp_cache_dir() / filename
         target.write_bytes(data)
 
         # Provide appropriate message based on content type

@@ -10,8 +10,6 @@ from typing import TYPE_CHECKING
 from rich.text import Text
 from textual.widgets import Markdown
 
-from openhands.sdk.conversation.impl.local_conversation import LocalConversation
-from openhands.sdk.conversation.impl.remote_conversation import RemoteConversation
 from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
 from openhands.sdk.event import (
     ActionEvent,
@@ -48,22 +46,26 @@ AGENT_MESSAGE_PADDING = (1, 0, 1, 1)  # top, right, bottom, left
 MAX_LINE_LENGTH = 70
 ELLIPSIS = "..."
 
+# Default agent name - don't show prefix for this agent
+DEFAULT_AGENT_NAME = "OpenHands Agent"
+
 
 if TYPE_CHECKING:
     from textual.containers import VerticalScroll
     from textual.widget import Widget
 
+    from openhands.sdk.critic.result import CriticResult
     from openhands_cli.tui.textual_app import OpenHandsApp
 
 
-def _get_event_border_color(event: Event) -> str:
+def _get_event_symbol_color(event: Event) -> str:
+    """Get the color for the collapse/expand symbol based on event type."""
     DEFAULT_COLOR = "#ffffff"
 
-    """Get the CSS border color for an event type."""
     if isinstance(event, ActionEvent):
-        return OPENHANDS_THEME.accent or DEFAULT_COLOR
+        return DEFAULT_COLOR
     elif isinstance(event, ObservationEvent):
-        return OPENHANDS_THEME.accent or DEFAULT_COLOR
+        return DEFAULT_COLOR
     elif isinstance(event, UserRejectObservation):
         return OPENHANDS_THEME.error or DEFAULT_COLOR
     elif isinstance(event, MessageEvent):
@@ -94,7 +96,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self,
         container: "VerticalScroll",
         app: "OpenHandsApp",
-        skip_user_messages: bool = False,
         name: str | None = None,
     ):
         """Initialize the visualizer.
@@ -102,14 +103,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
         Args:
             container: The Textual VerticalScroll container to add widgets to
             app: The Textual app instance for thread-safe UI updates
-            skip_user_messages: If True, skip displaying user messages
             name: Agent name to display in panel titles for delegation context.
                   When set, titles will be prefixed with the agent name.
         """
         super().__init__()
         self._container = container
         self._app = app
-        self._skip_user_messages = skip_user_messages
         self._name = name
         # Store the main thread ID for thread safety checks
         self._main_thread_id = threading.get_ident()
@@ -125,6 +124,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         return self._cli_settings
 
     def reload_configuration(self) -> None:
+        """Reload CLI settings from disk."""
         self._cli_settings = CliSettings.load()
 
     def create_sub_visualizer(self, agent_id: str) -> "ConversationVisualizer":
@@ -143,7 +143,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         return ConversationVisualizer(
             container=self._container,
             app=self._app,
-            skip_user_messages=self._skip_user_messages,
             name=agent_id,
         )
 
@@ -209,15 +208,25 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return formatted_name
         return f"{formatted_name} Agent"
 
+    def _is_non_default_agent(self) -> bool:
+        """Check if the current agent is NOT the default OpenHands Agent.
+
+        Returns:
+            True if name is set and is different from the default agent name.
+        """
+        if not self._name:
+            return False
+        return self._name.strip() != DEFAULT_AGENT_NAME
+
     def _get_agent_prefix(self) -> str:
         """Get the agent name prefix for titles when in delegation context.
 
         Returns:
-            Formatted agent name in parentheses like "(Agent Name) " if name is set,
-            empty string otherwise.
+            Formatted agent name in parentheses like "(Agent Name) " if name is set
+            and is NOT the default agent, empty string otherwise.
         """
-        agent_name = self._get_formatted_agent_name()
-        if agent_name:
+        if self._is_non_default_agent():
+            agent_name = self._get_formatted_agent_name()
             return f"({agent_name}) "
         return ""
 
@@ -247,21 +256,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
         plan_panel.toggle()
 
     def _get_agent_model(self) -> str | None:
-        """Get the agent's model name from the conversation runner.
+        """Get the agent's model name from the conversation state.
 
         Returns:
             The agent model name or None if not available.
         """
-        try:
-            runner = self._app.conversation_runner
-            if runner is None or runner.conversation is None:
-                return None
-            conversation = runner.conversation
-            if not isinstance(conversation, LocalConversation | RemoteConversation):
-                return None
-            return conversation.agent.llm.model
-        except Exception:
-            return None
+        return self._app.conversation_state.agent_model
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
@@ -284,42 +284,125 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
             # Add critic collapsible if present (for MessageEvent and ActionEvent)
             critic_result = getattr(event, "critic_result", None)
-            if critic_result is not None and self.cli_settings.enable_critic:
-                from openhands_cli.tui.utils.critic import (
-                    create_critic_collapsible,
-                    send_critic_inference_event,
-                )
-                from openhands_cli.tui.utils.critic.feedback import (
-                    CriticFeedbackWidget,
-                )
-
-                # Get agent model for tracking
-                agent_model = self._get_agent_model()
-                conversation_id = str(self._app.conversation_id)
-
-                # Send critic inference event to PostHog
-                send_critic_inference_event(
-                    critic_result=critic_result,
-                    conversation_id=conversation_id,
-                    agent_model=agent_model,
-                )
-
-                critic_widget = create_critic_collapsible(critic_result)
-                self._run_on_main_thread(self._add_widget_to_ui, critic_widget)
-
-                # Add feedback widget after critic collapsible
-                feedback_widget = CriticFeedbackWidget(
-                    critic_result=critic_result,
-                    conversation_id=conversation_id,
-                    agent_model=agent_model,
-                )
-                self._run_on_main_thread(self._add_widget_to_ui, feedback_widget)
+            if critic_result is not None:
+                self._handle_critic_result(critic_result)
 
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
         self._container.mount(widget)
-        # Automatically scroll to the bottom to show the newly added widget
-        self._container.scroll_end(animate=False)
+        if self._container.is_vertical_scroll_end:
+            self._container.scroll_end(animate=False)
+
+    def _handle_critic_result(self, critic_result: "CriticResult") -> None:
+        """Handle a critic result by displaying widgets and notifying controller.
+
+        This method is responsible for presentation only:
+        1. Displaying the critic score collapsible (if enabled)
+        2. Displaying the feedback widget
+        3. Sending telemetry
+        4. Posting CriticResultReceived for RefinementController to handle
+
+        Business logic (refinement triggering) is handled by RefinementController.
+
+        Args:
+            critic_result: The critic evaluation result to handle.
+        """
+        from openhands_cli.tui.messages import CriticResultReceived
+        from openhands_cli.tui.utils.critic import (
+            create_critic_collapsible,
+            send_critic_inference_event,
+        )
+        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
+
+        critic_settings = self.cli_settings.critic
+
+        # Skip display if critic is disabled
+        if not critic_settings.enable_critic:
+            return
+
+        # Get agent model for tracking
+        agent_model = self._get_agent_model()
+        conversation_id = str(self._app.conversation_id)
+
+        # Send critic inference event to PostHog
+        send_critic_inference_event(
+            critic_result=critic_result,
+            conversation_id=conversation_id,
+            agent_model=agent_model,
+        )
+
+        # Display critic score collapsible
+        critic_widget = create_critic_collapsible(critic_result)
+        self._run_on_main_thread(self._add_widget_to_ui, critic_widget)
+
+        # Add feedback widget after critic collapsible
+        feedback_widget = CriticFeedbackWidget(
+            critic_result=critic_result,
+            conversation_id=conversation_id,
+            agent_model=agent_model,
+        )
+        self._run_on_main_thread(self._add_widget_to_ui, feedback_widget)
+
+        # Notify RefinementController to evaluate and potentially trigger refinement
+        self._app.call_from_thread(
+            self._app.conversation_manager.post_message,
+            CriticResultReceived(critic_result),
+        )
+
+    def _dismiss_pending_feedback_widgets(self) -> None:
+        """Dismiss any pending feedback widgets.
+
+        Called when a new user turn starts - user chose to continue
+        instead of rating the critic feedback.
+        """
+        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
+
+        for widget in self._container.query(CriticFeedbackWidget):
+            widget.remove()
+
+    def _render_message_widget(self, content: str) -> None:
+        """Render a message widget to the UI (shared logic).
+
+        Args:
+            content: The message text to display.
+        """
+        from textual.widgets import Static
+
+        user_message_widget = Static(
+            f"> {content}", classes="user-message", markup=False
+        )
+        self._run_on_main_thread(self._add_widget_to_ui, user_message_widget)
+
+    def render_user_message(self, content: str) -> None:
+        """Render a user message to the UI.
+
+        This is the entry point for user-initiated messages. It:
+        1. Dismisses any pending feedback widgets
+        2. Renders the message to the UI
+
+        Note: The refinement iteration counter is reset by UserMessageController,
+        not here. This keeps the visualizer focused on presentation.
+
+        Use render_refinement_message() for system-generated refinement messages.
+
+        Args:
+            content: The user's message text to display.
+        """
+        self._dismiss_pending_feedback_widgets()
+        self._render_message_widget(content)
+
+    def render_refinement_message(self, content: str) -> None:
+        """Render a system-generated refinement message to the UI.
+
+        This is used for refinement messages that are part of the current
+        refinement loop. Unlike render_user_message(), this is only for display
+        purposes - iteration tracking is managed by RefinementController.
+
+        Args:
+            content: The refinement message text to display.
+        """
+        self._dismiss_pending_feedback_widgets()
+        self._render_message_widget(content)
 
     def _update_widget_in_ui(
         self, collapsible: Collapsible, new_title: str, new_content: str
@@ -327,7 +410,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """Update an existing widget in the UI (must be called from main thread)."""
         collapsible.update_title(new_title)
         collapsible.update_content(new_content)
-        self._container.scroll_end(animate=False)
+        if self._container.is_vertical_scroll_end:
+            self._container.scroll_end(animate=False)
 
     def _handle_observation_event(
         self, event: ObservationEvent | UserRejectObservation | AgentErrorEvent
@@ -567,7 +651,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self,
         content: str | Text,
         title: str,
-        event: Event | None,
+        event: Event | None = None,
         collapsed: bool | None = None,
     ) -> Collapsible:
         """Create a Collapsible widget with standard settings.
@@ -575,7 +659,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         Args:
             content: The content to display (string or Rich Text object).
             title: The title for the collapsible header.
-            event: The event used to determine border color (None for default).
+            event: The event used to determine symbol color (None for default).
             collapsed: Override the default collapsed state. If None, uses default.
 
         Returns:
@@ -583,21 +667,48 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """
         if collapsed is None:
             collapsed = self._default_collapsed
-        border_color = _get_event_border_color(event) if event else "#888888"
+        symbol_color = _get_event_symbol_color(event) if event else "#888888"
         return Collapsible(
             content,
             title=title,
             collapsed=collapsed,
-            border_color=border_color,
+            symbol_color=symbol_color,
         )
+
+    def _create_system_prompt_collapsible(
+        self, event: SystemPromptEvent
+    ) -> Collapsible:
+        """Create a collapsible widget showing the system prompt from SystemPromptEvent.
+
+        This displays the full system prompt content in a collapsible widget,
+        matching ACP's display format. The title shows the number of tools loaded.
+
+        Args:
+            event: The SystemPromptEvent containing tools and system prompt
+
+        Returns:
+            A Collapsible widget showing the system prompt
+        """
+        # Build the collapsible content - show system prompt like ACP does
+        content = str(event.visualize.plain)
+
+        # Get tool count for title
+        tool_count = len(event.tools) if event.tools else 0
+        title = (
+            f"Loaded: {tool_count} tool{'s' if tool_count != 1 else ''}, system prompt"
+        )
+
+        return self._make_collapsible(content, title, event)
 
     def _create_event_widget(self, event: Event) -> "Widget | None":
         """Create a widget for the event - either plain text or collapsible."""
         content = event.visualize
 
-        # Don't emit system prompt in CLI
+        # Handle SystemPromptEvent - create a collapsible showing the system prompt
+        # Note: Loaded resources (skills, hooks, tools, MCPs) are displayed at startup
+        # in _initialize_main_ui(). This collapsible shows the full system prompt.
         if isinstance(event, SystemPromptEvent):
-            return None
+            return self._create_system_prompt_collapsible(event)
         # Don't emit condensation request events (internal events)
         elif isinstance(event, CondensationRequest):
             return None
@@ -609,9 +720,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 # For finish action, render as markdown with padding to align
                 # User message has "padding: 0 1" and starts with "> ", so text
                 # starts at position 3 (1 padding + 2 for "> ")
-                # In delegation context, add agent header
+                # In delegation context (non-default agent), add agent header
                 message = str(action.message)
-                if self._name:
+                if self._is_non_default_agent():
                     agent_name = self._get_formatted_agent_name()
                     message = f"**{agent_name}:**\n\n{message}"
                 widget = Markdown(message)
@@ -628,14 +739,15 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 return None
 
             # Skip direct user messages (they are displayed separately in the UI)
-            # This applies both when skip_user_messages is set, and for user messages
+            # This applies for user messages
             # without a sender in delegation context
             if event.llm_message.role == "user" and not event.sender:
                 return None
 
             # Case 1: Delegation message (both sender and name are set)
             # Format with arrow notation showing sender → receiver
-            if event.sender and self._name:
+            # Only show prefix if this is NOT the default main agent
+            if event.sender and self._is_non_default_agent():
                 message_content = str(content)
                 agent_name = self._get_formatted_agent_name()
                 event_sender = self._format_agent_name_with_suffix(event.sender)
@@ -682,11 +794,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         agent_prefix = self._get_agent_prefix()
 
-        # Don't emit system prompt in CLI
-        if isinstance(event, SystemPromptEvent):
-            return None
         # Don't emit condensation request events (internal events)
-        elif isinstance(event, CondensationRequest):
+        if isinstance(event, CondensationRequest):
             return None
         elif isinstance(event, ActionEvent):
             # Build title using new format with agent prefix
