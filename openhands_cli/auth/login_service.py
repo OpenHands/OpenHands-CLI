@@ -13,7 +13,17 @@ from typing import Protocol, runtime_checkable
 class LoginProgressCallback(Protocol):
     """UI-agnostic interface for login progress updates.
 
-    Implement this protocol to receive login progress updates in your UI.
+    Called during the OAuth device flow to notify the UI of state changes:
+    - on_status: General status messages (e.g., "Connecting...")
+    - on_verification_url: Device flow URL is ready for user
+    - on_instructions: Additional instructions to display
+    - on_browser_opened: Browser open attempt completed
+    - on_already_logged_in: User has valid existing token
+    - on_token_expired: Existing token is invalid/expired
+    - on_login_success: Token stored, about to sync settings
+    - on_settings_synced: Settings sync completed (success or failure)
+    - on_error: Fatal error occurred, login failed
+
     All methods have default no-op implementations, so you only need to
     implement the ones you care about.
     """
