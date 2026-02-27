@@ -64,9 +64,13 @@ jobs:
                   # Update version in pyproject.toml
                   sed -i "s/^version = \"$CURRENT_VERSION\"/version = \"$VERSION\"/" pyproject.toml
 
-                  # Verify the change was made
-                  echo "Updated version line:"
-                  grep '^version = ' pyproject.toml
+                  # Verify the version field has the expected value
+                  ACTUAL_VERSION=$(grep "^version = " pyproject.toml | sed -E 's/version = "(.+)"/\1/')
+                  if [ "$ACTUAL_VERSION" != "$VERSION" ]; then
+                    echo "❌ Error: Version in pyproject.toml is $ACTUAL_VERSION, expected $VERSION"
+                    exit 1
+                  fi
+                  echo "✅ Verified: pyproject.toml version is $VERSION"
 
                   echo "current_version=$CURRENT_VERSION" >> $GITHUB_ENV
                   echo "branch_name=$BRANCH_NAME" >> $GITHUB_ENV
@@ -83,13 +87,25 @@ jobs:
                   # Ensure lock file is up to date
                   uv lock
 
+            - name: Update snapshot tests
+              run: |
+                  # Update snapshot tests to reflect the new version
+                  # The version appears in the splash screen SVG snapshots
+                  echo "Updating snapshot tests for version ${{ inputs.version }}..."
+                  uv run pytest tests/snapshots/ --snapshot-update -v
+
+                  # List the updated snapshot files
+                  echo "Updated snapshot files:"
+                  git status --short tests/snapshots/
+
             - name: Commit and push changes
               run: |
                   VERSION="${{ inputs.version }}"
                   BRANCH_NAME="${{ env.branch_name }}"
 
-                  # Stage all changes (pyproject.toml and uv.lock)
+                  # Stage all changes (pyproject.toml, uv.lock, and snapshot files)
                   git add pyproject.toml uv.lock
+                  git add tests/snapshots/
 
                   # Check if there are changes to commit
                   if git diff --cached --quiet; then
@@ -97,10 +113,15 @@ jobs:
                     exit 1
                   fi
 
+                  # Count updated snapshot files and export for PR description
+                  SNAPSHOT_COUNT=$(git diff --cached --name-only -- 'tests/snapshots/' | wc -l)
+                  echo "snapshot_count=$SNAPSHOT_COUNT" >> $GITHUB_ENV
+
                   # Commit changes
                   git commit -m "Bump version to $VERSION" \
                              -m "- Updated version in pyproject.toml from ${{ env.current_version }} to $VERSION" \
-                             -m "- Regenerated uv.lock file"
+                             -m "- Regenerated uv.lock file" \
+                             -m "- Updated $SNAPSHOT_COUNT snapshot test file(s)"
 
                   # Push branch
                   git push origin "$BRANCH_NAME"
@@ -131,6 +152,7 @@ jobs:
               run: |
                   VERSION="${{ inputs.version }}"
                   BRANCH_NAME="${{ env.branch_name }}"
+                  SNAPSHOT_COUNT="${{ env.snapshot_count }}"
 
                   # Create draft PR using GitHub API
                   PR_RESPONSE=$(curl -s -X POST \
@@ -141,7 +163,7 @@ jobs:
                       "title": "Bump version to '"$VERSION"'",
                       "head": "'"$BRANCH_NAME"'",
                       "base": "main",
-                      "body": "## Summary\n\nThis PR bumps the project version to **'"$VERSION"'**.\n\n## Changes\n\n- Updated `version` in `pyproject.toml` from `'"${{ env.current_version }}"'` to `'"$VERSION"'`\n- Regenerated `uv.lock` file\n\n## Triggered by\n\nManual workflow dispatch by @'"${{ github.actor }}"'",
+                      "body": "## Summary\n\nThis PR bumps the project version to **'"$VERSION"'**.\n\n## Changes\n\n### pyproject.toml\n```diff\n-version = \"'"${{ env.current_version }}"'\"\n+version = \"'"$VERSION"'\"\n```\n\n### Other changes\n- Regenerated `uv.lock` file\n- Updated '"$SNAPSHOT_COUNT"' snapshot test file(s)\n\n## Triggered by\n\nManual workflow dispatch by @'"${{ github.actor }}"'",
                       "draft": true
                     }')
 
