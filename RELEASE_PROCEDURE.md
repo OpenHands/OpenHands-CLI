@@ -54,7 +54,7 @@ git push origin --tags
 - Approve the PR
 - Merge it to main
 
-### 6. Edit the Release
+### 6. Edit and Publish the Release
 
 Visit the OpenHands CLI releases page:
 - https://github.com/OpenHands/OpenHands-CLI/releases
@@ -62,6 +62,11 @@ Visit the OpenHands CLI releases page:
 Edit the draft release:
 - Add release notes
 - Publish as latest release
+
+**Verify release assets:** After publishing, confirm that all platform binaries were uploaded successfully:
+- Linux (x86_64)
+- macOS (Intel and Apple Silicon)
+- Windows
 
 ### 7. Update Install Website
 
