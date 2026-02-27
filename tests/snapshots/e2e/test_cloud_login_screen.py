@@ -4,7 +4,7 @@ These tests verify the visual appearance of the cloud login flow
 with mocked API calls to avoid actual network requests.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .helpers import wait_for_app_ready
 
@@ -33,14 +33,14 @@ def _create_cloud_login_test_app(auto_start_login: bool = True):
     # Set the class attribute based on the parameter
     TestCloudLoginScreen.auto_start_login = auto_start_login
 
-    class CloudLoginTestApp(App):
+    class CloudLoginTestApp(App[None]):
         """Test app for CloudLoginScreen snapshots."""
 
         CSS = """
         Screen {
             background: $background;
         }
-        
+
         #main_content {
             width: 100%;
             height: 100%;
@@ -48,7 +48,9 @@ def _create_cloud_login_test_app(auto_start_login: bool = True):
         }
         """
 
-        def __init__(self, **kwargs):
+        login_screen: TestCloudLoginScreen
+
+        def __init__(self, **kwargs: Any):
             super().__init__(**kwargs)
             self.register_theme(OPENHANDS_THEME)
             self.theme = OPENHANDS_THEME.name
@@ -86,8 +88,8 @@ class TestCloudLoginScreenSnapshots:
         async def setup(pilot: "Pilot"):
             await wait_for_app_ready(pilot)
 
-            # Get the CloudLoginScreen from the app
-            screen = pilot.app.login_screen
+            # Get the CloudLoginScreen from the app (use getattr for type safety)
+            screen = getattr(pilot.app, "login_screen")
             screen._update_status("Browser opened. Complete login in your browser.")
             screen._show_verification_url(
                 "https://app.all-hands.dev/oauth/device?code=ABCD1234",
@@ -104,7 +106,7 @@ class TestCloudLoginScreenSnapshots:
         async def setup(pilot: "Pilot"):
             await wait_for_app_ready(pilot)
 
-            screen = pilot.app.login_screen
+            screen = getattr(pilot.app, "login_screen")
             screen._update_status("Browser opened. Complete login in your browser.")
             screen._show_verification_url(
                 "https://app.all-hands.dev/oauth/device?code=WXYZ5678",
@@ -122,7 +124,7 @@ class TestCloudLoginScreenSnapshots:
         async def setup(pilot: "Pilot"):
             await wait_for_app_ready(pilot)
 
-            screen = pilot.app.login_screen
+            screen = getattr(pilot.app, "login_screen")
             screen._update_status("✓ Logged into OpenHands Cloud!")
             screen._show_verification_url(
                 "https://app.all-hands.dev/oauth/device?code=SUCCESS",
@@ -140,7 +142,7 @@ class TestCloudLoginScreenSnapshots:
         async def setup(pilot: "Pilot"):
             await wait_for_app_ready(pilot)
 
-            screen = pilot.app.login_screen
+            screen = getattr(pilot.app, "login_screen")
             screen._update_status("Authentication failed: Device code expired")
             screen._update_instructions("Please try again or cancel.")
             await wait_for_app_ready(pilot)

@@ -9,7 +9,6 @@ from openhands_cli.auth.device_flow import (
     DeviceTokenResponse,
 )
 from openhands_cli.auth.login_service import (
-    LoginProgressCallback,
     NullLoginCallback,
     run_login_flow,
 )
@@ -85,9 +84,7 @@ class TestRunLoginFlow:
         with patch(
             "openhands_cli.auth.token_storage.TokenStorage"
         ) as mock_storage_class:
-            with patch(
-                "openhands_cli.auth.utils.is_token_valid"
-            ) as mock_is_valid:
+            with patch("openhands_cli.auth.utils.is_token_valid") as mock_is_valid:
                 with patch(
                     "openhands_cli.auth.api_client.fetch_user_data_after_oauth"
                 ) as mock_fetch:
@@ -117,9 +114,7 @@ class TestRunLoginFlow:
         with patch(
             "openhands_cli.auth.token_storage.TokenStorage"
         ) as mock_storage_class:
-            with patch(
-                "openhands_cli.auth.utils.is_token_valid"
-            ) as mock_is_valid:
+            with patch("openhands_cli.auth.utils.is_token_valid") as mock_is_valid:
                 with patch(
                     "openhands_cli.auth.api_client.fetch_user_data_after_oauth"
                 ) as mock_fetch:
@@ -146,9 +141,7 @@ class TestRunLoginFlow:
         with patch(
             "openhands_cli.auth.token_storage.TokenStorage"
         ) as mock_storage_class:
-            with patch(
-                "openhands_cli.auth.utils.is_token_valid"
-            ) as mock_is_valid:
+            with patch("openhands_cli.auth.utils.is_token_valid") as mock_is_valid:
                 with patch(
                     "openhands_cli.auth.logout_command.logout_command"
                 ) as mock_logout:
@@ -239,15 +232,11 @@ class TestRunLoginFlow:
                     assert result is True
 
                     # Verify callbacks were called
-                    assert any(
-                        "Connecting" in msg for msg in callback.status_messages
-                    )
+                    assert any("Connecting" in msg for msg in callback.status_messages)
                     assert callback.verification_urls == [
                         ("https://example.com/verify?code=UC-1234", "UC-1234")
                     ]
-                    assert any(
-                        "Waiting" in msg for msg in callback.instructions
-                    )
+                    assert any("Waiting" in msg for msg in callback.instructions)
                     assert callback.login_success_called
                     assert any("✓ Logged" in msg for msg in callback.status_messages)
 
@@ -394,12 +383,8 @@ class TestRunLoginFlow:
         with patch(
             "openhands_cli.auth.token_storage.TokenStorage"
         ) as mock_storage_class:
-            with patch(
-                "openhands_cli.auth.utils.is_token_valid"
-            ) as mock_is_valid:
-                with patch(
-                    "openhands_cli.auth.api_client.fetch_user_data_after_oauth"
-                ):
+            with patch("openhands_cli.auth.utils.is_token_valid") as mock_is_valid:
+                with patch("openhands_cli.auth.api_client.fetch_user_data_after_oauth"):
                     with patch.dict(
                         "os.environ", {"OPENHANDS_CLOUD_URL": "https://custom.url"}
                     ):
@@ -421,12 +406,8 @@ class TestRunLoginFlow:
         with patch(
             "openhands_cli.auth.token_storage.TokenStorage"
         ) as mock_storage_class:
-            with patch(
-                "openhands_cli.auth.utils.is_token_valid"
-            ) as mock_is_valid:
-                with patch(
-                    "openhands_cli.auth.api_client.fetch_user_data_after_oauth"
-                ):
+            with patch("openhands_cli.auth.utils.is_token_valid") as mock_is_valid:
+                with patch("openhands_cli.auth.api_client.fetch_user_data_after_oauth"):
                     mock_storage = MagicMock()
                     mock_storage_class.return_value = mock_storage
                     mock_storage.get_api_key.return_value = "existing-token"

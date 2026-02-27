@@ -207,7 +207,9 @@ class TestInitialSetupLLMSettingsFlow:
         """Phase 4: User saves settings and sees the landing screen."""
         app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
         assert snap_compare(
-            app, terminal_size=(120, 40), run_before=_fill_and_save_settings_from_welcome
+            app,
+            terminal_size=(120, 40),
+            run_before=_fill_and_save_settings_from_welcome,
         )
 
 
@@ -251,5 +253,7 @@ class TestInitialSetupCancelSettingsThenReturn:
         """Phase 4: User cancels exit and returns to welcome modal."""
         app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
         assert snap_compare(
-            app, terminal_size=(120, 40), run_before=_cancel_settings_then_return_to_welcome
+            app,
+            terminal_size=(120, 40),
+            run_before=_cancel_settings_then_return_to_welcome,
         )

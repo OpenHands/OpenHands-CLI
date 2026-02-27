@@ -1,6 +1,6 @@
 """Unit tests for login command functionality."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -74,9 +74,7 @@ class TestLoginCommand:
         """Test that login_command delegates to run_login_flow."""
         server_url = "https://api.example.com"
 
-        with patch(
-            "openhands_cli.auth.login_command.run_login_flow"
-        ) as mock_run_login:
+        with patch("openhands_cli.auth.login_command.run_login_flow") as mock_run_login:
             with patch("openhands_cli.auth.login_command.console_print"):
                 mock_run_login.return_value = True
 
@@ -94,9 +92,7 @@ class TestLoginCommand:
         """Test login command with skip_settings_sync=True."""
         server_url = "https://api.example.com"
 
-        with patch(
-            "openhands_cli.auth.login_command.run_login_flow"
-        ) as mock_run_login:
+        with patch("openhands_cli.auth.login_command.run_login_flow") as mock_run_login:
             with patch("openhands_cli.auth.login_command.console_print"):
                 mock_run_login.return_value = True
 
@@ -111,9 +107,7 @@ class TestLoginCommand:
         """Test login command returns False when run_login_flow fails."""
         server_url = "https://api.example.com"
 
-        with patch(
-            "openhands_cli.auth.login_command.run_login_flow"
-        ) as mock_run_login:
+        with patch("openhands_cli.auth.login_command.run_login_flow") as mock_run_login:
             with patch("openhands_cli.auth.login_command.console_print"):
                 mock_run_login.return_value = False
 

@@ -84,18 +84,14 @@ class WelcomeModal(ModalScreen[WelcomeChoice | None]):
                 try:
                     self.on_llm_settings()
                 except Exception as e:
-                    self.notify(
-                        f"Error opening LLM settings: {e}", severity="error"
-                    )
+                    self.notify(f"Error opening LLM settings: {e}", severity="error")
         elif event.button.id == "cloud_login_button":
             self.dismiss("cloud_login")
             if self.on_cloud_login:
                 try:
                     self.on_cloud_login()
                 except Exception as e:
-                    self.notify(
-                        f"Error during cloud login: {e}", severity="error"
-                    )
+                    self.notify(f"Error during cloud login: {e}", severity="error")
 
     def action_cancel(self) -> None:
         """Handle escape key to cancel the welcome modal."""

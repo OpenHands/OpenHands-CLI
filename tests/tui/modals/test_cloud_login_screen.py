@@ -1,11 +1,10 @@
 """Unit tests for CloudLoginScreen modal."""
 
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock
 
+import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Static
-from textual.worker import WorkerState
 
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.modals.cloud_login_screen import CloudLoginScreen

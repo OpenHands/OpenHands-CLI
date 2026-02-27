@@ -18,13 +18,21 @@ class ConsoleLoginCallback:
         """Display status message."""
         # Check for specific message patterns to apply appropriate styling
         if message.startswith("✓"):
-            console_print(f"[{OPENHANDS_THEME.success}]{message}[/{OPENHANDS_THEME.success}]")
+            console_print(
+                f"[{OPENHANDS_THEME.success}]{message}[/{OPENHANDS_THEME.success}]"
+            )
         elif "failed" in message.lower() or "error" in message.lower():
-            console_print(f"[{OPENHANDS_THEME.error}]{message}[/{OPENHANDS_THEME.error}]")
+            console_print(
+                f"[{OPENHANDS_THEME.error}]{message}[/{OPENHANDS_THEME.error}]"
+            )
         elif "expired" in message.lower() or "logging out" in message.lower():
-            console_print(f"[{OPENHANDS_THEME.warning}]{message}[/{OPENHANDS_THEME.warning}]")
+            console_print(
+                f"[{OPENHANDS_THEME.warning}]{message}[/{OPENHANDS_THEME.warning}]"
+            )
         else:
-            console_print(f"[{OPENHANDS_THEME.accent}]{message}[/{OPENHANDS_THEME.accent}]")
+            console_print(
+                f"[{OPENHANDS_THEME.accent}]{message}[/{OPENHANDS_THEME.accent}]"
+            )
 
     def on_verification_url(self, url: str, user_code: str) -> None:
         """Display verification URL and user code."""
@@ -44,11 +52,17 @@ class ConsoleLoginCallback:
     def on_instructions(self, message: str) -> None:
         """Display instruction message."""
         if message.startswith("✓"):
-            console_print(f"[{OPENHANDS_THEME.success}]{message}[/{OPENHANDS_THEME.success}]")
+            console_print(
+                f"[{OPENHANDS_THEME.success}]{message}[/{OPENHANDS_THEME.success}]"
+            )
         elif "warning" in message.lower():
-            console_print(f"[{OPENHANDS_THEME.warning}]{message}[/{OPENHANDS_THEME.warning}]")
+            console_print(
+                f"[{OPENHANDS_THEME.warning}]{message}[/{OPENHANDS_THEME.warning}]"
+            )
         else:
-            console_print(f"[{OPENHANDS_THEME.secondary}]{message}[/{OPENHANDS_THEME.secondary}]")
+            console_print(
+                f"[{OPENHANDS_THEME.secondary}]{message}[/{OPENHANDS_THEME.secondary}]"
+            )
 
     def on_browser_opened(self, success: bool) -> None:
         """Handle browser open result."""
