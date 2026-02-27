@@ -1,10 +1,18 @@
 """Base HTTP client for OpenHands authentication services."""
 
 import json
-from typing import Any
+from typing import Any, TypedDict
 from urllib.parse import urljoin
 
 import httpx
+
+
+class _RequestKwargs(TypedDict, total=False):
+    method: str
+    url: str
+    headers: dict[str, str] | None
+    json: dict[str, Any]
+    data: dict[str, Any]
 
 
 class AuthHttpError(Exception):
@@ -82,7 +90,7 @@ class BaseHttpClient:
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 # Prepare request parameters
-                request_kwargs = {
+                request_kwargs: _RequestKwargs = {
                     "method": method,
                     "url": url,
                     "headers": headers,

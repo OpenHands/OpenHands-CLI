@@ -15,7 +15,7 @@ class TestLogoutCommand:
         with patch(
             "openhands_cli.auth.logout_command.TokenStorage"
         ) as mock_storage_class:
-            with patch("openhands_cli.auth.logout_command._p") as mock_print:
+            with patch("openhands_cli.auth.logout_command.console_print") as mock_print:
                 mock_storage = MagicMock()
                 mock_storage_class.return_value = mock_storage
                 mock_storage.remove_api_key.return_value = True  # Was logged in
@@ -38,7 +38,7 @@ class TestLogoutCommand:
         with patch(
             "openhands_cli.auth.logout_command.TokenStorage"
         ) as mock_storage_class:
-            with patch("openhands_cli.auth.logout_command._p") as mock_print:
+            with patch("openhands_cli.auth.logout_command.console_print") as mock_print:
                 mock_storage = MagicMock()
                 mock_storage_class.return_value = mock_storage
                 mock_storage.remove_api_key.return_value = False  # Was not logged in
@@ -59,7 +59,7 @@ class TestLogoutCommand:
         with patch(
             "openhands_cli.auth.logout_command.TokenStorage"
         ) as mock_storage_class:
-            with patch("openhands_cli.auth.logout_command._p") as mock_print:
+            with patch("openhands_cli.auth.logout_command.console_print") as mock_print:
                 mock_storage = MagicMock()
                 mock_storage_class.return_value = mock_storage
                 mock_storage.has_api_key.return_value = True  # Is logged in
@@ -81,7 +81,7 @@ class TestLogoutCommand:
         with patch(
             "openhands_cli.auth.logout_command.TokenStorage"
         ) as mock_storage_class:
-            with patch("openhands_cli.auth.logout_command._p") as mock_print:
+            with patch("openhands_cli.auth.logout_command.console_print") as mock_print:
                 mock_storage = MagicMock()
                 mock_storage_class.return_value = mock_storage
                 mock_storage.has_api_key.return_value = False  # Not logged in
@@ -105,7 +105,7 @@ class TestLogoutCommand:
         with patch(
             "openhands_cli.auth.logout_command.TokenStorage"
         ) as mock_storage_class:
-            with patch("openhands_cli.auth.logout_command._p") as mock_print:
+            with patch("openhands_cli.auth.logout_command.console_print") as mock_print:
                 mock_storage_class.side_effect = Exception("Unexpected error")
 
                 result = logout_command(server_url)
@@ -125,7 +125,7 @@ class TestLogoutCommand:
         with patch(
             "openhands_cli.auth.logout_command.TokenStorage"
         ) as mock_storage_class:
-            with patch("openhands_cli.auth.logout_command._p") as mock_print:
+            with patch("openhands_cli.auth.logout_command.console_print") as mock_print:
                 mock_storage = MagicMock()
                 mock_storage_class.return_value = mock_storage
                 mock_storage.has_api_key.side_effect = Exception("Storage error")
@@ -177,7 +177,7 @@ class TestLogoutCommand:
         with patch(
             "openhands_cli.auth.logout_command.TokenStorage"
         ) as mock_storage_class:
-            with patch("openhands_cli.auth.logout_command._p"):
+            with patch("openhands_cli.auth.logout_command.console_print"):
                 mock_storage = MagicMock()
                 mock_storage_class.return_value = mock_storage
                 mock_storage.has_api_key.return_value = False
@@ -193,7 +193,7 @@ class TestLogoutCommand:
         with patch(
             "openhands_cli.auth.logout_command.TokenStorage"
         ) as mock_storage_class:
-            with patch("openhands_cli.auth.logout_command._p") as mock_print:
+            with patch("openhands_cli.auth.logout_command.console_print") as mock_print:
                 mock_storage = MagicMock()
                 mock_storage_class.return_value = mock_storage
                 mock_storage.has_api_key.return_value = True  # User is logged in
