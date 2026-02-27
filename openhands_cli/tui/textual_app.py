@@ -75,7 +75,7 @@ from openhands_cli.tui.core import (
 )
 from openhands_cli.tui.core.conversation_manager import SwitchConfirmed
 from openhands_cli.tui.core.runner_factory import RunnerFactory
-from openhands_cli.tui.modals import SettingsScreen, WelcomeModal
+from openhands_cli.tui.modals import CloudLoginScreen, SettingsScreen, WelcomeModal
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.panels.history_side_panel import HistorySidePanel
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
@@ -342,20 +342,16 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
     def _handle_cloud_login(self) -> None:
         """Handle cloud login flow for first-time setup."""
-        import os
+        cloud_login_screen = CloudLoginScreen(
+            on_login_success=self._on_cloud_login_success,
+            on_login_cancelled=self._show_initial_settings,
+        )
+        self.push_screen(cloud_login_screen)
 
-        from openhands_cli.auth.login_command import run_login_command
-
-        server_url = os.getenv("OPENHANDS_CLOUD_URL", "https://app.all-hands.dev")
-        success = run_login_command(server_url)
-
-        if success:
-            # Cloud login successful, initialize the main UI
-            self._initialize_main_ui()
-            self._reload_visualizer()
-        else:
-            # Cloud login failed or was cancelled, show welcome modal again
-            self._show_initial_settings()
+    def _on_cloud_login_success(self) -> None:
+        """Handle successful cloud login."""
+        self._initialize_main_ui()
+        self._reload_visualizer()
 
     def _handle_initial_setup_cancelled(self) -> None:
         """Handle when initial setup is cancelled - show welcome modal again."""

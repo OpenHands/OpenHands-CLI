@@ -1,3 +1,4 @@
+from openhands_cli.tui.modals.cloud_login_screen import CloudLoginScreen
 from openhands_cli.tui.modals.confirmation_modal import ConfirmationSettingsModal
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.modals.settings.settings_screen import SettingsScreen
@@ -6,6 +7,7 @@ from openhands_cli.tui.modals.welcome_modal import WelcomeModal
 
 
 __all__ = [
+    "CloudLoginScreen",
     "SettingsScreen",
     "ExitConfirmationModal",
     "ConfirmationSettingsModal",
