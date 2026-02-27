@@ -4,8 +4,6 @@ This screen handles the OAuth device flow login within the TUI,
 displaying status messages and the verification URL to the user.
 """
 
-import os
-import webbrowser
 from collections.abc import Callable
 from typing import ClassVar
 
@@ -14,6 +12,59 @@ from textual.containers import Container, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, LoadingIndicator, Rule, Static
 from textual.worker import Worker, WorkerState
+
+from openhands_cli.auth.login_service import run_login_flow
+
+
+class TuiLoginCallback:
+    """TUI-based implementation of LoginProgressCallback.
+
+    Updates the CloudLoginScreen widgets with login progress.
+    """
+
+    def __init__(self, screen: "CloudLoginScreen"):
+        """Initialize with reference to the screen.
+
+        Args:
+            screen: The CloudLoginScreen to update
+        """
+        self.screen = screen
+
+    def on_status(self, message: str) -> None:
+        """Update status in the TUI."""
+        self.screen._update_status(message)
+
+    def on_verification_url(self, url: str, user_code: str) -> None:
+        """Show verification URL in the TUI."""
+        self.screen._show_verification_url(url, user_code)
+
+    def on_instructions(self, message: str) -> None:
+        """Update instructions in the TUI."""
+        self.screen._update_instructions(message)
+
+    def on_browser_opened(self, success: bool) -> None:
+        """Handle browser open result - status already updated by on_status."""
+        pass  # Status message is handled by on_status callback
+
+    def on_already_logged_in(self) -> None:
+        """Handle already logged in state."""
+        pass  # Status message is handled by on_status callback
+
+    def on_token_expired(self) -> None:
+        """Handle token expired state."""
+        pass  # Status message is handled by on_status callback
+
+    def on_login_success(self) -> None:
+        """Handle login success."""
+        pass  # Status message is handled by on_status callback
+
+    def on_settings_synced(self, success: bool, error: str | None = None) -> None:
+        """Handle settings sync result."""
+        pass  # Instructions message is handled by on_instructions callback
+
+    def on_error(self, error: str) -> None:
+        """Handle error."""
+        pass  # Status message is handled by on_status callback
 
 
 class CloudLoginScreen(ModalScreen[bool]):
@@ -186,79 +237,12 @@ class CloudLoginScreen(ModalScreen[bool]):
         Returns:
             True if login was successful, False otherwise
         """
-        from openhands_cli.auth.api_client import (
-            ApiClientError,
-            fetch_user_data_after_oauth,
+        callback = TuiLoginCallback(self)
+        return await run_login_flow(
+            callback=callback,
+            skip_settings_sync=False,
+            open_browser=True,
         )
-        from openhands_cli.auth.device_flow import (
-            DeviceFlowClient,
-            DeviceFlowError,
-        )
-        from openhands_cli.auth.token_storage import TokenStorage
-        from openhands_cli.auth.utils import is_token_valid
-
-        server_url = os.getenv("OPENHANDS_CLOUD_URL", "https://app.all-hands.dev")
-        token_storage = TokenStorage()
-
-        # Check for existing valid token
-        existing_api_key = token_storage.get_api_key()
-        if existing_api_key and await is_token_valid(server_url, existing_api_key):
-            self._update_status("Already logged in. Syncing settings...")
-            try:
-                await fetch_user_data_after_oauth(server_url, existing_api_key)
-                self._update_status("✓ Settings synchronized!")
-                return True
-            except ApiClientError as e:
-                self._update_status(f"Warning: Could not sync settings: {e}")
-                return True
-
-        # Start device flow
-        self._update_status("Connecting to OpenHands Cloud...")
-        client = DeviceFlowClient(server_url)
-
-        try:
-            # Step 1: Get device authorization
-            auth_response = await client.start_device_flow()
-
-            # Step 2: Show URL and instructions to user
-            verification_url = auth_response.verification_uri_complete
-            user_code = auth_response.user_code
-
-            self._show_verification_url(verification_url, user_code)
-
-            # Try to open browser
-            try:
-                webbrowser.open(verification_url)
-                self._update_status("Browser opened. Complete login in your browser.")
-            except Exception:
-                self._update_status("Please open the URL above in your browser.")
-
-            # Step 3: Poll for token
-            self._update_instructions("Waiting for authentication to complete...")
-            token_response = await client.poll_for_token(
-                auth_response.device_code, auth_response.interval
-            )
-
-            # Step 4: Store the token
-            token_storage.store_api_key(token_response.access_token)
-            self._update_status("✓ Logged into OpenHands Cloud!")
-
-            # Step 5: Fetch user data
-            self._update_instructions("Syncing settings...")
-            try:
-                await fetch_user_data_after_oauth(
-                    server_url, token_response.access_token
-                )
-                self._update_instructions("✓ Settings synchronized!")
-            except ApiClientError as e:
-                self._update_instructions(f"Warning: Could not sync settings: {e}")
-
-            return True
-
-        except DeviceFlowError as e:
-            self._update_status(f"Authentication failed: {e}")
-            self._update_instructions("Please try again.")
-            return False
 
     def _update_status(self, message: str) -> None:
         """Update the status message in the UI."""

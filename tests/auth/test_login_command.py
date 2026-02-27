@@ -4,216 +4,122 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from openhands_cli.auth.device_flow import DeviceTokenResponse
 from openhands_cli.auth.login_command import (
-    _fetch_user_data_with_context,
+    ConsoleLoginCallback,
     login_command,
     run_login_command,
 )
+
+
+class TestConsoleLoginCallback:
+    """Test cases for ConsoleLoginCallback."""
+
+    def test_on_status_success_message(self):
+        """Test status message with success indicator."""
+        with patch("openhands_cli.auth.login_command.console_print") as mock_print:
+            callback = ConsoleLoginCallback()
+            callback.on_status("✓ Success message")
+
+            mock_print.assert_called_once()
+            call_arg = mock_print.call_args[0][0]
+            assert "✓ Success message" in call_arg
+
+    def test_on_status_error_message(self):
+        """Test status message with error."""
+        with patch("openhands_cli.auth.login_command.console_print") as mock_print:
+            callback = ConsoleLoginCallback()
+            callback.on_status("Authentication failed")
+
+            mock_print.assert_called_once()
+            call_arg = mock_print.call_args[0][0]
+            assert "Authentication failed" in call_arg
+
+    def test_on_verification_url(self):
+        """Test verification URL display."""
+        with patch("openhands_cli.auth.login_command.console_print") as mock_print:
+            callback = ConsoleLoginCallback()
+            callback.on_verification_url("https://example.com/auth", "ABCD-1234")
+
+            assert mock_print.call_count == 3
+            calls = [call[0][0] for call in mock_print.call_args_list]
+            assert any("https://example.com/auth" in call for call in calls)
+            assert any("ABCD-1234" in call for call in calls)
+
+    def test_on_settings_synced_success(self):
+        """Test settings sync success message."""
+        with patch("openhands_cli.auth.login_command.console_print") as mock_print:
+            callback = ConsoleLoginCallback()
+            callback.on_settings_synced(success=True)
+
+            mock_print.assert_called_once()
+            call_arg = mock_print.call_args[0][0]
+            assert "synchronized successfully" in call_arg
+
+    def test_on_settings_synced_error(self):
+        """Test settings sync error message."""
+        with patch("openhands_cli.auth.login_command.console_print") as mock_print:
+            callback = ConsoleLoginCallback()
+            callback.on_settings_synced(success=False, error="API error")
+
+            assert mock_print.call_count == 2
+            calls = [call[0][0] for call in mock_print.call_args_list]
+            assert any("API error" in call for call in calls)
 
 
 class TestLoginCommand:
     """Test cases for login command functionality."""
 
     @pytest.mark.asyncio
-    async def test_fetch_user_data_with_context_already_logged_in_success(self):
-        """Test fetching user data when already logged in - success case."""
+    async def test_login_command_delegates_to_run_login_flow(self):
+        """Test that login_command delegates to run_login_flow."""
         server_url = "https://api.example.com"
-        api_key = "test-api-key"
 
         with patch(
-            "openhands_cli.auth.login_command.fetch_user_data_after_oauth"
-        ) as mock_fetch:
-            with patch("openhands_cli.auth.login_command.console_print") as mock_print:
-                mock_fetch.return_value = {"llm_api_key": "llm-key", "settings": {}}
+            "openhands_cli.auth.login_command.run_login_flow"
+        ) as mock_run_login:
+            with patch("openhands_cli.auth.login_command.console_print"):
+                mock_run_login.return_value = True
 
-                await _fetch_user_data_with_context(
-                    server_url, api_key, already_logged_in=True
-                )
+                result = await login_command(server_url)
 
-                mock_fetch.assert_called_once_with(server_url, api_key)
-
-                # Check that appropriate messages were printed
-                print_calls = [call[0][0] for call in mock_print.call_args_list]
-                assert any("already logged in" in call for call in print_calls)
-                assert any("synchronized successfully" in call for call in print_calls)
+                assert result is True
+                mock_run_login.assert_called_once()
+                # Check that server_url was passed
+                call_kwargs = mock_run_login.call_args[1]
+                assert call_kwargs["server_url"] == server_url
+                assert isinstance(call_kwargs["callback"], ConsoleLoginCallback)
 
     @pytest.mark.asyncio
-    async def test_fetch_user_data_with_context_new_login_success(self):
-        """Test fetching user data for new login - success case."""
+    async def test_login_command_skip_settings_sync(self):
+        """Test login command with skip_settings_sync=True."""
         server_url = "https://api.example.com"
-        api_key = "test-api-key"
 
         with patch(
-            "openhands_cli.auth.login_command.fetch_user_data_after_oauth"
-        ) as mock_fetch:
-            with patch("openhands_cli.auth.login_command.console_print") as mock_print:
-                mock_fetch.return_value = {"llm_api_key": "llm-key", "settings": {}}
+            "openhands_cli.auth.login_command.run_login_flow"
+        ) as mock_run_login:
+            with patch("openhands_cli.auth.login_command.console_print"):
+                mock_run_login.return_value = True
 
-                await _fetch_user_data_with_context(
-                    server_url, api_key, already_logged_in=False
-                )
+                result = await login_command(server_url, skip_settings_sync=True)
 
-                mock_fetch.assert_called_once_with(server_url, api_key)
-
-                # Check that appropriate messages were printed
-                print_calls = [call[0][0] for call in mock_print.call_args_list]
-                assert any("synchronized successfully" in call for call in print_calls)
+                assert result is True
+                call_kwargs = mock_run_login.call_args[1]
+                assert call_kwargs["skip_settings_sync"] is True
 
     @pytest.mark.asyncio
-    async def test_fetch_user_data_with_context_api_error(self):
-        """Test fetching user data with API client error."""
-        server_url = "https://api.example.com"
-        api_key = "test-api-key"
-
-        with patch(
-            "openhands_cli.auth.login_command.fetch_user_data_after_oauth"
-        ) as mock_fetch:
-            with patch("openhands_cli.auth.login_command.console_print") as mock_print:
-                from openhands_cli.auth.api_client import ApiClientError
-
-                mock_fetch.side_effect = ApiClientError("API error")
-
-                await _fetch_user_data_with_context(
-                    server_url, api_key, already_logged_in=False
-                )
-
-                # Should print warning but not raise
-                print_calls = [call[0][0] for call in mock_print.call_args_list]
-                assert any(
-                    "Warning" in call and "API error" in call for call in print_calls
-                )
-
-    @pytest.mark.asyncio
-    async def test_login_command_existing_token(self):
-        """Test login command when user already has a valid token."""
+    async def test_login_command_returns_false_on_failure(self):
+        """Test login command returns False when run_login_flow fails."""
         server_url = "https://api.example.com"
 
         with patch(
-            "openhands_cli.auth.login_command.TokenStorage"
-        ) as mock_storage_class:
-            with patch(
-                "openhands_cli.auth.login_command.is_token_valid", return_value=True
-            ):
-                with patch(
-                    "openhands_cli.auth.login_command._fetch_user_data_with_context"
-                ) as mock_fetch:
-                    with patch("openhands_cli.auth.login_command.console_print"):
-                        mock_storage = MagicMock()
-                        mock_storage_class.return_value = mock_storage
-                        mock_storage.get_api_key.return_value = "existing-api-key"
+            "openhands_cli.auth.login_command.run_login_flow"
+        ) as mock_run_login:
+            with patch("openhands_cli.auth.login_command.console_print"):
+                mock_run_login.return_value = False
 
-                        result = await login_command(server_url)
+                result = await login_command(server_url)
 
-                        assert result is True
-                        mock_fetch.assert_called_once_with(
-                            server_url,
-                            "existing-api-key",
-                            already_logged_in=True,
-                            skip_settings_sync=False,
-                        )
-
-    @pytest.mark.asyncio
-    async def test_login_command_new_login_success(self):
-        """Test login command with new device flow authentication."""
-        server_url = "https://api.example.com"
-
-        with patch(
-            "openhands_cli.auth.login_command.TokenStorage"
-        ) as mock_storage_class:
-            with patch(
-                "openhands_cli.auth.login_command.authenticate_with_device_flow"
-            ) as mock_auth:
-                with patch(
-                    "openhands_cli.auth.login_command._fetch_user_data_with_context"
-                ) as mock_fetch:
-                    with patch("openhands_cli.auth.login_command.console_print"):
-                        mock_storage = MagicMock()
-                        mock_storage_class.return_value = mock_storage
-                        mock_storage.get_api_key.return_value = (
-                            None  # No existing token
-                        )
-
-                        mock_auth.return_value = DeviceTokenResponse(
-                            access_token="new-api-key",
-                            token_type="Bearer",
-                        )
-
-                        result = await login_command(server_url)
-
-                        assert result is True
-                        mock_auth.assert_called_once_with(server_url)
-                        mock_storage.store_api_key.assert_called_once_with(
-                            "new-api-key"
-                        )
-                        mock_fetch.assert_called_once_with(
-                            server_url,
-                            "new-api-key",
-                            already_logged_in=False,
-                            skip_settings_sync=False,
-                        )
-
-    @pytest.mark.asyncio
-    async def test_login_command_device_flow_error(self):
-        """Test login command when device flow fails."""
-        server_url = "https://api.example.com"
-
-        with patch(
-            "openhands_cli.auth.login_command.TokenStorage"
-        ) as mock_storage_class:
-            with patch(
-                "openhands_cli.auth.login_command.authenticate_with_device_flow"
-            ) as mock_auth:
-                with patch(
-                    "openhands_cli.auth.login_command.console_print"
-                ) as mock_print:
-                    mock_storage = MagicMock()
-                    mock_storage_class.return_value = mock_storage
-                    mock_storage.get_api_key.return_value = None
-
-                    from openhands_cli.auth.device_flow import DeviceFlowError
-
-                    mock_auth.side_effect = DeviceFlowError("Authentication failed")
-
-                    result = await login_command(server_url)
-
-                    assert result is False
-                    print_calls = [call[0][0] for call in mock_print.call_args_list]
-                    assert any("Authentication failed" in call for call in print_calls)
-
-    @pytest.mark.asyncio
-    async def test_login_command_with_expires_in(self):
-        """Test login command with token that has expiration."""
-        server_url = "https://api.example.com"
-
-        with patch(
-            "openhands_cli.auth.login_command.TokenStorage"
-        ) as mock_storage_class:
-            with patch(
-                "openhands_cli.auth.login_command.authenticate_with_device_flow"
-            ) as mock_auth:
-                with patch(
-                    "openhands_cli.auth.login_command._fetch_user_data_with_context"
-                ) as mock_fetch:
-                    with patch("openhands_cli.auth.login_command.console_print"):
-                        mock_storage = MagicMock()
-                        mock_storage_class.return_value = mock_storage
-                        mock_storage.get_api_key.return_value = None
-
-                        mock_auth.return_value = DeviceTokenResponse(
-                            access_token="new-api-key",
-                            token_type="Bearer",
-                            expires_in=3600,
-                        )
-
-                        result = await login_command(server_url)
-
-                        assert result is True
-                        mock_auth.assert_called_once_with(server_url)
-                        mock_storage.store_api_key.assert_called_once_with(
-                            "new-api-key"
-                        )
-                        mock_fetch.assert_called_once()
+                assert result is False
 
     def test_run_login_command_success(self):
         """Test synchronous wrapper for login command - success case."""
@@ -251,56 +157,3 @@ class TestLoginCommand:
             result = run_login_command(server_url)
 
             assert result is False
-
-    @pytest.mark.asyncio
-    async def test_login_command_with_successful_token_storage_and_fetch(self):
-        """Test complete successful login flow with token storage and data fetch."""
-        server_url = "https://api.example.com"
-
-        with patch(
-            "openhands_cli.auth.login_command.TokenStorage"
-        ) as mock_storage_class:
-            with patch(
-                "openhands_cli.auth.login_command.authenticate_with_device_flow"
-            ) as mock_auth:
-                with patch(
-                    "openhands_cli.auth.login_command._fetch_user_data_with_context"
-                ) as mock_fetch:
-                    with patch(
-                        "openhands_cli.auth.login_command.console_print"
-                    ) as mock_print:
-                        mock_storage = MagicMock()
-                        mock_storage_class.return_value = mock_storage
-                        mock_storage.get_api_key.return_value = None
-
-                        mock_auth.return_value = DeviceTokenResponse(
-                            access_token="new-api-key",
-                            token_type="Bearer",
-                            expires_in=3600,
-                        )
-
-                        result = await login_command(server_url)
-
-                        assert result is True
-
-                        # Verify the complete flow
-                        # get_api_key called twice: at start + after re-reading
-                        assert mock_storage.get_api_key.call_count == 2
-                        mock_auth.assert_called_once_with(server_url)
-                        mock_storage.store_api_key.assert_called_once_with(
-                            "new-api-key"
-                        )
-                        mock_fetch.assert_called_once_with(
-                            server_url,
-                            "new-api-key",
-                            already_logged_in=False,
-                            skip_settings_sync=False,
-                        )
-
-                        # Verify success messages
-                        print_calls = [call[0][0] for call in mock_print.call_args_list]
-                        assert any(
-                            "Logged into OpenHands Cloud" in call
-                            for call in print_calls
-                        )
-                        assert any("stored securely" in call for call in print_calls)
