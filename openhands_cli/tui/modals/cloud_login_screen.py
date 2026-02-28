@@ -14,7 +14,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Label, LoadingIndicator, Rule, Static
 from textual.worker import Worker, WorkerState
 
-from openhands_cli.auth.login_service import run_login_flow
+from openhands_cli.auth.login_service import StatusType, run_login_flow
 
 
 logger = logging.getLogger(__name__)
@@ -34,8 +34,16 @@ class TuiLoginCallback:
         """
         self.screen = screen
 
-    def on_status(self, message: str) -> None:
-        """Update status in the TUI."""
+    def on_status(
+        self, message: str, status_type: StatusType = StatusType.INFO  # noqa: ARG002
+    ) -> None:
+        """Update status in the TUI.
+
+        Args:
+            message: The status message to display
+            status_type: The type of status (currently unused in TUI, but available
+                for future styling enhancements)
+        """
         self.screen._update_status(message)
 
     def on_verification_url(self, url: str, user_code: str) -> None:

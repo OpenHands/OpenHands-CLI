@@ -9,30 +9,63 @@ from openhands_cli.auth.login_command import (
     login_command,
     run_login_command,
 )
+from openhands_cli.auth.login_service import StatusType
 
 
 class TestConsoleLoginCallback:
     """Test cases for ConsoleLoginCallback."""
 
-    def test_on_status_success_message(self):
-        """Test status message with success indicator."""
+    def test_on_status_success_type(self):
+        """Test status message with success type uses success styling."""
         with patch("openhands_cli.auth.login_command.console_print") as mock_print:
             callback = ConsoleLoginCallback()
-            callback.on_status("✓ Success message")
+            callback.on_status("Login successful!", StatusType.SUCCESS)
 
             mock_print.assert_called_once()
             call_arg = mock_print.call_args[0][0]
-            assert "✓ Success message" in call_arg
+            assert "Login successful!" in call_arg
+            # Should use success color from theme
+            assert "green" in call_arg.lower() or "success" in call_arg.lower()
 
-    def test_on_status_error_message(self):
-        """Test status message with error."""
+    def test_on_status_error_type(self):
+        """Test status message with error type uses error styling."""
         with patch("openhands_cli.auth.login_command.console_print") as mock_print:
             callback = ConsoleLoginCallback()
-            callback.on_status("Authentication failed")
+            callback.on_status("Authentication failed", StatusType.ERROR)
 
             mock_print.assert_called_once()
             call_arg = mock_print.call_args[0][0]
             assert "Authentication failed" in call_arg
+
+    def test_on_status_warning_type(self):
+        """Test status message with warning type uses warning styling."""
+        with patch("openhands_cli.auth.login_command.console_print") as mock_print:
+            callback = ConsoleLoginCallback()
+            callback.on_status("Token expired", StatusType.WARNING)
+
+            mock_print.assert_called_once()
+            call_arg = mock_print.call_args[0][0]
+            assert "Token expired" in call_arg
+
+    def test_on_status_info_type(self):
+        """Test status message with info type (default) uses info styling."""
+        with patch("openhands_cli.auth.login_command.console_print") as mock_print:
+            callback = ConsoleLoginCallback()
+            callback.on_status("Connecting...", StatusType.INFO)
+
+            mock_print.assert_called_once()
+            call_arg = mock_print.call_args[0][0]
+            assert "Connecting..." in call_arg
+
+    def test_on_status_default_type(self):
+        """Test status message without type defaults to INFO."""
+        with patch("openhands_cli.auth.login_command.console_print") as mock_print:
+            callback = ConsoleLoginCallback()
+            callback.on_status("Some message")
+
+            mock_print.assert_called_once()
+            call_arg = mock_print.call_args[0][0]
+            assert "Some message" in call_arg
 
     def test_on_verification_url(self):
         """Test verification URL display."""

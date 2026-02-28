@@ -10,6 +10,7 @@ from openhands_cli.auth.device_flow import (
 )
 from openhands_cli.auth.login_service import (
     NullLoginCallback,
+    StatusType,
     run_login_flow,
 )
 
@@ -19,6 +20,7 @@ class MockLoginCallback:
 
     def __init__(self):
         self.status_messages = []
+        self.status_types = []
         self.verification_urls = []
         self.instructions = []
         self.browser_opened_results = []
@@ -28,8 +30,11 @@ class MockLoginCallback:
         self.settings_synced_results = []
         self.errors = []
 
-    def on_status(self, message: str) -> None:
+    def on_status(
+        self, message: str, status_type: StatusType = StatusType.INFO
+    ) -> None:
         self.status_messages.append(message)
+        self.status_types.append(status_type)
 
     def on_verification_url(self, url: str, user_code: str) -> None:
         self.verification_urls.append((url, user_code))
@@ -63,6 +68,7 @@ class TestNullLoginCallback:
         """Test that all callback methods run without errors."""
         callback = NullLoginCallback()
         callback.on_status("test")
+        callback.on_status("test with type", StatusType.SUCCESS)
         callback.on_verification_url("url", "code")
         callback.on_instructions("test")
         callback.on_browser_opened(True)
@@ -238,7 +244,9 @@ class TestRunLoginFlow:
                     ]
                     assert any("Waiting" in msg for msg in callback.instructions)
                     assert callback.login_success_called
-                    assert any("✓ Logged" in msg for msg in callback.status_messages)
+                    # Verify success status message with SUCCESS type
+                    assert any("Logged" in msg for msg in callback.status_messages)
+                    assert StatusType.SUCCESS in callback.status_types
 
                     # Verify token was stored
                     mock_storage.store_api_key.assert_called_once_with("new-token")

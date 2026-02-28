@@ -6,7 +6,22 @@ This module provides the core login flow logic that can be used by any UI
 
 import os
 import webbrowser
+from enum import Enum
 from typing import Protocol, runtime_checkable
+
+
+class StatusType(Enum):
+    """Type of status message for styling purposes.
+
+    This enum allows the service layer to communicate the semantic meaning
+    of status messages to the UI layer, enabling proper styling without
+    the UI needing to parse message strings.
+    """
+
+    INFO = "info"  # General information (default)
+    SUCCESS = "success"  # Operation completed successfully
+    WARNING = "warning"  # Warning or caution
+    ERROR = "error"  # Error occurred
 
 
 @runtime_checkable
@@ -28,8 +43,15 @@ class LoginProgressCallback(Protocol):
     implement the ones you care about.
     """
 
-    def on_status(self, message: str) -> None:
-        """Called when there's a status update to display."""
+    def on_status(
+        self, message: str, status_type: StatusType = StatusType.INFO
+    ) -> None:
+        """Called when there's a status update to display.
+
+        Args:
+            message: The status message to display
+            status_type: The type of status for styling (INFO, SUCCESS, WARNING, ERROR)
+        """
         ...
 
     def on_verification_url(self, url: str, user_code: str) -> None:
@@ -68,7 +90,9 @@ class LoginProgressCallback(Protocol):
 class NullLoginCallback:
     """No-op implementation of LoginProgressCallback for silent operation."""
 
-    def on_status(self, message: str) -> None:
+    def on_status(
+        self, message: str, status_type: StatusType = StatusType.INFO
+    ) -> None:
         pass
 
     def on_verification_url(self, url: str, user_code: str) -> None:
@@ -154,7 +178,9 @@ async def run_login_flow(
         if await is_token_valid(server_url, existing_api_key):
             # Already logged in with valid token
             callback.on_already_logged_in()
-            callback.on_status("Already logged in. Syncing settings...")
+            callback.on_status(
+                "Already logged in. Syncing settings...", StatusType.INFO
+            )
 
             if not skip_settings_sync:
                 try:
@@ -167,13 +193,13 @@ async def run_login_flow(
         else:
             # Token is invalid/expired - logout first
             callback.on_token_expired()
-            callback.on_status("Token expired. Logging out...")
+            callback.on_status("Token expired. Logging out...", StatusType.WARNING)
             logout_command(server_url)
             # Clear the existing key reference since we just logged out
             existing_api_key = None
 
     # Step 2: Start device flow
-    callback.on_status("Connecting to OpenHands Cloud...")
+    callback.on_status("Connecting to OpenHands Cloud...", StatusType.INFO)
     client = DeviceFlowClient(server_url)
 
     try:
@@ -190,12 +216,18 @@ async def run_login_flow(
             try:
                 webbrowser.open(verification_url)
                 callback.on_browser_opened(success=True)
-                callback.on_status("Browser opened. Complete login in your browser.")
+                callback.on_status(
+                    "Browser opened. Complete login in your browser.", StatusType.INFO
+                )
             except Exception:
                 callback.on_browser_opened(success=False)
-                callback.on_status("Please open the URL above in your browser.")
+                callback.on_status(
+                    "Please open the URL above in your browser.", StatusType.INFO
+                )
         else:
-            callback.on_status("Please open the URL above in your browser.")
+            callback.on_status(
+                "Please open the URL above in your browser.", StatusType.INFO
+            )
 
         # Step 6: Poll for token
         callback.on_instructions("Waiting for authentication to complete...")
@@ -206,7 +238,7 @@ async def run_login_flow(
         # Step 7: Store the token
         token_storage.store_api_key(token_response.access_token)
         callback.on_login_success()
-        callback.on_status("✓ Logged into OpenHands Cloud!")
+        callback.on_status("Logged into OpenHands Cloud!", StatusType.SUCCESS)
 
         # Step 8: Fetch user data and sync settings
         if not skip_settings_sync:
@@ -225,6 +257,6 @@ async def run_login_flow(
 
     except DeviceFlowError as e:
         callback.on_error(str(e))
-        callback.on_status(f"Authentication failed: {e}")
+        callback.on_status(f"Authentication failed: {e}", StatusType.ERROR)
         callback.on_instructions("Please try again.")
         return False

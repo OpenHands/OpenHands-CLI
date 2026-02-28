@@ -3,7 +3,7 @@
 import asyncio
 import html
 
-from openhands_cli.auth.login_service import run_login_flow
+from openhands_cli.auth.login_service import StatusType, run_login_flow
 from openhands_cli.auth.utils import console_print
 from openhands_cli.theme import OPENHANDS_THEME
 
@@ -14,25 +14,23 @@ class ConsoleLoginCallback:
     Displays login progress using Rich console output.
     """
 
-    def on_status(self, message: str) -> None:
-        """Display status message."""
-        # Check for specific message patterns to apply appropriate styling
-        if message.startswith("✓"):
-            console_print(
-                f"[{OPENHANDS_THEME.success}]{message}[/{OPENHANDS_THEME.success}]"
-            )
-        elif "failed" in message.lower() or "error" in message.lower():
-            console_print(
-                f"[{OPENHANDS_THEME.error}]{message}[/{OPENHANDS_THEME.error}]"
-            )
-        elif "expired" in message.lower() or "logging out" in message.lower():
-            console_print(
-                f"[{OPENHANDS_THEME.warning}]{message}[/{OPENHANDS_THEME.warning}]"
-            )
-        else:
-            console_print(
-                f"[{OPENHANDS_THEME.accent}]{message}[/{OPENHANDS_THEME.accent}]"
-            )
+    def on_status(
+        self, message: str, status_type: StatusType = StatusType.INFO
+    ) -> None:
+        """Display status message with appropriate styling based on status type.
+
+        Args:
+            message: The status message to display
+            status_type: The type of status for styling (INFO, SUCCESS, WARNING, ERROR)
+        """
+        style_map = {
+            StatusType.INFO: OPENHANDS_THEME.accent,
+            StatusType.SUCCESS: OPENHANDS_THEME.success,
+            StatusType.WARNING: OPENHANDS_THEME.warning,
+            StatusType.ERROR: OPENHANDS_THEME.error,
+        }
+        style = style_map.get(status_type, OPENHANDS_THEME.accent)
+        console_print(f"[{style}]{message}[/{style}]")
 
     def on_verification_url(self, url: str, user_code: str) -> None:
         """Display verification URL and user code."""
