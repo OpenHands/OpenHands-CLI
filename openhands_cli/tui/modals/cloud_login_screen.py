@@ -54,30 +54,6 @@ class TuiLoginCallback:
         """Update instructions in the TUI."""
         self.screen._update_instructions(message)
 
-    def on_browser_opened(self, success: bool) -> None:
-        """Handle browser open result - status already updated by on_status."""
-        pass  # Status message is handled by on_status callback
-
-    def on_already_logged_in(self) -> None:
-        """Handle already logged in state."""
-        pass  # Status message is handled by on_status callback
-
-    def on_token_expired(self) -> None:
-        """Handle token expired state."""
-        pass  # Status message is handled by on_status callback
-
-    def on_login_success(self) -> None:
-        """Handle login success."""
-        pass  # Status message is handled by on_status callback
-
-    def on_settings_synced(self, success: bool, error: str | None = None) -> None:
-        """Handle settings sync result."""
-        pass  # Instructions message is handled by on_instructions callback
-
-    def on_error(self, error: str) -> None:
-        """Handle error."""
-        pass  # Status message is handled by on_status callback
-
 
 class CloudLoginScreen(ModalScreen[bool]):
     """Screen for handling cloud login via OAuth device flow.

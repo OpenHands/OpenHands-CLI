@@ -23,12 +23,6 @@ class MockLoginCallback:
         self.status_types = []
         self.verification_urls = []
         self.instructions = []
-        self.browser_opened_results = []
-        self.already_logged_in_called = False
-        self.token_expired_called = False
-        self.login_success_called = False
-        self.settings_synced_results = []
-        self.errors = []
 
     def on_status(
         self, message: str, status_type: StatusType = StatusType.INFO
@@ -42,24 +36,6 @@ class MockLoginCallback:
     def on_instructions(self, message: str) -> None:
         self.instructions.append(message)
 
-    def on_browser_opened(self, success: bool) -> None:
-        self.browser_opened_results.append(success)
-
-    def on_already_logged_in(self) -> None:
-        self.already_logged_in_called = True
-
-    def on_token_expired(self) -> None:
-        self.token_expired_called = True
-
-    def on_login_success(self) -> None:
-        self.login_success_called = True
-
-    def on_settings_synced(self, success: bool, error: str | None = None) -> None:
-        self.settings_synced_results.append((success, error))
-
-    def on_error(self, error: str) -> None:
-        self.errors.append(error)
-
 
 class TestNullLoginCallback:
     """Test NullLoginCallback does nothing (no errors)."""
@@ -71,12 +47,6 @@ class TestNullLoginCallback:
         callback.on_status("test with type", StatusType.SUCCESS)
         callback.on_verification_url("url", "code")
         callback.on_instructions("test")
-        callback.on_browser_opened(True)
-        callback.on_already_logged_in()
-        callback.on_token_expired()
-        callback.on_login_success()
-        callback.on_settings_synced(True)
-        callback.on_error("test")
 
 
 class TestRunLoginFlow:
@@ -106,11 +76,13 @@ class TestRunLoginFlow:
                     )
 
                     assert result is True
-                    assert callback.already_logged_in_called
                     assert any(
                         "Already logged in" in msg for msg in callback.status_messages
                     )
-                    assert callback.settings_synced_results == [(True, None)]
+                    # Settings sync success is communicated via instructions
+                    assert any(
+                        "Settings synchronized" in msg for msg in callback.instructions
+                    )
 
     @pytest.mark.asyncio
     async def test_already_logged_in_skip_settings_sync(self):
@@ -137,7 +109,10 @@ class TestRunLoginFlow:
 
                     assert result is True
                     mock_fetch.assert_not_called()
-                    assert callback.settings_synced_results == []
+                    # No sync instructions when skipped
+                    assert not any(
+                        "Settings synchronized" in msg for msg in callback.instructions
+                    )
 
     @pytest.mark.asyncio
     async def test_expired_token_triggers_logout(self):
@@ -189,7 +164,11 @@ class TestRunLoginFlow:
                             )
 
                             assert result is True
-                            assert callback.token_expired_called
+                            # Token expired is communicated via status message
+                            assert any(
+                                "expired" in msg.lower()
+                                for msg in callback.status_messages
+                            )
                             mock_logout.assert_called_once_with("https://example.com")
 
     @pytest.mark.asyncio
@@ -243,7 +222,6 @@ class TestRunLoginFlow:
                         ("https://example.com/verify?code=UC-1234", "UC-1234")
                     ]
                     assert any("Waiting" in msg for msg in callback.instructions)
-                    assert callback.login_success_called
                     # Verify success status message with SUCCESS type
                     assert any("Logged" in msg for msg in callback.status_messages)
                     assert StatusType.SUCCESS in callback.status_types
@@ -251,9 +229,11 @@ class TestRunLoginFlow:
                     # Verify token was stored
                     mock_storage.store_api_key.assert_called_once_with("new-token")
 
-                    # Verify settings sync was called
+                    # Verify settings sync was called and communicated via instructions
                     mock_fetch.assert_called_once()
-                    assert callback.settings_synced_results == [(True, None)]
+                    assert any(
+                        "Settings synchronized" in msg for msg in callback.instructions
+                    )
 
     @pytest.mark.asyncio
     async def test_device_flow_error(self):
@@ -284,8 +264,10 @@ class TestRunLoginFlow:
                 )
 
                 assert result is False
-                assert "Network error" in callback.errors
+                # Error is communicated via status message with ERROR type
+                assert any("Network error" in msg for msg in callback.status_messages)
                 assert any("failed" in msg.lower() for msg in callback.status_messages)
+                assert StatusType.ERROR in callback.status_types
 
     @pytest.mark.asyncio
     async def test_browser_open_success(self):
@@ -332,7 +314,10 @@ class TestRunLoginFlow:
                         )
 
                         mock_browser.assert_called_once()
-                        assert callback.browser_opened_results == [True]
+                        # Browser success is communicated via status message
+                        assert any(
+                            "Browser opened" in msg for msg in callback.status_messages
+                        )
 
     @pytest.mark.asyncio
     async def test_browser_open_failure(self):
@@ -381,7 +366,11 @@ class TestRunLoginFlow:
                         )
 
                         assert result is True  # Login should still succeed
-                        assert callback.browser_opened_results == [False]
+                        # Browser failure is communicated via status message
+                        assert any(
+                            "Could not open browser" in msg
+                            for msg in callback.status_messages
+                        )
 
     @pytest.mark.asyncio
     async def test_default_server_url(self):
@@ -430,20 +419,21 @@ class TestRunLoginFlow:
                     assert result is True
 
     @pytest.mark.asyncio
-    async def test_callback_exception_does_not_crash_login_flow(self):
-        """Test that callback exceptions don't crash the login flow.
+    async def test_callback_exception_propagates(self):
+        """Test that callback exceptions propagate up.
 
-        The login flow should complete successfully even if a callback
-        raises an exception. This is important because the core login
-        logic (token storage, etc.) should not be affected by UI errors.
+        This test documents the current behavior - callbacks that
+        raise exceptions WILL cause the flow to fail. The exception
+        propagates up to the caller.
         """
 
         class FailingCallback(MockLoginCallback):
-            def on_login_success(self):
-                raise ValueError("Simulated callback error")
-
-            def on_settings_synced(self, success: bool, error: str | None = None):
-                raise RuntimeError("Another simulated error")
+            def on_status(
+                self, message: str, status_type: StatusType = StatusType.INFO
+            ) -> None:
+                if "Logged into" in message:
+                    raise ValueError("Simulated callback error on login success")
+                super().on_status(message, status_type)
 
         callback = FailingCallback()
 
@@ -480,12 +470,10 @@ class TestRunLoginFlow:
                     )
                     mock_fetch.return_value = None
 
-                    # The login flow should succeed despite callback exceptions
-                    # Note: Currently the flow does NOT catch callback exceptions,
-                    # so if a callback raises, the exception propagates up.
-                    # This test documents the current behavior - callbacks that
-                    # raise exceptions WILL cause the flow to fail.
-                    with pytest.raises(ValueError, match="Simulated callback error"):
+                    # The exception should propagate up
+                    with pytest.raises(
+                        ValueError, match="Simulated callback error on login success"
+                    ):
                         await run_login_flow(
                             server_url="https://example.com",
                             callback=callback,

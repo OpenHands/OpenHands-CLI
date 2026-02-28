@@ -83,25 +83,25 @@ class TestConsoleLoginCallback:
             assert any("https://example.com/auth" in call for call in calls)
             assert any("ABCD-1234" in call for call in calls)
 
-    def test_on_settings_synced_success(self):
-        """Test settings sync success message."""
+    def test_on_instructions_success(self):
+        """Test instructions message with success indicator."""
         with patch("openhands_cli.auth.login_command.console_print") as mock_print:
             callback = ConsoleLoginCallback()
-            callback.on_settings_synced(success=True)
+            callback.on_instructions("✓ Settings synchronized!")
 
             mock_print.assert_called_once()
             call_arg = mock_print.call_args[0][0]
-            assert "synchronized successfully" in call_arg
+            assert "Settings synchronized" in call_arg
 
-    def test_on_settings_synced_error(self):
-        """Test settings sync error message."""
+    def test_on_instructions_warning(self):
+        """Test instructions message with warning content."""
         with patch("openhands_cli.auth.login_command.console_print") as mock_print:
             callback = ConsoleLoginCallback()
-            callback.on_settings_synced(success=False, error="API error")
+            callback.on_instructions("Warning: Could not sync settings")
 
-            assert mock_print.call_count == 2
-            calls = [call[0][0] for call in mock_print.call_args_list]
-            assert any("API error" in call for call in calls)
+            mock_print.assert_called_once()
+            call_arg = mock_print.call_args[0][0]
+            assert "Could not sync settings" in call_arg
 
 
 class TestLoginCommand:

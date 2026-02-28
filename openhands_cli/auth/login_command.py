@@ -1,7 +1,6 @@
 """Login command implementation for OpenHands CLI."""
 
 import asyncio
-import html
 
 from openhands_cli.auth.login_service import StatusType, run_login_flow
 from openhands_cli.auth.utils import console_print
@@ -61,66 +60,6 @@ class ConsoleLoginCallback:
             console_print(
                 f"[{OPENHANDS_THEME.secondary}]{message}[/{OPENHANDS_THEME.secondary}]"
             )
-
-    def on_browser_opened(self, success: bool) -> None:
-        """Handle browser open result."""
-        if success:
-            console_print(
-                f"[{OPENHANDS_THEME.success}]✓ Browser "
-                f"opened successfully[/{OPENHANDS_THEME.success}]"
-            )
-        else:
-            console_print(
-                f"[{OPENHANDS_THEME.warning}]Could not open browser automatically."
-                f"[/{OPENHANDS_THEME.warning}]"
-            )
-
-    def on_already_logged_in(self) -> None:
-        """Handle already logged in state."""
-        console_print(
-            f"[{OPENHANDS_THEME.warning}]You are already logged in to "
-            f"OpenHands Cloud.[/{OPENHANDS_THEME.warning}]"
-        )
-
-    def on_token_expired(self) -> None:
-        """Handle token expired state."""
-        console_print(
-            f"[{OPENHANDS_THEME.warning}]Token is invalid or expired."
-            f"[/{OPENHANDS_THEME.warning}]"
-        )
-
-    def on_login_success(self) -> None:
-        """Handle login success."""
-        console_print(
-            f"[{OPENHANDS_THEME.secondary}]Your authentication "
-            f"tokens have been stored securely.[/{OPENHANDS_THEME.secondary}]"
-        )
-
-    def on_settings_synced(self, success: bool, error: str | None = None) -> None:
-        """Handle settings sync result."""
-        if success:
-            console_print(
-                f"\n[{OPENHANDS_THEME.success}]✓ Settings synchronized "
-                f"successfully![/{OPENHANDS_THEME.success}]"
-            )
-        else:
-            safe_error = html.escape(str(error)) if error else "Unknown error"
-            console_print(
-                f"\n[{OPENHANDS_THEME.warning}]Warning: "
-                f"Could not fetch user data: {safe_error}[/{OPENHANDS_THEME.warning}]"
-            )
-            console_print(
-                f"[{OPENHANDS_THEME.secondary}]Please try: [bold]"
-                f"{html.escape('openhands logout && openhands login')}"
-                f"[/bold][/{OPENHANDS_THEME.secondary}]"
-            )
-
-    def on_error(self, error: str) -> None:
-        """Handle error."""
-        console_print(
-            f"[{OPENHANDS_THEME.error}]Authentication failed: "
-            f"{error}[/{OPENHANDS_THEME.error}]"
-        )
 
 
 async def login_command(server_url: str, skip_settings_sync: bool = False) -> bool:
