@@ -35,7 +35,9 @@ class TuiLoginCallback:
         self.screen = screen
 
     def on_status(
-        self, message: str, status_type: StatusType = StatusType.INFO  # noqa: ARG002
+        self,
+        message: str,
+        status_type: StatusType = StatusType.INFO,  # noqa: ARG002
     ) -> None:
         """Update status in the TUI.
 

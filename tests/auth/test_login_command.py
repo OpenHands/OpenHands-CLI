@@ -246,7 +246,9 @@ class TestLoginCommandIntegration:
                         with patch(
                             "openhands_cli.auth.api_client.fetch_user_data_after_oauth"
                         ):
-                            with patch("openhands_cli.auth.login_command.console_print"):
+                            with patch(
+                                "openhands_cli.auth.login_command.console_print"
+                            ):
                                 mock_storage = MagicMock()
                                 mock_storage_class.return_value = mock_storage
                                 mock_storage.get_api_key.return_value = "expired-token"
@@ -478,9 +480,7 @@ class TestLoginCommandIntegration:
                             print_calls = [
                                 call[0][0] for call in mock_print.call_args_list
                             ]
-                            assert any(
-                                "Logging in" in call for call in print_calls
-                            )
+                            assert any("Logging in" in call for call in print_calls)
 
     @pytest.mark.asyncio
     async def test_login_command_poll_for_token_error(self):
