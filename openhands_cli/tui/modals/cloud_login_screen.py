@@ -52,8 +52,16 @@ class TuiLoginCallback:
         """Show verification URL in the TUI."""
         self.screen._show_verification_url(url, user_code)
 
-    def on_instructions(self, message: str) -> None:
-        """Update instructions in the TUI."""
+    def on_instructions(
+        self, message: str, status_type: StatusType = StatusType.INFO  # noqa: ARG002
+    ) -> None:
+        """Update instructions in the TUI.
+
+        Args:
+            message: The instruction message to display
+            status_type: The type of status (currently unused in TUI, but available
+                for future styling enhancements)
+        """
         self.screen._update_instructions(message)
 
 

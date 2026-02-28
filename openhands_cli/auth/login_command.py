@@ -46,20 +46,16 @@ class ConsoleLoginCallback:
             f"[/{OPENHANDS_THEME.secondary}]"
         )
 
-    def on_instructions(self, message: str) -> None:
-        """Display instruction message."""
-        if message.startswith("✓"):
-            console_print(
-                f"[{OPENHANDS_THEME.success}]{message}[/{OPENHANDS_THEME.success}]"
-            )
-        elif "warning" in message.lower():
-            console_print(
-                f"[{OPENHANDS_THEME.warning}]{message}[/{OPENHANDS_THEME.warning}]"
-            )
-        else:
-            console_print(
-                f"[{OPENHANDS_THEME.secondary}]{message}[/{OPENHANDS_THEME.secondary}]"
-            )
+    def on_instructions(
+        self, message: str, status_type: StatusType = StatusType.INFO
+    ) -> None:
+        """Display instruction message with appropriate styling.
+
+        Args:
+            message: The instruction message to display
+            status_type: The type of status for styling (INFO, SUCCESS, WARNING, ERROR)
+        """
+        self.on_status(message, status_type)
 
 
 async def login_command(server_url: str, skip_settings_sync: bool = False) -> bool:

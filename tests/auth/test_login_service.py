@@ -33,7 +33,9 @@ class MockLoginCallback:
     def on_verification_url(self, url: str, user_code: str) -> None:
         self.verification_urls.append((url, user_code))
 
-    def on_instructions(self, message: str) -> None:
+    def on_instructions(
+        self, message: str, status_type: StatusType = StatusType.INFO
+    ) -> None:
         self.instructions.append(message)
 
 
@@ -47,6 +49,7 @@ class TestNullLoginCallback:
         callback.on_status("test with type", StatusType.SUCCESS)
         callback.on_verification_url("url", "code")
         callback.on_instructions("test")
+        callback.on_instructions("test with type", StatusType.SUCCESS)
 
 
 class TestRunLoginFlow:

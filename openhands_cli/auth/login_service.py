@@ -49,8 +49,15 @@ class LoginProgressCallback(Protocol):
         """Called when the verification URL and user code are available."""
         ...
 
-    def on_instructions(self, message: str) -> None:
-        """Called when there are instructions to display."""
+    def on_instructions(
+        self, message: str, status_type: StatusType = StatusType.INFO
+    ) -> None:
+        """Called when there are instructions to display.
+
+        Args:
+            message: The instruction message to display
+            status_type: The type of status for styling (INFO, SUCCESS, WARNING, ERROR)
+        """
         ...
 
 
@@ -65,7 +72,9 @@ class NullLoginCallback:
     def on_verification_url(self, url: str, user_code: str) -> None:
         pass
 
-    def on_instructions(self, message: str) -> None:
+    def on_instructions(
+        self, message: str, status_type: StatusType = StatusType.INFO
+    ) -> None:
         pass
 
 
@@ -133,9 +142,13 @@ async def run_login_flow(
             if not skip_settings_sync:
                 try:
                     await fetch_user_data_after_oauth(server_url, existing_api_key)
-                    callback.on_instructions("✓ Settings synchronized!")
+                    callback.on_instructions(
+                        "Settings synchronized!", StatusType.SUCCESS
+                    )
                 except ApiClientError as e:
-                    callback.on_instructions(f"Warning: Could not sync settings: {e}")
+                    callback.on_instructions(
+                        f"Could not sync settings: {e}", StatusType.WARNING
+                    )
 
             return True
         else:
@@ -176,7 +189,9 @@ async def run_login_flow(
             )
 
         # Step 6: Poll for token
-        callback.on_instructions("Waiting for authentication to complete...")
+        callback.on_instructions(
+            "Waiting for authentication to complete...", StatusType.INFO
+        )
         token_response = await client.poll_for_token(
             auth_response.device_code, auth_response.interval
         )
@@ -187,18 +202,20 @@ async def run_login_flow(
 
         # Step 8: Fetch user data and sync settings
         if not skip_settings_sync:
-            callback.on_instructions("Syncing settings...")
+            callback.on_instructions("Syncing settings...", StatusType.INFO)
             try:
                 await fetch_user_data_after_oauth(
                     server_url, token_response.access_token
                 )
-                callback.on_instructions("✓ Settings synchronized!")
+                callback.on_instructions("Settings synchronized!", StatusType.SUCCESS)
             except ApiClientError as e:
-                callback.on_instructions(f"Warning: Could not sync settings: {e}")
+                callback.on_instructions(
+                    f"Could not sync settings: {e}", StatusType.WARNING
+                )
 
         return True
 
     except DeviceFlowError as e:
         callback.on_status(f"Authentication failed: {e}", StatusType.ERROR)
-        callback.on_instructions("Please try again.")
+        callback.on_instructions("Please try again.", StatusType.INFO)
         return False
