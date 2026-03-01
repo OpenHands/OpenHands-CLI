@@ -147,7 +147,7 @@ This is a user microagent for testing.
         """Test that loading agent includes public skills from the OpenHands repository.
 
         This test verifies that when an agent is loaded with load_public_skills=True,
-        public skills from https://github.com/OpenHands/skills are loaded.
+        public skills from https://github.com/OpenHands/extensions are loaded.
         """
         from openhands.sdk.context.skills import Skill
 

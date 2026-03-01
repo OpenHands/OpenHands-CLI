@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from textual import events, on
+from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container
 from textual.message import Message
@@ -15,13 +16,22 @@ from textual.signal import Signal
 from textual.widgets import TextArea
 
 from openhands_cli.tui.core.commands import COMMANDS, is_valid_command
-from openhands_cli.tui.messages import SlashCommandSubmitted, UserInputSubmitted
+from openhands_cli.tui.messages import SendMessage, SlashCommandSubmitted
 from openhands_cli.tui.widgets.user_input.autocomplete_dropdown import (
     AutoCompleteDropdown,
 )
 from openhands_cli.tui.widgets.user_input.single_line_input import (
     SingleLineInputWithWrapping,
 )
+
+
+class MultilineInput(TextArea):
+    """A multiline TextArea with ctrl+a bound to select all."""
+
+    BINDINGS: ClassVar = [
+        # Override default ctrl+a (cursor_line_start) to select all instead
+        Binding("ctrl+a", "select_all", "Select all", show=True),
+    ]
 
 
 def get_external_editor() -> str:
@@ -94,10 +104,8 @@ class InputField(Container):
         width: 100%;
         height: auto;
         min-height: 3;
-        layers: base autocomplete;
 
         #single_line_input {
-            layer: base;
             width: 100%;
             height: auto;
             min-height: 3;
@@ -113,7 +121,6 @@ class InputField(Container):
         }
 
         #multiline_input {
-            layer: base;
             width: 100%;
             height: 6;
             background: $background;
@@ -125,14 +132,6 @@ class InputField(Container):
         #multiline_input:focus {
             border: solid $primary;
             background: $background;
-        }
-
-        AutoCompleteDropdown {
-            layer: autocomplete;
-            offset-x: 1;
-            offset-y: -2;
-            overlay: screen;
-            constrain: inside inflect;
         }
     }
     """
@@ -152,7 +151,7 @@ class InputField(Container):
             placeholder=self.placeholder,
             id="single_line_input",
         )
-        self.multiline_widget = TextArea(
+        self.multiline_widget = MultilineInput(
             id="multiline_input",
             soft_wrap=True,
             show_line_numbers=False,
@@ -166,11 +165,11 @@ class InputField(Container):
             self.single_line_widget
         )
 
-    def compose(self):
+    def compose(self) -> ComposeResult:
         """Create the input widgets."""
+        yield self.autocomplete
         yield self.single_line_widget
         yield self.multiline_widget
-        yield self.autocomplete
 
     def on_mount(self) -> None:
         """Focus the input when mounted."""
@@ -342,14 +341,14 @@ class InputField(Container):
                     command = content[1:]  # Remove leading "/"
                     self.post_message(SlashCommandSubmitted(command=command))
                 else:
-                    self.post_message(UserInputSubmitted(content=content))
+                    self.post_message(SendMessage(content=content))
 
     def _submit_current_content(self) -> None:
         """Submit current content and clear input.
 
         Posts different messages based on content type:
         - SlashCommandSubmitted for valid slash commands
-        - UserInputSubmitted for regular user input
+        - SendMessage for regular user input
         """
         content = self._get_current_text().strip()
         if not content:
@@ -364,7 +363,7 @@ class InputField(Container):
             self.post_message(SlashCommandSubmitted(command=command))
         else:
             # Regular user input
-            self.post_message(UserInputSubmitted(content=content))
+            self.post_message(SendMessage(content=content))
 
     @on(SingleLineInputWithWrapping.MultiLinePasteDetected)
     def _on_paste_detected(

@@ -5,11 +5,18 @@ from rich.console import Console
 from openhands_cli.theme import OPENHANDS_THEME
 
 
+__all__ = [
+    "AuthenticationError",
+    "console_print",
+    "ensure_valid_auth",
+    "is_token_valid",
+]
+
 # Create a console instance for printing
 _console = Console()
 
 
-def _p(message: str) -> None:
+def console_print(message: str) -> None:
     """Unified formatted print helper using rich console."""
     _console.print(message)
 

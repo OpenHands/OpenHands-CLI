@@ -22,12 +22,14 @@ from textual.widgets import (
 )
 from textual.widgets._select import NoSelection
 
-from openhands_cli.stores import AgentStore
+from openhands.sdk import LLMSummarizingCondenser
+from openhands_cli.stores import AgentStore, CliSettings, CriticSettings
 from openhands_cli.tui.modals.settings.choices import (
     get_model_options,
 )
 from openhands_cli.tui.modals.settings.components import (
     CliSettingsTab,
+    CriticSettingsTab,
     SettingsTab,
 )
 from openhands_cli.tui.modals.settings.utils import SettingsFormData, save_settings
@@ -53,6 +55,9 @@ class SettingsScreen(ModalScreen):
     memory_select: getters.query_one[Select] = getters.query_one(
         "#memory_condensation_select"
     )
+    timeout_input: getters.query_one[Input] = getters.query_one("#timeout_input")
+    max_tokens_input: getters.query_one[Input] = getters.query_one("#max_tokens_input")
+    max_size_input: getters.query_one[Input] = getters.query_one("#max_size_input")
     basic_section: getters.query_one[Container] = getters.query_one("#basic_section")
     advanced_section: getters.query_one[Container] = getters.query_one(
         "#advanced_section"
@@ -95,6 +100,9 @@ class SettingsScreen(ModalScreen):
 
     def compose(self) -> ComposeResult:
         """Create the settings form with tabs."""
+        # Load CLI settings once for initializing both tabs
+        cli_settings = CliSettings.load()
+
         with Container(id="settings_container"):
             yield Static("Settings", id="settings_title")
 
@@ -111,7 +119,11 @@ class SettingsScreen(ModalScreen):
                 # CLI Settings Tab - only show if not first-time setup
                 if not self.is_initial_setup:
                     with TabPane("CLI Settings", id="cli_settings_tab"):
-                        yield CliSettingsTab()
+                        yield CliSettingsTab(initial_settings=cli_settings)
+
+                    # Critic Settings Tab - only show if not first-time setup
+                    with TabPane("Critic", id="critic_settings_tab"):
+                        yield CriticSettingsTab(initial_settings=cli_settings.critic)
 
             # Buttons
             with Horizontal(id="button_container"):
@@ -152,9 +164,12 @@ class SettingsScreen(ModalScreen):
         self.custom_model_input.value = ""
         self.base_url_input.value = ""
         self.mode_select.value = "basic"
-        self.provider_select.value = Select.BLANK
-        self.model_select.value = Select.BLANK
-        self.memory_select.value = False
+        self.provider_select.clear()
+        self.model_select.clear()
+        self.memory_select.value = True
+        self.timeout_input.value = ""
+        self.max_tokens_input.value = ""
+        self.max_size_input.value = ""
 
     def _load_current_settings(self) -> None:
         """Load current settings into the form."""
@@ -199,6 +214,29 @@ class SettingsScreen(ModalScreen):
         # Memory Condensation
         self.memory_select.value = bool(self.current_agent.condenser)
 
+        # Timeout (seconds) – show existing value if set
+        if llm.timeout is not None:
+            self.timeout_input.value = str(llm.timeout)
+        else:
+            self.timeout_input.value = ""
+
+        # Max tokens (optional) – show existing value if set
+        max_input = getattr(llm, "max_input_tokens", None)
+        if max_input is not None:
+            self.max_tokens_input.value = str(max_input)
+        else:
+            self.max_tokens_input.value = ""
+
+        # Condenser max size (optional) – show existing value if set
+        if (
+            self.current_agent
+            and self.current_agent.condenser
+            and isinstance(self.current_agent.condenser, LLMSummarizingCondenser)
+        ):
+            self.max_size_input.value = str(self.current_agent.condenser.max_size)
+        else:
+            self.max_size_input.value = ""
+
         # Update field dependencies after loading all values
         self._update_field_dependencies()
 
@@ -213,7 +251,7 @@ class SettingsScreen(ModalScreen):
             self.model_select.set_options(model_options)
 
             # Try to preserve the current selection if it's still valid
-            if current_selection and current_selection != Select.BLANK:
+            if current_selection and not isinstance(current_selection, NoSelection):
                 # Check if the current selection is still in the new options
                 option_values = [option[1] for option in model_options]
                 if current_selection in option_values:
@@ -273,11 +311,13 @@ class SettingsScreen(ModalScreen):
 
                     # Model select: enabled when provider is selected
                     self.model_select.disabled = not (
-                        provider and provider != Select.BLANK
+                        provider and not isinstance(provider, NoSelection)
                     )
 
                     # API Key: enabled when model is selected
-                    self.api_key_input.disabled = not (model and model != Select.BLANK)
+                    self.api_key_input.disabled = not (
+                        model and not isinstance(model, NoSelection)
+                    )
                 except Exception:
                     pass
 
@@ -304,6 +344,15 @@ class SettingsScreen(ModalScreen):
             # Memory Condensation: enabled when API key is provided
             # or when there's an existing API key in the agent
             self.memory_select.disabled = not (api_key or self._has_existing_api_key())
+
+            # Advanced LLM settings (timeout, max_tokens, max_size):
+            # Only enabled in Advanced mode and when API key is provided
+            advanced_settings_enabled = is_advanced_mode and (
+                api_key or self._has_existing_api_key()
+            )
+            self.timeout_input.disabled = not advanced_settings_enabled
+            self.max_tokens_input.disabled = not advanced_settings_enabled
+            self.max_size_input.disabled = not advanced_settings_enabled
 
         except Exception:
             # Silently handle errors during initialization
@@ -382,29 +431,62 @@ class SettingsScreen(ModalScreen):
         model = self.model_select.value
         custom_model = self.custom_model_input.value
         base_url = self.base_url_input.value
+        # Gather timeout input (may be empty string)
+        timeout_input_value = self.timeout_input.value
         form_data = SettingsFormData(
             mode=mode,
-            provider=None if provider_value is Select.BLANK else str(provider_value),
-            model=None if model is Select.BLANK else str(model),
-            custom_model=None if custom_model is Select.BLANK else str(custom_model),
-            base_url=None if base_url is Select.BLANK else str(base_url),
+            provider=(
+                None if isinstance(provider_value, NoSelection) else str(provider_value)
+            ),
+            model=None if isinstance(model, NoSelection) else str(model),
+            custom_model=None if not custom_model else str(custom_model),
+            base_url=None if not base_url else str(base_url),
             api_key_input=self.api_key_input.value,
             memory_condensation_enabled=bool(self.memory_select.value),
+            timeout=timeout_input_value,
+            max_tokens=self.max_tokens_input.value,
+            max_size=self.max_size_input.value,
         )
 
+        # Preserve existing timeout if user entered an invalid value
+        # (validator returned None)
+        if form_data.timeout is None and self.current_agent:
+            form_data.timeout = getattr(self.current_agent.llm, "timeout", None)
         result = save_settings(form_data, self.current_agent)
         if not result.success:
             self._show_message(result.error_message or "Unknown error", is_error=True)
             return
 
-        # Save CLI settings if not in initial setup mode
+        # Save CLI and Critic settings if not in initial setup mode
         if not self.is_initial_setup:
             try:
+                # Get updated fields from each tab
                 cli_settings_tab = self.query_one("#cli_settings_tab", TabPane)
-                cli_settings_component = cli_settings_tab.query_one(CliSettingsTab)
-                cli_settings = cli_settings_component.get_cli_settings()
+                cli_tab = cli_settings_tab.query_one(CliSettingsTab)
 
-                cli_settings.save()
+                critic_settings_tab = self.query_one("#critic_settings_tab", TabPane)
+                critic_tab = critic_settings_tab.query_one(CriticSettingsTab)
+
+                # Load base settings and merge fields from both tabs
+                base_settings = CliSettings.load()
+
+                # Update the nested critic settings
+
+                updated_critic = base_settings.critic.model_copy(
+                    update=critic_tab.get_updated_fields()
+                )
+
+                merged_settings = base_settings.model_copy(
+                    update={
+                        **cli_tab.get_updated_fields(),
+                        "critic": updated_critic,
+                    }
+                )
+
+                merged_settings.save()
+
+                # Update reactive state to refresh UI components
+                self._update_critic_settings(updated_critic)
             except Exception as e:
                 self._show_message(
                     f"Settings saved, but CLI settings failed: {str(e)}", is_error=True
@@ -426,6 +508,19 @@ class SettingsScreen(ModalScreen):
                     f"Error occurred when saving settings: {e}", severity="error"
                 )
         self.dismiss(True)
+
+    def _update_critic_settings(self, critic_settings: CriticSettings) -> None:
+        """Update reactive critic settings in ConversationContainer.
+
+        This triggers automatic UI updates for all components bound to critic_settings.
+        """
+        try:
+            from openhands_cli.tui.core.state import ConversationContainer
+
+            container = self.app.query_one(ConversationContainer)
+            container.set_critic_settings(critic_settings)
+        except Exception:
+            pass  # Container may not exist in all contexts
 
     @staticmethod
     def is_initial_setup_required(env_overrides_enabled: bool = False) -> bool:

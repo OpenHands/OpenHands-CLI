@@ -29,6 +29,7 @@ import time
 import uuid
 from typing import TYPE_CHECKING, Any
 
+from textual.app import ComposeResult
 from textual.containers import Container
 from textual.message import Message
 from textual.reactive import var
@@ -39,6 +40,7 @@ from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
     NeverConfirm,
 )
+from openhands_cli.stores import CriticSettings
 
 
 if TYPE_CHECKING:
@@ -126,9 +128,18 @@ class ConversationContainer(Container):
     loaded_resources: var["LoadedResourcesInfo | None"] = var(None)
     """Loaded skills, hooks, and MCPs for the current conversation."""
 
+    # ---- Critic Settings ----
+    critic_settings: var[CriticSettings] = var(CriticSettings())
+    """Critic settings for iterative refinement. UI components bind to this."""
+
+    # ---- Refinement State ----
+    refinement_iteration: var[int] = var(0)
+    """Current refinement iteration within a user turn. Resets on new user message."""
+
     def __init__(
         self,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
+        initial_critic_settings: CriticSettings | None = None,
         **kwargs,
     ) -> None:
         # Initialize internal state BEFORE calling super().__init__
@@ -142,7 +153,10 @@ class ConversationContainer(Container):
         if initial_confirmation_policy is not None:
             self.confirmation_policy = initial_confirmation_policy
 
-    def compose(self):
+        if initial_critic_settings is not None:
+            self.critic_settings = initial_critic_settings
+
+    def compose(self) -> ComposeResult:
         """Compose UI widgets that bind to reactive state.
 
         ConversationContainer composes all widgets that need to bind to its reactive
@@ -183,6 +197,7 @@ class ConversationContainer(Container):
             yield WorkingStatusLine().data_bind(
                 running=ConversationContainer.running,
                 elapsed_seconds=ConversationContainer.elapsed_seconds,
+                critic_settings=ConversationContainer.critic_settings,
             )
             yield InputField(
                 placeholder="Type your message, @mention a file, or / for commands"
@@ -367,6 +382,19 @@ class ConversationContainer(Container):
         """Set loaded resources (skills, hooks, MCPs). Thread-safe."""
         self._schedule_update("loaded_resources", resources)
 
+    def set_critic_settings(self, settings: CriticSettings) -> None:
+        """Set critic settings for iterative refinement. Thread-safe."""
+        self._schedule_update("critic_settings", settings)
+
+    def set_refinement_iteration(self, iteration: int) -> None:
+        """Set the current refinement iteration. Thread-safe.
+
+        This is managed by RefinementController:
+        - Incremented when refinement is triggered
+        - Reset to 0 when user sends a new message
+        """
+        self._schedule_update("refinement_iteration", iteration)
+
     # ---- Conversation Attachment (for metrics) ----
 
     def attach_conversation_state(
@@ -395,7 +423,7 @@ class ConversationContainer(Container):
         """Reset state for a new conversation.
 
         Resets: running, elapsed_seconds, metrics, conversation_title,
-                pending_action_count, internal state.
+                pending_action_count, refinement_iteration, internal state.
         Preserves: confirmation_policy (persists across conversations),
                    conversation_id (set explicitly when switching).
 
@@ -406,6 +434,7 @@ class ConversationContainer(Container):
         self.metrics = None
         self.conversation_title = None
         self.pending_action_count = 0
+        self.refinement_iteration = 0
         self.switch_confirmation_target = None
         self._conversation_start_time = None
         self._conversation_state = None

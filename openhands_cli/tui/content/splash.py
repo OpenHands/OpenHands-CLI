@@ -93,11 +93,12 @@ def get_splash_content(
     # Add critic notification if enabled
     if has_critic:
         content["critic_notice"] = (
-            f"\n[{primary_color}]Experimental Critic Feature Enabled[/]\n"
-            "[dim]We've detected you're using the OpenHands LLM provider. "
-            "An experimental critic feature is now active (free) to predict task "
-            "success. We will collect usage metrics and your feedback "
-            "for critic improvement. You can disable this in settings.[/dim]"
+            f"\n[{primary_color}]Experimental Feature: "
+            "Critic + Iterative Refinement Mode[/]\n"
+            "[dim]Using OpenHands provider enables a free critic to predict task "
+            "success. Enable Iterative Refinement in settings to auto-prompt the "
+            "agent when work appears incomplete. "
+            "Anonymized data collected. Disable in settings.[/dim]"
         )
 
     return content
