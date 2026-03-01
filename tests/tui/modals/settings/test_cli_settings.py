@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from openhands_cli.stores import CliSettings, CriticSettings
+from openhands_cli.stores.cli_settings import DEFAULT_MARKETPLACE_PATH
 
 
 class TestCriticSettingsValidation:
@@ -202,6 +203,7 @@ class TestCliSettings:
             {
                 "default_cells_expanded": False,
                 "auto_open_plan_panel": False,
+                "marketplace_path": DEFAULT_MARKETPLACE_PATH,
                 "critic": {
                     "enable_critic": False,
                     "enable_iterative_refinement": False,
