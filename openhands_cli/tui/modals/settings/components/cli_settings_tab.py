@@ -127,9 +127,10 @@ class CliSettingsTab(Container):
             yield SettingsInput(
                 label="Marketplace Path",
                 description=(
-                    "Path to the marketplace JSON file in the public skills repository. "
-                    "The marketplace defines which skills are loaded by default. "
-                    "Leave empty to load all skills without marketplace filtering."
+                    "Path to the marketplace JSON file that defines which skills are loaded. "
+                    "Supports formats: 'marketplaces/default.json' (default repo), "
+                    "'owner/repo:path/to/marketplace.json' (custom repo), or leave empty "
+                    "to load all skills without filtering."
                 ),
                 input_id="marketplace_path_input",
                 value=self._initial_settings.marketplace_path or "",
