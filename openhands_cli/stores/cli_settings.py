@@ -7,6 +7,10 @@ from pathlib import Path
 from pydantic import BaseModel, field_validator
 
 
+# Default marketplace path placeholder - shown in UI as a suggestion
+# When marketplace_path is None, all public skills are loaded without filtering
+DEFAULT_MARKETPLACE_PATH = "marketplaces/default.json"
+
 # Refinement triggers when predicted success probability falls below this threshold
 # Default: 0.6 (60%) - agent is prompted to review work when critic scores < 60%
 DEFAULT_CRITIC_THRESHOLD = 0.6
@@ -51,6 +55,8 @@ class CliSettings(BaseModel):
 
     default_cells_expanded: bool = False
     auto_open_plan_panel: bool = True
+    # None = load all public skills, path string = filter to specific marketplace
+    marketplace_path: str | None = None
     critic: CriticSettings = CriticSettings()
 
     @classmethod

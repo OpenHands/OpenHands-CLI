@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 from textual.app import App, ComposeResult
-from textual.widgets import Switch
+from textual.widgets import Input, Switch
 
-from openhands_cli.stores.cli_settings import CliSettings
+from openhands_cli.stores.cli_settings import DEFAULT_MARKETPLACE_PATH, CliSettings
 from openhands_cli.tui.modals.settings.components.cli_settings_tab import (
     CliSettingsTab,
 )
@@ -123,8 +123,59 @@ class TestCliSettingsTab:
             tab = app.query_one(CliSettingsTab)
             result = tab.get_updated_fields()
 
-            # Should only contain the 2 fields this tab manages
+            # Should only contain the 3 fields this tab manages
             assert set(result.keys()) == {
                 "default_cells_expanded",
                 "auto_open_plan_panel",
+                "marketplace_path",
             }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "initial_value",
+        [DEFAULT_MARKETPLACE_PATH, "custom/marketplace.json", None],
+    )
+    async def test_compose_renders_marketplace_path_input(
+        self, initial_value: str | None
+    ):
+        """Verify the marketplace_path input is rendered with correct value."""
+        initial = CliSettings(marketplace_path=initial_value)
+        app = _TestApp(initial_settings=initial)
+
+        async with app.run_test():
+            tab = app.query_one(CliSettingsTab)
+            input_widget = tab.query_one("#marketplace_path_input", Input)
+            # None displays as empty string
+            expected_value = initial_value or ""
+            assert input_widget.value == expected_value
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "initial_value, new_value, expected",
+        [
+            (
+                DEFAULT_MARKETPLACE_PATH,
+                "custom/marketplace.json",
+                "custom/marketplace.json",
+            ),
+            ("custom/marketplace.json", "", None),  # Empty string becomes None
+            (None, DEFAULT_MARKETPLACE_PATH, DEFAULT_MARKETPLACE_PATH),
+        ],
+    )
+    async def test_get_updated_fields_reflects_marketplace_path(
+        self, initial_value: str | None, new_value: str, expected: str | None
+    ):
+        """Verify get_updated_fields() captures marketplace_path input state."""
+        initial = CliSettings(marketplace_path=initial_value)
+        app = _TestApp(initial_settings=initial)
+
+        async with app.run_test():
+            tab = app.query_one(CliSettingsTab)
+            input_widget = tab.query_one("#marketplace_path_input", Input)
+
+            # simulate user change
+            input_widget.value = new_value
+
+            result = tab.get_updated_fields()
+            assert isinstance(result, dict)
+            assert result["marketplace_path"] == expected

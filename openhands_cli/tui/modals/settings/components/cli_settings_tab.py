@@ -4,9 +4,9 @@ from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
-from textual.widgets import Label, Static, Switch
+from textual.widgets import Input, Label, Static, Switch
 
-from openhands_cli.stores.cli_settings import CliSettings
+from openhands_cli.stores.cli_settings import DEFAULT_MARKETPLACE_PATH, CliSettings
 
 
 class SettingsSwitch(Container):
@@ -40,6 +40,46 @@ class SettingsSwitch(Container):
             yield Label(f"{self._label}:", classes="form_label switch_label")
             yield Switch(value=self._value, id=self._switch_id, classes="form_switch")
         yield Static(self._description, classes="form_help switch_help")
+
+
+class SettingsInput(Container):
+    """Reusable text input component for settings forms."""
+
+    def __init__(
+        self,
+        label: str,
+        description: str,
+        input_id: str,
+        value: str = "",
+        placeholder: str = "",
+        **kwargs,
+    ):
+        """Initialize the settings input.
+
+        Args:
+            label: The label text for the input
+            description: Help text describing the setting
+            input_id: Unique ID for the input widget
+            value: Initial value of the input
+            placeholder: Placeholder text for the input
+        """
+        super().__init__(classes="form_group", **kwargs)
+        self._label = label
+        self._description = description
+        self._input_id = input_id
+        self._value = value
+        self._placeholder = placeholder
+
+    def compose(self) -> ComposeResult:
+        """Compose the input with label and description."""
+        yield Label(f"{self._label}:", classes="form_label")
+        yield Input(
+            value=self._value,
+            id=self._input_id,
+            classes="form_input",
+            placeholder=self._placeholder,
+        )
+        yield Static(self._description, classes="form_help")
 
 
 class CliSettingsTab(Container):
@@ -82,12 +122,28 @@ class CliSettingsTab(Container):
                 value=self._initial_settings.auto_open_plan_panel,
             )
 
+            yield Static("Skills Settings", classes="form_section_title")
+
+            yield SettingsInput(
+                label="Marketplace Path",
+                description=(
+                    "Path to the marketplace JSON file that defines which skills "
+                    "are loaded. Supports formats: 'marketplaces/default.json' "
+                    "(default repo), 'owner/repo:path/to/marketplace.json' "
+                    "(custom repo), or leave empty to load all skills."
+                ),
+                input_id="marketplace_path_input",
+                value=self._initial_settings.marketplace_path or "",
+                placeholder=DEFAULT_MARKETPLACE_PATH,
+            )
+
     def get_updated_fields(self) -> dict[str, Any]:
         """Return only the fields this tab manages.
 
         Returns:
-            Dict with 'default_cells_expanded' and 'auto_open_plan_panel' values.
+            Dict with CLI settings values.
         """
+        marketplace_value = self.query_one("#marketplace_path_input", Input).value
         return {
             "default_cells_expanded": self.query_one(
                 "#default_cells_expanded_switch", Switch
@@ -95,4 +151,5 @@ class CliSettingsTab(Container):
             "auto_open_plan_panel": self.query_one(
                 "#auto_open_plan_panel_switch", Switch
             ).value,
+            "marketplace_path": marketplace_value if marketplace_value else None,
         }

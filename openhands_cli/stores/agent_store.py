@@ -386,12 +386,26 @@ class AgentStore:
                 f"User operating system: {get_os_description()}",
             ]
         )
-        return AgentContext(
-            skills=skills,
-            system_message_suffix=system_suffix,
-            load_user_skills=True,
-            load_public_skills=True,
-        )
+
+        # Load CLI settings to get marketplace_path
+        cli_settings = CliSettings.load()
+        marketplace_path = cli_settings.marketplace_path
+
+        # Build AgentContext kwargs - marketplace_path support requires SDK update
+        # See: https://github.com/OpenHands/software-agent-sdk/pull/2253
+        context_kwargs: dict[str, Any] = {
+            "skills": skills,
+            "system_message_suffix": system_suffix,
+            "load_user_skills": True,
+            "load_public_skills": True,
+        }
+
+        # Add marketplace_path if SDK supports it (future compatibility)
+        sdk_has_marketplace = "marketplace_path" in AgentContext.model_fields
+        if marketplace_path is not None and sdk_has_marketplace:
+            context_kwargs["marketplace_path"] = marketplace_path
+
+        return AgentContext(**context_kwargs)
 
     def _maybe_build_condenser(
         self, agent: Agent, *, session_id: str | None

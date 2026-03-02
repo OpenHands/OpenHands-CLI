@@ -202,6 +202,7 @@ class TestCliSettings:
             {
                 "default_cells_expanded": False,
                 "auto_open_plan_panel": False,
+                "marketplace_path": None,  # Default is None = load all skills
                 "critic": {
                     "enable_critic": False,
                     "enable_iterative_refinement": False,
