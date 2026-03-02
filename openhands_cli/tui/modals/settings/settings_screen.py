@@ -22,6 +22,7 @@ from textual.widgets import (
 )
 from textual.widgets._select import NoSelection
 
+from openhands.sdk import LLMSummarizingCondenser
 from openhands_cli.stores import AgentStore, CliSettings, CriticSettings
 from openhands_cli.tui.modals.settings.choices import (
     get_model_options,
@@ -54,6 +55,9 @@ class SettingsScreen(ModalScreen):
     memory_select: getters.query_one[Select] = getters.query_one(
         "#memory_condensation_select"
     )
+    timeout_input: getters.query_one[Input] = getters.query_one("#timeout_input")
+    max_tokens_input: getters.query_one[Input] = getters.query_one("#max_tokens_input")
+    max_size_input: getters.query_one[Input] = getters.query_one("#max_size_input")
     basic_section: getters.query_one[Container] = getters.query_one("#basic_section")
     advanced_section: getters.query_one[Container] = getters.query_one(
         "#advanced_section"
@@ -163,6 +167,9 @@ class SettingsScreen(ModalScreen):
         self.provider_select.clear()
         self.model_select.clear()
         self.memory_select.value = True
+        self.timeout_input.value = ""
+        self.max_tokens_input.value = ""
+        self.max_size_input.value = ""
 
     def _load_current_settings(self) -> None:
         """Load current settings into the form."""
@@ -206,6 +213,29 @@ class SettingsScreen(ModalScreen):
 
         # Memory Condensation
         self.memory_select.value = bool(self.current_agent.condenser)
+
+        # Timeout (seconds) – show existing value if set
+        if llm.timeout is not None:
+            self.timeout_input.value = str(llm.timeout)
+        else:
+            self.timeout_input.value = ""
+
+        # Max tokens (optional) – show existing value if set
+        max_input = getattr(llm, "max_input_tokens", None)
+        if max_input is not None:
+            self.max_tokens_input.value = str(max_input)
+        else:
+            self.max_tokens_input.value = ""
+
+        # Condenser max size (optional) – show existing value if set
+        if (
+            self.current_agent
+            and self.current_agent.condenser
+            and isinstance(self.current_agent.condenser, LLMSummarizingCondenser)
+        ):
+            self.max_size_input.value = str(self.current_agent.condenser.max_size)
+        else:
+            self.max_size_input.value = ""
 
         # Update field dependencies after loading all values
         self._update_field_dependencies()
@@ -315,6 +345,15 @@ class SettingsScreen(ModalScreen):
             # or when there's an existing API key in the agent
             self.memory_select.disabled = not (api_key or self._has_existing_api_key())
 
+            # Advanced LLM settings (timeout, max_tokens, max_size):
+            # Only enabled in Advanced mode and when API key is provided
+            advanced_settings_enabled = is_advanced_mode and (
+                api_key or self._has_existing_api_key()
+            )
+            self.timeout_input.disabled = not advanced_settings_enabled
+            self.max_tokens_input.disabled = not advanced_settings_enabled
+            self.max_size_input.disabled = not advanced_settings_enabled
+
         except Exception:
             # Silently handle errors during initialization
             pass
@@ -392,6 +431,8 @@ class SettingsScreen(ModalScreen):
         model = self.model_select.value
         custom_model = self.custom_model_input.value
         base_url = self.base_url_input.value
+        # Gather timeout input (may be empty string)
+        timeout_input_value = self.timeout_input.value
         form_data = SettingsFormData(
             mode=mode,
             provider=(
@@ -402,8 +443,15 @@ class SettingsScreen(ModalScreen):
             base_url=None if not base_url else str(base_url),
             api_key_input=self.api_key_input.value,
             memory_condensation_enabled=bool(self.memory_select.value),
+            timeout=timeout_input_value,
+            max_tokens=self.max_tokens_input.value,
+            max_size=self.max_size_input.value,
         )
 
+        # Preserve existing timeout if user entered an invalid value
+        # (validator returned None)
+        if form_data.timeout is None and self.current_agent:
+            form_data.timeout = getattr(self.current_agent.llm, "timeout", None)
         result = save_settings(form_data, self.current_agent)
         if not result.success:
             self._show_message(result.error_message or "Unknown error", is_error=True)

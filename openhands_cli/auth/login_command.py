@@ -9,7 +9,7 @@ from openhands_cli.auth.device_flow import (
     authenticate_with_device_flow,
 )
 from openhands_cli.auth.token_storage import TokenStorage
-from openhands_cli.auth.utils import _p, is_token_valid
+from openhands_cli.auth.utils import console_print, is_token_valid
 from openhands_cli.theme import OPENHANDS_THEME
 
 
@@ -23,11 +23,11 @@ async def _fetch_user_data_with_context(
 
     # Initial context output
     if already_logged_in:
-        _p(
+        console_print(
             f"[{OPENHANDS_THEME.warning}]You are already logged in to "
             f"OpenHands Cloud.[/{OPENHANDS_THEME.warning}]"
         )
-        _p(
+        console_print(
             f"[{OPENHANDS_THEME.secondary}]Pulling latest settings from remote..."
             f"[/{OPENHANDS_THEME.secondary}]"
         )
@@ -40,7 +40,7 @@ async def _fetch_user_data_with_context(
         await fetch_user_data_after_oauth(server_url, api_key)
 
         # --- SUCCESS MESSAGES ---
-        _p(
+        console_print(
             f"\n[{OPENHANDS_THEME.success}]✓ Settings synchronized "
             f"successfully![/{OPENHANDS_THEME.success}]"
         )
@@ -49,11 +49,11 @@ async def _fetch_user_data_with_context(
         # --- FAILURE MESSAGES ---
         safe_error = html.escape(str(e))
 
-        _p(
+        console_print(
             f"\n[{OPENHANDS_THEME.warning}]Warning: "
             f"Could not fetch user data: {safe_error}[/{OPENHANDS_THEME.warning}]"
         )
-        _p(
+        console_print(
             f"[{OPENHANDS_THEME.secondary}]Please try: [bold]"
             f"{html.escape('openhands logout && openhands login')}"
             f"[/bold][/{OPENHANDS_THEME.secondary}]"
@@ -76,14 +76,14 @@ async def login_command(server_url: str, skip_settings_sync: bool = False) -> bo
     existing_api_key = token_storage.get_api_key()
 
     if existing_api_key and not await is_token_valid(server_url, existing_api_key):
-        _p(
+        console_print(
             f"[{OPENHANDS_THEME.warning}]Token is invalid or expired. "
             f"Logging out...[/{OPENHANDS_THEME.warning}]"
         )
         logout_command(server_url)
 
     # Proceed with normal login flow
-    _p(
+    console_print(
         f"[{OPENHANDS_THEME.accent}]Logging in to OpenHands Cloud..."
         f"[/{OPENHANDS_THEME.accent}]"
     )
@@ -105,7 +105,7 @@ async def login_command(server_url: str, skip_settings_sync: bool = False) -> bo
     try:
         token_response = await authenticate_with_device_flow(server_url)
     except DeviceFlowError as e:
-        _p(
+        console_print(
             f"[{OPENHANDS_THEME.error}]Authentication failed: "
             f"{e}[/{OPENHANDS_THEME.error}]"
         )
@@ -116,11 +116,11 @@ async def login_command(server_url: str, skip_settings_sync: bool = False) -> bo
     # Store the API key securely
     token_storage.store_api_key(api_key)
 
-    _p(
+    console_print(
         f"[{OPENHANDS_THEME.success}]✓ Logged "
         f"into OpenHands Cloud[/{OPENHANDS_THEME.success}]"
     )
-    _p(
+    console_print(
         f"[{OPENHANDS_THEME.secondary}]Your authentication "
         f"tokens have been stored securely.[/{OPENHANDS_THEME.secondary}]"
     )
@@ -147,7 +147,7 @@ def run_login_command(server_url: str) -> bool:
     try:
         return asyncio.run(login_command(server_url))
     except KeyboardInterrupt:
-        _p(
+        console_print(
             f"\n[{OPENHANDS_THEME.warning}]Login cancelled by "
             f"user.[/{OPENHANDS_THEME.warning}]"
         )
