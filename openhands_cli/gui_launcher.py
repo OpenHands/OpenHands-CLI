@@ -106,23 +106,13 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
 
     # Get the current version for the Docker image
     version = get_openhands_version()
-    runtime_image = f"docker.openhands.dev/openhands/runtime:{version}-nikolaik"
     app_image = f"docker.openhands.dev/openhands/openhands:{version}"
 
-    print_formatted_text(HTML("<grey>Pulling required Docker images...</grey>"))
+    # Note: We intentionally do NOT set AGENT_SERVER_IMAGE_REPOSITORY/TAG env vars.
+    # The OpenHands app image has a built-in default agent-server image that is
+    # tested and compatible with that specific app version. Setting these env vars
+    # could cause version mismatches between the app and agent server.
 
-    # Pull the runtime image first
-    pull_cmd = ["docker", "pull", runtime_image]
-    print_formatted_text(HTML(_format_docker_command_for_logging(pull_cmd)))
-    try:
-        subprocess.run(pull_cmd, check=True)
-    except subprocess.CalledProcessError:
-        print_formatted_text(
-            HTML("<ansired>❌ Failed to pull runtime image.</ansired>")
-        )
-        sys.exit(1)
-
-    print_formatted_text("")
     print_formatted_text(
         HTML("<ansigreen>✅ Starting OpenHands GUI server...</ansigreen>")
     )
@@ -139,8 +129,6 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
         "-it",
         "--rm",
         "--pull=always",
-        "-e",
-        f"SANDBOX_RUNTIME_CONTAINER_IMAGE={runtime_image}",
         "-e",
         "LOG_ALL_EVENTS=true",
         "-v",
