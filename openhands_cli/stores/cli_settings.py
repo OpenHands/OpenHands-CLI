@@ -7,7 +7,8 @@ from pathlib import Path
 from pydantic import BaseModel, field_validator
 
 
-# Default marketplace path for loading public skills
+# Default marketplace path placeholder - shown in UI as a suggestion
+# When marketplace_path is None, all public skills are loaded without filtering
 DEFAULT_MARKETPLACE_PATH = "marketplaces/default.json"
 
 # Refinement triggers when predicted success probability falls below this threshold
@@ -54,7 +55,8 @@ class CliSettings(BaseModel):
 
     default_cells_expanded: bool = False
     auto_open_plan_panel: bool = True
-    marketplace_path: str | None = DEFAULT_MARKETPLACE_PATH
+    # None = load all public skills, path string = filter to specific marketplace
+    marketplace_path: str | None = None
     critic: CriticSettings = CriticSettings()
 
     @classmethod
