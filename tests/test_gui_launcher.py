@@ -116,24 +116,16 @@ class TestLaunchGuiServer:
         assert exc_info.value.code == 1
 
     @pytest.mark.parametrize(
-        "pull_side_effect,run_side_effect,expected_exit_code,mount_cwd,gpu",
+        "run_side_effect,expected_exit_code,mount_cwd,gpu",
         [
-            # Docker pull failure
-            (subprocess.CalledProcessError(1, "docker pull"), None, 1, False, False),
             # Docker run failure
-            (
-                MagicMock(returncode=0),
-                subprocess.CalledProcessError(1, "docker run"),
-                1,
-                False,
-                False,
-            ),
+            (subprocess.CalledProcessError(1, "docker run"), 1, False, False),
             # KeyboardInterrupt during run
-            (MagicMock(returncode=0), KeyboardInterrupt(), 0, False, False),
+            (KeyboardInterrupt(), 0, False, False),
             # Success with mount_cwd
-            (MagicMock(returncode=0), MagicMock(returncode=0), None, True, False),
+            (MagicMock(returncode=0), None, True, False),
             # Success with GPU
-            (MagicMock(returncode=0), MagicMock(returncode=0), None, False, True),
+            (MagicMock(returncode=0), None, False, True),
         ],
     )
     @patch("openhands_cli.gui_launcher.check_docker_requirements")
@@ -152,7 +144,6 @@ class TestLaunchGuiServer:
         mock_version,
         mock_config_dir,
         mock_check_docker,
-        pull_side_effect,
         run_side_effect,
         expected_exit_code,
         mount_cwd,
@@ -166,21 +157,11 @@ class TestLaunchGuiServer:
         mock_check_output.return_value = "1000\n"
         mock_cwd.return_value = Path("/current/dir")
 
-        # Configure subprocess.run side effects
-        side_effects = []
-        if pull_side_effect is not None:
-            if isinstance(pull_side_effect, Exception):
-                side_effects.append(pull_side_effect)
-            else:
-                side_effects.append(pull_side_effect)
-
-        if run_side_effect is not None:
-            if isinstance(run_side_effect, Exception):
-                side_effects.append(run_side_effect)
-            else:
-                side_effects.append(run_side_effect)
-
-        mock_run.side_effect = side_effects
+        # Configure subprocess.run side effect for the docker run command
+        if isinstance(run_side_effect, BaseException):
+            mock_run.side_effect = run_side_effect
+        else:
+            mock_run.return_value = run_side_effect
 
         # Test the function
         if expected_exit_code is not None:
@@ -191,22 +172,15 @@ class TestLaunchGuiServer:
             # Should not raise SystemExit for successful cases
             launch_gui_server(mount_cwd=mount_cwd, gpu=gpu)
 
-            # Verify subprocess.run was called correctly
-            assert mock_run.call_count == 2  # Pull and run commands
-
-            # Check pull command
-            pull_call = mock_run.call_args_list[0]
-            pull_cmd = pull_call[0][0]
-            assert pull_cmd[0:3] == [
-                "docker",
-                "pull",
-                "docker.openhands.dev/openhands/runtime:latest-nikolaik",
-            ]
+            # Verify subprocess.run was called once (only docker run, no separate pull)
+            assert mock_run.call_count == 1
 
             # Check run command
-            run_call = mock_run.call_args_list[1]
+            run_call = mock_run.call_args_list[0]
             run_cmd = run_call[0][0]
             assert run_cmd[0:2] == ["docker", "run"]
+            # Verify --pull=always is in the command
+            assert "--pull=always" in run_cmd
 
             if mount_cwd:
                 assert "SANDBOX_VOLUMES=/current/dir:/workspace:rw" in " ".join(run_cmd)
