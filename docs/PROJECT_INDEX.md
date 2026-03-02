@@ -1,4 +1,4 @@
-# Project Index: OpenHands CLI (IronHands-CLI)
+# Project Index: OpenHands CLI
 
 Generated: 2026-03-02 | Version: 1.13.0 | Python 3.12
 
