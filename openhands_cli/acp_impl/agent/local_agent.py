@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -65,15 +66,48 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
         return "local"
 
     async def _is_authenticated(self) -> bool:
-        """Check if agent settings already exist for is_authenticated status.
+        """Check if agent settings exist or AWS credentials are configured.
 
-        For local agent, authentication is considered complete if agent specs exist.
+        For local agent, authentication is considered complete if:
+        1. Agent specs exist (agent_settings.json), OR
+        2. AWS credentials are available (for Bedrock users without agent_settings.json)
         """
         try:
             load_agent_specs()
             return True
         except MissingAgentSpec:
-            return False
+            # No agent_settings.json - check if user has AWS credentials for Bedrock
+            return self._has_aws_credentials()
+
+    def _has_aws_credentials(self) -> bool:
+        """Check if AWS credentials are available for Bedrock authentication.
+
+        This detects users who intend to use AWS Bedrock but haven't yet created
+        an agent_settings.json file. We check for:
+        1. AWS environment variables (explicit credentials or profile)
+        2. AWS credentials/config files (~/.aws/)
+
+        Note: This does NOT validate that credentials are correct - it only
+        detects intent to use AWS-based authentication.
+        """
+        # Check AWS environment variables
+        aws_env_vars = [
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+            "AWS_PROFILE",
+            "AWS_DEFAULT_PROFILE",
+        ]
+        if any(os.environ.get(var) for var in aws_env_vars):
+            logger.debug("AWS credentials detected via environment variables")
+            return True
+
+        # Check for AWS credentials/config files
+        aws_dir = Path.home() / ".aws"
+        if (aws_dir / "credentials").exists() or (aws_dir / "config").exists():
+            logger.debug("AWS credentials detected via ~/.aws/ files")
+            return True
+
+        return False
 
     def _cleanup_session(self, session_id: str) -> None:
         """Clean up resources for a session (no-op for local agent)."""
