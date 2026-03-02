@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from textual.app import App, ComposeResult
-from textual.widgets import Switch
+from textual.widgets import Checkbox
 
 from openhands_cli.stores.cli_settings import CliSettings
 from openhands_cli.tui.modals.settings.components.cli_settings_tab import (
@@ -45,7 +45,7 @@ class TestCliSettingsTab:
 
         async with app.run_test():
             tab = app.query_one(CliSettingsTab)
-            switch = tab.query_one("#default_cells_expanded_switch", Switch)
+            switch = tab.query_one("#default_cells_expanded_switch", Checkbox)
             assert switch.value is initial_value
 
     @pytest.mark.asyncio
@@ -64,7 +64,7 @@ class TestCliSettingsTab:
 
         async with app.run_test():
             tab = app.query_one(CliSettingsTab)
-            switch = tab.query_one("#default_cells_expanded_switch", Switch)
+            switch = tab.query_one("#default_cells_expanded_switch", Checkbox)
 
             # simulate user change
             switch.value = new_value
@@ -84,7 +84,7 @@ class TestCliSettingsTab:
 
         async with app.run_test():
             tab = app.query_one(CliSettingsTab)
-            switch = tab.query_one("#auto_open_plan_panel_switch", Switch)
+            switch = tab.query_one("#auto_open_plan_panel_switch", Checkbox)
             assert switch.value is initial_value
 
     @pytest.mark.asyncio
@@ -104,7 +104,7 @@ class TestCliSettingsTab:
 
         async with app.run_test():
             tab = app.query_one(CliSettingsTab)
-            switch = tab.query_one("#auto_open_plan_panel_switch", Switch)
+            switch = tab.query_one("#auto_open_plan_panel_switch", Checkbox)
 
             # simulate user change
             switch.value = new_value

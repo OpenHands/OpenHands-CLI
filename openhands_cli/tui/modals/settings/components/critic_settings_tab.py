@@ -5,7 +5,7 @@ from typing import Any
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.css.query import NoMatches
-from textual.widgets import Input, Label, Static, Switch
+from textual.widgets import Checkbox, Input, Label, Static
 
 from openhands_cli.stores.cli_settings import (
     DEFAULT_CRITIC_THRESHOLD,
@@ -201,9 +201,9 @@ class CriticSettingsTab(Container):
                 disabled=not enable_refinement,
             )
 
-    def on_switch_changed(self, event: Switch.Changed) -> None:
-        """Handle switch changes to enable/disable threshold inputs."""
-        if event.switch.id == "enable_iterative_refinement_switch":
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        """Handle checkbox changes to enable/disable threshold inputs."""
+        if event.checkbox.id == "enable_iterative_refinement_switch":
             try:
                 threshold_input = self.query_one("#critic_threshold_input", Input)
                 threshold_input.disabled = not event.value
@@ -234,9 +234,9 @@ class CriticSettingsTab(Container):
             Dict with 'enable_critic', 'enable_iterative_refinement',
             'critic_threshold', and 'issue_threshold' values.
         """
-        enable_critic_switch = self.query_one("#enable_critic_switch", Switch)
+        enable_critic_switch = self.query_one("#enable_critic_switch", Checkbox)
         enable_refinement_switch = self.query_one(
-            "#enable_iterative_refinement_switch", Switch
+            "#enable_iterative_refinement_switch", Checkbox
         )
         threshold_input = self.query_one("#critic_threshold_input", Input)
         issue_threshold_input = self.query_one("#issue_threshold_input", Input)

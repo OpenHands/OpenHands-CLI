@@ -45,17 +45,6 @@ SettingsScreen {
     overflow-y: auto;
 }
 
-.switch_container {
-    height: auto;
-    align: left middle;
-    margin-bottom: 1;
-}
-
-.switch_label {
-    width: auto;
-    margin-right: 2;
-}
-
 .form_switch {
     width: auto;
     height: auto;
@@ -152,7 +141,7 @@ VerticalScroll > .scrollbar--vertical:hover {
 
 .form_help {
     color: $secondary;
-    text-style: italic;
+    text-style: not bold italic;
     margin-bottom: 1;
     padding: 0 1;
     height: auto;
