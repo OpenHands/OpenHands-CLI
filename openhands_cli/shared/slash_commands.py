@@ -1,4 +1,4 @@
-"""Shared slash command parsing utilities.
+"""Slash command parsing utilities.
 
 This module provides common slash command parsing functionality
 that can be used by both ACP and TUI implementations.
