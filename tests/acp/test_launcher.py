@@ -1,6 +1,8 @@
 """Tests for the ACP server launcher."""
 
 import asyncio
+import tempfile
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -19,6 +21,13 @@ def mock_acp_dependencies():
         mock_stdio_streams.return_value = (AsyncMock(), AsyncMock())
         mock_event.return_value.wait = AsyncMock(side_effect=asyncio.CancelledError)
         yield {"connection": mock_conn}
+
+
+@pytest.fixture
+def temp_debug_dir():
+    """Create a temporary directory for debug logs."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield Path(tmpdir)
 
 
 @pytest.mark.asyncio
@@ -131,3 +140,77 @@ async def test_run_acp_server_cloud_agent_params(
         assert kwargs["cloud_api_url"] == api_url
         assert kwargs["initial_confirmation_mode"] == confirmation_mode
         assert kwargs["resume_conversation_id"] == resume_id
+
+
+@pytest.mark.asyncio
+async def test_run_acp_server_debug_disabled_by_default(mock_acp_dependencies):
+    """Test that debug logging is disabled by default (no observers)."""
+    from openhands_cli.acp_impl.agent.launcher import run_acp_server
+
+    with patch("openhands_cli.acp_impl.agent.local_agent.LocalOpenHandsACPAgent"):
+        try:
+            await run_acp_server(cloud=False)
+        except asyncio.CancelledError:
+            pass
+
+        mock_conn = mock_acp_dependencies["connection"]
+        assert mock_conn.called
+        # Check that observers is empty (no debug logger)
+        call_kwargs = mock_conn.call_args[1]
+        assert call_kwargs.get("observers") == []
+
+
+@pytest.mark.asyncio
+async def test_run_acp_server_debug_enabled_creates_observer(
+    mock_acp_dependencies, temp_debug_dir
+):
+    """Test that debug=True creates a DebugLogger observer."""
+    from openhands_cli.acp_impl.agent.launcher import run_acp_server
+
+    with (
+        patch("openhands_cli.acp_impl.agent.local_agent.LocalOpenHandsACPAgent"),
+        patch(
+            "openhands_cli.acp_impl.debug_logger.get_persistence_dir",
+            return_value=str(temp_debug_dir),
+        ),
+    ):
+        try:
+            await run_acp_server(cloud=False, debug=True)
+        except asyncio.CancelledError:
+            pass
+
+        mock_conn = mock_acp_dependencies["connection"]
+        assert mock_conn.called
+        call_kwargs = mock_conn.call_args[1]
+        assert "observers" in call_kwargs
+        assert len(call_kwargs["observers"]) == 1
+
+        # Verify the observer is a DebugLogger instance
+        from openhands_cli.acp_impl.debug_logger import DebugLogger
+
+        assert isinstance(call_kwargs["observers"][0], DebugLogger)
+
+
+@pytest.mark.asyncio
+async def test_run_acp_server_debug_enabled_cloud_mode(
+    mock_acp_dependencies, temp_debug_dir
+):
+    """Test that debug=True works with cloud mode."""
+    from openhands_cli.acp_impl.agent.launcher import run_acp_server
+
+    with (
+        patch("openhands_cli.acp_impl.agent.launcher.OpenHandsCloudACPAgent"),
+        patch(
+            "openhands_cli.acp_impl.debug_logger.get_persistence_dir",
+            return_value=str(temp_debug_dir),
+        ),
+    ):
+        try:
+            await run_acp_server(cloud=True, debug=True)
+        except asyncio.CancelledError:
+            pass
+
+        mock_conn = mock_acp_dependencies["connection"]
+        call_kwargs = mock_conn.call_args[1]
+        assert "observers" in call_kwargs
+        assert len(call_kwargs["observers"]) == 1
