@@ -3,6 +3,7 @@
 import base64
 import io
 import mimetypes
+from functools import lru_cache
 from pathlib import Path
 from uuid import uuid4
 
@@ -35,16 +36,14 @@ RESOURCE_SKILL = Skill(
     trigger=None,
 )
 
-_ACP_CACHE_DIR: Path | None = None
 
 
+@lru_cache(maxsize=1)
 def get_acp_cache_dir() -> Path:
     """Get the ACP cache directory, creating it lazily if needed."""
-    global _ACP_CACHE_DIR
-    if _ACP_CACHE_DIR is None:
-        _ACP_CACHE_DIR = Path.home() / ".openhands" / "cache" / "acp"
-        _ACP_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    return _ACP_CACHE_DIR
+    cache_dir = Path.home() / ".openhands" / "cache" / "acp"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
 
 
 # LLM API supported image MIME types (Anthropic/Claude compatible)
