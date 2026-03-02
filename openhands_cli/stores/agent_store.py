@@ -386,13 +386,11 @@ class AgentStore:
                 f"User operating system: {get_os_description()}",
             ]
         )
-        cli_settings = CliSettings.load()
         return AgentContext(
             skills=skills,
             system_message_suffix=system_suffix,
             load_user_skills=True,
             load_public_skills=True,
-            marketplace_path=cli_settings.marketplace_path,
         )
 
     def _maybe_build_condenser(

@@ -6,7 +6,7 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Input, Switch
 
-from openhands_cli.stores.cli_settings import CliSettings, DEFAULT_MARKETPLACE_PATH
+from openhands_cli.stores.cli_settings import DEFAULT_MARKETPLACE_PATH, CliSettings
 from openhands_cli.tui.modals.settings.components.cli_settings_tab import (
     CliSettingsTab,
 )
@@ -135,7 +135,9 @@ class TestCliSettingsTab:
         "initial_value",
         [DEFAULT_MARKETPLACE_PATH, "custom/marketplace.json", None],
     )
-    async def test_compose_renders_marketplace_path_input(self, initial_value: str | None):
+    async def test_compose_renders_marketplace_path_input(
+        self, initial_value: str | None
+    ):
         """Verify the marketplace_path input is rendered with correct value."""
         initial = CliSettings(marketplace_path=initial_value)
         app = _TestApp(initial_settings=initial)
@@ -151,7 +153,11 @@ class TestCliSettingsTab:
     @pytest.mark.parametrize(
         "initial_value, new_value, expected",
         [
-            (DEFAULT_MARKETPLACE_PATH, "custom/marketplace.json", "custom/marketplace.json"),
+            (
+                DEFAULT_MARKETPLACE_PATH,
+                "custom/marketplace.json",
+                "custom/marketplace.json",
+            ),
             ("custom/marketplace.json", "", None),  # Empty string becomes None
             (None, DEFAULT_MARKETPLACE_PATH, DEFAULT_MARKETPLACE_PATH),
         ],

@@ -6,7 +6,7 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.widgets import Input, Label, Static, Switch
 
-from openhands_cli.stores.cli_settings import CliSettings, DEFAULT_MARKETPLACE_PATH
+from openhands_cli.stores.cli_settings import DEFAULT_MARKETPLACE_PATH, CliSettings
 
 
 class SettingsSwitch(Container):
@@ -127,10 +127,10 @@ class CliSettingsTab(Container):
             yield SettingsInput(
                 label="Marketplace Path",
                 description=(
-                    "Path to the marketplace JSON file that defines which skills are loaded. "
-                    "Supports formats: 'marketplaces/default.json' (default repo), "
-                    "'owner/repo:path/to/marketplace.json' (custom repo), or leave empty "
-                    "to load all skills without filtering."
+                    "Path to the marketplace JSON file that defines which skills "
+                    "are loaded. Supports formats: 'marketplaces/default.json' "
+                    "(default repo), 'owner/repo:path/to/marketplace.json' "
+                    "(custom repo), or leave empty to load all skills."
                 ),
                 input_id="marketplace_path_input",
                 value=self._initial_settings.marketplace_path or "",
