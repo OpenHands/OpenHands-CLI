@@ -47,7 +47,7 @@ class DeviceTokenErrorResponse(BaseModel):
 class DeviceFlowClient(BaseHttpClient):
     """OAuth 2.0 Device Flow client for CLI authentication."""
 
-    def __init__(self, server_url: str):
+    def __init__(self, server_url: str) -> None:
         """Initialize the device flow client.
 
         Args:
