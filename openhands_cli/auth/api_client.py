@@ -34,7 +34,7 @@ def get_settings_path() -> str:
 class OpenHandsApiClient(BaseHttpClient):
     """Client for making authenticated API calls to OpenHands server."""
 
-    def __init__(self, server_url: str, api_key: str):
+    def __init__(self, server_url: str, api_key: str) -> None:
         super().__init__(server_url)
         self.api_key = api_key
         self._headers = {
