@@ -6,7 +6,7 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.widgets import Input, Label, Static, Switch
 
-from openhands_cli.stores.cli_settings import DEFAULT_MARKETPLACE_PATH, CliSettings
+from openhands_cli.stores.cli_settings import MARKETPLACE_PATH_PLACEHOLDER, CliSettings
 
 
 class SettingsSwitch(Container):
@@ -134,7 +134,7 @@ class CliSettingsTab(Container):
                 ),
                 input_id="marketplace_path_input",
                 value=self._initial_settings.marketplace_path or "",
-                placeholder=DEFAULT_MARKETPLACE_PATH,
+                placeholder=MARKETPLACE_PATH_PLACEHOLDER,
             )
 
     def get_updated_fields(self) -> dict[str, Any]:

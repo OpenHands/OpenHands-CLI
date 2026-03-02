@@ -6,7 +6,7 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Input, Switch
 
-from openhands_cli.stores.cli_settings import DEFAULT_MARKETPLACE_PATH, CliSettings
+from openhands_cli.stores.cli_settings import MARKETPLACE_PATH_PLACEHOLDER, CliSettings
 from openhands_cli.tui.modals.settings.components.cli_settings_tab import (
     CliSettingsTab,
 )
@@ -133,7 +133,7 @@ class TestCliSettingsTab:
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "initial_value",
-        [DEFAULT_MARKETPLACE_PATH, "custom/marketplace.json", None],
+        [MARKETPLACE_PATH_PLACEHOLDER, "custom/marketplace.json", None],
     )
     async def test_compose_renders_marketplace_path_input(
         self, initial_value: str | None
@@ -154,12 +154,12 @@ class TestCliSettingsTab:
         "initial_value, new_value, expected",
         [
             (
-                DEFAULT_MARKETPLACE_PATH,
+                MARKETPLACE_PATH_PLACEHOLDER,
                 "custom/marketplace.json",
                 "custom/marketplace.json",
             ),
             ("custom/marketplace.json", "", None),  # Empty string becomes None
-            (None, DEFAULT_MARKETPLACE_PATH, DEFAULT_MARKETPLACE_PATH),
+            (None, MARKETPLACE_PATH_PLACEHOLDER, MARKETPLACE_PATH_PLACEHOLDER),
         ],
     )
     async def test_get_updated_fields_reflects_marketplace_path(
