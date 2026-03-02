@@ -3,17 +3,22 @@
 These tests capture the user experience for first-time users who have
 not yet configured their agent settings.
 
-Test 1: First-time user cancels settings, then exits
-  - Phase 1: User is shown settings page
-  - Phase 2: User cancels and is shown the exit page
+Test 1: First-time user sees welcome modal, then exits
+  - Phase 1: User is shown welcome modal with LLM settings and Cloud login options
+  - Phase 2: User presses escape to cancel and is shown the exit page
   - Phase 3: User presses the exit button and quits the app
 
-Test 2: First-time user cancels settings, cancels exit, fills form, saves
-  - Phase 1: User is shown the settings page
-  - Phase 2: User cancels and is shown the exit page
-  - Phase 3: User cancels on the exit screen and is returned to settings page
-  - Phase 4: User fills out the settings form
-  - Phase 5: User saves and is shown the landing screen
+Test 2: First-time user chooses LLM settings flow
+  - Phase 1: User is shown the welcome modal
+  - Phase 2: User clicks "Enter your LLM settings" and sees settings form
+  - Phase 3: User fills out the settings form
+  - Phase 4: User saves and is shown the landing screen
+
+Test 3: First-time user cancels LLM settings, then returns to welcome modal
+  - Phase 1: User sees welcome modal
+  - Phase 2: User clicks LLM settings, sees settings form
+  - Phase 3: User cancels settings, sees exit modal
+  - Phase 4: User cancels exit, returns to welcome modal
 """
 
 from typing import TYPE_CHECKING
@@ -42,20 +47,20 @@ def _create_first_time_user_app(conversation_id):
 # =============================================================================
 
 
-async def _wait_for_settings_page(pilot: "Pilot") -> None:
-    """Wait for app to initialize and show settings screen."""
+async def _wait_for_welcome_modal(pilot: "Pilot") -> None:
+    """Wait for app to initialize and show welcome modal."""
     await wait_for_app_ready(pilot)
 
 
-async def _cancel_settings(pilot: "Pilot") -> None:
-    """Press Escape to cancel settings and show exit modal."""
+async def _cancel_welcome_modal(pilot: "Pilot") -> None:
+    """Press Escape to cancel welcome modal and show exit modal."""
     await wait_for_app_ready(pilot)
     await pilot.press("escape")
     await wait_for_app_ready(pilot)
 
 
-async def _confirm_exit(pilot: "Pilot") -> None:
-    """Click 'Yes, proceed' to confirm exit."""
+async def _confirm_exit_from_welcome(pilot: "Pilot") -> None:
+    """Cancel welcome modal, then click 'Yes, proceed' to confirm exit."""
     await wait_for_app_ready(pilot)
     await pilot.press("escape")
     await wait_for_app_ready(pilot)
@@ -63,19 +68,17 @@ async def _confirm_exit(pilot: "Pilot") -> None:
     await wait_for_app_ready(pilot)
 
 
-async def _cancel_exit_return_to_settings(pilot: "Pilot") -> None:
-    """Cancel settings, then cancel exit to return to settings."""
+async def _click_llm_settings(pilot: "Pilot") -> None:
+    """Click 'Enter your LLM settings' button on welcome modal."""
     await wait_for_app_ready(pilot)
-    await pilot.press("escape")
-    await wait_for_app_ready(pilot)
-    await pilot.click("#no")
+    await pilot.click("#llm_settings_button")
     await wait_for_app_ready(pilot)
 
 
-async def _fill_settings_form(pilot: "Pilot") -> None:
-    """Cancel settings, cancel exit, return to settings, then fill out the form."""
-    # First return to settings
-    await _cancel_exit_return_to_settings(pilot)
+async def _fill_settings_form_from_welcome(pilot: "Pilot") -> None:
+    """Click LLM settings, then fill out the form."""
+    # First click LLM settings button
+    await _click_llm_settings(pilot)
 
     # Select provider (openai)
     await pilot.click("#provider_select")
@@ -103,94 +106,154 @@ async def _fill_settings_form(pilot: "Pilot") -> None:
     await wait_for_app_ready(pilot)
 
 
-async def _fill_and_save_settings(pilot: "Pilot") -> None:
+async def _fill_and_save_settings_from_welcome(pilot: "Pilot") -> None:
     """Fill out settings form and save."""
-    await _fill_settings_form(pilot)
+    await _fill_settings_form_from_welcome(pilot)
 
     # Click save button
     await pilot.click("#save_button")
     await wait_for_app_ready(pilot)
 
 
+async def _cancel_settings_from_llm_flow(pilot: "Pilot") -> None:
+    """Click LLM settings, then press Escape to cancel."""
+    await _click_llm_settings(pilot)
+    await pilot.press("escape")
+    await wait_for_app_ready(pilot)
+
+
+async def _cancel_settings_then_return_to_welcome(pilot: "Pilot") -> None:
+    """Click LLM settings, cancel, then cancel exit to return to welcome."""
+    await _cancel_settings_from_llm_flow(pilot)
+    await pilot.click("#no")
+    await wait_for_app_ready(pilot)
+
+
 # =============================================================================
-# Test 1: First-time user cancels settings, then exits
+# Test 1: First-time user sees welcome modal, then exits
 # =============================================================================
 
 
-class TestInitialSetupCancelThenExit:
-    """Test 1: First-time user cancels settings, then exits.
+class TestInitialSetupWelcomeModalThenExit:
+    """Test 1: First-time user sees welcome modal, then exits.
 
     Flow:
     1. User is a first time user (no agent configured yet)
-    2. User is shown settings page
+    2. User is shown welcome modal with setup options
     3. User cancels and is shown the exit page
     4. User presses the exit button and quits the app
     """
 
-    def test_phase1_settings_page(self, snap_compare, first_time_user_setup):
-        """Phase 1: First-time user sees the settings page."""
+    def test_phase1_welcome_modal(self, snap_compare, first_time_user_setup):
+        """Phase 1: First-time user sees the welcome modal."""
         app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
         assert snap_compare(
-            app, terminal_size=(120, 40), run_before=_wait_for_settings_page
+            app, terminal_size=(120, 40), run_before=_wait_for_welcome_modal
         )
 
     def test_phase2_exit_page(self, snap_compare, first_time_user_setup):
         """Phase 2: User cancels and is shown the exit page."""
         app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
-        assert snap_compare(app, terminal_size=(120, 40), run_before=_cancel_settings)
+        assert snap_compare(
+            app, terminal_size=(120, 40), run_before=_cancel_welcome_modal
+        )
 
     def test_phase3_exit_confirmed(self, snap_compare, first_time_user_setup):
         """Phase 3: User presses the exit button and quits the app."""
         app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
-        assert snap_compare(app, terminal_size=(120, 40), run_before=_confirm_exit)
+        assert snap_compare(
+            app, terminal_size=(120, 40), run_before=_confirm_exit_from_welcome
+        )
 
 
 # =============================================================================
-# Test 2: First-time user cancels settings, cancels exit, returns to settings
+# Test 2: First-time user chooses LLM settings flow
 # =============================================================================
 
 
-class TestInitialSetupCancelThenReturn:
-    """Test 2: First-time user cancels settings, cancels exit, fills form, saves.
+class TestInitialSetupLLMSettingsFlow:
+    """Test 2: First-time user chooses LLM settings flow.
 
     Flow:
     1. User is a first time user (no agent configured yet)
-    2. User is shown the settings page
-    3. User cancels and is shown the exit page
-    4. User cancels on the exit screen and is returned to the settings page
-    5. User fills out the settings form
-    6. User saves and is shown the landing screen
+    2. User is shown the welcome modal
+    3. User clicks "Enter your LLM settings" and sees settings form
+    4. User fills out the settings form
+    5. User saves and is shown the landing screen
     """
 
-    def test_phase1_settings_page(self, snap_compare, first_time_user_setup):
-        """Phase 1: First-time user sees the settings page."""
+    def test_phase1_welcome_modal(self, snap_compare, first_time_user_setup):
+        """Phase 1: First-time user sees the welcome modal."""
         app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
         assert snap_compare(
-            app, terminal_size=(120, 40), run_before=_wait_for_settings_page
+            app, terminal_size=(120, 40), run_before=_wait_for_welcome_modal
         )
 
-    def test_phase2_exit_page(self, snap_compare, first_time_user_setup):
-        """Phase 2: User cancels and is shown the exit page."""
-        app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
-        assert snap_compare(app, terminal_size=(120, 40), run_before=_cancel_settings)
-
-    def test_phase3_returned_to_settings(self, snap_compare, first_time_user_setup):
-        """Phase 3: User cancels on exit screen and is returned to settings."""
+    def test_phase2_settings_page(self, snap_compare, first_time_user_setup):
+        """Phase 2: User clicks LLM settings and sees settings form."""
         app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
         assert snap_compare(
-            app, terminal_size=(120, 40), run_before=_cancel_exit_return_to_settings
+            app, terminal_size=(120, 40), run_before=_click_llm_settings
         )
 
-    def test_phase4_form_filled(self, snap_compare, first_time_user_setup):
-        """Phase 4: User fills out the settings form."""
+    def test_phase3_form_filled(self, snap_compare, first_time_user_setup):
+        """Phase 3: User fills out the settings form."""
         app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
         assert snap_compare(
-            app, terminal_size=(120, 40), run_before=_fill_settings_form
+            app, terminal_size=(120, 40), run_before=_fill_settings_form_from_welcome
         )
 
-    def test_phase5_landing_screen(self, snap_compare, first_time_user_setup):
-        """Phase 5: User saves settings and sees the landing screen."""
+    def test_phase4_landing_screen(self, snap_compare, first_time_user_setup):
+        """Phase 4: User saves settings and sees the landing screen."""
         app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
         assert snap_compare(
-            app, terminal_size=(120, 40), run_before=_fill_and_save_settings
+            app,
+            terminal_size=(120, 40),
+            run_before=_fill_and_save_settings_from_welcome,
+        )
+
+
+# =============================================================================
+# Test 3: First-time user cancels LLM settings, then returns to welcome modal
+# =============================================================================
+
+
+class TestInitialSetupCancelSettingsThenReturn:
+    """Test 3: First-time user cancels LLM settings, then returns to welcome modal.
+
+    Flow:
+    1. User sees welcome modal
+    2. User clicks LLM settings, sees settings form
+    3. User cancels settings, sees exit modal
+    4. User cancels exit, returns to welcome modal
+    """
+
+    def test_phase1_welcome_modal(self, snap_compare, first_time_user_setup):
+        """Phase 1: First-time user sees the welcome modal."""
+        app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
+        assert snap_compare(
+            app, terminal_size=(120, 40), run_before=_wait_for_welcome_modal
+        )
+
+    def test_phase2_settings_page(self, snap_compare, first_time_user_setup):
+        """Phase 2: User clicks LLM settings and sees settings form."""
+        app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
+        assert snap_compare(
+            app, terminal_size=(120, 40), run_before=_click_llm_settings
+        )
+
+    def test_phase3_exit_modal(self, snap_compare, first_time_user_setup):
+        """Phase 3: User cancels settings and sees exit modal."""
+        app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
+        assert snap_compare(
+            app, terminal_size=(120, 40), run_before=_cancel_settings_from_llm_flow
+        )
+
+    def test_phase4_back_to_welcome(self, snap_compare, first_time_user_setup):
+        """Phase 4: User cancels exit and returns to welcome modal."""
+        app = _create_first_time_user_app(first_time_user_setup["conversation_id"])
+        assert snap_compare(
+            app,
+            terminal_size=(120, 40),
+            run_before=_cancel_settings_then_return_to_welcome,
         )

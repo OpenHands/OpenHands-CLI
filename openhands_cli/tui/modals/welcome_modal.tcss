@@ -1,0 +1,72 @@
+WelcomeModal {
+    align: center middle;
+    background: rgba(0, 0, 0, 0.8);
+}
+
+#welcome_container {
+    padding: 2 4;
+    width: 60;
+    height: auto;
+    min-width: 50;
+    border: dashed $primary 80%;
+    background: $surface 90%;
+}
+
+#welcome_title {
+    width: 100%;
+    height: auto;
+    content-align: center middle;
+    text-align: center;
+    text-style: bold;
+    color: $primary;
+    padding: 1 0;
+}
+
+#title_rule {
+    margin: 0 0 1 0;
+    color: $primary 50%;
+}
+
+#welcome_buttons {
+    width: 100%;
+    height: auto;
+    align: center middle;
+    padding: 1 2;
+}
+
+#llm_settings_button {
+    width: 100%;
+    height: 3;
+    margin: 1 0;
+    text-style: bold;
+}
+
+#or_label {
+    width: 100%;
+    height: auto;
+    content-align: center middle;
+    text-align: center;
+    color: $foreground 70%;
+    margin: 1 0;
+}
+
+#cloud_login_button {
+    width: 100%;
+    height: 3;
+    margin: 1 0;
+    border: dashed $primary;
+    color: $primary;
+}
+
+#cloud_login_button:hover {
+    background: $primary 20%;
+}
+
+#settings_hint {
+    width: 100%;
+    height: auto;
+    content-align: center middle;
+    text-align: center;
+    color: $foreground 50%;
+    margin: 2 0 1 0;
+}
