@@ -67,6 +67,12 @@ class PauseConversation(Message):
     pass
 
 
+class InterruptConversation(Message):
+    """Request to interrupt the current running conversation immediately."""
+
+    pass
+
+
 class CondenseConversation(Message):
     """Request to condense the current conversation history."""
 
@@ -254,6 +260,18 @@ class ConversationManager(Container):
             return
 
         await runner.pause()
+
+    @on(InterruptConversation)
+    def _on_interrupt_conversation(self, event: InterruptConversation) -> None:
+        """Handle request to interrupt the current conversation immediately."""
+        event.stop()
+
+        runner = self._runners.current
+        if runner is None:
+            self.notify("No running conversation to interrupt", severity="error")
+            return
+
+        runner.interrupt()
 
     @on(CondenseConversation)
     async def _on_condense_conversation(self, event: CondenseConversation) -> None:
