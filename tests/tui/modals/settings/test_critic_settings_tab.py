@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from textual.app import App, ComposeResult
-from textual.widgets import Input, Switch
+from textual.widgets import Checkbox, Input
 
 from openhands_cli.stores.cli_settings import (
     DEFAULT_CRITIC_THRESHOLD,
@@ -54,7 +54,7 @@ class TestCriticSettingsTab:
 
         async with app.run_test():
             tab = app.query_one(CriticSettingsTab)
-            switch = tab.query_one("#enable_critic_switch", Switch)
+            switch = tab.query_one("#enable_critic_switch", Checkbox)
             assert switch.value is initial_value
 
     @pytest.mark.asyncio
@@ -66,7 +66,7 @@ class TestCriticSettingsTab:
 
         async with app.run_test():
             tab = app.query_one(CriticSettingsTab)
-            switch = tab.query_one("#enable_iterative_refinement_switch", Switch)
+            switch = tab.query_one("#enable_iterative_refinement_switch", Checkbox)
             assert switch.value is initial_value
 
     @pytest.mark.asyncio
@@ -104,7 +104,7 @@ class TestCriticSettingsTab:
         async with app.run_test() as pilot:
             tab = app.query_one(CriticSettingsTab)
             refinement_switch = tab.query_one(
-                "#enable_iterative_refinement_switch", Switch
+                "#enable_iterative_refinement_switch", Checkbox
             )
             critic_input = tab.query_one("#critic_threshold_input", Input)
             issue_input = tab.query_one("#issue_threshold_input", Input)
@@ -130,7 +130,7 @@ class TestCriticSettingsTab:
         async with app.run_test() as pilot:
             tab = app.query_one(CriticSettingsTab)
             refinement_switch = tab.query_one(
-                "#enable_iterative_refinement_switch", Switch
+                "#enable_iterative_refinement_switch", Checkbox
             )
             critic_input = tab.query_one("#critic_threshold_input", Input)
             issue_input = tab.query_one("#issue_threshold_input", Input)
@@ -177,9 +177,9 @@ class TestCriticSettingsTab:
 
         async with app.run_test():
             tab = app.query_one(CriticSettingsTab)
-            critic_switch = tab.query_one("#enable_critic_switch", Switch)
+            critic_switch = tab.query_one("#enable_critic_switch", Checkbox)
             refinement_switch = tab.query_one(
-                "#enable_iterative_refinement_switch", Switch
+                "#enable_iterative_refinement_switch", Checkbox
             )
 
             # Change switch values

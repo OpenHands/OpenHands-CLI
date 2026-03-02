@@ -3,10 +3,53 @@
 from typing import Any
 
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, VerticalScroll
-from textual.widgets import Label, Static, Switch
+from textual.containers import Container, VerticalScroll
+from textual.content import Content
+from textual.widgets import Checkbox, Static
 
 from openhands_cli.stores.cli_settings import CliSettings
+
+
+class RoundCheckbox(Checkbox):
+    """A round checkbox showing a circle when off and a yellow checkmark when on."""
+
+    DEFAULT_CSS = """
+    RoundCheckbox {
+        border: none;
+        padding: 0;
+        background: transparent;
+        width: auto;
+        height: auto;
+
+        & > .toggle--button {
+            color: $foreground 40%;
+            background: transparent;
+        }
+
+        &.-on > .toggle--button {
+            color: $success;
+            background: transparent;
+        }
+
+        &:focus {
+            border: none;
+            background-tint: initial;
+        }
+
+        &:focus > .toggle--label {
+            color: $block-cursor-foreground;
+            background: $block-cursor-background;
+            text-style: $block-cursor-text-style;
+        }
+    }
+    """
+
+    @property
+    def _button(self) -> Content:
+        button_style = self.get_visual_style("toggle--button")
+        if self.value:
+            return Content.assemble(("\u2714", button_style))
+        return Content.assemble(("\u25cb", button_style))
 
 
 class SettingsSwitch(Container):
@@ -36,9 +79,9 @@ class SettingsSwitch(Container):
 
     def compose(self) -> ComposeResult:
         """Compose the switch with label and description."""
-        with Horizontal(classes="switch_container"):
-            yield Label(f"{self._label}:", classes="form_label switch_label")
-            yield Switch(value=self._value, id=self._switch_id, classes="form_switch")
+        yield RoundCheckbox(
+            self._label, value=self._value, id=self._switch_id, classes="form_switch"
+        )
         yield Static(self._description, classes="form_help switch_help")
 
 
@@ -90,9 +133,9 @@ class CliSettingsTab(Container):
         """
         return {
             "default_cells_expanded": self.query_one(
-                "#default_cells_expanded_switch", Switch
+                "#default_cells_expanded_switch", Checkbox
             ).value,
             "auto_open_plan_panel": self.query_one(
-                "#auto_open_plan_panel_switch", Switch
+                "#auto_open_plan_panel_switch", Checkbox
             ).value,
         }
