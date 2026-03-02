@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from openhands.sdk import LLM, Agent, AgentContext
 from openhands_cli.stores import AgentStore, CliSettings
 
