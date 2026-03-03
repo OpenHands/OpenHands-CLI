@@ -10,6 +10,7 @@ import sys
 import uuid as uuid_module
 from collections.abc import Generator
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -147,6 +148,9 @@ FIXED_PYTHON_PATH = "/openhands/micromamba/envs/openhands/bin/python"
 # Fixed OS description for deterministic snapshots
 # (kernel version varies between environments)
 FIXED_OS_DESCRIPTION = "Linux (kernel 6.0.0-test)"
+
+# Fixed datetime for deterministic event timestamps
+FIXED_DATETIME = datetime(2026, 3, 3, 12, 0, 0)
 
 
 class DeterministicUUIDGenerator:
@@ -297,6 +301,41 @@ def patch_deterministic_paths(monkeypatch: pytest.MonkeyPatch) -> None:
         )
     except (ImportError, AttributeError):
         pass  # If the module doesn't exist, skip patching
+
+    # Patch datetime.now() to return a fixed timestamp for deterministic event
+    # timestamps. This ensures that event timestamps in snapshots are consistent
+    # across test runs. We need to patch it in multiple modules that import datetime
+    class MockDateTime:
+        """Mock datetime class that returns a fixed time for now()."""
+
+        @staticmethod
+        def now(*args, **kwargs):
+            return FIXED_DATETIME
+
+        @staticmethod
+        def fromisoformat(date_string: str):
+            return datetime.fromisoformat(date_string)
+
+        def __call__(self, *args, **kwargs):
+            return datetime(*args, **kwargs)
+
+    # Patch in SDK event module
+    try:
+        import openhands.sdk.event.base
+
+        monkeypatch.setattr(openhands.sdk.event.base, "datetime", MockDateTime)
+    except ImportError:
+        pass
+
+    # Patch in visualizer module
+    try:
+        import openhands_cli.tui.widgets.richlog_visualizer
+
+        monkeypatch.setattr(
+            openhands_cli.tui.widgets.richlog_visualizer, "datetime", MockDateTime
+        )
+    except ImportError:
+        pass
 
 
 def cleanup_work_dir() -> None:

@@ -5,6 +5,7 @@ This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 
 import re
 import threading
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from rich.text import Text
@@ -48,6 +49,23 @@ ELLIPSIS = "..."
 
 # Default agent name - don't show prefix for this agent
 DEFAULT_AGENT_NAME = "OpenHands Agent"
+
+
+def _format_timestamp(timestamp_str: str) -> str:
+    """Format an ISO timestamp string to hh:mm:ss format.
+
+    Args:
+        timestamp_str: ISO format timestamp string
+
+    Returns:
+        Time in hh:mm:ss format
+    """
+    try:
+        dt = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+        return dt.strftime("%H:%M:%S")
+    except (ValueError, AttributeError):
+        # Fallback to current time if parsing fails
+        return datetime.now().strftime("%H:%M:%S")
 
 
 if TYPE_CHECKING:
@@ -360,17 +378,24 @@ class ConversationVisualizer(ConversationVisualizerBase):
         for widget in self._container.query(CriticFeedbackWidget):
             widget.remove()
 
-    def _render_message_widget(self, content: str) -> None:
+    def _render_message_widget(
+        self, content: str, timestamp: str | None = None
+    ) -> None:
         """Render a message widget to the UI (shared logic).
 
         Args:
             content: The message text to display.
+            timestamp: Optional ISO format timestamp to display.
         """
         from textual.widgets import Static
 
-        user_message_widget = Static(
-            f"> {content}", classes="user-message", markup=False
-        )
+        if timestamp:
+            formatted_time = _format_timestamp(timestamp)
+            message_text = f"[{formatted_time}] > {content}"
+        else:
+            message_text = f"> {content}"
+
+        user_message_widget = Static(message_text, classes="user-message", markup=False)
         self._run_on_main_thread(self._add_widget_to_ui, user_message_widget)
 
     def render_user_message(self, content: str) -> None:
@@ -389,7 +414,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
             content: The user's message text to display.
         """
         self._dismiss_pending_feedback_widgets()
-        self._render_message_widget(content)
+        # Generate timestamp for user message
+        timestamp = datetime.now().isoformat()
+        self._render_message_widget(content, timestamp)
 
     def render_refinement_message(self, content: str) -> None:
         """Render a system-generated refinement message to the UI.
@@ -402,7 +429,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
             content: The refinement message text to display.
         """
         self._dismiss_pending_feedback_widgets()
-        self._render_message_widget(content)
+        # Generate timestamp for refinement message
+        timestamp = datetime.now().isoformat()
+        self._render_message_widget(content, timestamp)
 
     def _update_widget_in_ui(
         self, collapsible: Collapsible, new_title: str, new_content: str
@@ -716,6 +745,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Check if this is a plain text event (finish, think, or message)
         if isinstance(event, ActionEvent):
             action = event.action
+            # Format timestamp for action events
+            formatted_time = _format_timestamp(event.timestamp)
+            timestamp_prefix = f"**[{formatted_time}]** "
+
             if isinstance(action, FinishAction):
                 # For finish action, render as markdown with padding to align
                 # User message has "padding: 0 1" and starts with "> ", so text
@@ -724,13 +757,16 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 message = str(action.message)
                 if self._is_non_default_agent():
                     agent_name = self._get_formatted_agent_name()
-                    message = f"**{agent_name}:**\n\n{message}"
+                    message = f"{timestamp_prefix}**{agent_name}:**\n\n{message}"
+                else:
+                    message = f"{timestamp_prefix}{message}"
                 widget = Markdown(message)
                 widget.styles.padding = AGENT_MESSAGE_PADDING
                 return widget
             elif isinstance(action, ThinkAction):
                 # For think action, render as markdown with padding
-                widget = Markdown(str(action.visualize))
+                think_content = f"{timestamp_prefix}{str(action.visualize)}"
+                widget = Markdown(think_content)
                 widget.styles.padding = AGENT_MESSAGE_PADDING
                 return widget
 
@@ -744,6 +780,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if event.llm_message.role == "user" and not event.sender:
                 return None
 
+            # Format timestamp for all agent messages
+            formatted_time = _format_timestamp(event.timestamp)
+            timestamp_prefix = f"**[{formatted_time}]** "
+
             # Case 1: Delegation message (both sender and name are set)
             # Format with arrow notation showing sender → receiver
             # Only show prefix if this is NOT the default main agent
@@ -754,10 +794,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
                 if event.llm_message.role == "user":
                     # Message from another agent (via delegation)
-                    prefix = f"**{event_sender} → {agent_name}:**\n\n"
+                    prefix = f"{timestamp_prefix}**{event_sender} → {agent_name}:**\n\n"
                 else:
                     # Agent message - derive recipient from sender context
-                    prefix = f"**{agent_name} → {event_sender}:**\n\n"
+                    prefix = f"{timestamp_prefix}**{agent_name} → {event_sender}:**\n\n"
 
                 message_content = prefix + message_content
                 widget = Markdown(message_content)
@@ -768,7 +808,8 @@ class ConversationVisualizer(ConversationVisualizerBase):
             # This is the normal case for agent responses in the main conversation
             # Fixes GitHub issue #399: Agent MessageEvents were being silently dropped
             if self._name and event.llm_message.role == "assistant":
-                widget = Markdown(str(content))
+                message_content = f"{timestamp_prefix}{str(content)}"
+                widget = Markdown(message_content)
                 widget.styles.padding = AGENT_MESSAGE_PADDING
                 return widget
 
