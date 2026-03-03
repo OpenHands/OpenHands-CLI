@@ -168,13 +168,9 @@ def show_plugins(scroll_view: VerticalScroll) -> None:
         f"  [{secondary}]Uninstall:[/{secondary}] "
         "openhands plugin uninstall plugin-name"
     )
+    lines.append(f"  [{secondary}]List:[/{secondary}] openhands plugin list")
     lines.append(
-        f"  [{secondary}]List:[/{secondary}] "
-        "openhands plugin list"
-    )
-    lines.append(
-        f"  [{secondary}]Update:[/{secondary}] "
-        "openhands plugin update plugin-name"
+        f"  [{secondary}]Update:[/{secondary}] openhands plugin update plugin-name"
     )
     lines.append("")
     lines.append("[dim]Supported sources:[/dim]")
