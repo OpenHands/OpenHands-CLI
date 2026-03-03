@@ -29,7 +29,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 9
+        assert len(COMMANDS) == 10
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -48,6 +48,7 @@ class TestCommands:
             ("/confirm", "Configure confirmation settings"),
             ("/condense", "Condense conversation history"),
             ("/skills", "View loaded skills, hooks, and MCPs"),
+            ("/plugin", "Manage installed plugins"),
             ("/feedback", "Send anonymous feedback about CLI"),
             ("/exit", "Exit the application"),
         ],
@@ -187,7 +188,8 @@ class TestCommands:
         assert "/new" in command_names
         assert "/settings" in command_names
         assert "/skills" in command_names
-        assert len(COMMANDS) == 9
+        assert "/plugin" in command_names
+        assert len(COMMANDS) == 10
 
     def test_all_commands_included_in_help(self):
         """Test that all commands from COMMANDS list are included in help text.

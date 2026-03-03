@@ -77,8 +77,8 @@ class TestPluginParser:
 class TestPluginCommands:
     """Tests for plugin command handlers."""
 
-    @patch("openhands.sdk.plugin.list_installed_plugins")
-    @patch("openhands.sdk.plugin.get_installed_plugins_dir")
+    @patch("openhands_cli.plugin.installed.list_installed_plugins")
+    @patch("openhands_cli.plugin.installed.get_installed_plugins_dir")
     def test_handle_list_empty(self, mock_get_dir, mock_list, capsys):
         """Test listing plugins when none are installed."""
         from openhands_cli.plugin.commands import handle_plugin_command
@@ -92,11 +92,11 @@ class TestPluginCommands:
         captured = capsys.readouterr()
         assert "No plugins installed" in captured.out
 
-    @patch("openhands.sdk.plugin.list_installed_plugins")
-    @patch("openhands.sdk.plugin.get_installed_plugins_dir")
+    @patch("openhands_cli.plugin.installed.list_installed_plugins")
+    @patch("openhands_cli.plugin.installed.get_installed_plugins_dir")
     def test_handle_list_json(self, mock_get_dir, mock_list, capsys):
         """Test listing plugins with JSON output."""
-        from openhands.sdk.plugin import InstalledPluginInfo
+        from openhands_cli.plugin.installed import InstalledPluginInfo
         from openhands_cli.plugin.commands import handle_plugin_command
 
         mock_info = InstalledPluginInfo(
@@ -119,10 +119,10 @@ class TestPluginCommands:
         assert len(output["plugins"]) == 1
         assert output["plugins"][0]["name"] == "test-plugin"
 
-    @patch("openhands.sdk.plugin.install_plugin")
+    @patch("openhands_cli.plugin.installed.install_plugin")
     def test_handle_install_success(self, mock_install, capsys):
         """Test successful plugin installation."""
-        from openhands.sdk.plugin import InstalledPluginInfo
+        from openhands_cli.plugin.installed import InstalledPluginInfo
         from openhands_cli.plugin.commands import handle_plugin_command
 
         mock_info = InstalledPluginInfo(
@@ -149,7 +149,7 @@ class TestPluginCommands:
         assert "Successfully installed" in captured.out
         assert "new-plugin" in captured.out
 
-    @patch("openhands.sdk.plugin.install_plugin")
+    @patch("openhands_cli.plugin.installed.install_plugin")
     def test_handle_install_already_exists(self, mock_install, capsys):
         """Test installation when plugin already exists."""
         from openhands_cli.plugin.commands import handle_plugin_command
@@ -171,7 +171,7 @@ class TestPluginCommands:
         captured = capsys.readouterr()
         assert "already installed" in captured.out or "Use --force" in captured.out
 
-    @patch("openhands.sdk.plugin.uninstall_plugin")
+    @patch("openhands_cli.plugin.installed.uninstall_plugin")
     def test_handle_uninstall_success(self, mock_uninstall, capsys):
         """Test successful plugin uninstallation."""
         from openhands_cli.plugin.commands import handle_plugin_command
@@ -185,7 +185,7 @@ class TestPluginCommands:
         assert "Successfully uninstalled" in captured.out
         assert "old-plugin" in captured.out
 
-    @patch("openhands.sdk.plugin.uninstall_plugin")
+    @patch("openhands_cli.plugin.installed.uninstall_plugin")
     def test_handle_uninstall_not_found(self, mock_uninstall, capsys):
         """Test uninstalling a plugin that doesn't exist."""
         from openhands_cli.plugin.commands import handle_plugin_command
@@ -201,10 +201,10 @@ class TestPluginCommands:
         captured = capsys.readouterr()
         assert "not installed" in captured.out
 
-    @patch("openhands.sdk.plugin.update_plugin")
+    @patch("openhands_cli.plugin.installed.update_plugin")
     def test_handle_update_success(self, mock_update, capsys):
         """Test successful plugin update."""
-        from openhands.sdk.plugin import InstalledPluginInfo
+        from openhands_cli.plugin.installed import InstalledPluginInfo
         from openhands_cli.plugin.commands import handle_plugin_command
 
         mock_info = InstalledPluginInfo(
@@ -225,7 +225,7 @@ class TestPluginCommands:
         assert "Successfully updated" in captured.out
         assert "my-plugin" in captured.out
 
-    @patch("openhands.sdk.plugin.update_plugin")
+    @patch("openhands_cli.plugin.installed.update_plugin")
     def test_handle_update_not_found(self, mock_update, capsys):
         """Test updating a plugin that doesn't exist."""
         from openhands_cli.plugin.commands import handle_plugin_command

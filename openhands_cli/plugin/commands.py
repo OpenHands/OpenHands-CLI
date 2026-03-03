@@ -48,7 +48,7 @@ def handle_plugin_command(args: Namespace) -> None:
 
 def _handle_list(args: Namespace) -> None:
     """Handle 'plugin list' command."""
-    from openhands.sdk.plugin import (
+    from openhands_cli.plugin.installed import (
         get_installed_plugins_dir,
         list_installed_plugins,
     )
@@ -74,9 +74,8 @@ def _handle_list(args: Namespace) -> None:
             )
             return
 
-        console.print(
-            f"\n[bold {OPENHANDS_THEME.primary}]Installed Plugins[/bold {OPENHANDS_THEME.primary}]"
-        )
+        primary = OPENHANDS_THEME.primary
+        console.print(f"\n[bold {primary}]Installed Plugins[/bold {primary}]")
         console.print(f"[dim]Location: {plugins_dir}[/dim]\n")
 
         table = Table(show_header=True, header_style=OPENHANDS_THEME.primary)
@@ -105,7 +104,7 @@ def _handle_list(args: Namespace) -> None:
 
 def _handle_install(args: Namespace) -> None:
     """Handle 'plugin install' command."""
-    from openhands.sdk.plugin import PluginFetchError, install_plugin
+    from openhands_cli.plugin.installed import PluginFetchError, install_plugin
 
     source = args.source
     ref = args.ref
@@ -153,7 +152,7 @@ def _handle_install(args: Namespace) -> None:
 
 def _handle_uninstall(args: Namespace) -> None:
     """Handle 'plugin uninstall' command."""
-    from openhands.sdk.plugin import uninstall_plugin
+    from openhands_cli.plugin.installed import uninstall_plugin
 
     name = args.name
 
@@ -184,7 +183,7 @@ def _handle_uninstall(args: Namespace) -> None:
 
 def _handle_update(args: Namespace) -> None:
     """Handle 'plugin update' command."""
-    from openhands.sdk.plugin import PluginFetchError, update_plugin
+    from openhands_cli.plugin.installed import PluginFetchError, update_plugin
 
     name = args.name
 
@@ -211,7 +210,8 @@ def _handle_update(args: Namespace) -> None:
             console.print(f"  New ref: {info.resolved_ref[:8]}", style="dim")
 
     except PluginFetchError as e:
-        console.print(f"\nFailed to fetch plugin update: {e}", style=OPENHANDS_THEME.error)
+        err_style = OPENHANDS_THEME.error
+        console.print(f"\nFailed to fetch plugin update: {e}", style=err_style)
         sys.exit(1)
     except Exception as e:
         console.print(f"\nError updating plugin: {e}", style=OPENHANDS_THEME.error)
