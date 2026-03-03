@@ -15,7 +15,7 @@ console = Console()
 class ConversationViewer:
     """Class for viewing conversation trajectories."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the conversation viewer."""
         self.store = LocalFileStore()
 

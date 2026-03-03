@@ -215,7 +215,7 @@ def create_seeded_instructions_from_args(args: Namespace) -> list[str] | None:
 
 
 def extract_text_from_message_content(
-    message_content: list[TextContent | ImageContent], has_exactly_one=True
+    message_content: list[TextContent | ImageContent], has_exactly_one: bool = True
 ) -> str | None:
     """Extract text from message content for slash command detection.
 

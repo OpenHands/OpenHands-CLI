@@ -24,7 +24,7 @@ class AuthHttpError(Exception):
 class BaseHttpClient:
     """Base HTTP client with common functionality for authentication services."""
 
-    def __init__(self, server_url: str, timeout: float = 30.0):
+    def __init__(self, server_url: str, timeout: float = 30.0) -> None:
         """Initialize the HTTP client.
 
         Args:
