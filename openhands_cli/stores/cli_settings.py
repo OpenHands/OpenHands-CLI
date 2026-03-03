@@ -8,7 +8,7 @@ from pydantic import BaseModel, field_validator
 
 
 # Placeholder text shown in UI for marketplace path input
-# When marketplace_path is None (default), all public skills are loaded without filtering
+# When marketplace_path is None, all public skills load without filtering
 MARKETPLACE_PATH_PLACEHOLDER = "marketplaces/default.json"
 
 # Refinement triggers when predicted success probability falls below this threshold
