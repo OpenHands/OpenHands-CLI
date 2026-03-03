@@ -154,6 +154,7 @@ def test_update_text_uses_work_dir_and_metrics(monkeypatch):
 
     widget.work_dir_display = "~/my-dir"
     widget.metrics = None  # No metrics yet
+    widget.confirmation_policy = None  # No policy set
 
     update_mock = MagicMock()
     monkeypatch.setattr(widget, "update", update_mock)
@@ -163,8 +164,10 @@ def test_update_text_uses_work_dir_and_metrics(monkeypatch):
     # Check that update was called with the right structure
     update_mock.assert_called_once()
     call_arg = update_mock.call_args[0][0]
-    # Should contain left part (mode indicator and work dir)
-    assert "\\[Ctrl+L for multi-line • Ctrl+X for custom editor] • ~/my-dir" in call_arg
+    # Should contain left part (mode indicator, confirmation mode, and work dir)
+    assert "\\[Ctrl+L for multi-line • Ctrl+X for custom editor]" in call_arg
+    assert "Confirm: Ask" in call_arg
+    assert "~/my-dir" in call_arg
     # Should contain grey markup around metrics
     assert "[grey50]" in call_arg
     assert "[/grey50]" in call_arg
@@ -178,6 +181,7 @@ def test_update_text_shows_all_metrics(monkeypatch):
     widget = InfoStatusLine()
 
     widget.work_dir_display = "~/my-dir"
+    widget.confirmation_policy = None  # No policy set
     # Create metrics: 5.22M input, 42.01K output, 77% cache, 50K ctx, 128K win
     widget.metrics = create_mock_metrics(
         prompt_tokens=5220000,
@@ -196,8 +200,10 @@ def test_update_text_shows_all_metrics(monkeypatch):
     # Check that update was called with the right structure
     update_mock.assert_called_once()
     call_arg = update_mock.call_args[0][0]
-    # Should contain left part
-    assert "\\[Ctrl+L for multi-line • Ctrl+X for custom editor] • ~/my-dir" in call_arg
+    # Should contain left part components
+    assert "\\[Ctrl+L for multi-line • Ctrl+X for custom editor]" in call_arg
+    assert "Confirm: Ask" in call_arg
+    assert "~/my-dir" in call_arg
     # Should contain grey markup
     assert "[grey50]" in call_arg
     assert "[/grey50]" in call_arg

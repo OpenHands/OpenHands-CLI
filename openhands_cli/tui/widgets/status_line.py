@@ -7,6 +7,7 @@ from textual.timer import Timer
 from textual.widgets import Static
 
 from openhands.sdk.llm.utils.metrics import Metrics
+from openhands.sdk.security.confirmation_policy import ConfirmationPolicyBase
 from openhands_cli.locations import get_work_dir
 from openhands_cli.stores import CriticSettings
 from openhands_cli.utils import abbreviate_number, format_cost
@@ -135,6 +136,8 @@ class InfoStatusLine(Static):
     running: var[bool] = var(False)
     # Metrics object from conversation stats (bound from ConversationContainer)
     metrics: var[Metrics | None] = var(None)
+    # Confirmation policy (bound from ConversationContainer)
+    confirmation_policy: var[ConfirmationPolicyBase | None] = var(None)
 
     # Local UI state - updated via Signal subscription to InputField
     is_multiline_mode: var[bool] = var(False)
@@ -175,6 +178,10 @@ class InfoStatusLine(Static):
         """React to metrics changes from ConversationContainer."""
         self._update_text()
 
+    def watch_confirmation_policy(self, _value: ConfirmationPolicyBase | None) -> None:
+        """React to confirmation policy changes from ConversationContainer."""
+        self._update_text()
+
     # ----- Internal helpers -----
 
     @property
@@ -183,6 +190,30 @@ class InfoStatusLine(Static):
         if self.is_multiline_mode:
             return "\\[Multi-line: Ctrl+J to submit • Ctrl+X for custom editor]"
         return "\\[Ctrl+L for multi-line • Ctrl+X for custom editor]"
+
+    def _get_confirmation_mode_display(self) -> str:
+        """Get the confirmation mode display text.
+
+        Returns:
+            Short display text for current confirmation policy
+        """
+        from openhands.sdk.security.confirmation_policy import (
+            AlwaysConfirm,
+            ConfirmRisky,
+            NeverConfirm,
+        )
+
+        if self.confirmation_policy is None:
+            return "Confirm: Ask"
+
+        if isinstance(self.confirmation_policy, NeverConfirm):
+            return "Confirm: [green]Auto-approve[/green]"
+        elif isinstance(self.confirmation_policy, ConfirmRisky):
+            return "Confirm: [yellow]LLM-approve[/yellow]"
+        elif isinstance(self.confirmation_policy, AlwaysConfirm):
+            return "Confirm: Ask"
+        else:
+            return "Confirm: Custom"
 
     def _get_work_dir_display(self) -> str:
         """Get the work directory display string with tilde-shortening."""
@@ -241,7 +272,10 @@ class InfoStatusLine(Static):
 
     def _update_text(self) -> None:
         """Rebuild the info status text with metrics right-aligned in grey."""
-        left_part = f"{self.mode_indicator} • {self.work_dir_display}"
+        confirmation_mode = self._get_confirmation_mode_display()
+        left_part = (
+            f"{self.mode_indicator} • {confirmation_mode} • {self.work_dir_display}"
+        )
         metrics_display = self._format_metrics_display()
 
         # Calculate available width for spacing (account for padding of 2 chars)
@@ -251,7 +285,10 @@ class InfoStatusLine(Static):
             total_width = 80  # Fallback width
 
         # Calculate spacing needed to right-align metrics
-        left_len = len(left_part)
+        # Strip rich markup when calculating lengths
+        import re
+
+        left_len = len(re.sub(r"\[/?[^\]]*\]", "", left_part))
         right_len = len(metrics_display)
         spacing = max(1, total_width - left_len - right_len)
 

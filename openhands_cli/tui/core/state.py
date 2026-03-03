@@ -208,6 +208,7 @@ class ConversationContainer(Container):
             yield InfoStatusLine().data_bind(
                 running=ConversationContainer.running,
                 metrics=ConversationContainer.metrics,
+                confirmation_policy=ConversationContainer.confirmation_policy,
             )
 
     @property
