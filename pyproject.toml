@@ -23,7 +23,7 @@ dependencies = [
   "rich<14.3.0",
   "textual>=8.0.0,<9.0.0",
   "typer>=0.17.4",
-  "agent-client-protocol>=0.7.0,<0.8.0",
+  "agent-client-protocol>=0.8.1",
   "pydantic>=2.7",
   "textual-autocomplete>=4.0.6",
   "pyperclip>=1.9.0",
@@ -143,5 +143,5 @@ typeCheckingMode = "standard"
 # USE EXACT COMMIT FROM AGENT-SDK (PR #2031 - Add installed plugins management utilities)
 
 [tool.uv.sources]
-openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "c4c54eb3a0975de786a6df140ef90deb8309e14a" }
-openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "c4c54eb3a0975de786a6df140ef90deb8309e14a" }
+openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "d3f6e5cce64842093809f9ec46f9b33a4cda8ea1" }
+openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "d3f6e5cce64842093809f9ec46f9b33a4cda8ea1" }

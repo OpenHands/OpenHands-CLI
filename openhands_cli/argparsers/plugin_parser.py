@@ -39,7 +39,7 @@ Supported sources:
     list_parser = plugin_subparsers.add_parser(
         "list",
         help="List installed plugins",
-        description="Display all plugins installed in ~/.openhands/skills/installed/",
+        description="Display all plugins installed in ~/.openhands/plugins/installed/",
     )
     list_parser.add_argument(
         "--json",

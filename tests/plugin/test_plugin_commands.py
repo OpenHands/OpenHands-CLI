@@ -3,7 +3,7 @@
 import json
 from argparse import Namespace
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -84,7 +84,7 @@ class TestPluginCommands:
         from openhands_cli.plugin.commands import handle_plugin_command
 
         mock_list.return_value = []
-        mock_get_dir.return_value = Path("/home/user/.openhands/skills/installed")
+        mock_get_dir.return_value = Path("/home/user/.openhands/plugins/installed")
 
         args = Namespace(plugin_command="list", json=False)
         handle_plugin_command(args)
@@ -108,7 +108,7 @@ class TestPluginCommands:
             install_path="/path/to/plugin",
         )
         mock_list.return_value = [mock_info]
-        mock_get_dir.return_value = Path("/home/user/.openhands/skills/installed")
+        mock_get_dir.return_value = Path("/home/user/.openhands/plugins/installed")
 
         args = Namespace(plugin_command="list", json=True)
         handle_plugin_command(args)
