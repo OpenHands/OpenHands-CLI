@@ -123,7 +123,7 @@ def show_plugins(scroll_view: VerticalScroll) -> None:
     Args:
         scroll_view: The VerticalScroll widget to mount plugins content to
     """
-    from openhands.sdk.plugin import (
+    from openhands_cli.plugin.installed import (
         get_installed_plugins_dir,
         list_installed_plugins,
     )
