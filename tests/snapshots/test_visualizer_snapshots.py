@@ -95,6 +95,7 @@ def _create_finish_action_event(message: str) -> ActionEvent:
         llm_response_id="test_response_id",
         action=FinishAction(message=message),
         summary="Finish the task",
+        timestamp="2026-03-03T12:00:00.000000",  # Fixed timestamp for snapshots
     )
 
 
@@ -118,6 +119,7 @@ def _create_think_action_event(thought: str) -> ActionEvent:
         llm_response_id="test_response_id",
         action=ThinkAction(thought=thought),
         summary="Think about the problem",
+        timestamp="2026-03-03T12:00:00.000000",  # Fixed timestamp for snapshots
     )
 
 
