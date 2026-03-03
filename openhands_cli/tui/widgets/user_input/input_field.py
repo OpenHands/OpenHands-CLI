@@ -112,11 +112,11 @@ class InputField(Container):
             max-height: 8;
             background: $background;
             color: $foreground;
-            border: solid $primary !important;
+            border: round $primary !important;
         }
 
         #single_line_input:focus {
-            border: solid $primary !important;
+            border: round $primary !important;
             background: $background;
         }
 
@@ -125,12 +125,12 @@ class InputField(Container):
             height: 6;
             background: $background;
             color: $foreground;
-            border: solid $primary;
+            border: round $primary;
             display: none;
         }
 
         #multiline_input:focus {
-            border: solid $primary;
+            border: round $primary;
             background: $background;
         }
     }
