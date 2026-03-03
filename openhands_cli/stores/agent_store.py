@@ -404,8 +404,7 @@ class AgentStore:
         # See: https://github.com/OpenHands/software-agent-sdk/pull/2253
         if marketplace_path is not None:
             try:
-                # pyright: ignore[reportCallIssue] - forward compatibility
-                return AgentContext(**context_kwargs, marketplace_path=marketplace_path)
+                return AgentContext(**context_kwargs, marketplace_path=marketplace_path)  # pyright: ignore[reportCallIssue]
             except TypeError:
                 # SDK doesn't support marketplace_path yet, fall through to base context
                 pass
