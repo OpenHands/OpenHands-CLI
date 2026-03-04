@@ -32,7 +32,7 @@ class ThresholdInput(Container):
     }
 
     ThresholdInput.invalid .threshold_input {
-        border: tall $error;
+        border: round $error;
     }
     """
 
