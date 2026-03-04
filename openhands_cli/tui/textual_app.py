@@ -365,6 +365,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         from rich.panel import Panel
         from rich.rule import Rule
 
+        from openhands_cli.utils import abbreviate_number, format_cost
+
         console = Console()
 
         summary = self.conversation_state.get_conversation_summary()
@@ -377,6 +379,24 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         console.print(Rule("CONVERSATION SUMMARY"))
 
         console.print(f"[bold]Number of agent messages:[/bold] {num_agent_messages}")
+
+        # Include cost / token metrics when available
+        metrics = self.conversation_state.metrics
+        if metrics is not None:
+            cost = metrics.accumulated_cost or 0.0
+            usage = metrics.accumulated_token_usage
+            input_tokens = usage.prompt_tokens if usage else 0
+            output_tokens = usage.completion_tokens if usage else 0
+            cache_read = usage.cache_read_tokens if usage else 0
+            cache_pct = (
+                f"{cache_read / input_tokens * 100:.0f}%" if input_tokens > 0 else "N/A"
+            )
+            console.print(
+                f"[bold]Cost:[/bold] $ {format_cost(cost)}  "
+                f"([dim]↑ {abbreviate_number(input_tokens)} "
+                f"↓ {abbreviate_number(output_tokens)} "
+                f"cache {cache_pct}[/dim])"
+            )
 
         console.print("[bold]Last message sent by the agent:[/bold]")
         console.print(

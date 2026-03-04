@@ -289,6 +289,88 @@ class TestPrintConversationSummary:
             app.conversation_state.get_conversation_summary.assert_called_once()
             assert mock_console.print.call_count >= 1
 
+    def test_print_conversation_summary_includes_cost_when_metrics_present(
+        self, monkeypatch
+    ):
+        """When metrics are set, the summary must include a Cost line."""
+        from rich.text import Text
+
+        from openhands.sdk.llm.utils.metrics import Metrics
+
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+        app = OpenHandsApp(exit_confirmation=False)
+        app.conversation_state.get_conversation_summary = MagicMock(
+            return_value=(1, Text("reply"))
+        )
+
+        # Build a real Metrics object with known values
+        m = Metrics()
+        m.add_cost(0.05)
+        m.add_token_usage(
+            prompt_tokens=1000,
+            completion_tokens=200,
+            cache_read_tokens=100,
+            cache_write_tokens=0,
+            context_window=8192,
+            response_id="r1",
+        )
+        app.conversation_state.metrics = m
+
+        printed_text: list[str] = []
+
+        def capture_print(*args, **kwargs):
+            for a in args:
+                printed_text.append(str(a))
+
+        with patch("rich.console.Console") as mock_console_cls:
+            mock_console = MagicMock()
+            mock_console.print.side_effect = capture_print
+            mock_console_cls.return_value = mock_console
+
+            app._print_conversation_summary()
+
+        combined = " ".join(printed_text)
+        assert "Cost" in combined, f"Expected 'Cost' in output, got: {combined!r}"
+        # Should contain the formatted dollar amount
+        assert "$" in combined
+
+    def test_print_conversation_summary_no_cost_line_when_metrics_none(
+        self, monkeypatch
+    ):
+        """When metrics are None, the summary must NOT include a Cost line."""
+        from rich.text import Text
+
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+        app = OpenHandsApp(exit_confirmation=False)
+        app.conversation_state.get_conversation_summary = MagicMock(
+            return_value=(1, Text("reply"))
+        )
+        app.conversation_state.metrics = None
+
+        printed_text: list[str] = []
+
+        def capture_print(*args, **kwargs):
+            for a in args:
+                printed_text.append(str(a))
+
+        with patch("rich.console.Console") as mock_console_cls:
+            mock_console = MagicMock()
+            mock_console.print.side_effect = capture_print
+            mock_console_cls.return_value = mock_console
+
+            app._print_conversation_summary()
+
+        combined = " ".join(printed_text)
+        assert "Cost" not in combined
+
 
 # ---------------------------------------------------------------------------
 # ConversationRunner.get_conversation_summary behavior
