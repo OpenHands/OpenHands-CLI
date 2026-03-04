@@ -10,7 +10,10 @@ from textual.containers import Vertical
 from textual.widgets import ListView, Static
 
 from openhands_cli.tui.core.events import ConfirmationDecision
-from openhands_cli.tui.panels.confirmation_panel import InlineConfirmationPanel
+from openhands_cli.tui.panels.confirmation_panel import (
+    InlineConfirmationPanel,
+    _KeyboardOnlyListView,
+)
 from openhands_cli.user_actions.types import UserConfirmation
 
 
@@ -155,3 +158,56 @@ async def test_inline_panel_has_four_options():
         listview = pilot.app.query_one("#inline-confirmation-listview", ListView)
         # The ListView should have 4 items: accept, reject, always, risky
         assert len(listview.children) == 4
+
+
+# ============================================================================
+# Keyboard-only list view — mouse click must NOT post ListView.Selected
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_inline_panel_uses_keyboard_only_list_view():
+    """The confirmation list must be a _KeyboardOnlyListView instance."""
+    panel = InlineConfirmationPanel(num_actions=1)
+    app = make_test_app(panel)
+
+    async with app.run_test() as pilot:
+        listview = pilot.app.query_one("#inline-confirmation-listview", ListView)
+        assert isinstance(listview, _KeyboardOnlyListView), (
+            "InlineConfirmationPanel must use _KeyboardOnlyListView to prevent "
+            "accidental mouse-click confirmations."
+        )
+
+
+def test_keyboard_only_list_view_click_does_not_post_selected():
+    """A child-click on _KeyboardOnlyListView must NOT post ListView.Selected.
+
+    This guards against the misfire: a mouse click near the confirmation panel
+    would previously immediately accept/reject the pending action.
+    """
+    from textual.widgets import ListItem
+
+    lv = _KeyboardOnlyListView(ListItem(Static("Yes")))
+    selected_messages: list[object] = []
+
+    mock_item = mock.MagicMock()
+    mock_item.id = "accept"
+    mock_nodes = mock.MagicMock()
+    mock_nodes.index.return_value = 0
+
+    # Wire up post_message to capture any Selected messages; also patch
+    # focus() and _nodes (which require an active Textual app context).
+    with (
+        mock.patch.object(lv, "post_message", side_effect=selected_messages.append),
+        mock.patch.object(lv, "focus"),
+        mock.patch.object(lv, "_nodes", mock_nodes),
+    ):
+        child_click_event = mock.MagicMock(spec=ListItem._ChildClicked)
+        child_click_event.item = mock_item
+        lv._on_list_item__child_clicked(child_click_event)
+
+    selected = [m for m in selected_messages if isinstance(m, ListView.Selected)]
+    assert selected == [], (
+        "_KeyboardOnlyListView._on_list_item__child_clicked must NOT post "
+        "ListView.Selected so that mouse clicks cannot trigger confirmations."
+    )
