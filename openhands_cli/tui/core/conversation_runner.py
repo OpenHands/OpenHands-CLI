@@ -1,8 +1,12 @@
 """Conversation runner with confirmation mode support."""
 
 import asyncio
+import logging
+import time
 import uuid
-from collections.abc import Callable
+from collections import deque
+from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from rich.console import Console
@@ -21,6 +25,7 @@ from openhands.sdk.conversation.state import (
     ConversationState as SDKConversationState,
 )
 from openhands.sdk.event.base import Event
+from openhands.sdk.event.condenser import Condensation
 from openhands_cli.setup import setup_conversation
 from openhands_cli.tui.core.events import ShowConfirmationPanel
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
@@ -29,6 +34,21 @@ from openhands_cli.user_actions.types import UserConfirmation
 
 if TYPE_CHECKING:
     from openhands_cli.tui.core.state import ConversationContainer
+
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ReplayPlan:
+    summary_text: str | None
+    tail_events: list[Event]
+    total_count: int
+    hidden_count: int
+    has_condensation: bool
+    condensed_count: int | None
+    loadable_events: list[Event]
+    loaded_start_index: int
 
 
 class ConversationRunner:
@@ -80,7 +100,7 @@ class ConversationRunner:
         )
 
         self._running = False
-        self._historical_events_replayed = False
+        self._replayed_event_offset = 0
 
         # State for reading (is_confirmation_active) and updating (set_running)
         self._state = state
@@ -270,23 +290,181 @@ class ConversationRunner:
     def replay_historical_events(self) -> int:
         """Replay historical events from the conversation into the visualizer.
 
-        Iterates conversation.state.events and renders them via the visualizer's
-        replay_events() method, which skips side effects (critic, telemetry).
+        Uses a 3-level deterministic cascade:
+        1) Condensation-aware summary + tail path
+        2) Windowed tail path
+        3) Full passthrough path (only when total <= window)
 
         Returns:
             Count of replayed events, or 0 if already replayed or empty.
         """
-        if self._historical_events_replayed:
+        if self._replayed_event_offset > 0:
+            logger.debug("replay_historical_events: skip (offset=%d)", self._replayed_event_offset)
             return 0
 
-        self._historical_events_replayed = True
+        events = self.conversation.state.events
+        total_count = len(events)
+        window_size = self.visualizer.cli_settings.replay_window_size
 
-        events = list(self.conversation.state.events)
-        if not events:
+        # LOG-1: Entry
+        logger.debug(
+            "replay_historical_events: entry (offset=%d, events=%d, window=%d)",
+            self._replayed_event_offset,
+            total_count,
+            window_size,
+        )
+        if total_count == 0:
+            logger.debug("replay_historical_events: exit — empty history")
             return 0
 
-        self.visualizer.replay_events(events)
-        return len(events)
+        t0 = time.monotonic()
+        plan = self._build_replay_plan(events, total_count)
+
+        # LOG-2: Path selected
+        path = "condensation" if plan.has_condensation else (
+            "window" if plan.hidden_count > 0 else "full"
+        )
+        logger.debug(
+            "replay_historical_events: path=%s total=%d tail=%d hidden=%d condensed=%s",
+            path, plan.total_count, len(plan.tail_events), plan.hidden_count,
+            plan.condensed_count,
+        )
+
+        self.visualizer.set_replay_context(
+            all_events=plan.loadable_events,
+            loaded_start_index=plan.loaded_start_index,
+            summary_text=plan.summary_text,
+            has_condensation=plan.has_condensation,
+            condensed_count=plan.condensed_count,
+        )
+
+        if plan.hidden_count > 0:
+            self.visualizer.replay_with_summary(
+                summary_text=plan.summary_text,
+                tail_events=plan.tail_events,
+                total_count=plan.total_count,
+                hidden_count=plan.hidden_count,
+                has_condensation=plan.has_condensation,
+                condensed_count=plan.condensed_count,
+            )
+        else:
+            self.visualizer.replay_events(plan.tail_events)
+
+        self._replayed_event_offset = len(plan.tail_events)
+        elapsed_ms = (time.monotonic() - t0) * 1000
+
+        # LOG-3: Exit with metrics
+        logger.debug(
+            "replay_historical_events: exit — replayed=%d widgets, duration=%.1fms",
+            self._replayed_event_offset, elapsed_ms,
+        )
+        return self._replayed_event_offset
+
+    def _build_replay_plan(
+        self, events: Sequence[Event] | Iterable[Event], total_count: int
+    ) -> ReplayPlan:
+        """Build deterministic replay plan with condensation→window→full cascade."""
+        window_size = self.visualizer.cli_settings.replay_window_size
+
+        try:
+            condensation_plan = self._build_condensation_plan(events, total_count)
+            if condensation_plan is not None:
+                # LOG-4: Condensation path selected
+                logger.debug(
+                    "_build_replay_plan: condensation path — summary=%s, forgotten=%s",
+                    condensation_plan.summary_text is not None,
+                    condensation_plan.condensed_count,
+                )
+                return condensation_plan
+        except Exception as exc:
+            # LOG-5: Fallback triggered
+            logger.warning(
+                "_build_replay_plan: condensation failed, fallback to window/full: %s",
+                exc,
+            )
+
+        tail_events = self._extract_tail_events(events, min(window_size, total_count))
+        hidden_count = max(0, total_count - len(tail_events))
+        return ReplayPlan(
+            summary_text=None,
+            tail_events=tail_events,
+            total_count=total_count,
+            hidden_count=hidden_count,
+            has_condensation=False,
+            condensed_count=None,
+            loadable_events=list(events) if isinstance(events, Sequence) else tail_events,
+            loaded_start_index=max(0, total_count - len(tail_events)),
+        )
+
+    def _build_condensation_plan(
+        self, events: Sequence[Event] | Iterable[Event], total_count: int
+    ) -> ReplayPlan | None:
+        """Build summary+tail replay plan from latest Condensation event."""
+        latest: Condensation | None = None
+        tail_source: list[Event] = []
+
+        if isinstance(events, Sequence):
+            sequence_events = list(events)
+            latest_idx = -1
+            for idx in range(len(sequence_events) - 1, -1, -1):
+                candidate = sequence_events[idx]
+                if isinstance(candidate, Condensation):
+                    latest = candidate
+                    latest_idx = idx
+                    break
+
+            if latest is None:
+                return None
+
+            tail_source = list(sequence_events[latest_idx + 1 :])
+        else:
+            for event in events:
+                if isinstance(event, Condensation):
+                    latest = event
+                    tail_source = []
+                    continue
+                tail_source.append(event)
+
+            if latest is None:
+                return None
+
+        forgotten = set(latest.forgotten_event_ids)
+        tail_events = [
+            event
+            for event in tail_source
+            if event.id not in forgotten and not isinstance(event, Condensation)
+        ]
+
+        hidden_count = max(0, total_count - len(tail_events))
+        loadable_events = tail_source
+        loaded_start_index = max(0, len(loadable_events) - len(tail_events))
+
+        return ReplayPlan(
+            summary_text=latest.summary,
+            tail_events=tail_events,
+            total_count=total_count,
+            hidden_count=hidden_count,
+            has_condensation=True,
+            condensed_count=len(forgotten),
+            loadable_events=loadable_events,
+            loaded_start_index=loaded_start_index,
+        )
+
+    def _extract_tail_events(
+        self, events: Sequence[Event] | Iterable[Event], window_size: int
+    ) -> list[Event]:
+        """Extract latest window with slice-preferred/deque-fallback strategy."""
+        if window_size <= 0:
+            return []
+
+        if isinstance(events, Sequence):
+            return list(events[-window_size:])
+
+        return list(deque(events, maxlen=window_size))
+
+    def load_older_events(self) -> int:
+        """Load an older replay page through the visualizer."""
+        return self.visualizer.load_older_events()
 
     def get_conversation_summary(self) -> tuple[int, Text]:
         """Get a summary of the conversation for headless mode output.

@@ -65,3 +65,9 @@ class ConfirmationDecision(Message):
     def __init__(self, decision: UserConfirmation) -> None:
         super().__init__()
         self.decision = decision
+
+
+class LoadOlderEvents(Message):
+    """Request loading an older page of historical events."""
+
+    pass

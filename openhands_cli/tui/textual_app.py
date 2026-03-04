@@ -73,6 +73,7 @@ from openhands_cli.tui.core import (
     RequestSwitchConfirmation,
     SendMessage,
 )
+from openhands_cli.tui.core.events import LoadOlderEvents
 from openhands_cli.tui.core.conversation_manager import SwitchConfirmed
 from openhands_cli.tui.core.runner_factory import RunnerFactory
 from openhands_cli.tui.modals import SettingsScreen
@@ -520,7 +521,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
           losing typing context)
         - When Tab is pressed from input area, focus the most recent (last) cell
           instead of the first one (unless autocomplete is showing)
+        - PageUp requests loading older replay history when available
         """
+        if event.key == "pageup":
+            self.conversation_manager.post_message(LoadOlderEvents())
+            event.stop()
+            event.prevent_default()
+            return
         # Handle Tab from input area - focus most recent cell
         # Skip if autocomplete dropdown is visible (Tab is used for selection)
         if event.key == "tab" and isinstance(self.focused, Input | TextArea):
