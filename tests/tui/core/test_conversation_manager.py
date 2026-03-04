@@ -4,6 +4,32 @@ import uuid
 from unittest.mock import MagicMock
 
 from openhands_cli.tui.core.conversation_manager import ConversationManager
+from openhands_cli.tui.core.events import LoadOlderEvents
+
+
+class TestLoadOlderEvents:
+    """Verify load-older message delegates to current runner."""
+
+    def test_load_older_events_delegates_to_runner(self) -> None:
+        manager = object.__new__(ConversationManager)
+        runner = MagicMock()
+        registry = MagicMock()
+        registry.current = runner
+        manager._runners = registry
+
+        event = LoadOlderEvents()
+        manager._on_load_older_events(event)
+
+        runner.load_older_events.assert_called_once_with()
+
+    def test_load_older_events_no_runner_is_noop(self) -> None:
+        manager = object.__new__(ConversationManager)
+        registry = MagicMock()
+        registry.current = None
+        manager._runners = registry
+
+        event = LoadOlderEvents()
+        manager._on_load_older_events(event)
 
 
 class TestEnsureRunner:

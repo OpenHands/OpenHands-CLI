@@ -1,8 +1,11 @@
 """CLI settings models and utilities."""
 
 import json
+import logging
 import os
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel, field_validator
 
@@ -51,7 +54,16 @@ class CliSettings(BaseModel):
 
     default_cells_expanded: bool = False
     auto_open_plan_panel: bool = True
+    replay_window_size: int = 200
     critic: CriticSettings = CriticSettings()
+
+    @field_validator("replay_window_size")
+    @classmethod
+    def validate_replay_window_size(cls, v: int) -> int:
+        """Validate replay window size is between 10 and 1000."""
+        if not 10 <= v <= 1000:
+            raise ValueError(f"Replay window size must be between 10 and 1000, got {v}")
+        return v
 
     @classmethod
     def get_config_path(cls) -> Path:
@@ -128,8 +140,13 @@ class CliSettings(BaseModel):
                 settings.save()
 
             return settings
-        except (json.JSONDecodeError, ValueError):
+        except (json.JSONDecodeError, ValueError) as exc:
             # If file is corrupted, return defaults
+            logger.warning(
+                "Failed to load CLI settings from %s: %s; using defaults",
+                config_path,
+                exc,
+            )
             return cls()
 
     def save(self) -> None:

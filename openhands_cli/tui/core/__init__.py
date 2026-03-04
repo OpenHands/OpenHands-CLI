@@ -11,6 +11,7 @@ from openhands_cli.tui.core.conversation_manager import (
 )
 from openhands_cli.tui.core.events import (
     ConfirmationDecision,
+    LoadOlderEvents,
     RequestSwitchConfirmation,
     ShowConfirmationPanel,
 )
@@ -41,4 +42,5 @@ __all__ = [
     "RequestSwitchConfirmation",
     "ShowConfirmationPanel",
     "ConfirmationDecision",
+    "LoadOlderEvents",
 ]

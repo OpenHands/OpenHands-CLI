@@ -1,4 +1,4 @@
-"""Tests for ConversationVisualizer.replay_events() rendering behavior."""
+"""Tests for ConversationVisualizer replay rendering behavior."""
 
 from unittest.mock import MagicMock, patch
 
@@ -8,6 +8,7 @@ from textual.widgets import Static
 
 from openhands.sdk import MessageEvent, TextContent
 from openhands.sdk.event import ObservationEvent
+from openhands.sdk.event.base import Event
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
 
@@ -34,8 +35,17 @@ def visualizer(mock_container):
     vis._app = app
     vis._name = None
     vis._main_thread_id = 0  # Will not match, but replay_events doesn't check
-    vis._cli_settings = None
+    vis._cli_settings = MagicMock(replay_window_size=2)
     vis._pending_actions = {}
+    vis._all_events = []
+    vis._loaded_start_index = 0
+    vis._banner_widget = None
+    vis._summary_text = None
+    vis._has_condensation = False
+    vis._condensed_count = None
+    vis._prepend_in_progress = False
+    vis._live_event_buffer = __import__("collections").deque()
+    vis._max_viewable_widgets = 2000
     return vis
 
 
@@ -129,8 +139,7 @@ class TestReplayScrollBehavior:
     """Scroll behavior tests for replay_events()."""
 
     def test_scroll_end_called_once_after_all_events(self, visualizer, mock_container):
-        """T-4: scroll_end(animate=False) is called exactly once after all events
-        are processed, not once per event."""
+        """T-4: scroll_end(animate=False) is called exactly once after all events."""
         events = [
             _make_user_message_event("msg 1"),
             _make_user_message_event("msg 2"),
@@ -139,16 +148,162 @@ class TestReplayScrollBehavior:
 
         visualizer.replay_events(events)
 
-        # replay_events() calls scroll_end(animate=False) once after all events.
-        # _add_widget_to_ui also calls scroll_end conditionally (guarded by
-        # is_vertical_scroll_end), but with our mock set to False those are
-        # suppressed.  So scroll_end should be called exactly once here.
         mock_container.scroll_end.assert_called_once_with(animate=False)
+
+
+class TestReplayWithSummary:
+    """Tests for replay_with_summary banner + tail behavior."""
+
+    def _make_tail_event(self, text: str) -> Event:
+        return _make_user_message_event(text)
+
+    def test_replay_with_summary_renders_collapsible_banner(self, visualizer, mock_container):
+        tail = [self._make_tail_event("tail event")]
+
+        visualizer.replay_with_summary(
+            summary_text="Earlier context summary",
+            tail_events=tail,
+            total_count=10,
+            hidden_count=9,
+            has_condensation=True,
+            condensed_count=7,
+        )
+
+        # Banner + one tail widget are mounted
+        assert mock_container.mount.call_count == 2
+        banner = mock_container.mount.call_args_list[0][0][0]
+        assert "replay-summary" in banner.classes
+        assert banner.id == "replay-summary-banner"
+        assert "Prior context: 7 events condensed" in str(banner.title)
+
+    def test_replay_with_summary_renders_count_banner_without_summary(
+        self, visualizer, mock_container
+    ):
+        tail = [self._make_tail_event("tail")]
+
+        visualizer.replay_with_summary(
+            summary_text=None,
+            tail_events=tail,
+            total_count=10,
+            hidden_count=9,
+            has_condensation=False,
+            condensed_count=None,
+        )
+
+        assert mock_container.mount.call_count == 2
+        banner = mock_container.mount.call_args_list[0][0][0]
+        assert isinstance(banner, Static)
+        assert "9 earlier events not shown" in str(banner._Static__content)
+        assert "replay-summary" in banner.classes
+        assert banner.id == "replay-summary-banner"
+
+    def test_replay_with_summary_no_hidden_count_means_no_banner(
+        self, visualizer, mock_container
+    ):
+        tail = [self._make_tail_event("only")]
+
+        visualizer.replay_with_summary(
+            summary_text="ignored",
+            tail_events=tail,
+            total_count=1,
+            hidden_count=0,
+            has_condensation=True,
+            condensed_count=1,
+        )
+
+        assert mock_container.mount.call_count == 1
+
+    def test_replay_with_summary_condensation_none_uses_fallback_static(
+        self, visualizer, mock_container
+    ):
+        tail = [self._make_tail_event("tail")]
+
+        visualizer.replay_with_summary(
+            summary_text=None,
+            tail_events=tail,
+            total_count=10,
+            hidden_count=9,
+            has_condensation=True,
+            condensed_count=7,
+        )
+
+        assert mock_container.mount.call_count == 2
+        banner = mock_container.mount.call_args_list[0][0][0]
+        assert isinstance(banner, Static)
+        assert "Prior context condensed (7 events). Summary not available." in str(
+            banner._Static__content
+        )
 
 
 # ============================================================================
 # T-5: Empty event list edge case
 # ============================================================================
+
+
+class TestLoadOlderEvents:
+    """Tests for prepend loading behavior."""
+
+    def test_load_older_events_prepends_before_banner(self, visualizer, mock_container):
+        e1 = _make_user_message_event("older-1")
+        e2 = _make_user_message_event("older-2")
+        e3 = _make_user_message_event("tail-1")
+
+        banner = Static("banner", id="replay-summary-banner", classes="replay-summary")
+        mock_container.children = [banner]
+
+        visualizer.set_replay_context(
+            all_events=[e1, e2, e3],
+            loaded_start_index=2,
+            summary_text=None,
+            has_condensation=False,
+            condensed_count=None,
+        )
+        visualizer._banner_widget = banner
+
+        loaded = visualizer.load_older_events()
+
+        assert loaded == 2
+        assert visualizer._loaded_start_index == 0
+        mount_calls = mock_container.mount.call_args_list[:2]
+        assert len(mount_calls) == 2
+        assert all(call.kwargs.get("before") is banner for call in mount_calls)
+
+    def test_load_older_events_cap_stops_loading(self, visualizer, mock_container):
+        visualizer._max_viewable_widgets = 1
+        mock_container.children = [Static("existing")]
+
+        visualizer.set_replay_context(
+            all_events=[_make_user_message_event("older")],
+            loaded_start_index=1,
+            summary_text=None,
+            has_condensation=False,
+            condensed_count=None,
+        )
+
+        loaded = visualizer.load_older_events()
+
+        assert loaded == 0
+
+    def test_on_event_buffers_while_prepend_in_progress(self, visualizer):
+        live = _make_user_message_event("live")
+        visualizer._prepend_in_progress = True
+
+        visualizer.on_event(live)
+
+        assert len(visualizer._live_event_buffer) == 1
+
+    def test_update_banner_to_terminal_message_on_cap(self, visualizer, mock_container):
+        banner = Static("banner", id="replay-summary-banner", classes="replay-summary")
+        mock_container.children = [banner]
+        visualizer._banner_widget = banner
+        visualizer._loaded_start_index = 10
+        visualizer._max_viewable_widgets = 1
+        mock_container.children = [banner, Static("one")]
+
+        visualizer._update_banner_for_loaded_state()
+
+        assert isinstance(visualizer._banner_widget, Static)
+        assert "Maximum viewable history reached." in str(visualizer._banner_widget._Static__content)
 
 
 class TestReplayEdgeCases:
@@ -162,6 +317,21 @@ class TestReplayEdgeCases:
         # Per implementation: scroll_end is NOT called when events list is empty
         # (the `if events:` guard skips it)
         mock_container.scroll_end.assert_not_called()
+
+    def test_cross_boundary_observation_gets_indicator(self, visualizer, mock_container):
+        """Observation without matching action in window shows '(action not shown)'."""
+        obs = _make_observation_event("tc-orphan")
+        # Ensure _handle_observation_event returns False (no match)
+        with patch.object(
+            visualizer, "_handle_observation_event", return_value=False
+        ), patch.object(
+            visualizer,
+            "_create_cross_boundary_observation_widget",
+            return_value=Static("(action not shown) Obs"),
+        ) as mock_cross:
+            visualizer.replay_events([obs])
+
+        mock_cross.assert_called_once_with(obs)
 
 
 # ============================================================================
@@ -234,3 +404,49 @@ class TestReplaySideEffectOmissions:
             assert "plan" not in str(call).lower(), (
                 "Plan panel side effect detected during replay — intentionally omitted"
             )
+
+
+# ============================================================================
+# T07.03: Cross-boundary observation widget content test
+# ============================================================================
+
+
+class TestCrossBoundaryObservationWidgetContent:
+    """Test that _create_cross_boundary_observation_widget() produces correct content."""
+
+    def test_widget_title_contains_action_not_shown(self, visualizer):
+        """Real method call produces title with '(action not shown)' prefix (T07.03)."""
+        obs = _make_observation_event("tc-orphan")
+        obs.visualize = "Some observation output"
+
+        widget = visualizer._create_cross_boundary_observation_widget(obs)
+
+        assert widget is not None
+        assert "(action not shown)" in str(widget.title)
+
+
+# ============================================================================
+# T07.05: _flush_live_event_buffer drain test
+# ============================================================================
+
+
+class TestFlushLiveEventBuffer:
+    """Test that _flush_live_event_buffer drains buffer and re-dispatches via on_event."""
+
+    def test_flush_drains_buffer_and_redispatches(self, visualizer):
+        """Buffered events are re-dispatched via on_event after flush (T07.05)."""
+        live_event = _make_user_message_event("live during prepend")
+
+        # Simulate buffering during prepend
+        visualizer._prepend_in_progress = True
+        visualizer.on_event(live_event)
+        assert len(visualizer._live_event_buffer) == 1
+
+        # End prepend and flush
+        visualizer._prepend_in_progress = False
+
+        with patch.object(visualizer, "on_event") as mock_on_event:
+            visualizer._flush_live_event_buffer()
+
+        assert len(visualizer._live_event_buffer) == 0
+        mock_on_event.assert_called_once_with(live_event)

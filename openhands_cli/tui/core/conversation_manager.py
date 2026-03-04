@@ -31,7 +31,11 @@ from openhands_cli.tui.core.conversation_crud_controller import (
 from openhands_cli.tui.core.conversation_switch_controller import (
     ConversationSwitchController,
 )
-from openhands_cli.tui.core.events import ConfirmationDecision, ShowConfirmationPanel
+from openhands_cli.tui.core.events import (
+    ConfirmationDecision,
+    LoadOlderEvents,
+    ShowConfirmationPanel,
+)
 from openhands_cli.tui.core.refinement_controller import RefinementController
 from openhands_cli.tui.core.runner_factory import RunnerFactory
 from openhands_cli.tui.core.runner_registry import RunnerRegistry
@@ -300,6 +304,15 @@ class ConversationManager(Container):
     def _on_confirmation_decision(self, event: ConfirmationDecision) -> None:
         event.stop()
         self._confirmation_controller.handle_decision(event.decision)
+
+    @on(LoadOlderEvents)
+    def _on_load_older_events(self, event: LoadOlderEvents) -> None:
+        """Handle request to load older historical events."""
+        event.stop()
+        runner = self._runners.current
+        if runner is None:
+            return
+        runner.load_older_events()
 
     # ---- Public API for direct calls ----
 
