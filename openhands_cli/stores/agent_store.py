@@ -379,7 +379,17 @@ class AgentStore:
         )
 
     def _build_agent_context(self) -> AgentContext:
-        skills = load_project_skills(get_work_dir())
+        try:
+            skills = load_project_skills(get_work_dir())
+        except UnicodeDecodeError as exc:
+            Console(stderr=True).print(
+                f"[yellow]Warning:[/yellow] Could not read a skill/context file "
+                f"({exc.reason} at byte offset {exc.start}). "
+                "Check that AGENTS.md and other skill files are valid UTF-8. "
+                "Skills will not be loaded for this session.",
+                highlight=False,
+            )
+            skills = []
         system_suffix = "\n".join(
             [
                 f"Your current working directory is: {get_work_dir()}",
