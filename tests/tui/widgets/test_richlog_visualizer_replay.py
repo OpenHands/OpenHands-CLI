@@ -450,3 +450,91 @@ class TestFlushLiveEventBuffer:
 
         assert len(visualizer._live_event_buffer) == 0
         mock_on_event.assert_called_once_with(live_event)
+
+
+# ============================================================================
+# v0.04b Regression: _loaded_start_index consumed-vs-mounted tracking
+# ============================================================================
+
+
+class TestLoadOlderEventsConsumedTracking:
+    """Regression tests for _loaded_start_index decrement using consumed counter."""
+
+    def test_load_older_advances_index_when_events_filtered(self, visualizer, mock_container):
+        """_loaded_start_index must advance by consumed count, not mounted count."""
+        e1 = _make_user_message_event("older-1")
+        e2 = MagicMock(spec=Event)  # Will produce None widget
+        e3 = _make_user_message_event("older-3")
+
+        # Set page size large enough to load all 3 events in one page
+        visualizer._cli_settings.replay_window_size = 10
+
+        visualizer.set_replay_context(
+            all_events=[e1, e2, e3],
+            loaded_start_index=3,
+            summary_text=None,
+            has_condensation=False,
+            condensed_count=None,
+        )
+        # Start with empty children so _visible_widget_count returns 0
+        mock_container.children = []
+
+        def create_with_filter(event):
+            if event is e2:
+                return None
+            return Static(f"widget-{id(event)}")
+
+        with patch.object(visualizer, "_create_replay_widget", side_effect=create_with_filter):
+            mounted = visualizer.load_older_events()
+
+        # consumed=3 (all 3 events processed), mounted=2 (e2 filtered)
+        assert visualizer._loaded_start_index == 0, (
+            f"Expected 0 (3 - 3 consumed), got {visualizer._loaded_start_index}"
+        )
+        assert mounted == 2, f"Expected 2 mounted widgets, got {mounted}"
+
+    def test_load_older_cap_break_limits_consumed(self, visualizer, mock_container):
+        """When _max_viewable_widgets cap breaks loop, consumed != len(older_events)."""
+        e1 = _make_user_message_event("older-1")
+        e2 = _make_user_message_event("older-2")
+        e3 = _make_user_message_event("older-3")
+
+        visualizer.set_replay_context(
+            all_events=[e1, e2, e3],
+            loaded_start_index=3,
+            summary_text=None,
+            has_condensation=False,
+            condensed_count=None,
+        )
+        visualizer._max_viewable_widgets = 1
+        # Start empty so first _visible_widget_count() returns 0, then after mount returns 1
+        widget_count = [0]
+
+        def mock_visible_count():
+            return widget_count[0]
+
+        def create_and_count(event):
+            w = Static(f"widget-{id(event)}")
+            return w
+
+        original_mount = mock_container.mount
+
+        def mount_and_track(*args, **kwargs):
+            original_mount(*args, **kwargs)
+            widget_count[0] += 1
+
+        mock_container.mount = MagicMock(side_effect=mount_and_track)
+        mock_container.children = []
+
+        with (
+            patch.object(visualizer, "_visible_widget_count", side_effect=mock_visible_count),
+            patch.object(visualizer, "_create_replay_widget", side_effect=create_and_count),
+        ):
+            mounted = visualizer.load_older_events()
+
+        # First iteration: visible=0 < max=1, consumed=1, mount → visible=1
+        # Second iteration: visible=1 >= max=1 → break
+        assert visualizer._loaded_start_index == 2, (
+            f"Expected 2 (3 - 1 consumed), got {visualizer._loaded_start_index}"
+        )
+        assert mounted == 1, f"Expected 1 mounted widget, got {mounted}"

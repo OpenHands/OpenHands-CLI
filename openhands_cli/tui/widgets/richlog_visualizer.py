@@ -975,16 +975,18 @@ class ConversationVisualizer(ConversationVisualizerBase):
             )
 
             mounted = 0
+            consumed = 0
             for event in older_events:
                 if self._visible_widget_count() >= self._max_viewable_widgets:
                     break
+                consumed += 1
                 widget = self._create_replay_widget(event)
                 if widget is None:
                     continue
                 self._container.mount(widget, before=first_child)
                 mounted += 1
 
-            self._loaded_start_index -= mounted
+            self._loaded_start_index -= consumed
             self._update_banner_for_loaded_state()
 
             if mounted > 0:

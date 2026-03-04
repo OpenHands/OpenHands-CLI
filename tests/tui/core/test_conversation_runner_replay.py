@@ -390,6 +390,85 @@ class TestForgottenEventIdsFiltering:
             r.conversation = mock_conversation
             return r
 
+class TestReplayIdempotenceWithEmptyTail:
+    """Regression: replay guard must work even when tail_events is empty (v0.04b)."""
+
+    @pytest.fixture
+    def runner(self):
+        """Create a ConversationRunner with mocked dependencies."""
+        with patch(
+            "openhands_cli.tui.core.conversation_runner.setup_conversation"
+        ) as mock_setup:
+            mock_conversation = MagicMock()
+            mock_conversation.state.events = []
+            mock_setup.return_value = mock_conversation
+
+            import uuid
+
+            from openhands_cli.tui.core.conversation_runner import ConversationRunner
+
+            visualizer = MagicMock()
+            visualizer.cli_settings = SimpleNamespace(replay_window_size=200)
+
+            r = ConversationRunner(
+                conversation_id=uuid.uuid4(),
+                state=MagicMock(),
+                message_pump=MagicMock(),
+                notification_callback=MagicMock(),
+                visualizer=visualizer,
+            )
+            r.conversation = mock_conversation
+            return r
+
+    def test_replay_idempotent_with_empty_tail_after_condensation(self, runner):
+        """Calling replay twice when tail_events=[] must not duplicate banners."""
+        condensation = Condensation(
+            id="cond-1",
+            llm_response_id="resp-1",
+            forgotten_event_ids=[],
+            summary="Condensed context",
+        )
+        runner.conversation.state.events = [condensation]
+
+        count1 = runner.replay_historical_events()
+        count2 = runner.replay_historical_events()
+
+        assert count2 == 0, "Second replay call must be blocked by guard"
+        assert runner.visualizer.replay_with_summary.call_count == 1, (
+            "replay_with_summary must be called exactly once, not duplicated"
+        )
+
+
+class TestForgottenEventIdsFiltering:
+    """Tests for forgotten_event_ids exclusion in _build_condensation_plan (T07.02)."""
+
+    @pytest.fixture
+    def runner(self):
+        """Create a ConversationRunner with mocked dependencies."""
+        with patch(
+            "openhands_cli.tui.core.conversation_runner.setup_conversation"
+        ) as mock_setup:
+            mock_conversation = MagicMock()
+            mock_conversation.state.events = []
+            mock_setup.return_value = mock_conversation
+
+            import uuid
+
+            from openhands_cli.tui.core.conversation_runner import ConversationRunner
+
+            visualizer = MagicMock()
+            visualizer.cli_settings = SimpleNamespace(replay_window_size=200)
+
+            r = ConversationRunner(
+                conversation_id=uuid.uuid4(),
+                state=MagicMock(),
+                message_pump=MagicMock(),
+                notification_callback=MagicMock(),
+                visualizer=visualizer,
+            )
+            r.conversation = mock_conversation
+            return r
+
     def test_forgotten_tail_event_excluded_from_plan(self, runner):
         """A tail event whose ID is in forgotten_event_ids is excluded from tail_events."""
         pre = MagicMock(name="pre")

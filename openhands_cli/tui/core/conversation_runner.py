@@ -101,6 +101,7 @@ class ConversationRunner:
 
         self._running = False
         self._replayed_event_offset = 0
+        self._replay_complete = False
 
         # State for reading (is_confirmation_active) and updating (set_running)
         self._state = state
@@ -298,8 +299,11 @@ class ConversationRunner:
         Returns:
             Count of replayed events, or 0 if already replayed or empty.
         """
-        if self._replayed_event_offset > 0:
-            logger.debug("replay_historical_events: skip (offset=%d)", self._replayed_event_offset)
+        if self._replay_complete:
+            logger.debug(
+                "replay_historical_events: skip (offset=%d)",
+                self._replayed_event_offset,
+            )
             return 0
 
         events = self.conversation.state.events
@@ -351,6 +355,7 @@ class ConversationRunner:
             self.visualizer.replay_events(plan.tail_events)
 
         self._replayed_event_offset = len(plan.tail_events)
+        self._replay_complete = True
         elapsed_ms = (time.monotonic() - t0) * 1000
 
         # LOG-3: Exit with metrics
