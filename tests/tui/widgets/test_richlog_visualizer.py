@@ -11,7 +11,7 @@ from textual.containers import VerticalScroll
 from textual.widgets import Static
 
 from openhands.sdk import Action, MessageEvent, TextContent
-from openhands.sdk.event import ActionEvent
+from openhands.sdk.event import ActionEvent, SystemPromptEvent
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.llm import MessageToolCall
 from openhands.tools.terminal.definition import TerminalAction
@@ -1351,3 +1351,64 @@ class TestDefaultAgentPrefixBehavior:
         assert "(Code Reviewer Agent)" in title
         # Should contain the command
         assert "git diff" in title
+
+
+# ============================================================================
+# System Prompt Collapsible
+# ============================================================================
+
+
+class TestSystemPromptCollapsible:
+    """System-prompt collapsible must always start collapsed.
+
+    The system prompt is very long and rarely useful to read inline.  It
+    should remain collapsed even when ``default_cells_expanded=True`` so it
+    never overwhelms the conversation view.
+    """
+
+    def _make_system_prompt_event(self, text: str = "You are a helpful assistant."):
+        return SystemPromptEvent(
+            system_prompt=TextContent(text=text),
+            tools=[],
+        )
+
+    def test_system_prompt_always_collapsed_when_default_cells_expanded_true(
+        self, visualizer, mock_cli_settings
+    ):
+        """System prompt must be collapsed even when default_cells_expanded=True."""
+        event = self._make_system_prompt_event()
+        with mock_cli_settings(visualizer=visualizer, default_cells_expanded=True):
+            collapsible = visualizer._create_system_prompt_collapsible(event)
+        assert collapsible.collapsed, (
+            "System prompt collapsible should always start collapsed, "
+            "even when default_cells_expanded=True."
+        )
+
+    def test_system_prompt_collapsed_when_default_cells_expanded_false(
+        self, visualizer, mock_cli_settings
+    ):
+        """System prompt must be collapsed when default_cells_expanded=False."""
+        event = self._make_system_prompt_event()
+        with mock_cli_settings(visualizer=visualizer, default_cells_expanded=False):
+            collapsible = visualizer._create_system_prompt_collapsible(event)
+        assert collapsible.collapsed
+
+    def test_system_prompt_title_shows_tool_count(self, visualizer, mock_cli_settings):
+        """Title should reflect the number of tools in the event."""
+        event = self._make_system_prompt_event()
+        with mock_cli_settings(visualizer=visualizer):
+            collapsible = visualizer._create_system_prompt_collapsible(event)
+        assert "0 tools" in collapsible.title
+
+    def test_system_prompt_via_create_event_widget_always_collapsed(
+        self, visualizer, mock_cli_settings
+    ):
+        """_create_event_widget must return a collapsed widget for system prompts."""
+        event = self._make_system_prompt_event("Big long system prompt text")
+        with mock_cli_settings(visualizer=visualizer, default_cells_expanded=True):
+            widget = visualizer._create_event_widget(event)
+        assert widget is not None
+        assert widget.collapsed, (
+            "_create_event_widget must return a collapsed collapsible "
+            "for SystemPromptEvent regardless of default_cells_expanded."
+        )
