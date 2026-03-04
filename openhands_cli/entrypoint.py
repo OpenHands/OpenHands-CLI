@@ -14,28 +14,31 @@ from pathlib import Path
 from dotenv import load_dotenv
 from rich.console import Console
 
-from openhands_cli.argparsers.main_parser import create_main_parser
-from openhands_cli.stores import (
+
+# Load .env early so that DEBUG may be set from it, then suppress noisy
+# import-time warnings (e.g. litellm's asyncio DeprecationWarning) *before*
+# the heavyweight openhands_cli modules are imported below.
+_env_path = Path.cwd() / ".env"
+if _env_path.is_file():
+    load_dotenv(dotenv_path=str(_env_path), override=False)
+
+_debug_env = os.getenv("DEBUG", "false").lower()
+if _debug_env not in ("1", "true"):
+    logging.disable(logging.WARNING)
+    warnings.filterwarnings("ignore")
+
+# E402 is expected here: the imports intentionally follow the warning-setup block.
+from openhands_cli.argparsers.main_parser import create_main_parser  # noqa: E402
+from openhands_cli.stores import (  # noqa: E402
     MissingEnvironmentVariablesError,
     check_and_warn_env_vars,
 )
-from openhands_cli.terminal_compat import check_terminal_compatibility
-from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.utils import create_seeded_instructions_from_args
+from openhands_cli.terminal_compat import check_terminal_compatibility  # noqa: E402
+from openhands_cli.theme import OPENHANDS_THEME  # noqa: E402
+from openhands_cli.utils import create_seeded_instructions_from_args  # noqa: E402
 
 
 console = Console()
-
-
-env_path = Path.cwd() / ".env"
-if env_path.is_file():
-    load_dotenv(dotenv_path=str(env_path), override=False)
-
-
-debug_env = os.getenv("DEBUG", "false").lower()
-if debug_env != "1" and debug_env != "true":
-    logging.disable(logging.WARNING)
-    warnings.filterwarnings("ignore")
 
 
 def handle_resume_logic(args: argparse.Namespace) -> str | None:
