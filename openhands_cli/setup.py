@@ -2,8 +2,6 @@ from collections.abc import Callable
 from typing import Any
 from uuid import UUID
 
-from rich.console import Console
-
 from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, Workspace
 from openhands.sdk.context import Skill
 from openhands.sdk.event.base import Event
@@ -115,9 +113,6 @@ def setup_conversation(
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
     """
-    console = Console()
-    console.print("Initializing agent...", style="white")
-
     agent = load_agent_specs(
         str(conversation_id),
         env_overrides_enabled=env_overrides_enabled,
@@ -129,8 +124,6 @@ def setup_conversation(
 
     # Load hooks from ~/.openhands/hooks.json or {working_dir}/.openhands/hooks.json
     hook_config = HookConfig.load(working_dir=get_work_dir())
-    if not hook_config.is_empty():
-        console.print("✓ Hooks loaded", style="green")
 
     # Create conversation - agent context is now set in AgentStore.load()
     conversation: BaseConversation = Conversation(
@@ -146,7 +139,5 @@ def setup_conversation(
 
     conversation.set_security_analyzer(LLMSecurityAnalyzer())
     conversation.set_confirmation_policy(confirmation_policy)
-
-    console.print(f"✓ Agent initialized with model: {agent.llm.model}", style="green")
 
     return conversation
