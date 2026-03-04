@@ -575,3 +575,107 @@ class TestMissingEnvVarsErrorHandling:
             assert "LLM_API_KEY" in captured.out
             assert "LLM_MODEL" in captured.out
             assert "Missing required environment variable(s)" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# Headless conversation-ID announcement
+# ---------------------------------------------------------------------------
+
+
+class TestPrintHeadlessConversationId:
+    """_print_headless_conversation_id must emit the ID before the agent runs."""
+
+    def test_prints_conversation_id_hex(self, monkeypatch):
+        """The hex form of the conversation ID must appear in console output."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+        app = OpenHandsApp(exit_confirmation=False)
+        cid = uuid.uuid4()
+
+        with patch("rich.console.Console") as mock_console_cls:
+            mock_console = MagicMock()
+            mock_console_cls.return_value = mock_console
+
+            app._print_headless_conversation_id(cid)
+
+        printed = " ".join(
+            str(arg) for call in mock_console.print.call_args_list for arg in call.args
+        )
+        assert cid.hex in printed
+
+    def test_prints_resume_hint(self, monkeypatch):
+        """A --resume hint must be printed so users know how to continue."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+        app = OpenHandsApp(exit_confirmation=False)
+        cid = uuid.uuid4()
+
+        with patch("rich.console.Console") as mock_console_cls:
+            mock_console = MagicMock()
+            mock_console_cls.return_value = mock_console
+
+            app._print_headless_conversation_id(cid)
+
+        printed = " ".join(
+            str(arg) for call in mock_console.print.call_args_list for arg in call.args
+        )
+        assert "--resume" in printed
+
+    def test_called_during_initialize_main_ui_in_headless_mode(self, monkeypatch):
+        """_print_headless_conversation_id is called from _initialize_main_ui
+        when headless_mode=True."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+        cid = uuid.uuid4()
+        app = OpenHandsApp(exit_confirmation=False, headless_mode=True)
+        app.conversation_state.conversation_id = cid
+
+        clr_patch = patch(
+            "openhands_cli.tui.textual_app.collect_loaded_resources",
+            return_value=MagicMock(),
+        )
+        with (
+            patch.object(app, "_print_headless_conversation_id") as mock_print_id,
+            patch.object(app, "_process_queued_inputs"),
+            patch.object(app, "query_one", return_value=MagicMock()),
+            patch("openhands_cli.tui.textual_app.AgentStore"),
+            clr_patch,
+        ):
+            app._initialize_main_ui()
+
+        mock_print_id.assert_called_once_with(cid)
+
+    def test_not_called_in_non_headless_mode(self, monkeypatch):
+        """_print_headless_conversation_id must NOT be called in TUI mode."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+        cid = uuid.uuid4()
+        app = OpenHandsApp(exit_confirmation=False, headless_mode=False)
+        app.conversation_state.conversation_id = cid
+
+        clr_patch = patch(
+            "openhands_cli.tui.textual_app.collect_loaded_resources",
+            return_value=MagicMock(),
+        )
+        with (
+            patch.object(app, "_print_headless_conversation_id") as mock_print_id,
+            patch.object(app, "_process_queued_inputs"),
+            patch.object(app, "query_one", return_value=MagicMock()),
+            patch("openhands_cli.tui.textual_app.AgentStore"),
+            clr_patch,
+        ):
+            app._initialize_main_ui()
+
+        mock_print_id.assert_not_called()
