@@ -54,12 +54,11 @@ class TestEntrypointWarningsFilterOrdering:
                     filter_lineno = node.lineno
 
             # Detect: from openhands_cli.* import ...
-            is_openhands_import = (
+            if (
                 isinstance(node, ast.ImportFrom)
                 and node.module is not None
                 and node.module.startswith("openhands_cli")
-            )
-            if is_openhands_import:
+            ):
                 if (
                     first_openhands_import_lineno is None
                     or node.lineno < first_openhands_import_lineno
