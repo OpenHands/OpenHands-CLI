@@ -256,7 +256,8 @@ async def _call_handle_index(server, request):
     renders a Jinja2 template.  We bypass it via ``__wrapped__`` to test
     the URL-generation logic without needing a full template environment.
     """
-    return await ProxyAwareServer.handle_index.__wrapped__(server, request)
+    unwrapped = getattr(ProxyAwareServer.handle_index, "__wrapped__")
+    return await unwrapped(server, request)
 
 
 @pytest.mark.parametrize(
