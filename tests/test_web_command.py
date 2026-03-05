@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
-from multidict import CIMultiDict
+from multidict import CIMultiDict, CIMultiDictProxy
 
 from openhands_cli.argparsers.main_parser import create_main_parser
 from openhands_cli.entrypoint import main
@@ -117,7 +118,16 @@ def test_launch_web_server_propagates_exception(mock_server_class):
         launch_web_server()
 
 
-# --- ProxyAwareServer URL derivation tests ---
+# --- ProxyAwareServer._get_base_url tests ---
+
+
+def _make_request(headers: dict, scheme: str = "http", host: str = "localhost:12000"):
+    """Build a minimal mock aiohttp Request with the given headers."""
+    request = MagicMock()
+    request.headers = CIMultiDictProxy(CIMultiDict(headers))
+    request.scheme = scheme
+    request.host = host
+    return request
 
 
 @pytest.mark.parametrize(
@@ -152,9 +162,156 @@ def test_launch_web_server_propagates_exception(mock_server_class):
     ],
 )
 def test_get_base_url(headers, scheme, host, expected_base):
+    request = _make_request(headers, scheme, host)
+    assert ProxyAwareServer._get_base_url(request) == expected_base
+
+
+# --- Input validation for X-Forwarded-* headers ---
+
+
+@pytest.mark.parametrize(
+    "headers, scheme, host, expected_base",
+    [
+        # Invalid proto value – falls back to request.scheme
+        (
+            {"X-Forwarded-Proto": "ftp"},
+            "http",
+            "localhost:12000",
+            "http://localhost:12000",
+        ),
+        # Empty proto – falls back to request.scheme
+        (
+            {"X-Forwarded-Proto": ""},
+            "http",
+            "localhost:12000",
+            "http://localhost:12000",
+        ),
+        # Host with newline – falls back to request.host
+        (
+            {"X-Forwarded-Host": "evil.com\r\nX-Injected: true"},
+            "http",
+            "safe-host:12000",
+            "http://safe-host:12000",
+        ),
+        # Empty host – falls back to request.host
+        (
+            {"X-Forwarded-Host": ""},
+            "http",
+            "fallback:12000",
+            "http://fallback:12000",
+        ),
+        # Excessively long host – falls back to request.host
+        (
+            {"X-Forwarded-Host": "a" * 300},
+            "http",
+            "fallback:12000",
+            "http://fallback:12000",
+        ),
+    ],
+)
+def test_get_base_url_validates_headers(headers, scheme, host, expected_base):
+    request = _make_request(headers, scheme, host)
+    assert ProxyAwareServer._get_base_url(request) == expected_base
+
+
+# --- handle_index integration tests ---
+
+
+def _build_app_with_routes():
+    """Create a minimal aiohttp app with the same routes as textual-serve."""
+    from aiohttp import web
+
+    app = web.Application()
+
+    async def _noop(_request):
+        return web.Response()
+
+    app.router.add_get("/", _noop, name="index")
+    app.router.add_get("/ws", _noop, name="websocket")
+    app.router.add_static("/static", ".", name="static")
+    return app
+
+
+def _make_full_request(
+    app,
+    headers: dict | None = None,
+    scheme: str = "http",
+    host: str = "localhost:12000",
+    query: dict | None = None,
+):
+    """Build a mock request wired to a real aiohttp app router."""
     request = MagicMock()
-    request.headers = CIMultiDict(headers)
+    request.headers = CIMultiDictProxy(CIMultiDict(headers or {}))
     request.scheme = scheme
     request.host = host
+    request.app = app
+    request.query = query or {}
+    return request
 
-    assert ProxyAwareServer._get_base_url(request) == expected_base
+
+async def _call_handle_index(server, request):
+    """Call the unwrapped handle_index to get the context dict directly.
+
+    The ``@aiohttp_jinja2.template`` decorator wraps the handler so it
+    renders a Jinja2 template.  We bypass it via ``__wrapped__`` to test
+    the URL-generation logic without needing a full template environment.
+    """
+    return await ProxyAwareServer.handle_index.__wrapped__(server, request)
+
+
+@pytest.mark.parametrize(
+    "headers, scheme, host, expected_ws_prefix, expected_static_prefix",
+    [
+        # Direct access
+        (
+            {},
+            "http",
+            "localhost:12000",
+            "ws://localhost:12000/ws",
+            "http://localhost:12000/static/",
+        ),
+        # Reverse-proxy with HTTPS
+        (
+            {
+                "X-Forwarded-Proto": "https",
+                "X-Forwarded-Host": "app.example.com",
+            },
+            "http",
+            "internal:12000",
+            "wss://app.example.com/ws",
+            "https://app.example.com/static/",
+        ),
+    ],
+)
+def test_handle_index_returns_correct_urls(
+    headers, scheme, host, expected_ws_prefix, expected_static_prefix
+):
+    """Verify handle_index produces correct WebSocket and static URLs."""
+    app = _build_app_with_routes()
+    request = _make_full_request(app, headers=headers, scheme=scheme, host=host)
+
+    server = ProxyAwareServer.__new__(ProxyAwareServer)
+    server.title = "test-app"
+
+    context = asyncio.get_event_loop().run_until_complete(
+        _call_handle_index(server, request)
+    )
+
+    assert context["app_websocket_url"] == expected_ws_prefix
+    assert context["config"]["static"]["url"] == expected_static_prefix
+    assert context["application"]["name"] == "test-app"
+    assert context["font_size"] == 16
+
+
+def test_handle_index_respects_fontsize_query():
+    """Verify handle_index reads the fontsize query parameter."""
+    app = _build_app_with_routes()
+    request = _make_full_request(app, query={"fontsize": "20"})
+
+    server = ProxyAwareServer.__new__(ProxyAwareServer)
+    server.title = "test-app"
+
+    context = asyncio.get_event_loop().run_until_complete(
+        _call_handle_index(server, request)
+    )
+    assert context["font_size"] == 20
