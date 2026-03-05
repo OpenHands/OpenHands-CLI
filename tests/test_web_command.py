@@ -5,9 +5,11 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
+from multidict import CIMultiDict
 
 from openhands_cli.argparsers.main_parser import create_main_parser
 from openhands_cli.entrypoint import main
+from openhands_cli.tui.serve import ProxyAwareServer
 
 
 @pytest.mark.parametrize(
@@ -84,7 +86,7 @@ def test_web_command_help_smoke(capsys):
         ({"host": "localhost", "port": 3000, "debug": True}, "localhost", 3000, True),
     ],
 )
-@patch("openhands_cli.tui.serve.Server")
+@patch("openhands_cli.tui.serve.ProxyAwareServer")
 def test_launch_web_server_constructs_and_serves(
     mock_server_class, kwargs, expected_host, expected_port, expected_debug
 ):
@@ -103,7 +105,7 @@ def test_launch_web_server_constructs_and_serves(
     mock_server.serve.assert_called_once_with(debug=expected_debug)
 
 
-@patch("openhands_cli.tui.serve.Server")
+@patch("openhands_cli.tui.serve.ProxyAwareServer")
 def test_launch_web_server_propagates_exception(mock_server_class):
     from openhands_cli.tui.serve import launch_web_server
 
@@ -113,3 +115,46 @@ def test_launch_web_server_propagates_exception(mock_server_class):
 
     with pytest.raises(Exception, match="Server error"):
         launch_web_server()
+
+
+# --- ProxyAwareServer URL derivation tests ---
+
+
+@pytest.mark.parametrize(
+    "headers, scheme, host, expected_base",
+    [
+        # Direct access – no forwarding headers
+        ({}, "http", "localhost:12000", "http://localhost:12000"),
+        # Reverse-proxy that sets standard forwarding headers
+        (
+            {
+                "X-Forwarded-Proto": "https",
+                "X-Forwarded-Host": "app.example.com",
+            },
+            "http",
+            "internal-host:12000",
+            "https://app.example.com",
+        ),
+        # Only X-Forwarded-Proto set (host falls back to Host header)
+        (
+            {"X-Forwarded-Proto": "https"},
+            "http",
+            "myhost:12000",
+            "https://myhost:12000",
+        ),
+        # Only X-Forwarded-Host set (scheme falls back to request.scheme)
+        (
+            {"X-Forwarded-Host": "proxy.example.com"},
+            "http",
+            "internal:12000",
+            "http://proxy.example.com",
+        ),
+    ],
+)
+def test_get_base_url(headers, scheme, host, expected_base):
+    request = MagicMock()
+    request.headers = CIMultiDict(headers)
+    request.scheme = scheme
+    request.host = host
+
+    assert ProxyAwareServer._get_base_url(request) == expected_base
