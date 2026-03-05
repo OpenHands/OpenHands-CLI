@@ -66,19 +66,18 @@ class ProxyAwareServer(Server):
             ws_scheme = "wss" if parsed.scheme == "https" else "ws"
             return urlunparse(parsed._replace(scheme=ws_scheme))
 
-        context: dict[str, Any] = {
+        return {
             "font_size": font_size,
             "app_websocket_url": get_websocket_url("websocket"),
-        }
-        context["config"] = {
-            "static": {
-                "url": get_url("static", filename="/").rstrip("/") + "/",
+            "config": {
+                "static": {
+                    "url": get_url("static", filename="/").rstrip("/") + "/",
+                },
+            },
+            "application": {
+                "name": self.title,
             },
         }
-        context["application"] = {
-            "name": self.title,
-        }
-        return context
 
 
 def launch_web_server(
