@@ -9,7 +9,7 @@ SettingsScreen {
     max-height: 90%;
     min-height: 30;
     background: $surface;
-    border: solid $primary;
+    border: round $primary;
     padding: 1;
     layout: vertical;
 }
@@ -116,7 +116,7 @@ SettingsScreen {
 }
 
 #advanced_section {
-    border: solid $secondary;
+    border: round $secondary;
     padding: 1;
     margin-top: 1;
 }

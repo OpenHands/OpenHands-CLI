@@ -8,7 +8,7 @@ ConfirmationSettingsModal {
     min-width: 50;
     min-height: 15;
     max-height: 20;
-    border: $primary 80%;
+    border: round $primary 80%;
     background: $surface 90%;
     margin: 1 1;
     padding: 1 2;
@@ -29,7 +29,7 @@ ConfirmationSettingsModal {
 
 #options_list {
     height: 8;
-    border: $primary 40%;
+    border: round $primary 40%;
     margin-bottom: 1;
 }
 
