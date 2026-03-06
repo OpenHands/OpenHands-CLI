@@ -24,7 +24,7 @@ from openhands_cli.utils import extract_text_from_message_content
 class LocalFileStore(ConversationStore):
     """Local file system implementation of conversation storage."""
 
-    def __init__(self, base_dir: str | None = None):
+    def __init__(self, base_dir: str | None = None) -> None:
         """Initialize the local file store.
 
         Args:

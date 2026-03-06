@@ -104,45 +104,34 @@ class InputField(Container):
         width: 100%;
         height: auto;
         min-height: 3;
-        layers: base autocomplete;
 
         #single_line_input {
-            layer: base;
             width: 100%;
             height: auto;
             min-height: 3;
             max-height: 8;
             background: $background;
             color: $foreground;
-            border: solid $primary !important;
+            border: round $primary !important;
         }
 
         #single_line_input:focus {
-            border: solid $primary !important;
+            border: round $primary !important;
             background: $background;
         }
 
         #multiline_input {
-            layer: base;
             width: 100%;
             height: 6;
             background: $background;
             color: $foreground;
-            border: solid $primary;
+            border: round $primary;
             display: none;
         }
 
         #multiline_input:focus {
-            border: solid $primary;
+            border: round $primary;
             background: $background;
-        }
-
-        AutoCompleteDropdown {
-            layer: autocomplete;
-            offset-x: 1;
-            offset-y: -2;
-            overlay: screen;
-            constrain: inside inflect;
         }
     }
     """
@@ -178,9 +167,9 @@ class InputField(Container):
 
     def compose(self) -> ComposeResult:
         """Create the input widgets."""
+        yield self.autocomplete
         yield self.single_line_widget
         yield self.multiline_widget
-        yield self.autocomplete
 
     def on_mount(self) -> None:
         """Focus the input when mounted."""

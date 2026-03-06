@@ -1,5 +1,6 @@
 """Cloud command handler for OpenHands CLI."""
 
+import argparse
 import asyncio
 import sys
 
@@ -27,7 +28,7 @@ async def _run_cloud_conversation(server_url: str, initial_message: str) -> None
     )
 
 
-def handle_cloud_command(args) -> None:
+def handle_cloud_command(args: argparse.Namespace) -> None:
     """Handle cloud command execution.
 
     Args:
