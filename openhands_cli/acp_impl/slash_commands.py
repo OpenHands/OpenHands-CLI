@@ -51,6 +51,13 @@ def get_available_slash_commands() -> list[AvailableCommand]:
                 root=UnstructuredCommandInput(hint=mode_options),
             ),
         ),
+        AvailableCommand(
+            name="model",
+            description="Show or set current session model",
+            input=AvailableCommandInput(
+                root=UnstructuredCommandInput(hint="provider/model-name"),
+            ),
+        ),
     ]
 
 
@@ -119,6 +126,59 @@ def get_confirm_success_text(mode: ConfirmationMode) -> str:
         Formatted success text
     """
     return f"Confirmation mode set to: {mode}\n\n{CONFIRMATION_MODES[mode]['long']}"
+
+
+def get_model_help_text(current_model: str) -> str:
+    """Get help text for /model command.
+
+    Args:
+        current_model: Current model id
+
+    Returns:
+        Formatted help text
+    """
+    return (
+        f"Current model: {current_model}\n\n"
+        f"Usage: /model <provider/model>\n"
+        f"Example: /model anthropic/claude-opus-4-6"
+    )
+
+
+def get_model_success_text(previous_model: str, new_model: str) -> str:
+    """Get success text after changing model.
+
+    Args:
+        previous_model: Previous model id
+        new_model: New model id
+
+    Returns:
+        Formatted success text
+    """
+    if previous_model == new_model:
+        return f"Model unchanged: {new_model}"
+
+    return f"Model set to: {new_model}\n\nPrevious model: {previous_model}"
+
+
+def handle_model_argument(current_model: str, argument: str) -> tuple[str, str | None]:
+    """Handle /model command and return response.
+
+    This is a pure function that computes the response text and new model
+    without any side effects.
+
+    Args:
+        current_model: Current model id for the session
+        argument: Command argument (model id to set, or empty for help)
+
+    Returns:
+        Tuple of (response_text, new_model_or_none). new_model is None if
+        no model change should occur (help text).
+    """
+    new_model = argument.strip()
+    if not new_model:
+        return get_model_help_text(current_model), None
+
+    return get_model_success_text(current_model, new_model), new_model
 
 
 def validate_confirmation_mode(mode_str: str) -> ConfirmationMode | None:
