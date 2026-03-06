@@ -58,6 +58,7 @@ from openhands_cli.acp_impl.slash_commands import (
     get_confirmation_mode_from_conversation,
     get_unknown_command_text,
     handle_confirm_argument,
+    handle_model_argument,
     parse_slash_command,
     validate_confirmation_mode,
 )
@@ -221,6 +222,49 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
 
         return response_text
 
+    def _get_current_model(self, session_id: str) -> str:
+        """Return the active model identifier for a session, or ``'unknown'``."""
+        conversation = self._active_sessions.get(session_id)
+        if conversation is None:
+            return "unknown"
+        agent = getattr(conversation, "agent", None)
+        llm = getattr(agent, "llm", None)
+        name = getattr(llm, "model", None)
+        if isinstance(name, str) and name.strip():
+            return name
+        return "unknown"
+
+    def _switch_session_model(self, session_id: str, model_id: str) -> None:
+        """Switch the LLM for an active session via the SDK profile API.
+
+        Creates (or overwrites) a persisted LLM profile derived from the
+        current session LLM with the requested *model_id*, then delegates to
+        ``LocalConversation.switch_profile`` for a clean, registry-tracked
+        switch.
+        """
+        from openhands.sdk import LocalConversation
+        from openhands.sdk.llm.llm_profile_store import LLMProfileStore
+
+        conversation = self._active_sessions.get(session_id)
+        if not isinstance(conversation, LocalConversation):
+            logger.warning("Cannot switch model: session %s not found", session_id)
+            return
+
+        new_llm = conversation.agent.llm.model_copy(update={"model": model_id})
+        profile_name = model_id.replace("/", "--")
+
+        LLMProfileStore().save(profile_name, new_llm, include_secrets=True)
+        conversation.switch_profile(profile_name)
+        logger.info("Switched session %s to model %s", session_id, model_id)
+
+    async def _cmd_model(self, session_id: str, argument: str) -> str:
+        """Handle /model command."""
+        current_model = self._get_current_model(session_id)
+        response_text, new_model = handle_model_argument(current_model, argument)
+        if new_model is not None:
+            self._switch_session_model(session_id, new_model)
+        return response_text
+
     async def initialize(
         self,
         protocol_version: int,
@@ -330,12 +374,14 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
 
     async def set_session_model(
         self,
-        model_id: str,  # noqa: ARG002
+        model_id: str,
         session_id: str,
         **_kwargs: Any,
     ) -> SetSessionModelResponse | None:
-        """Set session model (no-op for now)."""
-        logger.info(f"Set session model requested: {session_id}")
+        """Set session model for an active conversation."""
+        logger.info(f"Set session model requested: {session_id} -> {model_id}")
+        if model_id.strip():
+            self._switch_session_model(session_id=session_id, model_id=model_id)
         return SetSessionModelResponse()
 
     async def set_config_option(
@@ -547,6 +593,8 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                     response_text = create_help_text()
                 elif command == "confirm":
                     response_text = await self._cmd_confirm(session_id, argument)
+                elif command == "model":
+                    response_text = await self._cmd_model(session_id, argument)
                 else:
                     response_text = get_unknown_command_text(command)
 

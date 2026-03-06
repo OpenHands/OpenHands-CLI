@@ -405,12 +405,16 @@ async def test_set_session_mode(acp_agent):
 
 @pytest.mark.asyncio
 async def test_set_session_model(acp_agent):
-    """Test setting session model."""
-    response = await acp_agent.set_session_model(
-        session_id="test-session", model_id="default"
-    )
+    """Test setting session model delegates to _switch_session_model."""
+    with patch.object(acp_agent, "_switch_session_model") as mock_switch:
+        response = await acp_agent.set_session_model(
+            session_id="test-session", model_id="anthropic/claude-opus-4-6"
+        )
 
     assert response is not None
+    mock_switch.assert_called_once_with(
+        session_id="test-session", model_id="anthropic/claude-opus-4-6"
+    )
 
 
 @pytest.mark.asyncio
