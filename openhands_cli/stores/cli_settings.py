@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 from pydantic import BaseModel, field_validator
+from textual.theme import BUILTIN_THEMES
 
 
 # Refinement triggers when predicted success probability falls below this threshold
@@ -46,12 +47,26 @@ class CriticSettings(BaseModel):
         return v
 
 
+VALID_THEMES: set[str] = {"openhands"} | set(BUILTIN_THEMES.keys())
+
+
 class CliSettings(BaseModel):
     """Model for CLI-level settings."""
 
     default_cells_expanded: bool = False
     auto_open_plan_panel: bool = True
+    theme: str = "openhands"
     critic: CriticSettings = CriticSettings()
+
+    @field_validator("theme")
+    @classmethod
+    def validate_theme(cls, v: str) -> str:
+        """Validate that theme is a known Textual built-in or 'openhands'."""
+        if v not in VALID_THEMES:
+            raise ValueError(
+                f"Unknown theme '{v}'. Must be one of: {sorted(VALID_THEMES)}"
+            )
+        return v
 
     @classmethod
     def get_config_path(cls) -> Path:
