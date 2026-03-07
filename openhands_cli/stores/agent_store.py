@@ -387,12 +387,14 @@ class AgentStore:
                 f"User operating system: {get_os_description()}",
             ]
         )
-        return AgentContext(
-            skills=skills,
-            system_message_suffix=system_suffix,
-            load_user_skills=True,
-            load_public_skills=True,
-            marketplace_path=self.cli_settings.marketplace_path,
+        return AgentContext.model_validate(
+            {
+                "skills": skills,
+                "system_message_suffix": system_suffix,
+                "load_user_skills": True,
+                "load_public_skills": True,
+                "marketplace_path": self.cli_settings.marketplace_path,
+            }
         )
 
     def _maybe_build_condenser(

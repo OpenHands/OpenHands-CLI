@@ -1,5 +1,6 @@
 """Unit tests for skills loading functionality in AgentStore."""
 
+from typing import cast
 from unittest.mock import patch
 
 import pytest
@@ -215,7 +216,8 @@ This is a user microagent for testing.
 
         assert loaded_agent is not None
         assert loaded_agent.agent_context is not None
-        assert loaded_agent.agent_context.marketplace_path == "marketplaces/custom.json"
+        agent_context = cast(CompatAgentContext, loaded_agent.agent_context)
+        assert agent_context.marketplace_path == "marketplaces/custom.json"
 
     def test_agent_store_caches_cli_settings_for_agent_context(
         self, temp_project_dir, persisted_agent, tmp_path
@@ -247,6 +249,5 @@ This is a user microagent for testing.
 
         assert loaded_agent is not None
         assert loaded_agent.agent_context is not None
-        assert (
-            loaded_agent.agent_context.marketplace_path == "marketplaces/initial.json"
-        )
+        agent_context = cast(CompatAgentContext, loaded_agent.agent_context)
+        assert agent_context.marketplace_path == "marketplaces/initial.json"
