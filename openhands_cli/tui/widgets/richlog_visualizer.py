@@ -562,7 +562,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 return f"{action_type}: {self._clean_and_truncate(action.command)}"
             elif hasattr(action, "path") and action.path:
                 # For file actions, truncate from start to show filename
-                return f"{action_type}: {self._clean_and_truncate(action.path, from_start=False)}"
+
+                return f"{action_type}: {
+                    self._clean_and_truncate(
+                        action.path,
+                        from_start=False,
+                    )
+                }"
             elif hasattr(action, "content") and action.content:
                 return f"{action_type}: {self._clean_and_truncate(action.content)}"
             elif hasattr(action, "message") and action.message:
