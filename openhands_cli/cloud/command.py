@@ -4,18 +4,17 @@ import argparse
 import asyncio
 import sys
 
-from rich.console import Console
-
-from openhands_cli.auth.utils import AuthenticationError, ensure_valid_auth
+from openhands_cli.auth.utils import (
+    AuthenticationError,
+    console_print,
+    ensure_valid_auth,
+)
 from openhands_cli.cloud.conversation import (
     CloudConversationError,
     create_cloud_conversation,
 )
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.utils import create_seeded_instructions_from_args
-
-
-console = Console()
 
 
 async def _run_cloud_conversation(server_url: str, initial_message: str) -> None:
@@ -41,14 +40,13 @@ def handle_cloud_command(args: argparse.Namespace) -> None:
         # Get the initial message from args
         queued_inputs = create_seeded_instructions_from_args(args)
         if not queued_inputs:
-            console.print(
-                f"[{OPENHANDS_THEME.error}]Error: No initial message "
-                f"provided for cloud conversation."
-                f"[/{OPENHANDS_THEME.error}]"
+            console_print(
+                "Error: No initial message provided for cloud conversation.",
+                style=OPENHANDS_THEME.error,
             )
-            console.print(
-                f"[{OPENHANDS_THEME.secondary}]Use --task or --file to "
-                f"provide an initial message.[/{OPENHANDS_THEME.secondary}]"
+            console_print(
+                "Use --task or --file to provide an initial message.",
+                style=OPENHANDS_THEME.secondary,
             )
             return
 
@@ -57,17 +55,14 @@ def handle_cloud_command(args: argparse.Namespace) -> None:
         # Ensure authentication and create cloud conversation
         asyncio.run(_run_cloud_conversation(args.server_url, initial_message))
 
-        console.print(
-            f"[{OPENHANDS_THEME.success}]Cloud conversation created "
-            f"successfully! 🚀[/{OPENHANDS_THEME.success}]"
+        console_print(
+            "Cloud conversation created successfully! 🚀",
+            style=OPENHANDS_THEME.success,
         )
 
     except (CloudConversationError, AuthenticationError):
         # Error already printed in the function
         sys.exit(1)
     except Exception as e:
-        console.print(
-            f"[{OPENHANDS_THEME.error}]Unexpected error: "
-            f"{str(e)}[/{OPENHANDS_THEME.error}]"
-        )
+        console_print(f"Unexpected error: {e}", style=OPENHANDS_THEME.error)
         sys.exit(1)
