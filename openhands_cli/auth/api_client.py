@@ -166,26 +166,22 @@ def _ask_user_consent_for_overwrite(
 
     console_print("Current configuration:", style=OPENHANDS_THEME.secondary)
     console_print(
-        f"  • Model: [{OPENHANDS_THEME.accent}]{html.escape(current_model)}"
-        f"[/{OPENHANDS_THEME.accent}]"
+        f"  • Model: {html.escape(current_model)}", style=OPENHANDS_THEME.accent
     )
 
     if existing_agent.llm.base_url:
         console_print(
-            f"  • Base URL: [{OPENHANDS_THEME.accent}]"
-            f"{html.escape(existing_agent.llm.base_url)}[/{OPENHANDS_THEME.accent}]"
+            f"  • Base URL: {html.escape(existing_agent.llm.base_url)}",
+            style=OPENHANDS_THEME.accent,
         )
 
     console_print("\nNew configuration from cloud:", style=OPENHANDS_THEME.secondary)
-    console_print(
-        f"  • Model: [{OPENHANDS_THEME.accent}]{html.escape(new_model)}"
-        f"[/{OPENHANDS_THEME.accent}]"
-    )
+    console_print(f"  • Model: {html.escape(new_model)}", style=OPENHANDS_THEME.accent)
 
     if base_url:
         console_print(
-            f"  • Base URL: [{OPENHANDS_THEME.accent}]{html.escape(base_url)}"
-            f"[/{OPENHANDS_THEME.accent}]"
+            f"  • Base URL: {html.escape(base_url)}",
+            style=OPENHANDS_THEME.accent,
         )
 
     try:
