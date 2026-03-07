@@ -2,7 +2,8 @@
 
 import json
 import os
-from pathlib import Path
+import re
+from pathlib import Path, PurePosixPath
 
 from pydantic import BaseModel, field_validator
 
@@ -10,6 +11,8 @@ from pydantic import BaseModel, field_validator
 # Placeholder text shown in UI for marketplace path input
 # When marketplace_path is None, all public skills load without filtering
 MARKETPLACE_PATH_PLACEHOLDER = "marketplaces/default.json"
+MARKETPLACE_PATH_PATTERN = re.compile(r"^[A-Za-z0-9_-]+(?:/[A-Za-z0-9_.-]+)*\.json$")
+
 
 # Refinement triggers when predicted success probability falls below this threshold
 # Default: 0.6 (60%) - agent is prompted to review work when critic scores < 60%
@@ -55,6 +58,33 @@ class CliSettings(BaseModel):
 
     default_cells_expanded: bool = False
     auto_open_plan_panel: bool = True
+
+    @field_validator("marketplace_path", mode="before")
+    @classmethod
+    def validate_marketplace_path(cls, value: str | None) -> str | None:
+        """Normalize and validate marketplace_path values."""
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            return value
+
+        normalized = value.strip()
+        if not normalized:
+            return None
+        if not MARKETPLACE_PATH_PATTERN.fullmatch(normalized):
+            raise ValueError(
+                "marketplace_path must be a relative JSON path like "
+                "'marketplaces/default.json'"
+            )
+
+        path = PurePosixPath(normalized)
+        if path.is_absolute() or ".." in path.parts:
+            raise ValueError(
+                "marketplace_path must not be absolute or traverse directories"
+            )
+
+        return normalized
+
     # None = load all public skills, path string = filter to specific marketplace
     marketplace_path: str | None = None
     critic: CriticSettings = CriticSettings()

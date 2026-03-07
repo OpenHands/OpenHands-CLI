@@ -185,3 +185,68 @@ This is a user microagent for testing.
 
             # Should have project skills + mocked public skill
             assert "github" in skill_names  # mocked public skill
+
+    def test_marketplace_path_flows_into_agent_context_when_supported(
+        self, temp_project_dir, persisted_agent, tmp_path
+    ):
+        """Test marketplace_path is forwarded when the SDK model supports it."""
+        from openhands.sdk import AgentContext
+        from openhands_cli.stores import AgentStore, CliSettings
+
+        class CompatAgentContext(AgentContext):
+            marketplace_path: str | None = None
+
+        config_path = tmp_path / "cli_config.json"
+
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
+            CliSettings(marketplace_path="marketplaces/custom.json").save()
+
+            with (
+                patch(
+                    "openhands.sdk.context.agent_context.load_public_skills",
+                    return_value=[],
+                ),
+                patch(
+                    "openhands_cli.stores.agent_store.AgentContext", CompatAgentContext
+                ),
+            ):
+                agent_store = AgentStore()
+                loaded_agent = agent_store.load_or_create()
+
+        assert loaded_agent is not None
+        assert loaded_agent.agent_context is not None
+        assert loaded_agent.agent_context.marketplace_path == "marketplaces/custom.json"
+
+    def test_agent_store_caches_cli_settings_for_agent_context(
+        self, temp_project_dir, persisted_agent, tmp_path
+    ):
+        """Test AgentStore reuses cached CLI settings during agent construction."""
+        from openhands.sdk import AgentContext
+        from openhands_cli.stores import AgentStore, CliSettings
+
+        class CompatAgentContext(AgentContext):
+            marketplace_path: str | None = None
+
+        config_path = tmp_path / "cli_config.json"
+
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
+            CliSettings(marketplace_path="marketplaces/initial.json").save()
+
+            with (
+                patch(
+                    "openhands.sdk.context.agent_context.load_public_skills",
+                    return_value=[],
+                ),
+                patch(
+                    "openhands_cli.stores.agent_store.AgentContext", CompatAgentContext
+                ),
+            ):
+                agent_store = AgentStore()
+                CliSettings(marketplace_path="marketplaces/updated.json").save()
+                loaded_agent = agent_store.load_or_create()
+
+        assert loaded_agent is not None
+        assert loaded_agent.agent_context is not None
+        assert (
+            loaded_agent.agent_context.marketplace_path == "marketplaces/initial.json"
+        )

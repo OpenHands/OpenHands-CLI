@@ -158,8 +158,8 @@ class TestCliSettingsTab:
                 "custom/marketplace.json",
                 "custom/marketplace.json",
             ),
-            ("custom/marketplace.json", "", None),  # Empty string becomes None
-            (None, MARKETPLACE_PATH_PLACEHOLDER, MARKETPLACE_PATH_PLACEHOLDER),
+            ("custom/marketplace.json", "   ", None),  # Whitespace becomes None
+            (None, f"  {MARKETPLACE_PATH_PLACEHOLDER}  ", MARKETPLACE_PATH_PLACEHOLDER),
         ],
     )
     async def test_get_updated_fields_reflects_marketplace_path(

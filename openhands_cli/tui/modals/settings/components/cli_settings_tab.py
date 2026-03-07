@@ -128,9 +128,9 @@ class CliSettingsTab(Container):
                 label="Marketplace Path",
                 description=(
                     "Path to the marketplace JSON file that defines which skills "
-                    "are loaded. Supports formats: 'marketplaces/default.json' "
-                    "(default repo), 'owner/repo:path/to/marketplace.json' "
-                    "(custom repo), or leave empty to load all skills."
+                    "are loaded. Use a relative JSON path like "
+                    "'marketplaces/default.json', or leave empty to load all "
+                    "skills."
                 ),
                 input_id="marketplace_path_input",
                 value=self._initial_settings.marketplace_path or "",
@@ -143,7 +143,9 @@ class CliSettingsTab(Container):
         Returns:
             Dict with CLI settings values.
         """
-        marketplace_value = self.query_one("#marketplace_path_input", Input).value
+        marketplace_value = self.query_one(
+            "#marketplace_path_input", Input
+        ).value.strip()
         return {
             "default_cells_expanded": self.query_one(
                 "#default_cells_expanded_switch", Switch
@@ -151,5 +153,5 @@ class CliSettingsTab(Container):
             "auto_open_plan_panel": self.query_one(
                 "#auto_open_plan_panel_switch", Switch
             ).value,
-            "marketplace_path": marketplace_value if marketplace_value else None,
+            "marketplace_path": marketplace_value or None,
         }
