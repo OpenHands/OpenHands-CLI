@@ -406,11 +406,19 @@ async def test_set_session_mode(acp_agent):
 @pytest.mark.asyncio
 async def test_set_session_model(acp_agent):
     """Test setting session model."""
+    mock_conversation = MagicMock()
+    mock_conversation.state.agent.llm.model = "openai/gpt-4o"
+    acp_agent._active_sessions["test-session"] = mock_conversation
+
     response = await acp_agent.set_session_model(
-        session_id="test-session", model_id="default"
+        session_id="test-session", model_id="anthropic/claude-opus-4-6"
     )
 
     assert response is not None
+    assert (
+        acp_agent._active_sessions["test-session"].state.agent.llm.model
+        == "anthropic/claude-opus-4-6"
+    )
 
 
 @pytest.mark.asyncio
