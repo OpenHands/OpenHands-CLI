@@ -28,20 +28,37 @@ def acp_agent(mock_connection):
 
 
 @pytest.mark.asyncio
-async def test_initialize(acp_agent):
-    """Test agent initialization always returns auth method."""
-    response = await acp_agent.initialize(
-        protocol_version=1,
-        client_info=Implementation(name="test-client", version="1.0.0"),
-    )
+async def test_initialize_returns_auth_methods_when_not_authenticated(acp_agent):
+    """Test agent initialization returns auth method when not authenticated."""
+    with patch.object(acp_agent, "_is_authenticated", return_value=False):
+        response = await acp_agent.initialize(
+            protocol_version=1,
+            client_info=Implementation(name="test-client", version="1.0.0"),
+        )
 
-    assert response.protocol_version == 1
-    assert isinstance(response.agent_capabilities, AgentCapabilities)
-    assert response.agent_capabilities.load_session is True
-    # Auth method is always returned for OAuth authentication
-    assert len(response.auth_methods) == 1
-    assert response.auth_methods[0].id == "oauth"
-    assert response.auth_methods[0].field_meta == {"type": "agent"}
+        assert response.protocol_version == 1
+        assert isinstance(response.agent_capabilities, AgentCapabilities)
+        assert response.agent_capabilities.load_session is True
+        # Auth method returned when not authenticated
+        assert response.auth_methods is not None
+        assert len(response.auth_methods) == 1
+        assert response.auth_methods[0].id == "oauth"
+        assert response.auth_methods[0].field_meta == {"type": "agent"}
+
+
+@pytest.mark.asyncio
+async def test_initialize_no_auth_methods_when_authenticated(acp_agent):
+    """Test agent initialization returns empty auth_methods when authenticated."""
+    with patch.object(acp_agent, "_is_authenticated", return_value=True):
+        response = await acp_agent.initialize(
+            protocol_version=1,
+            client_info=Implementation(name="test-client", version="1.0.0"),
+        )
+
+        assert response.protocol_version == 1
+        assert isinstance(response.agent_capabilities, AgentCapabilities)
+        # No auth methods when already authenticated
+        assert len(response.auth_methods) == 0
 
 
 @pytest.mark.asyncio
@@ -748,3 +765,116 @@ async def test_new_session_no_replay_for_new_conversation(mock_connection, tmp_p
         # Verify EventSubscriber was NOT called for replaying events
         # (it may be created for _send_available_commands, but not called with events)
         mock_subscriber.assert_not_called()
+
+
+class TestHasAwsCredentials:
+    """Tests for _has_aws_credentials method."""
+
+    def test_has_aws_credentials_with_access_key_env(self, acp_agent, monkeypatch):
+        """Test detection of AWS_ACCESS_KEY_ID environment variable."""
+        monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test-key")
+        assert acp_agent._has_aws_credentials() is True
+
+    def test_has_aws_credentials_with_secret_key_env(self, acp_agent, monkeypatch):
+        """Test detection of AWS_SECRET_ACCESS_KEY environment variable."""
+        monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "test-secret")
+        assert acp_agent._has_aws_credentials() is True
+
+    def test_has_aws_credentials_with_profile_env(self, acp_agent, monkeypatch):
+        """Test detection of AWS_PROFILE environment variable."""
+        monkeypatch.setenv("AWS_PROFILE", "my-profile")
+        assert acp_agent._has_aws_credentials() is True
+
+    def test_has_aws_credentials_with_default_profile_env(self, acp_agent, monkeypatch):
+        """Test detection of AWS_DEFAULT_PROFILE environment variable."""
+        monkeypatch.setenv("AWS_DEFAULT_PROFILE", "default")
+        assert acp_agent._has_aws_credentials() is True
+
+    def test_has_aws_credentials_with_credentials_file(self, acp_agent, tmp_path):
+        """Test detection of ~/.aws/credentials file."""
+        with patch("pathlib.Path.home", return_value=tmp_path):
+            aws_dir = tmp_path / ".aws"
+            aws_dir.mkdir()
+            (aws_dir / "credentials").touch()
+            assert acp_agent._has_aws_credentials() is True
+
+    def test_has_aws_credentials_with_config_file(self, acp_agent, tmp_path):
+        """Test detection of ~/.aws/config file."""
+        with patch("pathlib.Path.home", return_value=tmp_path):
+            aws_dir = tmp_path / ".aws"
+            aws_dir.mkdir()
+            (aws_dir / "config").touch()
+            assert acp_agent._has_aws_credentials() is True
+
+    def test_has_aws_credentials_returns_false_when_no_credentials(
+        self, acp_agent, tmp_path, monkeypatch
+    ):
+        """Test returns False when no AWS credentials are available."""
+        # Clear any AWS env vars
+        for var in [
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+            "AWS_PROFILE",
+            "AWS_DEFAULT_PROFILE",
+        ]:
+            monkeypatch.delenv(var, raising=False)
+
+        # Point home to a temp dir with no .aws folder
+        with patch("pathlib.Path.home", return_value=tmp_path):
+            assert acp_agent._has_aws_credentials() is False
+
+
+class TestIsAuthenticatedWithAwsCredentials:
+    """Tests for _is_authenticated method with AWS credentials fallback."""
+
+    @pytest.mark.asyncio
+    async def test_is_authenticated_returns_true_with_agent_specs(self, acp_agent):
+        """Test _is_authenticated returns True when agent_settings.json exists."""
+        with patch(
+            "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+        ) as mock_load:
+            mock_load.return_value = MagicMock()
+            result = await acp_agent._is_authenticated()
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_is_authenticated_falls_back_to_aws_credentials(
+        self, acp_agent, monkeypatch
+    ):
+        """Test _is_authenticated checks AWS credentials when no agent_settings.json."""
+        from openhands_cli.setup import MissingAgentSpec
+
+        monkeypatch.setenv("AWS_PROFILE", "bedrock-user")
+
+        with patch(
+            "openhands_cli.acp_impl.agent.local_agent.load_agent_specs",
+            side_effect=MissingAgentSpec("No settings"),
+        ):
+            result = await acp_agent._is_authenticated()
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_is_authenticated_returns_false_when_no_credentials(
+        self, acp_agent, tmp_path, monkeypatch
+    ):
+        """Test _is_authenticated returns False when no credentials exist."""
+        from openhands_cli.setup import MissingAgentSpec
+
+        # Clear AWS env vars
+        for var in [
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+            "AWS_PROFILE",
+            "AWS_DEFAULT_PROFILE",
+        ]:
+            monkeypatch.delenv(var, raising=False)
+
+        with (
+            patch(
+                "openhands_cli.acp_impl.agent.local_agent.load_agent_specs",
+                side_effect=MissingAgentSpec("No settings"),
+            ),
+            patch("pathlib.Path.home", return_value=tmp_path),
+        ):
+            result = await acp_agent._is_authenticated()
+            assert result is False
