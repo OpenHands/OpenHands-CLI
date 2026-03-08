@@ -109,6 +109,30 @@ class TestHistoryIntegration:
         )
 
 
+class TestPageUpHistoryLoading:
+    """Tests for PageUp -> LoadOlderEvents wiring."""
+
+    def test_pageup_posts_load_older_message_and_stops_event(self):
+        app = OpenHandsApp.__new__(OpenHandsApp)
+        app.conversation_manager = Mock()
+
+        event = Mock()
+        event.key = "pageup"
+        event.stop = Mock()
+        event.prevent_default = Mock()
+        event.is_printable = False
+
+        app.on_key(event)
+
+        app.conversation_manager.post_message.assert_called_once()
+        posted = app.conversation_manager.post_message.call_args[0][0]
+        from openhands_cli.tui.core.events import LoadOlderEvents
+
+        assert isinstance(posted, LoadOlderEvents)
+        event.stop.assert_called_once()
+        event.prevent_default.assert_called_once()
+
+
 class TestInputAreaContainerCommands:
     """Tests for InputAreaContainer command methods."""
 

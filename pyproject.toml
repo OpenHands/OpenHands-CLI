@@ -91,6 +91,9 @@ extend-select = ["B006", "B008", "B039", "RUF012"]
 [tool.ruff.lint.per-file-ignores]
 # Test files often have unused arguments (fixtures, mocks, interface implementations)
 "tests/**/*.py" = ["ARG"]
+# BUG-005: entrypoint places a warnings.filterwarnings() call between stdlib and
+# third-party imports to suppress RequestsDependencyWarning before it fires.
+"openhands_cli/entrypoint.py" = ["E402", "I001"]
 
 
 

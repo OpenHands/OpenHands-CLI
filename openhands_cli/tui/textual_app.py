@@ -73,6 +73,7 @@ from openhands_cli.tui.core import (
     RequestSwitchConfirmation,
     SendMessage,
 )
+from openhands_cli.tui.core.events import LoadOlderEvents
 from openhands_cli.tui.core.conversation_manager import SwitchConfirmed
 from openhands_cli.tui.core.runner_factory import RunnerFactory
 from openhands_cli.tui.modals import SettingsScreen
@@ -191,6 +192,10 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             resume_conversation_id if resume_conversation_id else uuid.uuid4()
         )
         self.conversation_state.conversation_id = initial_conversation_id
+
+        # BUG-001: Track whether this is a resume session so _initialize_main_ui()
+        # can eagerly create the runner to trigger replay_historical_events().
+        self._is_resume = resume_conversation_id is not None
 
         self.conversation_dir = BaseConversation.get_persistence_dir(
             get_conversations_dir(), initial_conversation_id
@@ -456,6 +461,16 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # in SplashContent via data_bind
         self.conversation_state.set_loaded_resources(loaded_resources)
 
+        # BUG-001: For --resume sessions, eagerly create the runner so that
+        # replay_historical_events() fires before the user sends their first
+        # message. ORDERING CONSTRAINT: must be called after set_loaded_resources()
+        # (widgets mounted) and before _process_queued_inputs() so the UI is
+        # ready to render replayed events.
+        if self._is_resume and self.conversation_state.conversation_id is not None:
+            self.conversation_manager.ensure_runner(
+                self.conversation_state.conversation_id
+            )
+
         # Process any queued inputs
         self._process_queued_inputs()
 
@@ -506,7 +521,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
           losing typing context)
         - When Tab is pressed from input area, focus the most recent (last) cell
           instead of the first one (unless autocomplete is showing)
+        - PageUp requests loading older replay history when available
         """
+        if event.key == "pageup":
+            self.conversation_manager.post_message(LoadOlderEvents())
+            event.stop()
+            event.prevent_default()
+            return
         # Handle Tab from input area - focus most recent cell
         # Skip if autocomplete dropdown is visible (Tab is used for selection)
         if event.key == "tab" and isinstance(self.focused, Input | TextArea):
@@ -541,8 +562,14 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         When the user finishes selecting text by releasing the mouse button,
         this method checks if there's selected text and copies it to clipboard.
         """
-        # Get selected text from the screen
-        selected_text = self.screen.get_selected_text()
+        # Get selected text from the screen.
+        # BUG-002: Wrap in try/except — during rapid clicking, Toast widgets in
+        # transient lifecycle states cause KeyError in Textual's style resolution.
+        # See upstream Textual issue #5646.
+        try:
+            selected_text = self.screen.get_selected_text()
+        except Exception:
+            return
         if not selected_text:
             return
 
