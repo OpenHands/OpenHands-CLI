@@ -81,7 +81,18 @@ class CliProgrammaticSettings(SDKSettings):
         cli_settings: CliSettings | None,
     ) -> CliProgrammaticSettings:
         cli_settings = cli_settings or CliSettings()
-        base = agent_settings.model_dump() if agent_settings is not None else {}
+        base = (
+            agent_settings.model_dump(
+                exclude={
+                    "enable_critic",
+                    "enable_iterative_refinement",
+                    "critic_threshold",
+                    "max_refinement_iterations",
+                }
+            )
+            if agent_settings is not None
+            else {}
+        )
         return cls(
             **base,
             enable_critic=cli_settings.critic.enable_critic,

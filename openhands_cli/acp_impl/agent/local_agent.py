@@ -7,6 +7,7 @@ from typing import Any
 from uuid import UUID
 
 from acp import Client, NewSessionResponse, RequestError
+from acp.schema import HttpMcpServer, McpServerStdio, SseMcpServer
 
 from openhands.sdk import (
     BaseConversation,
@@ -195,8 +196,7 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
     async def new_session(
         self,
         cwd: str,
-        mcp_servers: list[Any],
-        working_dir: str | None = None,
+        mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None,
         **_kwargs: Any,
     ) -> NewSessionResponse:
         """Create a new conversation session."""
@@ -207,7 +207,10 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
                 {"reason": "Authentication required to create a session"}
             )
 
-        effective_working_dir = working_dir or cwd or str(Path.cwd())
+        working_dir = _kwargs.get("working_dir")
+        effective_working_dir = (
+            working_dir if isinstance(working_dir, str) else cwd or str(Path.cwd())
+        )
         logger.info(f"Using working directory: {effective_working_dir}")
 
         return await super().new_session(

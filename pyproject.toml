@@ -140,9 +140,9 @@ pythonVersion = "3.12"
 useLibraryCodeForTypes = true
 typeCheckingMode = "standard"
 
-# Use the exact software-agent-sdk commit for cross-repo settings schema changes
+# Use the SDK issue branch for cross-repo settings schema changes until released.
 
 [tool.uv.sources]
-openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "5356a26e909b660d280de312cdc0409037c9ff48" }
-openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "5356a26e909b660d280de312cdc0409037c9ff48" }
-openhands-workspace = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-workspace", rev = "5356a26e909b660d280de312cdc0409037c9ff48" }
+openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", branch = "openhands/issue-2228-sdk-settings-schema" }
+openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", branch = "openhands/issue-2228-sdk-settings-schema" }
+openhands-workspace = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-workspace", branch = "openhands/issue-2228-sdk-settings-schema" }
