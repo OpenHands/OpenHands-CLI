@@ -4,9 +4,9 @@ from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
-from textual.widgets import Label, Static, Switch
+from textual.widgets import Label, Select, Static, Switch
 
-from openhands_cli.stores.cli_settings import CliSettings
+from openhands_cli.stores.cli_settings import VALID_THEMES, CliSettings
 
 
 class SettingsSwitch(Container):
@@ -57,6 +57,8 @@ class CliSettingsTab(Container):
 
     def compose(self) -> ComposeResult:
         """Compose the CLI settings tab content."""
+        theme_options = [(name, name) for name in sorted(VALID_THEMES)]
+
         with VerticalScroll(id="cli_settings_content"):
             yield Static("CLI Settings", classes="form_section_title")
 
@@ -82,11 +84,28 @@ class CliSettingsTab(Container):
                 value=self._initial_settings.auto_open_plan_panel,
             )
 
+            with Container(classes="form_group"):
+                yield Label("Theme:", classes="form_label")
+                yield Select(
+                    theme_options,
+                    value=self._initial_settings.theme,
+                    id="theme_select",
+                    classes="form_select",
+                    type_to_search=True,
+                )
+                yield Static(
+                    "Choose the TUI color theme. The custom 'openhands' theme "
+                    "is the default. Textual built-in themes like 'dracula', "
+                    "'nord', 'catppuccin-mocha', etc. are also available.",
+                    classes="form_help",
+                )
+
     def get_updated_fields(self) -> dict[str, Any]:
         """Return only the fields this tab manages.
 
         Returns:
-            Dict with 'default_cells_expanded' and 'auto_open_plan_panel' values.
+            Dict with 'default_cells_expanded', 'auto_open_plan_panel', and
+            'theme' values.
         """
         return {
             "default_cells_expanded": self.query_one(
@@ -95,4 +114,5 @@ class CliSettingsTab(Container):
             "auto_open_plan_panel": self.query_one(
                 "#auto_open_plan_panel_switch", Switch
             ).value,
+            "theme": self.query_one("#theme_select", Select).value,
         }

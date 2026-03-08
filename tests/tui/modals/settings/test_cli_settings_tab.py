@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from textual.app import App, ComposeResult
-from textual.widgets import Switch
+from textual.widgets import Select, Switch
 
 from openhands_cli.stores.cli_settings import CliSettings
 from openhands_cli.tui.modals.settings.components.cli_settings_tab import (
@@ -123,8 +123,45 @@ class TestCliSettingsTab:
             tab = app.query_one(CliSettingsTab)
             result = tab.get_updated_fields()
 
-            # Should only contain the 2 fields this tab manages
+            # Should contain the 3 fields this tab manages
             assert set(result.keys()) == {
                 "default_cells_expanded",
                 "auto_open_plan_panel",
+                "theme",
             }
+
+    @pytest.mark.asyncio
+    async def test_compose_renders_theme_select_with_default(self):
+        """Verify the theme selector is rendered with the default value."""
+        app = _TestApp(initial_settings=CliSettings())
+
+        async with app.run_test():
+            tab = app.query_one(CliSettingsTab)
+            select = tab.query_one("#theme_select", Select)
+            assert select.value == "openhands"
+
+    @pytest.mark.asyncio
+    async def test_compose_renders_theme_select_with_custom_value(self):
+        """Verify the theme selector reflects a non-default initial value."""
+        initial = CliSettings(theme="dracula")
+        app = _TestApp(initial_settings=initial)
+
+        async with app.run_test():
+            tab = app.query_one(CliSettingsTab)
+            select = tab.query_one("#theme_select", Select)
+            assert select.value == "dracula"
+
+    @pytest.mark.asyncio
+    async def test_get_updated_fields_reflects_theme_change(self):
+        """Verify get_updated_fields() captures theme select state."""
+        initial = CliSettings(theme="openhands")
+        app = _TestApp(initial_settings=initial)
+
+        async with app.run_test():
+            tab = app.query_one(CliSettingsTab)
+            select = tab.query_one("#theme_select", Select)
+
+            select.value = "nord"
+
+            result = tab.get_updated_fields()
+            assert result["theme"] == "nord"
