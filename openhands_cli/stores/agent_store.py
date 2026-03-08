@@ -4,10 +4,17 @@ from __future__ import annotations
 import json
 import os
 import re
-from typing import Any
+from typing import Any, Literal
 
 from prompt_toolkit import HTML, print_formatted_text
-from pydantic import BaseModel, SecretStr
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    SecretStr,
+    ValidationError,
+    field_serializer,
+    field_validator,
+)
 from rich.console import Console
 
 from openhands.sdk import (
@@ -22,6 +29,7 @@ from openhands.sdk.conversation.persistence_const import BASE_STATE
 from openhands.sdk.critic.base import CriticBase
 from openhands.sdk.critic.impl.api import APIBasedCritic
 from openhands.sdk.tool import Tool
+from openhands.sdk.utils.pydantic_secrets import serialize_secret, validate_secret
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
     get_conversations_dir,
@@ -246,33 +254,121 @@ def apply_llm_overrides(llm: LLM, overrides: LLMEnvOverrides) -> LLM:
     return llm.model_copy(update=overrides.model_dump(exclude_none=True))
 
 
+class PersistedAgentSettingsV1(BaseModel):
+    """Persisted subset of agent settings.
+
+    This is intentionally a CLI-owned schema ("strong contract") rather than a
+    serialized SDK Agent. It only stores user-facing knobs that the CLI supports.
+
+    Notes:
+    - We store only a small set of fields and rely on the SDK + CLI defaults for
+      everything else.
+    - Unknown fields are forbidden to keep the on-disk contract stable.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1]
+
+    model: str
+    api_key: SecretStr | None = None
+    base_url: str | None = None
+
+    memory_condensation_enabled: bool = True
+
+    @field_serializer("api_key")
+    def _serialize_api_key(self, v: SecretStr | None, info):
+        return serialize_secret(v, info)
+
+    @field_validator("api_key")
+    @classmethod
+    def _validate_api_key(cls, v: str | SecretStr | None, info) -> SecretStr | None:
+        return validate_secret(v, info)
+
+
 class AgentStore:
     """Single source of truth for persisting/retrieving AgentSpec."""
 
     def __init__(self) -> None:
         self.file_store = LocalFileStore(root=get_persistence_dir())
 
-    def load_from_disk(self) -> Agent | None:
-        """Load an agent configuration from disk storage.
+    def _write_settings(self, settings: PersistedAgentSettingsV1) -> None:
+        serialized = settings.model_dump_json(
+            exclude_defaults=True,
+            exclude_none=True,
+            context={"expose_secrets": True},
+            indent=2,
+        )
+        self.file_store.write(AGENT_SETTINGS_PATH, serialized)
 
-        This method only loads the persisted agent configuration. It does not
-        apply runtime configuration or create agents from environment variables.
+    @staticmethod
+    def _settings_from_agent(agent: Agent) -> PersistedAgentSettingsV1:
+        api_key = agent.llm.api_key
+        if isinstance(api_key, str):
+            api_key = SecretStr(api_key)
+        if not isinstance(api_key, SecretStr):
+            api_key = None
+
+        return PersistedAgentSettingsV1(
+            schema_version=1,
+            model=agent.llm.model,
+            api_key=api_key,
+            base_url=agent.llm.base_url,
+            memory_condensation_enabled=bool(agent.condenser),
+        )
+
+    def _agent_from_settings(self, settings: PersistedAgentSettingsV1) -> Agent:
+        llm = LLM(
+            model=settings.model,
+            api_key=settings.api_key,
+            base_url=settings.base_url,
+            usage_id="agent",
+        )
+
+        agent = get_default_cli_agent(llm)
+        if not settings.memory_condensation_enabled:
+            agent = agent.model_copy(update={"condenser": None})
+        return agent
+
+    def load_from_disk(self) -> Agent | None:
+        """Load persisted agent settings from disk.
+
+        The CLI stores a small, versioned settings schema in `agent_settings.json`
+        (see :class:`PersistedAgentSettingsV1`) and reconstructs a runtime SDK
+        :class:`~openhands.sdk.Agent` from it.
+
+        For backwards compatibility, we also support legacy files that stored a
+        full SDK Agent dump. When a legacy file is detected and successfully
+        parsed, it will be migrated in-place to the new CLI-owned schema.
 
         Returns:
-            Raw Agent instance from disk, or None if no configuration exists
-            or the file is corrupted.
+            A runtime Agent instance, or None if no configuration exists or the
+            file is corrupted.
         """
         try:
-            str_spec = self.file_store.read(AGENT_SETTINGS_PATH)
-            # Respects user choices persisted in agent_settings.json on disk.
-            return Agent.model_validate_json(str_spec)
+            raw = self.file_store.read(AGENT_SETTINGS_PATH)
         except FileNotFoundError:
             return None
-        except Exception:
+
+        # Preferred (v1) format
+        try:
+            settings = PersistedAgentSettingsV1.model_validate_json(raw)
+            return self._agent_from_settings(settings)
+        except ValidationError:
+            pass
+
+        # Legacy format (full Agent dump)
+        try:
+            legacy_agent = Agent.model_validate_json(raw)
+        except ValidationError:
             print_formatted_text(
                 HTML("\n<red>Agent configuration file is corrupted!</red>")
             )
             return None
+
+        settings = self._settings_from_agent(legacy_agent)
+        self._write_settings(settings)
+        return self._agent_from_settings(settings)
 
     def _ensure_agent(self, agent: Agent | None, overrides: LLMEnvOverrides) -> Agent:
         if agent is not None:
@@ -445,8 +541,8 @@ class AgentStore:
         )
 
     def save(self, agent: Agent) -> None:
-        serialized_spec = agent.model_dump_json(context={"expose_secrets": True})
-        self.file_store.write(AGENT_SETTINGS_PATH, serialized_spec)
+        settings = self._settings_from_agent(agent)
+        self._write_settings(settings)
 
     def create_and_save_from_settings(
         self,

@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -6,7 +7,6 @@ from pydantic import SecretStr
 
 from openhands.sdk import LLM, Agent
 from openhands_cli.locations import AGENT_SETTINGS_PATH
-from openhands_cli.utils import get_default_cli_agent
 
 
 @dataclass
@@ -53,9 +53,16 @@ def save_test_agent(
         tools=tools if tools is not None else [],
         mcp_config=mcp_config if mcp_config is not None else {},
     )
+
+    settings_payload = {
+        "schema_version": 1,
+        "model": model,
+        "api_key": api_key,
+    }
     (persistence_dir / AGENT_SETTINGS_PATH).write_text(
-        agent.model_dump_json(context={"expose_secrets": True})
+        json.dumps(settings_payload, indent=2)
     )
+
     return agent
 
 
@@ -83,23 +90,19 @@ def create_test_agent_config(
     Returns:
         Path to the created agent_settings.json file
     """
-    llm_kwargs = {
-        "model": model,
-        "api_key": SecretStr(api_key),
-        "usage_id": "test-agent",
-    }
-    if base_url:
-        llm_kwargs["base_url"] = base_url
+    # Kept for backwards compatibility with older call-sites.
+    _ = expose_secrets
 
-    llm = LLM(**llm_kwargs)
-    agent = get_default_cli_agent(llm=llm)
+    settings_payload: dict[str, object] = {
+        "schema_version": 1,
+        "model": model,
+        "api_key": api_key,
+    }
+    if base_url is not None:
+        settings_payload["base_url"] = base_url
 
     agent_settings_path = persistence_dir / "agent_settings.json"
-    if expose_secrets:
-        config_json = agent.model_dump_json(context={"expose_secrets": True})
-    else:
-        config_json = agent.model_dump_json()
-    agent_settings_path.write_text(config_json)
+    agent_settings_path.write_text(json.dumps(settings_payload, indent=2))
 
     return agent_settings_path
 
