@@ -35,3 +35,6 @@ AGENT_SETTINGS_PATH = "agent_settings.json"
 
 # MCP configuration file (relative to persistence dir)
 MCP_CONFIG_FILE = "mcp.json"
+
+# Plugin marketplaces configuration file
+MARKETPLACES_FILE = os.path.join(PERSISTENCE_DIR, "marketplaces.json")
