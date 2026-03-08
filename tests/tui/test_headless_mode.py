@@ -289,6 +289,88 @@ class TestPrintConversationSummary:
             app.conversation_state.get_conversation_summary.assert_called_once()
             assert mock_console.print.call_count >= 1
 
+    def test_print_conversation_summary_includes_cost_when_metrics_present(
+        self, monkeypatch
+    ):
+        """When metrics are set, the summary must include a Cost line."""
+        from rich.text import Text
+
+        from openhands.sdk.llm.utils.metrics import Metrics
+
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+        app = OpenHandsApp(exit_confirmation=False)
+        app.conversation_state.get_conversation_summary = MagicMock(
+            return_value=(1, Text("reply"))
+        )
+
+        # Build a real Metrics object with known values
+        m = Metrics()
+        m.add_cost(0.05)
+        m.add_token_usage(
+            prompt_tokens=1000,
+            completion_tokens=200,
+            cache_read_tokens=100,
+            cache_write_tokens=0,
+            context_window=8192,
+            response_id="r1",
+        )
+        app.conversation_state.metrics = m
+
+        printed_text: list[str] = []
+
+        def capture_print(*args, **kwargs):
+            for a in args:
+                printed_text.append(str(a))
+
+        with patch("rich.console.Console") as mock_console_cls:
+            mock_console = MagicMock()
+            mock_console.print.side_effect = capture_print
+            mock_console_cls.return_value = mock_console
+
+            app._print_conversation_summary()
+
+        combined = " ".join(printed_text)
+        assert "Cost" in combined, f"Expected 'Cost' in output, got: {combined!r}"
+        # Should contain the formatted dollar amount
+        assert "$" in combined
+
+    def test_print_conversation_summary_no_cost_line_when_metrics_none(
+        self, monkeypatch
+    ):
+        """When metrics are None, the summary must NOT include a Cost line."""
+        from rich.text import Text
+
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+        app = OpenHandsApp(exit_confirmation=False)
+        app.conversation_state.get_conversation_summary = MagicMock(
+            return_value=(1, Text("reply"))
+        )
+        app.conversation_state.metrics = None
+
+        printed_text: list[str] = []
+
+        def capture_print(*args, **kwargs):
+            for a in args:
+                printed_text.append(str(a))
+
+        with patch("rich.console.Console") as mock_console_cls:
+            mock_console = MagicMock()
+            mock_console.print.side_effect = capture_print
+            mock_console_cls.return_value = mock_console
+
+            app._print_conversation_summary()
+
+        combined = " ".join(printed_text)
+        assert "Cost" not in combined
+
 
 # ---------------------------------------------------------------------------
 # ConversationRunner.get_conversation_summary behavior
@@ -575,3 +657,107 @@ class TestMissingEnvVarsErrorHandling:
             assert "LLM_API_KEY" in captured.out
             assert "LLM_MODEL" in captured.out
             assert "Missing required environment variable(s)" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# Headless conversation-ID announcement
+# ---------------------------------------------------------------------------
+
+
+class TestPrintHeadlessConversationId:
+    """_print_headless_conversation_id must emit the ID before the agent runs."""
+
+    def test_prints_conversation_id_hex(self, monkeypatch):
+        """The hex form of the conversation ID must appear in console output."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+        app = OpenHandsApp(exit_confirmation=False)
+        cid = uuid.uuid4()
+
+        with patch("rich.console.Console") as mock_console_cls:
+            mock_console = MagicMock()
+            mock_console_cls.return_value = mock_console
+
+            app._print_headless_conversation_id(cid)
+
+        printed = " ".join(
+            str(arg) for call in mock_console.print.call_args_list for arg in call.args
+        )
+        assert cid.hex in printed
+
+    def test_prints_resume_hint(self, monkeypatch):
+        """A --resume hint must be printed so users know how to continue."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+        app = OpenHandsApp(exit_confirmation=False)
+        cid = uuid.uuid4()
+
+        with patch("rich.console.Console") as mock_console_cls:
+            mock_console = MagicMock()
+            mock_console_cls.return_value = mock_console
+
+            app._print_headless_conversation_id(cid)
+
+        printed = " ".join(
+            str(arg) for call in mock_console.print.call_args_list for arg in call.args
+        )
+        assert "--resume" in printed
+
+    def test_called_during_initialize_main_ui_in_headless_mode(self, monkeypatch):
+        """_print_headless_conversation_id is called from _initialize_main_ui
+        when headless_mode=True."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+        cid = uuid.uuid4()
+        app = OpenHandsApp(exit_confirmation=False, headless_mode=True)
+        app.conversation_state.conversation_id = cid
+
+        clr_patch = patch(
+            "openhands_cli.tui.textual_app.collect_loaded_resources",
+            return_value=MagicMock(),
+        )
+        with (
+            patch.object(app, "_print_headless_conversation_id") as mock_print_id,
+            patch.object(app, "_process_queued_inputs"),
+            patch.object(app, "query_one", return_value=MagicMock()),
+            patch("openhands_cli.tui.textual_app.AgentStore"),
+            clr_patch,
+        ):
+            app._initialize_main_ui()
+
+        mock_print_id.assert_called_once_with(cid)
+
+    def test_not_called_in_non_headless_mode(self, monkeypatch):
+        """_print_headless_conversation_id must NOT be called in TUI mode."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+        cid = uuid.uuid4()
+        app = OpenHandsApp(exit_confirmation=False, headless_mode=False)
+        app.conversation_state.conversation_id = cid
+
+        clr_patch = patch(
+            "openhands_cli.tui.textual_app.collect_loaded_resources",
+            return_value=MagicMock(),
+        )
+        with (
+            patch.object(app, "_print_headless_conversation_id") as mock_print_id,
+            patch.object(app, "_process_queued_inputs"),
+            patch.object(app, "query_one", return_value=MagicMock()),
+            patch("openhands_cli.tui.textual_app.AgentStore"),
+            clr_patch,
+        ):
+            app._initialize_main_ui()
+
+        mock_print_id.assert_not_called()

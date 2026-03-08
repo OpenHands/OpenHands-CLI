@@ -13,6 +13,22 @@ from openhands_cli.tui.panels.confirmation_panel_style import (
 from openhands_cli.user_actions.types import UserConfirmation
 
 
+class _KeyboardOnlyListView(ListView):
+    """A ListView that requires Enter (not mouse click) to confirm a selection.
+
+    Mouse clicks navigate to (highlight) an item but do not fire
+    ``ListView.Selected``, preventing accidental confirmation when the user
+    clicks near the confirmation panel by mistake.
+    """
+
+    def _on_list_item__child_clicked(self, event: ListItem._ChildClicked) -> None:  # type: ignore[override]
+        """Navigate to the clicked item without confirming the selection."""
+        event.stop()
+        self.focus()
+        # Only update the highlighted index; do NOT post ListView.Selected.
+        self.index = self._nodes.index(event.item)
+
+
 class ConfirmationOption(Static):
     """A confirmation option that shows > when highlighted."""
 
@@ -81,8 +97,8 @@ class InlineConfirmationPanel(Container):
                 classes="inline-confirmation-header",
             )
 
-            # Options ListView (vertical)
-            yield ListView(
+            # Options list – keyboard-only: mouse clicks highlight, Enter confirms
+            yield _KeyboardOnlyListView(
                 *[
                     ListItem(
                         ConfirmationOption(label, id=f"option-{item_id}"), id=item_id

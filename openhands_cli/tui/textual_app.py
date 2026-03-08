@@ -340,11 +340,32 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             self._print_conversation_summary()
             self.exit()
 
+    def _print_headless_conversation_id(self, conversation_id: uuid.UUID) -> None:
+        """Print the conversation ID at the start of a headless session.
+
+        Outputs the ID before the agent begins work so that users can track
+        or resume the session even while it is still running.
+        """
+        from rich.console import Console
+
+        console = Console()
+        console.print(
+            f"Conversation ID: {conversation_id.hex}",
+            style=OPENHANDS_THEME.accent,
+        )
+        console.print(
+            f"Hint: run openhands --resume {conversation_id} "
+            "to resume this conversation.",
+            style=OPENHANDS_THEME.secondary,
+        )
+
     def _print_conversation_summary(self) -> None:
         """Print conversation summary for headless mode."""
         from rich.console import Console
         from rich.panel import Panel
         from rich.rule import Rule
+
+        from openhands_cli.utils import abbreviate_number, format_cost
 
         console = Console()
 
@@ -358,6 +379,24 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         console.print(Rule("CONVERSATION SUMMARY"))
 
         console.print(f"[bold]Number of agent messages:[/bold] {num_agent_messages}")
+
+        # Include cost / token metrics when available
+        metrics = self.conversation_state.metrics
+        if metrics is not None:
+            cost = metrics.accumulated_cost or 0.0
+            usage = metrics.accumulated_token_usage
+            input_tokens = usage.prompt_tokens if usage else 0
+            output_tokens = usage.completion_tokens if usage else 0
+            cache_read = usage.cache_read_tokens if usage else 0
+            cache_pct = (
+                f"{cache_read / input_tokens * 100:.0f}%" if input_tokens > 0 else "N/A"
+            )
+            console.print(
+                f"[bold]Cost:[/bold] $ {format_cost(cost)}  "
+                f"([dim]↑ {abbreviate_number(input_tokens)} "
+                f"↓ {abbreviate_number(output_tokens)} "
+                f"cache {cache_pct}[/dim])"
+            )
 
         console.print("[bold]Last message sent by the agent:[/bold]")
         console.print(
@@ -455,6 +494,11 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Set loaded resources on ConversationContainer - triggers reactive update
         # in SplashContent via data_bind
         self.conversation_state.set_loaded_resources(loaded_resources)
+
+        # In headless mode, announce the conversation ID before the agent runs so
+        # users can track or resume the session even during long-running tasks.
+        if self.headless_mode and self.conversation_id is not None:
+            self._print_headless_conversation_id(self.conversation_id)
 
         # Process any queued inputs
         self._process_queued_inputs()
