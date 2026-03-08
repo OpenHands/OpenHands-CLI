@@ -161,55 +161,51 @@ class DeviceFlowClient(BaseHttpClient):
             DeviceFlowError: If authentication fails
         """
         console_print(
-            f"[{OPENHANDS_THEME.accent}]Starting OpenHands authentication..."
-            f"[/{OPENHANDS_THEME.accent}]"
+            "Starting OpenHands authentication...", style=OPENHANDS_THEME.accent
         )
 
         # Step 1: Start device flow
         try:
             auth_response = await self.start_device_flow()
         except DeviceFlowError as e:
-            console_print(
-                f"[{OPENHANDS_THEME.error}]Error: {e}[/{OPENHANDS_THEME.error}]"
-            )
+            console_print(f"Error: {e}", style=OPENHANDS_THEME.error)
             raise
 
         # Step 2: Use verification_uri_complete if available, otherwise construct URL
         verification_url = auth_response.verification_uri_complete
 
         console_print(
-            f"\n[{OPENHANDS_THEME.warning}]Opening your web browser for "
-            f"authentication...[/{OPENHANDS_THEME.warning}]"
+            "\nOpening your web browser for authentication...",
+            style=OPENHANDS_THEME.warning,
         )
         console_print(
-            f"[{OPENHANDS_THEME.secondary}]URL: [bold]{verification_url}[/bold]"
-            f"[/{OPENHANDS_THEME.secondary}]"
+            f"URL: [bold]{verification_url}[/bold]",
+            style=OPENHANDS_THEME.secondary,
         )
 
         # Automatically open the browser
         try:
             webbrowser.open(verification_url)
             console_print(
-                f"[{OPENHANDS_THEME.success}]✓ Browser "
-                f"opened successfully[/{OPENHANDS_THEME.success}]"
+                "✓ Browser opened successfully", style=OPENHANDS_THEME.success
             )
         except Exception as e:
             console_print(
-                f"[{OPENHANDS_THEME.warning}]Could not open browser automatically: "
-                f"{e}[/{OPENHANDS_THEME.warning}]"
+                f"Could not open browser automatically: {e}",
+                style=OPENHANDS_THEME.warning,
             )
             console_print(
-                f"[{OPENHANDS_THEME.secondary}]Please manually open: "
-                f"[bold]{verification_url}[/bold][/{OPENHANDS_THEME.secondary}]"
+                f"Please manually open: [bold]{verification_url}[/bold]",
+                style=OPENHANDS_THEME.secondary,
             )
 
         console_print(
-            f"[{OPENHANDS_THEME.secondary}]Follow the instructions in your browser "
-            f"to complete authentication[/{OPENHANDS_THEME.secondary}]"
+            "Follow the instructions in your browser to complete authentication",
+            style=OPENHANDS_THEME.secondary,
         )
         console_print(
-            f"\n[{OPENHANDS_THEME.accent}]Waiting for authentication to complete..."
-            f"[/{OPENHANDS_THEME.accent}]"
+            "\nWaiting for authentication to complete...",
+            style=OPENHANDS_THEME.accent,
         )
 
         # Step 3: Poll for token using device_code and interval from auth_response
@@ -217,15 +213,10 @@ class DeviceFlowClient(BaseHttpClient):
             token_response = await self.poll_for_token(
                 auth_response.device_code, auth_response.interval
             )
-            console_print(
-                f"[{OPENHANDS_THEME.success}]✓ Authentication "
-                f"successful![/{OPENHANDS_THEME.success}]"
-            )
+            console_print("✓ Authentication successful!", style=OPENHANDS_THEME.success)
             return token_response
         except DeviceFlowError as e:
-            console_print(
-                f"[{OPENHANDS_THEME.error}]Error: {e}[/{OPENHANDS_THEME.error}]"
-            )
+            console_print(f"Error: {e}", style=OPENHANDS_THEME.error)
             raise
 
 
