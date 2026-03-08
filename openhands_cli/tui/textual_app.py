@@ -686,13 +686,22 @@ def main(
     except MissingEnvironmentVariablesError as e:
         raise e
 
-    # Determine initial confirmation policy from CLI arguments
-    # If headless mode is enabled, always use NeverConfirm (auto-approve all actions)
-    initial_confirmation_policy = AlwaysConfirm()  # Default
+    # Determine initial confirmation policy from CLI arguments or saved settings
+    # Priority: CLI arguments > headless mode > saved settings > default (always-ask)
+    initial_confirmation_policy = None
+
+    # CLI arguments take precedence
     if headless or always_approve:
         initial_confirmation_policy = NeverConfirm()
     elif llm_approve:
         initial_confirmation_policy = ConfirmRisky(threshold=SecurityRisk.HIGH)
+
+    # If no CLI argument provided, load from saved settings
+    if initial_confirmation_policy is None:
+        from openhands_cli.stores import CliSettings
+
+        cli_settings = CliSettings.load()
+        initial_confirmation_policy = cli_settings.get_confirmation_policy_instance()
 
     app = OpenHandsApp(
         exit_confirmation=not exit_without_confirmation,
