@@ -7,7 +7,7 @@ This repo contains the current CLI UX, including the Textual TUI and a browser-s
 
 
 ### References
-- Agent-sdk example: https://github.com/All-Hands-AI/agent-sdk/blob/main/examples/hello_world.py
+- Agent-sdk example: https://github.com/OpenHands/agent-sdk/blob/main/examples/hello_world.py
 - If you need to compare with upstream OpenHands code, use `$GITHUB_TOKEN` for access.
 
 ## Project Structure & Module Organization
@@ -50,7 +50,7 @@ Prefer modern typing syntax (`X | None` over `Optional[X]`) in new code.
 - Don’t add new root-level `.md` files or “summary updates” to `README.md` unless explicitly requested (use this `AGENTS.md` for repo guidance).
 
 ## Coding Style & Naming Conventions
-- Python 3.12, ruff formatting (88-char line limit, double quotes).
+- Python 3.12.12, ruff formatting (88-char line limit, double quotes).
 - Ruff enforced rules: pycodestyle, pyflakes, isort, pyupgrade, unused-arg checks (tests allow fixture-style args), and guards against mutable defaults.
 - Keep modules/dirs snake_case; classes in CapWords; user-facing commands/flags kebab-case as in existing entrypoints.
 - Type checking via `pyright` (`uv run pyright`); prefer type hints on new functions and public interfaces.
