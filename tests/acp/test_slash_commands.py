@@ -78,17 +78,16 @@ class TestSlashCommandFunctions:
     def test_get_available_commands(self):
         """Test getting available slash commands."""
         commands = get_available_slash_commands()
-        assert len(commands) == 2
 
-        # Check that both commands are present (without "/" prefix per ACP spec)
         command_names = {cmd.name for cmd in commands}
-        assert command_names == {"help", "confirm"}
+        assert {"help", "confirm", "critic", "llm-model"}.issubset(command_names)
 
-        # Check that descriptions exist
         help_cmd = next(cmd for cmd in commands if cmd.name == "help")
         assert help_cmd.description
         confirm_cmd = next(cmd for cmd in commands if cmd.name == "confirm")
         assert confirm_cmd.description
+        critic_cmd = next(cmd for cmd in commands if cmd.name == "critic")
+        assert critic_cmd.input is not None
 
     def test_create_help_text(self):
         """Test creating help text."""

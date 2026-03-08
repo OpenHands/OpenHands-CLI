@@ -64,6 +64,7 @@ from openhands_cli.acp_impl.utils import (
 )
 from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.setup import MissingAgentSpec
+from openhands_cli.shared.settings_commands import handle_programmatic_setting_command
 from openhands_cli.utils import extract_text_from_message_content
 
 
@@ -515,7 +516,12 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                 elif command == "confirm":
                     response_text = await self._cmd_confirm(session_id, argument)
                 else:
-                    response_text = get_unknown_command_text(command)
+                    response_text = handle_programmatic_setting_command(
+                        command,
+                        argument,
+                    )
+                    if response_text is None:
+                        response_text = get_unknown_command_text(command)
 
                 # Send response to client
                 await self._conn.session_update(

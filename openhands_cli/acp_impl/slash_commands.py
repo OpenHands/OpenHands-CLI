@@ -12,6 +12,7 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 from openhands_cli.acp_impl.confirmation import CONFIRMATION_MODES, ConfirmationMode
+from openhands_cli.shared.settings_commands import get_programmatic_setting_fields
 from openhands_cli.shared.slash_commands import (
     parse_slash_command as parse_slash_command,
 )
@@ -27,16 +28,11 @@ VALID_CONFIRMATION_MODE: list[ConfirmationMode] = [
 
 
 def get_available_slash_commands() -> list[AvailableCommand]:
-    """Get list of available slash commands in ACP format.
-
-    Returns:
-        List of AvailableCommand objects
-    """
-    # Dynamically construct mode options from CONFIRMATION_MODES
+    """Get list of available slash commands in ACP format."""
     mode_options = " | ".join(CONFIRMATION_MODES.keys())
     mode_list = "|".join(CONFIRMATION_MODES.keys())
 
-    return [
+    commands = [
         AvailableCommand(
             name="help",
             description="Show available slash commands",
@@ -52,6 +48,33 @@ def get_available_slash_commands() -> list[AvailableCommand]:
             ),
         ),
     ]
+
+    for field in get_programmatic_setting_fields():
+        if field.slash_command is None:
+            continue
+        commands.append(
+            AvailableCommand(
+                name=field.slash_command,
+                description=f"Update {field.label.lower()}",
+                input=AvailableCommandInput(
+                    root=UnstructuredCommandInput(hint=_command_hint(field)),
+                ),
+            )
+        )
+
+    return commands
+
+
+def _command_hint(field) -> str:
+    if field.widget == "boolean":
+        return "on | off"
+    if field.widget == "select":
+        return " | ".join(choice.value for choice in field.choices)
+    if field.widget == "number":
+        return "<number>"
+    if field.secret:
+        return "<secret>"
+    return "<value>"
 
 
 def create_help_text() -> str:
