@@ -1,4 +1,5 @@
 import asyncio
+import atexit
 import logging
 
 from acp import Client, stdio_streams
@@ -8,6 +9,7 @@ from openhands_cli.acp_impl.agent.remote_agent import (
     OpenHandsCloudACPAgent,
 )
 from openhands_cli.acp_impl.confirmation import ConfirmationMode
+from openhands_cli.acp_impl.debug_logger import DebugLogger
 
 
 logger = logging.getLogger(__name__)
@@ -19,6 +21,7 @@ async def run_acp_server(
     streaming_enabled: bool = False,
     cloud: bool = False,
     cloud_api_url: str = "https://app.all-hands.dev",
+    debug: bool = False,
 ) -> None:
     """Run the OpenHands ACP server.
 
@@ -27,6 +30,9 @@ async def run_acp_server(
         resume_conversation_id: Optional conversation ID to resume when a new
             session is created
         streaming_enabled: Whether to enable token streaming for LLM outputs
+        cloud: Whether to use OpenHands Cloud instead of local workspace
+        cloud_api_url: OpenHands Cloud API URL
+        debug: Whether to enable debug logging of all ACP protocol messages
     """
     logger.info(
         f"Starting OpenHands ACP server with confirmation mode: "
@@ -34,6 +40,14 @@ async def run_acp_server(
     )
     if resume_conversation_id:
         logger.info(f"Will resume conversation: {resume_conversation_id}")
+
+    # Setup debug observer if enabled
+    debug_logger = DebugLogger() if debug else None
+    observers = [debug_logger] if (debug_logger and debug_logger.enabled) else []
+
+    # Register cleanup for debug logger file handle
+    if debug_logger:
+        atexit.register(debug_logger.close)
 
     reader, writer = await stdio_streams()
 
@@ -48,7 +62,7 @@ async def run_acp_server(
                 streaming_enabled,
             )
 
-        AgentSideConnection(create_local_agent, writer, reader)
+        AgentSideConnection(create_local_agent, writer, reader, observers=observers)
 
     else:
 
@@ -60,7 +74,7 @@ async def run_acp_server(
                 resume_conversation_id=resume_conversation_id,
             )
 
-        AgentSideConnection(create_agent, writer, reader)
+        AgentSideConnection(create_agent, writer, reader, observers=observers)
 
     # Keep the server running
     await asyncio.Event().wait()
