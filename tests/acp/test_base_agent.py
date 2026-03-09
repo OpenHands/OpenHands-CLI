@@ -176,10 +176,10 @@ class TestNewSession:
             option.model_dump()["id"]: option.model_dump()
             for option in response.config_options
         }
-        assert "enable_default_condenser" in config_options
-        assert config_options["enable_default_condenser"]["description"] is not None
-        assert config_options["enable_default_condenser"]["category"] == "Condenser"
-        assert "llm_model" not in config_options
+        assert "condenser.enabled" in config_options
+        assert config_options["condenser.enabled"]["description"] is not None
+        assert config_options["condenser.enabled"]["category"] == "Condenser"
+        assert "llm.model" not in config_options
 
     @pytest.mark.asyncio
     async def test_new_session_replays_events_on_resume(self, mock_connection):
@@ -276,7 +276,7 @@ class TestSetConfigOption:
             patch.object(test_agent, "_get_session_config_options", return_value=[]),
         ):
             response = await test_agent.set_config_option(
-                config_id="enable_default_condenser",
+                config_id="condenser.enabled",
                 session_id=str(uuid4()),
                 value="false",
             )

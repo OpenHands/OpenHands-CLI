@@ -3,23 +3,32 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
-from pydantic import Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr
 
 from openhands_cli.stores.agent_store import AgentStore
 from openhands_cli.stores.cli_settings import (
     DEFAULT_ISSUE_THRESHOLD,
     CliSettings,
-    CriticSettings,
+    CriticSettings as StoredCriticSettings,
 )
 from openhands_cli.utils import get_default_cli_agent
 
 
 _settings_module: Any = importlib.import_module("openhands.sdk.settings")
-SDKSettings = _settings_module.SDKSettings
+AgentSettings = _settings_module.AgentSettings
+CriticSettings = _settings_module.CriticSettings
 SettingsFieldMetadata = _settings_module.SettingsFieldMetadata
+SettingsSectionMetadata = _settings_module.SettingsSectionMetadata
+SETTINGS_METADATA_KEY = _settings_module.SETTINGS_METADATA_KEY
+SETTINGS_SECTION_METADATA_KEY = _settings_module.SETTINGS_SECTION_METADATA_KEY
 
 
-class CliProgrammaticSettings(SDKSettings):
+class CliCriticSettings(CriticSettings):
+    enabled: bool = Field(
+        default=True,
+        description="Enable critic evaluation for the agent.",
+        json_schema_extra=CriticSettings.model_fields["enabled"].json_schema_extra,
+    )
     issue_threshold: float = Field(
         default=DEFAULT_ISSUE_THRESHOLD,
         ge=0.0,
@@ -29,25 +38,24 @@ class CliProgrammaticSettings(SDKSettings):
             "this threshold."
         ),
         json_schema_extra={
-            "openhands_settings": SettingsFieldMetadata(
+            SETTINGS_METADATA_KEY: SettingsFieldMetadata(
                 label="Issue threshold",
-                section="critic",
-                section_label="Critic",
                 order=45,
                 widget="number",
-                depends_on=("enable_critic", "enable_iterative_refinement"),
+                depends_on=("enabled", "enable_iterative_refinement"),
                 slash_command="issue-threshold",
             ).model_dump()
         },
     )
+
+
+class CliInterfaceSettings(BaseModel):
     default_cells_expanded: bool = Field(
         default=False,
         description="Expand new cells by default in the TUI.",
         json_schema_extra={
-            "openhands_settings": SettingsFieldMetadata(
+            SETTINGS_METADATA_KEY: SettingsFieldMetadata(
                 label="Default cells expanded",
-                section="cli",
-                section_label="CLI",
                 order=10,
                 widget="boolean",
                 slash_command="default-cells-expanded",
@@ -58,59 +66,75 @@ class CliProgrammaticSettings(SDKSettings):
         default=True,
         description="Automatically open the plan panel when task tracking starts.",
         json_schema_extra={
-            "openhands_settings": SettingsFieldMetadata(
+            SETTINGS_METADATA_KEY: SettingsFieldMetadata(
                 label="Auto-open plan panel",
-                section="cli",
-                section_label="CLI",
                 order=20,
                 widget="boolean",
                 slash_command="auto-open-plan-panel",
             ).model_dump()
         },
     )
-    enable_critic: bool = Field(
-        default=True,
-        description="Enable critic evaluation for the agent.",
-        json_schema_extra=SDKSettings.model_fields["enable_critic"].json_schema_extra,
+
+
+class CliProgrammaticSettings(AgentSettings):
+    critic: CliCriticSettings = Field(
+        default_factory=CliCriticSettings,
+        description="Critic settings for the CLI agent.",
+        json_schema_extra=AgentSettings.model_fields["critic"].json_schema_extra,
+    )
+    cli: CliInterfaceSettings = Field(
+        default_factory=CliInterfaceSettings,
+        description="CLI interface settings.",
+        json_schema_extra={
+            SETTINGS_SECTION_METADATA_KEY: SettingsSectionMetadata(
+                key="cli",
+                label="CLI",
+                order=40,
+            ).model_dump()
+        },
     )
 
     @classmethod
     def from_sources(
         cls,
-        agent_settings: SDKSettings | None,
+        agent_settings: AgentSettings | None,
         cli_settings: CliSettings | None,
     ) -> CliProgrammaticSettings:
         cli_settings = cli_settings or CliSettings()
         base = (
-            agent_settings.model_dump(
-                exclude={
-                    "enable_critic",
-                    "enable_iterative_refinement",
-                    "critic_threshold",
-                    "max_refinement_iterations",
-                }
-            )
+            agent_settings.model_dump(mode="python")
             if agent_settings is not None
             else {}
         )
-        return cls(
-            **base,
-            enable_critic=cli_settings.critic.enable_critic,
-            enable_iterative_refinement=cli_settings.critic.enable_iterative_refinement,
-            critic_threshold=cli_settings.critic.critic_threshold,
-            max_refinement_iterations=cli_settings.critic.max_refinement_iterations,
-            issue_threshold=cli_settings.critic.issue_threshold,
-            default_cells_expanded=cli_settings.default_cells_expanded,
-            auto_open_plan_panel=cli_settings.auto_open_plan_panel,
+        critic = dict(base.get("critic", {}))
+        critic.update(
+            {
+                "enabled": cli_settings.critic.enable_critic,
+                "enable_iterative_refinement": (
+                    cli_settings.critic.enable_iterative_refinement
+                ),
+                "threshold": cli_settings.critic.critic_threshold,
+                "max_refinement_iterations": (
+                    cli_settings.critic.max_refinement_iterations
+                ),
+                "issue_threshold": cli_settings.critic.issue_threshold,
+            }
         )
+        base["critic"] = critic
+        base["cli"] = {
+            "default_cells_expanded": cli_settings.default_cells_expanded,
+            "auto_open_plan_panel": cli_settings.auto_open_plan_panel,
+        }
+        return cls(**base)
 
     @classmethod
     def load(cls, agent_store: AgentStore | None = None) -> CliProgrammaticSettings:
         agent_store = agent_store or AgentStore()
         agent = agent_store.load_from_disk()
-        agent_settings = SDKSettings.from_agent(agent) if agent is not None else None
+        agent_settings = AgentSettings.from_agent(agent) if agent is not None else None
         return cls.from_sources(
-            agent_settings=agent_settings, cli_settings=CliSettings.load()
+            agent_settings=agent_settings,
+            cli_settings=CliSettings.load(),
         )
 
     def save(self, agent_store: AgentStore | None = None) -> None:
@@ -118,26 +142,40 @@ class CliProgrammaticSettings(SDKSettings):
         existing_agent = agent_store.load_from_disk()
 
         effective_settings = self
-        if existing_agent is not None and self.llm_api_key is None:
+        if existing_agent is not None and self.llm.api_key is None:
             effective_settings = self.model_copy(
-                update={"llm_api_key": _to_secret(existing_agent.llm.api_key)}
+                update={
+                    "llm": self.llm.model_copy(
+                        update={"api_key": _to_secret(existing_agent.llm.api_key)}
+                    )
+                }
             )
 
-        agent = SDKSettings.model_validate(effective_settings.model_dump()).to_agent(
+        agent_settings = AgentSettings.model_validate(
+            {
+                "llm": effective_settings.llm.model_dump(mode="python"),
+                "condenser": effective_settings.condenser.model_dump(mode="python"),
+                "critic": effective_settings.critic.model_dump(
+                    mode="python",
+                    exclude={"issue_threshold"},
+                ),
+            }
+        )
+        agent = agent_settings.to_agent(
             existing_agent,
             agent_factory=get_default_cli_agent,
         )
         agent_store.save(agent)
 
         CliSettings(
-            default_cells_expanded=self.default_cells_expanded,
-            auto_open_plan_panel=self.auto_open_plan_panel,
-            critic=CriticSettings(
-                enable_critic=self.enable_critic,
-                enable_iterative_refinement=self.enable_iterative_refinement,
-                critic_threshold=self.critic_threshold,
-                issue_threshold=self.issue_threshold,
-                max_refinement_iterations=self.max_refinement_iterations,
+            default_cells_expanded=self.cli.default_cells_expanded,
+            auto_open_plan_panel=self.cli.auto_open_plan_panel,
+            critic=StoredCriticSettings(
+                enable_critic=self.critic.enabled,
+                enable_iterative_refinement=self.critic.enable_iterative_refinement,
+                critic_threshold=self.critic.threshold,
+                issue_threshold=self.critic.issue_threshold,
+                max_refinement_iterations=self.critic.max_refinement_iterations,
             ),
         ).save()
 

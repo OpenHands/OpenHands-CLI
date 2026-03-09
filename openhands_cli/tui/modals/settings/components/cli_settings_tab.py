@@ -68,11 +68,12 @@ class CliSettingsTab(Container):
         with VerticalScroll(id="cli_settings_content"):
             yield Static("CLI Settings", classes="form_section_title")
             for field in cli_fields:
+                leaf_key = field.key.split(".")[-1]
                 yield SettingsSwitch(
                     label=field.label,
                     description=field.description or "",
-                    switch_id=f"{field.key}_switch",
-                    value=bool(getattr(self._initial_settings, field.key)),
+                    switch_id=f"{leaf_key}_switch",
+                    value=bool(getattr(self._initial_settings, leaf_key)),
                 )
 
     def get_updated_fields(self) -> dict[str, Any]:
@@ -84,6 +85,8 @@ class CliSettingsTab(Container):
             for field in section.fields
         ]
         return {
-            field.key: self.query_one(f"#{field.key}_switch", Switch).value
+            field.key.split(".")[-1]: self.query_one(
+                f"#{field.key.split('.')[-1]}_switch", Switch
+            ).value
             for field in cli_fields
         }

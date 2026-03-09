@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, get_args, get_origin
 
+from pydantic import BaseModel
+
 from openhands_cli.stores.agent_store import AgentStore
 from openhands_cli.stores.programmatic_settings import CliProgrammaticSettings
 
@@ -28,6 +30,13 @@ def get_programmatic_setting_command_map() -> dict[str, Any]:
     }
 
 
+def get_programmatic_setting_value(settings: BaseModel, field_key: str) -> Any:
+    value: Any = settings
+    for part in field_key.split("."):
+        value = getattr(value, part)
+    return value
+
+
 def handle_programmatic_setting_command(
     command: str,
     argument: str,
@@ -43,7 +52,7 @@ def handle_programmatic_setting_command(
         return format_setting_command_help(field, settings)
 
     value = _parse_setting_value(field.key, field, argument)
-    updated = settings.model_copy(update={field.key: value})
+    updated = _update_setting_value(settings, field.key, value)
     updated.save(agent_store)
     return format_setting_update_message(field, value)
 
@@ -52,7 +61,7 @@ def format_setting_command_help(
     field: Any,
     settings: CliProgrammaticSettings,
 ) -> str:
-    current_value = getattr(settings, field.key)
+    current_value = get_programmatic_setting_value(settings, field.key)
     lines = [f"/{field.slash_command} - {field.label}"]
     if field.description:
         lines.extend(["", field.description])
@@ -97,7 +106,7 @@ def _parse_setting_value(field_key: str, field: Any, argument: str) -> Any:
             raise ValueError(f"Expected one of: {sorted(allowed_values)}")
         return raw_value
 
-    annotation = CliProgrammaticSettings.model_fields[field_key].annotation
+    annotation = _get_field_annotation(CliProgrammaticSettings, field_key)
     inner = _strip_optional(annotation)
     if inner is int:
         return int(raw_value)
@@ -112,6 +121,33 @@ def _display_value(field: Any, value: Any) -> str:
     if isinstance(value, bool):
         return "enabled" if value else "disabled"
     return str(value)
+
+
+def _get_field_annotation(model_type: type[BaseModel], field_key: str) -> Any:
+    current_model = model_type
+    parts = field_key.split(".")
+    for index, part in enumerate(parts):
+        field = current_model.model_fields[part]
+        if index == len(parts) - 1:
+            return field.annotation
+        inner = _strip_optional(field.annotation)
+        assert isinstance(inner, type) and issubclass(inner, BaseModel)
+        current_model = inner
+    raise KeyError(field_key)
+
+
+def _update_setting_value(
+    settings: CliProgrammaticSettings,
+    field_key: str,
+    value: Any,
+) -> CliProgrammaticSettings:
+    data = settings.model_dump(mode="python")
+    target = data
+    parts = field_key.split(".")
+    for part in parts[:-1]:
+        target = target[part]
+    target[parts[-1]] = value
+    return type(settings).model_validate(data)
 
 
 def _strip_optional(annotation: Any) -> Any:

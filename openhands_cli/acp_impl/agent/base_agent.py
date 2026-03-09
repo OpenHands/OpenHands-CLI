@@ -75,6 +75,7 @@ from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.setup import MissingAgentSpec
 from openhands_cli.shared.settings_commands import (
     get_programmatic_setting_fields,
+    get_programmatic_setting_value,
     handle_programmatic_setting_command,
 )
 from openhands_cli.utils import extract_text_from_message_content
@@ -238,14 +239,15 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         config_options: list[SessionConfigOption] = []
 
         for field in get_programmatic_setting_fields():
+            current_setting_value = get_programmatic_setting_value(settings, field.key)
             if field.widget == "boolean":
-                current_value = "true" if getattr(settings, field.key) else "false"
+                current_value = "true" if current_setting_value else "false"
                 options = [
                     SessionConfigSelectOption(name="Enabled", value="true"),
                     SessionConfigSelectOption(name="Disabled", value="false"),
                 ]
             elif field.widget == "select":
-                current_value = str(getattr(settings, field.key))
+                current_value = str(current_setting_value)
                 options = [
                     SessionConfigSelectOption(name=choice.label, value=choice.value)
                     for choice in field.choices
