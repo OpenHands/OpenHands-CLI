@@ -42,12 +42,17 @@ class EventSubscriber:
     them to ACP session update notifications that are streamed back to the client.
     """
 
+    session_id: str
+    conn: Client
+    conversation: BaseConversation | None
+    shared_events_handler: SharedEventHandler
+
     def __init__(
         self,
         session_id: str,
-        conn: "Client",
+        conn: Client,
         conversation: BaseConversation | None = None,
-    ):
+    ) -> None:
         """Initialize the event subscriber.
 
         Args:

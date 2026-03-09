@@ -66,6 +66,14 @@ logger = get_logger(__name__)
 class TokenBasedEventSubscriber:
     """Owns all token streaming logic + state (tool-call streaming included)."""
 
+    session_id: str
+    conn: Client
+    loop: asyncio.AbstractEventLoop
+    conversation: BaseConversation | None
+    _streaming_tool_calls: dict[int, ToolCallState]
+    shared_events_handler: SharedEventHandler
+    _reasoning_header_emitted: bool
+
     def __init__(
         self,
         *,
@@ -73,14 +81,14 @@ class TokenBasedEventSubscriber:
         conn: Client,
         loop: asyncio.AbstractEventLoop,
         conversation: BaseConversation | None = None,
-    ):
+    ) -> None:
         self.session_id = session_id
         self.conn = conn
         self.loop = loop
         self.conversation = conversation
 
         # index -> ToolCallState
-        self._streaming_tool_calls: dict[int, ToolCallState] = {}
+        self._streaming_tool_calls = {}
         self.shared_events_handler = SharedEventHandler()
 
         # Header tracking for consistent formatting with non-streaming mode
