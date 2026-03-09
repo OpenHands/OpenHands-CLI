@@ -16,10 +16,12 @@ from typing import Any, cast
 from acp import (
     Agent as ACPAgent,
     Client,
+    ForkSessionResponse,
     InitializeResponse,
     NewSessionResponse,
     PromptResponse,
     RequestError,
+    ResumeSessionResponse,
 )
 from acp.helpers import update_current_mode
 from acp.schema import (
@@ -33,6 +35,7 @@ from acp.schema import (
     LoadSessionResponse,
     McpCapabilities,
     PromptCapabilities,
+    SetSessionConfigOptionResponse,
     SetSessionModelResponse,
     SetSessionModeResponse,
     TextContentBlock,
@@ -334,6 +337,40 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         """Set session model (no-op for now)."""
         logger.info(f"Set session model requested: {session_id}")
         return SetSessionModelResponse()
+
+    async def set_config_option(
+        self,
+        config_id: str,  # noqa: ARG002
+        session_id: str,  # noqa: ARG002
+        value: str,  # noqa: ARG002
+        **_kwargs: Any,
+    ) -> SetSessionConfigOptionResponse | None:
+        """Set config option (not supported)."""
+        return None
+
+    async def fork_session(
+        self,
+        cwd: str,  # noqa: ARG002
+        session_id: str,
+        mcp_servers: list[Any] | None = None,  # noqa: ARG002
+        **_kwargs: Any,
+    ) -> ForkSessionResponse:
+        """Fork a session (not supported)."""
+        raise RequestError.method_not_found(
+            {"reason": "fork_session is not supported", "sessionId": session_id}
+        )
+
+    async def resume_session(
+        self,
+        cwd: str,  # noqa: ARG002
+        session_id: str,
+        mcp_servers: list[Any] | None = None,  # noqa: ARG002
+        **_kwargs: Any,
+    ) -> ResumeSessionResponse:
+        """Resume a session (not supported)."""
+        raise RequestError.method_not_found(
+            {"reason": "resume_session is not supported", "sessionId": session_id}
+        )
 
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         """Extension method (not supported)."""
