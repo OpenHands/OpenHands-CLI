@@ -17,6 +17,13 @@ This repo contains the current CLI UX, including the Textual TUI and a browser-s
 - Tooling & packaging: `Makefile` for common tasks, `build.sh`/`build.py` for PyInstaller artifacts, `openhands-cli.spec` for the frozen binary, `uv.lock` for resolved deps.
 - `.agents/skills/`: agent guidance for this repo.
 
+
+## Repository Memory
+- Schema-driven settings and slash commands should be derived from the SDK settings schema, not duplicated locally. Use `openhands_cli/stores/programmatic_settings.py` and `openhands_cli/shared/settings_commands.py` as the CLI bridge to `SDKSettings.export_schema()`.
+- Until `openhands-sdk`, `openhands-tools`, and `openhands-workspace` 1.12.x ship this settings work in a normal release, pin CLI cross-repo settings work to the SDK issue branch via `[tool.uv.sources]` so CI exercises the shared schema code instead of the older released packages.
+- SDK 1.12 also upgrades `agent-client-protocol`; when syncing CLI with that release line, use the renamed ACP schema models (`McpServerStdio` / `McpServerHttp` / `McpServerSse`) instead of the older `*McpServer` class names.
+
+
 ## Setup, Build, and Development Commands
 This repository uses **uv** for dependency management and running tooling (such as in `Makefile`, CI workflows, and `uv.lock`). Avoid using `pip install ...` directly if possible.
 

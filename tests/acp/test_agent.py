@@ -528,10 +528,10 @@ async def test_initialize_reports_image_capability(acp_agent):
 @pytest.mark.asyncio
 async def test_new_session_with_mcp_servers(acp_agent, tmp_path):
     """Test creating a new session with MCP servers transforms env correctly."""
-    from acp.schema import StdioMcpServer
+    from acp.schema import McpServerStdio
 
     # Create MCP server with env as array (ACP format)
-    mcp_server = StdioMcpServer(
+    mcp_server = McpServerStdio(
         name="test-server",
         command="/usr/bin/node",
         args=["server.js"],

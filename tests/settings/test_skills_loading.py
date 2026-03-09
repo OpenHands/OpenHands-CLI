@@ -159,10 +159,10 @@ This is a user microagent for testing.
         )
 
         with patch(
-            "openhands.sdk.context.agent_context.load_public_skills"
+            "openhands.sdk.context.agent_context.load_available_skills"
         ) as mock_load_public:
-            # Mock load_public_skills to return our test skill
-            mock_load_public.return_value = [mock_public_skill]
+            # Mock load_available_skills to return our test public skill
+            mock_load_public.return_value = {mock_public_skill.name: mock_public_skill}
 
             from openhands_cli.stores import AgentStore
 
