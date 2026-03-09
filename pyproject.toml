@@ -16,9 +16,9 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-  "openhands-sdk==1.12.0",
-  "openhands-tools==1.12.0",
-  "openhands-workspace==1.12.0",
+  "openhands-sdk @ git+https://github.com/OpenHands/software-agent-sdk.git@openhands/issue-2228-sdk-settings-schema#subdirectory=openhands-sdk",
+  "openhands-tools @ git+https://github.com/OpenHands/software-agent-sdk.git@openhands/issue-2228-sdk-settings-schema#subdirectory=openhands-tools",
+  "openhands-workspace @ git+https://github.com/OpenHands/software-agent-sdk.git@openhands/issue-2228-sdk-settings-schema#subdirectory=openhands-workspace",
   "prompt-toolkit>=3",
   "rich<14.3.0",
   "textual>=8.0.0,<9.0.0",
@@ -140,9 +140,3 @@ pythonVersion = "3.12"
 useLibraryCodeForTypes = true
 typeCheckingMode = "standard"
 
-# Use the SDK issue branch for cross-repo settings schema changes until released.
-
-[tool.uv.sources]
-openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", branch = "openhands/issue-2228-sdk-settings-schema" }
-openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", branch = "openhands/issue-2228-sdk-settings-schema" }
-openhands-workspace = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-workspace", branch = "openhands/issue-2228-sdk-settings-schema" }
