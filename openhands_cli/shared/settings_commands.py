@@ -4,6 +4,7 @@ from typing import Any, get_args, get_origin
 
 from pydantic import BaseModel
 
+from openhands.sdk.settings import SettingsFieldSchema
 from openhands_cli.stores.agent_store import AgentStore
 from openhands_cli.stores.programmatic_settings import CliProgrammaticSettings
 
@@ -12,7 +13,7 @@ BOOLEAN_TRUE_VALUES = {"1", "true", "yes", "on", "enable", "enabled"}
 BOOLEAN_FALSE_VALUES = {"0", "false", "no", "off", "disable", "disabled"}
 
 
-def get_programmatic_setting_fields() -> list[Any]:
+def get_programmatic_setting_fields() -> list[SettingsFieldSchema]:
     schema = CliProgrammaticSettings.export_schema()
     return [
         field
@@ -22,7 +23,7 @@ def get_programmatic_setting_fields() -> list[Any]:
     ]
 
 
-def get_programmatic_setting_command_map() -> dict[str, Any]:
+def get_programmatic_setting_command_map() -> dict[str, SettingsFieldSchema]:
     return {
         field.slash_command: field
         for field in get_programmatic_setting_fields()
@@ -58,7 +59,7 @@ def handle_programmatic_setting_command(
 
 
 def format_setting_command_help(
-    field: Any,
+    field: SettingsFieldSchema,
     settings: CliProgrammaticSettings,
 ) -> str:
     current_value = get_programmatic_setting_value(settings, field.key)
@@ -66,21 +67,25 @@ def format_setting_command_help(
     if field.description:
         lines.extend(["", field.description])
     lines.extend(["", f"Current value: {_display_value(field, current_value)}"])
-    hint = _argument_hint(field)
+    hint = format_setting_argument_hint(field)
     if hint:
         lines.extend(["", f"Usage: /{field.slash_command} {hint}"])
     return "\n".join(lines)
 
 
-def format_setting_update_message(field: Any, value: Any) -> str:
+def format_setting_update_message(field: SettingsFieldSchema, value: Any) -> str:
     return f"{field.label} set to {_display_value(field, value)}"
 
 
-def _argument_hint(field: Any) -> str:
+def format_setting_argument_hint(
+    field: SettingsFieldSchema,
+    *,
+    separator: str = "|",
+) -> str:
     if field.widget == "boolean":
-        return "on|off"
+        return separator.join(("on", "off"))
     if field.widget == "select":
-        return "|".join(choice.value for choice in field.choices)
+        return separator.join(choice.value for choice in field.choices)
     if field.widget == "number":
         return "<number>"
     if field.secret:
@@ -88,7 +93,11 @@ def _argument_hint(field: Any) -> str:
     return "<value>"
 
 
-def _parse_setting_value(field_key: str, field: Any, argument: str) -> Any:
+def _parse_setting_value(
+    field_key: str,
+    field: SettingsFieldSchema,
+    argument: str,
+) -> Any:
     raw_value = argument.strip()
     if field.widget == "boolean":
         normalized = raw_value.lower()
@@ -115,7 +124,7 @@ def _parse_setting_value(field_key: str, field: Any, argument: str) -> Any:
     return raw_value
 
 
-def _display_value(field: Any, value: Any) -> str:
+def _display_value(field: SettingsFieldSchema, value: Any) -> str:
     if field.secret:
         return "<hidden>" if value else "<not set>"
     if isinstance(value, bool):

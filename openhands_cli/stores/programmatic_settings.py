@@ -1,10 +1,15 @@
 from __future__ import annotations
 
-import importlib
-from typing import Any
+from pydantic import BaseModel, Field
 
-from pydantic import BaseModel, Field, SecretStr
-
+from openhands.sdk.settings import (
+    SETTINGS_METADATA_KEY,
+    SETTINGS_SECTION_METADATA_KEY,
+    AgentSettings,
+    CriticSettings,
+    SettingsFieldMetadata,
+    SettingsSectionMetadata,
+)
 from openhands_cli.stores.agent_store import AgentStore
 from openhands_cli.stores.cli_settings import (
     DEFAULT_ISSUE_THRESHOLD,
@@ -12,15 +17,6 @@ from openhands_cli.stores.cli_settings import (
     CriticSettings as StoredCriticSettings,
 )
 from openhands_cli.utils import get_default_cli_agent
-
-
-_settings_module: Any = importlib.import_module("openhands.sdk.settings")
-AgentSettings = _settings_module.AgentSettings
-CriticSettings = _settings_module.CriticSettings
-SettingsFieldMetadata = _settings_module.SettingsFieldMetadata
-SettingsSectionMetadata = _settings_module.SettingsSectionMetadata
-SETTINGS_METADATA_KEY = _settings_module.SETTINGS_METADATA_KEY
-SETTINGS_SECTION_METADATA_KEY = _settings_module.SETTINGS_SECTION_METADATA_KEY
 
 
 class CliCriticSettings(CriticSettings):
@@ -141,21 +137,11 @@ class CliProgrammaticSettings(AgentSettings):
         agent_store = agent_store or AgentStore()
         existing_agent = agent_store.load_from_disk()
 
-        effective_settings = self
-        if existing_agent is not None and self.llm.api_key is None:
-            effective_settings = self.model_copy(
-                update={
-                    "llm": self.llm.model_copy(
-                        update={"api_key": _to_secret(existing_agent.llm.api_key)}
-                    )
-                }
-            )
-
         agent_settings = AgentSettings.model_validate(
             {
-                "llm": effective_settings.llm.model_dump(mode="python"),
-                "condenser": effective_settings.condenser.model_dump(mode="python"),
-                "critic": effective_settings.critic.model_dump(
+                "llm": self.llm.model_dump(mode="python"),
+                "condenser": self.condenser.model_dump(mode="python"),
+                "critic": self.critic.model_dump(
                     mode="python",
                     exclude={"issue_threshold"},
                 ),
@@ -179,10 +165,3 @@ class CliProgrammaticSettings(AgentSettings):
             ),
         ).save()
 
-
-def _to_secret(value: str | SecretStr | None) -> SecretStr | None:
-    if value is None:
-        return None
-    if isinstance(value, SecretStr):
-        return value
-    return SecretStr(value)

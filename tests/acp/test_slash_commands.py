@@ -88,6 +88,11 @@ class TestSlashCommandFunctions:
         assert confirm_cmd.description
         critic_cmd = next(cmd for cmd in commands if cmd.name == "critic")
         assert critic_cmd.input is not None
+        assert critic_cmd.input.root.hint == "on | off"
+
+        model_cmd = next(cmd for cmd in commands if cmd.name == "llm-model")
+        assert model_cmd.input is not None
+        assert model_cmd.input.root.hint == "<value>"
 
     def test_create_help_text(self):
         """Test creating help text."""

@@ -12,7 +12,10 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 from openhands_cli.acp_impl.confirmation import CONFIRMATION_MODES, ConfirmationMode
-from openhands_cli.shared.settings_commands import get_programmatic_setting_fields
+from openhands_cli.shared.settings_commands import (
+    format_setting_argument_hint,
+    get_programmatic_setting_fields,
+)
 from openhands_cli.shared.slash_commands import (
     parse_slash_command as parse_slash_command,
 )
@@ -57,24 +60,14 @@ def get_available_slash_commands() -> list[AvailableCommand]:
                 name=field.slash_command,
                 description=f"Update {field.label.lower()}",
                 input=AvailableCommandInput(
-                    root=UnstructuredCommandInput(hint=_command_hint(field)),
+                    root=UnstructuredCommandInput(
+                        hint=format_setting_argument_hint(field, separator=" | ")
+                    ),
                 ),
             )
         )
 
     return commands
-
-
-def _command_hint(field) -> str:
-    if field.widget == "boolean":
-        return "on | off"
-    if field.widget == "select":
-        return " | ".join(choice.value for choice in field.choices)
-    if field.widget == "number":
-        return "<number>"
-    if field.secret:
-        return "<secret>"
-    return "<value>"
 
 
 def create_help_text() -> str:
