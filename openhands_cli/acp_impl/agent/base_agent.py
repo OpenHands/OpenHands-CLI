@@ -16,12 +16,10 @@ from typing import Any, cast
 from acp import (
     Agent as ACPAgent,
     Client,
-    ForkSessionResponse,
     InitializeResponse,
     NewSessionResponse,
     PromptResponse,
     RequestError,
-    ResumeSessionResponse,
 )
 from acp.helpers import update_current_mode
 from acp.schema import (
@@ -30,11 +28,13 @@ from acp.schema import (
     AuthenticateResponse,
     AuthMethod,
     AvailableCommandsUpdate,
+    ForkSessionResponse,
     Implementation,
     ListSessionsResponse,
     LoadSessionResponse,
     McpCapabilities,
     PromptCapabilities,
+    ResumeSessionResponse,
     SetSessionConfigOptionResponse,
     SetSessionModelResponse,
     SetSessionModeResponse,
@@ -351,26 +351,22 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
     async def fork_session(
         self,
         cwd: str,  # noqa: ARG002
-        session_id: str,
+        session_id: str,  # noqa: ARG002
         mcp_servers: list[Any] | None = None,  # noqa: ARG002
         **_kwargs: Any,
     ) -> ForkSessionResponse:
         """Fork a session (not supported)."""
-        raise RequestError.method_not_found(
-            {"reason": "fork_session is not supported", "sessionId": session_id}
-        )
+        raise RequestError.method_not_found("session/fork")
 
     async def resume_session(
         self,
         cwd: str,  # noqa: ARG002
-        session_id: str,
+        session_id: str,  # noqa: ARG002
         mcp_servers: list[Any] | None = None,  # noqa: ARG002
         **_kwargs: Any,
     ) -> ResumeSessionResponse:
         """Resume a session (not supported)."""
-        raise RequestError.method_not_found(
-            {"reason": "resume_session is not supported", "sessionId": session_id}
-        )
+        raise RequestError.method_not_found("session/resume")
 
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         """Extension method (not supported)."""
@@ -434,7 +430,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
     async def new_session(
         self,
         cwd: str,  # noqa: ARG002
-        mcp_servers: list[Any],
+        mcp_servers: list[Any] | None = None,
         working_dir: str | None = None,
         **_kwargs: Any,
     ) -> NewSessionResponse:
@@ -604,8 +600,8 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
     async def load_session(
         self,
         cwd: str,  # noqa: ARG002
-        mcp_servers: list[Any],  # noqa: ARG002
         session_id: str,
+        mcp_servers: list[Any] | None = None,  # noqa: ARG002
         **_kwargs: Any,
     ) -> LoadSessionResponse | None:
         """Load an existing session and replay conversation history.

@@ -195,7 +195,7 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
     async def new_session(
         self,
         cwd: str,
-        mcp_servers: list[Any],
+        mcp_servers: list[Any] | None = None,
         working_dir: str | None = None,
         **_kwargs: Any,
     ) -> NewSessionResponse:
