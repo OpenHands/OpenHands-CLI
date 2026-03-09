@@ -25,7 +25,7 @@ TOOL_KIND_MAPPING: dict[str, ToolKind] = {
 }
 
 
-def _format_status_line(usage, cost: float) -> str:
+def _format_status_line(usage: object, cost: float) -> str:
     """Format metrics as a status line string.
 
     Constructs a human-readable status line similar to the SDK's visualizer title,
