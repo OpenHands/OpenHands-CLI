@@ -16,14 +16,14 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-  "openhands-sdk==1.11.5",
-  "openhands-tools==1.11.5",
+  "openhands-sdk>=1.11.5,<1.13",
+  "openhands-tools>=1.11.5,<1.13",
   "openhands-workspace==1.11.1",
   "prompt-toolkit>=3",
   "rich<14.3.0",
   "textual>=8.0.0,<9.0.0",
   "typer>=0.17.4",
-  "agent-client-protocol>=0.7.0,<0.8.0",
+  "agent-client-protocol>=0.8.1,<0.9.0",
   "pydantic>=2.7",
   "textual-autocomplete>=4.0.6",
   "pyperclip>=1.9.0",
@@ -140,8 +140,7 @@ pythonVersion = "3.12"
 useLibraryCodeForTypes = true
 typeCheckingMode = "standard"
 
-# USE EXACT COMMIT FROM AGENT-SDK (PR #1368 - Add condense method to conversation class)
-
-# [tool.uv.sources]
-# openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "c76e5bd220ea9eb95a9d351313bdb4e533c9da6e" }
-# openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "c76e5bd220ea9eb95a9d351313bdb4e533c9da6e" }
+# Use the exact software-agent-sdk commit from PR #2253 while this CLI branch is being live-tested.
+[tool.uv.sources]
+openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "4170ccad13d255831ddc0bfffe31ab59c23493c1" }
+openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "4170ccad13d255831ddc0bfffe31ab59c23493c1" }

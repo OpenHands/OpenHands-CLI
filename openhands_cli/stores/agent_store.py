@@ -251,6 +251,7 @@ class AgentStore:
 
     def __init__(self) -> None:
         self.file_store = LocalFileStore(root=get_persistence_dir())
+        self.cli_settings = CliSettings.load()
 
     def load_from_disk(self) -> Agent | None:
         """Load an agent configuration from disk storage.
@@ -386,11 +387,14 @@ class AgentStore:
                 f"User operating system: {get_os_description()}",
             ]
         )
-        return AgentContext(
-            skills=skills,
-            system_message_suffix=system_suffix,
-            load_user_skills=True,
-            load_public_skills=True,
+        return AgentContext.model_validate(
+            {
+                "skills": skills,
+                "system_message_suffix": system_suffix,
+                "load_user_skills": True,
+                "load_public_skills": True,
+                "marketplace_path": self.cli_settings.marketplace_path,
+            }
         )
 
     def _maybe_build_condenser(
@@ -428,9 +432,8 @@ class AgentStore:
 
         critic = None
         if not critic_disabled:
-            cli_settings = CliSettings.load()
             critic = get_default_critic(
-                updated_llm, enable_critic=cli_settings.critic.enable_critic
+                updated_llm, enable_critic=self.cli_settings.critic.enable_critic
             )
 
         return agent.model_copy(
@@ -495,9 +498,8 @@ class AgentStore:
         self.save(agent)
 
         # Now add critic on-the-fly for the returned agent (not persisted)
-        cli_settings = CliSettings.load()
         critic = get_default_critic(
-            llm, enable_critic=cli_settings.critic.enable_critic
+            llm, enable_critic=self.cli_settings.critic.enable_critic
         )
         if critic is not None:
             agent = agent.model_copy(update={"critic": critic})
