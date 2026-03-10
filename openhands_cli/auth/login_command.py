@@ -24,12 +24,12 @@ async def _fetch_user_data_with_context(
     # Initial context output
     if already_logged_in:
         console_print(
-            f"[{OPENHANDS_THEME.warning}]You are already logged in to "
-            f"OpenHands Cloud.[/{OPENHANDS_THEME.warning}]"
+            "You are already logged in to OpenHands Cloud.",
+            style=OPENHANDS_THEME.warning,
         )
         console_print(
-            f"[{OPENHANDS_THEME.secondary}]Pulling latest settings from remote..."
-            f"[/{OPENHANDS_THEME.secondary}]"
+            "Pulling latest settings from remote...",
+            style=OPENHANDS_THEME.secondary,
         )
 
     # If already logged, skip re-fetching settings
@@ -41,8 +41,8 @@ async def _fetch_user_data_with_context(
 
         # --- SUCCESS MESSAGES ---
         console_print(
-            f"\n[{OPENHANDS_THEME.success}]✓ Settings synchronized "
-            f"successfully![/{OPENHANDS_THEME.success}]"
+            "\n✓ Settings synchronized successfully!",
+            style=OPENHANDS_THEME.success,
         )
 
     except ApiClientError as e:
@@ -50,13 +50,13 @@ async def _fetch_user_data_with_context(
         safe_error = html.escape(str(e))
 
         console_print(
-            f"\n[{OPENHANDS_THEME.warning}]Warning: "
-            f"Could not fetch user data: {safe_error}[/{OPENHANDS_THEME.warning}]"
+            f"\nWarning: Could not fetch user data: {safe_error}",
+            style=OPENHANDS_THEME.warning,
         )
+        escaped_cmd = html.escape("openhands logout && openhands login")
         console_print(
-            f"[{OPENHANDS_THEME.secondary}]Please try: [bold]"
-            f"{html.escape('openhands logout && openhands login')}"
-            f"[/bold][/{OPENHANDS_THEME.secondary}]"
+            f"Please try: [bold]{escaped_cmd}[/bold]",
+            style=OPENHANDS_THEME.secondary,
         )
 
 
@@ -77,16 +77,13 @@ async def login_command(server_url: str, skip_settings_sync: bool = False) -> bo
 
     if existing_api_key and not await is_token_valid(server_url, existing_api_key):
         console_print(
-            f"[{OPENHANDS_THEME.warning}]Token is invalid or expired. "
-            f"Logging out...[/{OPENHANDS_THEME.warning}]"
+            "Token is invalid or expired. Logging out...",
+            style=OPENHANDS_THEME.warning,
         )
         logout_command(server_url)
 
     # Proceed with normal login flow
-    console_print(
-        f"[{OPENHANDS_THEME.accent}]Logging in to OpenHands Cloud..."
-        f"[/{OPENHANDS_THEME.accent}]"
-    )
+    console_print("Logging in to OpenHands Cloud...", style=OPENHANDS_THEME.accent)
 
     # Re-read token (may have been cleared by logout above)
     existing_api_key = token_storage.get_api_key()
@@ -105,10 +102,7 @@ async def login_command(server_url: str, skip_settings_sync: bool = False) -> bo
     try:
         token_response = await authenticate_with_device_flow(server_url)
     except DeviceFlowError as e:
-        console_print(
-            f"[{OPENHANDS_THEME.error}]Authentication failed: "
-            f"{e}[/{OPENHANDS_THEME.error}]"
-        )
+        console_print(f"Authentication failed: {e}", style=OPENHANDS_THEME.error)
         return False
 
     api_key = token_response.access_token
@@ -116,13 +110,10 @@ async def login_command(server_url: str, skip_settings_sync: bool = False) -> bo
     # Store the API key securely
     token_storage.store_api_key(api_key)
 
+    console_print("✓ Logged into OpenHands Cloud", style=OPENHANDS_THEME.success)
     console_print(
-        f"[{OPENHANDS_THEME.success}]✓ Logged "
-        f"into OpenHands Cloud[/{OPENHANDS_THEME.success}]"
-    )
-    console_print(
-        f"[{OPENHANDS_THEME.secondary}]Your authentication "
-        f"tokens have been stored securely.[/{OPENHANDS_THEME.secondary}]"
+        "Your authentication tokens have been stored securely.",
+        style=OPENHANDS_THEME.secondary,
     )
 
     # Fetch user data and configure local agent
@@ -147,8 +138,5 @@ def run_login_command(server_url: str) -> bool:
     try:
         return asyncio.run(login_command(server_url))
     except KeyboardInterrupt:
-        console_print(
-            f"\n[{OPENHANDS_THEME.warning}]Login cancelled by "
-            f"user.[/{OPENHANDS_THEME.warning}]"
-        )
+        console_print("\nLogin cancelled by user.", style=OPENHANDS_THEME.warning)
         return False
