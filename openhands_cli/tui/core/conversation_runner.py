@@ -262,7 +262,7 @@ class ConversationRunner:
         self._running = is_running
         self._state.set_running(is_running)
 
-    def pause_runner_without_blocking(self):
+    def pause_runner_without_blocking(self) -> None:
         if self.is_running:
             asyncio.create_task(self.pause())
 
