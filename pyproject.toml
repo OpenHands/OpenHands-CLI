@@ -16,8 +16,8 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-  "openhands-sdk==1.11.5",
-  "openhands-tools==1.11.5",
+  "openhands-sdk>=1.12.0",
+  "openhands-tools>=1.12.0",
   "openhands-workspace==1.11.1",
   "prompt-toolkit>=3",
   "rich<14.3.0",
@@ -140,8 +140,7 @@ pythonVersion = "3.12"
 useLibraryCodeForTypes = true
 typeCheckingMode = "standard"
 
-# USE EXACT COMMIT FROM AGENT-SDK (PR #1368 - Add condense method to conversation class)
-
-# [tool.uv.sources]
-# openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "c76e5bd220ea9eb95a9d351313bdb4e533c9da6e" }
-# openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "c76e5bd220ea9eb95a9d351313bdb4e533c9da6e" }
+# Point to SDK PR #2190 (feat/acp-remote-runtime) for ACP agent support
+[tool.uv.sources]
+openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", branch = "feat/acp-remote-runtime" }
+openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", branch = "feat/acp-remote-runtime" }

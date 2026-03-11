@@ -25,6 +25,13 @@ VALID_CONFIRMATION_MODE: list[ConfirmationMode] = [
     "llm-approve",
 ]
 
+# Aliases used by external ACP clients (e.g. Claude Code, Codex) that map
+# non-standard mode names to our canonical confirmation modes.
+BYPASS_MODE_ALIASES: dict[str, ConfirmationMode] = {
+    "bypasspermissions": "always-approve",
+    "full-access": "always-approve",
+}
+
 
 def get_available_slash_commands() -> list[AvailableCommand]:
     """Get list of available slash commands in ACP format.
@@ -124,6 +131,10 @@ def get_confirm_success_text(mode: ConfirmationMode) -> str:
 def validate_confirmation_mode(mode_str: str) -> ConfirmationMode | None:
     """Validate and return confirmation mode.
 
+    Accepts canonical mode names (``always-ask``, ``always-approve``,
+    ``llm-approve``) as well as external aliases such as
+    ``bypassPermissions`` and ``full-access``.
+
     Args:
         mode_str: Mode string to validate
 
@@ -131,7 +142,9 @@ def validate_confirmation_mode(mode_str: str) -> ConfirmationMode | None:
         ConfirmationMode if valid, None otherwise
     """
     normalized = mode_str.lower().strip()
-    return normalized if normalized in VALID_CONFIRMATION_MODE else None
+    if normalized in VALID_CONFIRMATION_MODE:
+        return normalized
+    return BYPASS_MODE_ALIASES.get(normalized)
 
 
 def apply_confirmation_mode_to_conversation(

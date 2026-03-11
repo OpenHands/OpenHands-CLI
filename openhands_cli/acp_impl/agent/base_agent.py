@@ -11,7 +11,7 @@ import logging
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import Any
 
 from acp import (
     Agent as ACPAgent,
@@ -97,6 +97,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         initial_confirmation_mode: ConfirmationMode,
         resume_conversation_id: str | None = None,
         cloud_api_url: str = "https://app.all-hands.dev",
+        env_overrides_enabled: bool = False,
     ):
         """Initialize the base ACP agent.
 
@@ -105,12 +106,14 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             initial_confirmation_mode: Default confirmation mode for new sessions
             resume_conversation_id: Optional conversation ID to resume
             cloud_api_url: OpenHands Cloud API URL for authentication
+            env_overrides_enabled: Whether to override LLM settings from env vars
         """
         self._conn = conn
         self._active_sessions: dict[str, BaseConversation] = {}
         self._running_tasks: dict[str, asyncio.Task] = {}
         self._initial_confirmation_mode: ConfirmationMode = initial_confirmation_mode
         self._resume_conversation_id: str | None = resume_conversation_id
+        self._env_overrides_enabled: bool = env_overrides_enabled
 
         # Auth-related state
         self._store = TokenStorage()
@@ -318,12 +321,11 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                 }
             )
 
-        confirmation_mode: ConfirmationMode = cast(ConfirmationMode, mode_id)
-        await self._set_confirmation_mode(session_id, confirmation_mode)
+        await self._set_confirmation_mode(session_id, mode)
 
         await self._conn.session_update(
             session_id=session_id,
-            update=update_current_mode(current_mode_id=mode_id),
+            update=update_current_mode(current_mode_id=mode),
         )
 
         return SetSessionModeResponse()
