@@ -39,7 +39,9 @@ from openhands_cli.tui.widgets.collapsible import (
 
 # Icons for different event types
 SUCCESS_ICON = "✓"
+SUCCESS_COLOR = "#6bff6b"
 ERROR_ICON = "✗"
+ERROR_COLOR = "#ff6b6b"
 AGENT_MESSAGE_PADDING = (1, 0, 1, 1)  # top, right, bottom, left
 
 # Maximum line length for truncating titles/commands in collapsed view
@@ -429,10 +431,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Determine success/error status
         is_error = isinstance(event, UserRejectObservation | AgentErrorEvent)
         status_icon = ERROR_ICON if is_error else SUCCESS_ICON
+        status_color = ERROR_COLOR if is_error else SUCCESS_COLOR
 
-        # Build the new title with status icon
-        new_title = self._build_action_title(action_event)
-        new_title = f"{new_title} {status_icon}"
+        # Build the new title with colored status icon
+        title_text = Text(self._build_action_title(action_event))
+        icon_text = Text(status_icon, style=status_color)
+        new_title = Text.assemble(title_text, " ", icon_text)
 
         # Build the new content (observation result only)
         new_content = self._build_observation_content(event)
