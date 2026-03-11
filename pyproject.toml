@@ -139,6 +139,9 @@ venv = ".venv"
 pythonVersion = "3.12"
 useLibraryCodeForTypes = true
 typeCheckingMode = "standard"
+# The agent-client-protocol (acp) library uses __getattr__ for lazy imports,
+# which pyright cannot resolve statically.
+reportAttributeAccessIssue = "none"
 
 # Point to SDK PR #2190 (feat/acp-remote-runtime) for ACP agent support
 [tool.uv.sources]
