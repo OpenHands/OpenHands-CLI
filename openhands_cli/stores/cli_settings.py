@@ -3,9 +3,13 @@
 import json
 import os
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, field_validator
 
+
+# Confirmation policy type alias
+ConfirmationPolicyType = Literal["always-ask", "always-approve", "llm-approve"]
 
 # Refinement triggers when predicted success probability falls below this threshold
 # Default: 0.6 (60%) - agent is prompted to review work when critic scores < 60%
@@ -51,7 +55,17 @@ class CliSettings(BaseModel):
 
     default_cells_expanded: bool = False
     auto_open_plan_panel: bool = True
+    default_confirmation_policy: ConfirmationPolicyType = "always-ask"
     critic: CriticSettings = CriticSettings()
+
+    @field_validator("default_confirmation_policy")
+    @classmethod
+    def validate_confirmation_policy(cls, v: str) -> str:
+        """Validate that confirmation policy is one of the allowed values."""
+        allowed = {"always-ask", "always-approve", "llm-approve"}
+        if v not in allowed:
+            raise ValueError(f"Confirmation policy must be one of {allowed}, got {v}")
+        return v
 
     @classmethod
     def get_config_path(cls) -> Path:
@@ -141,3 +155,53 @@ class CliSettings(BaseModel):
 
         with open(config_path, "w") as f:
             json.dump(self.model_dump(), f, indent=2)
+
+    def get_confirmation_policy_instance(self):
+        """Convert the stored policy type to a ConfirmationPolicyBase instance.
+
+        Returns:
+            ConfirmationPolicyBase instance (AlwaysConfirm, NeverConfirm, or
+            ConfirmRisky)
+        """
+        from openhands.sdk.security.confirmation_policy import (
+            AlwaysConfirm,
+            ConfirmRisky,
+            NeverConfirm,
+        )
+        from openhands.sdk.security.risk import SecurityRisk
+
+        if self.default_confirmation_policy == "always-ask":
+            return AlwaysConfirm()
+        elif self.default_confirmation_policy == "always-approve":
+            return NeverConfirm()
+        elif self.default_confirmation_policy == "llm-approve":
+            return ConfirmRisky(threshold=SecurityRisk.HIGH)
+        else:
+            # Fallback (shouldn't happen due to validator)
+            return AlwaysConfirm()
+
+    @staticmethod
+    def policy_to_string(policy) -> ConfirmationPolicyType:
+        """Convert a ConfirmationPolicyBase instance to its string representation.
+
+        Args:
+            policy: ConfirmationPolicyBase instance
+
+        Returns:
+            String representation ("always-ask", "always-approve", or "llm-approve")
+        """
+        from openhands.sdk.security.confirmation_policy import (
+            AlwaysConfirm,
+            ConfirmRisky,
+            NeverConfirm,
+        )
+
+        if isinstance(policy, NeverConfirm):
+            return "always-approve"
+        elif isinstance(policy, ConfirmRisky):
+            return "llm-approve"
+        elif isinstance(policy, AlwaysConfirm):
+            return "always-ask"
+        else:
+            # Fallback for unknown policies
+            return "always-ask"
