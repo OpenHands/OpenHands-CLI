@@ -41,6 +41,16 @@ def create_mock_conversation_with_policy(initial_policy=None):
     )
     mock_conversation.set_security_analyzer = MagicMock()
 
+    # Configure a mock agent/llm that supports model switching.
+    mock_llm = MagicMock()
+    mock_llm.model = "openai/gpt-4o"
+
+    mock_agent = MagicMock()
+    mock_agent.llm = mock_llm
+    mock_agent.condenser = None
+    mock_agent.critic = None
+    mock_conversation.state.agent = mock_agent
+
     return mock_conversation
 
 
@@ -491,3 +501,37 @@ class TestSlashCommandIntegration:
                 get_confirmation_mode_from_conversation(conversation)
                 == "always-approve"
             )
+
+    @pytest.mark.asyncio
+    async def test_model_command_switches_active_session_model(
+        self, acp_agent, tmp_path
+    ):
+        """Test that /model changes llm model within an active session."""
+        with (
+            patch(
+                "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+            ) as mock_load,
+            patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
+        ):
+            mock_agent = MagicMock()
+            mock_agent.llm.model = "test-model"
+            mock_load.return_value = mock_agent
+
+            mock_conversation = create_mock_conversation_with_policy()
+            mock_conv.return_value = mock_conversation
+
+            response = await acp_agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+            session_id = response.session_id
+
+            await acp_agent.prompt(
+                session_id=session_id,
+                prompt=[
+                    TextContentBlock(
+                        type="text",
+                        text="/model anthropic/claude-opus-4-6",
+                    )
+                ],
+            )
+
+            updated_model = acp_agent._active_sessions[session_id].state.agent.llm.model
+            assert updated_model == "anthropic/claude-opus-4-6"

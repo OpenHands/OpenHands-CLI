@@ -58,6 +58,7 @@ from openhands_cli.acp_impl.slash_commands import (
     get_confirmation_mode_from_conversation,
     get_unknown_command_text,
     handle_confirm_argument,
+    handle_model_argument,
     parse_slash_command,
     validate_confirmation_mode,
 )
@@ -221,6 +222,78 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
 
         return response_text
 
+    @staticmethod
+    def _build_agent_with_updated_model(agent: Any, model_id: str) -> Any:
+        """Build a model-updated agent while preserving provider settings.
+
+        Uses in-place updates for active session objects and test doubles.
+        """
+        llm = getattr(agent, "llm", None)
+        if llm is not None:
+            try:
+                llm.model = model_id
+            except Exception:
+                logger.debug("Unable to mutate llm.model directly", exc_info=True)
+
+        condenser = getattr(agent, "condenser", None)
+        condenser_llm = getattr(condenser, "llm", None)
+        if condenser_llm is not None:
+            try:
+                condenser_llm.model = model_id
+            except Exception:
+                logger.debug("Unable to mutate condenser llm.model", exc_info=True)
+
+        critic = getattr(agent, "critic", None)
+        critic_llm = getattr(critic, "llm", None)
+        if critic_llm is not None:
+            try:
+                critic_llm.model = model_id
+            except Exception:
+                logger.debug("Unable to mutate critic llm.model", exc_info=True)
+
+        return agent
+
+    async def _set_session_model(self, session_id: str, model_id: str) -> bool:
+        """Set model for a session conversation.
+
+        Returns True when model is applied, False when session is unavailable.
+        """
+        conversation = self._active_sessions.get(session_id)
+        if conversation is None:
+            logger.warning(
+                f"Cannot set model for session {session_id}: session not found"
+            )
+            return False
+
+        current_agent = getattr(conversation.state, "agent", None)
+        if current_agent is None:
+            logger.warning(
+                f"Cannot set model for session {session_id}: agent not found"
+            )
+            return False
+
+        updated_agent = self._build_agent_with_updated_model(current_agent, model_id)
+        conversation.state.agent = updated_agent
+        logger.info(f"Set model for session {session_id}: {model_id}")
+        return True
+
+    async def _cmd_model(self, session_id: str, argument: str) -> str:
+        """Handle /model command."""
+        conversation = self._active_sessions.get(session_id)
+        current_model = "unknown"
+        if conversation is not None:
+            agent = getattr(conversation.state, "agent", None)
+            llm = getattr(agent, "llm", None)
+            model_name = getattr(llm, "model", None)
+            if isinstance(model_name, str) and model_name.strip():
+                current_model = model_name
+
+        response_text, new_model = handle_model_argument(current_model, argument)
+        if new_model is not None:
+            await self._set_session_model(session_id, new_model)
+
+        return response_text
+
     async def initialize(
         self,
         protocol_version: int,
@@ -330,12 +403,14 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
 
     async def set_session_model(
         self,
-        model_id: str,  # noqa: ARG002
+        model_id: str,
         session_id: str,
         **_kwargs: Any,
     ) -> SetSessionModelResponse | None:
-        """Set session model (no-op for now)."""
-        logger.info(f"Set session model requested: {session_id}")
+        """Set session model for an active conversation."""
+        logger.info(f"Set session model requested: {session_id} -> {model_id}")
+        if model_id.strip():
+            await self._set_session_model(session_id=session_id, model_id=model_id)
         return SetSessionModelResponse()
 
     async def set_config_option(
@@ -547,6 +622,8 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                     response_text = create_help_text()
                 elif command == "confirm":
                     response_text = await self._cmd_confirm(session_id, argument)
+                elif command == "model":
+                    response_text = await self._cmd_model(session_id, argument)
                 else:
                     response_text = get_unknown_command_text(command)
 
