@@ -42,6 +42,7 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
         initial_confirmation_mode: ConfirmationMode,
         resume_conversation_id: str | None = None,
         streaming_enabled: bool = False,
+        env_overrides_enabled: bool = False,
     ):
         """Initialize the local ACP agent.
 
@@ -50,8 +51,14 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
             initial_confirmation_mode: Default confirmation mode for new sessions
             resume_conversation_id: Optional conversation ID to resume
             streaming_enabled: Whether to enable token streaming for LLM outputs
+            env_overrides_enabled: Whether to override LLM settings from env vars
         """
-        super().__init__(conn, initial_confirmation_mode, resume_conversation_id)
+        super().__init__(
+            conn,
+            initial_confirmation_mode,
+            resume_conversation_id,
+            env_overrides_enabled=env_overrides_enabled,
+        )
         self._streaming_enabled: bool = streaming_enabled
 
         logger.info(
@@ -117,6 +124,7 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
                 conversation_id=session_id,
                 mcp_servers=mcp_servers,
                 skills=[RESOURCE_SKILL],
+                env_overrides_enabled=self._env_overrides_enabled,
             )
             streaming_enabled = (
                 self._streaming_enabled and not agent.llm.uses_responses_api()

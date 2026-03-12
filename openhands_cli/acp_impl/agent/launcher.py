@@ -19,6 +19,7 @@ async def run_acp_server(
     streaming_enabled: bool = False,
     cloud: bool = False,
     cloud_api_url: str = "https://app.all-hands.dev",
+    env_overrides_enabled: bool = False,
 ) -> None:
     """Run the OpenHands ACP server.
 
@@ -27,6 +28,9 @@ async def run_acp_server(
         resume_conversation_id: Optional conversation ID to resume when a new
             session is created
         streaming_enabled: Whether to enable token streaming for LLM outputs
+        cloud: Whether to use OpenHands Cloud workspace
+        cloud_api_url: OpenHands Cloud API URL
+        env_overrides_enabled: Whether to override LLM settings from env vars
     """
     logger.info(
         f"Starting OpenHands ACP server with confirmation mode: "
@@ -46,6 +50,7 @@ async def run_acp_server(
                 initial_confirmation_mode,
                 resume_conversation_id,
                 streaming_enabled,
+                env_overrides_enabled=env_overrides_enabled,
             )
 
         AgentSideConnection(create_local_agent, writer, reader)
@@ -58,6 +63,7 @@ async def run_acp_server(
                 initial_confirmation_mode=initial_confirmation_mode,
                 cloud_api_url=cloud_api_url,
                 resume_conversation_id=resume_conversation_id,
+                env_overrides_enabled=env_overrides_enabled,
             )
 
         AgentSideConnection(create_agent, writer, reader)

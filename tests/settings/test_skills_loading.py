@@ -158,11 +158,13 @@ This is a user microagent for testing.
             trigger=None,
         )
 
+        # In SDK >=1.12, load_public_skills was replaced by
+        # load_available_skills(include_public=True) inside AgentContext.
         with patch(
-            "openhands.sdk.context.agent_context.load_public_skills"
-        ) as mock_load_public:
-            # Mock load_public_skills to return our test skill
-            mock_load_public.return_value = [mock_public_skill]
+            "openhands.sdk.context.agent_context.load_available_skills"
+        ) as mock_load_available:
+            # Return dict[str, Skill] matching the new SDK signature
+            mock_load_available.return_value = {"github": mock_public_skill}
 
             from openhands_cli.stores import AgentStore
 
@@ -174,14 +176,12 @@ This is a user microagent for testing.
             assert loaded_agent is not None
             assert loaded_agent.agent_context is not None
 
-            # Verify load_public_skills was called
-            mock_load_public.assert_called_once()
+            # Verify load_available_skills was called
+            mock_load_available.assert_called_once()
 
-            # Verify that the agent context has load_public_skills enabled
-            # Note: We can't directly check this as it's processed during initialization
-            # But we can verify that our mocked public skill is in the skills list
+            # Verify that our mocked public skill is in the skills list
             all_skills = loaded_agent.agent_context.skills
             skill_names = [skill.name for skill in all_skills]
 
-            # Should have project skills + mocked public skill
+            # Should have the mocked public skill
             assert "github" in skill_names  # mocked public skill

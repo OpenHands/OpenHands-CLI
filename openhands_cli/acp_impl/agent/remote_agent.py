@@ -43,6 +43,7 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
         initial_confirmation_mode: ConfirmationMode,
         cloud_api_url: str = "https://app.all-hands.dev",
         resume_conversation_id: str | None = None,
+        env_overrides_enabled: bool = False,
     ):
         """Initialize the cloud ACP agent.
 
@@ -51,9 +52,14 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
             initial_confirmation_mode: Default confirmation mode for new sessions
             cloud_api_url: OpenHands Cloud API URL
             resume_conversation_id: Optional conversation ID to resume
+            env_overrides_enabled: Whether to override LLM settings from env vars
         """
         super().__init__(
-            conn, initial_confirmation_mode, resume_conversation_id, cloud_api_url
+            conn,
+            initial_confirmation_mode,
+            resume_conversation_id,
+            cloud_api_url,
+            env_overrides_enabled=env_overrides_enabled,
         )
 
         self._active_workspaces: dict[str, OpenHandsCloudWorkspace] = {}
@@ -194,6 +200,7 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
                 conversation_id=session_id,
                 mcp_servers=mcp_servers,
                 skills=[RESOURCE_SKILL],
+                env_overrides_enabled=self._env_overrides_enabled,
             )
         except MCPConfigurationError as e:
             logger.error(f"Invalid MCP configuration: {e}")
