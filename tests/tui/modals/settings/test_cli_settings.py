@@ -89,6 +89,7 @@ class TestCliSettings:
         cfg = CliSettings()
         assert cfg.default_cells_expanded is False
         assert cfg.auto_open_plan_panel is True
+        assert cfg.replay_window_size == 200
         assert cfg.critic.enable_critic is True
         assert cfg.critic.enable_iterative_refinement is False
         assert cfg.critic.critic_threshold == 0.6
@@ -99,6 +100,17 @@ class TestCliSettings:
     def test_default_cells_expanded_accepts_bool(self, value: bool):
         cfg = CliSettings(default_cells_expanded=value)
         assert cfg.default_cells_expanded is value
+
+    @pytest.mark.parametrize("value", [10, 200, 1000])
+    def test_replay_window_size_accepts_valid_range(self, value: int):
+        cfg = CliSettings(replay_window_size=value)
+        assert cfg.replay_window_size == value
+
+    @pytest.mark.parametrize("value", [0, -1, 9999])
+    def test_replay_window_size_rejects_invalid_range(self, value: int):
+        with pytest.raises(ValidationError) as exc_info:
+            CliSettings(replay_window_size=value)
+        assert "Replay window size must be between 10 and 1000" in str(exc_info.value)
 
     @pytest.mark.parametrize(
         "env_value, expected",
@@ -186,6 +198,7 @@ class TestCliSettings:
         cfg = CliSettings(
             default_cells_expanded=False,
             auto_open_plan_panel=False,
+            replay_window_size=200,
             critic=CriticSettings(
                 enable_critic=False,
                 enable_iterative_refinement=False,
@@ -202,6 +215,7 @@ class TestCliSettings:
             {
                 "default_cells_expanded": False,
                 "auto_open_plan_panel": False,
+                "replay_window_size": 200,
                 "critic": {
                     "enable_critic": False,
                     "enable_iterative_refinement": False,

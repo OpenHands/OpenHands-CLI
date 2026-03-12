@@ -9,6 +9,7 @@ business logic (runner lifecycle, CRUD/store interactions, switching flows,
 confirmation policy + resume flows, etc.).
 """
 
+import logging
 import uuid
 from typing import TYPE_CHECKING
 
@@ -30,7 +31,11 @@ from openhands_cli.tui.core.conversation_crud_controller import (
 from openhands_cli.tui.core.conversation_switch_controller import (
     ConversationSwitchController,
 )
-from openhands_cli.tui.core.events import ConfirmationDecision, ShowConfirmationPanel
+from openhands_cli.tui.core.events import (
+    ConfirmationDecision,
+    LoadOlderEvents,
+    ShowConfirmationPanel,
+)
 from openhands_cli.tui.core.refinement_controller import RefinementController
 from openhands_cli.tui.core.runner_factory import RunnerFactory
 from openhands_cli.tui.core.runner_registry import RunnerRegistry
@@ -109,6 +114,19 @@ class ConversationManager(Container):
     - UserMessageController: rendering + message send/queue behavior
     - ConfirmationPolicyService + ConfirmationFlowController: policy + resume flows
     - RefinementController: iterative refinement based on critic results
+
+    Communication pattern
+    ---------------------
+    Most coordination flows through Textual's message-based dispatch
+    (``on_*`` handlers).  Two methods bypass this pattern for synchronous
+    timing reasons:
+
+    - ``ensure_runner()`` — eagerly creates a runner so that
+      ``replay_historical_events()`` fires before the first user message
+      (required during ``--resume`` startup ordering).
+    - ``reload_visualizer_configuration()`` — called directly by the app
+      after settings changes to reload the visualizer configuration
+      immediately rather than going through the message queue.
     """
 
     def __init__(
@@ -287,11 +305,32 @@ class ConversationManager(Container):
         event.stop()
         self._confirmation_controller.handle_decision(event.decision)
 
+    @on(LoadOlderEvents)
+    def _on_load_older_events(self, event: LoadOlderEvents) -> None:
+        """Handle request to load older historical events."""
+        event.stop()
+        runner = self._runners.current
+        if runner is None:
+            return
+        runner.load_older_events()
+
     # ---- Public API for direct calls ----
 
     async def send_message(self, content: str) -> None:
         """Send a message to the current conversation."""
         self.post_message(SendMessage(content))
+
+    def ensure_runner(self, conversation_id: uuid.UUID) -> None:
+        """Eagerly create a runner for a conversation, triggering event replay.
+
+        BUG-001: During --resume startup, lazy runner creation means
+        replay_historical_events() never fires until the first user message.
+        This method forces early runner creation so historical events are
+        replayed immediately.
+        """
+        logger = logging.getLogger(__name__)
+        logger.debug("ensure_runner: eagerly creating runner for %s", conversation_id)
+        self._runners.get_or_create(conversation_id)
 
     def create_conversation(self) -> None:
         """Create a new conversation."""

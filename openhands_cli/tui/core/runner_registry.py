@@ -41,6 +41,13 @@ class RunnerRegistry:
         self._current_runner = None
 
     def get_or_create(self, conversation_id: uuid.UUID) -> ConversationRunner:
+        """Return the cached runner for *conversation_id*, creating one if needed.
+
+        Must be called from the main thread.  A newly-created runner is
+        **not** cached until ``replay_historical_events()`` completes
+        successfully.  If replay raises, no partially-initialized runner
+        is stored in the registry and the exception propagates to the caller.
+        """
         runner = self._runners.get(conversation_id)
         if runner is None:
             runner = self._factory.create(
@@ -48,6 +55,13 @@ class RunnerRegistry:
                 message_pump=self._message_pump,
                 notification_callback=self._notification_callback,
             )
+
+            # Replay historical events for newly created runners (resume / switch).
+            # This is a no-op for brand-new conversations with no events.
+            # IMPORTANT: Replay MUST complete before caching — if replay raises,
+            # the partially-initialized runner must not pollute the registry.
+            runner.replay_historical_events()
+
             self._runners[conversation_id] = runner
 
         if runner.conversation is not None:
