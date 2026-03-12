@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from openhands_cli.stores import CliSettings, CriticSettings
+from openhands_cli.stores.cli_settings import VALID_THEMES
 
 
 class TestCriticSettingsValidation:
@@ -89,6 +90,7 @@ class TestCliSettings:
         cfg = CliSettings()
         assert cfg.default_cells_expanded is False
         assert cfg.auto_open_plan_panel is True
+        assert cfg.theme == "openhands"
         assert cfg.critic.enable_critic is True
         assert cfg.critic.enable_iterative_refinement is False
         assert cfg.critic.critic_threshold == 0.6
@@ -99,6 +101,31 @@ class TestCliSettings:
     def test_default_cells_expanded_accepts_bool(self, value: bool):
         cfg = CliSettings(default_cells_expanded=value)
         assert cfg.default_cells_expanded is value
+
+    @pytest.mark.parametrize("theme", ["openhands", "dracula", "nord", "tokyo-night"])
+    def test_theme_accepts_valid_values(self, theme: str):
+        cfg = CliSettings(theme=theme)
+        assert cfg.theme == theme
+
+    def test_theme_rejects_unknown_value(self):
+        with pytest.raises(ValidationError) as exc_info:
+            CliSettings(theme="nonexistent-theme")
+        assert "Unknown theme" in str(exc_info.value)
+
+    def test_valid_themes_contains_openhands_and_builtins(self):
+        assert "openhands" in VALID_THEMES
+        assert "dracula" in VALID_THEMES
+        assert "nord" in VALID_THEMES
+
+    def test_theme_roundtrip(self, tmp_path: Path):
+        config_path = tmp_path / "cli_config.json"
+        cfg = CliSettings(theme="dracula")
+
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
+            cfg.save()
+            loaded = CliSettings.load()
+
+        assert loaded.theme == "dracula"
 
     @pytest.mark.parametrize(
         "env_value, expected",
@@ -186,6 +213,7 @@ class TestCliSettings:
         cfg = CliSettings(
             default_cells_expanded=False,
             auto_open_plan_panel=False,
+            theme="openhands",
             critic=CriticSettings(
                 enable_critic=False,
                 enable_iterative_refinement=False,
@@ -202,6 +230,7 @@ class TestCliSettings:
             {
                 "default_cells_expanded": False,
                 "auto_open_plan_panel": False,
+                "theme": "openhands",
                 "critic": {
                     "enable_critic": False,
                     "enable_iterative_refinement": False,
