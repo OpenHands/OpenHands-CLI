@@ -7,6 +7,84 @@ import pytest
 from tests.conftest import MockLocations
 
 
+# ============================================================================
+# UnicodeDecodeError recovery
+# ============================================================================
+
+
+class TestAgentStoreBuildContextUnicodeError:
+    """_build_agent_context must tolerate UnicodeDecodeError from load_project_skills.
+
+    AGENTS.md or any skill file may contain non-UTF-8 bytes (e.g., Latin-1
+    text or binary data).  A crash here blocks the entire session; we should
+    warn and continue with an empty project-skill list instead.
+    """
+
+    def _common_patches(self, mock_locations: MockLocations, unicode_exc: Exception):
+        """Return nested patches shared by both tests."""
+        return (
+            patch(
+                "openhands_cli.stores.agent_store.load_project_skills",
+                side_effect=unicode_exc,
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_work_dir",
+                return_value=str(mock_locations.work_dir),
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_os_description",
+                return_value="Linux",
+            ),
+            # Prevent public/user skill loading so context.skills stays minimal
+            patch(
+                "openhands.sdk.context.agent_context.load_public_skills",
+                return_value=[],
+            ),
+            patch(
+                "openhands.sdk.context.agent_context.load_user_skills",
+                return_value=[],
+            ),
+        )
+
+    def test_unicode_error_falls_back_to_empty_skills(
+        self, mock_locations: MockLocations
+    ):
+        """UnicodeDecodeError from load_project_skills must not crash the session."""
+        unicode_exc = UnicodeDecodeError("utf-8", b"\xd1", 0, 1, "invalid start byte")
+
+        patches = self._common_patches(mock_locations, unicode_exc)
+        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+            from openhands_cli.stores import AgentStore
+
+            store = AgentStore()
+            context = store._build_agent_context()
+
+        assert context.skills == [], (
+            "_build_agent_context should pass an empty project-skill list when "
+            "load_project_skills raises UnicodeDecodeError"
+        )
+
+    def test_unicode_error_prints_warning_to_stderr(
+        self, mock_locations: MockLocations, capsys
+    ):
+        """A human-readable warning must be printed to stderr on UnicodeDecodeError."""
+        unicode_exc = UnicodeDecodeError("utf-8", b"\xd1", 4, 5, "invalid start byte")
+
+        patches = self._common_patches(mock_locations, unicode_exc)
+        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+            from openhands_cli.stores import AgentStore
+
+            store = AgentStore()
+            store._build_agent_context()
+
+        captured = capsys.readouterr()
+        # Rich prints to stderr; check the combined output for the key message
+        output = captured.out + captured.err
+        assert "Warning" in output or "UTF-8" in output, (
+            f"Expected a warning message about the encoding error, but got: {output!r}"
+        )
+
+
 @pytest.fixture
 def temp_project_dir(mock_locations: MockLocations):
     """Create a temporary project directory with skills."""

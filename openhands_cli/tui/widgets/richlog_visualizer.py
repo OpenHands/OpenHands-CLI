@@ -692,7 +692,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
             f"Loaded: {tool_count} tool{'s' if tool_count != 1 else ''}, system prompt"
         )
 
-        return self._make_collapsible(content, title, event)
+        # System prompt content is very long and rarely useful to read inline.
+        # Always start it collapsed regardless of the global default_cells_expanded
+        # setting so it doesn't overwhelm the conversation view.
+        return self._make_collapsible(content, title, event, collapsed=True)
 
     def _create_event_widget(self, event: Event) -> "Widget | None":
         """Create a widget for the event - either plain text or collapsible."""
