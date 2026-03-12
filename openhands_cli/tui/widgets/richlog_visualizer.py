@@ -434,7 +434,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         status_color = ERROR_COLOR if is_error else SUCCESS_COLOR
 
         # Build the new title with colored status icon
-        title_text = Text(self._build_action_title(action_event))
+        title_text = Text.from_markup(self._build_action_title(action_event))
         icon_text = Text(status_icon, style=status_color)
         new_title = Text.assemble(title_text, " ", icon_text)
 
