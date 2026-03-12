@@ -16,6 +16,7 @@ from openhands.sdk import (
     AgentContext,
     LLMSummarizingCondenser,
     LocalFileStore,
+    get_logger,
 )
 from openhands.sdk.context import load_project_skills
 from openhands.sdk.conversation.persistence_const import BASE_STATE
@@ -39,6 +40,9 @@ from openhands_cli.utils import (
 )
 
 
+logger = get_logger(__name__)
+
+
 def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
     """Get tools from a persisted conversation's base_state.json.
 
@@ -58,6 +62,11 @@ def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
     base_state_path = os.path.join(conversation_dir, BASE_STATE)
 
     if not os.path.exists(base_state_path):
+        logger.debug(
+            "No base_state.json found for conversation %s at %s",
+            conversation_id,
+            base_state_path,
+        )
         return None
 
     try:
@@ -69,11 +78,22 @@ def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
         tools_data = agent_data.get("tools", [])
 
         if not tools_data:
+            logger.debug(
+                "No tools found in persisted conversation %s", conversation_id
+            )
             return None
 
-        # Convert tool data to Tool objects
-        return [Tool.model_validate(tool) for tool in tools_data]
-    except (json.JSONDecodeError, KeyError, OSError):
+        tools = [Tool.model_validate(tool) for tool in tools_data]
+        logger.debug(
+            "Loaded %d tools from persisted conversation %s",
+            len(tools),
+            conversation_id,
+        )
+        return tools
+    except (json.JSONDecodeError, KeyError, OSError) as e:
+        logger.debug(
+            "Failed to load tools from conversation %s: %s", conversation_id, e
+        )
         return None
 
 
