@@ -164,6 +164,19 @@ class TestBaseHttpClient:
                 await client._make_request("GET", "/test")
 
     @pytest.mark.asyncio
+    async def test_make_request_network_error_empty_message(self):
+        """Test that network errors with empty message fall back to exception type name."""
+        client = BaseHttpClient("https://api.example.com")
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client_class.return_value.__aenter__.return_value = mock_client
+            mock_client.request.side_effect = httpx.ConnectError("")
+
+            with pytest.raises(AuthHttpError, match="Network error: ConnectError"):
+                await client._make_request("GET", "/test")
+
+    @pytest.mark.asyncio
     async def test_make_request_no_raise_for_status(self):
         """Test HTTP request without raising for status errors."""
         client = BaseHttpClient("https://api.example.com")

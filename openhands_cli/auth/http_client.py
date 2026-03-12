@@ -114,7 +114,8 @@ class BaseHttpClient:
             raise AuthHttpError(f"HTTP {e.response.status_code}: {error_detail}")
 
         except httpx.RequestError as e:
-            raise AuthHttpError(f"Network error: {str(e)}")
+            error_msg = str(e) or type(e).__name__
+            raise AuthHttpError(f"Network error: {error_msg}")
 
     async def get(
         self,

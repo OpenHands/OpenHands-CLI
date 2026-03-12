@@ -76,7 +76,11 @@ class DeviceFlowClient(BaseHttpClient):
             ) from e
 
     async def poll_for_token(
-        self, device_code: str, interval: int, timeout: float = 600.0
+        self,
+        device_code: str,
+        interval: int,
+        timeout: float = 600.0,
+        max_network_errors: int = 3,
     ) -> DeviceTokenResponse:
         """Poll for the API key after user authorization.
 
@@ -84,6 +88,7 @@ class DeviceFlowClient(BaseHttpClient):
             device_code: The device code from start_device_flow
             interval: Polling interval in seconds
             timeout: Maximum time to wait for authorization in seconds (default: 10 min)
+            max_network_errors: Number of consecutive network errors before giving up
 
         Returns:
             DeviceTokenResponse containing access_token (API key), token_type, etc.
@@ -93,6 +98,7 @@ class DeviceFlowClient(BaseHttpClient):
         """
         data = {"device_code": device_code}
         start_time = time.time()
+        consecutive_network_errors = 0
 
         while time.time() - start_time < timeout:
             try:
@@ -101,8 +107,15 @@ class DeviceFlowClient(BaseHttpClient):
                     form_data=data,
                     raise_for_status=False,
                 )
+                consecutive_network_errors = 0
             except AuthHttpError as e:
-                raise DeviceFlowError(f"Network error during token polling: {e}") from e
+                consecutive_network_errors += 1
+                if consecutive_network_errors >= max_network_errors:
+                    raise DeviceFlowError(
+                        f"Network error during token polling: {e}"
+                    ) from e
+                await asyncio.sleep(interval)
+                continue
 
             if response.status_code == 200:
                 # Success - parse and validate the token response

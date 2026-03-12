@@ -265,7 +265,7 @@ class TestDeviceFlowClient:
 
     @pytest.mark.asyncio
     async def test_poll_for_token_network_error(self):
-        """Test token polling with network error."""
+        """Test token polling fails after max consecutive network errors."""
         client = DeviceFlowClient("https://api.example.com")
 
         with patch.object(client, "post") as mock_post:
@@ -273,10 +273,42 @@ class TestDeviceFlowClient:
 
             mock_post.side_effect = AuthHttpError("Connection failed")
 
-            with pytest.raises(
-                DeviceFlowError, match="Network error during token polling"
-            ):
-                await client.poll_for_token("device123", 1)
+            with patch("asyncio.sleep"):
+                with pytest.raises(
+                    DeviceFlowError, match="Network error during token polling"
+                ):
+                    await client.poll_for_token("device123", 1)
+
+            # Default max_network_errors=3, so post should be called 3 times
+            assert mock_post.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_poll_for_token_transient_network_error_recovers(self):
+        """Test that transient network errors are retried and polling recovers."""
+        client = DeviceFlowClient("https://api.example.com")
+
+        from openhands_cli.auth.http_client import AuthHttpError
+
+        success_response = httpx.Response(status_code=200)
+        success_response._content = json.dumps(
+            {"access_token": "token123", "token_type": "Bearer"}
+        ).encode()
+
+        # Two transient errors followed by success
+        with patch.object(client, "post") as mock_post:
+            mock_post.side_effect = [
+                AuthHttpError("Transient failure 1"),
+                AuthHttpError("Transient failure 2"),
+                success_response,
+            ]
+
+            with patch("asyncio.sleep") as mock_sleep:
+                result = await client.poll_for_token("device123", 5)
+
+                assert isinstance(result, DeviceTokenResponse)
+                assert result.access_token == "token123"
+                # Slept twice (once per transient error before retrying)
+                assert mock_sleep.call_count == 2
 
     @pytest.mark.asyncio
     async def test_poll_for_token_invalid_json_response(self):
