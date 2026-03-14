@@ -141,8 +141,8 @@ class SettingsScreen(ModalScreen):
                     id="cancel_button",
                     classes="settings_button",
                 )
-            # Render footer for bindings
-            yield Footer()
+        # Render footer for bindings - outside settings_container for proper positioning
+        yield Footer()
 
     def on_mount(self) -> None:
         """Initialize the form with current settings."""
