@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from pathlib import Path
 from typing import Any
 
 from prompt_toolkit import HTML, print_formatted_text
@@ -14,6 +15,7 @@ from openhands.sdk import (
     LLM,
     Agent,
     AgentContext,
+    LLMProfileStore,
     LLMSummarizingCondenser,
     LocalFileStore,
 )
@@ -251,6 +253,9 @@ class AgentStore:
 
     def __init__(self) -> None:
         self.file_store = LocalFileStore(root=get_persistence_dir())
+        self.profile_store = LLMProfileStore(
+            base_dir=Path(get_persistence_dir()) / "profiles"
+        )
 
     def load_from_disk(self) -> Agent | None:
         """Load an agent configuration from disk storage.
@@ -503,3 +508,140 @@ class AgentStore:
             agent = agent.model_copy(update={"critic": critic})
 
         return agent
+
+    # -------------------------------------------------------------------------
+    # LLM Profile Management
+    # -------------------------------------------------------------------------
+
+    def list_profiles(self) -> list[str]:
+        """List available LLM profiles.
+
+        Returns:
+            List of profile names (e.g., ["work.json", "personal.json"])
+        """
+        return self.profile_store.list()
+
+    def save_llm_as_profile(self, profile_name: str, llm: LLM) -> None:
+        """Save an LLM configuration as a reusable profile.
+
+        Args:
+            profile_name: Name for the profile (e.g., "work", "personal")
+            llm: LLM instance to save
+
+        Raises:
+            ValueError: If profile_name is invalid
+            TimeoutError: If the lock cannot be acquired
+        """
+        self.profile_store.save(profile_name, llm, include_secrets=True)
+
+    def delete_profile(self, profile_name: str) -> None:
+        """Delete an LLM profile.
+
+        Args:
+            profile_name: Name of the profile to delete
+
+        Raises:
+            TimeoutError: If the lock cannot be acquired
+        """
+        self.profile_store.delete(profile_name)
+
+    def create_agent_from_profile(self, profile_name: str) -> Agent:
+        """Create a fully configured Agent from an LLM profile.
+
+        This creates a new Agent with default tools and a condenser configured
+        with the LLM from the specified profile.
+
+        Args:
+            profile_name: Name of the profile to load (e.g., "work")
+
+        Returns:
+            A new Agent instance configured with the profile's LLM
+
+        Raises:
+            FileNotFoundError: If the profile doesn't exist
+            ValueError: If the profile is corrupted
+        """
+        # Load LLM from profile
+        llm = self.profile_store.load(profile_name)
+
+        # Create condenser with same LLM config but different usage_id
+        condenser_llm = llm.model_copy(update={"usage_id": "condenser"})
+        condenser = LLMSummarizingCondenser(llm=condenser_llm)
+
+        # Get default tools and MCP config
+        tools = get_default_cli_tools()
+        enabled_servers = list_enabled_servers()
+        mcp_config = {"mcpServers": enabled_servers} if enabled_servers else {}
+
+        # Create the Agent
+        return Agent(
+            llm=llm,
+            tools=tools,
+            condenser=condenser,
+            mcp_config=mcp_config,
+        )
+
+    def load_and_activate_profile(self, profile_name: str) -> Agent:
+        """Load a profile and make it the active agent configuration.
+
+        This creates an Agent from the profile and saves it as the current
+        agent configuration in agent_settings.json.
+
+        Args:
+            profile_name: Name of the profile to activate
+
+        Returns:
+            The newly created and saved Agent
+
+        Raises:
+            FileNotFoundError: If the profile doesn't exist
+            ValueError: If the profile is corrupted
+        """
+        agent = self.create_agent_from_profile(profile_name)
+        self.save(agent)
+        return agent
+
+    def swap_llm_from_profile(self, profile_name: str) -> Agent:
+        """Swap only the LLM in the current agent with one from a profile.
+
+        This preserves existing agent settings (tools, condenser max_size,
+        MCP config) while only updating the LLM configuration.
+
+        Args:
+            profile_name: Name of the profile to load
+
+        Returns:
+            The updated Agent with the new LLM
+
+        Raises:
+            FileNotFoundError: If the profile doesn't exist
+            ValueError: If the profile is corrupted or no existing agent
+        """
+        existing_agent = self.load_from_disk()
+        if existing_agent is None:
+            # No existing agent, create fresh from profile
+            return self.load_and_activate_profile(profile_name)
+
+        # Load new LLM from profile
+        new_llm = self.profile_store.load(profile_name)
+
+        # Update condenser with new LLM (preserve max_size if set)
+        new_condenser = None
+        if existing_agent.condenser and isinstance(
+            existing_agent.condenser, LLMSummarizingCondenser
+        ):
+            condenser_llm = new_llm.model_copy(update={"usage_id": "condenser"})
+            new_condenser = existing_agent.condenser.model_copy(
+                update={"llm": condenser_llm}
+            )
+
+        # Create updated agent (preserves tools, mcp_config)
+        updated_agent = existing_agent.model_copy(
+            update={
+                "llm": new_llm,
+                "condenser": new_condenser,
+            }
+        )
+
+        self.save(updated_agent)
+        return updated_agent

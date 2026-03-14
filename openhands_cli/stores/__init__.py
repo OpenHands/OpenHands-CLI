@@ -1,3 +1,4 @@
+from openhands.sdk import LLMProfileStore
 from openhands_cli.stores.agent_store import (
     AgentStore,
     MissingEnvironmentVariablesError,
@@ -15,6 +16,7 @@ __all__ = [
     "CliSettings",
     "CriticSettings",
     "DEFAULT_MAX_REFINEMENT_ITERATIONS",
+    "LLMProfileStore",
     "MissingEnvironmentVariablesError",
     "check_and_warn_env_vars",
 ]

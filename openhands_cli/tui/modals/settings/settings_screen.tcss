@@ -215,3 +215,26 @@ VerticalScroll > .scrollbar--vertical:hover {
     height: auto;
     min-height: 2;
 }
+
+/* Profiles Tab Styles */
+#profiles_content {
+    padding: 2;
+    height: 1fr;
+    scrollbar-gutter: stable;
+    overflow-y: auto;
+}
+
+.profile_buttons {
+    height: auto;
+    margin-top: 1;
+    margin-bottom: 2;
+}
+
+.profile_button {
+    margin-right: 1;
+    min-width: 16;
+}
+
+.save_profile_button {
+    margin-top: 1;
+}

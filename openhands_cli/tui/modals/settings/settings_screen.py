@@ -30,6 +30,8 @@ from openhands_cli.tui.modals.settings.choices import (
 from openhands_cli.tui.modals.settings.components import (
     CliSettingsTab,
     CriticSettingsTab,
+    ProfileLoaded,
+    ProfilesTab,
     SettingsTab,
 )
 from openhands_cli.tui.modals.settings.utils import SettingsFormData, save_settings
@@ -116,12 +118,17 @@ class SettingsScreen(ModalScreen):
                 with TabPane("Agent Settings", id="settings_tab"):
                     yield SettingsTab()
 
-                # CLI Settings Tab - only show if not first-time setup
+                # Tabs only shown for existing users (not first-time setup)
                 if not self.is_initial_setup:
+                    # LLM Profiles Tab
+                    with TabPane("LLM Profiles", id="profiles_tab"):
+                        yield ProfilesTab()
+
+                    # CLI Settings Tab
                     with TabPane("CLI Settings", id="cli_settings_tab"):
                         yield CliSettingsTab(initial_settings=cli_settings)
 
-                    # Critic Settings Tab - only show if not first-time setup
+                    # Critic Settings Tab
                     with TabPane("Critic", id="critic_settings_tab"):
                         yield CriticSettingsTab(initial_settings=cli_settings.critic)
 
@@ -404,6 +411,26 @@ class SettingsScreen(ModalScreen):
             self._save_settings()
         elif event.button.id == "cancel_button":
             self._handle_cancel()
+
+    def on_profile_loaded(self, event: ProfileLoaded) -> None:
+        """Handle profile loaded event from ProfilesTab.
+
+        Updates the settings form with the newly loaded profile's LLM configuration.
+        """
+        # Update current_agent to reflect the loaded profile
+        self.current_agent = event.agent
+
+        # Reload the settings form with the new agent's LLM config
+        self._load_current_settings()
+        self._update_advanced_visibility()
+        self._update_field_dependencies()
+
+        # Show success message
+        self._show_message(
+            f"Profile '{event.profile_name}' loaded. "
+            "Click Save to keep these settings.",
+            is_error=False,
+        )
 
     def action_cancel(self) -> None:
         """Handle escape key to cancel settings."""
