@@ -114,10 +114,6 @@ SettingsScreen {
     border: round $primary;
 }
 
-.form_select > SelectOverlay {
-    border: round $primary;
-}
-
 .form_checkbox {
     margin-bottom: 1;
     height: 1;
