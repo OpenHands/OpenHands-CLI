@@ -193,16 +193,19 @@ def main() -> None:
                 sys.exit(1)
 
         else:
-            compat_result = check_terminal_compatibility(console=console)
-            if not compat_result.is_tty:
-                print(
-                    "OpenHands CLI terminal UI may not work correctly in this "
-                    f"environment: {compat_result.reason}"
-                )
-                print(
-                    "To override Rich's detection, you can set TTY_INTERACTIVE=1 "
-                    "(and optionally TTY_COMPATIBLE=1)."
-                )
+            # Only check terminal compatibility when not in headless mode
+            # In headless mode, we don't need an interactive terminal
+            if not args.headless:
+                compat_result = check_terminal_compatibility(console=console)
+                if not compat_result.is_tty:
+                    print(
+                        "OpenHands CLI terminal UI may not work correctly in this "
+                        f"environment: {compat_result.reason}"
+                    )
+                    print(
+                        "To override Rich's detection, you can set TTY_INTERACTIVE=1 "
+                        "(and optionally TTY_COMPATIBLE=1)."
+                    )
             # Handle resume logic (including --last and conversation list)
             resume_id = handle_resume_logic(args)
             if resume_id is None and (args.last or args.resume == ""):
