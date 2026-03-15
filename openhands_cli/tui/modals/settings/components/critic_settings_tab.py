@@ -105,7 +105,7 @@ class CriticSettingsTab(Container):
 
     DEFAULT_CSS = """
     .threshold_container {
-        height: auto;
+        height: 3;
         align: left middle;
     }
 
@@ -116,11 +116,15 @@ class CriticSettingsTab(Container):
     .threshold_label {
         width: auto;
         margin-right: 1;
+        height: 1;
+        margin-top: 1;
     }
 
     .threshold_suffix {
         width: 2;
-        margin-left: 1;
+        margin-left: 0;
+        content-align: left middle;
+        height: 3;
     }
 
     .threshold_help {

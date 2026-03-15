@@ -89,12 +89,33 @@ SettingsScreen {
     width: 100%;
     margin-bottom: 1;
     height: 3;
+    border: round $primary;
+}
+
+.form_input:focus {
+    border: round $primary;
+}
+
+.form_input.threshold_input {
+    width: 10;
 }
 
 .form_select {
     width: 100%;
     margin-bottom: 1;
     height: 3;
+}
+
+.form_select > SelectCurrent {
+    border: round $primary;
+}
+
+.form_select:focus > SelectCurrent {
+    border: round $primary;
+}
+
+.form_select > SelectOverlay {
+    border: round $primary;
 }
 
 .form_checkbox {
