@@ -632,7 +632,7 @@ class TestCriticBehaviorInAgentCreation:
     def test_critic_enabled_when_param_is_false(self, tmp_path) -> None:
         """Critic should NOT be None when critic_disabled=False and settings allow."""
         from openhands_cli.stores import AgentStore
-        from openhands_cli.stores.cli_settings import CliSettings
+        from openhands_cli.stores.cli_settings import CliSettings, CriticSettings
 
         conversations_dir = tmp_path / "conversations"
         conversations_dir.mkdir(exist_ok=True)
@@ -645,7 +645,7 @@ class TestCriticBehaviorInAgentCreation:
         }
 
         # Mock CliSettings to enable critic
-        mock_settings = CliSettings(enable_critic=True)
+        mock_settings = CliSettings(critic=CriticSettings(enable_critic=True))
 
         with (
             patch(

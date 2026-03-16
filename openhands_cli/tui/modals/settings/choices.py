@@ -35,13 +35,22 @@ def get_provider_options() -> list[tuple[str, str]]:
 
 
 def get_model_options(provider: str) -> list[tuple[str, str]]:
-    """Get list of available models for a provider, sorted alphabetically."""
+    """Get list of available models for a provider.
+
+    Models are returned in their original order (VERIFIED first, then UNVERIFIED),
+    preserving the original casing. Duplicates are removed while maintaining order.
+    """
     models = VERIFIED_MODELS.get(
         provider, []
     ) + UNVERIFIED_MODELS_EXCLUDING_BEDROCK.get(provider, [])
 
-    # Remove duplicates and sort
-    unique_models = sorted(set(models))
+    # Remove duplicates while preserving order
+    seen: set[str] = set()
+    unique_models: list[str] = []
+    for model in models:
+        if model not in seen:
+            seen.add(model)
+            unique_models.append(model)
 
     return [(model, model) for model in unique_models]
 

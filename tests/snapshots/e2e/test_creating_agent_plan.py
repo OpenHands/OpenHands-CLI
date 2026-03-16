@@ -49,6 +49,13 @@ class TestCreatingAgentPlan:
             # Wait for all animations to complete (indicates processing finished)
             await wait_for_idle(pilot)
 
+            # Scroll to end for consistent snapshot position
+            # Use scroll_end directly on the scroll view instead of pilot.press("end")
+            # which may be captured by the focused input widget
+            scroll_view = pilot.app.query_one("#scroll_view")
+            scroll_view.scroll_end(animate=False)
+            await pilot.wait_for_scheduled_animations()
+
         # Use fixed conversation ID from fixture for deterministic snapshots
         app = OpenHandsApp(
             exit_confirmation=False,

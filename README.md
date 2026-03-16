@@ -104,7 +104,7 @@ Control how the agent handles actions:
 openhands
 
 # Auto-approve all actions
-openhands --always-approve
+openhands --always-approve  # or --yolo
 
 # LLM-based security analyzer
 openhands --llm-approve
@@ -129,9 +129,18 @@ Run OpenHands without the interactive UI for CI/CD pipelines and automation:
 
 ```bash
 openhands --headless -t "Write unit tests for auth.py"
+openhands --headless -f instructions.md  # or use a file
 
 # With JSON output for parsing
 openhands --headless --json -t "Create a Flask app"
+```
+
+### Resume Conversations
+
+```bash
+openhands --resume              # list recent conversations
+openhands --resume <id>         # resume specific conversation
+openhands --resume --last       # resume most recent
 ```
 
 ## Documentation

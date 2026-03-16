@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 from rich.markup import escape
+from textual.app import ComposeResult
 from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Button, Static
 
@@ -82,7 +83,7 @@ class PlanSidePanel(VerticalScroll):
             content_area.mount(self)
             self.refresh_from_disk()
 
-    def compose(self):
+    def compose(self) -> ComposeResult:
         """Compose the Plan side panel content."""
         with Horizontal(classes="plan-header-row"):
             yield Static("Agent Plan", classes="plan-header")

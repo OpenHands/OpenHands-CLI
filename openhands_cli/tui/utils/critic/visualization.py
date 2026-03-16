@@ -37,7 +37,6 @@ def create_critic_collapsible(critic_result: CriticResult) -> Collapsible:
         content_text,
         title=title_text,
         collapsed=not has_content,  # Collapse if no content
-        border_color="#888888",  # Default gray border
     )
 
     # Reduce padding for more compact display
