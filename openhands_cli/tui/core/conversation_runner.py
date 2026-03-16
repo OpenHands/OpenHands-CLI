@@ -276,4 +276,5 @@ class ConversationRunner:
         if not self.conversation or not self.conversation.state:
             return 0, Text(text="No conversation data available")
 
+        # TODO is this need common enough that maybe it should be exposed in the SDK?
         return extract_conversation_summary(self.conversation.state.events)
