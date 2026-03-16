@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Protocol
 
 from acp import (
@@ -52,6 +53,33 @@ THOUGHT_HEADER = "\n**Thought**:\n"
 
 def _event_visualize_to_plain(event: Event) -> str:
     return str(event.visualize.plain)
+
+
+def _strip_truncation_notes(text: str) -> str:
+    """Strip truncation NOTE messages from tool output.
+
+    Tool outputs are sometimes truncated by the OpenHands runtime with a NOTE
+    message appended to indicate that the output was incomplete. This function
+    removes those NOTE messages to prevent them from being concatenated with
+    file paths or other sensitive content.
+
+    The pattern removed is:
+    <NOTE>Due to the max output limit, ...</NOTE>
+
+    Args:
+        text: The text potentially containing truncation notes.
+
+    Returns:
+        The text with truncation notes removed.
+    """
+    # Remove <NOTE>...</NOTE> patterns (handles both single and multi-line)
+    text = re.sub(
+        r"<NOTE>.*?</NOTE>",
+        "",
+        text,
+        flags=re.DOTALL,
+    )
+    return text.rstrip()
 
 
 class _ACPContext(Protocol):
@@ -117,11 +145,16 @@ class SharedEventHandler:
     async def handle_user_reject_or_agent_error(
         self, ctx: _ACPContext, event: UserRejectObservation | AgentErrorEvent
     ) -> None:
+        # Strip truncation notes before sending to prevent them from being
+        # concatenated with file paths or other sensitive content
+        error_text = _event_visualize_to_plain(event)
+        error_text = _strip_truncation_notes(error_text)
+
         await self.send_tool_progress(
             ctx,
             tool_call_id=event.tool_call_id,
             status="failed",
-            text=_event_visualize_to_plain(event),
+            text=error_text,
             raw_output=event.model_dump(),
         )
 
@@ -153,11 +186,16 @@ class SharedEventHandler:
             )
             return
 
+        # Strip truncation notes before sending to prevent them from being
+        # concatenated with file paths or other sensitive content
+        obs_text = _event_visualize_to_plain(event)
+        obs_text = _strip_truncation_notes(obs_text)
+
         await self.send_tool_progress(
             ctx,
             tool_call_id=event.tool_call_id,
             status="completed",
-            text=_event_visualize_to_plain(event),
+            text=obs_text,
             raw_output=event.model_dump(),
         )
 
