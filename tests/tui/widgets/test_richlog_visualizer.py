@@ -442,6 +442,180 @@ class TestDefaultCellsExpandedSetting:
             assert visualizer._default_collapsed is True
 
 
+class TestDirectoryViewValidation:
+    """Tests for preventing view command on directories."""
+
+    def test_view_on_directory_returns_error_message(self, visualizer):
+        """Test that viewing a directory returns error instead of raw output."""
+        import tempfile
+        from pathlib import Path
+
+        from openhands.sdk.event import ObservationEvent
+        from openhands.tools.file_editor.definition import (
+            FileEditorAction,
+            FileEditorObservation,
+        )
+
+        # Create a temporary directory to use as test target
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a directory (not a file)
+            test_dir = Path(tmpdir) / "test_directory"
+            test_dir.mkdir()
+
+            # Create a file editor action to view the directory
+            action = FileEditorAction(command="view", path=str(test_dir))
+            tool_call = create_tool_call("call_dir_view", "file_editor")
+            action_event = ActionEvent(
+                thought=[TextContent(text="View directory")],
+                action=action,
+                tool_name="file_editor",
+                tool_call_id="call_dir_view",
+                tool_call=tool_call,
+                llm_response_id="response_dir_view",
+            )
+
+            # Add action to pending_actions (simulating execution)
+            # Widget not used in this test
+            visualizer._pending_actions["call_dir_view"] = (
+                action_event,
+                None,  # type: ignore[arg-type]
+            )
+
+            # Create an observation event for viewing the directory
+            observation = FileEditorObservation(
+                command="view",
+                path=str(test_dir),
+                new_content="directory content here",
+            )
+            obs_event = ObservationEvent(
+                observation=observation,
+                tool_name="file_editor",
+                tool_call_id="call_dir_view",
+                action_id="call_dir_view",
+                source="environment",
+            )
+
+            # Build the observation content - should return the error message
+            result = visualizer._build_observation_content(obs_event)
+
+            # Verify the error message is returned
+            assert "Cannot use 'view' on a directory" in result
+            assert "ls -la" in result
+            assert "Avoid attempting to read entire directories" in result
+
+    def test_view_on_file_returns_normal_content(self, visualizer):
+        """Test that viewing a file returns the normal content."""
+        import tempfile
+        from pathlib import Path
+
+        from openhands.sdk.event import ObservationEvent
+        from openhands.tools.file_editor.definition import (
+            FileEditorAction,
+            FileEditorObservation,
+        )
+
+        # Create a temporary file to use as test target
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a file (not a directory)
+            test_file = Path(tmpdir) / "test_file.py"
+            test_file.write_text("print('hello')")
+
+            # Create a file editor action to view the file
+            action = FileEditorAction(command="view", path=str(test_file))
+            tool_call = create_tool_call("call_file_view", "file_editor")
+            action_event = ActionEvent(
+                thought=[TextContent(text="View file")],
+                action=action,
+                tool_name="file_editor",
+                tool_call_id="call_file_view",
+                tool_call=tool_call,
+                llm_response_id="response_file_view",
+            )
+
+            # Add the action to pending actions
+            visualizer._pending_actions["call_file_view"] = (
+                action_event,
+                None,  # type: ignore[arg-type]
+            )
+
+            # Create an observation event with file content
+            observation = FileEditorObservation(
+                command="view",
+                path=str(test_file),
+                new_content="print('hello')",
+            )
+            obs_event = ObservationEvent(
+                observation=observation,
+                tool_name="file_editor",
+                tool_call_id="call_file_view",
+                action_id="call_file_view",
+                source="environment",
+            )
+
+            # Build the observation content - should return the normal content
+            result = visualizer._build_observation_content(obs_event)
+
+            # Verify the content is returned (not the error message about directories)
+            # The actual output depends on how the FileEditorObservation renders
+            assert "Cannot use 'view' on a directory" not in result
+
+    def test_edit_on_directory_returns_normal_content(self, visualizer):
+        """Test that editing a directory is not affected by the view check."""
+        import tempfile
+        from pathlib import Path
+
+        from openhands.sdk.event import ObservationEvent
+        from openhands.tools.file_editor.definition import (
+            FileEditorAction,
+            FileEditorObservation,
+        )
+
+        # Create a temporary directory to use as test target
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_dir = Path(tmpdir) / "test_directory"
+            test_dir.mkdir()
+
+            # Create a file editor action to edit the directory (not view)
+            action = FileEditorAction(command="str_replace", path=str(test_dir))
+            tool_call = create_tool_call("call_dir_edit", "file_editor")
+            action_event = ActionEvent(
+                thought=[TextContent(text="Edit directory")],
+                action=action,
+                tool_name="file_editor",
+                tool_call_id="call_dir_edit",
+                tool_call=tool_call,
+                llm_response_id="response_dir_edit",
+            )
+
+            # Add the action to pending actions
+            visualizer._pending_actions["call_dir_edit"] = (
+                action_event,
+                None,  # type: ignore[arg-type]
+            )
+
+            # Create an observation event
+            observation = FileEditorObservation(
+                command="str_replace",
+                path=str(test_dir),
+                old_content="",
+                new_content="edit result",
+            )
+            obs_event = ObservationEvent(
+                observation=observation,
+                tool_name="file_editor",
+                tool_call_id="call_dir_edit",
+                action_id="call_dir_edit",
+                source="environment",
+            )
+
+            # Build observation content - should return normal content
+            result = visualizer._build_observation_content(obs_event)
+
+            # Verify normal content (no dir check for non-view commands)
+            # Output depends on diff visualization
+            assert "Cannot use 'view' on a directory" not in result
+
+
 class TestCliSettingsCaching:
     """Tests for app configuration caching in ConversationVisualizer."""
 

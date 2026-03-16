@@ -3,6 +3,7 @@ Textual-compatible visualizer for OpenHands conversation events.
 This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 """
 
+import os
 import re
 import threading
 from typing import TYPE_CHECKING
@@ -510,6 +511,29 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         Returns the Rich-formatted content to preserve colors and styling.
         """
+        # Check if this is a file_editor view command on a directory
+        # If so, return a helpful error message instead of the raw output
+        tool_call_id = event.tool_call_id
+        if tool_call_id in self._pending_actions:
+            action_event, _ = self._pending_actions[tool_call_id]
+            if hasattr(action_event, "action") and action_event.action:
+                action = action_event.action
+                # Check if this is a file_editor view command on a directory
+                # Use getattr to safely access dynamic attributes
+                action_command = getattr(action, "command", None)
+                action_path = getattr(action, "path", None)
+                if action_command and action_path:
+                    if action_command == "view":
+                        # Check if the path is a directory
+                        if os.path.isdir(action_path):
+                            return (
+                                "Error: Cannot use 'view' on a directory. "
+                                "Please use standard shell commands like "
+                                "'ls -la' to explore directory contents incrementally, "
+                                "and only use 'view' on specific files. "
+                                "Avoid attempting to read entire directories."
+                            )
+
         # Return the visualize content directly (Rich Text object)
         # The Collapsible widget can handle Rich renderables
         return str(event.visualize)
