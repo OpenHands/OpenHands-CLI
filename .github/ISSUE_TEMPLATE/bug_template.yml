@@ -9,9 +9,7 @@ body:
           value: |
               ## Thank you for reporting a bug! 🐛
 
-              **Please fill out all required fields.** Issues missing critical information (version, installation method, reproduction steps, etc.) will be delayed or closed until complete details are provided.
-
-              Clear, detailed reports help us resolve issues faster.
+              **Please fill out the fields.**  Clear, detailed reports help us resolve issues faster.
 
     - type: checkboxes
       attributes:
