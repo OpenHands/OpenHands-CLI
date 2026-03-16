@@ -43,6 +43,7 @@ from openhands.sdk.llm.streaming import LLMStreamChunk
 from openhands_cli.acp_impl.events.shared_event_handler import (
     REASONING_HEADER,
     SharedEventHandler,
+    _strip_truncation_notes,
 )
 from openhands_cli.acp_impl.events.tool_state import ToolCallState
 from openhands_cli.acp_impl.events.utils import (
@@ -137,7 +138,9 @@ class TokenBasedEventSubscriber:
                 title=title,
                 kind=kind,
                 status="in_progress",
-                content=format_content_blocks(str(event.visualize.plain)),
+                content=format_content_blocks(
+                    _strip_truncation_notes(str(event.visualize.plain))
+                ),
             ),
             field_meta=get_metadata(self.conversation),
         )

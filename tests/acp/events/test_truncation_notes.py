@@ -23,6 +23,15 @@ class TestStripTruncationNotes:
         assert "<NOTE>" not in result
         assert "max output limit" not in result
 
+    def test_response_clipped_note_removed(self):
+        """<response clipped> prefix with NOTE tag should be removed."""
+        text = 'Some output<response clipped><NOTE>Due to the max output limit, only part of this directory has been shown to you. You should use `ls -la` instead to view large directories incrementally.</NOTE>'
+        result = _strip_truncation_notes(text)
+        assert result == "Some output"
+        assert "<response clipped>" not in result
+        assert "<NOTE>" not in result
+        assert "max output limit" not in result
+
     def test_multiline_note_removed(self):
         """Multi-line NOTE tag should be removed."""
         text = """Directory listing:
@@ -89,5 +98,20 @@ drwxr-xr-x 10 user user  4096 Jan  1 12:00 ..
         assert "file1.py" in result
         assert "file2.py" in result
         assert "drwxr-xr-x" in result
+        assert "<NOTE>" not in result
+        assert "max output limit" not in result
+
+    def test_real_world_example_with_response_clipped(self):
+        """Test with a real-world file listing scenario including <response clipped>."""
+        text = """drwxr-xr-x  2 user user  4096 Jan  1 12:00 .
+drwxr-xr-x 10 user user  4096 Jan  1 12:00 ..
+-rw-r--r--  1 user user 12345 Jan  1 12:00 file1.py
+-rw-r--r--  1 user user 67890 Jan  1 12:00 file2.py
+<response clipped><NOTE>Due to the max output limit, only part of this directory has been shown to you. You should use `ls -la` instead to view large directories incrementally.</NOTE>"""
+        result = _strip_truncation_notes(text)
+        assert "file1.py" in result
+        assert "file2.py" in result
+        assert "drwxr-xr-x" in result
+        assert "<response clipped>" not in result
         assert "<NOTE>" not in result
         assert "max output limit" not in result

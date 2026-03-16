@@ -10,6 +10,7 @@ def add_confirmation_mode_args(
         parser_or_group: Either an ArgumentParser or a mutually exclusive group
     """
     parser_or_group.add_argument(
+        "-y",
         "--always-approve",
         "--yolo",
         action="store_true",

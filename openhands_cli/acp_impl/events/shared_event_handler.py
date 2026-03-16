@@ -63,8 +63,9 @@ def _strip_truncation_notes(text: str) -> str:
     removes those NOTE messages to prevent them from being concatenated with
     file paths or other sensitive content.
 
-    The pattern removed is:
+    The patterns removed are:
     <NOTE>Due to the max output limit, ...</NOTE>
+    <response clipped><NOTE>Due to the max output limit, ...</NOTE>
 
     Args:
         text: The text potentially containing truncation notes.
@@ -72,7 +73,14 @@ def _strip_truncation_notes(text: str) -> str:
     Returns:
         The text with truncation notes removed.
     """
-    # Remove <NOTE>...</NOTE> patterns (handles both single and multi-line)
+    # Remove <response clipped><NOTE>...</NOTE> patterns
+    text = re.sub(
+        r"<response clipped><NOTE>.*?</NOTE>",
+        "",
+        text,
+        flags=re.DOTALL,
+    )
+    # Also remove standalone <NOTE>...</NOTE> patterns
     text = re.sub(
         r"<NOTE>.*?</NOTE>",
         "",
@@ -127,20 +135,24 @@ class SharedEventHandler:
     # -----------------------
 
     async def handle_pause(self, ctx: _ACPContext, event: PauseEvent) -> None:
-        await self.send_thought(ctx, _event_visualize_to_plain(event))
+        text = _strip_truncation_notes(_event_visualize_to_plain(event))
+        await self.send_thought(ctx, text)
 
     async def handle_system_prompt(
         self, ctx: _ACPContext, event: SystemPromptEvent
     ) -> None:
-        await self.send_thought(ctx, str(event.visualize.plain))
+        text = _strip_truncation_notes(str(event.visualize.plain))
+        await self.send_thought(ctx, text)
 
     async def handle_condensation(self, ctx: _ACPContext, event: Condensation) -> None:
-        await self.send_thought(ctx, _event_visualize_to_plain(event))
+        text = _strip_truncation_notes(_event_visualize_to_plain(event))
+        await self.send_thought(ctx, text)
 
     async def handle_condensation_request(
         self, ctx: _ACPContext, event: CondensationRequest
     ) -> None:
-        await self.send_thought(ctx, _event_visualize_to_plain(event))
+        text = _strip_truncation_notes(_event_visualize_to_plain(event))
+        await self.send_thought(ctx, text)
 
     async def handle_user_reject_or_agent_error(
         self, ctx: _ACPContext, event: UserRejectObservation | AgentErrorEvent
@@ -202,13 +214,12 @@ class SharedEventHandler:
     async def handle_action_event(self, ctx: _ACPContext, event: ActionEvent) -> None:
         content = None
         tool_kind = get_tool_kind(tool_name=event.tool_name, action=event.action)
-        # Use LLM-generated summary for the title when available
         summary = str(event.summary) if event.summary else None
         title = get_tool_title(
             tool_name=event.tool_name, action=event.action, summary=summary
         )
         if event.action:
-            action_viz = _event_visualize_to_plain(event)
+            action_viz = _strip_truncation_notes(_event_visualize_to_plain(event))
             content = format_content_blocks(action_viz)
 
             if isinstance(event.action, ThinkAction):

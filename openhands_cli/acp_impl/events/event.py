@@ -25,6 +25,7 @@ from openhands_cli.acp_impl.events.shared_event_handler import (
     THOUGHT_HEADER,
     SharedEventHandler,
     _event_visualize_to_plain,
+    _strip_truncation_notes,
 )
 from openhands_cli.acp_impl.events.utils import (
     get_metadata,
@@ -133,7 +134,7 @@ class EventSubscriber:
         """
         try:
             # Get visualization text
-            viz_text = _event_visualize_to_plain(event)
+            viz_text = _strip_truncation_notes(_event_visualize_to_plain(event))
             if not viz_text.strip():
                 return
 
