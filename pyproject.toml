@@ -16,9 +16,9 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-  "openhands-sdk>=1.12.0",
-  "openhands-tools>=1.12.0",
-  "openhands-workspace==1.11.1",
+  "openhands-sdk==1.14.0",
+  "openhands-tools==1.14.0",
+  "openhands-workspace==1.14.0",
   "prompt-toolkit>=3",
   "rich<14.3.0",
   "textual>=8.0.0,<9.0.0",
@@ -143,7 +143,4 @@ typeCheckingMode = "standard"
 # which pyright cannot resolve statically.
 reportAttributeAccessIssue = "none"
 
-# Point to SDK PR #2190 (feat/acp-remote-runtime) for ACP agent support
-[tool.uv.sources]
-openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", branch = "feat/acp-remote-runtime" }
-openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", branch = "feat/acp-remote-runtime" }
+# uv source pins for internal packages (none needed – using PyPI releases)
