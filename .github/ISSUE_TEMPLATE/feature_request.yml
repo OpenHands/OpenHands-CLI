@@ -61,27 +61,6 @@ body:
       validations:
           required: true
 
-    - type: dropdown
-      id: feature-area
-      attributes:
-          label: Feature Area
-          description: Which part of OpenHands CLI does this feature relate to? If you select "Other", please specify the area in the Additional 
-              Context section below.
-          options:
-              - TUI / Terminal interface
-              - CLI commands and arguments
-              - Agent / AI behavior
-              - Conversation management / History
-              - Configuration / Settings
-              - Authentication / Cloud integration
-              - MCP (Model Context Protocol)
-              - File system / Workspace management
-              - Performance / Optimization
-              - Documentation
-              - Other
-      validations:
-          required: true
-
     - type: textarea
       id: technical-details
       attributes:
