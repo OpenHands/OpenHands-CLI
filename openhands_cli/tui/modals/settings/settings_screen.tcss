@@ -89,15 +89,18 @@ SettingsScreen {
     width: 100%;
     margin-bottom: 1;
     height: 3;
-    border: round $primary;
-}
-
-.form_input:focus {
-    border: round $primary;
 }
 
 .form_input.threshold_input {
     width: 10;
+}
+
+#settings_tab .form_input {
+    border: round $primary;
+}
+
+#settings_tab .form_input:focus {
+    border: round $primary;
 }
 
 .form_select {
@@ -106,11 +109,15 @@ SettingsScreen {
     height: 3;
 }
 
-.form_select > SelectCurrent {
+#settings_tab .form_select {
+    height: auto;
+}
+
+#settings_tab .form_select > SelectCurrent {
     border: round $primary;
 }
 
-.form_select:focus > SelectCurrent {
+#settings_tab .form_select:focus > SelectCurrent {
     border: round $primary;
 }
 
