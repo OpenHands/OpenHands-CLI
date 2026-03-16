@@ -62,18 +62,6 @@ body:
           required: true
 
     - type: dropdown
-      id: scope
-      attributes:
-          label: Estimated Scope
-          description: To the best of your knowledge, how complex do you think this feature would be to implement?
-          options:
-              - Small - UI tweak, config option, or minor change
-              - Medium - New feature with moderate complexity
-              - Large - Significant feature requiring architecture changes
-              - Unknown - Not sure about the technical complexity
-          default: 3
-
-    - type: dropdown
       id: feature-area
       attributes:
           label: Feature Area
