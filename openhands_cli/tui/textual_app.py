@@ -541,8 +541,20 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         When the user finishes selecting text by releasing the mouse button,
         this method checks if there's selected text and copies it to clipboard.
         """
-        # Get selected text from the screen
-        selected_text = self.screen.get_selected_text()
+        # Textual's Selection.extract() can crash with IndexError when
+        # screen coordinates aren't translated to widget-local coordinates.
+        # See: https://github.com/Textualize/textual/issues/6428
+        # TODO: Remove once upstream fix is merged
+        try:
+            # Get selected text from the screen
+            selected_text = self.screen.get_selected_text()
+        except IndexError:
+            self.notify(
+                "Could not copy selection",
+                title="Selection error",
+                timeout=2,
+            )
+            return
         if not selected_text:
             return
 
