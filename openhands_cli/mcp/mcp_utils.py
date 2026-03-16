@@ -5,11 +5,24 @@ similar to Claude's MCP command line interface.
 """
 
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal, TypedDict, cast
 
 from fastmcp.exceptions import ValidationError
 from fastmcp.mcp_config import MCPConfig, RemoteMCPServer, StdioMCPServer
 from pydantic import ValidationError as PydanticValidationError
+
+
+class ConfigStatus(TypedDict):
+    """Status information for the MCP configuration file."""
+
+    exists: bool
+    """Whether the configuration file exists."""
+    valid: bool
+    """Whether the configuration file is valid."""
+    servers: dict[str, Any]
+    """Dictionary of configured servers (empty if invalid)."""
+    message: str
+    """Human-readable status message."""
 
 
 def _get_mcp_config_path() -> Path:
@@ -372,40 +385,34 @@ def list_enabled_servers() -> dict[str, StdioMCPServer | RemoteMCPServer]:
     return enabled_servers
 
 
-def get_config_status() -> dict[str, Any]:
+def get_config_status() -> ConfigStatus:
     """Get the status of the MCP configuration file.
 
     Returns:
-        Dictionary with status information:
-        {
-            'exists': bool,
-            'valid': bool,
-            'servers': dict,
-            'message': str
-        }
+        ConfigStatus with exists, valid, servers, and message fields.
     """
     config_path = _get_mcp_config_path()
     if not config_path.exists():
-        return {
-            "exists": False,
-            "valid": False,
-            "servers": {},
-            "message": f"MCP configuration file not found at {config_path}",
-        }
+        return ConfigStatus(
+            exists=False,
+            valid=False,
+            servers={},
+            message=f"MCP configuration file not found at {config_path}",
+        )
 
     try:
         config = load_mcp_config()
         servers = config.to_dict().get("mcpServers", {})
-        return {
-            "exists": True,
-            "valid": True,
-            "servers": servers,
-            "message": f"Valid MCP configuration found with {len(servers)} server(s)",
-        }
+        return ConfigStatus(
+            exists=True,
+            valid=True,
+            servers=servers,
+            message=f"Valid MCP configuration found with {len(servers)} server(s)",
+        )
     except (MCPConfigurationError, ValidationError) as e:
-        return {
-            "exists": True,
-            "valid": False,
-            "servers": {},
-            "message": f"Invalid MCP configuration file: {str(e)}",
-        }
+        return ConfigStatus(
+            exists=True,
+            valid=False,
+            servers={},
+            message=f"Invalid MCP configuration file: {str(e)}",
+        )
