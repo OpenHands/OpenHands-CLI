@@ -4,7 +4,7 @@ import json
 from argparse import Namespace
 from unittest.mock import patch
 
-from acp.schema import EnvVariable, StdioMcpServer
+from acp.schema import EnvVariable, McpServerStdio
 
 from openhands.sdk.event import MessageEvent, SystemPromptEvent
 from openhands.sdk.llm import Message, TextContent
@@ -79,7 +79,7 @@ def test_convert_acp_mcp_servers_empty_list():
 def test_convert_acp_mcp_servers_with_empty_env():
     """Test converting MCP server with empty env array."""
     servers = [
-        StdioMcpServer(
+        McpServerStdio(
             name="test-server",
             command="/usr/bin/node",
             args=["server.js"],
@@ -99,7 +99,7 @@ def test_convert_acp_mcp_servers_with_empty_env():
 def test_convert_acp_mcp_servers_with_env_variables():
     """Test converting MCP server with env variables."""
     servers = [
-        StdioMcpServer(
+        McpServerStdio(
             name="test-server",
             command="/usr/bin/python",
             args=["-m", "server"],
@@ -121,13 +121,13 @@ def test_convert_acp_mcp_servers_with_env_variables():
 def test_convert_acp_mcp_servers_multiple_servers():
     """Test converting multiple MCP servers."""
     servers = [
-        StdioMcpServer(
+        McpServerStdio(
             name="server1",
             command="/usr/bin/node",
             args=["server1.js"],
             env=[],
         ),
-        StdioMcpServer(
+        McpServerStdio(
             name="server2",
             command="/usr/bin/python",
             args=["-m", "server2"],

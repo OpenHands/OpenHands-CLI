@@ -27,6 +27,7 @@ from openhands.sdk.conversation.state import (
 from openhands.sdk.event.base import Event
 from openhands.sdk.event.condenser import Condensation
 from openhands_cli.setup import setup_conversation
+from openhands_cli.shared import extract_conversation_summary
 from openhands_cli.tui.core.events import ShowConfirmationPanel
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.user_actions.types import UserConfirmation
@@ -284,7 +285,7 @@ class ConversationRunner:
         self._running = is_running
         self._state.set_running(is_running)
 
-    def pause_runner_without_blocking(self):
+    def pause_runner_without_blocking(self) -> None:
         if self.is_running:
             asyncio.create_task(self.pause())
 
@@ -475,20 +476,10 @@ class ConversationRunner:
         """Get a summary of the conversation for headless mode output.
 
         Returns:
-            Dictionary with conversation statistics and last agent message
+            Tuple of (agent_event_count, last_agent_message).
         """
         if not self.conversation or not self.conversation.state:
-            return 0, Text(
-                text="No conversation data available",
-            )
+            return 0, Text(text="No conversation data available")
 
-        agent_event_count = 0
-        last_agent_message = Text(text="No agent messages found")
-
-        # Parse events to count messages
-        for event in self.conversation.state.events:
-            if event.source == "agent":
-                agent_event_count += 1
-                last_agent_message = event.visualize
-
-        return agent_event_count, last_agent_message
+        # TODO is this need common enough that maybe it should be exposed in the SDK?
+        return extract_conversation_summary(self.conversation.state.events)
