@@ -93,13 +93,21 @@ class ConversationRunner:
     def is_confirmation_mode_active(self) -> bool:
         return self._state.is_confirmation_active
 
-    def replay_events(self) -> None:
-        """Replay persisted events through the visualizer.
+    # Maximum number of events to replay on resume/switch to avoid
+    # O(n) memory and rendering cost for long conversations.
+    MAX_REPLAY_EVENTS = 50
 
-        User messages are rendered via render_user_message since on_event
-        skips them (they are normally rendered separately by the UI).
+    def replay_events(self) -> None:
+        """Replay the tail of persisted events through the visualizer.
+
+        Only the last MAX_REPLAY_EVENTS are replayed to avoid loading
+        unbounded history into memory. User messages are rendered via
+        render_user_message since on_event skips them.
         """
-        for event in self.conversation.state.events:
+        events = self.conversation.state.events
+        total = len(events)
+        start = max(0, total - self.MAX_REPLAY_EVENTS)
+        for event in events[start:]:
             if (
                 isinstance(event, MessageEvent)
                 and event.llm_message
