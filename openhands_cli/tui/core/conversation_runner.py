@@ -21,6 +21,7 @@ from openhands.sdk.conversation.state import (
     ConversationState as SDKConversationState,
 )
 from openhands.sdk.event.base import Event
+from openhands.sdk.event.llm_convertible.message import MessageEvent
 from openhands_cli.setup import setup_conversation
 from openhands_cli.shared import extract_conversation_summary
 from openhands_cli.tui.core.events import ShowConfirmationPanel
@@ -91,6 +92,25 @@ class ConversationRunner:
     @property
     def is_confirmation_mode_active(self) -> bool:
         return self._state.is_confirmation_active
+
+    def replay_events(self) -> None:
+        """Replay persisted events through the visualizer.
+
+        User messages are rendered via render_user_message since on_event
+        skips them (they are normally rendered separately by the UI).
+        """
+        for event in self.conversation.state.events:
+            if (
+                isinstance(event, MessageEvent)
+                and event.llm_message
+                and event.llm_message.role == "user"
+                and not event.sender
+            ):
+                text = str(event.visualize)
+                if text.strip():
+                    self.visualizer.render_user_message(text)
+                continue
+            self.visualizer.on_event(event)
 
     async def queue_message(self, user_input: str) -> None:
         """Queue a message for a running conversation"""
