@@ -29,8 +29,8 @@ This repository uses **uv** for dependency management and running tooling (such 
 - run the Textual TUI (interactive; prefer running inside tmux so you can detach with `Ctrl+b d`): `make run` (or `uv run openhands`)
 - run the Textual TUI (automation-friendly; use for agent-driven runs): `uv run openhands --exit-without-confirmation` (quit with `Ctrl+Q`; `Ctrl+C` does not work once the TUI is running)
 - **fast TUI development** (see [Fast TUI Development Workflow](#fast-tui-development-workflow) below):
-  - `make console` - Start the Textual dev console (in terminal 1)
-  - `make run-dev` - Run CLI with dev mode enabled (in terminal 2)
+  - `make run-watch` - **Recommended**: Auto-restarts app when you edit any `.py` file
+  - `make console` + `make run-dev` - For logging/debugging (two terminals)
 
 - run the browser-served web app (Textual `textual-serve`): `openhands web`
 - run the Docker-based OpenHands GUI server: `openhands serve`
@@ -45,12 +45,19 @@ This repository uses **uv** for dependency management and running tooling (such 
 
 ### Fast TUI Development Workflow
 
-For rapid iteration when developing the TUI, use Textual's built-in development tools instead of repeatedly running `make run`. This gives you:
-- **Live logging** - See `print()`, `log()`, and event messages in real-time
-- **DOM inspection** - Examine widget tree and CSS styles
-- **Event tracing** - Watch key presses, mouse events, and messages
+For rapid iteration when developing the TUI, use these tools instead of repeatedly running `make run`:
 
-**Setup (two terminals):**
+#### Option 1: Auto-restart on file changes (recommended)
+
+```bash
+make run-watch
+```
+
+This watches `openhands_cli/` for changes and **automatically restarts** the app when you save any `.py` file. Just edit your code, save, and see the result immediately.
+
+#### Option 2: Dev console for logging/debugging
+
+For debugging with live logs, use Textual's dev tools (requires two terminals):
 
 ```bash
 # Terminal 1: Start the dev console
@@ -60,12 +67,15 @@ make console
 make run-dev
 ```
 
-The dev console shows logs as you interact with the app. Use `self.log()` or Python's `print()` in your code - output appears in the console instead of corrupting the TUI.
+This gives you:
+- **Live logging** - `print()` and `self.log()` output appears in the console, not the TUI
+- **DOM inspection** - Press `Ctrl+P` in the app to inspect widget tree and CSS
+- **Event tracing** - Watch key presses, mouse events, and messages
 
-**Tips:**
-- Press `Ctrl+P` in the running app to open the command palette for DOM inspection
-- Add `self.log(f"debug: {variable}")` to trace values without breaking the UI
-- The console persists across app restarts - just re-run `make run-dev` to test changes
+**Tip:** You can combine both - run `make console` in one terminal, then use `watchfiles` manually:
+```bash
+uv run watchfiles "uv run textual run --dev -c 'uv run openhands --exit-without-confirmation'" openhands_cli/
+```
 
 ### Linting Requirements
 **Before any commit, run `make lint` and only commit after it passes.** Use `make lint` to run all pre-commit hooks on all files, and do it before every commit (not after) to avoid CI failures.

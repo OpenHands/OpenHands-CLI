@@ -10,7 +10,7 @@ CYAN := \033[36m
 UNDERLINE := \033[4m
 RESET := \033[0m
 
-.PHONY: help install install-dev test format clean run run-dev console check-uv-version build
+.PHONY: help install install-dev test format clean run run-dev run-watch console check-uv-version build
 
 check-uv-version:
 	@$(ECHO) "$(YELLOW)Checking uv version...$(RESET)"
@@ -50,7 +50,8 @@ help:
 	@$(ECHO) "  $(CYAN)pre-commit$(RESET)        Run pre-commit"
 	@$(ECHO) "  $(CYAN)clean$(RESET)             Clean build artifacts"
 	@$(ECHO) "  $(CYAN)run$(RESET)               Run the CLI"
-	@$(ECHO) "  $(CYAN)run-dev$(RESET)           Run CLI with Textual dev console (faster iteration)"
+	@$(ECHO) "  $(CYAN)run-dev$(RESET)           Run CLI with Textual dev console (for logging/debugging)"
+	@$(ECHO) "  $(CYAN)run-watch$(RESET)         Run CLI with auto-restart on file changes (fastest iteration)"
 	@$(ECHO) "  $(CYAN)console$(RESET)           Start Textual dev console (run in separate terminal)"
 
 install:
@@ -105,12 +106,18 @@ clean:
 run:
 	uv run openhands
 
-# Run the CLI with Textual dev tools (faster iteration for TUI development)
+# Run the CLI with Textual dev tools (for logging/debugging)
 # Start `make console` in a separate terminal first to see logs/events
 run-dev:
 	@$(ECHO) "$(YELLOW)Running CLI with Textual dev console...$(RESET)"
 	@$(ECHO) "$(CYAN)Tip: Start 'make console' in another terminal to see logs$(RESET)"
 	uv run textual run --dev -c "uv run openhands"
+
+# Run the CLI with auto-restart on file changes (fastest iteration)
+run-watch:
+	@$(ECHO) "$(YELLOW)Running CLI with auto-restart on file changes...$(RESET)"
+	@$(ECHO) "$(CYAN)Edit any .py file in openhands_cli/ and the app will restart$(RESET)"
+	uv run watchfiles "uv run openhands --exit-without-confirmation" openhands_cli/
 
 # Start the Textual dev console (run in a separate terminal)
 console:
