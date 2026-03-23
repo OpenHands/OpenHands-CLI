@@ -28,6 +28,9 @@ This repository uses **uv** for dependency management and running tooling (such 
 - format: `make format`
 - run the Textual TUI (interactive; prefer running inside tmux so you can detach with `Ctrl+b d`): `make run` (or `uv run openhands`)
 - run the Textual TUI (automation-friendly; use for agent-driven runs): `uv run openhands --exit-without-confirmation` (quit with `Ctrl+Q`; `Ctrl+C` does not work once the TUI is running)
+- **fast TUI development** (see [Fast TUI Development Workflow](#fast-tui-development-workflow) below):
+  - `make console` - Start the Textual dev console (in terminal 1)
+  - `make run-dev` - Run CLI with dev mode enabled (in terminal 2)
 
 - run the browser-served web app (Textual `textual-serve`): `openhands web`
 - run the Docker-based OpenHands GUI server: `openhands serve`
@@ -39,6 +42,30 @@ This repository uses **uv** for dependency management and running tooling (such 
 - build PyInstaller binaries: `./build.sh --install-pyinstaller`
 
 ## Development Guidelines
+
+### Fast TUI Development Workflow
+
+For rapid iteration when developing the TUI, use Textual's built-in development tools instead of repeatedly running `make run`. This gives you:
+- **Live logging** - See `print()`, `log()`, and event messages in real-time
+- **DOM inspection** - Examine widget tree and CSS styles
+- **Event tracing** - Watch key presses, mouse events, and messages
+
+**Setup (two terminals):**
+
+```bash
+# Terminal 1: Start the dev console
+make console
+
+# Terminal 2: Run the app with dev mode
+make run-dev
+```
+
+The dev console shows logs as you interact with the app. Use `self.log()` or Python's `print()` in your code - output appears in the console instead of corrupting the TUI.
+
+**Tips:**
+- Press `Ctrl+P` in the running app to open the command palette for DOM inspection
+- Add `self.log(f"debug: {variable}")` to trace values without breaking the UI
+- The console persists across app restarts - just re-run `make run-dev` to test changes
 
 ### Linting Requirements
 **Before any commit, run `make lint` and only commit after it passes.** Use `make lint` to run all pre-commit hooks on all files, and do it before every commit (not after) to avoid CI failures.
