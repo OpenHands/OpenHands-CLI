@@ -114,16 +114,10 @@ run-dev:
 	uv run textual run --dev -c "uv run openhands"
 
 # Run the CLI with auto-restart on file changes (fastest iteration)
-# Uses a helper script that ensures terminal state is properly restored between restarts
-# --filter python: only watch .py files (ignore .pyc, __pycache__, etc.)
-# --grace-period 1: wait 1 second after start before watching (lets app initialize)
-# --sigint-timeout 3: give app 3 seconds to exit cleanly on restart
+# Uses a custom watcher script with proper subprocess and terminal management
 run-watch:
 	@$(ECHO) "$(YELLOW)Running CLI with auto-restart on file changes...$(RESET)"
-	@$(ECHO) "$(CYAN)Edit any .py file in openhands_cli/ and the app will restart$(RESET)"
-	@$(ECHO) "$(CYAN)Press Ctrl+C to stop watching$(RESET)"
-	uv run watchfiles --filter python --grace-period 1 --sigint-timeout 3 \
-		"uv run python scripts/run_watch.py" openhands_cli/
+	uv run python scripts/run_watch.py
 
 # Start the Textual dev console (run in a separate terminal)
 console:
