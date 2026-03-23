@@ -2,7 +2,7 @@
 """Watch for file changes and restart openhands CLI with proper terminal handling.
 
 This script manages the subprocess lifecycle properly, ensuring clean terminal
-state between restarts. It watches openhands_cli/ for .py file changes.
+state between restarts. It watches openhands_cli/ for .py and .tcss file changes.
 """
 
 import os
@@ -86,10 +86,14 @@ def run_watch():
 
     print_status(f"Watching {watch_path}/ for changes (Ctrl+C to stop)")
 
+    def is_watched_file(path: str) -> bool:
+        """Check if file should trigger a restart."""
+        return path.endswith(".py") or path.endswith(".tcss")
+
     # Watch for changes
     for changes in watch(
         watch_path,
-        watch_filter=lambda _change, path: path.endswith(".py"),
+        watch_filter=lambda _change, path: is_watched_file(path),
         debounce=1000,  # 1 second debounce
         step=100,
     ):
@@ -98,14 +102,14 @@ def run_watch():
             print_status("App exited. Waiting for changes to restart...")
             process = None
 
-        # Filter to only .py files (double-check)
-        py_changes = [(c, p) for c, p in changes if p.endswith(".py")]
-        if not py_changes:
+        # Filter to watched files (double-check)
+        relevant_changes = [(c, p) for c, p in changes if is_watched_file(p)]
+        if not relevant_changes:
             continue
 
-        changed_files = [Path(p).name for _, p in py_changes[:3]]
-        if len(py_changes) > 3:
-            changed_files.append(f"... and {len(py_changes) - 3} more")
+        changed_files = [Path(p).name for _, p in relevant_changes[:3]]
+        if len(relevant_changes) > 3:
+            changed_files.append(f"... and {len(relevant_changes) - 3} more")
 
         print_status(f"Changed: {', '.join(changed_files)}")
 

@@ -108,7 +108,7 @@ run:
 
 # Run the CLI with auto-restart on file changes (.py and .tcss files)
 run-watch:
-	uv run watchfiles "uv run openhands --exit-without-confirmation" openhands_cli/
+	uv run python scripts/run_watch.py
 
 # Run the CLI with Textual dev tools (for debugging)
 # Start `make console` in a separate terminal first to see logs/events
