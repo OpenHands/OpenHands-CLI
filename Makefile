@@ -106,9 +106,9 @@ clean:
 run:
 	uv run openhands
 
-# Run the CLI with auto-restart on file changes
+# Run the CLI with auto-restart on file changes (.py and .tcss files)
 run-watch:
-	uv run watchfiles --filter python "uv run openhands --exit-without-confirmation" openhands_cli/
+	uv run watchfiles "uv run openhands --exit-without-confirmation" openhands_cli/
 
 # Run the CLI with Textual dev tools (for debugging)
 # Start `make console` in a separate terminal first to see logs/events
