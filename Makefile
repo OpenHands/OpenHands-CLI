@@ -10,7 +10,7 @@ CYAN := \033[36m
 UNDERLINE := \033[4m
 RESET := \033[0m
 
-.PHONY: help install install-dev test format clean run run-dev run-watch console check-uv-version build
+.PHONY: help install install-dev test format clean run run-watch check-uv-version build
 
 check-uv-version:
 	@$(ECHO) "$(YELLOW)Checking uv version...$(RESET)"
@@ -51,8 +51,6 @@ help:
 	@$(ECHO) "  $(CYAN)clean$(RESET)             Clean build artifacts"
 	@$(ECHO) "  $(CYAN)run$(RESET)               Run the CLI"
 	@$(ECHO) "  $(CYAN)run-watch$(RESET)         Run CLI with auto-restart on file changes"
-	@$(ECHO) "  $(CYAN)run-dev$(RESET)           Run CLI with Textual dev console (for debugging)"
-	@$(ECHO) "  $(CYAN)console$(RESET)           Start Textual dev console (run in separate terminal)"
 
 install:
 	@$(ECHO) "$(YELLOW)Installing the package...$(RESET)"
@@ -109,19 +107,6 @@ run:
 # Run the CLI with auto-restart on file changes (.py and .tcss files)
 run-watch:
 	uv run python scripts/run_watch.py
-
-# Run the CLI with Textual dev tools (for debugging)
-# Start `make console` in a separate terminal first to see logs/events
-run-dev:
-	@$(ECHO) "$(YELLOW)Running CLI with Textual dev console...$(RESET)"
-	@$(ECHO) "$(CYAN)Tip: Start 'make console' in another terminal to see logs$(RESET)"
-	uv run textual run --dev -c "uv run openhands"
-
-# Start the Textual dev console (run in a separate terminal)
-console:
-	@$(ECHO) "$(YELLOW)Starting Textual dev console on port 8081...$(RESET)"
-	@$(ECHO) "$(CYAN)Run 'make run-dev' in another terminal to connect$(RESET)"
-	uv run textual console -v
 
 # Install UV if not present
 install-uv:
