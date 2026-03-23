@@ -115,7 +115,7 @@ class PlanSidePanel(VerticalScroll):
             logger.warning("Failed to load tasks from %s: %s", tasks_file, e)
             return None
 
-    def _refresh_content(self):
+    def _refresh_content(self) -> None:
         """Refresh the plan content display."""
         content_widget = self.query_one("#plan-content", Static)
 
