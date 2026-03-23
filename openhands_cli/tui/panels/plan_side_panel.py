@@ -116,7 +116,7 @@ class PlanSidePanel(VerticalScroll):
             return None
 
     def _refresh_content(self) -> None:
-        """Refresh the plan content display."""
+        """Refresh the display of the plan content."""
         content_widget = self.query_one("#plan-content", Static)
 
         if not self._task_list:
