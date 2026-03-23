@@ -77,14 +77,19 @@ def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
         return None
 
 
-def get_default_critic(llm: LLM, *, enable_critic: bool = True) -> CriticBase | None:
+def get_default_critic(
+    llm: LLM, *, enable_critic: bool = True, model_name: str = "critic"
+) -> CriticBase | None:
     """Auto-configure critic for All-Hands LLM proxy.
 
     When the LLM base_url matches `llm-proxy.*.all-hands.dev`, returns an
     APIBasedCritic configured with:
     - server_url: {base_url}/vllm
     - api_key: same as LLM
-    - model_name: "critic"
+    - model_name: the provided model_name (default: "critic")
+
+    For OpenAI-compatible endpoints (e.g., llama-server), the model_name
+    allows dynamic model switching within a single server instance.
 
     Returns None if base_url doesn't match, api_key is not set, or enable_critic
     is False.
@@ -92,6 +97,7 @@ def get_default_critic(llm: LLM, *, enable_critic: bool = True) -> CriticBase | 
     Args:
         llm: The LLM configuration
         enable_critic: Whether critic feature is enabled (from settings)
+        model_name: The model name to use for the critic (default: "critic")
     """
     # Check if critic is enabled in settings
     if not enable_critic:
@@ -111,7 +117,7 @@ def get_default_critic(llm: LLM, *, enable_critic: bool = True) -> CriticBase | 
         return APIBasedCritic(
             server_url=f"{base_url.rstrip('/')}/vllm",
             api_key=api_key,
-            model_name="critic",
+            model_name=model_name,
         )
     except Exception:
         # If critic creation fails, silently return None
@@ -430,7 +436,9 @@ class AgentStore:
         if not critic_disabled:
             cli_settings = CliSettings.load()
             critic = get_default_critic(
-                updated_llm, enable_critic=cli_settings.critic.enable_critic
+                updated_llm,
+                enable_critic=cli_settings.critic.enable_critic,
+                model_name=cli_settings.critic.model_name,
             )
 
         return agent.model_copy(
@@ -497,7 +505,9 @@ class AgentStore:
         # Now add critic on-the-fly for the returned agent (not persisted)
         cli_settings = CliSettings.load()
         critic = get_default_critic(
-            llm, enable_critic=cli_settings.critic.enable_critic
+            llm,
+            enable_critic=cli_settings.critic.enable_critic,
+            model_name=cli_settings.critic.model_name,
         )
         if critic is not None:
             agent = agent.model_copy(update={"critic": critic})
