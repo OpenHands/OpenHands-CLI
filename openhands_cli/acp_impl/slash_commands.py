@@ -19,7 +19,7 @@ from openhands_cli.shared.slash_commands import (
 
 logger = logging.getLogger(__name__)
 
-# Derive valid modes from CONFIRMATION_MODES to avoid duplication
+# Valid modes are CONFIRMATION_MODES keys
 VALID_CONFIRMATION_MODE: list[ConfirmationMode] = list(CONFIRMATION_MODES.keys())
 
 
