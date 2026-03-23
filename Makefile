@@ -50,8 +50,8 @@ help:
 	@$(ECHO) "  $(CYAN)pre-commit$(RESET)        Run pre-commit"
 	@$(ECHO) "  $(CYAN)clean$(RESET)             Clean build artifacts"
 	@$(ECHO) "  $(CYAN)run$(RESET)               Run the CLI"
-	@$(ECHO) "  $(CYAN)run-dev$(RESET)           Run CLI with Textual dev console (for logging/debugging)"
-	@$(ECHO) "  $(CYAN)run-watch$(RESET)         Run CLI with auto-restart on file changes (fastest iteration)"
+	@$(ECHO) "  $(CYAN)run-watch$(RESET)         Run CLI with auto-restart on file changes"
+	@$(ECHO) "  $(CYAN)run-dev$(RESET)           Run CLI with Textual dev console (for debugging)"
 	@$(ECHO) "  $(CYAN)console$(RESET)           Start Textual dev console (run in separate terminal)"
 
 install:
@@ -106,18 +106,16 @@ clean:
 run:
 	uv run openhands
 
-# Run the CLI with Textual dev tools (for logging/debugging)
+# Run the CLI with auto-restart on file changes (.py and .tcss files)
+run-watch:
+	uv run watchfiles "uv run openhands --exit-without-confirmation" openhands_cli/
+
+# Run the CLI with Textual dev tools (for debugging)
 # Start `make console` in a separate terminal first to see logs/events
 run-dev:
 	@$(ECHO) "$(YELLOW)Running CLI with Textual dev console...$(RESET)"
 	@$(ECHO) "$(CYAN)Tip: Start 'make console' in another terminal to see logs$(RESET)"
 	uv run textual run --dev -c "uv run openhands"
-
-# Run the CLI with auto-restart on file changes (fastest iteration)
-# Uses a custom watcher script with proper subprocess and terminal management
-run-watch:
-	@$(ECHO) "$(YELLOW)Running CLI with auto-restart on file changes...$(RESET)"
-	uv run python scripts/run_watch.py
 
 # Start the Textual dev console (run in a separate terminal)
 console:

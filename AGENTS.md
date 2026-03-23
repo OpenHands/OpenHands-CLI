@@ -29,8 +29,8 @@ This repository uses **uv** for dependency management and running tooling (such 
 - run the Textual TUI (interactive; prefer running inside tmux so you can detach with `Ctrl+b d`): `make run` (or `uv run openhands`)
 - run the Textual TUI (automation-friendly; use for agent-driven runs): `uv run openhands --exit-without-confirmation` (quit with `Ctrl+Q`; `Ctrl+C` does not work once the TUI is running)
 - **fast TUI development** (see [Fast TUI Development Workflow](#fast-tui-development-workflow) below):
-  - `make run-watch` - **Recommended**: Auto-restarts app when you edit any `.py` file
-  - `make console` + `make run-dev` - For logging/debugging (two terminals)
+  - `make run-watch` - Auto-restart on file changes (recommended for most development)
+  - `make console` + `make run-dev` - For debugging with live logs (two terminals)
 
 - run the browser-served web app (Textual `textual-serve`): `openhands web`
 - run the Docker-based OpenHands GUI server: `openhands serve`
@@ -45,17 +45,17 @@ This repository uses **uv** for dependency management and running tooling (such 
 
 ### Fast TUI Development Workflow
 
-For rapid iteration when developing the TUI, use these tools instead of repeatedly running `make run`:
+#### Auto-restart on file changes (recommended)
 
-#### Option 1: Auto-restart on file changes (recommended)
+The fastest way to iterate on TUI changes:
 
 ```bash
 make run-watch
 ```
 
-This watches `openhands_cli/` for changes and **automatically restarts** the app when you save any `.py` file. Just edit your code, save, and see the result immediately.
+This watches `openhands_cli/` and automatically restarts the app when you save any `.py` or `.tcss` file. Just edit, save, and see your changes.
 
-#### Option 2: Dev console for logging/debugging
+#### Debugging with the dev console
 
 For debugging with live logs, use Textual's dev tools (requires two terminals):
 
@@ -71,11 +71,6 @@ This gives you:
 - **Live logging** - `print()` and `self.log()` output appears in the console, not the TUI
 - **DOM inspection** - Press `Ctrl+P` in the app to inspect widget tree and CSS
 - **Event tracing** - Watch key presses, mouse events, and messages
-
-**Tip:** You can combine both - run `make console` in one terminal, then use `watchfiles` manually:
-```bash
-uv run watchfiles "uv run textual run --dev -c 'uv run openhands --exit-without-confirmation'" openhands_cli/
-```
 
 ### Linting Requirements
 **Before any commit, run `make lint` and only commit after it passes.** Use `make lint` to run all pre-commit hooks on all files, and do it before every commit (not after) to avoid CI failures.
