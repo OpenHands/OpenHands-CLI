@@ -161,7 +161,7 @@ class SharedEventHandler:
             raw_output=event.model_dump(),
         )
 
-    async def handle_action_event(self, ctx: _ACPContext, event: ActionEvent):
+    async def handle_action_event(self, ctx: _ACPContext, event: ActionEvent) -> None:
         content = None
         tool_kind = get_tool_kind(tool_name=event.tool_name, action=event.action)
         # Use LLM-generated summary for the title when available

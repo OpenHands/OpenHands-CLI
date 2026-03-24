@@ -5,11 +5,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from acp.schema import (
-    SessionUpdate2,
-    SessionUpdate3,
-    SessionUpdate4,
-    SessionUpdate5,
-    SessionUpdate6,
+    AgentMessageChunk,
+    AgentPlanUpdate,
+    AgentThoughtChunk,
+    ToolCallProgress,
+    ToolCallStart,
 )
 
 from openhands.sdk import Message, TextContent
@@ -57,7 +57,7 @@ async def test_handle_message_event(event_subscriber, mock_connection):
     # Get the update parameter (second argument, first is session_id)
     call_kwargs = mock_connection.session_update.call_args[1]
     assert call_kwargs["session_id"] == "test-session"
-    assert isinstance(call_kwargs["update"], SessionUpdate2)
+    assert isinstance(call_kwargs["update"], AgentMessageChunk)
     assert call_kwargs["update"].session_update == "agent_message_chunk"
 
 
@@ -110,7 +110,7 @@ async def test_handle_action_event(event_subscriber, mock_connection):
     for call in calls:
         call_kwargs = call[1]
         update = call_kwargs["update"]
-        if isinstance(update, SessionUpdate4):
+        if isinstance(update, ToolCallStart):
             tool_call_found = True
             assert update.session_update == "tool_call"
             assert update.tool_call_id == "test-call-123"
@@ -145,7 +145,7 @@ async def test_handle_observation_event(event_subscriber, mock_connection):
     call_kwargs = mock_connection.session_update.call_args[1]
     assert call_kwargs["session_id"] == "test-session"
     update = call_kwargs["update"]
-    assert isinstance(update, SessionUpdate5)
+    assert isinstance(update, ToolCallProgress)
     assert update.session_update == "tool_call_update"
     assert update.tool_call_id == "test-call-123"
     assert update.status == "completed"
@@ -197,7 +197,7 @@ async def test_handle_system_prompt_event(event_subscriber, mock_connection):
     call_kwargs = mock_connection.session_update.call_args[1]
     assert call_kwargs["session_id"] == "test-session"
     update = call_kwargs["update"]
-    assert isinstance(update, SessionUpdate3)
+    assert isinstance(update, AgentThoughtChunk)
     assert update.session_update == "agent_thought_chunk"
 
 
@@ -215,7 +215,7 @@ async def test_handle_pause_event(event_subscriber, mock_connection):
     call_kwargs = mock_connection.session_update.call_args[1]
     assert call_kwargs["session_id"] == "test-session"
     update = call_kwargs["update"]
-    assert isinstance(update, SessionUpdate3)
+    assert isinstance(update, AgentThoughtChunk)
     assert update.session_update == "agent_thought_chunk"
 
 
@@ -238,7 +238,7 @@ async def test_handle_condensation_event(event_subscriber, mock_connection):
     call_kwargs = mock_connection.session_update.call_args[1]
     assert call_kwargs["session_id"] == "test-session"
     update = call_kwargs["update"]
-    assert isinstance(update, SessionUpdate3)
+    assert isinstance(update, AgentThoughtChunk)
     assert update.session_update == "agent_thought_chunk"
 
 
@@ -256,7 +256,7 @@ async def test_handle_condensation_request_event(event_subscriber, mock_connecti
     call_kwargs = mock_connection.session_update.call_args[1]
     assert call_kwargs["session_id"] == "test-session"
     update = call_kwargs["update"]
-    assert isinstance(update, SessionUpdate3)
+    assert isinstance(update, AgentThoughtChunk)
     assert update.session_update == "agent_thought_chunk"
 
 
@@ -308,7 +308,7 @@ async def test_handle_task_tracker_observation(event_subscriber, mock_connection
     assert call_kwargs["session_id"] == "test-session"
     update = call_kwargs["update"]
 
-    assert isinstance(update, SessionUpdate6)
+    assert isinstance(update, AgentPlanUpdate)
     # Verify plan structure
     assert update.session_update == "plan"
     assert len(update.entries) == 3
@@ -357,7 +357,7 @@ async def test_handle_task_tracker_with_empty_list(event_subscriber, mock_connec
     call_kwargs = mock_connection.session_update.call_args[1]
     assert call_kwargs["session_id"] == "test-session"
     update = call_kwargs["update"]
-    assert isinstance(update, SessionUpdate6)
+    assert isinstance(update, AgentPlanUpdate)
     assert update.entries == []
 
 
