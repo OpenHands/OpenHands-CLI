@@ -70,11 +70,11 @@ class MCPSidePanel(VerticalScroll):
         yield Static("MCP Servers", classes="mcp-header")
         yield Static("", id="mcp-content")
 
-    def on_mount(self):
+    def on_mount(self) -> None:
         """Called when the panel is mounted."""
         self.refresh_content()
 
-    def refresh_content(self):
+    def refresh_content(self) -> None:
         """Refresh the MCP server content."""
         content_widget = self.query_one("#mcp-content", Static)
 
