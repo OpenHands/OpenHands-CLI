@@ -8,6 +8,9 @@ from pydantic import SecretStr
 
 from openhands.sdk import LLM
 from openhands_cli.stores.agent_store import (
+    ENV_AWS_ACCESS_KEY_ID,
+    ENV_AWS_REGION_NAME,
+    ENV_AWS_SECRET_ACCESS_KEY,
     ENV_LLM_API_KEY,
     ENV_LLM_BASE_URL,
     ENV_LLM_MODEL,
@@ -15,6 +18,7 @@ from openhands_cli.stores.agent_store import (
     MissingEnvironmentVariablesError,
     apply_llm_overrides,
     check_and_warn_env_vars,
+    is_aws_auth_model,
 )
 
 
@@ -704,3 +708,220 @@ class TestMissingEnvironmentVariablesError:
 
         assert ENV_LLM_MODEL in error_str
         assert "Missing required environment variable(s)" in error_str
+
+    def test_aws_model_error_message(self) -> None:
+        """Error for AWS model should mention AWS credential chain."""
+        error = MissingEnvironmentVariablesError([ENV_LLM_MODEL], is_aws_model=True)
+        error_str = str(error)
+
+        assert ENV_LLM_MODEL in error_str
+        assert "AWS credentials" in error_str
+        assert "credential chain" in error_str
+        # Should NOT mention LLM_API_KEY as required for AWS models
+        assert "LLM_API_KEY: Your LLM API key" not in error_str
+
+
+class TestIsAwsAuthModel:
+    """Tests for is_aws_auth_model helper function."""
+
+    def test_bedrock_model_detected(self) -> None:
+        """bedrock/ prefix should be detected as AWS auth model."""
+        assert is_aws_auth_model("bedrock/anthropic.claude-3-sonnet") is True
+        assert is_aws_auth_model("bedrock/meta.llama2-70b") is True
+
+    def test_bedrock_converse_model_detected(self) -> None:
+        """bedrock_converse/ prefix should be detected as AWS auth model."""
+        assert is_aws_auth_model("bedrock_converse/anthropic.claude-3") is True
+
+    def test_sagemaker_model_detected(self) -> None:
+        """sagemaker/ prefix should be detected as AWS auth model."""
+        assert is_aws_auth_model("sagemaker/my-endpoint") is True
+
+    def test_standard_models_not_detected(self) -> None:
+        """Non-AWS models should not be detected."""
+        assert is_aws_auth_model("claude-sonnet-4-5-20250929") is False
+        assert is_aws_auth_model("gpt-4") is False
+        assert is_aws_auth_model("anthropic/claude-3") is False
+        assert is_aws_auth_model("openai/gpt-4") is False
+
+    def test_none_model(self) -> None:
+        """None model should return False."""
+        assert is_aws_auth_model(None) is False
+
+    def test_bedrock_arn_model(self) -> None:
+        """Bedrock ARN model should be detected."""
+        model = (
+            "bedrock/arn:aws-us-gov:bedrock:us-gov-west-1:123456:inference-profile/"
+            "us-gov.anthropic.claude-sonnet-4-5-20250929-v1:0"
+        )
+        assert is_aws_auth_model(model) is True
+
+
+class TestLLMEnvOverridesWithAwsCredentials:
+    """Tests for LLMEnvOverrides with AWS credentials."""
+
+    def test_aws_credentials_loaded_from_env(self) -> None:
+        """AWS credentials should be loaded from environment variables."""
+        env_vars = {
+            ENV_LLM_MODEL: "bedrock/anthropic.claude-3",
+            ENV_AWS_ACCESS_KEY_ID: "test-access-key",
+            ENV_AWS_SECRET_ACCESS_KEY: "test-secret-key",
+            ENV_AWS_REGION_NAME: "us-west-2",
+        }
+        with patch.dict(os.environ, env_vars, clear=False):
+            overrides = LLMEnvOverrides.from_env(enabled=True)
+            assert overrides.model == "bedrock/anthropic.claude-3"
+            assert overrides.aws_access_key_id is not None
+            assert overrides.aws_access_key_id.get_secret_value() == "test-access-key"
+            assert overrides.aws_secret_access_key is not None
+            assert (
+                overrides.aws_secret_access_key.get_secret_value() == "test-secret-key"
+            )
+            assert overrides.aws_region_name == "us-west-2"
+
+    def test_aws_model_without_api_key_passes_validation(self) -> None:
+        """AWS model should not require LLM_API_KEY."""
+        overrides = LLMEnvOverrides(model="bedrock/anthropic.claude-3")
+        # Should not raise - AWS models don't require api_key
+        overrides.require_for_headless()
+
+    def test_aws_model_without_model_fails_validation(self) -> None:
+        """AWS model still requires LLM_MODEL to be set."""
+        overrides = LLMEnvOverrides()  # No model set
+        with pytest.raises(MissingEnvironmentVariablesError) as exc_info:
+            overrides.require_for_headless()
+        assert ENV_LLM_MODEL in exc_info.value.missing_vars
+
+    def test_standard_model_without_api_key_fails_validation(self) -> None:
+        """Standard model should require LLM_API_KEY."""
+        overrides = LLMEnvOverrides(model="claude-sonnet-4-5-20250929")
+        with pytest.raises(MissingEnvironmentVariablesError) as exc_info:
+            overrides.require_for_headless()
+        assert ENV_LLM_API_KEY in exc_info.value.missing_vars
+
+    def test_has_overrides_with_aws_credentials(self) -> None:
+        """has_overrides should return True when AWS credentials are set."""
+        overrides = LLMEnvOverrides(
+            aws_access_key_id=SecretStr("key"),
+        )
+        assert overrides.has_overrides() is True
+
+        overrides2 = LLMEnvOverrides(
+            aws_region_name="us-west-2",
+        )
+        assert overrides2.has_overrides() is True
+
+
+class TestAgentStoreWithAwsModels:
+    """Tests for AgentStore with AWS Bedrock/SageMaker models."""
+
+    def test_agent_created_for_bedrock_model_without_api_key(self, tmp_path) -> None:
+        """Agent should be created for Bedrock model without LLM_API_KEY."""
+        from openhands_cli.stores import AgentStore
+
+        conversations_dir = tmp_path / "conversations"
+        conversations_dir.mkdir(exist_ok=True)
+
+        # Set bedrock model but not API key
+        env_vars = {
+            ENV_LLM_MODEL: "bedrock/anthropic.claude-3-sonnet",
+        }
+
+        with (
+            patch(
+                "openhands_cli.stores.agent_store.get_persistence_dir",
+                return_value=str(tmp_path),
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_conversations_dir",
+                return_value=str(conversations_dir),
+            ),
+            patch.dict(os.environ, env_vars, clear=False),
+        ):
+            # Ensure LLM_API_KEY is not set
+            os.environ.pop(ENV_LLM_API_KEY, None)
+
+            store = AgentStore()
+            agent = store.load_or_create(env_overrides_enabled=True)
+
+            assert agent is not None
+            assert agent.llm.model == "bedrock/anthropic.claude-3-sonnet"
+            # api_key should be None for bedrock model
+            assert agent.llm.api_key is None
+
+    def test_agent_created_with_aws_credentials(self, tmp_path) -> None:
+        """Agent should be created with explicit AWS credentials."""
+        from openhands_cli.stores import AgentStore
+
+        conversations_dir = tmp_path / "conversations"
+        conversations_dir.mkdir(exist_ok=True)
+
+        env_vars = {
+            ENV_LLM_MODEL: "bedrock/anthropic.claude-3-sonnet",
+            ENV_AWS_ACCESS_KEY_ID: "test-access-key",
+            ENV_AWS_SECRET_ACCESS_KEY: "test-secret-key",
+            ENV_AWS_REGION_NAME: "us-west-2",
+        }
+
+        with (
+            patch(
+                "openhands_cli.stores.agent_store.get_persistence_dir",
+                return_value=str(tmp_path),
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_conversations_dir",
+                return_value=str(conversations_dir),
+            ),
+            patch.dict(os.environ, env_vars, clear=False),
+        ):
+            os.environ.pop(ENV_LLM_API_KEY, None)
+
+            store = AgentStore()
+            agent = store.load_or_create(env_overrides_enabled=True)
+
+            assert agent is not None
+            assert agent.llm.model == "bedrock/anthropic.claude-3-sonnet"
+            # AWS credentials are stored as SecretStr in the SDK's LLM class
+            assert agent.llm.aws_access_key_id is not None
+            assert isinstance(agent.llm.aws_access_key_id, SecretStr)
+            assert agent.llm.aws_access_key_id.get_secret_value() == "test-access-key"
+            assert agent.llm.aws_secret_access_key is not None
+            assert isinstance(agent.llm.aws_secret_access_key, SecretStr)
+            assert (
+                agent.llm.aws_secret_access_key.get_secret_value() == "test-secret-key"
+            )
+            assert agent.llm.aws_region_name == "us-west-2"
+
+    def test_bedrock_arn_model_works(self, tmp_path) -> None:
+        """Bedrock model with ARN should work without API key."""
+        from openhands_cli.stores import AgentStore
+
+        conversations_dir = tmp_path / "conversations"
+        conversations_dir.mkdir(exist_ok=True)
+
+        model = (
+            "bedrock/arn:aws-us-gov:bedrock:us-gov-west-1:123456:inference-profile/"
+            "us-gov.anthropic.claude-sonnet-4-5-20250929-v1:0"
+        )
+        env_vars = {
+            ENV_LLM_MODEL: model,
+        }
+
+        with (
+            patch(
+                "openhands_cli.stores.agent_store.get_persistence_dir",
+                return_value=str(tmp_path),
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_conversations_dir",
+                return_value=str(conversations_dir),
+            ),
+            patch.dict(os.environ, env_vars, clear=False),
+        ):
+            os.environ.pop(ENV_LLM_API_KEY, None)
+
+            store = AgentStore()
+            agent = store.load_or_create(env_overrides_enabled=True)
+
+            assert agent is not None
+            assert agent.llm.model == model
