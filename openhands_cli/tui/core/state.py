@@ -3,6 +3,7 @@
 This module provides:
 - ConversationContainer: UI container that owns and exposes reactive state
 - ConversationFinished: Message emitted when conversation finishes
+- AgentMode: Literal type for agent operating modes ("plan" or "code")
 
 Architecture:
     ConversationContainer holds reactive properties that UI components bind to.
@@ -27,7 +28,7 @@ Widget Hierarchy:
 import threading
 import time
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from textual.app import ComposeResult
 from textual.containers import Container
@@ -41,6 +42,11 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands_cli.stores import CriticSettings
+
+
+# Agent operating mode: "plan" focuses on generating PLAN.md without code execution
+# "code" is the default mode for normal code-writing and execution
+AgentMode = Literal["plan", "code"]
 
 
 if TYPE_CHECKING:
@@ -136,6 +142,10 @@ class ConversationContainer(Container):
     refinement_iteration: var[int] = var(0)
     """Current refinement iteration within a user turn. Resets on new user message."""
 
+    # ---- Agent Mode ----
+    agent_mode: var[AgentMode] = var("code")
+    """Agent operating mode: 'plan' for planning-only or 'code' for normal execution."""
+
     def __init__(
         self,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
@@ -198,12 +208,14 @@ class ConversationContainer(Container):
                 running=ConversationContainer.running,
                 elapsed_seconds=ConversationContainer.elapsed_seconds,
                 critic_settings=ConversationContainer.critic_settings,
+                agent_mode=ConversationContainer.agent_mode,
             )
             yield InputField(
                 placeholder="Type your message, @mention a file, or / for commands"
             ).data_bind(
                 conversation_id=ConversationContainer.conversation_id,
                 pending_action_count=ConversationContainer.pending_action_count,
+                agent_mode=ConversationContainer.agent_mode,
             )
             yield InfoStatusLine().data_bind(
                 running=ConversationContainer.running,
@@ -394,6 +406,15 @@ class ConversationContainer(Container):
         - Reset to 0 when user sends a new message
         """
         self._schedule_update("refinement_iteration", iteration)
+
+    def set_agent_mode(self, mode: AgentMode) -> None:
+        """Set the agent operating mode. Thread-safe.
+
+        Args:
+            mode: 'plan' for planning-only mode (generates PLAN.md),
+                  'code' for normal code execution mode.
+        """
+        self._schedule_update("agent_mode", mode)
 
     # ---- Conversation Attachment (for metrics) ----
 

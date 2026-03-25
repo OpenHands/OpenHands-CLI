@@ -81,6 +81,18 @@ class SetConfirmationPolicy(Message):
         self.policy = policy
 
 
+class SetAgentMode(Message):
+    """Request to change the agent operating mode.
+
+    Args:
+        mode: The agent mode to set ('plan' or 'code')
+    """
+
+    def __init__(self, mode: str) -> None:
+        super().__init__()
+        self.mode = mode
+
+
 class SwitchConfirmed(Message):
     """Internal message: User confirmed switch in modal."""
 
@@ -276,6 +288,26 @@ class ConversationManager(Container):
         """Handle request to change confirmation policy."""
         event.stop()
         self._policy_service.set_policy(event.policy)
+
+    @on(SetAgentMode)
+    def _on_set_agent_mode(self, event: SetAgentMode) -> None:
+        """Handle request to change agent operating mode."""
+        event.stop()
+        mode = event.mode
+        if mode not in ("plan", "code"):
+            self.notify(
+                f"Invalid mode: {mode}. Use 'plan' or 'code'.",
+                title="Mode Error",
+                severity="error",
+            )
+            return
+
+        self._state.set_agent_mode(mode)  # type: ignore[arg-type]
+        mode_display = "Planning" if mode == "plan" else "Code"
+        self.notify(
+            f"Switched to {mode_display} Mode",
+            severity="information",
+        )
 
     @on(ShowConfirmationPanel)
     def _on_show_confirmation_panel(self, event: ShowConfirmationPanel) -> None:

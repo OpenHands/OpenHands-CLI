@@ -98,6 +98,12 @@ class InputField(Container):
     conversation_id: reactive[uuid.UUID | None] = reactive(None)
     # >0 = waiting for user confirmation (input disabled)
     pending_action_count: reactive[int] = reactive(0)
+    # Agent operating mode ("plan" or "code")
+    agent_mode: reactive[str] = reactive("code")
+
+    # Color constants for mode indication
+    CODE_MODE_BORDER = "#ffe165"  # Primary/logo color (yellow)
+    PLAN_MODE_BORDER = "#277dff"  # Accent color (blue)
 
     DEFAULT_CSS = """
     InputField {
@@ -188,6 +194,25 @@ class InputField(Container):
         if count == 0 and self.conversation_id is not None:
             # Re-enable and focus when confirmation is complete
             self.focus_input()
+
+    def watch_agent_mode(self, _mode: str) -> None:
+        """React to agent_mode changes - update border color."""
+        self._update_border_color()
+
+    def _update_border_color(self) -> None:
+        """Update the input border color based on the current agent mode.
+
+        Uses blue (#277dff) for planning mode, yellow (#ffe165) for code mode.
+        """
+        from textual.color import Color
+
+        is_plan_mode = self.agent_mode == "plan"
+        border_color = self.PLAN_MODE_BORDER if is_plan_mode else self.CODE_MODE_BORDER
+        color = Color.parse(border_color)
+
+        # Update both single-line and multiline input borders
+        self.single_line_widget.styles.border = ("round", color)
+        self.multiline_widget.styles.border = ("round", color)
 
     def _update_disabled_state(self) -> None:
         """Update disabled state based on conversation_id and pending actions."""
