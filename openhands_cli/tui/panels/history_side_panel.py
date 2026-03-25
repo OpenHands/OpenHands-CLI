@@ -186,7 +186,7 @@ class HistorySidePanel(Container):
             yield Button("✕", id="history-close-btn", classes="history-close-btn")
         yield VerticalScroll(id="history-list")
 
-    def on_mount(self):
+    def on_mount(self) -> None:
         """Called when the panel is mounted.
 
         Sets up watchers on ConversationContainer to react to state changes.

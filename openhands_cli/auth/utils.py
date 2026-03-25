@@ -16,9 +16,19 @@ __all__ = [
 _console = Console()
 
 
-def console_print(message: str) -> None:
-    """Unified formatted print helper using rich console."""
-    _console.print(message)
+def console_print(message: str, *, style: str | None = None) -> None:
+    """Unified formatted print helper using rich console.
+
+    Args:
+        message: Text to print (may contain Rich markup).
+        style: Optional OPENHANDS_THEME style name.  When given, the message
+            is automatically wrapped in ``[{style}]…[/{style}]`` tags so
+            callers don't have to repeat the verbose markup pattern.
+    """
+    if style:
+        _console.print(f"[{style}]{message}[/{style}]")
+    else:
+        _console.print(message)
 
 
 async def is_token_valid(server_url: str, api_key: str) -> bool:
@@ -59,19 +69,17 @@ async def ensure_valid_auth(server_url: str) -> str:
     # If no API key or token is invalid, run login
     if not api_key or not await is_token_valid(server_url, api_key):
         if not api_key:
-            _console.print(
-                f"[{OPENHANDS_THEME.warning}]You are not logged in to OpenHands Cloud."
-                f"[/{OPENHANDS_THEME.warning}]"
+            console_print(
+                "You are not logged in to OpenHands Cloud.",
+                style=OPENHANDS_THEME.warning,
             )
         else:
-            _console.print(
-                f"[{OPENHANDS_THEME.warning}]Your connection with OpenHands Cloud "
-                f"has expired.[/{OPENHANDS_THEME.warning}]"
+            console_print(
+                "Your connection with OpenHands Cloud has expired.",
+                style=OPENHANDS_THEME.warning,
             )
 
-        _console.print(
-            f"[{OPENHANDS_THEME.accent}]Starting login...[/{OPENHANDS_THEME.accent}]"
-        )
+        console_print("Starting login...", style=OPENHANDS_THEME.accent)
         success = await login_command(server_url)
         if not success:
             raise AuthenticationError("Login failed")

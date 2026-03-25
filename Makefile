@@ -10,7 +10,7 @@ CYAN := \033[36m
 UNDERLINE := \033[4m
 RESET := \033[0m
 
-.PHONY: help install install-dev test format clean run check-uv-version build
+.PHONY: help install install-dev test format clean run run-watch check-uv-version build
 
 check-uv-version:
 	@$(ECHO) "$(YELLOW)Checking uv version...$(RESET)"
@@ -50,6 +50,7 @@ help:
 	@$(ECHO) "  $(CYAN)pre-commit$(RESET)        Run pre-commit"
 	@$(ECHO) "  $(CYAN)clean$(RESET)             Clean build artifacts"
 	@$(ECHO) "  $(CYAN)run$(RESET)               Run the CLI"
+	@$(ECHO) "  $(CYAN)run-watch$(RESET)         Run CLI with auto-restart on file changes"
 
 install:
 	@$(ECHO) "$(YELLOW)Installing the package...$(RESET)"
@@ -102,6 +103,10 @@ clean:
 # Run the CLI
 run:
 	uv run openhands
+
+# Run the CLI with auto-restart on file changes (.py and .tcss files)
+run-watch:
+	uv run python scripts/run_watch.py
 
 # Install UV if not present
 install-uv:
