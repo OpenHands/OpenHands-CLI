@@ -4,7 +4,7 @@ requires = [ "hatchling>=1.25" ]
 
 [project]
 name = "openhands"
-version = "1.13.0"
+version = "1.13.1"
 description = "OpenHands CLI - Terminal User Interface for OpenHands AI Agent"
 readme = "README.md"
 license = { text = "MIT" }
@@ -54,6 +54,7 @@ dev = [
   "pre-commit>=4.3.0",
   "textual-dev>=1.8.0",
   "pytest-httpserver>=1.1.3",
+  "watchfiles>=1.1.1",
 ]
 
 [tool.hatch.metadata]
@@ -140,7 +141,4 @@ pythonVersion = "3.12"
 useLibraryCodeForTypes = true
 typeCheckingMode = "standard"
 
-# Use the exact software-agent-sdk commit from PR #2253 while this CLI branch is being live-tested.
-[tool.uv.sources]
-openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "4170ccad13d255831ddc0bfffe31ab59c23493c1" }
-openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "4170ccad13d255831ddc0bfffe31ab59c23493c1" }
+# Marketplace-path support now comes from released SDK packages; no direct git source pins needed here.

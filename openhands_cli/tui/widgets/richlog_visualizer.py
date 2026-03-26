@@ -39,7 +39,9 @@ from openhands_cli.tui.widgets.collapsible import (
 
 # Icons for different event types
 SUCCESS_ICON = "✓"
+SUCCESS_COLOR = "#6bff6b"
 ERROR_ICON = "✗"
+ERROR_COLOR = "#ff6b6b"
 AGENT_MESSAGE_PADDING = (1, 0, 1, 1)  # top, right, bottom, left
 
 # Maximum line length for truncating titles/commands in collapsed view
@@ -429,10 +431,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Determine success/error status
         is_error = isinstance(event, UserRejectObservation | AgentErrorEvent)
         status_icon = ERROR_ICON if is_error else SUCCESS_ICON
+        status_color = ERROR_COLOR if is_error else SUCCESS_COLOR
 
-        # Build the new title with status icon
-        new_title = self._build_action_title(action_event)
-        new_title = f"{new_title} {status_icon}"
+        # Build the new title with colored status icon
+        title_text = Text.from_markup(self._build_action_title(action_event))
+        icon_text = Text(status_icon, style=status_color)
+        new_title = Text.assemble(title_text, " ", icon_text)
 
         # Build the new content (observation result only)
         new_content = self._build_observation_content(event)
@@ -538,14 +542,18 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 return ELLIPSIS + text[-(max_length - len(ELLIPSIS)) :]
         return text
 
+    def _clean_and_truncate(self, text: str, *, from_start: bool = True) -> str:
+        """Strip, collapse newlines, truncate, and escape Rich markup for display."""
+        text = str(text).strip().replace("\n", " ")
+        text = self._truncate_for_display(text, from_start=from_start)
+        return self._escape_rich_markup(text)
+
     def _extract_meaningful_title(self, event, fallback_title: str) -> str:
         """Extract a meaningful title from an event, with fallback to truncated
         content."""
         # For ActionEvents, prefer the LLM-generated summary if available
         if hasattr(event, "summary") and event.summary:
-            summary = str(event.summary).strip().replace("\n", " ")
-            summary = self._truncate_for_display(summary)
-            return self._escape_rich_markup(summary)
+            return self._clean_and_truncate(event.summary)
 
         # Try to extract meaningful information from the event
         if hasattr(event, "action") and event.action is not None:
@@ -555,42 +563,33 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
             # Try to get specific details based on action type
             if hasattr(action, "command") and action.command:
-                # For command actions, show the command
-                cmd = str(action.command).strip()
-                cmd = self._truncate_for_display(cmd)
-                return f"{action_type}: {self._escape_rich_markup(cmd)}"
+                return f"{action_type}: {self._clean_and_truncate(action.command)}"
             elif hasattr(action, "path") and action.path:
-                # For file actions, show the path (truncate from start to show filename)
-                path = str(action.path)
-                path = self._truncate_for_display(path, from_start=False)
-                return f"{action_type}: {self._escape_rich_markup(path)}"
+                # For file actions, truncate from start to show filename
+
+                return f"{action_type}: {
+                    self._clean_and_truncate(
+                        action.path,
+                        from_start=False,
+                    )
+                }"
             elif hasattr(action, "content") and action.content:
-                # For content-based actions, show truncated content
-                content = str(action.content).strip().replace("\n", " ")
-                content = self._truncate_for_display(content)
-                return f"{action_type}: {self._escape_rich_markup(content)}"
+                return f"{action_type}: {self._clean_and_truncate(action.content)}"
             elif hasattr(action, "message") and action.message:
-                # For message actions, show truncated message
-                msg = str(action.message).strip().replace("\n", " ")
-                msg = self._truncate_for_display(msg)
-                return f"{action_type}: {self._escape_rich_markup(msg)}"
+                return f"{action_type}: {self._clean_and_truncate(action.message)}"
             else:
                 return f"{action_type} Action"
 
         elif hasattr(event, "observation") and event.observation is not None:
-            # For ObservationEvents, try to get observation details
             obs = event.observation
             obs_type = obs.__class__.__name__.replace("Observation", "")
 
             if hasattr(obs, "content") and obs.content:
-                content = str(obs.content).strip().replace("\n", " ")
-                content = self._truncate_for_display(content)
-                return f"{obs_type}: {self._escape_rich_markup(content)}"
+                return f"{obs_type}: {self._clean_and_truncate(obs.content)}"
             else:
                 return f"{obs_type} Observation"
 
         elif hasattr(event, "llm_message") and event.llm_message is not None:
-            # For MessageEvents, show truncated message content
             msg = event.llm_message
             if hasattr(msg, "content") and msg.content:
                 # Extract text from content list (content is a list of TextContent
@@ -605,16 +604,11 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 else:
                     content_text = str(msg.content)
 
-                content_text = content_text.strip().replace("\n", " ")
-                content_text = self._truncate_for_display(content_text)
                 role = "User" if msg.role == "user" else "Agent"
-                return f"{role}: {self._escape_rich_markup(content_text)}"
+                return f"{role}: {self._clean_and_truncate(content_text)}"
 
         elif hasattr(event, "message") and event.message:
-            # For events with direct message attribute
-            content = str(event.message).strip().replace("\n", " ")
-            content = self._truncate_for_display(content)
-            return f"{fallback_title}: {self._escape_rich_markup(content)}"
+            return f"{fallback_title}: {self._clean_and_truncate(event.message)}"
 
         # If we can't extract meaningful info, try to truncate the visualized content
         if hasattr(event, "visualize"):
