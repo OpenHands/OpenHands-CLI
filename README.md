@@ -22,9 +22,8 @@
   <a href="https://www.readme-i18n.com/OpenHands/OpenHands-CLI?lang=pt">Português</a> |
   <a href="https://www.readme-i18n.com/OpenHands/OpenHands-CLI?lang=ru">Русский</a> |
   <a href="https://www.readme-i18n.com/OpenHands/OpenHands-CLI?lang=zh">中文</a>
-  <hr>
 </div>
-
+</br>
 <div align="center">
   <strong>Trusted by engineers at</strong>
   <br/><br/>
