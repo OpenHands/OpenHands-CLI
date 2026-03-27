@@ -148,9 +148,15 @@ openhands --resume --last       # resume most recent
 
 For complete documentation, visit https://docs.openhands.dev/openhands/usage/cli.
 
-## Trusted by engineers at
+## License
 
+MIT License - see [LICENSE](LICENSE) for details.
+
+<hr>
 <div align="center">
+  <sub><strong>Trusted by engineers at:</sub></strong>
+  </br> 
+  </br>
   <img src="https://cdn.prod.website-files.com/68ff4058b35616cdd47d5b59/69137f6974b71a1a4a932f82_TikTok_logo.svg" alt="TikTok" height="30">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
   <img src="https://cdn.prod.website-files.com/68ff4058b35616cdd47d5b59/69137f523b08f91a5aa905b9_Vmware.svg" alt="VMware" height="30">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
   <img src="https://cdn.prod.website-files.com/68ff4058b35616cdd47d5b59/69137f2cb537758796a9dba1_Roche_Logo.svg" alt="Roche" height="30">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -165,7 +171,3 @@ For complete documentation, visit https://docs.openhands.dev/openhands/usage/cli
   <img src="https://cdn.prod.website-files.com/68ff4058b35616cdd47d5b59/69137e34e3a5ab71e37082a7_NVIDIA_logo%201.svg" alt="NVIDIA" height="30">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
   <img src="https://cdn.prod.website-files.com/68ff4058b35616cdd47d5b59/69137e199ce2cb594b0210ab_google-ar21%201.svg" alt="Google" height="30">
 </div>
-
-## License
-
-MIT License - see [LICENSE](LICENSE) for details.
