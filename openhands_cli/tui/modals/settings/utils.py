@@ -119,7 +119,7 @@ class SettingsFormData(BaseModel):
             return val if val > 30 else None
         return None
 
-    def resolve_data_fields(self, existing_agent: Agent | None):
+    def resolve_data_fields(self, existing_agent: Agent | None) -> None:
         # Check advance mode requirements
         if self.mode == "advanced":
             if not self.custom_model:
@@ -154,7 +154,7 @@ class SettingsFormData(BaseModel):
         if not self.api_key_input:
             raise Exception("API Key is required")
 
-    def get_full_model_name(self):
+    def get_full_model_name(self) -> str:
         if self.mode == "advanced":
             return str(self.custom_model)
 
