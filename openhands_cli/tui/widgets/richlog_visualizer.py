@@ -694,82 +694,102 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         return self._make_collapsible(content, title, event)
 
+    def _create_markdown_widget(self, content: str) -> Markdown:
+        """Create a standard markdown widget for agent-authored messages."""
+        widget = Markdown(content)
+        widget.styles.padding = AGENT_MESSAGE_PADDING
+        return widget
+
+    def _build_finish_message(self, message: str) -> str:
+        """Build finish-action markdown content for the current agent context."""
+        if not self._is_non_default_agent():
+            return message
+
+        agent_name = self._get_formatted_agent_name()
+        return f"**{agent_name}:**\n\n{message}"
+
+    def _create_action_widget(self, event: ActionEvent) -> Markdown | None:
+        """Create a widget for action events that render as markdown."""
+        action = event.action
+        if isinstance(action, FinishAction):
+            return self._create_markdown_widget(
+                self._build_finish_message(str(action.message))
+            )
+        if isinstance(action, ThinkAction):
+            return self._create_markdown_widget(str(action.visualize))
+        return None
+
+    def _build_delegation_message(
+        self, *, sender: str, role: str, content: str
+    ) -> str:
+        """Build delegation markdown showing sender and recipient agent names."""
+        agent_name = self._get_formatted_agent_name()
+        event_sender = self._format_agent_name_with_suffix(sender)
+
+        if role == "user":
+            prefix = f"**{event_sender} → {agent_name}:**\n\n"
+        else:
+            prefix = f"**{agent_name} → {event_sender}:**\n\n"
+        return prefix + content
+
+    def _create_message_event_widget(self, event: MessageEvent) -> "Widget | None":
+        """Create a widget for message events shown as markdown or collapsibles."""
+        if not event.llm_message:
+            return None
+
+        if event.llm_message.role == "user" and not event.sender:
+            return None
+
+        message_content = str(event.visualize)
+        if event.sender and self._is_non_default_agent():
+            return self._create_markdown_widget(
+                self._build_delegation_message(
+                    sender=event.sender,
+                    role=event.llm_message.role,
+                    content=message_content,
+                )
+            )
+
+        if self._name and event.llm_message.role == "assistant":
+            return self._create_markdown_widget(message_content)
+
+        if not self._name:
+            return None
+
+        return self._create_event_collapsible(event)
+
+    def _create_titled_collapsible(
+        self, event: Event, fallback_title: str
+    ) -> Collapsible:
+        """Create a standard titled collapsible for non-action events."""
+        title = self._extract_meaningful_title(event, fallback_title)
+        content_string = self._escape_rich_markup(str(event.visualize))
+        return self._make_collapsible(
+            content_string,
+            f"{self._get_agent_prefix()}{title}",
+            event,
+        )
+
+
     def _create_event_widget(self, event: Event) -> "Widget | None":
         """Create a widget for the event - either plain text or collapsible."""
-        content = event.visualize
-
         # Handle SystemPromptEvent - create a collapsible showing the system prompt
         # Note: Loaded resources (skills, hooks, tools, MCPs) are displayed at startup
         # in _initialize_main_ui(). This collapsible shows the full system prompt.
         if isinstance(event, SystemPromptEvent):
             return self._create_system_prompt_collapsible(event)
+
         # Don't emit condensation request events (internal events)
-        elif isinstance(event, CondensationRequest):
+        if isinstance(event, CondensationRequest):
             return None
 
-        # Check if this is a plain text event (finish, think, or message)
         if isinstance(event, ActionEvent):
-            action = event.action
-            if isinstance(action, FinishAction):
-                # For finish action, render as markdown with padding to align
-                # User message has "padding: 0 1" and starts with "> ", so text
-                # starts at position 3 (1 padding + 2 for "> ")
-                # In delegation context (non-default agent), add agent header
-                message = str(action.message)
-                if self._is_non_default_agent():
-                    agent_name = self._get_formatted_agent_name()
-                    message = f"**{agent_name}:**\n\n{message}"
-                widget = Markdown(message)
-                widget.styles.padding = AGENT_MESSAGE_PADDING
-                return widget
-            elif isinstance(action, ThinkAction):
-                # For think action, render as markdown with padding
-                widget = Markdown(str(action.visualize))
-                widget.styles.padding = AGENT_MESSAGE_PADDING
-                return widget
+            action_widget = self._create_action_widget(event)
+            if action_widget is not None:
+                return action_widget
 
         if isinstance(event, MessageEvent):
-            if not event.llm_message:
-                return None
-
-            # Skip direct user messages (they are displayed separately in the UI)
-            # This applies for user messages
-            # without a sender in delegation context
-            if event.llm_message.role == "user" and not event.sender:
-                return None
-
-            # Case 1: Delegation message (both sender and name are set)
-            # Format with arrow notation showing sender → receiver
-            # Only show prefix if this is NOT the default main agent
-            if event.sender and self._is_non_default_agent():
-                message_content = str(content)
-                agent_name = self._get_formatted_agent_name()
-                event_sender = self._format_agent_name_with_suffix(event.sender)
-
-                if event.llm_message.role == "user":
-                    # Message from another agent (via delegation)
-                    prefix = f"**{event_sender} → {agent_name}:**\n\n"
-                else:
-                    # Agent message - derive recipient from sender context
-                    prefix = f"**{agent_name} → {event_sender}:**\n\n"
-
-                message_content = prefix + message_content
-                widget = Markdown(message_content)
-                widget.styles.padding = AGENT_MESSAGE_PADDING
-                return widget
-
-            # Case 2: Regular agent message (name set, no sender, assistant role)
-            # This is the normal case for agent responses in the main conversation
-            # Fixes GitHub issue #399: Agent MessageEvents were being silently dropped
-            if self._name and event.llm_message.role == "assistant":
-                widget = Markdown(str(content))
-                widget.styles.padding = AGENT_MESSAGE_PADDING
-                return widget
-
-            # Case 3: No name context - skip MessageEvents
-            # (visualizer without name is typically not used in CLI)
-            if not self._name:
-                return None
+            return self._create_message_event_widget(event)
 
         # For other events, use collapsible
         return self._create_event_collapsible(event)
@@ -780,72 +800,43 @@ class ConversationVisualizer(ConversationVisualizerBase):
         When in delegation context (self._name is set), titles are prefixed
         with the agent name (e.g., "Lodging Expert Agent Observation").
         """
-        # Use the event's visualize property for content
         content = event.visualize
-
         if not content.plain.strip():
             return None
 
-        agent_prefix = self._get_agent_prefix()
-
-        # Don't emit condensation request events (internal events)
         if isinstance(event, CondensationRequest):
             return None
-        elif isinstance(event, ActionEvent):
-            # Build title using new format with agent prefix
+
+        if isinstance(event, ActionEvent):
             title = self._build_action_title(event)
-            content_string = self._escape_rich_markup(str(content))
-
-            # Action events default to collapsed since we have summary in title
-            collapsible = self._make_collapsible(content_string, title, event)
-
-            # Store for pairing with observation
+            collapsible = self._make_collapsible(
+                self._escape_rich_markup(str(content)),
+                title,
+                event,
+            )
             self._pending_actions[event.tool_call_id] = (event, collapsible)
-
             return collapsible
-        elif isinstance(event, ObservationEvent):
-            # If we get here, the observation wasn't paired with an action
-            # (shouldn't happen normally, but handle gracefully)
-            title = self._extract_meaningful_title(event, "Observation")
-            return self._make_collapsible(
-                self._escape_rich_markup(str(content)), f"{agent_prefix}{title}", event
-            )
-        elif isinstance(event, UserRejectObservation):
-            title = self._extract_meaningful_title(event, "User Rejected Action")
-            return self._make_collapsible(
-                self._escape_rich_markup(str(content)), f"{agent_prefix}{title}", event
-            )
-        elif isinstance(event, AgentErrorEvent):
-            title = self._extract_meaningful_title(event, "Agent Error")
-            content_string = self._escape_rich_markup(str(content))
-            return self._make_collapsible(
-                content_string, f"{agent_prefix}{title}", event
-            )
-        elif isinstance(event, ConversationErrorEvent):
-            title = self._extract_meaningful_title(event, "Conversation Error")
-            content_string = self._escape_rich_markup(str(content))
-            return self._make_collapsible(
-                content_string, f"{agent_prefix}{title}", event
-            )
-        elif isinstance(event, PauseEvent):
-            title = self._extract_meaningful_title(event, "User Paused")
-            return self._make_collapsible(
-                self._escape_rich_markup(str(content)), f"{agent_prefix}{title}", event
-            )
-        elif isinstance(event, Condensation):
-            title = self._extract_meaningful_title(event, "Condensation")
-            content_string = self._escape_rich_markup(str(content))
-            return self._make_collapsible(
-                content_string, f"{agent_prefix}{title}", event
-            )
-        else:
-            # Fallback for unknown event types
-            title = self._extract_meaningful_title(
-                event, f"UNKNOWN Event: {event.__class__.__name__}"
-            )
-            content_string = (
-                f"{self._escape_rich_markup(str(content))}\n\nSource: {event.source}"
-            )
-            return self._make_collapsible(
-                content_string, f"{agent_prefix}{title}", event
-            )
+
+        fallback_titles: list[tuple[type[Event], str]] = [
+            (ObservationEvent, "Observation"),
+            (UserRejectObservation, "User Rejected Action"),
+            (AgentErrorEvent, "Agent Error"),
+            (ConversationErrorEvent, "Conversation Error"),
+            (PauseEvent, "User Paused"),
+            (Condensation, "Condensation"),
+        ]
+        for event_type, fallback_title in fallback_titles:
+            if isinstance(event, event_type):
+                return self._create_titled_collapsible(event, fallback_title)
+
+        title = self._extract_meaningful_title(
+            event, f"UNKNOWN Event: {event.__class__.__name__}"
+        )
+        content_string = (
+            f"{self._escape_rich_markup(str(content))}\n\nSource: {event.source}"
+        )
+        return self._make_collapsible(
+            content_string,
+            f"{self._get_agent_prefix()}{title}",
+            event,
+        )
