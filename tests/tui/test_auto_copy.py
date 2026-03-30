@@ -192,3 +192,36 @@ class TestAutoCopyOnSelection:
                 assert "Selection copied to clipboard" in call_args[0][0]
                 assert "xclip" not in call_args[0][0]
                 assert call_args[1]["title"] == "Auto-copy"
+
+    @pytest.mark.asyncio
+    async def test_mouse_up_get_selected_text_raises_does_not_crash(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """BUG-002: KeyError from Textual widget lifecycle during rapid clicking
+        is caught and does not crash the application."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            # Mock get_selected_text to raise KeyError (Textual #5646)
+            oh_app.screen.get_selected_text = MagicMock(
+                side_effect=KeyError("toast--title")
+            )
+
+            # Mock notify to verify it is NOT called
+            notify_mock = MagicMock()
+            oh_app.notify = notify_mock
+
+            # Simulate mouse up event — should not raise
+            oh_app.on_mouse_up(_create_mouse_up_event())
+
+            # Verify no notification (early return from except branch)
+            notify_mock.assert_not_called()

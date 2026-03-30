@@ -5,11 +5,13 @@ This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 
 import re
 import threading
-from typing import TYPE_CHECKING
+from collections import deque
+from typing import TYPE_CHECKING, Sequence
 
 from rich.text import Text
-from textual.widgets import Markdown
+from textual.widgets import Markdown, Static
 
+from openhands.sdk import TextContent
 from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
 from openhands.sdk.event import (
     ActionEvent,
@@ -32,6 +34,7 @@ from openhands.tools.terminal.definition import TerminalAction
 from openhands_cli.shared.delegate_formatter import format_delegate_title
 from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
+from openhands_cli.tui.core.events import LoadOlderEvents
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
 )
@@ -118,6 +121,17 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._cli_settings: CliSettings | None = None
         # Track pending actions by tool_call_id for action-observation pairing
         self._pending_actions: dict[str, tuple[ActionEvent, Collapsible]] = {}
+
+        # Replay/loading state for on-demand history loading
+        self._all_events: list[Event] = []
+        self._loaded_start_index: int = 0
+        self._banner_widget: Static | Collapsible | None = None
+        self._summary_text: str | None = None
+        self._has_condensation: bool = False
+        self._condensed_count: int | None = None
+        self._prepend_in_progress: bool = False
+        self._live_event_buffer: deque[Event] = deque()
+        self._max_viewable_widgets: int = 2000
 
     @property
     def cli_settings(self) -> CliSettings:
@@ -267,6 +281,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
+        if self._prepend_in_progress:
+            self._live_event_buffer.append(event)
+            return
+
         # Check for TaskTrackerObservation to update/open the plan panel
         if isinstance(event, ObservationEvent) and isinstance(
             event.observation, TaskTrackerObservation
@@ -849,3 +867,269 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return self._make_collapsible(
                 content_string, f"{agent_prefix}{title}", event
             )
+
+    def _render_event_for_replay(self, event: Event) -> None:
+        """Render a single historical event without replay-end scrolling."""
+        # Render user messages that on_event normally skips
+        if (
+            isinstance(event, MessageEvent)
+            and event.llm_message
+            and event.llm_message.role == "user"
+            and not event.sender
+        ):
+            text_parts = []
+            for item in event.llm_message.content:
+                if isinstance(item, TextContent):
+                    text_parts.append(item.text)
+            content_text = "\n".join(text_parts)
+            if content_text.strip():
+                widget = Static(f"> {content_text}", classes="user-message", markup=False)
+                self._add_widget_to_ui(widget)
+            return
+
+        # Handle observation pairing (same as on_event)
+        if isinstance(event, ObservationEvent | UserRejectObservation | AgentErrorEvent):
+            if self._handle_observation_event(event):
+                return
+            # Cross-boundary: action was outside replay window
+            widget = self._create_cross_boundary_observation_widget(event)
+            if widget:
+                self._add_widget_to_ui(widget)
+            return
+
+        widget = self._create_event_widget(event)
+        if widget:
+            self._add_widget_to_ui(widget)
+
+    def _create_cross_boundary_observation_widget(
+        self, event: ObservationEvent | UserRejectObservation | AgentErrorEvent
+    ) -> "Widget | None":
+        """Create widget for an observation whose action is outside the replay window."""
+        title = self._extract_meaningful_title(event, "Observation")
+        title = f"(action not shown) {title}"
+        content = event.visualize if hasattr(event, "visualize") else str(event)
+        content_string = self._escape_rich_markup(str(content))
+        return self._make_collapsible(content_string, title, event)
+
+    def replay_events(self, events: list[Event]) -> None:
+        """Replay historical events into the UI without triggering side effects.
+
+        Unlike on_event(), this skips critic handling, telemetry, and plan panel
+        refreshes. User messages (normally rendered separately by
+        UserMessageController) are rendered inline so the full conversation
+        history appears.
+
+        Must be called from the main thread.
+        """
+        for event in events:
+            self._render_event_for_replay(event)
+
+        # Scroll to the end after replaying all events
+        if events:
+            self._container.scroll_end(animate=False)
+
+    def set_replay_context(
+        self,
+        all_events: Sequence[Event],
+        loaded_start_index: int,
+        summary_text: str | None,
+        has_condensation: bool,
+        condensed_count: int | None,
+    ) -> None:
+        """Set full replay context for on-demand older-event loading."""
+        self._all_events = list(all_events)
+        self._loaded_start_index = loaded_start_index
+        self._summary_text = summary_text
+        self._has_condensation = has_condensation
+        self._condensed_count = condensed_count
+
+    def load_older_events(self) -> int:
+        """Load one older page above the current loaded tail while preserving viewport."""
+        if self._visible_widget_count() >= self._max_viewable_widgets:
+            self._update_banner_for_loaded_state()
+            return 0
+
+        if self._loaded_start_index <= 0:
+            return 0
+
+        page_size = self.cli_settings.replay_window_size
+        start = max(0, self._loaded_start_index - page_size)
+        older_events = self._all_events[start : self._loaded_start_index]
+        if not older_events:
+            return 0
+
+        self._prepend_in_progress = True
+        try:
+            # Scroll stability strategy from SPEC-002: preserve + restore offset
+            before_scroll = float(self._container.scroll_y)
+
+            # Render and prepend by mounting before banner (or current first child)
+            first_child = self._banner_widget if self._banner_widget is not None else (
+                self._container.children[0] if self._container.children else None
+            )
+
+            mounted = 0
+            consumed = 0
+            for event in older_events:
+                if self._visible_widget_count() >= self._max_viewable_widgets:
+                    break
+                consumed += 1
+                widget = self._create_replay_widget(event)
+                if widget is None:
+                    continue
+                self._container.mount(widget, before=first_child)
+                mounted += 1
+
+            self._loaded_start_index -= consumed
+            self._update_banner_for_loaded_state()
+
+            if mounted > 0:
+                # Approximate restoration strategy validated by spike
+                self._container.scroll_to(y=before_scroll + mounted, animate=False)
+        finally:
+            self._prepend_in_progress = False
+            self._flush_live_event_buffer()
+
+        return mounted
+
+    def _create_replay_widget(self, event: Event) -> "Widget | None":
+        """Create a widget for historical replay prepend operations."""
+        # Keep behavior consistent with replay_events path
+        if (
+            isinstance(event, MessageEvent)
+            and event.llm_message
+            and event.llm_message.role == "user"
+            and not event.sender
+        ):
+            text_parts = [
+                item.text
+                for item in event.llm_message.content
+                if isinstance(item, TextContent)
+            ]
+            content_text = "\n".join(text_parts)
+            if content_text.strip():
+                return Static(f"> {content_text}", classes="user-message", markup=False)
+            return None
+        return self._create_event_widget(event)
+
+    def _visible_widget_count(self) -> int:
+        """Count currently mounted history widgets for cap enforcement."""
+        return sum(
+            1
+            for w in self._container.children
+            if w.id not in {"splash_content", "replay-summary-banner"}
+        )
+
+    def _remove_banner_widget(self) -> None:
+        """Best-effort banner removal that is safe in unit tests without active app."""
+        if self._banner_widget is None:
+            return
+        try:
+            if self._banner_widget.is_attached:
+                self._banner_widget.remove()
+        except Exception:
+            pass
+        self._banner_widget = None
+
+    def _update_banner_for_loaded_state(self) -> None:
+        """Update banner text and terminal message after each older-page load."""
+        hidden_count = self._loaded_start_index
+        at_cap = self._visible_widget_count() >= self._max_viewable_widgets
+
+        if self._banner_widget is None:
+            return
+
+        if at_cap:
+            terminal = Static(
+                "Maximum viewable history reached.",
+                classes="replay-summary",
+                id="replay-summary-banner",
+            )
+            self._remove_banner_widget()
+            self._banner_widget = terminal
+            self._container.mount(
+                terminal,
+                before=(self._container.children[0] if self._container.children else None),
+            )
+            return
+
+        if hidden_count <= 0:
+            self._remove_banner_widget()
+            return
+
+        if isinstance(self._banner_widget, Static):
+            if self._has_condensation:
+                condensed_total = self._condensed_count if self._condensed_count is not None else hidden_count
+                if self._summary_text is None:
+                    self._banner_widget.update(
+                        f"Prior context condensed ({condensed_total} events). Summary not available."
+                    )
+                else:
+                    self._banner_widget.update(
+                        f"Prior context: {condensed_total} events condensed"
+                    )
+            else:
+                self._banner_widget.update(
+                    f"{hidden_count:,} earlier events not shown. Press [Page Up] to load more."
+                )
+        elif isinstance(self._banner_widget, Collapsible):
+            condensed_total = self._condensed_count if self._condensed_count is not None else hidden_count
+            self._banner_widget.update_title(
+                f"Prior context: {condensed_total} events condensed"
+            )
+
+    def _flush_live_event_buffer(self) -> None:
+        """Flush live events buffered during prepend operation."""
+        while self._live_event_buffer:
+            event = self._live_event_buffer.popleft()
+            self.on_event(event)
+
+    def replay_with_summary(
+        self,
+        summary_text: str | None,
+        tail_events: list[Event],
+        total_count: int,
+        hidden_count: int,
+        has_condensation: bool,
+        condensed_count: int | None,
+    ) -> None:
+        """Replay tail events with a top summary/count banner when history is hidden."""
+        if hidden_count > 0:
+            if has_condensation and summary_text is not None:
+                condensed_total = (
+                    condensed_count if condensed_count is not None else hidden_count
+                )
+                title = f"Prior context: {condensed_total} events condensed"
+                banner = Collapsible(
+                    self._escape_rich_markup(summary_text),
+                    title=title,
+                    collapsed=True,
+                    symbol_color="#727987",
+                    classes="replay-summary",
+                    id="replay-summary-banner",
+                )
+                self._banner_widget = banner
+                self._add_widget_to_ui(banner)
+            elif has_condensation:
+                condensed_total = (
+                    condensed_count if condensed_count is not None else hidden_count
+                )
+                banner = Static(
+                    f"Prior context condensed ({condensed_total} events). Summary not available.",
+                    classes="replay-summary",
+                    id="replay-summary-banner",
+                )
+                self._banner_widget = banner
+                self._add_widget_to_ui(banner)
+            else:
+                banner = Static(
+                    f"{hidden_count:,} earlier events not shown. Press [Page Up] to load more.",
+                    classes="replay-summary",
+                    id="replay-summary-banner",
+                )
+                self._banner_widget = banner
+                self._add_widget_to_ui(banner)
+        else:
+            self._banner_widget = None
+
+        self.replay_events(tail_events)
