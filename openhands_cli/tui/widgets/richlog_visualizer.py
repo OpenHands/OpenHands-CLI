@@ -719,9 +719,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return self._create_markdown_widget(str(action.visualize))
         return None
 
-    def _build_delegation_message(
-        self, *, sender: str, role: str, content: str
-    ) -> str:
+    def _build_delegation_message(self, *, sender: str, role: str, content: str) -> str:
         """Build delegation markdown showing sender and recipient agent names."""
         agent_name = self._get_formatted_agent_name()
         event_sender = self._format_agent_name_with_suffix(sender)
@@ -769,7 +767,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
             f"{self._get_agent_prefix()}{title}",
             event,
         )
-
 
     def _create_event_widget(self, event: Event) -> "Widget | None":
         """Create a widget for the event - either plain text or collapsible."""

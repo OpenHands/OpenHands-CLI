@@ -971,7 +971,6 @@ class TestMessageEventDelegation:
         assert "→" in markdown_content
 
 
-
 class TestRenderingHelpers:
     """Tests for extracted richlog rendering helpers."""
 
