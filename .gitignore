@@ -195,3 +195,4 @@ $RECYCLE.BIN/
 .pytest_cache/
 software-agent-sdk/
 snapshot_report.html
+.live-llm-results/

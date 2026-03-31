@@ -44,6 +44,7 @@ help:
 	@$(ECHO) "  $(CYAN)test$(RESET)              Run tests"
 	@$(ECHO) "  $(CYAN)test-snapshots$(RESET)    Run tests snapshots"
 	@$(ECHO) "  $(CYAN)test-binary$(RESET)       Run end-to-end tests"
+	@$(ECHO) "  $(CYAN)test-live-llm$(RESET)    Run live LLM integration tests (requires LLM_API_KEY, LLM_MODEL)"
 	@$(ECHO) "  $(CYAN)test-all$(RESET)          Run tests and tests-snapshots"
 	@$(ECHO) "  $(CYAN)lint$(RESET)              Lint code with Ruff"
 	@$(ECHO) "  $(CYAN)format$(RESET)            Format code with Ruff"
@@ -76,6 +77,11 @@ test-binary:
 	@$(ECHO) "$(YELLOW)Run end-to-end tests...$(RESET)"
 	uv run pytest tui_e2e
 	@$(ECHO) "$(GREEN)End-to-end tests completed.$(RESET)"
+
+test-live-llm:
+	@$(ECHO) "$(YELLOW)Run live LLM integration tests...$(RESET)"
+	uv run pytest tests/live_llm/ --run-live-llm -v
+	@$(ECHO) "$(GREEN)Live LLM tests completed.$(RESET)"
 
 test-all: test test-snapshots
 

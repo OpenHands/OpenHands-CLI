@@ -38,6 +38,7 @@ This repository uses **uv** for dependency management and running tooling (such 
 - run snapshot tests (Textual UI): `make test-snapshots` (or `uv run pytest tests/snapshots -v`; use `--snapshot-update` when updating snapshots)
 - run binary tests: `make test-binary` (or `uv run pytest tui_e2e`)
 - run unit/integration + snapshot tests together: `make test-all`
+- run live LLM integration tests: `make test-live-llm` (requires `LLM_API_KEY` and `LLM_MODEL` env vars; see `tests/live_llm/README.md`)
 - build PyInstaller binaries: `./build.sh --install-pyinstaller`
 
 ## Development Guidelines
@@ -70,9 +71,10 @@ Prefer modern typing syntax (`X | None` over `Optional[X]`) in new code.
 - Type checking via `pyright` (`uv run pyright`); prefer type hints on new functions and public interfaces.
 
 ## Testing Guidelines
-- Unit/integration tests live under `tests/` (excluding `tests/snapshots`) and run via `make test`.
+- Unit/integration tests live under `tests/` (excluding `tests/snapshots` and `tests/live_llm`) and run via `make test`.
 - Snapshot tests live under `tests/snapshots/` and run via `make test-snapshots`.
 - Binary tests live under `tui_e2e/` and run via `make test-binary`.
+- Live LLM tests live under `tests/live_llm/` and run via `make test-live-llm` (opt-in, requires `--run-live-llm` flag + `LLM_API_KEY`/`LLM_MODEL` env vars). In CI, triggered by the `run-live-llm` PR label.
 - Pytest discovery: files `test_*.py`, classes `Test*`, functions `test_*`. Use `@pytest.mark.integration` for costly flows.
 - Match test locations to implementation (`tests/` mirrors `openhands_cli/`); add fixtures in `tests/conftest.py` when shared.
 - Run `make test` before PRs; run snapshot/binary tests when relevant to the change.
