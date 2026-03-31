@@ -17,6 +17,10 @@ This repo contains the current CLI UX, including the Textual TUI and a browser-s
 - Tooling & packaging: `Makefile` for common tasks, `build.sh`/`build.py` for PyInstaller artifacts, `openhands-cli.spec` for the frozen binary, `uv.lock` for resolved deps.
 - `.agents/skills/`: agent guidance for this repo.
 
+## Repository Memory
+- Schema-driven programmatic settings are persisted separately from the runtime `Agent` in `programmatic_settings.json`; use `CliProgrammaticSettings` for SDK-owned LLM/verification settings and keep `CliSettings` limited to CLI/UI state.
+- `CliSettings.critic` is only a legacy compatibility shim for old `cli_config.json` files and should not be used as the source of truth for new verification behavior.
+
 ## Setup, Build, and Development Commands
 This repository uses **uv** for dependency management and running tooling (such as in `Makefile`, CI workflows, and `uv.lock`). Avoid using `pip install ...` directly if possible.
 

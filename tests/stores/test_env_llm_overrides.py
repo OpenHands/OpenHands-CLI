@@ -645,7 +645,7 @@ class TestCriticBehaviorInAgentCreation:
         }
 
         # Mock CliSettings to enable critic
-        mock_settings = CliSettings(critic=CriticSettings(enable_critic=True))
+        mock_settings = CliSettings(critic=CriticSettings(critic_enabled=True))
 
         with (
             patch(

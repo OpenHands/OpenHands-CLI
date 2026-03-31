@@ -496,7 +496,7 @@ def mock_llm_with_critic(
             settings = settings.model_copy(
                 update={
                     "critic": CriticSettings(
-                        enable_critic=True,
+                        critic_enabled=True,
                         enable_iterative_refinement=True,
                         critic_threshold=0.9,  # High threshold to trigger refinement
                         max_refinement_iterations=3,

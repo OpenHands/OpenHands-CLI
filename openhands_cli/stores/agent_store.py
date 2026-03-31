@@ -77,7 +77,7 @@ def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
         return None
 
 
-def get_default_critic(llm: LLM, *, enable_critic: bool = True) -> CriticBase | None:
+def get_default_critic(llm: LLM, *, critic_enabled: bool = True) -> CriticBase | None:
     """Auto-configure critic for All-Hands LLM proxy.
 
     When the LLM base_url matches `llm-proxy.*.all-hands.dev`, returns an
@@ -86,15 +86,15 @@ def get_default_critic(llm: LLM, *, enable_critic: bool = True) -> CriticBase | 
     - api_key: same as LLM
     - model_name: "critic"
 
-    Returns None if base_url doesn't match, api_key is not set, or enable_critic
+    Returns None if base_url doesn't match, api_key is not set, or critic_enabled
     is False.
 
     Args:
         llm: The LLM configuration
-        enable_critic: Whether critic feature is enabled (from settings)
+        critic_enabled: Whether critic feature is enabled (from settings)
     """
     # Check if critic is enabled in settings
-    if not enable_critic:
+    if not critic_enabled:
         return None
 
     base_url = llm.base_url
@@ -407,6 +407,31 @@ class AgentStore:
 
         return agent.condenser.model_copy(update={"llm": condenser_llm})
 
+    def _get_runtime_critic(
+        self,
+        agent: Agent,
+        updated_llm: LLM,
+        *,
+        critic_disabled: bool,
+    ) -> CriticBase | None:
+        if critic_disabled:
+            return None
+
+        if agent.critic is not None:
+            api_key = getattr(agent.critic, "api_key", None)
+            if api_key is not None:
+                return agent.critic.model_copy(update={"api_key": updated_llm.api_key})
+            return agent.critic
+
+        legacy_critic = CliSettings.load().critic
+        if legacy_critic is None:
+            return None
+
+        return get_default_critic(
+            updated_llm,
+            critic_enabled=legacy_critic.critic_enabled,
+        )
+
     def _apply_runtime_config(
         self,
         agent: Agent,
@@ -426,12 +451,11 @@ class AgentStore:
 
         condenser = self._maybe_build_condenser(agent, session_id=session_id)
 
-        critic = None
-        if not critic_disabled:
-            cli_settings = CliSettings.load()
-            critic = get_default_critic(
-                updated_llm, enable_critic=cli_settings.critic.enable_critic
-            )
+        critic = self._get_runtime_critic(
+            agent,
+            updated_llm,
+            critic_disabled=critic_disabled,
+        )
 
         return agent.model_copy(
             update={
@@ -494,11 +518,14 @@ class AgentStore:
         # Save the agent configuration (without critic)
         self.save(agent)
 
-        # Now add critic on-the-fly for the returned agent (not persisted)
-        cli_settings = CliSettings.load()
-        critic = get_default_critic(
-            llm, enable_critic=cli_settings.critic.enable_critic
-        )
+        # Backward-compatibility fallback for older CLI critic settings.
+        legacy_critic = CliSettings.load().critic
+        critic = None
+        if legacy_critic is not None:
+            critic = get_default_critic(
+                llm,
+                critic_enabled=legacy_critic.critic_enabled,
+            )
         if critic is not None:
             agent = agent.model_copy(update={"critic": critic})
 

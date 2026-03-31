@@ -15,10 +15,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from openhands_cli.tui.messages import SendRefinementMessage
-from openhands_cli.tui.utils.critic.refinement import (
-    build_refinement_message,
-    should_trigger_refinement,
-)
 
 
 if TYPE_CHECKING:
@@ -74,38 +70,26 @@ class RefinementController:
             critic_result: The critic evaluation result to handle.
         """
         critic_settings = self._state.critic_settings
-
-        if not critic_settings.enable_iterative_refinement:
+        refinement_config = critic_settings.build_iterative_refinement_config()
+        if refinement_config is None:
             return
 
-        max_iterations = critic_settings.max_refinement_iterations
         current_iteration = self._state.refinement_iteration
-
-        if current_iteration >= max_iterations:
+        if current_iteration >= refinement_config.max_iterations:
             return
 
-        should_refine, triggered_issues = should_trigger_refinement(
-            critic_result=critic_result,
-            threshold=critic_settings.critic_threshold,
-            issue_threshold=critic_settings.issue_threshold,
-        )
-
-        if not should_refine:
+        decision = refinement_config.evaluate(critic_result)
+        if not decision.should_refine:
             return
 
-        # Increment iteration count
         new_iteration = current_iteration + 1
         self._state.set_refinement_iteration(new_iteration)
 
-        # Build and send refinement message
-        refinement_message = build_refinement_message(
-            critic_result=critic_result,
-            iteration=new_iteration,
-            max_iterations=max_iterations,
-            issue_threshold=critic_settings.issue_threshold,
-            triggered_issues=triggered_issues,
+        refinement_message = refinement_config.build_followup_prompt(
+            critic_result,
+            new_iteration,
+            decision=decision,
         )
-
         self._post_message(SendRefinementMessage(refinement_message))
 
     def reset_iteration(self) -> None:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from pydantic import BaseModel, Field
 
 from openhands.sdk.agent import Agent
@@ -11,30 +13,10 @@ from openhands.sdk.settings import (
     VerificationSettings,
     field_meta,
 )
+from openhands_cli.locations import PROGRAMMATIC_SETTINGS_PATH
 from openhands_cli.stores.agent_store import AgentStore
-from openhands_cli.stores.cli_settings import (
-    DEFAULT_ISSUE_THRESHOLD,
-    CliSettings,
-    CriticSettings as StoredCriticSettings,
-)
+from openhands_cli.stores.cli_settings import CliSettings
 from openhands_cli.utils import get_default_cli_agent
-
-
-class CliVerificationSettings(VerificationSettings):
-    issue_threshold: float = Field(
-        default=DEFAULT_ISSUE_THRESHOLD,
-        ge=0.0,
-        le=1.0,
-        description=(
-            "Trigger iterative refinement when any individual critic issue exceeds "
-            "this threshold."
-        ),
-        json_schema_extra=field_meta(
-            SettingProminence.MINOR,
-            label="Issue threshold",
-            depends_on=("critic_enabled", "enable_iterative_refinement"),
-        ),
-    )
 
 
 class CliInterfaceSettings(BaseModel):
@@ -57,8 +39,8 @@ class CliInterfaceSettings(BaseModel):
 
 
 class CliProgrammaticSettings(AgentSettings):
-    verification: CliVerificationSettings = Field(  # pyright: ignore[reportIncompatibleVariableOverride]
-        default_factory=CliVerificationSettings,
+    verification: VerificationSettings = Field(  # pyright: ignore[reportIncompatibleVariableOverride]
+        default_factory=VerificationSettings,
         description="Verification settings for the CLI agent.",
         json_schema_extra=AgentSettings.model_fields["verification"].json_schema_extra,
     )
@@ -85,21 +67,15 @@ class CliProgrammaticSettings(AgentSettings):
             if agent_settings is not None
             else {}
         )
-        verification = dict(base.get("verification", {}))
-        verification.update(
-            {
-                "critic_enabled": cli_settings.critic.enable_critic,
-                "enable_iterative_refinement": (
-                    cli_settings.critic.enable_iterative_refinement
-                ),
-                "critic_threshold": cli_settings.critic.critic_threshold,
-                "max_refinement_iterations": (
-                    cli_settings.critic.max_refinement_iterations
-                ),
-                "issue_threshold": cli_settings.critic.issue_threshold,
-            }
-        )
-        base["verification"] = verification
+
+        legacy_critic = cli_settings.critic
+        if legacy_critic is not None:
+            verification = dict(base.get("verification", {}))
+            verification.update(
+                legacy_critic.model_dump(mode="python", exclude_unset=True)
+            )
+            base["verification"] = verification
+
         base["cli"] = {
             "default_cells_expanded": cli_settings.default_cells_expanded,
             "auto_open_plan_panel": cli_settings.auto_open_plan_panel,
@@ -109,10 +85,12 @@ class CliProgrammaticSettings(AgentSettings):
     @classmethod
     def load(cls, agent_store: AgentStore | None = None) -> CliProgrammaticSettings:
         agent_store = agent_store or AgentStore()
-        agent = agent_store.load_from_disk()
-        agent_settings = (
-            _agent_settings_from_agent(agent) if agent is not None else None
-        )
+        agent_settings = _load_agent_settings_snapshot(agent_store)
+        if agent_settings is None:
+            agent = agent_store.load_from_disk()
+            agent_settings = (
+                _agent_settings_from_agent(agent) if agent is not None else None
+            )
         return cls.from_sources(
             agent_settings=agent_settings,
             cli_settings=CliSettings.load(),
@@ -125,23 +103,42 @@ class CliProgrammaticSettings(AgentSettings):
         agent_settings = AgentSettings.model_validate(
             self.model_dump(
                 mode="python",
-                exclude={"cli": True, "verification": {"issue_threshold"}},
+                exclude={"cli": True},
             )
         )
+        _save_agent_settings_snapshot(agent_store, agent_settings)
+
         agent = _update_agent_from_settings(agent_settings, existing_agent)
         agent_store.save(agent)
 
         CliSettings(
             default_cells_expanded=self.cli.default_cells_expanded,
             auto_open_plan_panel=self.cli.auto_open_plan_panel,
-            critic=StoredCriticSettings(
-                enable_critic=self.verification.critic_enabled,
-                enable_iterative_refinement=self.verification.enable_iterative_refinement,
-                critic_threshold=self.verification.critic_threshold,
-                issue_threshold=self.verification.issue_threshold,
-                max_refinement_iterations=self.verification.max_refinement_iterations,
-            ),
         ).save()
+
+
+def _load_agent_settings_snapshot(
+    agent_store: AgentStore,
+) -> AgentSettings | None:
+    try:
+        raw = agent_store.file_store.read(PROGRAMMATIC_SETTINGS_PATH)
+    except FileNotFoundError:
+        return None
+
+    try:
+        return AgentSettings.model_validate(json.loads(raw))
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
+def _save_agent_settings_snapshot(
+    agent_store: AgentStore,
+    settings: AgentSettings,
+) -> None:
+    agent_store.file_store.write(
+        PROGRAMMATIC_SETTINGS_PATH,
+        settings.model_dump_json(context={"expose_secrets": True}),
+    )
 
 
 def _agent_settings_from_agent(agent: Agent) -> AgentSettings:
@@ -159,11 +156,44 @@ def _agent_settings_from_agent(agent: Agent) -> AgentSettings:
         "tools": agent.tools,
         "mcp_config": agent.mcp_config or None,
         "condenser": condenser,
+        "verification": _verification_from_agent(agent),
     }
     if agent.agent_context is not None:
         data["agent_context"] = agent.agent_context
 
     return AgentSettings.model_validate(data)
+
+
+def _verification_from_agent(agent: Agent) -> VerificationSettings:
+    critic = agent.critic
+    if critic is None:
+        return VerificationSettings(critic_enabled=False)
+
+    data: dict[str, object] = {
+        "critic_enabled": True,
+        "critic_mode": critic.mode,
+    }
+
+    iterative_refinement = critic.iterative_refinement
+    if iterative_refinement is not None:
+        data.update(
+            {
+                "enable_iterative_refinement": True,
+                "critic_threshold": iterative_refinement.success_threshold,
+                "issue_threshold": iterative_refinement.issue_threshold,
+                "max_refinement_iterations": iterative_refinement.max_iterations,
+            }
+        )
+
+    server_url = getattr(critic, "server_url", None)
+    if isinstance(server_url, str):
+        data["critic_server_url"] = server_url
+
+    model_name = getattr(critic, "model_name", None)
+    if isinstance(model_name, str):
+        data["critic_model_name"] = model_name
+
+    return VerificationSettings.model_validate(data)
 
 
 def _update_agent_from_settings(

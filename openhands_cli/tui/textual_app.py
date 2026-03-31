@@ -60,7 +60,7 @@ from openhands_cli.conversations.store.local import LocalFileStore
 from openhands_cli.locations import get_conversations_dir, get_work_dir
 from openhands_cli.stores import (
     AgentStore,
-    CliSettings,
+    CliProgrammaticSettings,
     MissingEnvironmentVariablesError,
 )
 from openhands_cli.theme import OPENHANDS_THEME
@@ -151,13 +151,12 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         """
         super().__init__(**kwargs)
 
-        # Load CLI settings for initial critic settings
-        cli_settings = CliSettings.load()
+        programmatic_settings = CliProgrammaticSettings.load()
 
         # ConversationContainer holds reactive state for UI binding
         self.conversation_state = ConversationContainer(
             initial_confirmation_policy=initial_confirmation_policy or AlwaysConfirm(),
-            initial_critic_settings=cli_settings.critic,
+            initial_critic_settings=programmatic_settings.verification,
         )
 
         # Store exit confirmation setting
