@@ -842,9 +842,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         # UserRejectObservation needs dynamic title based on rejection_source
         if isinstance(event, UserRejectObservation):
-            return self._create_titled_collapsible(
-                event, _get_rejection_title(event)
-            )
+            return self._create_titled_collapsible(event, _get_rejection_title(event))
 
         fallback_titles: list[tuple[type[Event], str]] = [
             (ObservationEvent, "Observation"),

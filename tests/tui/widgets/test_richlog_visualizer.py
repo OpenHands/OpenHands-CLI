@@ -1279,7 +1279,7 @@ class TestHookRejectionDetection:
         assert _is_hook_rejection(event) is False
 
     def test_is_hook_rejection_with_default_source(self):
-        """Test _is_hook_rejection returns False when rejection_source defaults to 'user'."""
+        """Test _is_hook_rejection returns False with default source."""
         from openhands.sdk.event import UserRejectObservation
         from openhands_cli.tui.widgets.richlog_visualizer import _is_hook_rejection
 

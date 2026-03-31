@@ -33,7 +33,7 @@ class TestACPHookRejectionDetection:
         assert _is_hook_rejection(event) is False
 
     def test_is_hook_rejection_with_default_source(self):
-        """Test _is_hook_rejection returns False when rejection_source defaults to 'user'."""
+        """Test _is_hook_rejection returns False with default source."""
         event = UserRejectObservation(
             action_id="test_action_id",
             tool_name="terminal",
