@@ -1,5 +1,6 @@
 import json
 import os
+from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import patch
 
@@ -22,20 +23,20 @@ class TestCriticSettingsValidation:
         assert settings.max_refinement_iterations == 5
 
     @pytest.mark.parametrize(
-        "kwargs",
+        "factory",
         [
-            {"critic_threshold": 1.5},
-            {"critic_threshold": -0.1},
-            {"issue_threshold": 5.0},
-            {"issue_threshold": -0.5},
-            {"max_refinement_iterations": 0},
+            lambda: CriticSettings(critic_threshold=1.5),
+            lambda: CriticSettings(critic_threshold=-0.1),
+            lambda: CriticSettings(issue_threshold=5.0),
+            lambda: CriticSettings(issue_threshold=-0.5),
+            lambda: CriticSettings(max_refinement_iterations=0),
         ],
     )
     def test_invalid_verification_values_raise(
-        self, kwargs: dict[str, float | int]
+        self, factory: Callable[[], CriticSettings]
     ) -> None:
         with pytest.raises(ValidationError):
-            CriticSettings(**kwargs)
+            factory()
 
 
 class TestCliSettings:
