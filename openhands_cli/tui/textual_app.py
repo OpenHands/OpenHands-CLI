@@ -133,7 +133,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
         **kwargs,
-    ):
+    ) -> None:
         """Initialize the app with custom OpenHands theme.
 
         Args:

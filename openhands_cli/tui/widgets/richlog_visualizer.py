@@ -99,7 +99,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         container: "VerticalScroll",
         app: "OpenHandsApp",
         name: str | None = None,
-    ):
+    ) -> None:
         """Initialize the visualizer.
 
         Args:
