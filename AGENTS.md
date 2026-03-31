@@ -99,6 +99,8 @@ uv run pytest tests/snapshots/ --snapshot-update
 ### Snapshot Test Location
 - **Test files**: `tests/snapshots/test_app_snapshots.py`, `tests/snapshots/test_visualizer_snapshots.py`
 - **Generated snapshots**: `tests/snapshots/__snapshots__/test_app_snapshots/*.svg`, `tests/snapshots/__snapshots__/test_visualizer_snapshots/*.svg`
+- `tests/tui/widgets/test_richlog_visualizer.py` is the primary unit test suite for `richlog_visualizer.py`; for maintainability refactors there, prefer targeted unit coverage in that file plus snapshot tests only when rendered output changes visually.
+
 
 ### Writing Snapshot Tests
 Snapshot tests must be **synchronous** (not async). The `snap_compare` fixture handles async internally:

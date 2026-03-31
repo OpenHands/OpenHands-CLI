@@ -97,7 +97,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         initial_confirmation_mode: ConfirmationMode,
         resume_conversation_id: str | None = None,
         cloud_api_url: str = "https://app.all-hands.dev",
-    ):
+    ) -> None:
         """Initialize the base ACP agent.
 
         Args:
