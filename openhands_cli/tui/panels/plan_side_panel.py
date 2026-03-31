@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 from rich.markup import escape
+from textual.app import ComposeResult
 from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Button, Static
 
@@ -82,7 +83,7 @@ class PlanSidePanel(VerticalScroll):
             content_area.mount(self)
             self.refresh_from_disk()
 
-    def compose(self):
+    def compose(self) -> ComposeResult:
         """Compose the Plan side panel content."""
         with Horizontal(classes="plan-header-row"):
             yield Static("Agent Plan", classes="plan-header")
@@ -114,8 +115,8 @@ class PlanSidePanel(VerticalScroll):
             logger.warning("Failed to load tasks from %s: %s", tasks_file, e)
             return None
 
-    def _refresh_content(self):
-        """Refresh the plan content display."""
+    def _refresh_content(self) -> None:
+        """Refresh the display of the plan content."""
         content_widget = self.query_one("#plan-content", Static)
 
         if not self._task_list:

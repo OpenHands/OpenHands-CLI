@@ -28,11 +28,14 @@ from acp.schema import (
     AuthenticateResponse,
     AuthMethod,
     AvailableCommandsUpdate,
+    ForkSessionResponse,
     Implementation,
     ListSessionsResponse,
     LoadSessionResponse,
     McpCapabilities,
     PromptCapabilities,
+    ResumeSessionResponse,
+    SetSessionConfigOptionResponse,
     SetSessionModelResponse,
     SetSessionModeResponse,
     TextContentBlock,
@@ -94,7 +97,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         initial_confirmation_mode: ConfirmationMode,
         resume_conversation_id: str | None = None,
         cloud_api_url: str = "https://app.all-hands.dev",
-    ):
+    ) -> None:
         """Initialize the base ACP agent.
 
         Args:
@@ -335,6 +338,36 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         logger.info(f"Set session model requested: {session_id}")
         return SetSessionModelResponse()
 
+    async def set_config_option(
+        self,
+        config_id: str,  # noqa: ARG002
+        session_id: str,  # noqa: ARG002
+        value: str,  # noqa: ARG002
+        **_kwargs: Any,
+    ) -> SetSessionConfigOptionResponse | None:
+        """Set config option (not supported)."""
+        return None
+
+    async def fork_session(
+        self,
+        cwd: str,  # noqa: ARG002
+        session_id: str,  # noqa: ARG002
+        mcp_servers: list[Any] | None = None,  # noqa: ARG002
+        **_kwargs: Any,
+    ) -> ForkSessionResponse:
+        """Fork a session (not supported)."""
+        raise RequestError.method_not_found("session/fork")
+
+    async def resume_session(
+        self,
+        cwd: str,  # noqa: ARG002
+        session_id: str,  # noqa: ARG002
+        mcp_servers: list[Any] | None = None,  # noqa: ARG002
+        **_kwargs: Any,
+    ) -> ResumeSessionResponse:
+        """Resume a session (not supported)."""
+        raise RequestError.method_not_found("session/resume")
+
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         """Extension method (not supported)."""
         logger.info(f"Extension method '{method}' requested with params: {params}")
@@ -397,7 +430,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
     async def new_session(
         self,
         cwd: str,  # noqa: ARG002
-        mcp_servers: list[Any],
+        mcp_servers: list[Any] | None = None,
         working_dir: str | None = None,
         **_kwargs: Any,
     ) -> NewSessionResponse:
@@ -435,8 +468,6 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
 
             logger.info(f"Created new {self.agent_type} session {session_id}")
 
-            await self.send_available_commands(session_id)
-
             current_mode = get_confirmation_mode_from_conversation(conversation)
 
             response = NewSessionResponse(
@@ -452,6 +483,12 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                 subscriber = EventSubscriber(session_id, self._conn)
                 for event in conversation.state.events:
                     await subscriber(event)
+
+            # Schedule available commands notification to be sent after the response.
+            # This ensures the client receives the NewSessionResponse (with sessionId)
+            # before any session/update notifications, per the ACP spec.
+            # Fire-and-forget: notification failure is non-fatal.
+            asyncio.create_task(self.send_available_commands(session_id))
 
             return response
 
@@ -563,8 +600,8 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
     async def load_session(
         self,
         cwd: str,  # noqa: ARG002
-        mcp_servers: list[Any],  # noqa: ARG002
         session_id: str,
+        mcp_servers: list[Any] | None = None,  # noqa: ARG002
         **_kwargs: Any,
     ) -> LoadSessionResponse | None:
         """Load an existing session and replay conversation history.

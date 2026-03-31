@@ -16,7 +16,6 @@ from .helpers import type_text, wait_for_app_ready, wait_for_idle
 class TestCreatingAgentPlan:
     """Test creating an agent plan conversation."""
 
-    @pytest.mark.flaky(reruns=5, reruns_delay=1)
     @pytest.mark.parametrize(
         "mock_llm_with_trajectory", ["creating_agent_plan"], indirect=True
     )
@@ -49,6 +48,13 @@ class TestCreatingAgentPlan:
 
             # Wait for all animations to complete (indicates processing finished)
             await wait_for_idle(pilot)
+
+            # Scroll to end for consistent snapshot position
+            # Use scroll_end directly on the scroll view instead of pilot.press("end")
+            # which may be captured by the focused input widget
+            scroll_view = pilot.app.query_one("#scroll_view")
+            scroll_view.scroll_end(animate=False)
+            await pilot.wait_for_scheduled_animations()
 
         # Use fixed conversation ID from fixture for deterministic snapshots
         app = OpenHandsApp(

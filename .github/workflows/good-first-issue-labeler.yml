@@ -28,6 +28,10 @@ jobs:
 
             - name: Install uv
               uses: astral-sh/setup-uv@v7
+              with:
+                  # Security: this workflow processes untrusted issue text via an agent.
+                  # Disable uv caching to reduce cross-workflow cache poisoning risk.
+                  enable-cache: false
 
             - name: Install dependencies
               run: |

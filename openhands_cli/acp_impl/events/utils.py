@@ -8,6 +8,7 @@ from acp.schema import (
 )
 
 from openhands.sdk import Action, BaseConversation
+from openhands.sdk.llm.utils.metrics import TokenUsage
 from openhands.tools.delegate.definition import DelegateAction
 from openhands.tools.file_editor.definition import (
     FileEditorAction,
@@ -25,7 +26,7 @@ TOOL_KIND_MAPPING: dict[str, ToolKind] = {
 }
 
 
-def _format_status_line(usage, cost: float) -> str:
+def _format_status_line(usage: TokenUsage, cost: float) -> str:
     """Format metrics as a status line string.
 
     Constructs a human-readable status line similar to the SDK's visualizer title,

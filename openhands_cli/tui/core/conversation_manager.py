@@ -31,28 +31,20 @@ from openhands_cli.tui.core.conversation_switch_controller import (
     ConversationSwitchController,
 )
 from openhands_cli.tui.core.events import ConfirmationDecision, ShowConfirmationPanel
+from openhands_cli.tui.core.refinement_controller import RefinementController
 from openhands_cli.tui.core.runner_factory import RunnerFactory
 from openhands_cli.tui.core.runner_registry import RunnerRegistry
 from openhands_cli.tui.core.user_message_controller import UserMessageController
-from openhands_cli.tui.messages import UserInputSubmitted
+from openhands_cli.tui.messages import (
+    CriticResultReceived,
+    SendMessage,
+    SendRefinementMessage,
+)
 
 
 if TYPE_CHECKING:
     from openhands_cli.tui.core.conversation_runner import ConversationRunner
     from openhands_cli.tui.core.state import ConversationContainer
-
-
-# ============================================================================
-# Messages - Components post these to ConversationManager
-# ============================================================================
-
-
-class SendMessage(Message):
-    """Request to send a user message to the current conversation."""
-
-    def __init__(self, content: str) -> None:
-        super().__init__()
-        self.content = content
 
 
 class CreateConversation(Message):
@@ -116,6 +108,7 @@ class ConversationManager(Container):
     - ConversationSwitchController: switching + switch-confirmation orchestration
     - UserMessageController: rendering + message send/queue behavior
     - ConfirmationPolicyService + ConfirmationFlowController: policy + resume flows
+    - RefinementController: iterative refinement based on critic results
     """
 
     def __init__(
@@ -148,6 +141,12 @@ class ConversationManager(Container):
         self._policy_service = ConfirmationPolicyService(
             state=self._state,
             runners=self._runners,
+        )
+
+        self._refinement_controller = RefinementController(
+            state=self._state,
+            runners=self._runners,
+            post_message=self.post_message,
         )
 
         self._message_controller = UserMessageController(
@@ -191,17 +190,37 @@ class ConversationManager(Container):
 
     # ---- Message Handlers ----
 
-    @on(UserInputSubmitted)
-    async def _on_user_input_submitted(self, event: UserInputSubmitted) -> None:
-        """Handle UserInputSubmitted from InputField."""
-        event.stop()
-        await self._message_controller.handle_user_message(event.content)
-
     @on(SendMessage)
     async def _on_send_message(self, event: SendMessage) -> None:
-        """Handle SendMessage posted directly to ConversationManager."""
+        """Handle SendMessage - the primary entry point for user messages.
+
+        This handler:
+        1. Resets the refinement iteration counter (new user turn)
+        2. Delegates to UserMessageController for rendering and processing
+        """
         event.stop()
+        self._refinement_controller.reset_iteration()
         await self._message_controller.handle_user_message(event.content)
+
+    @on(SendRefinementMessage)
+    async def _on_send_refinement_message(self, event: SendRefinementMessage) -> None:
+        """Handle SendRefinementMessage for iterative refinement.
+
+        Unlike SendMessage, this uses render_refinement_message which
+        preserves the iteration counter for proper refinement tracking.
+        """
+        event.stop()
+        await self._message_controller.handle_refinement_message(event.content)
+
+    @on(CriticResultReceived)
+    def _on_critic_result_received(self, event: CriticResultReceived) -> None:
+        """Handle CriticResultReceived from visualizer.
+
+        Routes critic results to RefinementController for evaluation and
+        potential triggering of iterative refinement.
+        """
+        event.stop()
+        self._refinement_controller.handle_critic_result(event.critic_result)
 
     @on(CreateConversation)
     def _on_create_conversation(self, event: CreateConversation) -> None:

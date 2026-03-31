@@ -60,7 +60,7 @@ class EventSubscriber:
         self.conversation = conversation
         self.shared_events_handler = SharedEventHandler()
 
-    async def __call__(self, event: Event):
+    async def __call__(self, event: Event) -> None:
         """Handle incoming events and convert them to ACP notifications.
 
         Args:
@@ -92,7 +92,7 @@ class EventSubscriber:
         elif isinstance(event, CondensationRequest):
             await self.shared_events_handler.handle_condensation_request(self, event)
 
-    async def _handle_action_event(self, event: ActionEvent):
+    async def _handle_action_event(self, event: ActionEvent) -> None:
         """Handle ActionEvent: send thought as agent_message_chunk, then tool_call.
 
         Args:
@@ -125,7 +125,7 @@ class EventSubscriber:
         except Exception as e:
             logger.debug(f"Error processing ActionEvent: {e}", exc_info=True)
 
-    async def _handle_message_event(self, event: MessageEvent):
+    async def _handle_message_event(self, event: MessageEvent) -> None:
         """Handle MessageEvent by sending AgentMessageChunk or UserMessageChunk.
 
         Args:

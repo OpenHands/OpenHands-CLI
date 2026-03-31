@@ -56,13 +56,9 @@ def _event_visualize_to_plain(event: Event) -> str:
 
 
 def _is_hook_rejection(event: UserRejectObservation | AgentErrorEvent) -> bool:
-    """Check if a rejection event originated from a hook.
-
-    Uses the rejection_source field when available (SDK >= X.Y.Z),
-    otherwise returns False for backwards compatibility.
-    """
+    """Check if a rejection event originated from a hook."""
     if isinstance(event, UserRejectObservation):
-        return getattr(event, "rejection_source", "user") == "hook"
+        return event.rejection_source == "hook"
     return False
 
 
@@ -75,7 +71,7 @@ class _ACPContext(Protocol):
 class SharedEventHandler:
     """Shared event-to-ACP behavior used by multiple subscribers."""
 
-    def _meta(self, ctx: _ACPContext):
+    def _meta(self, ctx: _ACPContext) -> dict[str, dict[str, int | float | str]] | None:
         return get_metadata(ctx.conversation)
 
     async def send_thought(self, ctx: _ACPContext, text: str) -> None:
@@ -177,7 +173,7 @@ class SharedEventHandler:
             raw_output=event.model_dump(),
         )
 
-    async def handle_action_event(self, ctx: _ACPContext, event: ActionEvent):
+    async def handle_action_event(self, ctx: _ACPContext, event: ActionEvent) -> None:
         content = None
         tool_kind = get_tool_kind(tool_name=event.tool_name, action=event.action)
         # Use LLM-generated summary for the title when available

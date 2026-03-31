@@ -45,7 +45,7 @@ class InputAreaContainer(Container):
     that bubble up to ConversationManager, which is an ancestor in the
     widget hierarchy.
 
-    UserInputSubmitted messages from InputField also bubble up to
+    SendMessage messages from InputField also bubble up to
     ConversationManager automatically.
 
     Reactive Properties:
@@ -80,6 +80,8 @@ class InputAreaContainer(Container):
                 self._command_new()
             case "history":
                 self._command_history()
+            case "settings":
+                self._command_settings()
             case "confirm":
                 self._command_confirm()
             case "condense":
@@ -115,6 +117,11 @@ class InputAreaContainer(Container):
 
         app = cast("OpenHandsApp", self.app)
         app.action_toggle_history()
+
+    def _command_settings(self) -> None:
+        """Handle the /settings command to open settings modal."""
+        app = cast("OpenHandsApp", self.app)
+        app.action_open_settings()
 
     def _command_confirm(self) -> None:
         """Handle the /confirm command to show confirmation settings modal."""

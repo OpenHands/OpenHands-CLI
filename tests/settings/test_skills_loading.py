@@ -143,45 +143,47 @@ This is a user microagent for testing.
             assert "user_skill" in skill_names  # user skill
             assert "user_microagent" in skill_names  # user microagent
 
-    def test_load_agent_with_public_skills(self, temp_project_dir, persisted_agent):
-        """Test that loading agent includes public skills from the OpenHands repository.
+    def test_build_agent_context_enables_sdk_managed_skill_loading(
+        self, temp_project_dir
+    ):
+        """Test that AgentStore enables SDK-managed user and public skill loading.
 
-        This test verifies that when an agent is loaded with load_public_skills=True,
-        public skills from https://github.com/OpenHands/skills are loaded.
+        This verifies the CLI-specific contract: AgentStore builds an AgentContext
+        with project skills plus the flags that tell the SDK to auto-load user and
+        public skills.
         """
-        from openhands.sdk.context.skills import Skill
+        from openhands_cli.stores import AgentStore
 
-        # Mock public skills - simulate loading from GitHub repo
-        mock_public_skill = Skill(
-            name="github",
-            content="This is a public skill about GitHub.",
-            trigger=None,
-        )
+        class FakeAgentContext:
+            def __init__(self, **kwargs):
+                self.skills = kwargs["skills"]
+                self.system_message_suffix = kwargs["system_message_suffix"]
+                self.load_user_skills = kwargs["load_user_skills"]
+                self.load_public_skills = kwargs["load_public_skills"]
 
-        with patch(
-            "openhands.sdk.context.agent_context.load_public_skills"
-        ) as mock_load_public:
-            # Mock load_public_skills to return our test skill
-            mock_load_public.return_value = [mock_public_skill]
-
-            from openhands_cli.stores import AgentStore
-
+        with (
+            patch("openhands_cli.stores.agent_store.AgentContext", FakeAgentContext),
+            patch(
+                "openhands_cli.stores.agent_store.get_work_dir",
+                return_value=temp_project_dir,
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_os_description",
+                return_value="TestOS 1.0",
+            ),
+        ):
             agent_store = AgentStore()
+            agent_context = agent_store._build_agent_context()
 
-            # Load agent - this should include public skills
-            loaded_agent = agent_store.load_or_create()
+        assert isinstance(agent_context, FakeAgentContext)
+        assert agent_context.load_user_skills is True
+        assert agent_context.load_public_skills is True
 
-            assert loaded_agent is not None
-            assert loaded_agent.agent_context is not None
-
-            # Verify load_public_skills was called
-            mock_load_public.assert_called_once()
-
-            # Verify that the agent context has load_public_skills enabled
-            # Note: We can't directly check this as it's processed during initialization
-            # But we can verify that our mocked public skill is in the skills list
-            all_skills = loaded_agent.agent_context.skills
-            skill_names = [skill.name for skill in all_skills]
-
-            # Should have project skills + mocked public skill
-            assert "github" in skill_names  # mocked public skill
+        skill_names = [skill.name for skill in agent_context.skills]
+        assert "test_skill" in skill_names
+        assert "test_microagent" in skill_names
+        assert "integration_test" in skill_names
+        assert agent_context.system_message_suffix == (
+            f"Your current working directory is: {temp_project_dir}\n"
+            "User operating system: TestOS 1.0"
+        )
