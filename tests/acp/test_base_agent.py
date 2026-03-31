@@ -2,15 +2,17 @@
 
 import asyncio
 from collections.abc import Mapping
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from acp import RequestError
-from acp.schema import Implementation
+from acp.schema import Implementation, TextContentBlock
 
 from openhands.sdk import BaseConversation
+from openhands.sdk.security.confirmation_policy import AlwaysConfirm
 from openhands_cli.acp_impl.agent.base_agent import BaseOpenHandsACPAgent
 from openhands_cli.acp_impl.agent.util import AgentType
 from openhands_cli.acp_impl.confirmation import ConfirmationMode
@@ -66,6 +68,38 @@ def mock_connection():
 def test_agent(mock_connection):
     """Create a ConcreteTestAgent instance."""
     return ConcreteTestAgent(mock_connection)
+
+
+class RecordingConnection:
+    """Minimal ACP connection that records session updates for assertions."""
+
+    def __init__(self) -> None:
+        self.session_updates: list[dict[str, Any]] = []
+
+    async def session_update(self, **kwargs: Any) -> None:
+        self.session_updates.append(kwargs)
+
+
+@pytest.fixture
+def recording_connection() -> RecordingConnection:
+    """Create a connection that records updates instead of mocking them."""
+    return RecordingConnection()
+
+
+@pytest.fixture
+def recording_agent(recording_connection: RecordingConnection):
+    """Create a ConcreteTestAgent backed by a recording connection."""
+    return ConcreteTestAgent(recording_connection)
+
+
+def make_test_conversation(*events: Any) -> MagicMock:
+    """Create a conversation double with realistic state for base-agent tests."""
+    conversation = MagicMock()
+    conversation.state = SimpleNamespace(
+        events=list(events),
+        confirmation_policy=AlwaysConfirm(),
+    )
+    return conversation
 
 
 class TestInitialize:
@@ -125,72 +159,74 @@ class TestAuthenticate:
         )
 
 
-class TestBaseAgentHelpers:
-    """Tests for the focused helper methods extracted from BaseOpenHandsACPAgent."""
+class TestPrompt:
+    """Tests for prompt handling behavior."""
 
     @pytest.mark.asyncio
-    async def test_send_agent_text_chunk_sends_text_update(self, test_agent):
-        """_send_agent_text_chunk should wrap plain text in an ACP text update."""
+    async def test_prompt_help_command_streams_help_text(self, recording_agent):
+        """Prompting /help should send the rendered help text to the client."""
         session_id = str(uuid4())
+        recording_agent._mock_conversation = make_test_conversation()
 
-        await test_agent._send_agent_text_chunk(session_id, "Hello from helper")
-
-        test_agent._conn.session_update.assert_awaited_once()
-        call_kwargs = test_agent._conn.session_update.await_args.kwargs
-        assert call_kwargs["session_id"] == session_id
-        assert call_kwargs["update"].session_update == "agent_message_chunk"
-        assert call_kwargs["update"].content.text == "Hello from helper"
-
-    @pytest.mark.asyncio
-    async def test_handle_slash_command_help_sends_help_text(self, test_agent):
-        """_handle_slash_command should send a help response to the client."""
-        session_id = str(uuid4())
-
-        response = await test_agent._handle_slash_command(
+        response = await recording_agent.prompt(
             session_id=session_id,
-            command="help",
-            argument="",
+            prompt=[TextContentBlock(type="text", text="/help")],
         )
 
         assert response.stop_reason == "end_turn"
-        call_kwargs = test_agent._conn.session_update.await_args.kwargs
-        assert call_kwargs["session_id"] == session_id
-        assert "Available slash commands" in call_kwargs["update"].content.text
+        assert len(recording_agent._conn.session_updates) == 1
+        update_call = recording_agent._conn.session_updates[0]
+        assert update_call["session_id"] == session_id
+        assert update_call["update"].session_update == "agent_message_chunk"
+        assert "Available slash commands" in update_call["update"].content.text
 
     @pytest.mark.asyncio
-    async def test_run_conversation_task_cleans_up_task_after_error(self, test_agent):
-        """_run_conversation_task should always clean up its tracking entry."""
+    async def test_prompt_runner_failure_cleans_up_task_and_streams_error(
+        self, recording_agent
+    ):
+        """Prompt should clear running-task tracking and stream the failure text."""
         session_id = str(uuid4())
-        mock_conversation = MagicMock()
+        mock_conversation = make_test_conversation()
+        recording_agent._mock_conversation = mock_conversation
 
         async def failing_runner(*, conversation, conn, session_id: str):
             assert conversation is mock_conversation
-            assert conn is test_agent._conn
-            assert session_id in test_agent._running_tasks
+            assert conn is recording_agent._conn
+            assert session_id in recording_agent._running_tasks
             raise RuntimeError("runner failed")
 
         with patch(
             "openhands_cli.acp_impl.agent.base_agent.run_conversation_with_confirmation",
             side_effect=failing_runner,
-        ) as mock_runner:
-            with pytest.raises(RuntimeError, match="runner failed"):
-                await test_agent._run_conversation_task(session_id, mock_conversation)
+        ):
+            with pytest.raises(RequestError) as exc_info:
+                await recording_agent.prompt(
+                    session_id=session_id,
+                    prompt=[TextContentBlock(type="text", text="Hello")],
+                )
 
-        mock_runner.assert_awaited_once_with(
-            conversation=mock_conversation,
-            conn=test_agent._conn,
-            session_id=session_id,
-        )
-        assert session_id not in test_agent._running_tasks
+        assert exc_info.value.data is not None
+        assert exc_info.value.data["reason"] == "Failed to process prompt"
+        assert exc_info.value.data["details"] == "runner failed"
+        assert session_id not in recording_agent._running_tasks
+        assert [
+            update["update"].content.text
+            for update in recording_agent._conn.session_updates
+            if update["update"].session_update == "agent_message_chunk"
+        ] == ["Error: runner failed"]
+
+
+class TestLoadSession:
+    """Tests for the load_session method."""
 
     @pytest.mark.asyncio
-    async def test_replay_conversation_events_streams_real_events(self, test_agent):
-        """_replay_conversation_events should stream real agent messages."""
+    async def test_load_session_streams_real_message_events(self, recording_agent):
+        """load_session should replay real message events through EventSubscriber."""
         from openhands.sdk import Message, TextContent
         from openhands.sdk.event.llm_convertible.message import MessageEvent
 
         session_id = str(uuid4())
-        events = [
+        recording_agent._mock_conversation = make_test_conversation(
             MessageEvent(
                 source="agent",
                 llm_message=Message(
@@ -205,23 +241,21 @@ class TestBaseAgentHelpers:
                     content=[TextContent(text="Second reply")],
                 ),
             ),
-        ]
-
-        await test_agent._replay_conversation_events(
-            session_id=session_id,
-            events=events,
-            context="for testing",
         )
 
-        assert test_agent._conn.session_update.await_count == len(events)
-        updates = [
-            call.kwargs["update"]
-            for call in test_agent._conn.session_update.await_args_list
-        ]
-        assert [update.content.text for update in updates] == [
-            "First reply",
-            "Second reply",
-        ]
+        response = await recording_agent.load_session(
+            cwd="/tmp",
+            mcp_servers=[],
+            session_id=session_id,
+        )
+
+        assert response is not None
+        assert response.modes is not None
+        assert [
+            update["update"].content.text
+            for update in recording_agent._conn.session_updates
+            if update["update"].session_update == "agent_message_chunk"
+        ] == ["First reply", "Second reply"]
 
 
 class TestNewSession:
@@ -272,28 +306,41 @@ class TestNewSession:
         assert len(response.modes.available_modes) == 3
 
     @pytest.mark.asyncio
-    async def test_new_session_replays_events_on_resume(self, mock_connection):
+    async def test_new_session_replays_events_on_resume(self, recording_connection):
         """Test new_session replays historic events when resuming."""
+        from openhands.sdk import Message, TextContent
+        from openhands.sdk.event.llm_convertible.message import MessageEvent
+
         resume_id = str(uuid4())
-        agent = ConcreteTestAgent(mock_connection, resume_conversation_id=resume_id)
+        agent = ConcreteTestAgent(
+            recording_connection,
+            resume_conversation_id=resume_id,
+        )
+        agent._mock_conversation = make_test_conversation(
+            MessageEvent(
+                source="agent",
+                llm_message=Message(
+                    role="assistant",
+                    content=[TextContent(text="First reply")],
+                ),
+            ),
+            MessageEvent(
+                source="agent",
+                llm_message=Message(
+                    role="assistant",
+                    content=[TextContent(text="Second reply")],
+                ),
+            ),
+        )
 
-        # Create mock events
-        mock_event1 = MagicMock()
-        mock_event2 = MagicMock()
-        mock_conversation = MagicMock()
-        mock_conversation.state.events = [mock_event1, mock_event2]
-        agent._mock_conversation = mock_conversation
+        response = await agent.new_session(cwd="/tmp", mcp_servers=[])
 
-        with patch(
-            "openhands_cli.acp_impl.agent.base_agent.EventSubscriber"
-        ) as mock_subscriber_class:
-            mock_subscriber = AsyncMock()
-            mock_subscriber_class.return_value = mock_subscriber
-
-            await agent.new_session(cwd="/tmp", mcp_servers=[])
-
-            # Verify events were replayed
-            assert mock_subscriber.call_count == 2
+        assert response.session_id == resume_id
+        assert [
+            update["update"].content.text
+            for update in recording_connection.session_updates
+            if update["update"].session_update == "agent_message_chunk"
+        ] == ["First reply", "Second reply"]
 
     @pytest.mark.asyncio
     async def test_new_session_handles_missing_agent_spec(self, mock_connection):

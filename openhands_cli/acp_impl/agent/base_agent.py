@@ -243,25 +243,6 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                 {"reason": "Invalid session ID format", "sessionId": session_id}
             ) from exc
 
-    @staticmethod
-    def _build_load_session_response(
-        conversation: BaseConversation,
-    ) -> LoadSessionResponse:
-        """Build a load-session response using the conversation's current mode."""
-        current_mode = get_confirmation_mode_from_conversation(conversation)
-        return LoadSessionResponse(modes=get_session_mode_state(current_mode))
-
-    @staticmethod
-    def _build_new_session_response(
-        session_id: str, conversation: BaseConversation
-    ) -> NewSessionResponse:
-        """Build a new-session response using the conversation's current mode."""
-        current_mode = get_confirmation_mode_from_conversation(conversation)
-        return NewSessionResponse(
-            session_id=session_id,
-            modes=get_session_mode_state(current_mode),
-        )
-
     async def _replay_conversation_events(
         self, session_id: str, events: Sequence[Event], context: str
     ) -> None:
@@ -284,25 +265,17 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             ),
         )
 
-    async def _get_slash_command_response(
-        self, session_id: str, command: str, argument: str
-    ) -> str:
-        """Execute a slash command and return its text response."""
-        if command == "help":
-            return create_help_text()
-        if command == "confirm":
-            return await self._cmd_confirm(session_id, argument)
-        return get_unknown_command_text(command)
-
     async def _handle_slash_command(
         self, session_id: str, command: str, argument: str
     ) -> PromptResponse:
         """Execute a slash command and send its response back to the client."""
-        response_text = await self._get_slash_command_response(
-            session_id=session_id,
-            command=command,
-            argument=argument,
-        )
+        if command == "help":
+            response_text = create_help_text()
+        elif command == "confirm":
+            response_text = await self._cmd_confirm(session_id, argument)
+        else:
+            response_text = get_unknown_command_text(command)
+
         await self._send_agent_text_chunk(session_id=session_id, text=response_text)
         return PromptResponse(stop_reason="end_turn")
 
@@ -563,7 +536,11 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             )
 
             logger.info(f"Created new {self.agent_type} session {session_id}")
-            response = self._build_new_session_response(session_id, conversation)
+            current_mode = get_confirmation_mode_from_conversation(conversation)
+            response = NewSessionResponse(
+                session_id=session_id,
+                modes=get_session_mode_state(current_mode),
+            )
 
             if is_resuming:
                 await self._replay_conversation_events(
@@ -674,11 +651,14 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             conversation = await self._get_or_create_conversation(session_id=session_id)
 
             # Check if there's actually any history to load
+            current_mode = get_confirmation_mode_from_conversation(conversation)
+            response = LoadSessionResponse(modes=get_session_mode_state(current_mode))
+
             if not conversation.state.events:
                 logger.warning(
                     f"Session {session_id} has no history (new or empty session)"
                 )
-                return self._build_load_session_response(conversation)
+                return response
 
             await self._replay_conversation_events(
                 session_id=session_id,
@@ -691,7 +671,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             # Send available slash commands to client
             await self.send_available_commands(session_id)
 
-            return self._build_load_session_response(conversation)
+            return response
 
         except RequestError:
             raise
