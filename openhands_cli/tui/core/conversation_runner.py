@@ -54,7 +54,7 @@ class ConversationRunner:
         *,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
-    ):
+    ) -> None:
         """Initialize the conversation runner.
 
         Args:
