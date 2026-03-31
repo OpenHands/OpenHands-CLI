@@ -10,22 +10,39 @@ from textual.containers import VerticalScroll
 from textual.widgets import Static
 from textual_autocomplete import DropdownItem
 
+from openhands_cli.shared.settings_commands import get_programmatic_setting_fields
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.content.resources import LoadedResourcesInfo
 
 
-# Available commands with descriptions after the command
-COMMANDS = [
-    DropdownItem(main="/help - Display available commands"),
-    DropdownItem(main="/new - Start a new conversation"),
-    DropdownItem(main="/history - Toggle conversation history"),
-    DropdownItem(main="/settings - Open settings"),
-    DropdownItem(main="/confirm - Configure confirmation settings"),
-    DropdownItem(main="/condense - Condense conversation history"),
-    DropdownItem(main="/skills - View loaded skills, hooks, and MCPs"),
-    DropdownItem(main="/feedback - Send anonymous feedback about CLI"),
-    DropdownItem(main="/exit - Exit the application"),
+STATIC_COMMANDS = [
+    ("help", "Display available commands"),
+    ("new", "Start a new conversation"),
+    ("history", "Toggle conversation history"),
+    ("settings", "Open settings"),
+    ("confirm", "Configure confirmation settings"),
+    ("condense", "Condense conversation history"),
+    ("skills", "View loaded skills, hooks, and MCPs"),
+    ("feedback", "Send anonymous feedback about CLI"),
+    ("exit", "Exit the application"),
 ]
+
+
+def _build_commands() -> list[DropdownItem]:
+    commands = [
+        DropdownItem(main=f"/{command} - {description}")
+        for command, description in STATIC_COMMANDS
+    ]
+    for field in get_programmatic_setting_fields():
+        if field.slash_command is None:
+            continue
+        commands.append(
+            DropdownItem(main=f"/{field.slash_command} - Update {field.label.lower()}")
+        )
+    return commands
+
+
+COMMANDS = _build_commands()
 
 
 def get_valid_commands() -> set[str]:
@@ -59,33 +76,26 @@ def is_valid_command(user_input: str) -> bool:
 
 
 def show_help(scroll_view: VerticalScroll) -> None:
-    """Display help information in the scrollable content area.
-
-    Args:
-        scroll_view: The VerticalScroll widget to mount help content to
-    """
+    """Display help information in the scrollable content area."""
     primary = OPENHANDS_THEME.primary
     secondary = OPENHANDS_THEME.secondary
 
-    help_text = f"""
-[bold {primary}]OpenHands CLI Help[/bold {primary}]
-[dim]Available commands:[/dim]
-
-  [{secondary}]/help[/{secondary}] - Display available commands
-  [{secondary}]/new[/{secondary}] - Start a new conversation
-  [{secondary}]/history[/{secondary}] - Toggle conversation history
-  [{secondary}]/settings[/{secondary}] - Open settings
-  [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
-  [{secondary}]/condense[/{secondary}] - Condense conversation history
-  [{secondary}]/skills[/{secondary}] - View loaded skills, hooks, and MCPs
-  [{secondary}]/feedback[/{secondary}] - Send anonymous feedback about CLI
-  [{secondary}]/exit[/{secondary}] - Exit the application
-
-[dim]Tips:[/dim]
-  • Type / and press Tab to see command suggestions
-  • Use arrow keys to navigate through suggestions
-  • Press Enter to select a command
-"""
+    command_lines = []
+    for command in COMMANDS:
+        command_text = str(command.main)
+        command_name, command_description = command_text.split(" - ", 1)
+        command_lines.append(
+            f"  [{secondary}]{command_name}[/{secondary}] - {command_description}"
+        )
+    help_text = (
+        f"\n[bold {primary}]OpenHands CLI Help[/bold {primary}]\n"
+        f"[dim]Available commands:[/dim]\n\n"
+        + "\n".join(command_lines)
+        + "\n\n[dim]Tips:[/dim]\n"
+        "  • Type / and press Tab to see command suggestions\n"
+        "  • Use arrow keys to navigate through suggestions\n"
+        "  • Press Enter to select a command\n"
+    )
     help_widget = Static(help_text, classes="help-message")
     scroll_view.mount(help_widget)
 

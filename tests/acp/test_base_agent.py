@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import pytest
 from acp import RequestError
-from acp.schema import Implementation
+from acp.schema import Implementation, LoadSessionResponse
 
 from openhands.sdk import BaseConversation
 from openhands_cli.acp_impl.agent.base_agent import BaseOpenHandsACPAgent
@@ -160,8 +160,8 @@ class TestNewSession:
         assert response.session_id != resume_id
 
     @pytest.mark.asyncio
-    async def test_new_session_returns_modes(self, test_agent):
-        """Test new_session returns session modes in response."""
+    async def test_new_session_returns_modes_and_config_options(self, test_agent):
+        """Test new_session returns session modes and schema-driven config options."""
         mock_conversation = MagicMock()
         mock_conversation.state.events = []
         test_agent._mock_conversation = mock_conversation
@@ -171,6 +171,15 @@ class TestNewSession:
         assert response.modes is not None
         assert response.modes.available_modes is not None
         assert len(response.modes.available_modes) == 3
+        assert response.config_options is not None
+        config_options = {
+            option.model_dump()["id"]: option.model_dump()
+            for option in response.config_options
+        }
+        assert "condenser.enabled" in config_options
+        assert config_options["condenser.enabled"]["description"] is not None
+        assert config_options["condenser.enabled"]["category"] == "Condenser"
+        assert "llm.model" not in config_options
 
     @pytest.mark.asyncio
     async def test_new_session_replays_events_on_resume(self, mock_connection):
@@ -251,6 +260,71 @@ class TestSetSessionMode:
 
         assert exc_info.value.data is not None
         assert "Invalid mode ID" in exc_info.value.data.get("reason", "")
+
+
+class TestSetConfigOption:
+    """Tests for schema-driven config option updates."""
+
+    @pytest.mark.asyncio
+    async def test_set_config_option_routes_to_programmatic_settings(self, test_agent):
+        """Test set_config_option uses SDK-driven field metadata to update settings."""
+        with (
+            patch(
+                "openhands_cli.acp_impl.agent.base_agent.handle_programmatic_setting_command",
+                return_value="updated",
+            ) as mock_handle,
+            patch.object(test_agent, "_get_session_config_options", return_value=[]),
+        ):
+            response = await test_agent.set_config_option(
+                config_id="condenser.enabled",
+                session_id=str(uuid4()),
+                value="false",
+            )
+
+        mock_handle.assert_called_once_with("condenser", "false")
+        assert response is not None
+        assert response.config_options == []
+
+
+class TestResumeAndForkSession:
+    """Tests for additional ACP session lifecycle methods."""
+
+    @pytest.mark.asyncio
+    async def test_resume_session_delegates_to_load_session(self, test_agent):
+        """Test resume_session reuses load_session state replay behavior."""
+        load_response = LoadSessionResponse(config_options=[])
+        session_id = str(uuid4())
+
+        with patch.object(
+            test_agent,
+            "load_session",
+            new=AsyncMock(return_value=load_response),
+        ) as mock_load_session:
+            response = await test_agent.resume_session(
+                cwd="/tmp",
+                session_id=session_id,
+                mcp_servers=[],
+            )
+
+        mock_load_session.assert_awaited_once_with(
+            cwd="/tmp",
+            session_id=session_id,
+            mcp_servers=[],
+        )
+        assert response.config_options == []
+
+    @pytest.mark.asyncio
+    async def test_fork_session_is_not_supported(self, test_agent):
+        """Test fork_session returns a clear unsupported-method error."""
+        with pytest.raises(RequestError) as exc_info:
+            await test_agent.fork_session(
+                cwd="/tmp",
+                session_id=str(uuid4()),
+                mcp_servers=[],
+            )
+
+        assert exc_info.value.data is not None
+        assert "fork_session is not supported" in exc_info.value.data.get("reason", "")
 
 
 class TestCancel:

@@ -6,7 +6,7 @@ from typing import Any
 from uuid import UUID
 
 from acp import Client, NewSessionResponse, PromptResponse, RequestError
-from acp.schema import LoadSessionResponse
+from acp.schema import HttpMcpServer, LoadSessionResponse, McpServerStdio, SseMcpServer
 
 from openhands.sdk import BaseConversation, Conversation, Event, RemoteConversation
 from openhands.sdk.hooks import HookConfig
@@ -255,7 +255,7 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
     async def new_session(
         self,
         cwd: str,
-        mcp_servers: list[Any] | None = None,
+        mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None,
         working_dir: str | None = None,
         **_kwargs: Any,
     ) -> NewSessionResponse:
@@ -268,7 +268,10 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
             )
 
         return await super().new_session(
-            cwd=cwd, mcp_servers=mcp_servers, working_dir=working_dir, **_kwargs
+            cwd=cwd,
+            mcp_servers=mcp_servers,
+            working_dir=working_dir,
+            **_kwargs,
         )
 
     async def prompt(
@@ -300,7 +303,7 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
         self,
         cwd: str,  # noqa: ARG002
         session_id: str,
-        mcp_servers: list[Any] | None = None,  # noqa: ARG002
+        mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None,  # noqa: ARG002
         **_kwargs: Any,
     ) -> LoadSessionResponse | None:
         """Load an existing session (cloud mode has limited support)."""
@@ -328,7 +331,10 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
                         await subscriber(event)
 
                 current_mode = get_confirmation_mode_from_conversation(conversation)
-                return LoadSessionResponse(modes=get_session_mode_state(current_mode))
+                return LoadSessionResponse(
+                    modes=get_session_mode_state(current_mode),
+                    config_options=self._get_session_config_options(),
+                )
 
             raise RequestError.invalid_params(
                 {

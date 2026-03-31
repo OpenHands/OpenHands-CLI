@@ -15,7 +15,11 @@ from textual.reactive import reactive
 from textual.signal import Signal
 from textual.widgets import TextArea
 
-from openhands_cli.tui.core.commands import COMMANDS, is_valid_command
+from openhands_cli.shared.slash_commands import parse_slash_command
+from openhands_cli.tui.core.commands import (
+    COMMANDS,
+    get_valid_commands,
+)
 from openhands_cli.tui.messages import SendMessage, SlashCommandSubmitted
 from openhands_cli.tui.widgets.user_input.autocomplete_dropdown import (
     AutoCompleteDropdown,
@@ -337,9 +341,14 @@ class InputField(Container):
                 self._clear_current()
                 self.action_toggle_input_mode()
                 # Use the same submission logic as single-line mode
-                if is_valid_command(content):
-                    command = content[1:]  # Remove leading "/"
-                    self.post_message(SlashCommandSubmitted(command=command))
+                slash_command = parse_slash_command(content) if content else None
+                valid_commands = get_valid_commands()
+                if (
+                    slash_command is not None
+                    and f"/{slash_command[0]}" in valid_commands
+                ):
+                    command, args = slash_command
+                    self.post_message(SlashCommandSubmitted(command=command, args=args))
                 else:
                     self.post_message(SendMessage(content=content))
 
@@ -357,10 +366,11 @@ class InputField(Container):
         self._clear_current()
 
         # Check if this is a valid slash command
-        if is_valid_command(content):
-            # Extract command name (without the leading slash)
-            command = content[1:]  # Remove leading "/"
-            self.post_message(SlashCommandSubmitted(command=command))
+        slash_command = parse_slash_command(content) if content else None
+        valid_commands = get_valid_commands()
+        if slash_command is not None and f"/{slash_command[0]}" in valid_commands:
+            command, args = slash_command
+            self.post_message(SlashCommandSubmitted(command=command, args=args))
         else:
             # Regular user input
             self.post_message(SendMessage(content=content))

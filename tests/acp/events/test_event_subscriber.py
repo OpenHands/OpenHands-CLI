@@ -112,7 +112,6 @@ async def test_handle_action_event(event_subscriber, mock_connection):
         update = call_kwargs["update"]
         if isinstance(update, ToolCallStart):
             tool_call_found = True
-            assert update.session_update == "tool_call"
             assert update.tool_call_id == "test-call-123"
             assert update.kind == "execute"  # terminal maps to execute
             assert update.status == "in_progress"
@@ -307,10 +306,10 @@ async def test_handle_task_tracker_observation(event_subscriber, mock_connection
     call_kwargs = mock_connection.session_update.call_args[1]
     assert call_kwargs["session_id"] == "test-session"
     update = call_kwargs["update"]
-
     assert isinstance(update, AgentPlanUpdate)
-    # Verify plan structure
     assert update.session_update == "plan"
+
+    # Verify plan structure
     assert len(update.entries) == 3
 
     # Verify first entry (done -> completed)
@@ -358,6 +357,7 @@ async def test_handle_task_tracker_with_empty_list(event_subscriber, mock_connec
     assert call_kwargs["session_id"] == "test-session"
     update = call_kwargs["update"]
     assert isinstance(update, AgentPlanUpdate)
+    assert update.session_update == "plan"
     assert update.entries == []
 
 
