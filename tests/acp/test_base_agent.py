@@ -158,21 +158,23 @@ class TestBaseAgentHelpers:
         assert "Available slash commands" in call_kwargs["update"].content.text
 
     @pytest.mark.asyncio
-    async def test_run_conversation_task_tracks_and_cleans_up_task(self, test_agent):
-        """_run_conversation_task should register the task while it is running."""
+    async def test_run_conversation_task_cleans_up_task_after_error(self, test_agent):
+        """_run_conversation_task should always clean up its tracking entry."""
         session_id = str(uuid4())
         mock_conversation = MagicMock()
 
-        async def fake_runner(*, conversation, conn, session_id: str):
+        async def failing_runner(*, conversation, conn, session_id: str):
             assert conversation is mock_conversation
             assert conn is test_agent._conn
             assert session_id in test_agent._running_tasks
+            raise RuntimeError("runner failed")
 
         with patch(
             "openhands_cli.acp_impl.agent.base_agent.run_conversation_with_confirmation",
-            side_effect=fake_runner,
+            side_effect=failing_runner,
         ) as mock_runner:
-            await test_agent._run_conversation_task(session_id, mock_conversation)
+            with pytest.raises(RuntimeError, match="runner failed"):
+                await test_agent._run_conversation_task(session_id, mock_conversation)
 
         mock_runner.assert_awaited_once_with(
             conversation=mock_conversation,
@@ -182,27 +184,44 @@ class TestBaseAgentHelpers:
         assert session_id not in test_agent._running_tasks
 
     @pytest.mark.asyncio
-    async def test_replay_conversation_events_replays_each_event(
-        self, test_agent, mock_connection
-    ):
-        """_replay_conversation_events should forward each event via EventSubscriber."""
+    async def test_replay_conversation_events_streams_real_events(self, test_agent):
+        """_replay_conversation_events should stream real agent messages."""
+        from openhands.sdk import Message, TextContent
+        from openhands.sdk.event.llm_convertible.message import MessageEvent
+
         session_id = str(uuid4())
-        events = [MagicMock(), MagicMock()]
+        events = [
+            MessageEvent(
+                source="agent",
+                llm_message=Message(
+                    role="assistant",
+                    content=[TextContent(text="First reply")],
+                ),
+            ),
+            MessageEvent(
+                source="agent",
+                llm_message=Message(
+                    role="assistant",
+                    content=[TextContent(text="Second reply")],
+                ),
+            ),
+        ]
 
-        with patch(
-            "openhands_cli.acp_impl.agent.base_agent.EventSubscriber"
-        ) as mock_subscriber_class:
-            mock_subscriber = AsyncMock()
-            mock_subscriber_class.return_value = mock_subscriber
+        await test_agent._replay_conversation_events(
+            session_id=session_id,
+            events=events,
+            context="for testing",
+        )
 
-            await test_agent._replay_conversation_events(
-                session_id=session_id,
-                events=events,
-                context="for testing",
-            )
-
-        mock_subscriber_class.assert_called_once_with(session_id, mock_connection)
-        assert mock_subscriber.await_count == len(events)
+        assert test_agent._conn.session_update.await_count == len(events)
+        updates = [
+            call.kwargs["update"]
+            for call in test_agent._conn.session_update.await_args_list
+        ]
+        assert [update.content.text for update in updates] == [
+            "First reply",
+            "Second reply",
+        ]
 
 
 class TestNewSession:
