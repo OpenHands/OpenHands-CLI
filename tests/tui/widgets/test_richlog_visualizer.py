@@ -11,7 +11,7 @@ from textual.containers import VerticalScroll
 from textual.widgets import Static
 
 from openhands.sdk import Action, MessageEvent, TextContent
-from openhands.sdk.event import ActionEvent
+from openhands.sdk.event import ActionEvent, AgentErrorEvent, UserRejectObservation
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.llm import MessageToolCall
 from openhands.tools.terminal.definition import TerminalAction
@@ -969,6 +969,96 @@ class TestMessageEventDelegation:
         assert "Child Agent" in markdown_content
         assert "Parent Agent" in markdown_content
         assert "→" in markdown_content
+
+
+class TestRenderingHelpers:
+    """Tests for extracted richlog rendering helpers."""
+
+    @pytest.mark.parametrize(
+        ("role", "expected_prefix"),
+        [
+            ("user", "**Parent Agent → Child Agent:**"),
+            ("assistant", "**Child Agent → Parent Agent:**"),
+        ],
+    )
+    def test_build_delegation_message_formats_sender_and_receiver(
+        self, role: str, expected_prefix: str
+    ):
+        """Delegation helper should keep arrow direction consistent by role."""
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,  # type: ignore[arg-type]
+            name="child_agent",
+        )
+
+        content = visualizer._build_delegation_message(
+            sender="parent_agent",
+            role=role,
+            content="Check the result",
+        )
+
+        assert content.startswith(expected_prefix)
+        assert content.endswith("Check the result")
+
+    def test_create_titled_collapsible_adds_agent_prefix(self, mock_cli_settings):
+        """Shared collapsible helper should apply the delegated agent prefix."""
+        app: OpenHandsApp = cast(OpenHandsApp, App())
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,
+            name="code_reviewer",
+        )
+        event = ConversationErrorEvent(
+            source="agent",
+            code="test_error",
+            detail="Formatter failed",
+        )
+
+        with mock_cli_settings(visualizer=visualizer):
+            collapsible = visualizer._create_titled_collapsible(
+                event, "Conversation Error"
+            )
+
+        assert "(Code Reviewer Agent)" in str(collapsible.title)
+        assert "Conversation Error" in str(collapsible.title)
+
+    @pytest.mark.parametrize(
+        ("event", "expected_title"),
+        [
+            (
+                AgentErrorEvent(
+                    tool_name="terminal",
+                    tool_call_id="call_1",
+                    error="boom",
+                ),
+                "Agent Error",
+            ),
+            (
+                UserRejectObservation(
+                    tool_name="terminal",
+                    tool_call_id="call_2",
+                    action_id="action_2",
+                ),
+                "User Rejected Action",
+            ),
+        ],
+    )
+    def test_create_event_collapsible_uses_shared_fallback_titles(
+        self,
+        visualizer,
+        mock_cli_settings,
+        event,
+        expected_title: str,
+    ):
+        """Shared collapsible routing should preserve fallback titles."""
+        with mock_cli_settings(visualizer=visualizer):
+            collapsible = visualizer._create_event_collapsible(event)
+
+        assert collapsible is not None
+        assert expected_title in str(collapsible.title)
 
 
 class TestAgentMessageEventDisplay:

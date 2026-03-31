@@ -43,7 +43,7 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
         initial_confirmation_mode: ConfirmationMode,
         cloud_api_url: str = "https://app.all-hands.dev",
         resume_conversation_id: str | None = None,
-    ):
+    ) -> None:
         """Initialize the cloud ACP agent.
 
         Args:
