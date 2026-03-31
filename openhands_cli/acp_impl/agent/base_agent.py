@@ -10,7 +10,7 @@ import asyncio
 import logging
 import uuid
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any, cast
 from uuid import UUID
 
@@ -263,7 +263,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         )
 
     async def _replay_conversation_events(
-        self, session_id: str, events: list[Event], context: str
+        self, session_id: str, events: Sequence[Event], context: str
     ) -> None:
         """Replay stored conversation events to the connected ACP client."""
         if not events:
