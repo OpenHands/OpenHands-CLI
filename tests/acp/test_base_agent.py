@@ -125,6 +125,86 @@ class TestAuthenticate:
         )
 
 
+class TestBaseAgentHelpers:
+    """Tests for the focused helper methods extracted from BaseOpenHandsACPAgent."""
+
+    @pytest.mark.asyncio
+    async def test_send_agent_text_chunk_sends_text_update(self, test_agent):
+        """_send_agent_text_chunk should wrap plain text in an ACP text update."""
+        session_id = str(uuid4())
+
+        await test_agent._send_agent_text_chunk(session_id, "Hello from helper")
+
+        test_agent._conn.session_update.assert_awaited_once()
+        call_kwargs = test_agent._conn.session_update.await_args.kwargs
+        assert call_kwargs["session_id"] == session_id
+        assert call_kwargs["update"].session_update == "agent_message_chunk"
+        assert call_kwargs["update"].content.text == "Hello from helper"
+
+    @pytest.mark.asyncio
+    async def test_handle_slash_command_help_sends_help_text(self, test_agent):
+        """_handle_slash_command should send a help response to the client."""
+        session_id = str(uuid4())
+
+        response = await test_agent._handle_slash_command(
+            session_id=session_id,
+            command="help",
+            argument="",
+        )
+
+        assert response.stop_reason == "end_turn"
+        call_kwargs = test_agent._conn.session_update.await_args.kwargs
+        assert call_kwargs["session_id"] == session_id
+        assert "Available slash commands" in call_kwargs["update"].content.text
+
+    @pytest.mark.asyncio
+    async def test_run_conversation_task_tracks_and_cleans_up_task(self, test_agent):
+        """_run_conversation_task should register the task while it is running."""
+        session_id = str(uuid4())
+        mock_conversation = MagicMock()
+
+        async def fake_runner(*, conversation, conn, session_id: str):
+            assert conversation is mock_conversation
+            assert conn is test_agent._conn
+            assert session_id in test_agent._running_tasks
+
+        with patch(
+            "openhands_cli.acp_impl.agent.base_agent.run_conversation_with_confirmation",
+            side_effect=fake_runner,
+        ) as mock_runner:
+            await test_agent._run_conversation_task(session_id, mock_conversation)
+
+        mock_runner.assert_awaited_once_with(
+            conversation=mock_conversation,
+            conn=test_agent._conn,
+            session_id=session_id,
+        )
+        assert session_id not in test_agent._running_tasks
+
+    @pytest.mark.asyncio
+    async def test_replay_conversation_events_replays_each_event(
+        self, test_agent, mock_connection
+    ):
+        """_replay_conversation_events should forward each event via EventSubscriber."""
+        session_id = str(uuid4())
+        events = [MagicMock(), MagicMock()]
+
+        with patch(
+            "openhands_cli.acp_impl.agent.base_agent.EventSubscriber"
+        ) as mock_subscriber_class:
+            mock_subscriber = AsyncMock()
+            mock_subscriber_class.return_value = mock_subscriber
+
+            await test_agent._replay_conversation_events(
+                session_id=session_id,
+                events=events,
+                context="for testing",
+            )
+
+        mock_subscriber_class.assert_called_once_with(session_id, mock_connection)
+        assert mock_subscriber.await_count == len(events)
+
+
 class TestNewSession:
     """Tests for the new_session method."""
 

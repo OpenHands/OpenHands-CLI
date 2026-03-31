@@ -76,6 +76,7 @@ Prefer modern typing syntax (`X | None` over `Optional[X]`) in new code.
 - Pytest discovery: files `test_*.py`, classes `Test*`, functions `test_*`. Use `@pytest.mark.integration` for costly flows.
 - Match test locations to implementation (`tests/` mirrors `openhands_cli/`); add fixtures in `tests/conftest.py` when shared.
 - Run `make test` before PRs; run snapshot/binary tests when relevant to the change.
+- For `openhands_cli/acp_impl/agent/base_agent.py` changes, start with `tests/acp/test_base_agent.py`, then run `tests/acp/test_agent_common.py` to verify shared local/cloud behavior.
 
 ### Binary Tests with Mock LLM
 - Binary tests in `tui_e2e/` can use `mock_llm_server.py` for deterministic testing without real LLM calls.

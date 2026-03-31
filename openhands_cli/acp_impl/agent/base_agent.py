@@ -12,6 +12,7 @@ import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import Any, cast
+from uuid import UUID
 
 from acp import (
     Agent as ACPAgent,
@@ -45,6 +46,7 @@ from openhands.sdk import (
     BaseConversation,
     Message,
 )
+from openhands.sdk.event.base import Event
 from openhands_cli import __version__
 from openhands_cli.acp_impl.agent.util import AgentType, get_session_mode_state
 from openhands_cli.acp_impl.confirmation import ConfirmationMode
@@ -220,6 +222,107 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             await self._set_confirmation_mode(session_id, new_mode)
 
         return response_text
+
+    def _get_new_session_context(self) -> tuple[str, bool]:
+        """Return the next session ID and whether it resumes a conversation."""
+        if self._resume_conversation_id:
+            session_id = self._resume_conversation_id
+            self._resume_conversation_id = None
+            logger.info(f"Resuming conversation: {session_id}")
+            return session_id, True
+
+        return str(uuid.uuid4()), False
+
+    @staticmethod
+    def _validate_session_id(session_id: str) -> None:
+        """Validate that a session ID is a UUID string."""
+        try:
+            UUID(session_id)
+        except ValueError as exc:
+            raise RequestError.invalid_params(
+                {"reason": "Invalid session ID format", "sessionId": session_id}
+            ) from exc
+
+    @staticmethod
+    def _build_load_session_response(
+        conversation: BaseConversation,
+    ) -> LoadSessionResponse:
+        """Build a load-session response using the conversation's current mode."""
+        current_mode = get_confirmation_mode_from_conversation(conversation)
+        return LoadSessionResponse(modes=get_session_mode_state(current_mode))
+
+    @staticmethod
+    def _build_new_session_response(
+        session_id: str, conversation: BaseConversation
+    ) -> NewSessionResponse:
+        """Build a new-session response using the conversation's current mode."""
+        current_mode = get_confirmation_mode_from_conversation(conversation)
+        return NewSessionResponse(
+            session_id=session_id,
+            modes=get_session_mode_state(current_mode),
+        )
+
+    async def _replay_conversation_events(
+        self, session_id: str, events: list[Event], context: str
+    ) -> None:
+        """Replay stored conversation events to the connected ACP client."""
+        if not events:
+            return
+
+        logger.info(f"Replaying {len(events)} historic events {context}")
+        subscriber = EventSubscriber(session_id, self._conn)
+        for event in events:
+            await subscriber(event)
+
+    async def _send_agent_text_chunk(self, session_id: str, text: str) -> None:
+        """Send a text chunk update to the ACP client."""
+        await self._conn.session_update(
+            session_id=session_id,
+            update=AgentMessageChunk(
+                session_update="agent_message_chunk",
+                content=TextContentBlock(type="text", text=text),
+            ),
+        )
+
+    async def _get_slash_command_response(
+        self, session_id: str, command: str, argument: str
+    ) -> str:
+        """Execute a slash command and return its text response."""
+        if command == "help":
+            return create_help_text()
+        if command == "confirm":
+            return await self._cmd_confirm(session_id, argument)
+        return get_unknown_command_text(command)
+
+    async def _handle_slash_command(
+        self, session_id: str, command: str, argument: str
+    ) -> PromptResponse:
+        """Execute a slash command and send its response back to the client."""
+        response_text = await self._get_slash_command_response(
+            session_id=session_id,
+            command=command,
+            argument=argument,
+        )
+        await self._send_agent_text_chunk(session_id=session_id, text=response_text)
+        return PromptResponse(stop_reason="end_turn")
+
+    async def _run_conversation_task(
+        self, session_id: str, conversation: BaseConversation
+    ) -> None:
+        """Run a conversation and track its task for cancellation support."""
+        run_task = asyncio.create_task(
+            run_conversation_with_confirmation(
+                conversation=conversation,
+                conn=self._conn,
+                session_id=session_id,
+            )
+        )
+
+        self._running_tasks[session_id] = run_task
+        try:
+            await run_task
+        finally:
+            self._running_tasks.pop(session_id, None)
 
     async def initialize(
         self,
@@ -449,14 +552,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         if mcp_servers:
             mcp_servers_dict = convert_acp_mcp_servers_to_agent_format(mcp_servers)
 
-        is_resuming = False
-        if self._resume_conversation_id:
-            session_id = self._resume_conversation_id
-            self._resume_conversation_id = None
-            is_resuming = True
-            logger.info(f"Resuming conversation: {session_id}")
-        else:
-            session_id = str(uuid.uuid4())
+        session_id, is_resuming = self._get_new_session_context()
 
         try:
             conversation = await self._get_or_create_conversation(
@@ -467,22 +563,14 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             )
 
             logger.info(f"Created new {self.agent_type} session {session_id}")
+            response = self._build_new_session_response(session_id, conversation)
 
-            current_mode = get_confirmation_mode_from_conversation(conversation)
-
-            response = NewSessionResponse(
-                session_id=session_id,
-                modes=get_session_mode_state(current_mode),
-            )
-
-            if is_resuming and conversation.state.events:
-                logger.info(
-                    f"Replaying {len(conversation.state.events)} historic events "
-                    f"for resumed session {session_id}"
+            if is_resuming:
+                await self._replay_conversation_events(
+                    session_id=session_id,
+                    events=conversation.state.events,
+                    context=f"for resumed session {session_id}",
                 )
-                subscriber = EventSubscriber(session_id, self._conn)
-                for event in conversation.state.events:
-                    await subscriber(event)
 
             # Schedule available commands notification to be sent after the response.
             # This ensures the client receives the NewSessionResponse (with sessionId)
@@ -541,44 +629,19 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             if slash_cmd:
                 command, argument = slash_cmd
                 logger.info(f"Executing slash command: /{command} {argument}")
-
-                # Execute the slash command
-                if command == "help":
-                    response_text = create_help_text()
-                elif command == "confirm":
-                    response_text = await self._cmd_confirm(session_id, argument)
-                else:
-                    response_text = get_unknown_command_text(command)
-
-                # Send response to client
-                await self._conn.session_update(
+                return await self._handle_slash_command(
                     session_id=session_id,
-                    update=AgentMessageChunk(
-                        session_update="agent_message_chunk",
-                        content=TextContentBlock(type="text", text=response_text),
-                    ),
+                    command=command,
+                    argument=argument,
                 )
-
-                return PromptResponse(stop_reason="end_turn")
 
             # Send the message with potentially multiple content types
             message = Message(role="user", content=message_content)
             conversation.send_message(message)
-
-            # Run the conversation with confirmation mode via runner function
-            run_task = asyncio.create_task(
-                run_conversation_with_confirmation(
-                    conversation=conversation,
-                    conn=self._conn,
-                    session_id=session_id,
-                )
+            await self._run_conversation_task(
+                session_id=session_id,
+                conversation=conversation,
             )
-
-            self._running_tasks[session_id] = run_task
-            try:
-                await run_task
-            finally:
-                self._running_tasks.pop(session_id, None)
 
             return PromptResponse(stop_reason="end_turn")
 
@@ -586,13 +649,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             raise
         except Exception as e:
             logger.error(f"Error processing prompt: {e}", exc_info=True)
-            await self._conn.session_update(
-                session_id=session_id,
-                update=AgentMessageChunk(
-                    session_update="agent_message_chunk",
-                    content=TextContentBlock(type="text", text=f"Error: {str(e)}"),
-                ),
-            )
+            await self._send_agent_text_chunk(session_id=session_id, text=f"Error: {e}")
             raise RequestError.internal_error(
                 {"reason": "Failed to process prompt", "details": str(e)}
             )
@@ -608,18 +665,10 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
 
         Default implementation for local agent. Cloud agent should override.
         """
-        from uuid import UUID
-
         logger.info(f"Loading session: {session_id}")
 
         try:
-            # Validate session ID format
-            try:
-                UUID(session_id)
-            except ValueError:
-                raise RequestError.invalid_params(
-                    {"reason": "Invalid session ID format", "sessionId": session_id}
-                )
+            self._validate_session_id(session_id)
 
             # Get or create conversation (loads from disk if not in cache)
             conversation = await self._get_or_create_conversation(session_id=session_id)
@@ -629,27 +678,20 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                 logger.warning(
                     f"Session {session_id} has no history (new or empty session)"
                 )
-                current_mode = get_confirmation_mode_from_conversation(conversation)
-                return LoadSessionResponse(modes=get_session_mode_state(current_mode))
+                return self._build_load_session_response(conversation)
 
-            # Stream conversation history to client
-            logger.info(
-                f"Streaming {len(conversation.state.events)} events from "
-                f"conversation history"
+            await self._replay_conversation_events(
+                session_id=session_id,
+                events=conversation.state.events,
+                context="from conversation history",
             )
-            subscriber = EventSubscriber(session_id, self._conn)
-            for event in conversation.state.events:
-                await subscriber(event)
 
             logger.info(f"Successfully loaded session {session_id}")
 
             # Send available slash commands to client
             await self.send_available_commands(session_id)
 
-            # Get current confirmation mode for this session
-            current_mode = get_confirmation_mode_from_conversation(conversation)
-
-            return LoadSessionResponse(modes=get_session_mode_state(current_mode))
+            return self._build_load_session_response(conversation)
 
         except RequestError:
             raise
