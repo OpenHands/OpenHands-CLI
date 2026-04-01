@@ -96,8 +96,8 @@ class TestPluginCommands:
     @patch("openhands.sdk.plugin.installed.get_installed_plugins_dir")
     def test_handle_list_json(self, mock_get_dir, mock_list, capsys):
         """Test listing plugins with JSON output."""
-        from openhands_cli.plugin.commands import handle_plugin_command
         from openhands.sdk.plugin.installed import InstalledPluginInfo
+        from openhands_cli.plugin.commands import handle_plugin_command
 
         mock_info = InstalledPluginInfo(
             name="test-plugin",
@@ -122,8 +122,8 @@ class TestPluginCommands:
     @patch("openhands.sdk.plugin.installed.install_plugin")
     def test_handle_install_success(self, mock_install, capsys):
         """Test successful plugin installation."""
-        from openhands_cli.plugin.commands import handle_plugin_command
         from openhands.sdk.plugin.installed import InstalledPluginInfo
+        from openhands_cli.plugin.commands import handle_plugin_command
 
         mock_info = InstalledPluginInfo(
             name="new-plugin",
@@ -204,8 +204,8 @@ class TestPluginCommands:
     @patch("openhands.sdk.plugin.installed.update_plugin")
     def test_handle_update_success(self, mock_update, capsys):
         """Test successful plugin update."""
-        from openhands_cli.plugin.commands import handle_plugin_command
         from openhands.sdk.plugin.installed import InstalledPluginInfo
+        from openhands_cli.plugin.commands import handle_plugin_command
 
         mock_info = InstalledPluginInfo(
             name="my-plugin",
