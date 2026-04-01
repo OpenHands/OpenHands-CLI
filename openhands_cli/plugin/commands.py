@@ -48,7 +48,7 @@ def handle_plugin_command(args: Namespace) -> None:
 
 def _handle_list(args: Namespace) -> None:
     """Handle 'plugin list' command."""
-    from openhands_cli.plugin.installed import (
+    from openhands.sdk.plugin.installed import (
         get_installed_plugins_dir,
         list_installed_plugins,
     )
@@ -104,7 +104,8 @@ def _handle_list(args: Namespace) -> None:
 
 def _handle_install(args: Namespace) -> None:
     """Handle 'plugin install' command."""
-    from openhands_cli.plugin.installed import PluginFetchError, install_plugin
+    from openhands.sdk.plugin.fetch import PluginFetchError
+    from openhands.sdk.plugin.installed import install_plugin
 
     source = args.source
     ref = args.ref
@@ -152,7 +153,7 @@ def _handle_install(args: Namespace) -> None:
 
 def _handle_uninstall(args: Namespace) -> None:
     """Handle 'plugin uninstall' command."""
-    from openhands_cli.plugin.installed import uninstall_plugin
+    from openhands.sdk.plugin.installed import uninstall_plugin
 
     name = args.name
 
@@ -183,7 +184,8 @@ def _handle_uninstall(args: Namespace) -> None:
 
 def _handle_update(args: Namespace) -> None:
     """Handle 'plugin update' command."""
-    from openhands_cli.plugin.installed import PluginFetchError, update_plugin
+    from openhands.sdk.plugin.fetch import PluginFetchError
+    from openhands.sdk.plugin.installed import update_plugin
 
     name = args.name
 
