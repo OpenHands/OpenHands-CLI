@@ -14,6 +14,7 @@ from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
+    Footer,
     Input,
     Select,
     Static,
@@ -40,6 +41,7 @@ class SettingsScreen(ModalScreen):
 
     BINDINGS: ClassVar = [
         ("escape", "cancel", "Cancel"),
+        ("tab", "focus_next", "Navigate"),
     ]
 
     CSS_PATH = "settings_screen.tcss"
@@ -139,6 +141,8 @@ class SettingsScreen(ModalScreen):
                     id="cancel_button",
                     classes="settings_button",
                 )
+        # Render footer for bindings - outside settings_container for proper positioning
+        yield Footer()
 
     def on_mount(self) -> None:
         """Initialize the form with current settings."""
