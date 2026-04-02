@@ -56,9 +56,7 @@ The workflow will:
 5. Update snapshot tests (version appears in splash screen SVGs)
 6. Open a draft PR titled **"Bump version to \<version\>"**
 
-### ⏸ Checkpoint — Confirm PR Created
-
-Verify the PR exists and the version changes look correct before continuing.
+Once the workflow completes, retrieve the PR number for later phases:
 
 ```bash
 gh pr list --repo OpenHands/OpenHands-CLI \
@@ -214,8 +212,7 @@ steps and troubleshooting.
 ## Quick Reference — Full Checklist
 
 - [ ] Trigger `bump-version.yml` with target version
-- [ ] Verify draft PR is created on `bump-version-<version>` branch
-- [ ] All CI checks pass on the PR
+- [ ] All CI checks pass on the bump PR
 - [ ] **🚨 Get human approval**, then tag the release (no `v` prefix)
 - [ ] **🚨 Get human approval**, then merge the PR
 - [ ] **🚨 Get human approval**, then publish the GitHub release
