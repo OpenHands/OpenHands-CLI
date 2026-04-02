@@ -112,12 +112,12 @@ class TestAgentStoreLoadWithConversationTools:
         loaded = agent_store.load_or_create()
         assert loaded is not None
 
-        # Should have default CLI tools including delegate
+        # Should have default CLI tools with TaskToolSet (not delegate)
         tool_names = {t.name for t in loaded.tools}
         assert "terminal" in tool_names
         assert "file_editor" in tool_names
         assert "task_tracker" in tool_names
-        assert "delegate" in tool_names
+        assert "task_tool_set" in tool_names  # TaskToolSet for new conversations
 
     @patch("openhands_cli.stores.agent_store.get_llm_metadata", return_value={})
     def test_load_uses_default_tools_for_nonexistent_conversation(
@@ -132,9 +132,9 @@ class TestAgentStoreLoadWithConversationTools:
         loaded = agent_store.load_or_create(session_id="nonexistent-conversation-id")
         assert loaded is not None
 
-        # Should have default CLI tools including delegate
+        # Should have default CLI tools with TaskToolSet (not delegate)
         tool_names = {t.name for t in loaded.tools}
-        assert "delegate" in tool_names
+        assert "task_tool_set" in tool_names
 
     @patch("openhands_cli.stores.agent_store.get_llm_metadata", return_value={})
     def test_load_preserves_tools_from_existing_conversation(

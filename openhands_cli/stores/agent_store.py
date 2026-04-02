@@ -31,6 +31,7 @@ from openhands_cli.locations import (
 from openhands_cli.mcp.mcp_utils import list_enabled_servers
 from openhands_cli.stores.cli_settings import CliSettings
 from openhands_cli.utils import (
+    conversation_has_delegate_tool_events,
     get_default_cli_agent,
     get_default_cli_tools,
     get_llm_metadata,
@@ -358,8 +359,24 @@ class AgentStore:
         )
 
     def _resolve_tools(self, session_id: str | None) -> list[Tool]:
-        tools = get_persisted_conversation_tools(session_id) if session_id else None
-        return tools or get_default_cli_tools()
+        """Resolve tools for a conversation, with backward compatibility.
+
+        For persisted conversations:
+        1. First try to load tools from base_state.json
+        2. If not available, check if the conversation has DelegateTool events
+           and use DelegateTool for backward compatibility
+
+        For new conversations:
+        - Use TaskToolSet (the default for new conversations)
+        """
+        if session_id:
+            tools = get_persisted_conversation_tools(session_id)
+            if tools:
+                return tools
+            # Check if conversation has DelegateTool events for backward compatibility
+            use_delegate = conversation_has_delegate_tool_events(session_id)
+            return get_default_cli_tools(use_delegate_tool=use_delegate)
+        return get_default_cli_tools()
 
     def _with_llm_metadata(
         self, llm: LLM, *, session_id: str | None, llm_type: str

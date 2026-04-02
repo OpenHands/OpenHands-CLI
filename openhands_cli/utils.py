@@ -15,11 +15,13 @@ from openhands.sdk import LLM, Agent, ImageContent, TextContent
 from openhands.sdk.event import SystemPromptEvent
 from openhands.sdk.event.base import Event
 from openhands.sdk.tool import Tool
+from openhands.tools import TaskToolSet
 from openhands.tools.delegate import DelegateTool
 from openhands.tools.file_editor import FileEditorTool
 from openhands.tools.preset.default import get_default_condenser
 from openhands.tools.task_tracker import TaskTrackerTool
 from openhands.tools.terminal import TerminalTool
+from openhands_cli.locations import get_conversations_dir
 
 
 def abbreviate_number(n: int | float) -> str:
@@ -160,13 +162,58 @@ def get_llm_metadata(
     return metadata
 
 
-def get_default_cli_tools() -> list[Tool]:
-    """Get the default tool specifications for CLI mode (browser disabled)."""
+def conversation_has_delegate_tool_events(conversation_id: str) -> bool:
+    """Check if a conversation contains DelegateTool events.
+
+    Scans the conversation's event files for any ActionEvent with
+    tool_name="delegate", indicating the conversation used DelegateTool.
+
+    Args:
+        conversation_id: The conversation ID to check
+
+    Returns:
+        True if the conversation contains DelegateTool events, False otherwise
+    """
+    conversations_dir = get_conversations_dir()
+    events_dir = Path(conversations_dir) / conversation_id / "events"
+
+    if not events_dir.exists():
+        return False
+
+    for event_file in events_dir.glob("event-*.json"):
+        try:
+            with open(event_file, encoding="utf-8") as f:
+                event_data = json.load(f)
+            if event_data.get("tool_name") == DelegateTool.name:
+                return True
+        except (OSError, json.JSONDecodeError):
+            continue
+
+    return False
+
+
+def get_default_cli_tools(*, use_delegate_tool: bool = False) -> list[Tool]:
+    """Get the default tool specifications for CLI mode (browser disabled).
+
+    Args:
+        use_delegate_tool: If True, use DelegateTool instead of TaskToolSet.
+            This is used for backward compatibility with conversations that
+            already have DelegateTool events. Defaults to False (use TaskToolSet).
+
+    Returns:
+        List of Tool specifications for the CLI agent.
+
+    Note:
+        DelegateTool is deprecated in favor of TaskToolSet for new conversations.
+        Existing conversations with DelegateTool events will continue to use
+        DelegateTool to maintain backward compatibility.
+    """
+    task_tool_name = DelegateTool.name if use_delegate_tool else TaskToolSet.name
     return [
         Tool(name=TerminalTool.name),
         Tool(name=FileEditorTool.name),
         Tool(name=TaskTrackerTool.name),
-        Tool(name=DelegateTool.name),
+        Tool(name=task_tool_name),
     ]
 
 
