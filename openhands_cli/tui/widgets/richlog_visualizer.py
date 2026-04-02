@@ -845,11 +845,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         # HookExecutionEvent: dynamic title based on blocked status
         if isinstance(event, HookExecutionEvent):
-            title = (
-                _get_rejection_title(event)
-                if event.blocked
-                else "Hook Executed"
-            )
+            title = _get_rejection_title(event) if event.blocked else "Hook Executed"
             return self._create_titled_collapsible(event, title)
 
         fallback_titles: list[tuple[type[Event], str]] = [
