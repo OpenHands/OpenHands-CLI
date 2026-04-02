@@ -1331,6 +1331,7 @@ class TestHookRejectionDetection:
         )
         assert _get_rejection_title(event) == "User Rejected Action"
 
+
 class TestDefaultAgentPrefixBehavior:
     """Tests for hiding agent prefix for the default OpenHands Agent.
 
