@@ -42,7 +42,6 @@ SUCCESS_ICON = "✓"
 SUCCESS_COLOR = "#6bff6b"
 ERROR_ICON = "✗"
 ERROR_COLOR = "#ff6b6b"
-HOOK_ICON = "⚡"  # Icon for hook-blocked actions
 AGENT_MESSAGE_PADDING = (1, 0, 1, 1)  # top, right, bottom, left
 
 # Maximum line length for truncating titles/commands in collapsed view
@@ -65,13 +64,6 @@ def _get_rejection_title(event: UserRejectObservation | AgentErrorEvent) -> str:
     if _is_hook_rejection(event):
         return "Hook Blocked Action"
     return "User Rejected Action"
-
-
-def _get_rejection_icon(event: UserRejectObservation | AgentErrorEvent) -> str:
-    """Get the appropriate icon for a rejection event."""
-    if _is_hook_rejection(event):
-        return f"{HOOK_ICON} {ERROR_ICON}"
-    return ERROR_ICON
 
 
 if TYPE_CHECKING:
@@ -450,14 +442,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         action_event, collapsible = self._pending_actions.pop(tool_call_id)
 
-        # Determine success/error status and icon
+        # Determine success/error status
         is_error = isinstance(event, UserRejectObservation | AgentErrorEvent)
-        if is_error:
-            status_icon = _get_rejection_icon(event)
-            status_color = ERROR_COLOR
-        else:
-            status_icon = SUCCESS_ICON
-            status_color = SUCCESS_COLOR
+        status_icon = ERROR_ICON if is_error else SUCCESS_ICON
+        status_color = ERROR_COLOR if is_error else SUCCESS_COLOR
 
         # Build the new title with colored status icon
         title_text = Text.from_markup(self._build_action_title(action_event))

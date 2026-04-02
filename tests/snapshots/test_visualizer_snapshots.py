@@ -171,7 +171,7 @@ class TestRejectionEventSnapshots:
         assert snap_compare(VisualizerTestApp(events), terminal_size=(80, 12))
 
     def test_hook_rejection_display(self, snap_compare):
-        """Verify hook rejection shows 'Hook Blocked Action' title with ⚡ icon."""
+        """Verify hook rejection shows 'Hook Blocked Action' title."""
         events = [
             _create_user_reject_observation(
                 rejection_reason="Blocked by security hook: dangerous command detected",

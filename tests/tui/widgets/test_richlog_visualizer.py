@@ -1331,43 +1331,6 @@ class TestHookRejectionDetection:
         )
         assert _get_rejection_title(event) == "User Rejected Action"
 
-    def test_get_rejection_icon_for_hook(self):
-        """Test _get_rejection_icon returns hook icon for hook rejection."""
-        from openhands.sdk.event import UserRejectObservation
-        from openhands_cli.tui.widgets.richlog_visualizer import (
-            ERROR_ICON,
-            HOOK_ICON,
-            _get_rejection_icon,
-        )
-
-        event = UserRejectObservation(
-            action_id="test_action_id",
-            tool_name="terminal",
-            tool_call_id="call_1",
-            rejection_reason="Blocked by hook",
-            rejection_source="hook",
-        )
-        expected_icon = f"{HOOK_ICON} {ERROR_ICON}"
-        assert _get_rejection_icon(event) == expected_icon
-
-    def test_get_rejection_icon_for_user(self):
-        """Test _get_rejection_icon returns error icon for user rejection."""
-        from openhands.sdk.event import UserRejectObservation
-        from openhands_cli.tui.widgets.richlog_visualizer import (
-            ERROR_ICON,
-            _get_rejection_icon,
-        )
-
-        event = UserRejectObservation(
-            action_id="test_action_id",
-            tool_name="terminal",
-            tool_call_id="call_1",
-            rejection_reason="User rejected",
-            rejection_source="user",
-        )
-        assert _get_rejection_icon(event) == ERROR_ICON
-
-
 class TestDefaultAgentPrefixBehavior:
     """Tests for hiding agent prefix for the default OpenHands Agent.
 

@@ -48,7 +48,7 @@ logger = get_logger(__name__)
 # Formatting constants for consistent headers across streaming and non-streaming modes
 REASONING_HEADER = "**Reasoning**:\n"
 THOUGHT_HEADER = "\n**Thought**:\n"
-HOOK_BLOCKED_HEADER = "**⚡ Hook Blocked Action**:\n"
+HOOK_BLOCKED_HEADER = "**Hook Blocked Action**:\n"
 
 
 def _event_visualize_to_plain(event: Event) -> str:

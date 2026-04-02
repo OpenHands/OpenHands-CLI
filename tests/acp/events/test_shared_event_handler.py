@@ -53,6 +53,5 @@ class TestACPHookRejectionDetection:
 
     def test_hook_blocked_header_format(self):
         """Test HOOK_BLOCKED_HEADER has expected format."""
-        assert "⚡" in HOOK_BLOCKED_HEADER
         assert "Hook" in HOOK_BLOCKED_HEADER
         assert HOOK_BLOCKED_HEADER.endswith("\n")
