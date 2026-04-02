@@ -39,7 +39,7 @@ class TestResolveToolsBackwardCompatibility:
     def test_conversation_with_delegate_events_uses_delegate_tool(
         self, agent_store, tmp_path
     ):
-        """Test that conversations with DelegateTool events continue using DelegateTool."""
+        """Test conversations with DelegateTool events continue using DelegateTool."""
         conv_id = "legacy-conversation-123"
         events_dir = tmp_path / "conversations" / conv_id / "events"
         events_dir.mkdir(parents=True)

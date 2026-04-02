@@ -19,7 +19,7 @@ from openhands_cli.utils import (
 
 
 def test_get_default_cli_tools_returns_task_tool_set_by_default():
-    """Test that get_default_cli_tools uses TaskToolSet by default for new conversations."""
+    """Test get_default_cli_tools uses TaskToolSet by default for new conversations."""
     tools = get_default_cli_tools()
     tool_names = {t.name for t in tools}
     assert tool_names == {"terminal", "file_editor", "task_tracker", "task_tool_set"}
