@@ -1331,6 +1331,50 @@ class TestHookRejectionDetection:
         )
         assert _get_rejection_title(event) == "User Rejected Action"
 
+    def test_is_hook_rejection_with_blocked_hook_execution_event(self):
+        """Test _is_hook_rejection returns True for blocked HookExecutionEvent."""
+        from openhands.sdk.event import HookExecutionEvent
+        from openhands_cli.tui.widgets.richlog_visualizer import _is_hook_rejection
+
+        event = HookExecutionEvent(
+            hook_event_type="Stop",
+            hook_command=".openhands/hooks/on_stop.sh",
+            success=False,
+            blocked=True,
+            exit_code=2,
+            reason="Checks failed",
+        )
+        assert _is_hook_rejection(event) is True
+
+    def test_is_hook_rejection_with_successful_hook_execution_event(self):
+        """Test _is_hook_rejection returns False for successful HookExecutionEvent."""
+        from openhands.sdk.event import HookExecutionEvent
+        from openhands_cli.tui.widgets.richlog_visualizer import _is_hook_rejection
+
+        event = HookExecutionEvent(
+            hook_event_type="Stop",
+            hook_command=".openhands/hooks/on_stop.sh",
+            success=True,
+            blocked=False,
+            exit_code=0,
+        )
+        assert _is_hook_rejection(event) is False
+
+    def test_get_rejection_title_for_blocked_hook_execution(self):
+        """Test _get_rejection_title returns hook title for blocked HookExecutionEvent."""
+        from openhands.sdk.event import HookExecutionEvent
+        from openhands_cli.tui.widgets.richlog_visualizer import _get_rejection_title
+
+        event = HookExecutionEvent(
+            hook_event_type="Stop",
+            hook_command=".openhands/hooks/on_stop.sh",
+            success=False,
+            blocked=True,
+            exit_code=2,
+            reason="CI checks failed",
+        )
+        assert _get_rejection_title(event) == "Hook Blocked Action"
+
 
 class TestDefaultAgentPrefixBehavior:
     """Tests for hiding agent prefix for the default OpenHands Agent.

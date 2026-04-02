@@ -23,6 +23,7 @@ from openhands.sdk.event import (
     Condensation,
     CondensationRequest,
     Event,
+    HookExecutionEvent,
     ObservationEvent,
     PauseEvent,
     SystemPromptEvent,
@@ -55,8 +56,12 @@ def _event_visualize_to_plain(event: Event) -> str:
     return str(event.visualize.plain)
 
 
-def _is_hook_rejection(event: UserRejectObservation | AgentErrorEvent) -> bool:
+def _is_hook_rejection(
+    event: UserRejectObservation | AgentErrorEvent | HookExecutionEvent,
+) -> bool:
     """Check if a rejection event originated from a hook."""
+    if isinstance(event, HookExecutionEvent):
+        return event.blocked
     if isinstance(event, UserRejectObservation):
         return event.rejection_source == "hook"
     return False
@@ -113,6 +118,15 @@ class SharedEventHandler:
         self, ctx: _ACPContext, event: SystemPromptEvent
     ) -> None:
         await self.send_thought(ctx, str(event.visualize.plain))
+
+    async def handle_hook_execution(
+        self, ctx: _ACPContext, event: HookExecutionEvent
+    ) -> None:
+        if not event.blocked:
+            return
+        text = _event_visualize_to_plain(event)
+        text = f"{HOOK_BLOCKED_HEADER}{text}"
+        await self.send_thought(ctx, text)
 
     async def handle_condensation(self, ctx: _ACPContext, event: Condensation) -> None:
         await self.send_thought(ctx, _event_visualize_to_plain(event))

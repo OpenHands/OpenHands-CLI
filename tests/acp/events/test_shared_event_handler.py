@@ -1,6 +1,10 @@
 """Tests for ACP shared event handler hook rejection detection."""
 
-from openhands.sdk.event import AgentErrorEvent, UserRejectObservation
+from openhands.sdk.event import (
+    AgentErrorEvent,
+    HookExecutionEvent,
+    UserRejectObservation,
+)
 from openhands_cli.acp_impl.events.shared_event_handler import (
     HOOK_BLOCKED_HEADER,
     _is_hook_rejection,
@@ -48,6 +52,29 @@ class TestACPHookRejectionDetection:
             error="Something went wrong",
             tool_name="terminal",
             tool_call_id="call_1",
+        )
+        assert _is_hook_rejection(event) is False
+
+    def test_is_hook_rejection_with_blocked_hook_execution_event(self):
+        """Test _is_hook_rejection returns True for blocked HookExecutionEvent."""
+        event = HookExecutionEvent(
+            hook_event_type="Stop",
+            hook_command=".openhands/hooks/on_stop.sh",
+            success=False,
+            blocked=True,
+            exit_code=2,
+            reason="Checks failed",
+        )
+        assert _is_hook_rejection(event) is True
+
+    def test_is_hook_rejection_with_successful_hook_execution_event(self):
+        """Test _is_hook_rejection returns False for successful HookExecutionEvent."""
+        event = HookExecutionEvent(
+            hook_event_type="Stop",
+            hook_command=".openhands/hooks/on_stop.sh",
+            success=True,
+            blocked=False,
+            exit_code=0,
         )
         assert _is_hook_rejection(event) is False
 
