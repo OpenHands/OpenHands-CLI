@@ -1361,7 +1361,7 @@ class TestHookRejectionDetection:
         assert _is_hook_rejection(event) is False
 
     def test_get_rejection_title_for_blocked_hook_execution(self):
-        """Test _get_rejection_title returns hook title for blocked HookExecutionEvent."""
+        """Test _get_rejection_title for blocked HookExecutionEvent."""
         from openhands.sdk.event import HookExecutionEvent
         from openhands_cli.tui.widgets.richlog_visualizer import _get_rejection_title
 
