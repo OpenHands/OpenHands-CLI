@@ -122,10 +122,9 @@ class SharedEventHandler:
     async def handle_hook_execution(
         self, ctx: _ACPContext, event: HookExecutionEvent
     ) -> None:
-        if not event.blocked:
-            return
         text = _event_visualize_to_plain(event)
-        text = f"{HOOK_BLOCKED_HEADER}{text}"
+        if event.blocked:
+            text = f"{HOOK_BLOCKED_HEADER}{text}"
         await self.send_thought(ctx, text)
 
     async def handle_condensation(self, ctx: _ACPContext, event: Condensation) -> None:

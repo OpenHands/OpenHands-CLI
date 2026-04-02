@@ -843,13 +843,14 @@ class ConversationVisualizer(ConversationVisualizerBase):
         if isinstance(event, UserRejectObservation):
             return self._create_titled_collapsible(event, _get_rejection_title(event))
 
-        # HookExecutionEvent: show blocked hooks, hide successful ones
+        # HookExecutionEvent: dynamic title based on blocked status
         if isinstance(event, HookExecutionEvent):
-            if event.blocked:
-                return self._create_titled_collapsible(
-                    event, _get_rejection_title(event)
-                )
-            return None
+            title = (
+                _get_rejection_title(event)
+                if event.blocked
+                else "Hook Executed"
+            )
+            return self._create_titled_collapsible(event, title)
 
         fallback_titles: list[tuple[type[Event], str]] = [
             (ObservationEvent, "Observation"),
