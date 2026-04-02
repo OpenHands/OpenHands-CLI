@@ -156,7 +156,9 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 Many thanks to all individual contributors
 
-<a href="https://github.com/OpenHands/OpenHands-CLI/graphs/contributors"><img src="https://assets.openhands.dev/readme/20260401-openhands-openhands-cli-contributors.svg" /></a>
+<div align="center">
+  <a href="https://github.com/OpenHands/OpenHands-CLI/graphs/contributors"><img src="https://assets.openhands.dev/readme/20260401-openhands-openhands-cli-contributors.svg" /></a>
+</div>
 
 <hr>
 <div align="center">
