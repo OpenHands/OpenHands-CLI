@@ -78,19 +78,17 @@ Alternatively, trigger via the GitHub Actions UI at
 ### Binary Build Failed for a Platform
 
 Individual platform builds run in a matrix. Re-run only the failed
-jobs from the Actions UI, or re-trigger the entire workflow by
-pushing the tag again (delete and recreate if necessary):
+jobs from the Actions UI:
 
 ```bash
-git tag -d <version>
-git push origin :refs/tags/<version>
-git tag <version>
-git push origin --tags
+gh run list --repo OpenHands/OpenHands-CLI \
+  --workflow "cli-build-binary-and-optionally-release.yml" --limit 5
+gh run rerun <RUN_ID> --repo OpenHands/OpenHands-CLI --failed
 ```
 
-> **⚠️ Warning**: Deleting and recreating tags should only be done
-> before the release is published. After publication, prefer re-running
-> the workflow instead.
+> **🚨 DO NOT delete and recreate tags after publication.**
+> If assets are missing, re-run the workflow or upload manually:
+> `gh release upload <version> <file> --repo OpenHands/OpenHands-CLI`
 
 ### Install Website PR Not Created
 

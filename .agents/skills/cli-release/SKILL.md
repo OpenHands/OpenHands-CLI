@@ -105,6 +105,14 @@ Tag the latest commit on the version bump branch. **No `v` prefix.**
 ```bash
 git fetch origin
 git checkout bump-version-<version>
+git reset --hard origin/bump-version-<version>  # ensure we're at latest
+
+# verify tag doesn't already exist
+if git rev-parse <version> >/dev/null 2>&1; then
+  echo "Error: Tag <version> already exists"
+  exit 1
+fi
+
 git tag <version>
 git push origin --tags
 ```
@@ -119,9 +127,10 @@ Pushing the tag triggers two automated workflows:
 
 > **🚨 STOP — Do NOT merge without explicit human approval.**
 
-Wait for CI to complete after tagging, then merge:
+Wait for CI to complete after tagging. Verify all checks passed, then merge:
 
 ```bash
+gh pr checks <PR_NUMBER> --repo OpenHands/OpenHands-CLI
 gh pr merge <PR_NUMBER> --repo OpenHands/OpenHands-CLI --merge
 ```
 
