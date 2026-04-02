@@ -10,7 +10,7 @@ exclude-newer-package = { "openhands-sdk" = false, "openhands-tools" = false }
 
 [project]
 name = "openhands"
-version = "1.13.1"
+version = "1.14.0"
 description = "OpenHands CLI - Terminal User Interface for OpenHands AI Agent"
 readme = "README.md"
 license = { text = "MIT" }
