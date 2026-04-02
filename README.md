@@ -152,6 +152,12 @@ For complete documentation, visit https://docs.openhands.dev/openhands/usage/cli
 
 MIT License - see [LICENSE](LICENSE) for details.
 
+## Contributors
+
+Many thanks to all individual contributors
+
+<a href="https://github.com/OpenHands/OpenHands-CLI/graphs/contributors"><img src="https://assets.openhands.dev/readme/20260401-openhands-openhands-cli-contributors.svg" /></a>
+
 <hr>
 <div align="center">
   <sub><strong>Trusted by engineers at:</strong></sub>
