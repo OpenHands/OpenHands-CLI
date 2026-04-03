@@ -5,8 +5,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-import pytest
-
 
 class TestPluginsDirArgument:
     """Tests for --plugins-dir CLI argument parsing."""
@@ -34,12 +32,14 @@ class TestPluginsDirArgument:
         from openhands_cli.argparsers.main_parser import create_main_parser
 
         parser = create_main_parser()
-        args = parser.parse_args([
-            "--plugins-dir",
-            "/path/to/plugin1",
-            "--plugins-dir",
-            "/path/to/plugin2",
-        ])
+        args = parser.parse_args(
+            [
+                "--plugins-dir",
+                "/path/to/plugin1",
+                "--plugins-dir",
+                "/path/to/plugin2",
+            ]
+        )
         assert args.plugins_dir == ["/path/to/plugin1", "/path/to/plugin2"]
 
     def test_plugins_dir_none_when_not_specified(self):
@@ -118,10 +118,12 @@ description: A duplicate skill
 """)
 
             # Load from both directories
-            skills = load_skills_from_plugins_dirs([
-                str(Path(tmpdir) / "plugin0"),
-                str(Path(tmpdir) / "plugin1"),
-            ])
+            skills = load_skills_from_plugins_dirs(
+                [
+                    str(Path(tmpdir) / "plugin0"),
+                    str(Path(tmpdir) / "plugin1"),
+                ]
+            )
 
             # Should handle gracefully (no duplicates or error)
             skill_names = [s.name for s in skills]
