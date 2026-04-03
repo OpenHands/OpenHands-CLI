@@ -97,6 +97,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+o", "toggle_cells", "Toggle Cells"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
+        ("tab", "focus_next", "Navigate"),
         ("escape", "pause_conversation", "Pause the conversation"),
         ("ctrl+q", "request_quit", "Quit the application"),
         ("ctrl+c", "request_quit", "Quit the application"),
@@ -133,7 +134,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
         **kwargs,
-    ):
+    ) -> None:
         """Initialize the app with custom OpenHands theme.
 
         Args:
