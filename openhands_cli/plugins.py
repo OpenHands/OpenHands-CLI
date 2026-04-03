@@ -133,9 +133,7 @@ def _load_plugins_from_path(path: Path, seen_names: set[str]) -> list[Plugin]:
                     f"[yellow]Warning:[/yellow] Skipping duplicate plugin "
                     f"'{plugin.name}' from {path}"
                 )
-                logger.warning(
-                    f"Skipping duplicate plugin '{plugin.name}' from {path}"
-                )
+                logger.warning(f"Skipping duplicate plugin '{plugin.name}' from {path}")
     except Exception as e:
         logger.debug(f"Could not load plugins from {path}: {e}")
 
