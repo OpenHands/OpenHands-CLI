@@ -1497,7 +1497,6 @@ class TestCriticFeedbackDismissalOnNewEvent:
         call_order: list[str] = []
 
         original_dismiss = visualizer._dismiss_pending_feedback_widgets
-        original_add = visualizer._add_widget_to_ui
 
         def tracking_dismiss():
             call_order.append("dismiss")
@@ -1522,4 +1521,3 @@ class TestCriticFeedbackDismissalOnNewEvent:
         assert call_order[0] == "dismiss", (
             f"Expected dismiss to be called first, but call order was: {call_order}"
         )
-
