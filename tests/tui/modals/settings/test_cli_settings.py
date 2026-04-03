@@ -89,11 +89,16 @@ class TestCliSettings:
         cfg = CliSettings()
         assert cfg.default_cells_expanded is False
         assert cfg.auto_open_plan_panel is True
+        assert cfg.theme == "openhands"
         assert cfg.critic.enable_critic is True
         assert cfg.critic.enable_iterative_refinement is False
         assert cfg.critic.critic_threshold == 0.6
         assert cfg.critic.issue_threshold == 0.75
         assert cfg.critic.max_refinement_iterations == 3
+
+    def test_theme_accepts_string(self):
+        cfg = CliSettings(theme="dracula")
+        assert cfg.theme == "dracula"
 
     @pytest.mark.parametrize("value", [True, False])
     def test_default_cells_expanded_accepts_bool(self, value: bool):
@@ -186,6 +191,7 @@ class TestCliSettings:
         cfg = CliSettings(
             default_cells_expanded=False,
             auto_open_plan_panel=False,
+            theme="dracula",
             critic=CriticSettings(
                 enable_critic=False,
                 enable_iterative_refinement=False,
@@ -202,6 +208,7 @@ class TestCliSettings:
             {
                 "default_cells_expanded": False,
                 "auto_open_plan_panel": False,
+                "theme": "dracula",
                 "critic": {
                     "enable_critic": False,
                     "enable_iterative_refinement": False,
