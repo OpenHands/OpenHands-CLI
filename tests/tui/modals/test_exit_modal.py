@@ -1,10 +1,51 @@
 """Tests for exit confirmation modal functionality."""
 
+import re
+from pathlib import Path
 from unittest import mock
 
 from textual.widgets import Button
 
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
+
+# Path to exit modal TCSS relative to the modal module
+EXIT_MODAL_TCSS_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "openhands_cli"
+    / "tui"
+    / "modals"
+    / "exit_modal.tcss"
+)
+
+
+class TestExitModalCssScoping:
+    """Tests that exit modal CSS doesn't leak global styles.
+
+    Regression test for GitHub issue #641: an unscoped `Button { width: 100%; }`
+    rule in exit_modal.tcss was overriding CriticFeedbackWidget button styles,
+    causing only the first button to be visible.
+    """
+
+    def test_button_rule_is_scoped_to_dialog(self):
+        """Button CSS rules must be scoped (e.g., #dialog Button), not global.
+
+        An unscoped `Button { ... }` rule would override button styles
+        in every other widget (e.g., CriticFeedbackWidget).
+        """
+        tcss_content = EXIT_MODAL_TCSS_PATH.read_text()
+
+        # Find all Button selector lines (ignoring comments)
+        # Match lines like "Button {" but not "#dialog Button {" or ".foo Button {"
+        unscoped_button_rules = re.findall(
+            r"^\s*Button\s*\{", tcss_content, re.MULTILINE
+        )
+
+        assert not unscoped_button_rules, (
+            f"Found unscoped global 'Button' rule(s) in exit_modal.tcss. "
+            f"Button rules must be scoped to a parent (e.g., '#dialog Button') "
+            f"to avoid overriding button styles in other widgets. "
+            f"See: https://github.com/OpenHands/OpenHands-CLI/issues/641"
+        )
 
 
 class TestExitConfirmationModal:
