@@ -1199,8 +1199,6 @@ class TestRenderUserMessage:
 
     def test_render_user_message_creates_static_widget(self):
         """render_user_message should create a Static widget with user message."""
-        from unittest.mock import MagicMock
-
         app = MagicMock()
         container = MagicMock()
         visualizer = ConversationVisualizer(container, app)
@@ -1224,8 +1222,6 @@ class TestRenderUserMessage:
 
     def test_render_user_message_format(self):
         """render_user_message should prefix content with '> '."""
-        from unittest.mock import MagicMock
-
         app = MagicMock()
         container = MagicMock()
         visualizer = ConversationVisualizer(container, app)
@@ -1456,68 +1452,71 @@ class TestCriticFeedbackDismissalOnNewEvent:
     when subsequent events/actions appear in the conversation history.
     """
 
-    def test_on_event_dismisses_pending_feedback_widgets(self, mock_cli_settings):
-        """on_event should dismiss pending CriticFeedbackWidgets.
-
-        When a new event arrives, any existing CriticFeedbackWidget should be
-        removed because the agent has continued working and the feedback
-        opportunity has passed.
-        """
-        app: OpenHandsApp = cast(OpenHandsApp, App())
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)
-
-        # Mock _dismiss_pending_feedback_widgets to track calls
-        visualizer._dismiss_pending_feedback_widgets = MagicMock()  # type: ignore[method-assign]
-        # Mock _add_widget_to_ui since container isn't mounted in tests
-        visualizer._add_widget_to_ui = MagicMock()  # type: ignore[method-assign]
-        # Mock _run_on_main_thread to execute immediately (we're in a test)
-        visualizer._run_on_main_thread = lambda func, *args: func(*args)  # type: ignore[method-assign]
-
-        event = create_terminal_action_event("echo hello", "Say hello")
-
-        with mock_cli_settings(visualizer=visualizer):
-            visualizer.on_event(event)
-
-        # _dismiss_pending_feedback_widgets should have been called
-        visualizer._dismiss_pending_feedback_widgets.assert_called()
-
-    def test_on_event_dismisses_feedback_before_adding_new_widgets(
+    async def test_feedback_widget_removed_from_dom_on_new_event(
         self, mock_cli_settings
     ):
-        """Feedback widgets should be dismissed before new event widgets are added.
+        """CriticFeedbackWidget should be removed from the DOM when on_event fires.
 
-        This ensures the dismiss happens at the start of on_event, not after
-        a new critic result might be added.
+        Scenario:
+        1. A CriticFeedbackWidget is mounted in a VerticalScroll container
+        2. A new action event arrives via on_event()
+        3. The feedback widget should be removed from the container
+
+        This is an integration test using Textual's async test framework
+        to verify actual DOM state, not just method calls.
         """
-        app: OpenHandsApp = cast(OpenHandsApp, App())
-        container = VerticalScroll()
-        visualizer = ConversationVisualizer(container, app)
+        from textual.app import ComposeResult
 
-        call_order: list[str] = []
+        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
 
-        original_dismiss = visualizer._dismiss_pending_feedback_widgets
+        # Create a mock CriticResult
+        mock_result = MagicMock()
+        mock_result.score = 0.65
+        mock_result.success = True
+        mock_result.metadata = {"event_ids": ["test-event-1"]}
 
-        def tracking_dismiss():
-            call_order.append("dismiss")
-            original_dismiss()
+        class FeedbackTestApp(App):
+            """Minimal app to test feedback widget dismissal."""
 
-        def tracking_add(widget):
-            call_order.append("add_widget")
-            # Don't actually mount (no running app in unit test)
+            def compose(self) -> ComposeResult:
+                yield VerticalScroll(id="scroll_view")
 
-        visualizer._dismiss_pending_feedback_widgets = tracking_dismiss  # type: ignore[method-assign]
-        visualizer._add_widget_to_ui = tracking_add  # type: ignore[method-assign]
-        # Execute functions immediately instead of scheduling on main thread
-        visualizer._run_on_main_thread = lambda func, *args: func(*args)  # type: ignore[method-assign]
+        app = FeedbackTestApp()
 
-        event = create_terminal_action_event("ls -la", "List files")
+        async with app.run_test() as pilot:
+            container = pilot.app.query_one("#scroll_view", VerticalScroll)
 
-        with mock_cli_settings(visualizer=visualizer):
-            visualizer.on_event(event)
+            # Mount a CriticFeedbackWidget (simulating what the visualizer does)
+            feedback_widget = CriticFeedbackWidget(
+                critic_result=mock_result,
+                conversation_id="test-conv-123",
+            )
+            await container.mount(feedback_widget)
+            await pilot.pause()
 
-        # Dismiss should happen before any widget is added
-        assert len(call_order) >= 1
-        assert call_order[0] == "dismiss", (
-            f"Expected dismiss to be called first, but call order was: {call_order}"
-        )
+            # Verify the feedback widget is in the DOM
+            feedback_widgets = container.query(CriticFeedbackWidget)
+            assert len(feedback_widgets) == 1, (
+                "CriticFeedbackWidget should be mounted in the container"
+            )
+
+            # Create a visualizer pointing at the same container
+            visualizer = ConversationVisualizer(container, pilot.app)  # type: ignore[arg-type]
+            # Run on main thread directly (we're already in the event loop)
+            visualizer._run_on_main_thread = lambda func, *args: func(*args)  # type: ignore[method-assign]
+            # Prevent actual widget mounting in on_event
+            visualizer._add_widget_to_ui = MagicMock()  # type: ignore[method-assign]
+
+            # Fire a new event — this should dismiss the feedback widget
+            event = create_terminal_action_event("echo hello", "Say hello")
+            with mock_cli_settings(visualizer=visualizer):
+                visualizer.on_event(event)
+
+            await pilot.pause()
+
+            # The feedback widget should now be removed from the DOM
+            remaining = container.query(CriticFeedbackWidget)
+            assert len(remaining) == 0, (
+                "CriticFeedbackWidget should be removed after a new event arrives, "
+                f"but {len(remaining)} widget(s) still present"
+            )
