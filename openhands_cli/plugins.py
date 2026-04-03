@@ -1,37 +1,38 @@
 """Plugin loading utilities for OpenHands CLI.
 
-This module provides functionality to load plugins (skills) from custom
-directories specified via the --plugins-dir CLI flag. Similar to Claude
-Code's --plugin-dir flag, this allows loading skills for a session only.
+This module provides functionality to load plugins from custom directories
+specified via the --plugins-dir CLI flag. Similar to Claude Code's
+--plugin-dir flag, this allows loading plugins for a session only.
+
+Plugins can include skills, hooks, MCP configurations, agents, and commands.
 """
 
 from pathlib import Path
 
 from rich.console import Console
 
-from openhands.sdk.context import Skill
-from openhands.sdk.context.skills.skill import load_skills_from_dir
 from openhands.sdk.logger import get_logger
+from openhands.sdk.plugin import Plugin
 
 
 logger = get_logger(__name__)
 console = Console()
 
 
-def load_skills_from_plugins_dirs(plugins_dirs: list[str]) -> list[Skill]:
-    """Load skills from custom plugins directories.
+def load_plugins_from_dirs(plugins_dirs: list[str]) -> list[Plugin]:
+    """Load plugins from custom directories.
 
     Each directory can be either:
-    - A directory containing multiple plugins (subdirectories with skills)
-    - A specific plugin directory containing skills directly
+    - A specific plugin directory (containing .plugin/ or .claude-plugin/)
+    - A directory containing multiple plugin subdirectories
 
     Args:
         plugins_dirs: List of directory paths to load plugins from.
 
     Returns:
-        List of Skill objects loaded from the plugins directories.
+        List of Plugin objects loaded from the directories.
     """
-    all_skills: list[Skill] = []
+    all_plugins: list[Plugin] = []
     seen_names: set[str] = set()
 
     for dir_path in plugins_dirs:
@@ -51,78 +52,95 @@ def load_skills_from_plugins_dirs(plugins_dirs: list[str]) -> list[Skill]:
             logger.warning(f"Plugins path is not a directory: {path}")
             continue
 
-        try:
-            # Try to load skills from the directory (handles both direct plugin
-            # directories and directories containing multiple plugins)
-            skills = _load_skills_from_dir(path, seen_names)
-            all_skills.extend(skills)
+        plugins = _load_plugins_from_path(path, seen_names)
+        all_plugins.extend(plugins)
 
-            if skills:
-                console.print(
-                    f"[green]✓[/green] Loaded {len(skills)} skill(s) from {path}"
-                )
-                logger.info(
-                    f"Loaded {len(skills)} skills from plugins dir {path}: "
-                    f"{[s.name for s in skills]}"
-                )
-        except Exception as e:
-            console.print(
-                f"[yellow]Warning:[/yellow] Failed to load plugins from {path}: {e}"
-            )
-            logger.warning(f"Failed to load plugins from {path}: {e}")
-
-    return all_skills
+    return all_plugins
 
 
-def _load_skills_from_dir(path: Path, seen_names: set[str]) -> list[Skill]:
-    """Load skills from a single directory.
+def _is_plugin_directory(path: Path) -> bool:
+    """Check if a directory looks like a plugin directory.
 
-    Attempts to load skills using the SDK's load_skills_from_dir function.
-    Also checks subdirectories if the directory appears to contain multiple plugins.
+    A plugin directory has either .plugin/ or .claude-plugin/ with plugin.json.
+    """
+    for manifest_dir in [".plugin", ".claude-plugin"]:
+        manifest_path = path / manifest_dir / "plugin.json"
+        if manifest_path.exists():
+            return True
+    return False
+
+
+def _load_plugins_from_path(path: Path, seen_names: set[str]) -> list[Plugin]:
+    """Load plugins from a single path.
+
+    If the path looks like a plugin directory (has .plugin/ or .claude-plugin/),
+    load it as a single plugin. Otherwise, try loading all plugins from
+    subdirectories.
 
     Args:
-        path: Path to the directory to load skills from.
-        seen_names: Set of skill names already seen (for deduplication).
+        path: Path to the directory to load plugins from.
+        seen_names: Set of plugin names already seen (for deduplication).
 
     Returns:
-        List of Skill objects loaded from the directory.
+        List of Plugin objects loaded from the path.
     """
-    skills: list[Skill] = []
+    plugins: list[Plugin] = []
 
-    # Try loading skills directly from this directory
+    # Check if this is a plugin directory (has manifest)
+    if _is_plugin_directory(path):
+        try:
+            plugin = Plugin.load(path)
+            if plugin.name not in seen_names:
+                plugins.append(plugin)
+                seen_names.add(plugin.name)
+                console.print(
+                    f"[green]✓[/green] Loaded plugin '{plugin.name}' from {path} "
+                    f"({len(plugin.skills)} skills, "
+                    f"hooks={'yes' if plugin.hooks else 'no'}, "
+                    f"mcp={'yes' if plugin.mcp_config else 'no'})"
+                )
+                logger.info(f"Loaded plugin '{plugin.name}' from {path}")
+            else:
+                console.print(
+                    f"[yellow]Warning:[/yellow] Skipping duplicate plugin "
+                    f"'{plugin.name}' from {path}"
+                )
+                logger.warning(f"Skipping duplicate plugin '{plugin.name}' from {path}")
+            return plugins
+        except Exception as e:
+            logger.warning(f"Failed to load plugin from {path}: {e}")
+            console.print(
+                f"[yellow]Warning:[/yellow] Failed to load plugin from {path}: {e}"
+            )
+            return plugins
+
+    # Not a plugin directory - try loading plugins from subdirectories
     try:
-        repo_skills, knowledge_skills, agent_skills = load_skills_from_dir(path)
-
-        for skills_dict in [repo_skills, knowledge_skills, agent_skills]:
-            for name, skill in skills_dict.items():
-                if name not in seen_names:
-                    skills.append(skill)
-                    seen_names.add(name)
-                else:
-                    logger.warning(f"Skipping duplicate skill '{name}' from {path}")
+        loaded_plugins = Plugin.load_all(path)
+        for plugin in loaded_plugins:
+            if plugin.name not in seen_names:
+                plugins.append(plugin)
+                seen_names.add(plugin.name)
+                console.print(
+                    f"[green]✓[/green] Loaded plugin '{plugin.name}' from {path} "
+                    f"({len(plugin.skills)} skills, "
+                    f"hooks={'yes' if plugin.hooks else 'no'}, "
+                    f"mcp={'yes' if plugin.mcp_config else 'no'})"
+                )
+                logger.info(f"Loaded plugin '{plugin.name}' from {path}")
+            else:
+                console.print(
+                    f"[yellow]Warning:[/yellow] Skipping duplicate plugin "
+                    f"'{plugin.name}' from {path}"
+                )
+                logger.warning(
+                    f"Skipping duplicate plugin '{plugin.name}' from {path}"
+                )
     except Exception as e:
-        logger.debug(f"Could not load skills directly from {path}: {e}")
+        logger.debug(f"Could not load plugins from {path}: {e}")
 
-    # If no skills were loaded directly, check if this is a directory containing
-    # multiple plugin subdirectories
-    if not skills:
-        for subdir in path.iterdir():
-            if subdir.is_dir() and not subdir.name.startswith("."):
-                try:
-                    repo_skills, knowledge_skills, agent_skills = load_skills_from_dir(
-                        subdir
-                    )
+    if not plugins:
+        console.print(f"[yellow]Warning:[/yellow] No plugins found in {path}")
+        logger.warning(f"No plugins found in {path}")
 
-                    for skills_dict in [repo_skills, knowledge_skills, agent_skills]:
-                        for name, skill in skills_dict.items():
-                            if name not in seen_names:
-                                skills.append(skill)
-                                seen_names.add(name)
-                            else:
-                                logger.warning(
-                                    f"Skipping duplicate skill '{name}' from {subdir}"
-                                )
-                except Exception as e:
-                    logger.debug(f"Could not load skills from {subdir}: {e}")
-
-    return skills
+    return plugins

@@ -1,5 +1,6 @@
 """Tests for the --plugins-dir CLI argument functionality."""
 
+import json
 import subprocess
 import sys
 import tempfile
@@ -54,89 +55,117 @@ class TestPluginsDirArgument:
 class TestPluginLoading:
     """Tests for loading plugins from directories."""
 
-    def test_load_skills_from_nonexistent_dir(self):
+    def test_load_plugins_from_nonexistent_dir(self):
         """Test that nonexistent directories are handled gracefully."""
-        from openhands_cli.plugins import load_skills_from_plugins_dirs
+        from openhands_cli.plugins import load_plugins_from_dirs
 
-        skills = load_skills_from_plugins_dirs(["/nonexistent/path"])
-        assert skills == []
+        plugins = load_plugins_from_dirs(["/nonexistent/path"])
+        assert plugins == []
 
-    def test_load_skills_from_empty_dir(self):
-        """Test loading from an empty directory."""
-        from openhands_cli.plugins import load_skills_from_plugins_dirs
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            skills = load_skills_from_plugins_dirs([tmpdir])
-            assert skills == []
-
-    def test_load_skills_from_dir_with_skill(self):
-        """Test loading a skill from a directory with a SKILL.md file."""
-        from openhands_cli.plugins import load_skills_from_plugins_dirs
+    def test_load_plugins_from_empty_dir(self):
+        """Test loading from an empty directory returns no plugins."""
+        from openhands_cli.plugins import load_plugins_from_dirs
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create a skill directory structure
-            skill_dir = Path(tmpdir) / "my-test-skill"
-            skill_dir.mkdir()
+            plugins = load_plugins_from_dirs([tmpdir])
+            # Empty directory with no plugin manifest should return no plugins
+            assert plugins == []
 
-            # Create a SKILL.md file
-            skill_file = skill_dir / "SKILL.md"
-            skill_file.write_text("""---
-name: test-skill
-description: A test skill for unit testing
-triggers:
-  - type: keyword
-    pattern: "test-pattern"
----
-
-# Test Skill
-
-This is a test skill content.
-""")
-
-            skills = load_skills_from_plugins_dirs([tmpdir])
-            # The skill should be loaded (may vary based on SDK behavior)
-            # At minimum, we should not raise an error
-            assert isinstance(skills, list)
-
-    def test_load_skills_deduplication(self):
-        """Test that duplicate skills are not loaded twice."""
-        from openhands_cli.plugins import load_skills_from_plugins_dirs
+    def test_load_plugins_from_dir_with_plugin(self):
+        """Test loading a plugin from a directory with proper structure."""
+        from openhands_cli.plugins import load_plugins_from_dirs
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create the same skill in two locations
+            # Create a plugin directory structure
+            plugin_dir = Path(tmpdir) / "my-test-plugin"
+            plugin_dir.mkdir()
+
+            # Create .plugin directory with plugin.json manifest
+            manifest_dir = plugin_dir / ".plugin"
+            manifest_dir.mkdir()
+
+            manifest = {
+                "name": "test-plugin",
+                "version": "1.0.0",
+                "description": "A test plugin for unit testing",
+            }
+            manifest_file = manifest_dir / "plugin.json"
+            manifest_file.write_text(json.dumps(manifest))
+
+            plugins = load_plugins_from_dirs([str(plugin_dir)])
+            # The plugin should be loaded
+            assert len(plugins) == 1
+            assert plugins[0].name == "test-plugin"
+
+    def test_load_plugins_deduplication(self):
+        """Test that duplicate plugins are not loaded twice."""
+        from openhands_cli.plugins import load_plugins_from_dirs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create the same plugin in two locations
             for i in range(2):
-                skill_dir = Path(tmpdir) / f"plugin{i}" / "test-skill"
-                skill_dir.mkdir(parents=True)
+                plugin_dir = Path(tmpdir) / f"location{i}" / "duplicate-plugin"
+                plugin_dir.mkdir(parents=True)
 
-                skill_file = skill_dir / "SKILL.md"
-                skill_file.write_text("""---
-name: duplicate-skill
-description: A duplicate skill
----
+                manifest_dir = plugin_dir / ".plugin"
+                manifest_dir.mkdir()
 
-# Duplicate Skill
-""")
+                manifest = {
+                    "name": "duplicate-plugin",
+                    "version": "1.0.0",
+                    "description": "A duplicate plugin",
+                }
+                manifest_file = manifest_dir / "plugin.json"
+                manifest_file.write_text(json.dumps(manifest))
 
             # Load from both directories
-            skills = load_skills_from_plugins_dirs(
+            plugins = load_plugins_from_dirs(
                 [
-                    str(Path(tmpdir) / "plugin0"),
-                    str(Path(tmpdir) / "plugin1"),
+                    str(Path(tmpdir) / "location0" / "duplicate-plugin"),
+                    str(Path(tmpdir) / "location1" / "duplicate-plugin"),
                 ]
             )
 
-            # Should handle gracefully (no duplicates or error)
-            skill_names = [s.name for s in skills]
-            # Count occurrences of the skill name
-            assert skill_names.count("duplicate-skill") <= 1
+            # Should have only one plugin (deduplication by name)
+            plugin_names = [p.name for p in plugins]
+            assert plugin_names.count("duplicate-plugin") == 1
 
-    def test_load_skills_handles_file_path(self):
+    def test_load_plugins_handles_file_path(self):
         """Test that file paths (not directories) are handled gracefully."""
-        from openhands_cli.plugins import load_skills_from_plugins_dirs
+        from openhands_cli.plugins import load_plugins_from_dirs
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt") as f:
             f.write("not a directory")
             f.flush()
 
-            skills = load_skills_from_plugins_dirs([f.name])
-            assert skills == []
+            plugins = load_plugins_from_dirs([f.name])
+            assert plugins == []
+
+    def test_load_plugins_from_directory_containing_plugins(self):
+        """Test loading multiple plugins from a parent directory."""
+        from openhands_cli.plugins import load_plugins_from_dirs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create multiple plugins in a parent directory
+            for name in ["plugin-a", "plugin-b"]:
+                plugin_dir = Path(tmpdir) / name
+                plugin_dir.mkdir()
+
+                manifest_dir = plugin_dir / ".plugin"
+                manifest_dir.mkdir()
+
+                manifest = {
+                    "name": name,
+                    "version": "1.0.0",
+                    "description": f"Plugin {name}",
+                }
+                manifest_file = manifest_dir / "plugin.json"
+                manifest_file.write_text(json.dumps(manifest))
+
+            # Load all plugins from the parent directory
+            plugins = load_plugins_from_dirs([tmpdir])
+
+            # Should have loaded both plugins
+            assert len(plugins) == 2
+            plugin_names = {p.name for p in plugins}
+            assert plugin_names == {"plugin-a", "plugin-b"}

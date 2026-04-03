@@ -381,17 +381,8 @@ class AgentStore:
             }
         )
 
-    def _build_agent_context(
-        self, plugins_dirs: list[str] | None = None
-    ) -> AgentContext:
+    def _build_agent_context(self) -> AgentContext:
         skills = load_project_skills(get_work_dir())
-
-        # Load additional skills from plugins directories
-        if plugins_dirs:
-            from openhands_cli.plugins import load_skills_from_plugins_dirs
-
-            plugin_skills = load_skills_from_plugins_dirs(plugins_dirs)
-            skills.extend(plugin_skills)
 
         system_suffix = "\n".join(
             [
@@ -433,10 +424,24 @@ class AgentStore:
             agent.llm, session_id=session_id, llm_type="agent"
         )
 
-        agent_context = self._build_agent_context(plugins_dirs=plugins_dirs)
+        agent_context = self._build_agent_context()
 
+        # Start with enabled MCP servers from global config
         enabled_servers = list_enabled_servers()
-        mcp_config = {"mcpServers": enabled_servers} if enabled_servers else {}
+        mcp_config: dict[str, Any] = (
+            {"mcpServers": enabled_servers} if enabled_servers else {}
+        )
+
+        # Load and merge plugins from custom directories
+        if plugins_dirs:
+            from openhands_cli.plugins import load_plugins_from_dirs
+
+            plugins = load_plugins_from_dirs(plugins_dirs)
+            for plugin in plugins:
+                # Merge skills into agent context
+                agent_context = plugin.add_skills_to(agent_context)
+                # Merge MCP config (plugin config takes precedence)
+                mcp_config = plugin.add_mcp_config_to(mcp_config)
 
         condenser = self._maybe_build_condenser(agent, session_id=session_id)
 
