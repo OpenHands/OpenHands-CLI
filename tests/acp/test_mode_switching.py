@@ -571,3 +571,37 @@ class TestSwitchSessionModel:
         """Verify no-op when conversation is not a LocalConversation."""
         acp_agent._active_sessions["s1"] = MagicMock()  # not spec=LocalConversation
         acp_agent._switch_session_model("s1", "some/model")
+
+    def test_switches_to_existing_profile_by_name(self, acp_agent):
+        """When model_id has no slash and matches a saved profile, load it directly."""
+        mock_conversation = MagicMock(spec=LocalConversation)
+        mock_conversation.agent = MagicMock()
+        acp_agent._active_sessions["s1"] = mock_conversation
+
+        acp_agent._switch_session_model("s1", "my-fast-profile")
+
+        mock_conversation.switch_profile.assert_called_once_with("my-fast-profile")
+
+    def test_falls_back_to_model_string_when_profile_missing(self, acp_agent):
+        """No-slash arg without matching profile creates one on the fly."""
+        mock_llm = MagicMock()
+        mock_llm.model_copy.return_value = mock_llm
+
+        mock_conversation = MagicMock(spec=LocalConversation)
+        mock_conversation.agent = MagicMock()
+        mock_conversation.agent.llm = mock_llm
+        mock_conversation.switch_profile.side_effect = [
+            FileNotFoundError("no such profile"),
+            None,  # second call (after save) succeeds
+        ]
+
+        acp_agent._active_sessions["s1"] = mock_conversation
+
+        with patch("openhands.sdk.llm.llm_profile_store.LLMProfileStore") as MockStore:
+            mock_store = MockStore.return_value
+            acp_agent._switch_session_model("s1", "gpt-4o")
+
+        mock_llm.model_copy.assert_called_once_with(update={"model": "gpt-4o"})
+        mock_store.save.assert_called_once_with(
+            "gpt-4o", mock_llm, include_secrets=True
+        )

@@ -55,7 +55,7 @@ def get_available_slash_commands() -> list[AvailableCommand]:
             name="model",
             description="Show or set current session model",
             input=AvailableCommandInput(
-                root=UnstructuredCommandInput(hint="provider/model-name"),
+                root=UnstructuredCommandInput(hint="provider/model-name or profile"),
             ),
         ),
     ]
@@ -139,8 +139,10 @@ def get_model_help_text(current_model: str) -> str:
     """
     return (
         f"Current model: {current_model}\n\n"
-        f"Usage: /model <provider/model>\n"
-        f"Example: /model anthropic/claude-opus-4-6"
+        f"Usage: /model <provider/model>  or  /model <profile_name>\n"
+        f"Examples:\n"
+        f"  /model anthropic/claude-opus-4-6\n"
+        f"  /model my-fast-profile"
     )
 
 

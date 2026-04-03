@@ -201,7 +201,8 @@ class TestTextGeneration:
         """Test model help text generation."""
         help_text = get_model_help_text("openai/gpt-4o")
         assert "Current model: openai/gpt-4o" in help_text
-        assert "Usage: /model <provider/model>" in help_text
+        assert "/model <provider/model>" in help_text
+        assert "/model <profile_name>" in help_text
 
     def test_get_model_success_text(self):
         """Test model success text generation."""

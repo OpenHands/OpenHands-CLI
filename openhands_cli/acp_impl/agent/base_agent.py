@@ -11,7 +11,7 @@ import logging
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from acp import (
     Agent as ACPAgent,
@@ -45,6 +45,11 @@ from openhands.sdk import (
     BaseConversation,
     Message,
 )
+
+
+if TYPE_CHECKING:
+    from openhands.sdk import LocalConversation
+
 from openhands_cli import __version__
 from openhands_cli.acp_impl.agent.util import AgentType, get_session_mode_state
 from openhands_cli.acp_impl.confirmation import ConfirmationMode
@@ -222,33 +227,49 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
 
         return response_text
 
+    def _get_local_conversation(self, session_id: str) -> LocalConversation | None:
+        """Return the ``LocalConversation`` for *session_id*, or ``None``."""
+        from openhands.sdk import LocalConversation
+
+        conversation = self._active_sessions.get(session_id)
+        if isinstance(conversation, LocalConversation):
+            return conversation
+        return None
+
     def _get_current_model(self, session_id: str) -> str:
         """Return the active model identifier for a session, or ``'unknown'``."""
-        conversation = self._active_sessions.get(session_id)
+        conversation = self._get_local_conversation(session_id)
         if conversation is None:
             return "unknown"
-        agent = getattr(conversation, "agent", None)
-        llm = getattr(agent, "llm", None)
-        name = getattr(llm, "model", None)
-        if isinstance(name, str) and name.strip():
-            return name
-        return "unknown"
+        model = conversation.agent.llm.model
+        return model if model.strip() else "unknown"
 
     def _switch_session_model(self, session_id: str, model_id: str) -> None:
-        """Switch the LLM for an active session via the SDK profile API.
+        """Switch the LLM for an active session.
 
-        Creates (or overwrites) a persisted LLM profile derived from the
-        current session LLM with the requested *model_id*, then delegates to
-        ``LocalConversation.switch_profile`` for a clean, registry-tracked
-        switch.
+        If *model_id* matches a saved LLM profile (no ``/`` and the profile
+        file exists), it is loaded directly via
+        ``LocalConversation.switch_profile``.
+
+        Otherwise *model_id* is treated as a ``provider/model`` string: a new
+        profile is derived from the current session LLM, persisted, and
+        switched to.
         """
-        from openhands.sdk import LocalConversation
         from openhands.sdk.llm.llm_profile_store import LLMProfileStore
 
-        conversation = self._active_sessions.get(session_id)
-        if not isinstance(conversation, LocalConversation):
+        conversation = self._get_local_conversation(session_id)
+        if conversation is None:
             logger.warning("Cannot switch model: session %s not found", session_id)
             return
+
+        # Try loading an existing profile when the argument has no slash.
+        if "/" not in model_id:
+            try:
+                conversation.switch_profile(model_id)
+                logger.info("Switched session %s to profile %s", session_id, model_id)
+                return
+            except (FileNotFoundError, ValueError):
+                pass  # not a saved profile; fall through to model-string path
 
         new_llm = conversation.agent.llm.model_copy(update={"model": model_id})
         profile_name = model_id.replace("/", "--")
