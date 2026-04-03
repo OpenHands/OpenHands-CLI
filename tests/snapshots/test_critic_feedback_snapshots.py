@@ -169,5 +169,3 @@ class TestCriticFeedbackWidgetSnapshots:
             CriticFeedbackInScrollApp(),
             terminal_size=(100, 20),
         )
-
-

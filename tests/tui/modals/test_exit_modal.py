@@ -8,6 +8,7 @@ from textual.widgets import Button
 
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 
+
 # Path to exit modal TCSS relative to the modal module
 EXIT_MODAL_TCSS_PATH = (
     Path(__file__).resolve().parents[3]
@@ -41,10 +42,10 @@ class TestExitModalCssScoping:
         )
 
         assert not unscoped_button_rules, (
-            f"Found unscoped global 'Button' rule(s) in exit_modal.tcss. "
-            f"Button rules must be scoped to a parent (e.g., '#dialog Button') "
-            f"to avoid overriding button styles in other widgets. "
-            f"See: https://github.com/OpenHands/OpenHands-CLI/issues/641"
+            "Found unscoped global 'Button' rule(s) in exit_modal.tcss. "
+            "Button rules must be scoped to a parent (e.g., '#dialog Button') "
+            "to avoid overriding button styles in other widgets. "
+            "See: https://github.com/OpenHands/OpenHands-CLI/issues/641"
         )
 
 
