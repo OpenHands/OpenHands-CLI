@@ -11,6 +11,7 @@ from openhands_cli.argparsers.serve_parser import add_serve_parser
 from openhands_cli.argparsers.util import (
     add_confirmation_mode_args,
     add_env_override_args,
+    add_plugins_dir_args,
     add_resume_args,
 )
 from openhands_cli.argparsers.view_parser import add_view_parser
@@ -40,6 +41,7 @@ def create_main_parser() -> argparse.ArgumentParser:
                 openhands --resume conversation-id  # Resume conversation
                 openhands --yolo                    # Auto-approve all actions
                 openhands --llm-approve             # LLM-based approval mode
+                openhands --plugins-dir ./my-plugin # Load plugins from directory
                 openhands cloud -t "Fix bug"        # Create cloud conversation
                 openhands serve                     # Launch GUI server
                 openhands serve --gpu               # Launch with GPU support
@@ -106,6 +108,9 @@ def create_main_parser() -> argparse.ArgumentParser:
 
     # Environment variable override option
     add_env_override_args(parser)
+
+    # Plugins directory option
+    add_plugins_dir_args(parser)
 
     # Subcommands
     subparsers = parser.add_subparsers(dest="command", help="Additional commands")

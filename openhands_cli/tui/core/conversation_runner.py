@@ -54,6 +54,7 @@ class ConversationRunner:
         *,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
+        plugins_dirs: list[str] | None = None,
     ) -> None:
         """Initialize the conversation runner.
 
@@ -67,6 +68,7 @@ class ConversationRunner:
             env_overrides_enabled: If True, environment variables will override
                 stored LLM settings.
             critic_disabled: If True, critic functionality will be disabled.
+            plugins_dirs: Optional list of directories to load plugins (skills) from.
         """
         self.visualizer = visualizer
 
@@ -78,6 +80,7 @@ class ConversationRunner:
             event_callback=event_callback,
             env_overrides_enabled=env_overrides_enabled,
             critic_disabled=critic_disabled,
+            plugins_dirs=plugins_dirs,
         )
 
         self._running = False

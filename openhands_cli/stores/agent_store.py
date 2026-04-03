@@ -310,6 +310,7 @@ class AgentStore:
         *,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
+        plugins_dirs: list[str] | None = None,
     ) -> Agent | None:
         """Load an Agent and apply runtime configuration.
 
@@ -330,6 +331,7 @@ class AgentStore:
                 LLM metadata tagging.
             env_overrides_enabled: Whether env overrides are enabled.
             critic_disabled: If True, do not configure a critic.
+            plugins_dirs: Optional list of directories to load plugins (skills) from.
 
         Returns:
             A fully configured Agent, or None if no persisted agent exists and
@@ -355,6 +357,7 @@ class AgentStore:
             agent,
             session_id,
             critic_disabled=critic_disabled,
+            plugins_dirs=plugins_dirs,
         )
 
     def _resolve_tools(self, session_id: str | None) -> list[Tool]:
@@ -378,8 +381,18 @@ class AgentStore:
             }
         )
 
-    def _build_agent_context(self) -> AgentContext:
+    def _build_agent_context(
+        self, plugins_dirs: list[str] | None = None
+    ) -> AgentContext:
         skills = load_project_skills(get_work_dir())
+
+        # Load additional skills from plugins directories
+        if plugins_dirs:
+            from openhands_cli.plugins import load_skills_from_plugins_dirs
+
+            plugin_skills = load_skills_from_plugins_dirs(plugins_dirs)
+            skills.extend(plugin_skills)
+
         system_suffix = "\n".join(
             [
                 f"Your current working directory is: {get_work_dir()}",
@@ -413,13 +426,14 @@ class AgentStore:
         session_id: str | None = None,
         *,
         critic_disabled: bool = False,
+        plugins_dirs: list[str] | None = None,
     ) -> Agent:
         updated_tools = self._resolve_tools(session_id)
         updated_llm = self._with_llm_metadata(
             agent.llm, session_id=session_id, llm_type="agent"
         )
 
-        agent_context = self._build_agent_context()
+        agent_context = self._build_agent_context(plugins_dirs=plugins_dirs)
 
         enabled_servers = list_enabled_servers()
         mcp_config = {"mcpServers": enabled_servers} if enabled_servers else {}

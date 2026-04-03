@@ -224,6 +224,7 @@ def main() -> None:
                 json_mode=json_mode,
                 env_overrides_enabled=env_overrides_enabled,
                 critic_disabled=critic_disabled,
+                plugins_dirs=args.plugins_dir,
             )
             console.print("Goodbye! 👋", style=OPENHANDS_THEME.success)
             # Show conversation ID if available (may be None if app exited early)

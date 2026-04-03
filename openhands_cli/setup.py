@@ -32,6 +32,7 @@ def load_agent_specs(
     *,
     env_overrides_enabled: bool = False,
     critic_disabled: bool = False,
+    plugins_dirs: list[str] | None = None,
 ) -> Agent:
     """Load agent specifications.
 
@@ -43,6 +44,7 @@ def load_agent_specs(
             stored LLM settings, and agent can be created from env vars if no
             disk config exists.
         critic_disabled: If True, critic functionality will be disabled.
+        plugins_dirs: Optional list of directories to load plugins (skills) from.
 
     Returns:
         Configured Agent instance
@@ -55,6 +57,7 @@ def load_agent_specs(
         session_id=conversation_id,
         env_overrides_enabled=env_overrides_enabled,
         critic_disabled=critic_disabled,
+        plugins_dirs=plugins_dirs,
     )
     if not agent:
         raise MissingAgentSpec(
@@ -98,6 +101,7 @@ def setup_conversation(
     *,
     env_overrides_enabled: bool = False,
     critic_disabled: bool = False,
+    plugins_dirs: list[str] | None = None,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
@@ -111,6 +115,7 @@ def setup_conversation(
             stored LLM settings, and agent can be created from env vars if no
             disk config exists.
         critic_disabled: If True, critic functionality will be disabled.
+        plugins_dirs: Optional list of directories to load plugins (skills) from.
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
@@ -122,6 +127,7 @@ def setup_conversation(
         str(conversation_id),
         env_overrides_enabled=env_overrides_enabled,
         critic_disabled=critic_disabled,
+        plugins_dirs=plugins_dirs,
     )
 
     # Prepare callbacks list
