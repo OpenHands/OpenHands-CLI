@@ -521,12 +521,14 @@ def mock_llm_with_critic(
             *,
             env_overrides_enabled: bool = False,
             critic_disabled: bool = False,
+            plugins_dirs: list[str] | None = None,
         ):
             agent = original_load_or_create(
                 self,
                 session_id=session_id,
                 env_overrides_enabled=env_overrides_enabled,
                 critic_disabled=critic_disabled,
+                plugins_dirs=plugins_dirs,
             )
             if agent is not None and not critic_disabled:
                 # Inject mock critic using model_copy
