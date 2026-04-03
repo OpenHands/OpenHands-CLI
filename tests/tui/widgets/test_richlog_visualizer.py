@@ -1,7 +1,7 @@
 """Tests for ConversationVisualizer and Chinese character markup handling."""
 
 from typing import TYPE_CHECKING, cast
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from rich.errors import MarkupError
@@ -1441,3 +1441,85 @@ class TestDefaultAgentPrefixBehavior:
         assert "(Code Reviewer Agent)" in title
         # Should contain the command
         assert "git diff" in title
+
+
+# ============================================================================
+# Tests for critic feedback widget dismissal on new events (GitHub issue #641)
+# ============================================================================
+
+
+class TestCriticFeedbackDismissalOnNewEvent:
+    """Tests that CriticFeedbackWidget is dismissed when new events arrive.
+
+    Relates to: https://github.com/OpenHands/OpenHands-CLI/issues/641
+    The critic feedback buttons ("[1] Accurate", etc.) should not remain visible
+    when subsequent events/actions appear in the conversation history.
+    """
+
+    def test_on_event_dismisses_pending_feedback_widgets(self, mock_cli_settings):
+        """on_event should dismiss pending CriticFeedbackWidgets.
+
+        When a new event arrives, any existing CriticFeedbackWidget should be
+        removed because the agent has continued working and the feedback
+        opportunity has passed.
+        """
+        app: OpenHandsApp = cast(OpenHandsApp, App())
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)
+
+        # Mock _dismiss_pending_feedback_widgets to track calls
+        visualizer._dismiss_pending_feedback_widgets = MagicMock()  # type: ignore[method-assign]
+        # Mock _add_widget_to_ui since container isn't mounted in tests
+        visualizer._add_widget_to_ui = MagicMock()  # type: ignore[method-assign]
+        # Mock _run_on_main_thread to execute immediately (we're in a test)
+        visualizer._run_on_main_thread = lambda func, *args: func(*args)  # type: ignore[method-assign]
+
+        event = create_terminal_action_event("echo hello", "Say hello")
+
+        with mock_cli_settings(visualizer=visualizer):
+            visualizer.on_event(event)
+
+        # _dismiss_pending_feedback_widgets should have been called
+        visualizer._dismiss_pending_feedback_widgets.assert_called()
+
+    def test_on_event_dismisses_feedback_before_adding_new_widgets(
+        self, mock_cli_settings
+    ):
+        """Feedback widgets should be dismissed before new event widgets are added.
+
+        This ensures the dismiss happens at the start of on_event, not after
+        a new critic result might be added.
+        """
+        app: OpenHandsApp = cast(OpenHandsApp, App())
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(container, app)
+
+        call_order: list[str] = []
+
+        original_dismiss = visualizer._dismiss_pending_feedback_widgets
+        original_add = visualizer._add_widget_to_ui
+
+        def tracking_dismiss():
+            call_order.append("dismiss")
+            original_dismiss()
+
+        def tracking_add(widget):
+            call_order.append("add_widget")
+            # Don't actually mount (no running app in unit test)
+
+        visualizer._dismiss_pending_feedback_widgets = tracking_dismiss  # type: ignore[method-assign]
+        visualizer._add_widget_to_ui = tracking_add  # type: ignore[method-assign]
+        # Execute functions immediately instead of scheduling on main thread
+        visualizer._run_on_main_thread = lambda func, *args: func(*args)  # type: ignore[method-assign]
+
+        event = create_terminal_action_event("ls -la", "List files")
+
+        with mock_cli_settings(visualizer=visualizer):
+            visualizer.on_event(event)
+
+        # Dismiss should happen before any widget is added
+        assert len(call_order) >= 1
+        assert call_order[0] == "dismiss", (
+            f"Expected dismiss to be called first, but call order was: {call_order}"
+        )
+
