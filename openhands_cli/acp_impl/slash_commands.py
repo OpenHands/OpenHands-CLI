@@ -128,6 +128,21 @@ def get_confirm_success_text(mode: ConfirmationMode) -> str:
     return f"Confirmation mode set to: {mode}\n\n{CONFIRMATION_MODES[mode]['long']}"
 
 
+def _list_profile_names() -> list[str]:
+    """Return sorted profile names from ``~/.openhands/profiles/``."""
+    from pathlib import Path
+
+    profile_dir = Path.home() / ".openhands" / "profiles"
+    if not profile_dir.is_dir():
+        return []
+    try:
+        return sorted(
+            p.stem for p in profile_dir.glob("*.json") if not p.stem.startswith(".")
+        )
+    except (OSError, PermissionError):
+        return []
+
+
 def get_model_help_text(current_model: str) -> str:
     """Get help text for /model command.
 
@@ -137,11 +152,16 @@ def get_model_help_text(current_model: str) -> str:
     Returns:
         Formatted help text
     """
+    profiles = _list_profile_names()
+    profile_list = (
+        "\n".join(f"  - {p}" for p in profiles) if profiles else "  (none found)"
+    )
     return (
         f"Current model: {current_model}\n\n"
         f"Usage: /model <profile>\n"
         f"Example: /model my-fast-profile\n\n"
-        f"Profiles live in ~/.openhands/profiles/<name>.json"
+        f"Profiles in ~/.openhands/profiles/:\n"
+        f"{profile_list}"
     )
 
 

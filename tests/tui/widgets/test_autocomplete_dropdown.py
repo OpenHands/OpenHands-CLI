@@ -1,5 +1,6 @@
 """Tests for AutoCompleteDropdown widget functionality."""
 
+from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -37,9 +38,13 @@ class TestDetectCompletionType:
             ("/h", CompletionType.COMMAND),
             ("/help", CompletionType.COMMAND),
             ("  /help", CompletionType.COMMAND),  # Leading whitespace
-            # Command with space ends completion
+            # Command with space ends completion (no arg-completions)
             ("/help ", CompletionType.NONE),
             ("/help arg", CompletionType.NONE),
+            # /model triggers PROFILE arg-completion
+            ("/model ", CompletionType.PROFILE),
+            ("/model my-", CompletionType.PROFILE),
+            ("  /model ", CompletionType.PROFILE),
             # File completion
             ("@", CompletionType.FILE),
             ("@R", CompletionType.FILE),
@@ -567,3 +572,107 @@ class TestApplyCompletion:
 
         # Verify move_cursor was called with document.end
         mock_widget.move_cursor.assert_called_once_with(mock_widget.document.end)
+
+    def test_apply_completion_for_profile_keeps_command_prefix(self):
+        """Profile completion keeps /model and replaces the argument."""
+        mock_widget = create_mock_single_line_widget("/model my-")
+        mock_widget.document = mock.MagicMock()
+        mock_widget.document.end = (0, 18)
+        autocomplete = AutoCompleteDropdown(mock_widget, command_candidates=[])
+
+        item = CompletionItem(
+            display_text="my-fast-profile",
+            completion_value="my-fast-profile",
+            completion_type=CompletionType.PROFILE,
+        )
+
+        autocomplete.apply_completion(item)
+
+        assert mock_widget.text == "/model my-fast-profile"
+        mock_widget.move_cursor.assert_called_once_with((0, 18))
+
+
+class TestProfileCandidates:
+    """Tests for LLM profile argument completion."""
+
+    @pytest.fixture
+    def profile_dir(self, tmp_path):
+        """Create a temporary profile directory with test profiles."""
+        d = tmp_path / "profiles"
+        d.mkdir()
+        (d / "fast.json").write_text("{}")
+        (d / "cheap.json").write_text("{}")
+        (d / "reasoning.json").write_text("{}")
+        (d / ".hidden.json").write_text("{}")
+        return d
+
+    @pytest.fixture
+    def autocomplete(self, profile_dir):
+        mock_widget = create_mock_single_line_widget()
+        ac = AutoCompleteDropdown(mock_widget, command_candidates=[])
+        # Patch module-level _PROFILE_DIR for this instance
+        with mock.patch(
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown._PROFILE_DIR",
+            profile_dir,
+        ):
+            yield ac
+
+    def _get(self, autocomplete, text, profile_dir):
+        with mock.patch(
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown._PROFILE_DIR",
+            profile_dir,
+        ):
+            return autocomplete._get_profile_candidates(text)
+
+    def test_lists_all_profiles_on_bare_model(self, autocomplete, profile_dir):
+        """Bare '/model ' returns all non-hidden profiles."""
+        candidates = self._get(autocomplete, "/model ", profile_dir)
+        names = [c.completion_value for c in candidates]
+        assert names == ["cheap", "fast", "reasoning"]
+
+    def test_filters_by_prefix(self, autocomplete, profile_dir):
+        """Typing partial name filters candidates."""
+        candidates = self._get(autocomplete, "/model f", profile_dir)
+        assert len(candidates) == 1
+        assert candidates[0].completion_value == "fast"
+
+    def test_skips_hidden_profiles(self, autocomplete, profile_dir):
+        """Profiles starting with '.' are excluded."""
+        candidates = self._get(autocomplete, "/model .", profile_dir)
+        assert candidates == []
+
+    def test_returns_empty_when_no_profiles_dir(self):
+        """Returns empty list when profile directory does not exist."""
+        mock_widget = create_mock_single_line_widget()
+        ac = AutoCompleteDropdown(mock_widget, command_candidates=[])
+        with mock.patch(
+            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown._PROFILE_DIR",
+            Path("/nonexistent/path"),
+        ):
+            candidates = ac._get_profile_candidates("/model ")
+        assert candidates == []
+
+    def test_candidates_have_correct_type(self, autocomplete, profile_dir):
+        """All profile candidates are typed PROFILE."""
+        candidates = self._get(autocomplete, "/model ", profile_dir)
+        for c in candidates:
+            assert c.completion_type == CompletionType.PROFILE
+
+    def test_update_candidates_routes_to_profile(self, profile_dir):
+        """update_candidates calls _get_profile_candidates for /model."""
+        mock_widget = create_mock_single_line_widget("/model f")
+        ac = AutoCompleteDropdown(mock_widget, command_candidates=[])
+        with (
+            mock.patch(
+                "openhands_cli.tui.widgets.user_input"
+                ".autocomplete_dropdown._PROFILE_DIR",
+                profile_dir,
+            ),
+            mock.patch.object(ac, "show_dropdown") as mock_show,
+        ):
+            ac.update_candidates()
+
+        mock_show.assert_called_once()
+        items = mock_show.call_args[0][0]
+        assert len(items) == 1
+        assert items[0].completion_value == "fast"
