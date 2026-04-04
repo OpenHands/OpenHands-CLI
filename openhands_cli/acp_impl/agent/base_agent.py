@@ -244,46 +244,39 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         model = conversation.agent.llm.model
         return model if model.strip() else "unknown"
 
-    def _switch_session_model(self, session_id: str, model_id: str) -> None:
-        """Switch the LLM for an active session.
+    def _switch_session_model(self, session_id: str, profile_name: str) -> None:
+        """Switch the LLM for an active session to a saved profile.
 
-        If *model_id* matches a saved LLM profile (no ``/`` and the profile
-        file exists), it is loaded directly via
-        ``LocalConversation.switch_profile``.
-
-        Otherwise *model_id* is treated as a ``provider/model`` string: a new
-        profile is derived from the current session LLM, persisted, and
-        switched to.
+        Loads the named profile via ``LocalConversation.switch_profile``.
+        The profile must already exist in ``~/.openhands/profiles/``.
         """
-        from openhands.sdk.llm.llm_profile_store import LLMProfileStore
-
         conversation = self._get_local_conversation(session_id)
         if conversation is None:
-            logger.warning("Cannot switch model: session %s not found", session_id)
+            logger.warning(
+                "Cannot switch model: session %s not found",
+                session_id,
+            )
             return
 
-        # Try loading an existing profile when the argument has no slash.
-        if "/" not in model_id:
-            try:
-                conversation.switch_profile(model_id)
-                logger.info("Switched session %s to profile %s", session_id, model_id)
-                return
-            except (FileNotFoundError, ValueError):
-                pass  # not a saved profile; fall through to model-string path
-
-        new_llm = conversation.agent.llm.model_copy(update={"model": model_id})
-        profile_name = model_id.replace("/", "--")
-
-        LLMProfileStore().save(profile_name, new_llm, include_secrets=True)
         conversation.switch_profile(profile_name)
-        logger.info("Switched session %s to model %s", session_id, model_id)
+        logger.info(
+            "Switched session %s to profile %s",
+            session_id,
+            profile_name,
+        )
 
     async def _cmd_model(self, session_id: str, argument: str) -> str:
         """Handle /model command."""
         current_model = self._get_current_model(session_id)
         response_text, new_model = handle_model_argument(current_model, argument)
         if new_model is not None:
-            self._switch_session_model(session_id, new_model)
+            try:
+                self._switch_session_model(session_id, new_model)
+            except FileNotFoundError:
+                return (
+                    f"Profile '{new_model}' not found.\n\n"
+                    f"Profiles live in ~/.openhands/profiles/<name>.json"
+                )
         return response_text
 
     async def initialize(

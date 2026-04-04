@@ -529,51 +529,15 @@ class TestSlashCommandIntegration:
 
 
 class TestSwitchSessionModel:
-    """Unit tests for _switch_session_model (SDK profile-based switching)."""
+    """Unit tests for _switch_session_model (profile-based switching)."""
 
     @pytest.fixture
     def acp_agent(self):
         conn = AsyncMock()
         return LocalOpenHandsACPAgent(conn, "always-ask")
 
-    def test_saves_profile_and_calls_switch_profile(self, acp_agent):
-        """Verify that _switch_session_model persists a profile and delegates."""
-        mock_llm = MagicMock()
-        mock_llm.model_copy.return_value = mock_llm
-
-        # spec gives isinstance() truthiness; agent is set separately because
-        # it's a dynamic attribute not present on the class signature.
-        mock_conversation = MagicMock(spec=LocalConversation)
-        mock_conversation.agent = MagicMock()
-        mock_conversation.agent.llm = mock_llm
-
-        acp_agent._active_sessions["s1"] = mock_conversation
-
-        with patch("openhands.sdk.llm.llm_profile_store.LLMProfileStore") as MockStore:
-            mock_store = MockStore.return_value
-            acp_agent._switch_session_model("s1", "anthropic/claude-opus-4-6")
-
-        mock_llm.model_copy.assert_called_once_with(
-            update={"model": "anthropic/claude-opus-4-6"}
-        )
-        mock_store.save.assert_called_once_with(
-            "anthropic--claude-opus-4-6", mock_llm, include_secrets=True
-        )
-        mock_conversation.switch_profile.assert_called_once_with(
-            "anthropic--claude-opus-4-6"
-        )
-
-    def test_skips_when_session_not_found(self, acp_agent):
-        """Verify no-op when session is not in _active_sessions."""
-        acp_agent._switch_session_model("missing", "some/model")
-
-    def test_skips_when_conversation_is_not_local(self, acp_agent):
-        """Verify no-op when conversation is not a LocalConversation."""
-        acp_agent._active_sessions["s1"] = MagicMock()  # not spec=LocalConversation
-        acp_agent._switch_session_model("s1", "some/model")
-
-    def test_switches_to_existing_profile_by_name(self, acp_agent):
-        """When model_id has no slash and matches a saved profile, load it directly."""
+    def test_switches_to_profile(self, acp_agent):
+        """Verify switch_profile is called with the profile name."""
         mock_conversation = MagicMock(spec=LocalConversation)
         mock_conversation.agent = MagicMock()
         acp_agent._active_sessions["s1"] = mock_conversation
@@ -582,26 +546,26 @@ class TestSwitchSessionModel:
 
         mock_conversation.switch_profile.assert_called_once_with("my-fast-profile")
 
-    def test_falls_back_to_model_string_when_profile_missing(self, acp_agent):
-        """No-slash arg without matching profile creates one on the fly."""
-        mock_llm = MagicMock()
-        mock_llm.model_copy.return_value = mock_llm
+    def test_skips_when_session_not_found(self, acp_agent):
+        """Verify no-op when session is not in _active_sessions."""
+        acp_agent._switch_session_model("missing", "some-profile")
 
+    def test_skips_when_conversation_is_not_local(self, acp_agent):
+        """Verify no-op when conversation is not a LocalConversation."""
+        acp_agent._active_sessions["s1"] = MagicMock()
+        acp_agent._switch_session_model("s1", "some-profile")
+
+    @pytest.mark.asyncio
+    async def test_missing_profile_returns_error_text(self, acp_agent):
+        """_cmd_model returns helpful message when profile not found."""
         mock_conversation = MagicMock(spec=LocalConversation)
         mock_conversation.agent = MagicMock()
-        mock_conversation.agent.llm = mock_llm
-        mock_conversation.switch_profile.side_effect = [
-            FileNotFoundError("no such profile"),
-            None,  # second call (after save) succeeds
-        ]
-
+        mock_conversation.agent.llm.model = "current-model"
+        mock_conversation.switch_profile.side_effect = FileNotFoundError
         acp_agent._active_sessions["s1"] = mock_conversation
 
-        with patch("openhands.sdk.llm.llm_profile_store.LLMProfileStore") as MockStore:
-            mock_store = MockStore.return_value
-            acp_agent._switch_session_model("s1", "gpt-4o")
+        result = await acp_agent._cmd_model("s1", "nope")
 
-        mock_llm.model_copy.assert_called_once_with(update={"model": "gpt-4o"})
-        mock_store.save.assert_called_once_with(
-            "gpt-4o", mock_llm, include_secrets=True
-        )
+        assert "not found" in result
+        assert "nope" in result
+        assert "~/.openhands/profiles/" in result
