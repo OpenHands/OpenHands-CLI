@@ -1,6 +1,7 @@
 """Slash commands implementation for ACP."""
 
 import logging
+from pathlib import Path
 
 from acp.schema import AvailableCommand, AvailableCommandInput, UnstructuredCommandInput
 
@@ -12,6 +13,7 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 from openhands_cli.acp_impl.confirmation import CONFIRMATION_MODES, ConfirmationMode
+from openhands_cli.locations import get_profiles_dir
 from openhands_cli.shared.slash_commands import (
     parse_slash_command as parse_slash_command,
 )
@@ -129,17 +131,21 @@ def get_confirm_success_text(mode: ConfirmationMode) -> str:
 
 
 def _list_profile_names() -> list[str]:
-    """Return sorted profile names from ``~/.openhands/profiles/``."""
-    from pathlib import Path
-
-    profile_dir = Path.home() / ".openhands" / "profiles"
+    """Return sorted profile names from the profiles directory."""
+    profile_dir = Path(get_profiles_dir())
     if not profile_dir.is_dir():
+        logger.debug("Profiles directory does not exist: %s", profile_dir)
         return []
     try:
         return sorted(
             p.stem for p in profile_dir.glob("*.json") if not p.stem.startswith(".")
         )
     except (OSError, PermissionError):
+        logger.warning(
+            "Unable to read profiles directory: %s",
+            profile_dir,
+            exc_info=True,
+        )
         return []
 
 
@@ -153,14 +159,16 @@ def get_model_help_text(current_model: str) -> str:
         Formatted help text
     """
     profiles = _list_profile_names()
-    profile_list = (
-        "\n".join(f"  - {p}" for p in profiles) if profiles else "  (none found)"
-    )
+    profiles_dir = get_profiles_dir()
+    if profiles:
+        profile_list = "\n".join(f"  - {p}" for p in profiles)
+    else:
+        profile_list = "  (no profiles saved)"
     return (
         f"Current model: {current_model}\n\n"
         f"Usage: /model <profile>\n"
         f"Example: /model my-fast-profile\n\n"
-        f"Profiles in ~/.openhands/profiles/:\n"
+        f"Profiles in {profiles_dir}:\n"
         f"{profile_list}"
     )
 
@@ -178,7 +186,7 @@ def get_model_success_text(previous_model: str, new_model: str) -> str:
     if previous_model == new_model:
         return f"Model unchanged: {new_model}"
 
-    return f"Model set to: {new_model}\n\nPrevious model: {previous_model}"
+    return f"Model set to: {new_model}\nPrevious model: {previous_model}"
 
 
 def handle_model_argument(current_model: str, argument: str) -> tuple[str, str | None]:

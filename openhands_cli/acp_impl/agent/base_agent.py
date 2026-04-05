@@ -72,6 +72,7 @@ from openhands_cli.acp_impl.utils import (
     convert_acp_prompt_to_message_content,
 )
 from openhands_cli.auth.token_storage import TokenStorage
+from openhands_cli.locations import get_profiles_dir
 from openhands_cli.setup import MissingAgentSpec
 from openhands_cli.utils import extract_text_from_message_content
 
@@ -266,16 +267,21 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         )
 
     async def _cmd_model(self, session_id: str, argument: str) -> str:
-        """Handle /model command."""
+        """Handle /model command.
+
+        Kept async to match the ``_cmd_*`` handler interface awaited by
+        the prompt dispatcher.
+        """
         current_model = self._get_current_model(session_id)
         response_text, new_model = handle_model_argument(current_model, argument)
         if new_model is not None:
             try:
                 self._switch_session_model(session_id, new_model)
             except FileNotFoundError:
+                profiles_dir = get_profiles_dir()
                 return (
                     f"Profile '{new_model}' not found.\n\n"
-                    f"Profiles live in ~/.openhands/profiles/<name>.json"
+                    f"Profiles live in {profiles_dir}/<name>.json"
                 )
         return response_text
 

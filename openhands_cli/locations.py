@@ -30,6 +30,17 @@ def get_work_dir() -> str:
     return os.environ.get("OPENHANDS_WORK_DIR", os.getcwd())
 
 
+def get_profiles_dir() -> str:
+    """Get the directory for LLM profiles.
+
+    Can be overridden via OPENHANDS_PROFILES_DIR environment variable.
+    """
+    return os.environ.get(
+        "OPENHANDS_PROFILES_DIR",
+        os.path.join(get_persistence_dir(), "profiles"),
+    )
+
+
 # Static configuration values (don't need to be dynamic)
 AGENT_SETTINGS_PATH = "agent_settings.json"
 

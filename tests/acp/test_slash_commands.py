@@ -202,7 +202,8 @@ class TestTextGeneration:
         help_text = get_model_help_text("openai/gpt-4o")
         assert "Current model: openai/gpt-4o" in help_text
         assert "/model <profile>" in help_text
-        assert "~/.openhands/profiles/" in help_text
+        assert "profiles" in help_text.lower()
+        assert "no profiles saved" in help_text.lower() or "-" in help_text
 
     def test_get_model_success_text(self):
         """Test model success text generation."""

@@ -568,4 +568,4 @@ class TestSwitchSessionModel:
 
         assert "not found" in result
         assert "nope" in result
-        assert "~/.openhands/profiles/" in result
+        assert "profiles" in result

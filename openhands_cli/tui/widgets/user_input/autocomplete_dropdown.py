@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Final
 
@@ -7,7 +8,7 @@ from textual.containers import Container
 from textual.widgets import OptionList
 from textual.widgets.option_list import Option
 
-from openhands_cli.locations import get_work_dir
+from openhands_cli.locations import get_profiles_dir, get_work_dir
 from openhands_cli.tui.widgets.user_input.models import (
     CompletionItem,
     CompletionType,
@@ -17,13 +18,13 @@ from openhands_cli.tui.widgets.user_input.single_line_input import (
 )
 
 
+logger = logging.getLogger(__name__)
+
 # Slash commands whose arguments trigger sub-completions, mapped to
 # the ``CompletionType`` used for their candidates.
 _ARG_COMPLETABLE_COMMANDS: Final[dict[str, CompletionType]] = {
     "/model": CompletionType.PROFILE,
 }
-
-_PROFILE_DIR: Final[Path] = Path.home() / ".openhands" / "profiles"
 
 
 class AutoCompleteDropdown(Container):
@@ -278,12 +279,13 @@ class AutoCompleteDropdown(Container):
         parts = text.lstrip().split(None, 1)
         search = parts[1].lower() if len(parts) > 1 else ""
 
-        candidates: list[CompletionItem] = []
-        if not _PROFILE_DIR.is_dir():
-            return candidates
+        profile_dir = Path(get_profiles_dir())
+        if not profile_dir.is_dir():
+            return []
 
+        candidates: list[CompletionItem] = []
         try:
-            for path in sorted(_PROFILE_DIR.glob("*.json")):
+            for path in sorted(profile_dir.glob("*.json")):
                 name = path.stem
                 if name.startswith("."):
                     continue
@@ -297,7 +299,11 @@ class AutoCompleteDropdown(Container):
                     )
                 )
         except (OSError, PermissionError):
-            pass
+            logger.warning(
+                "Unable to read profiles directory: %s",
+                profile_dir,
+                exc_info=True,
+            )
 
         return candidates
 

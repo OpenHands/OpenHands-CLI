@@ -1,6 +1,5 @@
 """Tests for AutoCompleteDropdown widget functionality."""
 
-from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -606,22 +605,19 @@ class TestProfileCandidates:
         (d / ".hidden.json").write_text("{}")
         return d
 
+    _PATCH_TARGET = (
+        "openhands_cli.tui.widgets.user_input.autocomplete_dropdown.get_profiles_dir"
+    )
+
     @pytest.fixture
     def autocomplete(self, profile_dir):
         mock_widget = create_mock_single_line_widget()
         ac = AutoCompleteDropdown(mock_widget, command_candidates=[])
-        # Patch module-level _PROFILE_DIR for this instance
-        with mock.patch(
-            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown._PROFILE_DIR",
-            profile_dir,
-        ):
+        with mock.patch(self._PATCH_TARGET, return_value=str(profile_dir)):
             yield ac
 
     def _get(self, autocomplete, text, profile_dir):
-        with mock.patch(
-            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown._PROFILE_DIR",
-            profile_dir,
-        ):
+        with mock.patch(self._PATCH_TARGET, return_value=str(profile_dir)):
             return autocomplete._get_profile_candidates(text)
 
     def test_lists_all_profiles_on_bare_model(self, autocomplete, profile_dir):
@@ -645,10 +641,7 @@ class TestProfileCandidates:
         """Returns empty list when profile directory does not exist."""
         mock_widget = create_mock_single_line_widget()
         ac = AutoCompleteDropdown(mock_widget, command_candidates=[])
-        with mock.patch(
-            "openhands_cli.tui.widgets.user_input.autocomplete_dropdown._PROFILE_DIR",
-            Path("/nonexistent/path"),
-        ):
+        with mock.patch(self._PATCH_TARGET, return_value="/nonexistent/path"):
             candidates = ac._get_profile_candidates("/model ")
         assert candidates == []
 
@@ -664,9 +657,8 @@ class TestProfileCandidates:
         ac = AutoCompleteDropdown(mock_widget, command_candidates=[])
         with (
             mock.patch(
-                "openhands_cli.tui.widgets.user_input"
-                ".autocomplete_dropdown._PROFILE_DIR",
-                profile_dir,
+                self._PATCH_TARGET,
+                return_value=str(profile_dir),
             ),
             mock.patch.object(ac, "show_dropdown") as mock_show,
         ):
