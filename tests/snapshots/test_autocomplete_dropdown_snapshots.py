@@ -130,3 +130,59 @@ class TestAutocompleteDropdownSnapshots:
             terminal_size=(100, 30),
             run_before=show_dropdown,
         )
+
+
+class TestProfileCompletionSnapshots:
+    """Snapshot tests for LLM profile autocomplete after ``/model ``."""
+
+    def test_profile_dropdown_all(self, snap_compare, tmp_path, monkeypatch):
+        """Dropdown lists all saved profiles after '/model '."""
+        profiles = tmp_path / "profiles"
+        profiles.mkdir()
+        for name in ("fast", "cheap", "reasoning"):
+            (profiles / f"{name}.json").write_text("{}")
+
+        monkeypatch.setattr(
+            "openhands_cli.tui.widgets.user_input"
+            ".autocomplete_dropdown.get_profiles_dir",
+            lambda: str(profiles),
+        )
+
+        async def type_model(pilot):
+            field = pilot.app.query_one(InputField)
+            field.single_line_widget.text = "/model "
+            field.single_line_widget.move_cursor(field.single_line_widget.document.end)
+            field.autocomplete.update_candidates()
+            await pilot.pause()
+
+        assert snap_compare(
+            AutocompleteTestApp(),
+            terminal_size=(100, 30),
+            run_before=type_model,
+        )
+
+    def test_profile_dropdown_filtered(self, snap_compare, tmp_path, monkeypatch):
+        """Dropdown filters profiles as the user types a prefix."""
+        profiles = tmp_path / "profiles"
+        profiles.mkdir()
+        for name in ("fast", "cheap", "reasoning"):
+            (profiles / f"{name}.json").write_text("{}")
+
+        monkeypatch.setattr(
+            "openhands_cli.tui.widgets.user_input"
+            ".autocomplete_dropdown.get_profiles_dir",
+            lambda: str(profiles),
+        )
+
+        async def type_model_prefix(pilot):
+            field = pilot.app.query_one(InputField)
+            field.single_line_widget.text = "/model f"
+            field.single_line_widget.move_cursor(field.single_line_widget.document.end)
+            field.autocomplete.update_candidates()
+            await pilot.pause()
+
+        assert snap_compare(
+            AutocompleteTestApp(),
+            terminal_size=(100, 30),
+            run_before=type_model_prefix,
+        )
