@@ -5,6 +5,7 @@ import os
 import platform
 import re
 from argparse import Namespace
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -181,13 +182,11 @@ def conversation_has_delegate_tool_events(conversation_id: str) -> bool:
         return False
 
     for event_file in events_dir.glob("event-*.json"):
-        try:
+        with suppress(OSError, json.JSONDecodeError):
             with open(event_file, encoding="utf-8") as f:
                 event_data = json.load(f)
             if event_data.get("tool_name") == DelegateTool.name:
                 return True
-        except (OSError, json.JSONDecodeError):
-            continue
 
     return False
 

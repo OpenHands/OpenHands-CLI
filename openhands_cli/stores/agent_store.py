@@ -369,14 +369,15 @@ class AgentStore:
         For new conversations:
         - Use TaskToolSet (the default for new conversations)
         """
-        if session_id:
-            tools = get_persisted_conversation_tools(session_id)
-            if tools:
-                return tools
-            # Check if conversation has DelegateTool events for backward compatibility
-            use_delegate = conversation_has_delegate_tool_events(session_id)
-            return get_default_cli_tools(use_delegate_tool=use_delegate)
-        return get_default_cli_tools()
+        if not session_id:
+            return get_default_cli_tools()
+
+        if tools := get_persisted_conversation_tools(session_id):
+            return tools
+
+        # Check if conversation has DelegateTool events for backward compatibility
+        use_delegate = conversation_has_delegate_tool_events(session_id)
+        return get_default_cli_tools(use_delegate_tool=use_delegate)
 
     def _with_llm_metadata(
         self, llm: LLM, *, session_id: str | None, llm_type: str
