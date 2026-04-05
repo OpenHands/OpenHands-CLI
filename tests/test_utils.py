@@ -4,6 +4,7 @@ import json
 from argparse import Namespace
 from unittest.mock import patch
 
+import pytest
 from acp.schema import EnvVariable, McpServerStdio
 
 from openhands.sdk.event import MessageEvent, SystemPromptEvent
@@ -236,96 +237,90 @@ class TestJsonCallback:
             assert content[0]["text"] == "Hello, this is a test message"
 
 
-class TestConversationHasDelegateToolEvents:
-    """Tests for backward compatibility with DelegateTool events detection."""
+@pytest.mark.parametrize(
+    ("setup", "expected"),
+    [
+        # No events directory at all
+        (None, False),
+        # Empty events directory
+        ([], False),
+        # Events without delegate
+        (
+            [
+                {"tool_name": "terminal", "id": "event-1"},
+                {"tool_name": "file_editor", "id": "event-2"},
+                {"tool_name": "task_tracker", "id": "event-3"},
+            ],
+            False,
+        ),
+        # Events with delegate
+        (
+            [
+                {"tool_name": "terminal", "id": "event-1"},
+                {"tool_name": "delegate", "id": "event-2"},
+                {"tool_name": "file_editor", "id": "event-3"},
+            ],
+            True,
+        ),
+    ],
+    ids=[
+        "no_events_dir",
+        "empty_events_dir",
+        "events_without_delegate",
+        "events_with_delegate",
+    ],
+)
+def test_conversation_has_delegate_tool_events(tmp_path, monkeypatch, setup, expected):
+    """Detect DelegateTool usage from conversation events."""
+    monkeypatch.setattr(
+        "openhands_cli.utils.get_conversations_dir", lambda: str(tmp_path)
+    )
+    conv_id = "test-conv"
 
-    def test_no_events_dir_returns_false(self, tmp_path, monkeypatch):
-        """Test returns False when conversation events directory doesn't exist."""
-        monkeypatch.setattr(
-            "openhands_cli.utils.get_conversations_dir", lambda: str(tmp_path)
-        )
-        assert conversation_has_delegate_tool_events("nonexistent-conv-id") is False
-
-    def test_empty_events_dir_returns_false(self, tmp_path, monkeypatch):
-        """Test returns False when events directory exists but is empty."""
-        monkeypatch.setattr(
-            "openhands_cli.utils.get_conversations_dir", lambda: str(tmp_path)
-        )
-        conv_id = "test-conv-123"
+    if setup is not None:
         events_dir = tmp_path / conv_id / "events"
         events_dir.mkdir(parents=True)
-        assert conversation_has_delegate_tool_events(conv_id) is False
-
-    def test_events_without_delegate_returns_false(self, tmp_path, monkeypatch):
-        """Test returns False when events exist but none use DelegateTool."""
-        monkeypatch.setattr(
-            "openhands_cli.utils.get_conversations_dir", lambda: str(tmp_path)
-        )
-        conv_id = "test-conv-456"
-        events_dir = tmp_path / conv_id / "events"
-        events_dir.mkdir(parents=True)
-
-        # Create event files with other tool names
-        events = [
-            {"tool_name": "terminal", "id": "event-1"},
-            {"tool_name": "file_editor", "id": "event-2"},
-            {"tool_name": "task_tracker", "id": "event-3"},
-        ]
-        for i, event in enumerate(events):
+        for i, event in enumerate(setup):
             event_file = events_dir / f"event-{i:05d}-abc123.json"
             event_file.write_text(json.dumps(event))
 
-        assert conversation_has_delegate_tool_events(conv_id) is False
+    assert conversation_has_delegate_tool_events(conv_id) is expected
 
-    def test_events_with_delegate_returns_true(self, tmp_path, monkeypatch):
-        """Test returns True when at least one event uses DelegateTool."""
-        monkeypatch.setattr(
-            "openhands_cli.utils.get_conversations_dir", lambda: str(tmp_path)
-        )
-        conv_id = "test-conv-789"
-        events_dir = tmp_path / conv_id / "events"
-        events_dir.mkdir(parents=True)
 
-        # Create event files, one with delegate tool_name
-        events = [
-            {"tool_name": "terminal", "id": "event-1"},
-            {"tool_name": "delegate", "id": "event-2"},  # DelegateTool event!
-            {"tool_name": "file_editor", "id": "event-3"},
-        ]
-        for i, event in enumerate(events):
-            event_file = events_dir / f"event-{i:05d}-abc123.json"
-            event_file.write_text(json.dumps(event))
+@pytest.mark.parametrize(
+    ("files", "expected"),
+    [
+        # Invalid JSON before a valid delegate event — still detected
+        (
+            [
+                ("event-00000-abc.json", "not valid json"),
+                ("event-00001-def.json", json.dumps({"tool_name": "delegate"})),
+            ],
+            True,
+        ),
+        # All invalid JSON — returns False
+        (
+            [
+                ("event-00000-abc.json", "not valid json"),
+                ("event-00001-def.json", "{broken json"),
+            ],
+            False,
+        ),
+    ],
+    ids=["invalid_json_with_delegate", "only_invalid_json"],
+)
+def test_conversation_has_delegate_handles_invalid_json(
+    tmp_path, monkeypatch, files, expected
+):
+    """Gracefully handle invalid JSON event files."""
+    monkeypatch.setattr(
+        "openhands_cli.utils.get_conversations_dir", lambda: str(tmp_path)
+    )
+    conv_id = "test-conv-invalid"
+    events_dir = tmp_path / conv_id / "events"
+    events_dir.mkdir(parents=True)
 
-        assert conversation_has_delegate_tool_events(conv_id) is True
+    for filename, content in files:
+        (events_dir / filename).write_text(content)
 
-    def test_handles_invalid_json_gracefully(self, tmp_path, monkeypatch):
-        """Test gracefully handles invalid JSON files."""
-        monkeypatch.setattr(
-            "openhands_cli.utils.get_conversations_dir", lambda: str(tmp_path)
-        )
-        conv_id = "test-conv-invalid"
-        events_dir = tmp_path / conv_id / "events"
-        events_dir.mkdir(parents=True)
-
-        # Create one valid event and one invalid JSON file
-        (events_dir / "event-00000-abc.json").write_text("not valid json")
-        (events_dir / "event-00001-def.json").write_text(
-            json.dumps({"tool_name": "delegate"})
-        )
-
-        # Should still detect delegate even with invalid JSON before it
-        assert conversation_has_delegate_tool_events(conv_id) is True
-
-    def test_only_invalid_json_returns_false(self, tmp_path, monkeypatch):
-        """Test returns False when all event files are invalid JSON."""
-        monkeypatch.setattr(
-            "openhands_cli.utils.get_conversations_dir", lambda: str(tmp_path)
-        )
-        conv_id = "test-conv-all-invalid"
-        events_dir = tmp_path / conv_id / "events"
-        events_dir.mkdir(parents=True)
-
-        (events_dir / "event-00000-abc.json").write_text("not valid json")
-        (events_dir / "event-00001-def.json").write_text("{broken json")
-
-        assert conversation_has_delegate_tool_events(conv_id) is False
+    assert conversation_has_delegate_tool_events(conv_id) is expected
