@@ -153,8 +153,19 @@ For complete documentation, visit https://docs.openhands.dev/openhands/usage/cli
 MIT License - see [LICENSE](LICENSE) for details.
 
 <hr>
+
+### Thank You to Our Contributors
+
 <div align="center">
-  <sub><strong>Trusted by engineers at:</strong></sub>
+  <a href="https://github.com/OpenHands/OpenHands-CLI/graphs/contributors"><img src="https://assets.openhands.dev/readme/openhands-openhands-cli-contributors.svg" /></a>
+</div>
+
+<hr>
+
+### Trusted by Engineers at
+
+<div align="center">
+  
   <br/><br/>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://assets.openhands.dev/logos/external/white/tiktok.svg">
