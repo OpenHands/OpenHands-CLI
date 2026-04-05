@@ -191,7 +191,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             ),
         )
 
-    async def _set_confirmation_mode(
+    def _set_confirmation_mode(
         self, session_id: str, mode: ConfirmationMode
     ) -> None:
         """Set confirmation mode for a session."""
@@ -205,7 +205,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                 "session not found"
             )
 
-    async def _cmd_confirm(self, session_id: str, argument: str) -> str:
+    def _cmd_confirm(self, session_id: str, argument: str) -> str:
         """Handle /confirm command.
 
         Args:
@@ -224,7 +224,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
 
         response_text, new_mode = handle_confirm_argument(current_mode, argument)
         if new_mode is not None:
-            await self._set_confirmation_mode(session_id, new_mode)
+            self._set_confirmation_mode(session_id, new_mode)
 
         return response_text
 
@@ -266,12 +266,8 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             profile_name,
         )
 
-    async def _cmd_model(self, session_id: str, argument: str) -> str:
-        """Handle /model command.
-
-        Kept async to match the ``_cmd_*`` handler interface awaited by
-        the prompt dispatcher.
-        """
+    def _cmd_model(self, session_id: str, argument: str) -> str:
+        """Handle /model command."""
         current_model = self._get_current_model(session_id)
         response_text, new_model = handle_model_argument(current_model, argument)
         if new_model is not None:
@@ -383,7 +379,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             )
 
         confirmation_mode: ConfirmationMode = cast(ConfirmationMode, mode_id)
-        await self._set_confirmation_mode(session_id, confirmation_mode)
+        self._set_confirmation_mode(session_id, confirmation_mode)
 
         await self._conn.session_update(
             session_id=session_id,
@@ -612,9 +608,9 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                 if command == "help":
                     response_text = create_help_text()
                 elif command == "confirm":
-                    response_text = await self._cmd_confirm(session_id, argument)
+                    response_text = self._cmd_confirm(session_id, argument)
                 elif command == "model":
-                    response_text = await self._cmd_model(session_id, argument)
+                    response_text = self._cmd_model(session_id, argument)
                 else:
                     response_text = get_unknown_command_text(command)
 

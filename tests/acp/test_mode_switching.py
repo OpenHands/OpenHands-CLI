@@ -555,8 +555,7 @@ class TestSwitchSessionModel:
         acp_agent._active_sessions["s1"] = MagicMock()
         acp_agent._switch_session_model("s1", "some-profile")
 
-    @pytest.mark.asyncio
-    async def test_missing_profile_returns_error_text(self, acp_agent):
+    def test_missing_profile_returns_error_text(self, acp_agent):
         """_cmd_model returns helpful message when profile not found."""
         mock_conversation = MagicMock(spec=LocalConversation)
         mock_conversation.agent = MagicMock()
@@ -564,7 +563,7 @@ class TestSwitchSessionModel:
         mock_conversation.switch_profile.side_effect = FileNotFoundError
         acp_agent._active_sessions["s1"] = mock_conversation
 
-        result = await acp_agent._cmd_model("s1", "nope")
+        result = acp_agent._cmd_model("s1", "nope")
 
         assert "not found" in result
         assert "nope" in result
