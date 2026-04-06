@@ -23,6 +23,7 @@ from openhands.sdk.conversation.state import (
 )
 from openhands.sdk.event.base import Event
 from openhands.sdk.hooks import HookMatcher
+from openhands_cli.locations import get_work_dir
 from openhands_cli.setup import setup_conversation
 from openhands_cli.shared import extract_conversation_summary
 from openhands_cli.stop_hooks import run_stop_hooks
@@ -74,6 +75,7 @@ class ConversationRunner:
             critic_disabled: If True, critic functionality will be disabled.
         """
         self.visualizer = visualizer
+        self._conversation_id = conversation_id
 
         # Create conversation with policy from state; stop hooks are stripped
         # from the SDK's HookConfig and returned for CLI-level handling.
@@ -190,18 +192,14 @@ class ConversationRunner:
             ):
                 should_stop, feedback = run_stop_hooks(
                     stop_matchers=self._stop_matchers,
-                    session_id=str(self.conversation.state.conversation_id),
-                    working_dir=self.conversation.workspace.working_dir,
+                    session_id=str(self._conversation_id),
+                    working_dir=get_work_dir(),
                 )
                 if not should_stop and feedback:
                     logger.info("Stop hook denied agent stopping, sending feedback")
                     feedback_message = Message(
                         role="user",
-                        content=[
-                            TextContent(
-                                text=f"[Stop hook feedback] {feedback}"
-                            )
-                        ],
+                        content=[TextContent(text=f"[Stop hook feedback] {feedback}")],
                     )
                     self.conversation.send_message(feedback_message)
                     self.conversation.run()

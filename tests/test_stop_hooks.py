@@ -1,12 +1,5 @@
 """Tests for CLI-level stop hook handling."""
 
-import os
-import stat
-import tempfile
-from unittest.mock import patch
-
-import pytest
-
 from openhands.sdk.hooks import (
     HookConfig,
     HookDefinition,
@@ -22,9 +15,7 @@ class TestStripStopHooks:
     def test_no_stop_hooks_returns_unchanged(self):
         config = HookConfig(
             pre_tool_use=[
-                HookMatcher(
-                    matcher="*", hooks=[HookDefinition(command="echo pre")]
-                )
+                HookMatcher(matcher="*", hooks=[HookDefinition(command="echo pre")])
             ]
         )
         result_config, stop_matchers = strip_stop_hooks(config)
@@ -38,9 +29,7 @@ class TestStripStopHooks:
         )
         config = HookConfig(
             pre_tool_use=[
-                HookMatcher(
-                    matcher="*", hooks=[HookDefinition(command="echo pre")]
-                )
+                HookMatcher(matcher="*", hooks=[HookDefinition(command="echo pre")])
             ],
             stop=[stop_matcher],
         )
@@ -59,11 +48,7 @@ class TestStripStopHooks:
 
     def test_only_stop_hooks(self):
         config = HookConfig(
-            stop=[
-                HookMatcher(
-                    matcher="*", hooks=[HookDefinition(command="echo stop")]
-                )
-            ]
+            stop=[HookMatcher(matcher="*", hooks=[HookDefinition(command="echo stop")])]
         )
         result_config, stop_matchers = strip_stop_hooks(config)
         assert len(stop_matchers) == 1
@@ -137,9 +122,7 @@ class TestRunStopHooks:
             HookMatcher(
                 matcher="*",
                 hooks=[
-                    HookDefinition(
-                        command="python3 /nonexistent_stop_hook_script.py"
-                    )
+                    HookDefinition(command="python3 /nonexistent_stop_hook_script.py")
                 ],
             )
         ]
@@ -209,11 +192,7 @@ class TestRunStopHooks:
         matchers = [
             HookMatcher(
                 matcher="*",
-                hooks=[
-                    HookDefinition(
-                        command='echo \'{"decision": "allow"}\''
-                    )
-                ],
+                hooks=[HookDefinition(command='echo \'{"decision": "allow"}\'')],
             )
         ]
         should_stop, feedback = run_stop_hooks(
