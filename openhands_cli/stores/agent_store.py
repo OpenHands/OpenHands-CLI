@@ -22,6 +22,7 @@ from openhands.sdk.conversation.persistence_const import BASE_STATE
 from openhands.sdk.critic.base import CriticBase
 from openhands.sdk.critic.impl.api import APIBasedCritic
 from openhands.sdk.tool import Tool
+from openhands_cli.deprecated_utils import conversation_has_delegate_tool
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
     get_conversations_dir,
@@ -31,7 +32,6 @@ from openhands_cli.locations import (
 from openhands_cli.mcp.mcp_utils import list_enabled_servers
 from openhands_cli.stores.cli_settings import CliSettings
 from openhands_cli.utils import (
-    conversation_has_delegate_tool_events,
     get_default_cli_agent,
     get_default_cli_tools,
     get_llm_metadata,
@@ -55,7 +55,10 @@ def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
         List of Tool objects from the persisted conversation, or None if
         the conversation doesn't exist or can't be read
     """
-    conversation_dir = os.path.join(get_conversations_dir(), conversation_id)
+    # Normalize: directory names use hex (no dashes), but callers may pass
+    # str(UUID) which includes dashes.
+    normalized_id = conversation_id.replace("-", "")
+    conversation_dir = os.path.join(get_conversations_dir(), normalized_id)
     base_state_path = os.path.join(conversation_dir, BASE_STATE)
 
     if not os.path.exists(base_state_path):
@@ -375,8 +378,8 @@ class AgentStore:
         if tools := get_persisted_conversation_tools(session_id):
             return tools
 
-        # Check if conversation has DelegateTool events for backward compatibility
-        use_delegate = conversation_has_delegate_tool_events(session_id)
+        # Check if conversation's SystemPromptEvent lists DelegateTool
+        use_delegate = conversation_has_delegate_tool(session_id)
         return get_default_cli_tools(use_delegate_tool=use_delegate)
 
     def _with_llm_metadata(

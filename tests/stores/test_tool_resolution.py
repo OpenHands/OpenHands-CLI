@@ -22,6 +22,12 @@ DELEGATE_CONVERSATION_EVENTS = [
         "timestamp": "2026-02-26T09:53:26.630217",
         "source": "agent",
         "kind": "SystemPromptEvent",
+        "tools": [
+            {"title": "terminal", "action_type": "TerminalAction"},
+            {"title": "file_editor", "action_type": "FileEditorAction"},
+            {"title": "task_tracker", "action_type": "TaskTrackerAction"},
+            {"title": "delegate", "action_type": "DelegateAction"},
+        ],
     },
     {
         "id": "9d99120d-5d0c-47b3-baac-e4a5bdecfb37",
@@ -47,13 +53,19 @@ DELEGATE_CONVERSATION_EVENTS = [
     },
 ]
 
-# From conversation bf81e949… which never invoked DelegateTool
+# From conversation bf81e949… which uses TaskToolSet (no DelegateTool)
 NON_DELEGATE_CONVERSATION_EVENTS = [
     {
         "id": "c2dd4a86-2de0-48e6-bde2-a6f6564d925d",
         "timestamp": "2026-03-11T18:33:19.032087",
         "source": "agent",
         "kind": "SystemPromptEvent",
+        "tools": [
+            {"title": "terminal", "action_type": "TerminalAction"},
+            {"title": "file_editor", "action_type": "FileEditorAction"},
+            {"title": "task_tracker", "action_type": "TaskTrackerAction"},
+            {"title": "task_tool_set", "action_type": "TaskToolSetAction"},
+        ],
     },
     {
         "id": "dd76abe3-2977-4b1a-bed8-b627835bc7a0",
@@ -92,7 +104,7 @@ def agent_store(tmp_path, monkeypatch):
         lambda: str(tmp_path / "conversations"),
     )
     monkeypatch.setattr(
-        "openhands_cli.utils.get_conversations_dir",
+        "openhands_cli.deprecated_utils.get_conversations_dir",
         lambda: str(tmp_path / "conversations"),
     )
     return AgentStore()
@@ -141,8 +153,8 @@ def test_no_events_uses_task_tool_set(agent_store, session_id):
 def test_tool_resolution_from_real_events(
     agent_store, tmp_path, events, expected_tool, unexpected_tool
 ):
-    """Tool resolution detects DelegateTool usage from real persisted events."""
-    conv_id = "test-conversation"
+    """Tool resolution detects DelegateTool from SystemPromptEvent's tools list."""
+    conv_id = "abc123def456"
     events_dir = tmp_path / "conversations" / conv_id / "events"
     _write_events(events_dir, events)
 

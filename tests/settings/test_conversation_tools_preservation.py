@@ -40,39 +40,39 @@ class TestGetPersistedConversationTools:
 
     def test_returns_none_when_conversation_does_not_exist(self, conversations_dir):
         """Should return None when conversation directory doesn't exist."""
-        result = get_persisted_conversation_tools("nonexistent-conversation-id")
+        result = get_persisted_conversation_tools("nonexistentconversationid")
         assert result is None
 
     def test_returns_none_when_base_state_missing(self, conversations_dir):
         """Should return None when base_state.json is missing."""
-        convo_dir = conversations_dir / "test-conversation-id"
+        convo_dir = conversations_dir / "testconversationid"
         convo_dir.mkdir()
         # No base_state.json created
 
-        result = get_persisted_conversation_tools("test-conversation-id")
+        result = get_persisted_conversation_tools("testconversationid")
         assert result is None
 
     def test_returns_none_when_base_state_invalid_json(self, conversations_dir):
         """Should return None when base_state.json contains invalid JSON."""
-        convo_dir = conversations_dir / "test-conversation-id"
+        convo_dir = conversations_dir / "testconversationid"
         convo_dir.mkdir()
         (convo_dir / BASE_STATE).write_text("not valid json")
 
-        result = get_persisted_conversation_tools("test-conversation-id")
+        result = get_persisted_conversation_tools("testconversationid")
         assert result is None
 
     def test_returns_none_when_tools_empty(self, conversations_dir):
         """Should return None when tools list is empty."""
-        convo_dir = conversations_dir / "test-conversation-id"
+        convo_dir = conversations_dir / "testconversationid"
         convo_dir.mkdir()
         write_json(convo_dir / BASE_STATE, {"agent": {"tools": []}})
 
-        result = get_persisted_conversation_tools("test-conversation-id")
+        result = get_persisted_conversation_tools("testconversationid")
         assert result is None
 
     def test_returns_tools_from_persisted_conversation(self, conversations_dir):
         """Should return tools from a valid persisted conversation."""
-        convo_dir = conversations_dir / "test-conversation-id"
+        convo_dir = conversations_dir / "testconversationid"
         convo_dir.mkdir()
 
         # Create a base_state.json with tools (without delegate)
@@ -86,7 +86,7 @@ class TestGetPersistedConversationTools:
             {"agent": {"tools": persisted_tools}},
         )
 
-        result = get_persisted_conversation_tools("test-conversation-id")
+        result = get_persisted_conversation_tools("testconversationid")
         assert result is not None
         assert len(result) == 3
         assert all(isinstance(t, Tool) for t in result)
@@ -129,7 +129,7 @@ class TestAgentStoreLoadWithConversationTools:
     ):
         """When session_id is provided but conversation doesn't exist, use defaults."""
         # Load with session_id for non-existent conversation
-        loaded = agent_store.load_or_create(session_id="nonexistent-conversation-id")
+        loaded = agent_store.load_or_create(session_id="nonexistentconversationid")
         assert loaded is not None
 
         # Should have default CLI tools with TaskToolSet (not delegate)
@@ -146,7 +146,7 @@ class TestAgentStoreLoadWithConversationTools:
     ):
         """When resuming a conversation, should use tools from persisted state."""
         # Create a conversation with tools that DON'T include delegate
-        convo_id = "existing-conversation-id"
+        convo_id = "existingconversationid"
         convo_dir = conversations_dir / convo_id
         convo_dir.mkdir()
         persisted_tools = [
@@ -178,7 +178,7 @@ class TestAgentStoreLoadWithConversationTools:
     ):
         """When resuming a conversation that had delegate, should preserve it."""
         # Create a conversation with tools that INCLUDE delegate
-        convo_id = "conversation-with-delegate"
+        convo_id = "conversationwithdelegate"
         convo_dir = conversations_dir / convo_id
         convo_dir.mkdir()
         persisted_tools = [

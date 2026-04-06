@@ -10,8 +10,8 @@ from acp.schema import EnvVariable, McpServerStdio
 from openhands.sdk.event import MessageEvent, SystemPromptEvent
 from openhands.sdk.llm import Message, TextContent
 from openhands_cli.acp_impl.utils import convert_acp_mcp_servers_to_agent_format
+from openhands_cli.deprecated_utils import conversation_has_delegate_tool
 from openhands_cli.utils import (
-    conversation_has_delegate_tool_events,
     create_seeded_instructions_from_args,
     get_default_cli_tools,
     json_callback,
@@ -242,85 +242,85 @@ class TestJsonCallback:
     [
         # No events directory at all
         (None, False),
-        # Empty events directory
-        ([], False),
-        # Events without delegate
+        # Empty events directory — no SystemPromptEvent
+        (None, False),
+        # SystemPromptEvent without delegate tool
         (
-            [
-                {"tool_name": "terminal", "id": "event-1"},
-                {"tool_name": "file_editor", "id": "event-2"},
-                {"tool_name": "task_tracker", "id": "event-3"},
-            ],
+            {
+                "id": "abc",
+                "kind": "SystemPromptEvent",
+                "tools": [
+                    {"title": "terminal"},
+                    {"title": "file_editor"},
+                    {"title": "task_tool_set"},
+                ],
+            },
             False,
         ),
-        # Events with delegate
+        # SystemPromptEvent with delegate tool
         (
-            [
-                {"tool_name": "terminal", "id": "event-1"},
-                {"tool_name": "delegate", "id": "event-2"},
-                {"tool_name": "file_editor", "id": "event-3"},
-            ],
+            {
+                "id": "abc",
+                "kind": "SystemPromptEvent",
+                "tools": [
+                    {"title": "terminal"},
+                    {"title": "file_editor"},
+                    {"title": "delegate"},
+                ],
+            },
             True,
+        ),
+        # SystemPromptEvent with no tools field
+        (
+            {"id": "abc", "kind": "SystemPromptEvent"},
+            False,
         ),
     ],
     ids=[
         "no_events_dir",
         "empty_events_dir",
-        "events_without_delegate",
-        "events_with_delegate",
+        "tools_without_delegate",
+        "tools_with_delegate",
+        "no_tools_field",
     ],
 )
-def test_conversation_has_delegate_tool_events(tmp_path, monkeypatch, setup, expected):
-    """Detect DelegateTool usage from conversation events."""
+def test_conversation_has_delegate_tool(tmp_path, monkeypatch, setup, expected):
+    """Detect DelegateTool from SystemPromptEvent's tools list."""
     monkeypatch.setattr(
-        "openhands_cli.utils.get_conversations_dir", lambda: str(tmp_path)
+        "openhands_cli.deprecated_utils.get_conversations_dir", lambda: str(tmp_path)
     )
-    conv_id = "test-conv"
+    conv_id = "testconv"
 
     if setup is not None:
         events_dir = tmp_path / conv_id / "events"
         events_dir.mkdir(parents=True)
-        for i, event in enumerate(setup):
-            event_file = events_dir / f"event-{i:05d}-abc123.json"
-            event_file.write_text(json.dumps(event))
+        event_file = events_dir / "event-00000-abc123.json"
+        event_file.write_text(json.dumps(setup))
 
-    assert conversation_has_delegate_tool_events(conv_id) is expected
+    assert conversation_has_delegate_tool(conv_id) is expected
 
 
 @pytest.mark.parametrize(
-    ("files", "expected"),
+    ("content", "expected"),
     [
-        # Invalid JSON before a valid delegate event — still detected
-        (
-            [
-                ("event-00000-abc.json", "not valid json"),
-                ("event-00001-def.json", json.dumps({"tool_name": "delegate"})),
-            ],
-            True,
-        ),
-        # All invalid JSON — returns False
-        (
-            [
-                ("event-00000-abc.json", "not valid json"),
-                ("event-00001-def.json", "{broken json"),
-            ],
-            False,
-        ),
+        # Invalid JSON in SystemPromptEvent — returns False
+        ("not valid json", False),
+        # Broken JSON — returns False
+        ("{broken json", False),
     ],
-    ids=["invalid_json_with_delegate", "only_invalid_json"],
+    ids=["invalid_json", "broken_json"],
 )
 def test_conversation_has_delegate_handles_invalid_json(
-    tmp_path, monkeypatch, files, expected
+    tmp_path, monkeypatch, content, expected
 ):
-    """Gracefully handle invalid JSON event files."""
+    """Gracefully handle invalid JSON in SystemPromptEvent."""
     monkeypatch.setattr(
-        "openhands_cli.utils.get_conversations_dir", lambda: str(tmp_path)
+        "openhands_cli.deprecated_utils.get_conversations_dir", lambda: str(tmp_path)
     )
-    conv_id = "test-conv-invalid"
+    conv_id = "testconvinvalid"
     events_dir = tmp_path / conv_id / "events"
     events_dir.mkdir(parents=True)
 
-    for filename, content in files:
-        (events_dir / filename).write_text(content)
+    (events_dir / "event-00000-abc.json").write_text(content)
 
-    assert conversation_has_delegate_tool_events(conv_id) is expected
+    assert conversation_has_delegate_tool(conv_id) is expected

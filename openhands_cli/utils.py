@@ -5,7 +5,6 @@ import os
 import platform
 import re
 from argparse import Namespace
-from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +21,6 @@ from openhands.tools.file_editor import FileEditorTool
 from openhands.tools.preset.default import get_default_condenser
 from openhands.tools.task_tracker import TaskTrackerTool
 from openhands.tools.terminal import TerminalTool
-from openhands_cli.locations import get_conversations_dir
 
 
 def abbreviate_number(n: int | float) -> str:
@@ -161,34 +159,6 @@ def get_llm_metadata(
     if user_id is not None:
         metadata["trace_user_id"] = user_id
     return metadata
-
-
-def conversation_has_delegate_tool_events(conversation_id: str) -> bool:
-    """Check if a conversation contains DelegateTool events.
-
-    Scans the conversation's event files for any ActionEvent with
-    tool_name="delegate", indicating the conversation used DelegateTool.
-
-    Args:
-        conversation_id: The conversation ID to check
-
-    Returns:
-        True if the conversation contains DelegateTool events, False otherwise
-    """
-    conversations_dir = get_conversations_dir()
-    events_dir = Path(conversations_dir) / conversation_id / "events"
-
-    if not events_dir.exists():
-        return False
-
-    for event_file in events_dir.glob("event-*.json"):
-        with suppress(OSError, json.JSONDecodeError):
-            with open(event_file, encoding="utf-8") as f:
-                event_data = json.load(f)
-            if event_data.get("tool_name") == DelegateTool.name:
-                return True
-
-    return False
 
 
 def get_default_cli_tools(*, use_delegate_tool: bool = False) -> list[Tool]:
