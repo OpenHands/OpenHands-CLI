@@ -16,6 +16,7 @@ from openhands.sdk import (
     Workspace,
 )
 from openhands.sdk.hooks import HookConfig
+from openhands.tools.preset.default import register_builtins_agents
 from openhands_cli.acp_impl.agent.base_agent import BaseOpenHandsACPAgent
 from openhands_cli.acp_impl.agent.util import AgentType
 from openhands_cli.acp_impl.confirmation import ConfirmationMode
@@ -112,6 +113,10 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
         mcp_servers: dict[str, dict[str, Any]] | None = None,
     ) -> LocalConversation:
         """Set up a local conversation with event streaming support."""
+        # Register built-in subagent types (default, explore, bash) so the
+        # delegate tool can spawn them.
+        register_builtins_agents(cli_mode=True)
+
         try:
             agent = load_agent_specs(
                 conversation_id=session_id,
