@@ -1,6 +1,7 @@
 """Conversation runner with confirmation mode support."""
 
 import asyncio
+import logging
 import uuid
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -21,7 +22,7 @@ from openhands.sdk.conversation.state import (
     ConversationState as SDKConversationState,
 )
 from openhands.sdk.event.base import Event
-from openhands_cli.setup import setup_conversation
+from openhands_cli.setup import run_stop_hooks, setup_conversation
 from openhands_cli.shared import extract_conversation_summary
 from openhands_cli.tui.core.events import ShowConfirmationPanel
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
@@ -29,7 +30,11 @@ from openhands_cli.user_actions.types import UserConfirmation
 
 
 if TYPE_CHECKING:
+    from openhands.sdk.hooks.config import HookMatcher
     from openhands_cli.tui.core.state import ConversationContainer
+
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationRunner:
@@ -70,8 +75,11 @@ class ConversationRunner:
         """
         self.visualizer = visualizer
 
-        # Create conversation with policy from state
-        self.conversation: BaseConversation = setup_conversation(
+        # Create conversation with policy from state; stop hooks are stripped
+        # from the SDK config and stored separately for CLI-level execution.
+        self.conversation: BaseConversation
+        self._stop_hook_matchers: list[HookMatcher]
+        self.conversation, self._stop_hook_matchers = setup_conversation(
             conversation_id,
             confirmation_policy=state.confirmation_policy,
             visualizer=visualizer,
@@ -189,6 +197,36 @@ class ConversationRunner:
             )
         finally:
             self._update_run_status(False)
+            self._run_stop_hooks_if_finished()
+
+    def _run_stop_hooks_if_finished(self) -> None:
+        """Run stop hooks after conversation finishes, outside the SDK state lock.
+
+        Stop hooks are stripped from the SDK's HookConfig and run here instead,
+        preventing the state lock from being held during hook execution.
+        Failed hooks are logged but do not affect the conversation state.
+        """
+        if not self._stop_hook_matchers:
+            return
+
+        if (
+            not self.conversation
+            or not self.conversation.state
+            or self.conversation.state.execution_status
+            != ConversationExecutionStatus.FINISHED
+        ):
+            return
+
+        try:
+            working_dir = str(self.conversation.workspace.working_dir)
+            session_id = str(self.conversation.state.id)
+            run_stop_hooks(
+                stop_matchers=self._stop_hook_matchers,
+                working_dir=working_dir,
+                session_id=session_id,
+            )
+        except Exception:
+            logger.exception("Error running stop hooks")
 
     def _request_confirmation(self) -> None:
         """Post ShowConfirmationPanel message for pending actions."""
