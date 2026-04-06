@@ -13,7 +13,7 @@
 ## Summary
 
 <!-- 1-3 bullets describing what changed. -->
--
+- Brief description
 
 ## Issue Number
 <!-- Required if there is a relevant issue to this PR. -->
