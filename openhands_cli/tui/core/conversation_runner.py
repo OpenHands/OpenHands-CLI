@@ -22,6 +22,7 @@ from openhands.sdk.conversation.state import (
     ConversationState as SDKConversationState,
 )
 from openhands.sdk.event.base import Event
+from openhands_cli.locations import get_work_dir
 from openhands_cli.setup import run_stop_hooks, setup_conversation
 from openhands_cli.shared import extract_conversation_summary
 from openhands_cli.tui.core.events import ShowConfirmationPanel
@@ -218,12 +219,10 @@ class ConversationRunner:
             return
 
         try:
-            working_dir = str(self.conversation.workspace.working_dir)
-            session_id = str(self.conversation.state.id)
             run_stop_hooks(
                 stop_matchers=self._stop_hook_matchers,
-                working_dir=working_dir,
-                session_id=session_id,
+                working_dir=get_work_dir(),
+                session_id=str(self.conversation.id),
             )
         except Exception:
             logger.exception("Error running stop hooks")

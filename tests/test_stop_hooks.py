@@ -54,7 +54,7 @@ class TestPythonExitCode2CausesBlock:
         from openhands.sdk.hooks.types import HookEvent
 
         event = HookEvent(
-            event_type=HookEventType.STOP.value,
+            event_type=HookEventType.STOP,
             session_id="test",
             working_dir=str(tmp_path),
         )
@@ -183,24 +183,14 @@ class TestStopHookStripping:
         from openhands_cli.setup import strip_stop_hooks
 
         config = HookConfig(
-            pre_tool_use=[
-                HookMatcher(hooks=[HookDefinition(command="echo pre")])
-            ],
-            post_tool_use=[
-                HookMatcher(hooks=[HookDefinition(command="echo post")])
-            ],
+            pre_tool_use=[HookMatcher(hooks=[HookDefinition(command="echo pre")])],
+            post_tool_use=[HookMatcher(hooks=[HookDefinition(command="echo post")])],
             user_prompt_submit=[
                 HookMatcher(hooks=[HookDefinition(command="echo prompt")])
             ],
-            session_start=[
-                HookMatcher(hooks=[HookDefinition(command="echo start")])
-            ],
-            session_end=[
-                HookMatcher(hooks=[HookDefinition(command="echo end")])
-            ],
-            stop=[
-                HookMatcher(hooks=[HookDefinition(command="echo stop")])
-            ],
+            session_start=[HookMatcher(hooks=[HookDefinition(command="echo start")])],
+            session_end=[HookMatcher(hooks=[HookDefinition(command="echo end")])],
+            stop=[HookMatcher(hooks=[HookDefinition(command="echo stop")])],
         )
 
         stripped, stop_hooks = strip_stop_hooks(config)
@@ -341,10 +331,11 @@ class TestSetupConversationStripsStopHooks:
             )
         )
 
-        with mock.patch(
-            "openhands_cli.setup.Conversation"
-        ) as mock_conversation_cls, mock.patch(
-            "openhands_cli.setup.load_agent_specs", return_value=persisted_agent
+        with (
+            mock.patch("openhands_cli.setup.Conversation") as mock_conversation_cls,
+            mock.patch(
+                "openhands_cli.setup.load_agent_specs", return_value=persisted_agent
+            ),
         ):
             mock_conversation_cls.return_value = mock.MagicMock()
 
@@ -358,9 +349,9 @@ class TestSetupConversationStripsStopHooks:
             # Verify that Conversation was called with a hook_config
             # that does NOT contain stop hooks
             call_kwargs = mock_conversation_cls.call_args
-            hook_config_passed = call_kwargs.kwargs.get(
-                "hook_config"
-            ) or call_kwargs[1].get("hook_config")
+            hook_config_passed = call_kwargs.kwargs.get("hook_config") or call_kwargs[
+                1
+            ].get("hook_config")
 
             if hook_config_passed is not None:
                 assert len(hook_config_passed.stop) == 0, (

@@ -146,7 +146,7 @@ def run_stop_hooks(
     """
     executor = HookExecutor(working_dir=working_dir)
     event = HookEvent(
-        event_type=HookEventType.STOP.value,
+        event_type=HookEventType.STOP,
         session_id=session_id,
         working_dir=working_dir,
         metadata={"reason": "agent_finished"},
