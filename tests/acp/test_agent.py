@@ -413,7 +413,7 @@ async def test_set_session_model(acp_agent):
 
     assert response is not None
     mock_switch.assert_called_once_with(
-        session_id="test-session", model_id="anthropic/claude-opus-4-6"
+        session_id="test-session", profile_name="anthropic/claude-opus-4-6"
     )
 
 

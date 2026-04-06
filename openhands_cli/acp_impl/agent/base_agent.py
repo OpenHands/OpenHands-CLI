@@ -397,7 +397,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         """Set session model for an active conversation."""
         logger.info(f"Set session model requested: {session_id} -> {model_id}")
         if model_id.strip():
-            self._switch_session_model(session_id=session_id, model_id=model_id)
+            self._switch_session_model(session_id=session_id, profile_name=model_id)
         return SetSessionModelResponse()
 
     async def set_config_option(
