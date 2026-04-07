@@ -191,9 +191,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             ),
         )
 
-    def _set_confirmation_mode(
-        self, session_id: str, mode: ConfirmationMode
-    ) -> None:
+    def _set_confirmation_mode(self, session_id: str, mode: ConfirmationMode) -> None:
         """Set confirmation mode for a session."""
         if session_id in self._active_sessions:
             conversation = self._active_sessions[session_id]
