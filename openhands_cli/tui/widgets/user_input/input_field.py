@@ -160,6 +160,7 @@ class InputField(Container):
         self.autocomplete = AutoCompleteDropdown(
             single_line_widget=self.single_line_widget, command_candidates=COMMANDS
         )
+        self.single_line_widget.autocomplete = self.autocomplete
 
         self.active_input_widget: SingleLineInputWithWrapping | TextArea = (
             self.single_line_widget
