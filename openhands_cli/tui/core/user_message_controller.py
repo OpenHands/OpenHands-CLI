@@ -13,23 +13,35 @@ if TYPE_CHECKING:
     from openhands_cli.tui.core.state import ConversationContainer
 
 
-# Planning mode instructions prepended to user messages when in plan mode
+# Planning mode instructions prepended to user messages when in plan mode.
+# These work in tandem with AlwaysConfirm policy — the prompt guides the agent
+# toward planning behavior, while AlwaysConfirm provides a hard safety net
+# requiring user approval before any action executes.
 PLANNING_MODE_INSTRUCTIONS = """
 <PLANNING_MODE>
-You are currently in PLANNING MODE. In this mode:
+You are currently in PLANNING MODE. This is a read-only mode.
 
-1. **DO NOT execute any code** - Do not use terminal, file_editor, or tools
-2. **Focus on understanding** - Ask clarifying questions about requirements
-3. **Create a PLAN.md file** - Generate a structured plan document with:
+STRICTLY FORBIDDEN actions:
+- DO NOT use CmdRunAction (terminal/shell commands)
+- DO NOT use FileWriteAction or FileEditAction (file modifications)
+- DO NOT use BrowseInteractiveAction
+- DO NOT execute, compile, or run any code
+- The ONLY file you may create or edit is PLAN.md in the workspace root
+
+Your role in this mode:
+1. Ask clarifying questions to understand requirements fully
+2. Analyze the existing codebase using read-only tools (file reading, search)
+3. Create a structured PLAN.md with:
    - Problem statement and requirements
    - Proposed approach and architecture
    - Step-by-step implementation plan
    - Potential challenges and mitigations
    - Success criteria and testing approach
-4. **Be thorough** - Identify edge cases, dependencies, and constraints
-5. **Seek confirmation** - Ask user to confirm before they switch to Code Mode
+4. Identify edge cases, dependencies, and constraints
+5. Present the plan and ask the user to switch to /code mode when ready
 
-When you've gathered enough information, create PLAN.md in the workspace root.
+IMPORTANT: Even if the user asks you to "just do it" or "go ahead," stay in
+planning mode. They must explicitly use /code to enable execution.
 </PLANNING_MODE>
 
 User's request:
@@ -115,7 +127,11 @@ class UserMessageController:
 
         # Note: Don't update conversation title for refinement messages
 
-        await self._process_message(runner, content)
+        # Apply planning mode instructions to refinements too — the agent
+        # must stay in planning mode even through system-generated follow-ups.
+        message_content = self._apply_mode_instructions(content)
+
+        await self._process_message(runner, message_content)
 
     async def _process_message(self, runner: ConversationRunner, content: str) -> None:
         """Process a message by queuing or starting a new run.

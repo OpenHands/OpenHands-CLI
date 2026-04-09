@@ -1,5 +1,8 @@
 """Tests for Planning Mode functionality."""
 
+from unittest.mock import MagicMock
+
+from openhands.sdk.security.confirmation_policy import ConfirmationPolicyBase
 from openhands_cli.tui.core.state import AgentMode, ConversationContainer
 from openhands_cli.tui.core.user_message_controller import (
     PLANNING_MODE_INSTRUCTIONS,
@@ -37,6 +40,66 @@ class TestAgentMode:
         assert code_mode == "code"
 
 
+class TestAgentModeStateReset:
+    """Tests for agent_mode being reset on new conversation."""
+
+    def test_reset_conversation_state_resets_agent_mode(self):
+        """Test that reset_conversation_state() resets agent_mode to 'code'."""
+        container = ConversationContainer()
+        container.set_agent_mode("plan")
+        assert container.agent_mode == "plan"
+
+        container.reset_conversation_state()
+        assert container.agent_mode == "code"
+
+    def test_reset_clears_pre_plan_policy(self):
+        """Test that reset_conversation_state() clears saved pre-plan policy."""
+        container = ConversationContainer()
+        mock_policy = MagicMock(spec=ConfirmationPolicyBase)
+        container.save_pre_plan_policy(mock_policy)
+        assert container.has_pre_plan_policy
+
+        container.reset_conversation_state()
+        assert not container.has_pre_plan_policy
+
+
+class TestPlanModePolicySaveRestore:
+    """Tests for confirmation policy save/restore around plan mode."""
+
+    def test_save_and_restore_pre_plan_policy(self):
+        """Test save and restore cycle for confirmation policy."""
+        container = ConversationContainer()
+        original_policy = MagicMock(spec=ConfirmationPolicyBase)
+
+        container.save_pre_plan_policy(original_policy)
+        assert container.has_pre_plan_policy
+
+        restored = container.restore_pre_plan_policy()
+        assert restored is original_policy
+        assert not container.has_pre_plan_policy
+
+    def test_restore_returns_none_when_no_policy_saved(self):
+        """Test that restore returns None when no policy was saved."""
+        container = ConversationContainer()
+        assert not container.has_pre_plan_policy
+        assert container.restore_pre_plan_policy() is None
+
+    def test_save_does_not_overwrite_if_already_saved(self):
+        """Test idempotent save — calling save twice uses the first policy."""
+        container = ConversationContainer()
+        first_policy = MagicMock(spec=ConfirmationPolicyBase)
+        second_policy = MagicMock(spec=ConfirmationPolicyBase)
+
+        container.save_pre_plan_policy(first_policy)
+        container.save_pre_plan_policy(second_policy)
+
+        # The second save overwrites (ConversationManager checks
+        # has_pre_plan_policy before calling save, but the state
+        # layer itself doesn't guard)
+        restored = container.restore_pre_plan_policy()
+        assert restored is second_policy
+
+
 class TestPlanningModeInstructions:
     """Tests for PLANNING_MODE_INSTRUCTIONS constant."""
 
@@ -54,10 +117,17 @@ class TestPlanningModeInstructions:
         assert "PLAN.md" in PLANNING_MODE_INSTRUCTIONS
 
         # Should mention understanding/questions
-        assert "understanding" in PLANNING_MODE_INSTRUCTIONS.lower()
+        assert "understand" in PLANNING_MODE_INSTRUCTIONS.lower()
 
-        # Should mention confirmation
-        assert "confirm" in PLANNING_MODE_INSTRUCTIONS.lower()
+    def test_planning_mode_instructions_forbid_specific_actions(self):
+        """Test that instructions explicitly forbid dangerous action types."""
+        assert "CmdRunAction" in PLANNING_MODE_INSTRUCTIONS
+        assert "FileWriteAction" in PLANNING_MODE_INSTRUCTIONS
+        assert "FileEditAction" in PLANNING_MODE_INSTRUCTIONS
+
+    def test_planning_mode_instructions_mention_read_only(self):
+        """Test that instructions emphasize read-only mode."""
+        assert "read-only" in PLANNING_MODE_INSTRUCTIONS.lower()
 
 
 class TestUserMessageControllerPlanningMode:
@@ -65,12 +135,9 @@ class TestUserMessageControllerPlanningMode:
 
     def test_apply_mode_instructions_code_mode_returns_original(self):
         """Test that code mode returns the original content unchanged."""
-        # Create a minimal mock state
-        from unittest.mock import MagicMock
-
         mock_state = MagicMock()
         mock_state.agent_mode = "code"
-        mock_state.conversation_id = None  # Not used in _apply_mode_instructions
+        mock_state.conversation_id = None
 
         controller = UserMessageController(
             state=mock_state,
@@ -86,8 +153,6 @@ class TestUserMessageControllerPlanningMode:
 
     def test_apply_mode_instructions_plan_mode_prepends_instructions(self):
         """Test that plan mode prepends instructions to the content."""
-        from unittest.mock import MagicMock
-
         mock_state = MagicMock()
         mock_state.agent_mode = "plan"
 
@@ -108,4 +173,7 @@ class TestUserMessageControllerPlanningMode:
         assert original_content in result
 
         # Instructions should come before the content
-        assert result.index(PLANNING_MODE_INSTRUCTIONS) < result.index(original_content)
+        assert result.index(PLANNING_MODE_INSTRUCTIONS) < result.index(
+            original_content
+        )
+

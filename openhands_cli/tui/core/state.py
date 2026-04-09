@@ -159,6 +159,10 @@ class ConversationContainer(Container):
         self._conversation_state: ConversationStateProtocol | None = None
         self._timer = None
 
+        # Store the user's confirmation policy before plan mode overrides it.
+        # None means plan mode hasn't overridden the policy.
+        self._pre_plan_confirmation_policy: ConfirmationPolicyBase | None = None
+
         super().__init__(id="conversation_state", **kwargs)
 
         if initial_confirmation_policy is not None:
@@ -431,11 +435,34 @@ class ConversationContainer(Container):
             combined_metrics = stats.get_combined_metrics()
             self.metrics = combined_metrics
 
+    def save_pre_plan_policy(self, policy: ConfirmationPolicyBase) -> None:
+        """Save the user's confirmation policy before plan mode overrides it.
+
+        Called by ConversationManager when entering plan mode.
+        """
+        self._pre_plan_confirmation_policy = policy
+
+    def restore_pre_plan_policy(self) -> ConfirmationPolicyBase | None:
+        """Restore and clear the saved confirmation policy from before plan mode.
+
+        Returns:
+            The saved policy, or None if not in plan mode / no policy was saved.
+        """
+        policy = self._pre_plan_confirmation_policy
+        self._pre_plan_confirmation_policy = None
+        return policy
+
+    @property
+    def has_pre_plan_policy(self) -> bool:
+        """Check if a pre-plan confirmation policy is saved."""
+        return self._pre_plan_confirmation_policy is not None
+
     def reset_conversation_state(self) -> None:
         """Reset state for a new conversation.
 
         Resets: running, elapsed_seconds, metrics, conversation_title,
-                pending_action_count, refinement_iteration, internal state.
+                pending_action_count, refinement_iteration, agent_mode,
+                internal state.
         Preserves: confirmation_policy (persists across conversations),
                    conversation_id (set explicitly when switching).
 
@@ -447,6 +474,8 @@ class ConversationContainer(Container):
         self.conversation_title = None
         self.pending_action_count = 0
         self.refinement_iteration = 0
+        self.agent_mode = "code"
         self.switch_confirmation_target = None
         self._conversation_start_time = None
         self._conversation_state = None
+        self._pre_plan_confirmation_policy = None
