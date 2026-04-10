@@ -185,6 +185,14 @@ def save_settings(
         if full_model.startswith("openhands/") and data.base_url is None:
             data.base_url = "https://llm-proxy.app.all-hands.dev/"
 
+        # Reset max_input_tokens when model changes so SDK auto-looks up
+        # from LiteLLM; preserve user-supplied value when model is unchanged.
+        model_changed = (
+            existing_agent is None
+            or full_model != existing_agent.llm.model
+        )
+        max_input_tokens = None if model_changed else data.max_tokens
+
         if should_set_litellm_extra_body(full_model, data.base_url):
             extra_kwargs["litellm_extra_body"] = {
                 "metadata": get_llm_metadata(model_name=full_model, llm_type="agent")
@@ -198,9 +206,7 @@ def save_settings(
             timeout=int(data.timeout)
             if isinstance(data.timeout, str)
             else data.timeout,
-            max_input_tokens=int(data.max_tokens)
-            if isinstance(data.max_tokens, str)
-            else data.max_tokens,
+            max_input_tokens=max_input_tokens,
             **extra_kwargs,
         )
 
