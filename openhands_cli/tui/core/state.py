@@ -40,6 +40,7 @@ from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
     NeverConfirm,
 )
+from openhands_cli.shared import extract_conversation_summary
 from openhands_cli.stores import CriticSettings
 
 
@@ -247,20 +248,10 @@ class ConversationContainer(Container):
             Tuple of (agent_event_count, last_agent_message) or None if
             no conversation is attached.
         """
-        from rich.text import Text
-
         if self._conversation_state is None:
             return None
 
-        agent_event_count = 0
-        last_agent_message = Text(text="No agent messages found")
-
-        for event in self._conversation_state.events:
-            if event.source == "agent":
-                agent_event_count += 1
-                last_agent_message = event.visualize
-
-        return agent_event_count, last_agent_message
+        return extract_conversation_summary(self._conversation_state.events)
 
     @property
     def scroll_view(self) -> "ScrollableContent":

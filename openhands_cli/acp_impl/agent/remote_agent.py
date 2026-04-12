@@ -43,7 +43,7 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
         initial_confirmation_mode: ConfirmationMode,
         cloud_api_url: str = "https://app.all-hands.dev",
         resume_conversation_id: str | None = None,
-    ):
+    ) -> None:
         """Initialize the cloud ACP agent.
 
         Args:
@@ -255,7 +255,7 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
     async def new_session(
         self,
         cwd: str,
-        mcp_servers: list[Any],
+        mcp_servers: list[Any] | None = None,
         working_dir: str | None = None,
         **_kwargs: Any,
     ) -> NewSessionResponse:
@@ -299,8 +299,8 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
     async def load_session(
         self,
         cwd: str,  # noqa: ARG002
-        mcp_servers: list[Any],  # noqa: ARG002
         session_id: str,
+        mcp_servers: list[Any] | None = None,  # noqa: ARG002
         **_kwargs: Any,
     ) -> LoadSessionResponse | None:
         """Load an existing session (cloud mode has limited support)."""

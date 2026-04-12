@@ -442,7 +442,7 @@ def test_handle_cloud_command_with_task(monkeypatch):
         mock_create_seeded.return_value = ["Test task"]
 
         with patch("asyncio.run") as mock_asyncio_run:
-            with patch("openhands_cli.cloud.command.console") as mock_console:
+            with patch("openhands_cli.cloud.command.console_print") as mock_print:
                 handle_cloud_command(args)
 
                 # Verify create_seeded_instructions_from_args was called
@@ -454,7 +454,7 @@ def test_handle_cloud_command_with_task(monkeypatch):
                 # Verify success message was printed
                 success_calls = [
                     call
-                    for call in mock_console.print.call_args_list
+                    for call in mock_print.call_args_list
                     if "successfully" in str(call)
                 ]
                 assert len(success_calls) > 0
@@ -478,13 +478,13 @@ def test_handle_cloud_command_no_initial_message(monkeypatch):
     ) as mock_create_seeded:
         mock_create_seeded.return_value = []  # No initial message
 
-        with patch("openhands_cli.cloud.command.console") as mock_console:
+        with patch("openhands_cli.cloud.command.console_print") as mock_print:
             handle_cloud_command(args)
 
             # Verify error message was printed
             error_calls = [
                 call
-                for call in mock_console.print.call_args_list
+                for call in mock_print.call_args_list
                 if "Error: No initial message" in str(call)
             ]
             assert len(error_calls) > 0

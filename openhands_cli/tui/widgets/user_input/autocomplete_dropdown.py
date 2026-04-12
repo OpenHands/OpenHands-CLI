@@ -35,9 +35,8 @@ class AutoCompleteDropdown(Container):
         max-height: 12;
         display: none;
         background: $surface;
-        border-top: solid $primary;
-        border-left: solid $primary;
-        border-right: solid $primary;
+        border: round $primary;
+        border-bottom: none;
         padding: 0 1;
         margin: 0;
 

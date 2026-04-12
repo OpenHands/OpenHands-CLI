@@ -12,7 +12,7 @@ SwitchConversationModal {
     width: 60;
     height: auto;
     min-width: 40;
-    border: $primary 80%;
+    border: round $primary 80%;
     background: $surface 90%;
     margin: 1 1;
 }

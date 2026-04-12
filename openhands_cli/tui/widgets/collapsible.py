@@ -5,7 +5,7 @@ title or pressing Enter when focused. It also supports programmatic control via
 Ctrl+O to toggle all cells at once.
 """
 
-from typing import TYPE_CHECKING, Any, ClassVar, Protocol
+from typing import TYPE_CHECKING, ClassVar, Protocol
 
 from rich.text import Text
 from textual import events
@@ -21,6 +21,9 @@ from textual.widgets import Static
 
 if TYPE_CHECKING:
     from textual.dom import DOMNode
+
+# Type alias for collapsible content - can be str, Text, or any Rich renderable
+CollapsibleContent = str | Text
 
 
 class CollapsibleTitle(Container, can_focus=True):
@@ -215,7 +218,7 @@ class Collapsible(Widget):
 
     def __init__(
         self,
-        content: Any,
+        content: CollapsibleContent,
         *,
         title: str | Text = "Toggle",
         collapsed: bool = True,
@@ -230,7 +233,7 @@ class Collapsible(Widget):
         """Initialize a Collapsible widget.
 
         Args:
-            content: Content that will be collapsed/expanded (converted to string).
+            content: Content that will be collapsed/expanded (str or Rich Text).
             title: Title of the collapsed/expanded contents (str or Rich Text).
             collapsed: Default status of the contents.
             collapsed_symbol: Collapsed symbol before the title.
@@ -267,11 +270,11 @@ class Collapsible(Widget):
         self._title.label = Content.from_text(new_title)
         self._title._update_label()
 
-    def update_content(self, new_content: Any) -> None:
+    def update_content(self, new_content: CollapsibleContent) -> None:
         """Update the content of the collapsible.
 
         Args:
-            new_content: The new content to display (can be string or Rich renderable).
+            new_content: The new content to display (str or Rich Text).
         """
         self._content_string = str(new_content)
         self._content_widget.update(new_content)
