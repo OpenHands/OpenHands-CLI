@@ -37,7 +37,6 @@ RESOURCE_SKILL = Skill(
 )
 
 
-
 @lru_cache(maxsize=1)
 def get_acp_cache_dir() -> Path:
     """Get the ACP cache directory, creating it lazily if needed."""
