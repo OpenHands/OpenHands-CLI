@@ -22,7 +22,10 @@ from openhands.sdk.conversation.state import (
 )
 from openhands.sdk.event.base import Event
 from openhands_cli.setup import setup_conversation
-from openhands_cli.shared import extract_conversation_summary
+from openhands_cli.shared import (
+    extract_conversation_summary,
+    handle_confirmation_decision,
+)
 from openhands_cli.tui.core.events import ShowConfirmationPanel
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.user_actions.types import UserConfirmation
@@ -155,12 +158,8 @@ class ConversationRunner:
         try:
             # Handle user decision if resuming after confirmation
             if decision is not None:
-                if decision == UserConfirmation.REJECT:
-                    self.conversation.reject_pending_actions(
-                        "User rejected the actions"
-                    )
-                elif decision == UserConfirmation.DEFER:
-                    self.conversation.pause()
+                handle_confirmation_decision(self.conversation, decision)
+                if decision == UserConfirmation.DEFER:
                     return
                 # ACCEPT and policy changes just continue running
 
