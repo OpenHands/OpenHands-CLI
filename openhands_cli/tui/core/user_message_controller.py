@@ -61,9 +61,7 @@ class UserMessageController:
                 if content
                 else f"[Image: {dims_str}{size_str}]"
             )
-            runner.visualizer.render_user_message(
-                display_text, image_data=image_data
-            )
+            runner.visualizer.render_user_message(display_text, image_data=image_data)
         else:
             runner.visualizer.render_user_message(content)
 

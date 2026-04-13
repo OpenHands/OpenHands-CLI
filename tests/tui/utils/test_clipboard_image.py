@@ -3,8 +3,6 @@
 import io
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from openhands_cli.tui.utils.clipboard_image import (
     _validate_image,
     get_image_dimensions,
@@ -174,7 +172,9 @@ class TestReadClipboardLinux:
         img.save(buf, format="PNG")
         png_bytes = buf.getvalue()
 
-        mock_which.side_effect = lambda cmd: "/usr/bin/xclip" if cmd == "xclip" else None
+        mock_which.side_effect = (
+            lambda cmd: "/usr/bin/xclip" if cmd == "xclip" else None
+        )
 
         # First call: check TARGETS
         targets_result = MagicMock()
@@ -199,7 +199,9 @@ class TestReadClipboardLinux:
         """xclip returns None when no image/png in TARGETS."""
         from openhands_cli.tui.utils.clipboard_image import _read_clipboard_linux
 
-        mock_which.side_effect = lambda cmd: "/usr/bin/xclip" if cmd == "xclip" else None
+        mock_which.side_effect = (
+            lambda cmd: "/usr/bin/xclip" if cmd == "xclip" else None
+        )
 
         targets_result = MagicMock()
         targets_result.stdout = "TARGETS\ntext/plain"
@@ -342,7 +344,6 @@ class TestBuildContentBlocks:
     def test_text_only(self):
         """Text-only message should produce single TextContent block."""
         from openhands.sdk import TextContent
-
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
 
         blocks = ConversationRunner._build_content_blocks("hello", None)
@@ -353,7 +354,6 @@ class TestBuildContentBlocks:
     def test_image_only(self):
         """Image-only message should produce single ImageContent block."""
         from openhands.sdk import ImageContent
-
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
 
         blocks = ConversationRunner._build_content_blocks("", b"\x89PNG\r\n\x1a\ndata")
@@ -364,7 +364,6 @@ class TestBuildContentBlocks:
     def test_text_and_image(self):
         """Text + image should produce both content blocks."""
         from openhands.sdk import ImageContent, TextContent
-
         from openhands_cli.tui.core.conversation_runner import ConversationRunner
 
         blocks = ConversationRunner._build_content_blocks(

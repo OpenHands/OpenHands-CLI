@@ -107,7 +107,7 @@ def _try_read_file_from_clipboard_macos() -> bytes | None:
     try:
         # Get clipboard content as text (may contain a file path)
         result = subprocess.run(
-            ["osascript", "-e", 'the clipboard as text'],
+            ["osascript", "-e", "the clipboard as text"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -390,7 +390,7 @@ def image_to_rich_text(
         # Each character row represents 2 pixel rows via half-blocks
         pixel_height = height * 2
         img = img.resize((width, pixel_height), Image.Resampling.LANCZOS)
-        pixels = list(img.getdata())
+        pixels: list[tuple[int, int, int]] = list(img.getdata())  # type: ignore[arg-type]
 
         text = Text()
         for row in range(height):
