@@ -95,6 +95,7 @@ def setup_conversation(
     confirmation_policy: ConfirmationPolicyBase,
     visualizer: ConversationVisualizer | None = None,
     event_callback: Callable[[Event], None] | None = None,
+    console: Console | None = None,
     *,
     env_overrides_enabled: bool = False,
     critic_disabled: bool = False,
@@ -107,6 +108,8 @@ def setup_conversation(
             will be generated.
         visualizer: Optional visualizer to use. If None, a default will be used
         event_callback: Optional callback function to handle events (e.g., JSON output)
+        console: Optional Console for status output. If None, a default Console
+            will be created.
         env_overrides_enabled: If True, environment variables will override
             stored LLM settings, and agent can be created from env vars if no
             disk config exists.
@@ -115,7 +118,8 @@ def setup_conversation(
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
     """
-    console = Console()
+    if console is None:
+        console = Console()
     console.print("Initializing agent...", style="white")
 
     agent = load_agent_specs(
