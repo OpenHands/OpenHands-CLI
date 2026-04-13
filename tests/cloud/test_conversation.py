@@ -215,13 +215,22 @@ def test_extract_repository_from_cwd_branch_missing_is_ok():
 @pytest.mark.parametrize(
     "repo_branch,expected_payload",
     [
-        ((None, None), {"initial_user_msg": "hi"}),
-        (("owner/repo", None), {"initial_user_msg": "hi", "repository": "owner/repo"}),
+        (
+            (None, None),
+            {"initial_message": {"content": [{"type": "text", "text": "hi"}]}},
+        ),
+        (
+            ("owner/repo", None),
+            {
+                "initial_message": {"content": [{"type": "text", "text": "hi"}]},
+                "selected_repository": "owner/repo",
+            },
+        ),
         (
             ("owner/repo", "main"),
             {
-                "initial_user_msg": "hi",
-                "repository": "owner/repo",
+                "initial_message": {"content": [{"type": "text", "text": "hi"}]},
+                "selected_repository": "owner/repo",
                 "selected_branch": "main",
             },
         ),
@@ -239,12 +248,12 @@ async def test_create_cloud_conversation_payload_includes_repo_and_branch(
     ):
         client = Mock()
         resp = Mock()
-        resp.json.return_value = {"conversation_id": "c1"}
+        resp.json.return_value = {"id": "c1", "app_conversation_id": "ac1"}
         client.create_conversation = AsyncMock(return_value=resp)
         mock_client_cls.return_value = client
 
         result = await create_cloud_conversation("https://server", "key", "hi")
-        assert result["conversation_id"] == "c1"
+        assert result["id"] == "c1"
         client.create_conversation.assert_called_once_with(json_data=expected_payload)
 
 
@@ -265,3 +274,165 @@ async def test_create_cloud_conversation_propagates_api_error_as_cloud_error():
             CloudConversationError, match=r"Failed to create conversation: boom"
         ):
             await create_cloud_conversation("https://server", "key", "hi")
+
+
+@pytest.mark.asyncio
+async def test_create_cloud_conversation_polls_for_app_conversation_id():
+    """When app_conversation_id is None initially, poll start-tasks until ready."""
+    with (
+        patch(
+            "openhands_cli.cloud.conversation.extract_repository_from_cwd",
+            return_value=(None, None),
+        ),
+        patch("openhands_cli.cloud.conversation.OpenHandsApiClient") as mock_client_cls,
+    ):
+        client = Mock()
+        resp = Mock()
+        resp.json.return_value = {"id": "t1", "app_conversation_id": None}
+        client.create_conversation = AsyncMock(return_value=resp)
+        client.get_start_task_status = AsyncMock(
+            side_effect=[
+                {"id": "t1", "status": "WORKING", "app_conversation_id": None},
+                {"id": "t1", "status": "READY", "app_conversation_id": "ac1"},
+            ]
+        )
+        mock_client_cls.return_value = client
+
+        result = await create_cloud_conversation(
+            "https://server", "key", "hi", poll_interval=0
+        )
+        assert result["id"] == "t1"
+        assert client.get_start_task_status.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_create_cloud_conversation_raises_on_start_task_error():
+    """When start-task status is ERROR, raise CloudConversationError."""
+    with (
+        patch(
+            "openhands_cli.cloud.conversation.extract_repository_from_cwd",
+            return_value=(None, None),
+        ),
+        patch("openhands_cli.cloud.conversation.OpenHandsApiClient") as mock_client_cls,
+    ):
+        client = Mock()
+        resp = Mock()
+        resp.json.return_value = {"id": "t1", "app_conversation_id": None}
+        client.create_conversation = AsyncMock(return_value=resp)
+        client.get_start_task_status = AsyncMock(
+            return_value={
+                "id": "t1",
+                "status": "ERROR",
+                "detail": "sandbox failed",
+                "app_conversation_id": None,
+            }
+        )
+        mock_client_cls.return_value = client
+
+        with pytest.raises(CloudConversationError, match="sandbox failed"):
+            await create_cloud_conversation(
+                "https://server", "key", "hi", poll_interval=0
+            )
+
+
+@pytest.mark.asyncio
+async def test_create_cloud_conversation_polls_timeout_falls_back_to_task_id():
+    """When polling exhausts all attempts, fall back to task_id for the URL."""
+    with (
+        patch(
+            "openhands_cli.cloud.conversation.extract_repository_from_cwd",
+            return_value=(None, None),
+        ),
+        patch("openhands_cli.cloud.conversation.OpenHandsApiClient") as mock_client_cls,
+    ):
+        client = Mock()
+        resp = Mock()
+        resp.json.return_value = {"id": "t1", "app_conversation_id": None}
+        client.create_conversation = AsyncMock(return_value=resp)
+        client.get_start_task_status = AsyncMock(
+            return_value={"id": "t1", "status": "WORKING", "app_conversation_id": None}
+        )
+        mock_client_cls.return_value = client
+
+        result = await create_cloud_conversation(
+            "https://server", "key", "hi", poll_interval=0, poll_max_attempts=2
+        )
+        assert result["id"] == "t1"
+        assert client.get_start_task_status.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_create_cloud_conversation_timeout_shows_warning(capsys):
+    """When polling times out, print a warning about the link."""
+    with (
+        patch(
+            "openhands_cli.cloud.conversation.extract_repository_from_cwd",
+            return_value=(None, None),
+        ),
+        patch("openhands_cli.cloud.conversation.OpenHandsApiClient") as mock_client_cls,
+    ):
+        client = Mock()
+        resp = Mock()
+        resp.json.return_value = {"id": "t1", "app_conversation_id": None}
+        client.create_conversation = AsyncMock(return_value=resp)
+        client.get_start_task_status = AsyncMock(
+            return_value={"id": "t1", "status": "WORKING", "app_conversation_id": None}
+        )
+        mock_client_cls.return_value = client
+
+        await create_cloud_conversation(
+            "https://server", "key", "hi", poll_interval=0, poll_max_attempts=1
+        )
+        output = capsys.readouterr().out
+        assert "still initializing" in output
+
+
+@pytest.mark.asyncio
+async def test_create_cloud_conversation_poll_handles_none_task_info():
+    """When get_start_task_status returns None, keep polling."""
+    with (
+        patch(
+            "openhands_cli.cloud.conversation.extract_repository_from_cwd",
+            return_value=(None, None),
+        ),
+        patch("openhands_cli.cloud.conversation.OpenHandsApiClient") as mock_client_cls,
+    ):
+        client = Mock()
+        resp = Mock()
+        resp.json.return_value = {"id": "t1", "app_conversation_id": None}
+        client.create_conversation = AsyncMock(return_value=resp)
+        client.get_start_task_status = AsyncMock(
+            side_effect=[
+                None,
+                {"id": "t1", "status": "READY", "app_conversation_id": "ac1"},
+            ]
+        )
+        mock_client_cls.return_value = client
+
+        result = await create_cloud_conversation(
+            "https://server", "key", "hi", poll_interval=0
+        )
+        assert result["id"] == "t1"
+        assert client.get_start_task_status.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_create_cloud_conversation_skips_polling_when_no_task_id():
+    """When response has no id at all, skip polling entirely."""
+    with (
+        patch(
+            "openhands_cli.cloud.conversation.extract_repository_from_cwd",
+            return_value=(None, None),
+        ),
+        patch("openhands_cli.cloud.conversation.OpenHandsApiClient") as mock_client_cls,
+    ):
+        client = Mock()
+        resp = Mock()
+        resp.json.return_value = {}
+        client.create_conversation = AsyncMock(return_value=resp)
+        client.get_start_task_status = AsyncMock()
+        mock_client_cls.return_value = client
+
+        result = await create_cloud_conversation("https://server", "key", "hi")
+        assert result == {}
+        client.get_start_task_status.assert_not_called()
