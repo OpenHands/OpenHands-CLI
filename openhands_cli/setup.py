@@ -25,6 +25,52 @@ class MissingAgentSpec(Exception):
     pass
 
 
+_builtin_agents_registered = False
+
+
+def ensure_builtin_agents_registered() -> None:
+    """Register SDK built-in sub-agent types so the delegate tool can spawn them.
+
+    Registers agents like "default", "bash", and "explore" that are shipped with
+    the SDK.  Safe to call multiple times — subsequent calls are no-ops.
+
+    In SDK v1.16.x, ``register_builtins_agents(cli_mode=True)`` registers the
+    CLI default agent under the name ``"default cli mode"`` while
+    ``DelegateExecutor`` resolves unnamed agent types to ``"default"``.  We
+    bridge this gap by also registering the CLI factory under the ``"default"``
+    name.  This workaround can be removed once the SDK ships the
+    ``enable_browser`` parameter (already on ``main``).
+    """
+    global _builtin_agents_registered
+    if _builtin_agents_registered:
+        return
+
+    from openhands.sdk.subagent.registry import (
+        get_agent_factory,
+        register_agent_if_absent,
+    )
+    from openhands.tools import register_builtins_agents
+
+    register_builtins_agents(cli_mode=True)
+
+    # Workaround: SDK v1.16.x registers the CLI default as "default cli mode"
+    # but DelegateExecutor._resolve_agent_type() defaults to "default".
+    try:
+        get_agent_factory("default")
+    except ValueError:
+        try:
+            cli_factory = get_agent_factory("default cli mode")
+            register_agent_if_absent(
+                name="default",
+                factory_func=cli_factory.factory_func,
+                description=cli_factory.definition,
+            )
+        except ValueError:
+            pass  # no CLI default either — nothing to alias
+
+    _builtin_agents_registered = True
+
+
 def load_agent_specs(
     conversation_id: str | None = None,
     mcp_servers: dict[str, dict[str, Any]] | None = None,
@@ -121,6 +167,8 @@ def setup_conversation(
     if console is None:
         console = Console()
     console.print("Initializing agent...", style="white")
+
+    ensure_builtin_agents_registered()
 
     agent = load_agent_specs(
         str(conversation_id),
