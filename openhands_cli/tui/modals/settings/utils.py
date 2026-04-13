@@ -187,11 +187,12 @@ def save_settings(
 
         # Reset max_input_tokens when model changes so SDK auto-looks up
         # from LiteLLM; preserve user-supplied value when model is unchanged.
-        model_changed = (
-            existing_agent is None
-            or full_model != existing_agent.llm.model
-        )
-        max_input_tokens = None if model_changed else data.max_tokens
+        max_input_tokens: int | None = None
+        if existing_agent is not None and full_model == existing_agent.llm.model:
+            if isinstance(data.max_tokens, str):
+                max_input_tokens = int(data.max_tokens)
+            elif isinstance(data.max_tokens, int):
+                max_input_tokens = data.max_tokens
 
         if should_set_litellm_extra_body(full_model, data.base_url):
             extra_kwargs["litellm_extra_body"] = {
