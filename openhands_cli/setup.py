@@ -25,6 +25,26 @@ class MissingAgentSpec(Exception):
     pass
 
 
+_builtin_agents_registered = False
+
+
+def ensure_builtin_agents_registered() -> None:
+    """Register SDK built-in sub-agent types so the delegate tool can spawn them.
+
+    Registers agents like "default", "bash", and "explore" that are shipped with
+    the SDK.  Safe to call multiple times — subsequent calls are no-ops.
+    """
+    global _builtin_agents_registered
+    if _builtin_agents_registered:
+        return
+
+    from openhands.tools import register_builtins_agents
+
+    register_builtins_agents(cli_mode=False)
+
+    _builtin_agents_registered = True
+
+
 def load_agent_specs(
     conversation_id: str | None = None,
     mcp_servers: dict[str, dict[str, Any]] | None = None,
@@ -121,6 +141,8 @@ def setup_conversation(
     if console is None:
         console = Console()
     console.print("Initializing agent...", style="white")
+
+    ensure_builtin_agents_registered()
 
     agent = load_agent_specs(
         str(conversation_id),

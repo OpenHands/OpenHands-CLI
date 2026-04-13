@@ -15,6 +15,7 @@ from openhands.sdk import LLM, Agent, ImageContent, TextContent
 from openhands.sdk.event import SystemPromptEvent
 from openhands.sdk.event.base import Event
 from openhands.sdk.tool import Tool
+from openhands.tools.browser_use import BrowserToolSet
 from openhands.tools.delegate import DelegateTool
 from openhands.tools.file_editor import FileEditorTool
 from openhands.tools.preset.default import get_default_condenser
@@ -161,21 +162,21 @@ def get_llm_metadata(
 
 
 def get_default_cli_tools() -> list[Tool]:
-    """Get the default tool specifications for CLI mode (browser disabled)."""
+    """Get the default tool specifications for CLI mode."""
     return [
         Tool(name=TerminalTool.name),
         Tool(name=FileEditorTool.name),
         Tool(name=TaskTrackerTool.name),
+        Tool(name=BrowserToolSet.name),
         Tool(name=DelegateTool.name),
     ]
 
 
 def get_default_cli_agent(llm: LLM) -> Agent:
-    """Create the default CLI agent with all tools (browser disabled)."""
+    """Create the default CLI agent with all tools."""
     return Agent(
         llm=llm,
         tools=get_default_cli_tools(),
-        system_prompt_kwargs={"cli_mode": True},
         condenser=get_default_condenser(
             llm=llm.model_copy(update={"usage_id": "condenser"})
         ),

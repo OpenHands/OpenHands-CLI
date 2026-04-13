@@ -21,7 +21,13 @@ def test_get_default_cli_tools_returns_expected_tools():
     """Test that get_default_cli_tools returns exactly the expected tools."""
     tools = get_default_cli_tools()
     tool_names = {t.name for t in tools}
-    assert tool_names == {"terminal", "file_editor", "task_tracker", "delegate"}
+    assert tool_names == {
+        "terminal",
+        "file_editor",
+        "task_tracker",
+        "browser_tool_set",
+        "delegate",
+    }
 
 
 def test_should_set_litellm_extra_body_for_openhands():
