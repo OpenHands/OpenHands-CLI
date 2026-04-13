@@ -12,20 +12,18 @@ Future maintainers: Please move methods from here into the `CloudStore` class
 implementation and deprecate this module.
 """
 
+import asyncio
 import logging
 import os
 import subprocess
 from typing import Any
 
-from rich.console import Console
-
 from openhands_cli.auth.api_client import OpenHandsApiClient
+from openhands_cli.auth.utils import console_print
 from openhands_cli.theme import OPENHANDS_THEME
 
 
 logger = logging.getLogger(__name__)
-
-console = Console()
 
 
 class CloudConversationError(Exception):
@@ -33,7 +31,12 @@ class CloudConversationError(Exception):
 
 
 async def create_cloud_conversation(
-    server_url: str, api_key: str, initial_user_msg: str
+    server_url: str,
+    api_key: str,
+    initial_user_msg: str,
+    *,
+    poll_interval: float = 2.0,
+    poll_max_attempts: int = 15,
 ) -> dict[str, Any]:
     """Create a new conversation in OpenHands Cloud.
 
@@ -41,6 +44,8 @@ async def create_cloud_conversation(
         server_url: OpenHands server URL
         api_key: Valid API key for authentication
         initial_user_msg: Initial message for the conversation
+        poll_interval: Seconds between start-task polling attempts
+        poll_max_attempts: Maximum number of polling attempts
 
     Returns:
         Conversation data from the server
@@ -49,30 +54,29 @@ async def create_cloud_conversation(
     client = OpenHandsApiClient(server_url, api_key)
 
     repo, branch = extract_repository_from_cwd()
+    accent = OPENHANDS_THEME.accent
     if repo:
-        console.print(
-            f"[{OPENHANDS_THEME.secondary}]Detected repository: "
-            f"[{OPENHANDS_THEME.accent}]{repo}[/{OPENHANDS_THEME.accent}]"
-            f"[/{OPENHANDS_THEME.secondary}]"
+        console_print(
+            f"Detected repository: [{accent}]{repo}[/{accent}]",
+            style=OPENHANDS_THEME.secondary,
         )
     if branch:
-        console.print(
-            f"[{OPENHANDS_THEME.secondary}]Detected branch: "
-            f"[{OPENHANDS_THEME.accent}]{branch}[/{OPENHANDS_THEME.accent}]"
-            f"[/{OPENHANDS_THEME.secondary}]"
+        console_print(
+            f"Detected branch: [{accent}]{branch}[/{accent}]",
+            style=OPENHANDS_THEME.secondary,
         )
 
-    payload: dict[str, Any] = {"initial_user_msg": initial_user_msg}
+    payload: dict[str, Any] = {
+        "initial_message": {
+            "content": [{"type": "text", "text": initial_user_msg}],
+        }
+    }
     if repo:
-        payload["repository"] = repo
+        payload["selected_repository"] = repo
     if branch:
         payload["selected_branch"] = branch
 
-    console.print(
-        f"[{OPENHANDS_THEME.accent}]"
-        "Creating cloud conversation..."
-        f"[/{OPENHANDS_THEME.accent}]"
-    )
+    console_print("Creating cloud conversation...", style=OPENHANDS_THEME.accent)
 
     try:
         resp = await client.create_conversation(json_data=payload)
@@ -80,25 +84,50 @@ async def create_cloud_conversation(
     except CloudConversationError:
         raise
     except Exception as e:
-        console.print(
-            f"[{OPENHANDS_THEME.error}]Error creating cloud conversation: {e}"
-            f"[/{OPENHANDS_THEME.error}]"
+        console_print(
+            f"Error creating cloud conversation: {e}", style=OPENHANDS_THEME.error
         )
         raise CloudConversationError(f"Failed to create conversation: {e}") from e
 
-    conversation_id = conversation.get("conversation_id")
-    console.print(
-        f"[{OPENHANDS_THEME.secondary}]Conversation ID: "
-        f"[{OPENHANDS_THEME.accent}]{conversation_id}[/{OPENHANDS_THEME.accent}]"
-        f"[/{OPENHANDS_THEME.secondary}]"
+    task_id = conversation.get("id")
+    app_conversation_id = conversation.get("app_conversation_id")
+
+    # V1 returns a start-task; poll until app_conversation_id is available
+    if not app_conversation_id and task_id:
+        console_print(
+            "Waiting for conversation to start...", style=OPENHANDS_THEME.secondary
+        )
+        for _ in range(poll_max_attempts):
+            await asyncio.sleep(poll_interval)
+            task_info = await client.get_start_task_status(task_id)
+            if task_info:
+                status = task_info.get("status")
+                app_conversation_id = task_info.get("app_conversation_id")
+                if app_conversation_id:
+                    break
+                if status == "ERROR":
+                    detail = task_info.get("detail", "Unknown error")
+                    raise CloudConversationError(
+                        f"Conversation failed to start: {detail}"
+                    )
+
+    conversation_id = app_conversation_id or task_id
+    if not app_conversation_id:
+        console_print(
+            "⚠️ Conversation is still initializing. "
+            "The link below may take a moment to become active.",
+            style=OPENHANDS_THEME.warning,
+        )
+    console_print(
+        f"Conversation ID: [{accent}]{conversation_id}[/{accent}]",
+        style=OPENHANDS_THEME.secondary,
     )
 
     if conversation_id:
         url = f"{server_url}/conversations/{conversation_id}"
-        console.print(
-            f"[{OPENHANDS_THEME.secondary}]View in browser: "
-            f"[{OPENHANDS_THEME.accent}]{url}[/{OPENHANDS_THEME.accent}]"
-            f"[/{OPENHANDS_THEME.secondary}]"
+        console_print(
+            f"View in browser: [{accent}]{url}[/{accent}]",
+            style=OPENHANDS_THEME.secondary,
         )
 
     return conversation

@@ -35,6 +35,7 @@ a = Analysis(
         # Include all data files from openhands.sdk (templates, configs, etc.)
         *collect_data_files('openhands.sdk'),
         *collect_data_files('openhands.tools'),
+        *collect_data_files('browser_use'),
         # Include all data files from openhands_cli package
         *collect_data_files('openhands_cli'),
         # Include package metadata for importlib.metadata
@@ -49,6 +50,7 @@ a = Analysis(
         # Include OpenHands SDK submodules explicitly to avoid resolution issues
         *collect_submodules('openhands.sdk'),
         *collect_submodules('openhands.tools'),
+        *collect_submodules('browser_use'),
         *collect_submodules('tiktoken'),
         *collect_submodules('tiktoken_ext'),
         *collect_submodules('litellm'),
@@ -90,8 +92,6 @@ a = Analysis(
         'fastmcp.cli',
         'boto3',
         'botocore',
-        'browser-use',
-        'openhands.tools.browser_use'
     ],
     noarchive=False,
     # IMPORTANT: do not use optimize=2 (-OO) because it strips docstrings used by PLY/bashlex grammar

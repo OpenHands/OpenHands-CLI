@@ -41,6 +41,9 @@ class TrajectoryEvent:
     # For MessageEvent
     llm_message: dict[str, Any] | None = None
 
+    # For critic results (attached to agent events)
+    critic_result: dict[str, Any] | None = None
+
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> "TrajectoryEvent":
         """Parse a trajectory event from JSON data."""
@@ -56,7 +59,12 @@ class TrajectoryEvent:
             reasoning_content=data.get("reasoning_content"),
             thinking_blocks=data.get("thinking_blocks", []),
             llm_message=data.get("llm_message"),
+            critic_result=data.get("critic_result"),
         )
+
+    def has_critic_result(self) -> bool:
+        """Check if this event has a critic result attached."""
+        return self.critic_result is not None
 
     def is_user_input(self) -> bool:
         """Check if this event represents user input to be simulated."""
@@ -95,6 +103,30 @@ class Trajectory:
     def get_llm_responses(self) -> list[TrajectoryEvent]:
         """Get all events that should be replayed by the mock LLM server."""
         return [e for e in self.events if e.is_llm_response()]
+
+    def get_critic_results(self) -> list[dict[str, Any]]:
+        """Get all critic results from the trajectory in order.
+
+        Returns:
+            List of critic result dictionaries with 'score', 'message', and 'metadata'.
+        """
+        return [
+            e.critic_result
+            for e in self.events
+            if e.has_critic_result() and e.critic_result is not None
+        ]
+
+    def get_critic_scores(self) -> list[float]:
+        """Get all critic scores from the trajectory in order.
+
+        Returns:
+            List of critic scores (floats between 0 and 1).
+        """
+        return [
+            e.critic_result["score"]
+            for e in self.events
+            if e.has_critic_result() and e.critic_result is not None
+        ]
 
 
 def load_trajectory(trajectory_path: Path | str) -> Trajectory:

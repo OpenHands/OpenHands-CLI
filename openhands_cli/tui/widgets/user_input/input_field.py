@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from textual import events, on
+from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container
 from textual.message import Message
@@ -15,13 +16,25 @@ from textual.signal import Signal
 from textual.widgets import Static, TextArea
 
 from openhands_cli.tui.core.commands import COMMANDS, is_valid_command
-from openhands_cli.tui.messages import SlashCommandSubmitted, UserInputSubmitted
+from openhands_cli.tui.messages import (
+    SlashCommandSubmitted,
+    UserInputSubmitted,
+)
 from openhands_cli.tui.widgets.user_input.autocomplete_dropdown import (
     AutoCompleteDropdown,
 )
 from openhands_cli.tui.widgets.user_input.single_line_input import (
     SingleLineInputWithWrapping,
 )
+
+
+class MultilineInput(TextArea):
+    """A multiline TextArea with ctrl+a bound to select all."""
+
+    BINDINGS: ClassVar = [
+        # Override default ctrl+a (cursor_line_start) to select all instead
+        Binding("ctrl+a", "select_all", "Select all", show=True),
+    ]
 
 
 def get_external_editor() -> str:
@@ -97,36 +110,33 @@ class InputField(Container):
         width: 100%;
         height: auto;
         min-height: 3;
-        layers: base autocomplete;
 
         #single_line_input {
-            layer: base;
             width: 100%;
             height: auto;
             min-height: 3;
             max-height: 8;
             background: $background;
             color: $foreground;
-            border: solid $primary !important;
+            border: round $primary !important;
         }
 
         #single_line_input:focus {
-            border: solid $primary !important;
+            border: round $primary !important;
             background: $background;
         }
 
         #multiline_input {
-            layer: base;
             width: 100%;
             height: 6;
             background: $background;
             color: $foreground;
-            border: solid $primary;
+            border: round $primary;
             display: none;
         }
 
         #multiline_input:focus {
-            border: solid $primary;
+            border: round $primary;
             background: $background;
         }
 
@@ -138,14 +148,6 @@ class InputField(Container):
             color: $text;
             padding: 0 1;
             display: none;
-        }
-
-        AutoCompleteDropdown {
-            layer: autocomplete;
-            offset-x: 1;
-            offset-y: -2;
-            overlay: screen;
-            constrain: inside inflect;
         }
     }
     """
@@ -167,7 +169,7 @@ class InputField(Container):
             placeholder=self.placeholder,
             id="single_line_input",
         )
-        self.multiline_widget = TextArea(
+        self.multiline_widget = MultilineInput(
             id="multiline_input",
             soft_wrap=True,
             show_line_numbers=False,
@@ -181,12 +183,12 @@ class InputField(Container):
             self.single_line_widget
         )
 
-    def compose(self):
+    def compose(self) -> ComposeResult:
         """Create the input widgets."""
         yield self._image_indicator
+        yield self.autocomplete
         yield self.single_line_widget
         yield self.multiline_widget
-        yield self.autocomplete
 
     def on_mount(self) -> None:
         """Focus the input when mounted."""

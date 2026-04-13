@@ -12,10 +12,12 @@ import shutil
 import subprocess
 from typing import TYPE_CHECKING
 
+
 if TYPE_CHECKING:
     from rich.text import Text
 
 from openhands.sdk.logger import get_logger
+
 
 logger = get_logger(__name__)
 

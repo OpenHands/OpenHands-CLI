@@ -39,18 +39,24 @@ from openhands_cli.tui.widgets.collapsible import (
 
 # Icons for different event types
 SUCCESS_ICON = "✓"
+SUCCESS_COLOR = "#6bff6b"
 ERROR_ICON = "✗"
+ERROR_COLOR = "#ff6b6b"
 AGENT_MESSAGE_PADDING = (1, 0, 1, 1)  # top, right, bottom, left
 
 # Maximum line length for truncating titles/commands in collapsed view
 MAX_LINE_LENGTH = 70
 ELLIPSIS = "..."
 
+# Default agent name - don't show prefix for this agent
+DEFAULT_AGENT_NAME = "OpenHands Agent"
+
 
 if TYPE_CHECKING:
     from textual.containers import VerticalScroll
     from textual.widget import Widget
 
+    from openhands.sdk.critic.result import CriticResult
     from openhands_cli.tui.textual_app import OpenHandsApp
 
 
@@ -93,13 +99,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
         container: "VerticalScroll",
         app: "OpenHandsApp",
         name: str | None = None,
-    ):
+    ) -> None:
         """Initialize the visualizer.
 
         Args:
             container: The Textual VerticalScroll container to add widgets to
             app: The Textual app instance for thread-safe UI updates
-            skip_user_messages: If True, skip displaying user messages
             name: Agent name to display in panel titles for delegation context.
                   When set, titles will be prefixed with the agent name.
         """
@@ -121,6 +126,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         return self._cli_settings
 
     def reload_configuration(self) -> None:
+        """Reload CLI settings from disk."""
         self._cli_settings = CliSettings.load()
 
     def create_sub_visualizer(self, agent_id: str) -> "ConversationVisualizer":
@@ -204,15 +210,25 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return formatted_name
         return f"{formatted_name} Agent"
 
+    def _is_non_default_agent(self) -> bool:
+        """Check if the current agent is NOT the default OpenHands Agent.
+
+        Returns:
+            True if name is set and is different from the default agent name.
+        """
+        if not self._name:
+            return False
+        return self._name.strip() != DEFAULT_AGENT_NAME
+
     def _get_agent_prefix(self) -> str:
         """Get the agent name prefix for titles when in delegation context.
 
         Returns:
-            Formatted agent name in parentheses like "(Agent Name) " if name is set,
-            empty string otherwise.
+            Formatted agent name in parentheses like "(Agent Name) " if name is set
+            and is NOT the default agent, empty string otherwise.
         """
-        agent_name = self._get_formatted_agent_name()
-        if agent_name:
+        if self._is_non_default_agent():
+            agent_name = self._get_formatted_agent_name()
             return f"({agent_name}) "
         return ""
 
@@ -270,66 +286,116 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
             # Add critic collapsible if present (for MessageEvent and ActionEvent)
             critic_result = getattr(event, "critic_result", None)
-            if critic_result is not None and self.cli_settings.enable_critic:
-                from openhands_cli.tui.utils.critic import (
-                    create_critic_collapsible,
-                    send_critic_inference_event,
-                )
-                from openhands_cli.tui.utils.critic.feedback import (
-                    CriticFeedbackWidget,
-                )
-
-                # Get agent model for tracking
-                agent_model = self._get_agent_model()
-                conversation_id = str(self._app.conversation_id)
-
-                # Send critic inference event to PostHog
-                send_critic_inference_event(
-                    critic_result=critic_result,
-                    conversation_id=conversation_id,
-                    agent_model=agent_model,
-                )
-
-                critic_widget = create_critic_collapsible(critic_result)
-                self._run_on_main_thread(self._add_widget_to_ui, critic_widget)
-
-                # Add feedback widget after critic collapsible
-                feedback_widget = CriticFeedbackWidget(
-                    critic_result=critic_result,
-                    conversation_id=conversation_id,
-                    agent_model=agent_model,
-                )
-                self._run_on_main_thread(self._add_widget_to_ui, feedback_widget)
+            if critic_result is not None:
+                self._handle_critic_result(critic_result)
 
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
         self._container.mount(widget)
-        # Automatically scroll to the bottom to show the newly added widget
-        self._container.scroll_end(animate=False)
+        if self._container.is_vertical_scroll_end:
+            self._container.scroll_end(animate=False)
+
+    def _handle_critic_result(self, critic_result: "CriticResult") -> None:
+        """Handle a critic result by displaying widgets and notifying controller.
+
+        This method is responsible for presentation only:
+        1. Displaying the critic score collapsible (if enabled)
+        2. Displaying the feedback widget
+        3. Sending telemetry
+        4. Posting CriticResultReceived for RefinementController to handle
+
+        Business logic (refinement triggering) is handled by RefinementController.
+
+        Args:
+            critic_result: The critic evaluation result to handle.
+        """
+        from openhands_cli.tui.messages import CriticResultReceived
+        from openhands_cli.tui.utils.critic import (
+            create_critic_collapsible,
+            send_critic_inference_event,
+        )
+        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
+
+        critic_settings = self.cli_settings.critic
+
+        # Skip display if critic is disabled
+        if not critic_settings.enable_critic:
+            return
+
+        # Get agent model for tracking
+        agent_model = self._get_agent_model()
+        conversation_id = str(self._app.conversation_id)
+
+        # Send critic inference event to PostHog
+        send_critic_inference_event(
+            critic_result=critic_result,
+            conversation_id=conversation_id,
+            agent_model=agent_model,
+        )
+
+        # Display critic score collapsible
+        critic_widget = create_critic_collapsible(critic_result)
+        self._run_on_main_thread(self._add_widget_to_ui, critic_widget)
+
+        # Add feedback widget after critic collapsible
+        feedback_widget = CriticFeedbackWidget(
+            critic_result=critic_result,
+            conversation_id=conversation_id,
+            agent_model=agent_model,
+        )
+        self._run_on_main_thread(self._add_widget_to_ui, feedback_widget)
+
+        # Notify RefinementController to evaluate and potentially trigger refinement
+        self._app.call_from_thread(
+            self._app.conversation_manager.post_message,
+            CriticResultReceived(critic_result),
+        )
+
+    def _dismiss_pending_feedback_widgets(self) -> None:
+        """Dismiss any pending feedback widgets.
+
+        Called when a new user turn starts - user chose to continue
+        instead of rating the critic feedback.
+        """
+        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
+
+        for widget in self._container.query(CriticFeedbackWidget):
+            widget.remove()
+
+    def _render_message_widget(self, content: str) -> None:
+        """Render a message widget to the UI (shared logic).
+
+        Args:
+            content: The message text to display.
+        """
+        from textual.widgets import Static
+
+        user_message_widget = Static(
+            f"> {content}", classes="user-message", markup=False
+        )
+        self._run_on_main_thread(self._add_widget_to_ui, user_message_widget)
 
     def render_user_message(
         self, content: str, *, image_data: bytes | None = None
     ) -> None:
         """Render a user message to the UI.
 
-        Dismisses any pending feedback widgets before rendering the user message.
+        This is the entry point for user-initiated messages. It:
+        1. Dismisses any pending feedback widgets
+        2. Renders the message to the UI
+        3. Optionally renders an image preview
+
+        Note: The refinement iteration counter is reset by UserMessageController,
+        not here. This keeps the visualizer focused on presentation.
+
+        Use render_refinement_message() for system-generated refinement messages.
 
         Args:
             content: The user's message text to display.
             image_data: Optional PNG image bytes to display as a preview.
         """
-        from textual.widgets import Static
-
-        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
-
-        # Dismiss pending feedback widgets (user chose to continue instead of rating)
-        for widget in self._container.query(CriticFeedbackWidget):
-            widget.remove()
-
-        user_message_widget = Static(
-            f"> {content}", classes="user-message", markup=False
-        )
-        self._run_on_main_thread(self._add_widget_to_ui, user_message_widget)
+        self._dismiss_pending_feedback_widgets()
+        self._render_message_widget(content)
 
         # Display image preview if image data is provided
         if image_data is not None:
@@ -346,13 +412,27 @@ class ConversationVisualizer(ConversationVisualizerBase):
             preview_widget = Static(preview, classes="image-preview")
             self._run_on_main_thread(self._add_widget_to_ui, preview_widget)
 
+    def render_refinement_message(self, content: str) -> None:
+        """Render a system-generated refinement message to the UI.
+
+        This is used for refinement messages that are part of the current
+        refinement loop. Unlike render_user_message(), this is only for display
+        purposes - iteration tracking is managed by RefinementController.
+
+        Args:
+            content: The refinement message text to display.
+        """
+        self._dismiss_pending_feedback_widgets()
+        self._render_message_widget(content)
+
     def _update_widget_in_ui(
         self, collapsible: Collapsible, new_title: str, new_content: str
     ) -> None:
         """Update an existing widget in the UI (must be called from main thread)."""
         collapsible.update_title(new_title)
         collapsible.update_content(new_content)
-        self._container.scroll_end(animate=False)
+        if self._container.is_vertical_scroll_end:
+            self._container.scroll_end(animate=False)
 
     def _handle_observation_event(
         self, event: ObservationEvent | UserRejectObservation | AgentErrorEvent
@@ -370,10 +450,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # Determine success/error status
         is_error = isinstance(event, UserRejectObservation | AgentErrorEvent)
         status_icon = ERROR_ICON if is_error else SUCCESS_ICON
+        status_color = ERROR_COLOR if is_error else SUCCESS_COLOR
 
-        # Build the new title with status icon
-        new_title = self._build_action_title(action_event)
-        new_title = f"{new_title} {status_icon}"
+        # Build the new title with colored status icon
+        title_text = Text.from_markup(self._build_action_title(action_event))
+        icon_text = Text(status_icon, style=status_color)
+        new_title = Text.assemble(title_text, " ", icon_text)
 
         # Build the new content (observation result only)
         new_content = self._build_observation_content(event)
@@ -479,14 +561,18 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 return ELLIPSIS + text[-(max_length - len(ELLIPSIS)) :]
         return text
 
+    def _clean_and_truncate(self, text: str, *, from_start: bool = True) -> str:
+        """Strip, collapse newlines, truncate, and escape Rich markup for display."""
+        text = str(text).strip().replace("\n", " ")
+        text = self._truncate_for_display(text, from_start=from_start)
+        return self._escape_rich_markup(text)
+
     def _extract_meaningful_title(self, event, fallback_title: str) -> str:
         """Extract a meaningful title from an event, with fallback to truncated
         content."""
         # For ActionEvents, prefer the LLM-generated summary if available
         if hasattr(event, "summary") and event.summary:
-            summary = str(event.summary).strip().replace("\n", " ")
-            summary = self._truncate_for_display(summary)
-            return self._escape_rich_markup(summary)
+            return self._clean_and_truncate(event.summary)
 
         # Try to extract meaningful information from the event
         if hasattr(event, "action") and event.action is not None:
@@ -496,42 +582,33 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
             # Try to get specific details based on action type
             if hasattr(action, "command") and action.command:
-                # For command actions, show the command
-                cmd = str(action.command).strip()
-                cmd = self._truncate_for_display(cmd)
-                return f"{action_type}: {self._escape_rich_markup(cmd)}"
+                return f"{action_type}: {self._clean_and_truncate(action.command)}"
             elif hasattr(action, "path") and action.path:
-                # For file actions, show the path (truncate from start to show filename)
-                path = str(action.path)
-                path = self._truncate_for_display(path, from_start=False)
-                return f"{action_type}: {self._escape_rich_markup(path)}"
+                # For file actions, truncate from start to show filename
+
+                return f"{action_type}: {
+                    self._clean_and_truncate(
+                        action.path,
+                        from_start=False,
+                    )
+                }"
             elif hasattr(action, "content") and action.content:
-                # For content-based actions, show truncated content
-                content = str(action.content).strip().replace("\n", " ")
-                content = self._truncate_for_display(content)
-                return f"{action_type}: {self._escape_rich_markup(content)}"
+                return f"{action_type}: {self._clean_and_truncate(action.content)}"
             elif hasattr(action, "message") and action.message:
-                # For message actions, show truncated message
-                msg = str(action.message).strip().replace("\n", " ")
-                msg = self._truncate_for_display(msg)
-                return f"{action_type}: {self._escape_rich_markup(msg)}"
+                return f"{action_type}: {self._clean_and_truncate(action.message)}"
             else:
                 return f"{action_type} Action"
 
         elif hasattr(event, "observation") and event.observation is not None:
-            # For ObservationEvents, try to get observation details
             obs = event.observation
             obs_type = obs.__class__.__name__.replace("Observation", "")
 
             if hasattr(obs, "content") and obs.content:
-                content = str(obs.content).strip().replace("\n", " ")
-                content = self._truncate_for_display(content)
-                return f"{obs_type}: {self._escape_rich_markup(content)}"
+                return f"{obs_type}: {self._clean_and_truncate(obs.content)}"
             else:
                 return f"{obs_type} Observation"
 
         elif hasattr(event, "llm_message") and event.llm_message is not None:
-            # For MessageEvents, show truncated message content
             msg = event.llm_message
             if hasattr(msg, "content") and msg.content:
                 # Extract text from content list (content is a list of TextContent
@@ -546,16 +623,11 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 else:
                     content_text = str(msg.content)
 
-                content_text = content_text.strip().replace("\n", " ")
-                content_text = self._truncate_for_display(content_text)
                 role = "User" if msg.role == "user" else "Agent"
-                return f"{role}: {self._escape_rich_markup(content_text)}"
+                return f"{role}: {self._clean_and_truncate(content_text)}"
 
         elif hasattr(event, "message") and event.message:
-            # For events with direct message attribute
-            content = str(event.message).strip().replace("\n", " ")
-            content = self._truncate_for_display(content)
-            return f"{fallback_title}: {self._escape_rich_markup(content)}"
+            return f"{fallback_title}: {self._clean_and_truncate(event.message)}"
 
         # If we can't extract meaningful info, try to truncate the visualized content
         if hasattr(event, "visualize"):
@@ -641,81 +713,99 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         return self._make_collapsible(content, title, event)
 
+    def _create_markdown_widget(self, content: str) -> Markdown:
+        """Create a standard markdown widget for agent-authored messages."""
+        widget = Markdown(content)
+        widget.styles.padding = AGENT_MESSAGE_PADDING
+        return widget
+
+    def _build_finish_message(self, message: str) -> str:
+        """Build finish-action markdown content for the current agent context."""
+        if not self._is_non_default_agent():
+            return message
+
+        agent_name = self._get_formatted_agent_name()
+        return f"**{agent_name}:**\n\n{message}"
+
+    def _create_action_widget(self, event: ActionEvent) -> Markdown | None:
+        """Create a widget for action events that render as markdown."""
+        action = event.action
+        if isinstance(action, FinishAction):
+            return self._create_markdown_widget(
+                self._build_finish_message(str(action.message))
+            )
+        if isinstance(action, ThinkAction):
+            return self._create_markdown_widget(str(action.visualize))
+        return None
+
+    def _build_delegation_message(self, *, sender: str, role: str, content: str) -> str:
+        """Build delegation markdown showing sender and recipient agent names."""
+        agent_name = self._get_formatted_agent_name()
+        event_sender = self._format_agent_name_with_suffix(sender)
+
+        if role == "user":
+            prefix = f"**{event_sender} → {agent_name}:**\n\n"
+        else:
+            prefix = f"**{agent_name} → {event_sender}:**\n\n"
+        return prefix + content
+
+    def _create_message_event_widget(self, event: MessageEvent) -> "Widget | None":
+        """Create a widget for message events shown as markdown or collapsibles."""
+        if not event.llm_message:
+            return None
+
+        if event.llm_message.role == "user" and not event.sender:
+            return None
+
+        message_content = str(event.visualize)
+        if event.sender and self._is_non_default_agent():
+            return self._create_markdown_widget(
+                self._build_delegation_message(
+                    sender=event.sender,
+                    role=event.llm_message.role,
+                    content=message_content,
+                )
+            )
+
+        if self._name and event.llm_message.role == "assistant":
+            return self._create_markdown_widget(message_content)
+
+        if not self._name:
+            return None
+
+        return self._create_event_collapsible(event)
+
+    def _create_titled_collapsible(
+        self, event: Event, fallback_title: str
+    ) -> Collapsible:
+        """Create a standard titled collapsible for non-action events."""
+        title = self._extract_meaningful_title(event, fallback_title)
+        content_string = self._escape_rich_markup(str(event.visualize))
+        return self._make_collapsible(
+            content_string,
+            f"{self._get_agent_prefix()}{title}",
+            event,
+        )
+
     def _create_event_widget(self, event: Event) -> "Widget | None":
         """Create a widget for the event - either plain text or collapsible."""
-        content = event.visualize
-
         # Handle SystemPromptEvent - create a collapsible showing the system prompt
         # Note: Loaded resources (skills, hooks, tools, MCPs) are displayed at startup
         # in _initialize_main_ui(). This collapsible shows the full system prompt.
         if isinstance(event, SystemPromptEvent):
             return self._create_system_prompt_collapsible(event)
+
         # Don't emit condensation request events (internal events)
-        elif isinstance(event, CondensationRequest):
+        if isinstance(event, CondensationRequest):
             return None
 
-        # Check if this is a plain text event (finish, think, or message)
         if isinstance(event, ActionEvent):
-            action = event.action
-            if isinstance(action, FinishAction):
-                # For finish action, render as markdown with padding to align
-                # User message has "padding: 0 1" and starts with "> ", so text
-                # starts at position 3 (1 padding + 2 for "> ")
-                # In delegation context, add agent header
-                message = str(action.message)
-                if self._name:
-                    agent_name = self._get_formatted_agent_name()
-                    message = f"**{agent_name}:**\n\n{message}"
-                widget = Markdown(message)
-                widget.styles.padding = AGENT_MESSAGE_PADDING
-                return widget
-            elif isinstance(action, ThinkAction):
-                # For think action, render as markdown with padding
-                widget = Markdown(str(action.visualize))
-                widget.styles.padding = AGENT_MESSAGE_PADDING
-                return widget
+            action_widget = self._create_action_widget(event)
+            if action_widget is not None:
+                return action_widget
 
         if isinstance(event, MessageEvent):
-            if not event.llm_message:
-                return None
-
-            # Skip direct user messages (they are displayed separately in the UI)
-            # This applies for user messages
-            # without a sender in delegation context
-            if event.llm_message.role == "user" and not event.sender:
-                return None
-
-            # Case 1: Delegation message (both sender and name are set)
-            # Format with arrow notation showing sender → receiver
-            if event.sender and self._name:
-                message_content = str(content)
-                agent_name = self._get_formatted_agent_name()
-                event_sender = self._format_agent_name_with_suffix(event.sender)
-
-                if event.llm_message.role == "user":
-                    # Message from another agent (via delegation)
-                    prefix = f"**{event_sender} → {agent_name}:**\n\n"
-                else:
-                    # Agent message - derive recipient from sender context
-                    prefix = f"**{agent_name} → {event_sender}:**\n\n"
-
-                message_content = prefix + message_content
-                widget = Markdown(message_content)
-                widget.styles.padding = AGENT_MESSAGE_PADDING
-                return widget
-
-            # Case 2: Regular agent message (name set, no sender, assistant role)
-            # This is the normal case for agent responses in the main conversation
-            # Fixes GitHub issue #399: Agent MessageEvents were being silently dropped
-            if self._name and event.llm_message.role == "assistant":
-                widget = Markdown(str(content))
-                widget.styles.padding = AGENT_MESSAGE_PADDING
-                return widget
-
-            # Case 3: No name context - skip MessageEvents
-            # (visualizer without name is typically not used in CLI)
-            if not self._name:
-                return None
+            return self._create_message_event_widget(event)
 
         # For other events, use collapsible
         return self._create_event_collapsible(event)
@@ -726,72 +816,43 @@ class ConversationVisualizer(ConversationVisualizerBase):
         When in delegation context (self._name is set), titles are prefixed
         with the agent name (e.g., "Lodging Expert Agent Observation").
         """
-        # Use the event's visualize property for content
         content = event.visualize
-
         if not content.plain.strip():
             return None
 
-        agent_prefix = self._get_agent_prefix()
-
-        # Don't emit condensation request events (internal events)
         if isinstance(event, CondensationRequest):
             return None
-        elif isinstance(event, ActionEvent):
-            # Build title using new format with agent prefix
+
+        if isinstance(event, ActionEvent):
             title = self._build_action_title(event)
-            content_string = self._escape_rich_markup(str(content))
-
-            # Action events default to collapsed since we have summary in title
-            collapsible = self._make_collapsible(content_string, title, event)
-
-            # Store for pairing with observation
+            collapsible = self._make_collapsible(
+                self._escape_rich_markup(str(content)),
+                title,
+                event,
+            )
             self._pending_actions[event.tool_call_id] = (event, collapsible)
-
             return collapsible
-        elif isinstance(event, ObservationEvent):
-            # If we get here, the observation wasn't paired with an action
-            # (shouldn't happen normally, but handle gracefully)
-            title = self._extract_meaningful_title(event, "Observation")
-            return self._make_collapsible(
-                self._escape_rich_markup(str(content)), f"{agent_prefix}{title}", event
-            )
-        elif isinstance(event, UserRejectObservation):
-            title = self._extract_meaningful_title(event, "User Rejected Action")
-            return self._make_collapsible(
-                self._escape_rich_markup(str(content)), f"{agent_prefix}{title}", event
-            )
-        elif isinstance(event, AgentErrorEvent):
-            title = self._extract_meaningful_title(event, "Agent Error")
-            content_string = self._escape_rich_markup(str(content))
-            return self._make_collapsible(
-                content_string, f"{agent_prefix}{title}", event
-            )
-        elif isinstance(event, ConversationErrorEvent):
-            title = self._extract_meaningful_title(event, "Conversation Error")
-            content_string = self._escape_rich_markup(str(content))
-            return self._make_collapsible(
-                content_string, f"{agent_prefix}{title}", event
-            )
-        elif isinstance(event, PauseEvent):
-            title = self._extract_meaningful_title(event, "User Paused")
-            return self._make_collapsible(
-                self._escape_rich_markup(str(content)), f"{agent_prefix}{title}", event
-            )
-        elif isinstance(event, Condensation):
-            title = self._extract_meaningful_title(event, "Condensation")
-            content_string = self._escape_rich_markup(str(content))
-            return self._make_collapsible(
-                content_string, f"{agent_prefix}{title}", event
-            )
-        else:
-            # Fallback for unknown event types
-            title = self._extract_meaningful_title(
-                event, f"UNKNOWN Event: {event.__class__.__name__}"
-            )
-            content_string = (
-                f"{self._escape_rich_markup(str(content))}\n\nSource: {event.source}"
-            )
-            return self._make_collapsible(
-                content_string, f"{agent_prefix}{title}", event
-            )
+
+        fallback_titles: list[tuple[type[Event], str]] = [
+            (ObservationEvent, "Observation"),
+            (UserRejectObservation, "User Rejected Action"),
+            (AgentErrorEvent, "Agent Error"),
+            (ConversationErrorEvent, "Conversation Error"),
+            (PauseEvent, "User Paused"),
+            (Condensation, "Condensation"),
+        ]
+        for event_type, fallback_title in fallback_titles:
+            if isinstance(event, event_type):
+                return self._create_titled_collapsible(event, fallback_title)
+
+        title = self._extract_meaningful_title(
+            event, f"UNKNOWN Event: {event.__class__.__name__}"
+        )
+        content_string = (
+            f"{self._escape_rich_markup(str(content))}\n\nSource: {event.source}"
+        )
+        return self._make_collapsible(
+            content_string,
+            f"{self._get_agent_prefix()}{title}",
+            event,
+        )

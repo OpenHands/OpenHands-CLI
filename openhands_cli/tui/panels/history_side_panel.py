@@ -17,6 +17,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
+from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.widgets import Button, Static
@@ -178,14 +179,14 @@ class HistorySidePanel(Container):
         )
         content_area.mount(panel)
 
-    def compose(self):
+    def compose(self) -> ComposeResult:
         """Compose the history side panel content."""
         with Horizontal(classes="history-header-row"):
             yield Static("Conversations", classes="history-header", id="history-header")
             yield Button("✕", id="history-close-btn", classes="history-close-btn")
         yield VerticalScroll(id="history-list")
 
-    def on_mount(self):
+    def on_mount(self) -> None:
         """Called when the panel is mounted.
 
         Sets up watchers on ConversationContainer to react to state changes.

@@ -143,6 +143,18 @@ class TestOpenHandsApiClient:
             ):
                 await client._get_json("/test")
 
+    def test_v1_conversations_path_without_endpoint(self):
+        assert (
+            OpenHandsApiClient._v1_conversations_path("abc")
+            == "/api/v1/app-conversations?ids=abc"
+        )
+
+    def test_v1_conversations_path_with_endpoint(self):
+        assert (
+            OpenHandsApiClient._v1_conversations_path("abc", "start-tasks")
+            == "/api/v1/app-conversations/start-tasks?ids=abc"
+        )
+
 
 class TestHelperFunctions:
     """Test cases for helper functions in api_client module."""
@@ -158,7 +170,7 @@ class TestHelperFunctions:
         }
 
         with patch("openhands_cli.auth.api_client.AgentStore") as mock_store_class:
-            with patch("openhands_cli.auth.api_client._p") as mock_print:
+            with patch("openhands_cli.auth.api_client.console_print") as mock_print:
                 mock_store = MagicMock()
                 mock_agent = MagicMock()
                 mock_llm = MagicMock()
@@ -193,7 +205,7 @@ class TestHelperFunctions:
             with patch(
                 "openhands_cli.auth.api_client.create_and_save_agent_configuration"
             ) as mock_create_and_save:
-                with patch("openhands_cli.auth.api_client._p"):
+                with patch("openhands_cli.auth.api_client.console_print"):
                     mock_client = AsyncMock()
                     mock_client_class.return_value = mock_client
 
@@ -227,7 +239,7 @@ class TestHelperFunctions:
         with patch(
             "openhands_cli.auth.api_client.OpenHandsApiClient"
         ) as mock_client_class:
-            with patch("openhands_cli.auth.api_client._p"):
+            with patch("openhands_cli.auth.api_client.console_print"):
                 mock_client = AsyncMock()
                 mock_client_class.return_value = mock_client
 
@@ -251,7 +263,7 @@ class TestHelperFunctions:
         with patch(
             "openhands_cli.auth.api_client.OpenHandsApiClient"
         ) as mock_client_class:
-            with patch("openhands_cli.auth.api_client._p"):
+            with patch("openhands_cli.auth.api_client.console_print"):
                 mock_client = AsyncMock()
                 mock_client_class.return_value = mock_client
 
@@ -275,7 +287,7 @@ class TestHelperFunctions:
             with patch(
                 "openhands_cli.auth.api_client.create_and_save_agent_configuration"
             ) as mock_create_and_save:
-                with patch("openhands_cli.auth.api_client._p"):
+                with patch("openhands_cli.auth.api_client.console_print"):
                     mock_client = AsyncMock()
                     mock_client_class.return_value = mock_client
 
@@ -306,7 +318,7 @@ class TestHelperFunctions:
         with patch(
             "openhands_cli.auth.api_client.OpenHandsApiClient"
         ) as mock_client_class:
-            with patch("openhands_cli.auth.api_client._p"):
+            with patch("openhands_cli.auth.api_client.console_print"):
                 mock_client = AsyncMock()
                 mock_client_class.return_value = mock_client
 
@@ -327,7 +339,7 @@ class TestHelperFunctions:
         # New settings also doesn't have llm_base_url
         new_settings = {"llm_model": "claude-sonnet-4-5-20250929"}
 
-        with patch("openhands_cli.auth.api_client._p") as mock_print:
+        with patch("openhands_cli.auth.api_client.console_print") as mock_print:
             with patch("builtins.input", return_value="n"):  # User says no
                 result = _ask_user_consent_for_overwrite(mock_agent, new_settings)
 

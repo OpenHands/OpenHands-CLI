@@ -42,7 +42,7 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
         initial_confirmation_mode: ConfirmationMode,
         resume_conversation_id: str | None = None,
         streaming_enabled: bool = False,
-    ):
+    ) -> None:
         """Initialize the local ACP agent.
 
         Args:
@@ -195,7 +195,7 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
     async def new_session(
         self,
         cwd: str,
-        mcp_servers: list[Any],
+        mcp_servers: list[Any] | None = None,
         working_dir: str | None = None,
         **_kwargs: Any,
     ) -> NewSessionResponse:

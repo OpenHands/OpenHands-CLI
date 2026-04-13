@@ -142,7 +142,7 @@ class TokenBasedEventSubscriber:
             field_meta=get_metadata(self.conversation),
         )
 
-    async def unstreamed_event_handler(self, event: Event):
+    async def unstreamed_event_handler(self, event: Event) -> None:
         # Skip ConversationStateUpdateEvent (internal state management)
         if isinstance(event, ConversationStateUpdateEvent):
             return

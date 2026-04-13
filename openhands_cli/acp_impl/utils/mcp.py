@@ -5,12 +5,12 @@ from typing import Any
 
 from acp.schema import (
     HttpMcpServer,
+    McpServerStdio,
     SseMcpServer,
-    StdioMcpServer,
 )
 
 
-ACPMCPServerType = StdioMcpServer | HttpMcpServer | SseMcpServer
+ACPMCPServerType = McpServerStdio | HttpMcpServer | SseMcpServer
 
 
 def _convert_env_to_dict(env: Sequence[dict[str, str]]) -> dict[str, str]:
@@ -64,7 +64,7 @@ def convert_acp_mcp_servers_to_agent_format(
 
         # Add transport type based on server class
         # StdioMcpServer -> stdio, HttpMcpServer -> http, SseMcpServer -> sse
-        if isinstance(server, StdioMcpServer):
+        if isinstance(server, McpServerStdio):
             server_config["transport"] = "stdio"
         elif isinstance(server, HttpMcpServer):
             server_config["transport"] = "http"

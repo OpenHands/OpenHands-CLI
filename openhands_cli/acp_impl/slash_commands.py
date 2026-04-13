@@ -12,6 +12,9 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 from openhands_cli.acp_impl.confirmation import CONFIRMATION_MODES, ConfirmationMode
+from openhands_cli.shared.slash_commands import (
+    parse_slash_command as parse_slash_command,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -49,34 +52,6 @@ def get_available_slash_commands() -> list[AvailableCommand]:
             ),
         ),
     ]
-
-
-def parse_slash_command(text: str) -> tuple[str, str] | None:
-    """Parse a slash command from user input.
-
-    Args:
-        text: User input text
-
-    Returns:
-        Tuple of (command, argument) if text is a slash command, None otherwise
-    """
-    text = text.strip()
-    if not text.startswith("/"):
-        return None
-
-    # Remove leading slash
-    text = text[1:].strip()
-
-    # If nothing after the slash, it's not a valid command
-    if not text:
-        return None
-
-    # Split into command and argument
-    parts = text.split(None, 1)
-    command = parts[0].lower()
-    argument = parts[1] if len(parts) > 1 else ""
-
-    return command, argument
 
 
 def create_help_text() -> str:

@@ -430,7 +430,7 @@ class AgentStore:
         if not critic_disabled:
             cli_settings = CliSettings.load()
             critic = get_default_critic(
-                updated_llm, enable_critic=cli_settings.enable_critic
+                updated_llm, enable_critic=cli_settings.critic.enable_critic
             )
 
         return agent.model_copy(
@@ -496,7 +496,9 @@ class AgentStore:
 
         # Now add critic on-the-fly for the returned agent (not persisted)
         cli_settings = CliSettings.load()
-        critic = get_default_critic(llm, enable_critic=cli_settings.enable_critic)
+        critic = get_default_critic(
+            llm, enable_critic=cli_settings.critic.enable_critic
+        )
         if critic is not None:
             agent = agent.model_copy(update={"critic": critic})
 

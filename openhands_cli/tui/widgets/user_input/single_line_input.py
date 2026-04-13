@@ -1,4 +1,7 @@
+from typing import ClassVar
+
 from textual import on
+from textual.binding import Binding
 from textual.content import Content
 from textual.events import Paste
 from textual.message import Message
@@ -14,6 +17,11 @@ class SingleLineInputWithWrapping(TextArea):
     - CSS height: auto makes it grow based on content
     - CSS max-height limits maximum growth
     """
+
+    BINDINGS: ClassVar = [
+        # Override default ctrl+a (cursor_line_start) to select all instead
+        Binding("ctrl+a", "select_all", "Select all", show=True),
+    ]
 
     class MultiLinePasteDetected(Message):
         """Message sent when multi-line paste is detected."""

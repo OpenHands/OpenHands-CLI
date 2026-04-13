@@ -20,6 +20,7 @@ COMMANDS = [
     DropdownItem(main="/new - Start a new conversation"),
     DropdownItem(main="/history - Toggle conversation history"),
     DropdownItem(main="/image - Attach image from clipboard"),
+    DropdownItem(main="/settings - Open settings"),
     DropdownItem(main="/confirm - Configure confirmation settings"),
     DropdownItem(main="/condense - Condense conversation history"),
     DropdownItem(main="/skills - View loaded skills, hooks, and MCPs"),
@@ -75,6 +76,7 @@ def show_help(scroll_view: VerticalScroll) -> None:
   [{secondary}]/new[/{secondary}] - Start a new conversation
   [{secondary}]/history[/{secondary}] - Toggle conversation history
   [{secondary}]/image[/{secondary}] - Attach image from clipboard
+  [{secondary}]/settings[/{secondary}] - Open settings
   [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
   [{secondary}]/condense[/{secondary}] - Condense conversation history
   [{secondary}]/skills[/{secondary}] - View loaded skills, hooks, and MCPs

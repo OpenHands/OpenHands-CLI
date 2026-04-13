@@ -14,6 +14,7 @@ except Exception:  # pragma: no cover - optional dependency
     Posthog = None  # type: ignore[assignment]
     POSTHOG_AVAILABLE = False
 from textual import events, on
+from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Button, Static
 
@@ -158,7 +159,7 @@ class CriticFeedbackWidget(Static, can_focus=True):
                 host=POSTHOG_HOST,
             )
 
-    def compose(self):
+    def compose(self) -> ComposeResult:
         """Compose the widget with prompt and buttons."""
         yield Static(
             "[bold]Does the critic's success prediction align with your "
