@@ -407,7 +407,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._render_message_widget(content)
 
     def _update_widget_in_ui(
-        self, collapsible: Collapsible, new_title: str, new_content: str
+        self, collapsible: Collapsible, new_title: str | Text, new_content: str | Text
     ) -> None:
         """Update an existing widget in the UI (must be called from main thread)."""
         collapsible.update_title(new_title)
@@ -505,14 +505,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     def _build_observation_content(
         self, event: ObservationEvent | UserRejectObservation | AgentErrorEvent
-    ) -> str:
-        """Build content string from an observation event.
+    ) -> str | Text:
+        """Build content from an observation event.
 
-        Returns the Rich-formatted content to preserve colors and styling.
+        Returns the Rich Text object directly to preserve colors and styling
+        (e.g., red/green diff highlighting from FileEditorObservation).
         """
-        # Return the visualize content directly (Rich Text object)
-        # The Collapsible widget can handle Rich renderables
-        return str(event.visualize)
+        return event.visualize
 
     def _escape_rich_markup(self, text: str) -> str:
         """Escape Rich markup characters in text to prevent markup errors.
@@ -761,9 +760,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
     ) -> Collapsible:
         """Create a standard titled collapsible for non-action events."""
         title = self._extract_meaningful_title(event, fallback_title)
-        content_string = self._escape_rich_markup(str(event.visualize))
+        content = event.visualize
         return self._make_collapsible(
-            content_string,
+            content,
             f"{self._get_agent_prefix()}{title}",
             event,
         )
@@ -807,7 +806,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         if isinstance(event, ActionEvent):
             title = self._build_action_title(event)
             collapsible = self._make_collapsible(
-                self._escape_rich_markup(str(content)),
+                content,
                 title,
                 event,
             )
@@ -829,11 +828,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
         title = self._extract_meaningful_title(
             event, f"UNKNOWN Event: {event.__class__.__name__}"
         )
-        content_string = (
-            f"{self._escape_rich_markup(str(content))}\n\nSource: {event.source}"
-        )
+        full_content = Text.assemble(content, f"\n\nSource: {event.source}")
         return self._make_collapsible(
-            content_string,
+            full_content,
             f"{self._get_agent_prefix()}{title}",
             event,
         )
