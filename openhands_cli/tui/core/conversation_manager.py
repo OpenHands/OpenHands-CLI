@@ -47,6 +47,8 @@ from openhands_cli.tui.messages import (
 
 
 if TYPE_CHECKING:
+    from openhands_cli.auth.api_client import OpenHandsApiClient
+    from openhands_cli.tui.core.btw_store import BtwStore
     from openhands_cli.tui.core.conversation_runner import ConversationRunner
     from openhands_cli.tui.core.state import ConversationContainer
 
@@ -183,14 +185,14 @@ class ConversationManager(Container):
         # Initialize BTW interceptor for side-channel questions
         # Note: api_client will be lazily initialized on first /btw use
         self._btw_interceptor: BtwInterceptor | None = None
-        self._api_client = None
+        self._api_client: OpenHandsApiClient | None = None
 
     def set_api_client(self, api_client, server_url: str | None = None) -> None:  # noqa: ARG002
         """Set the API client for BTW functionality.
 
         Args:
             api_client: The API client instance for making requests.
-            server_url: Optional server URL for the API (unused, kept for API compatibility).
+            server_url: Optional server URL (unused, kept for API compatibility).
         """
         self._api_client = api_client
 
@@ -255,9 +257,11 @@ class ConversationManager(Container):
             result = self._btw_interceptor.process(event.content)
 
             if result.is_btw and result.entry_id:
-                # Handle BTW command - call the API asynchronously
-                self._handle_btw_message(
-                    event.content, result.question, result.entry_id
+                # Handle BTW command - run asynchronously without blocking
+                self.run_worker(
+                    self._handle_btw_message(
+                        event.content, result.question, result.entry_id
+                    )
                 )
                 return  # Don't process as regular message
 
@@ -298,6 +302,7 @@ class ConversationManager(Container):
             if self._api_client is None:
                 self._init_api_client()
 
+            assert self._api_client is not None
             response = await self._api_client.ask_agent(conversation_id, question)
             await self._btw_interceptor.resolve(entry_id, response.get("response", ""))
 
@@ -341,6 +346,7 @@ class ConversationManager(Container):
 
         async def ask_agent_callback(conv_id: str, question: str) -> dict:
             """Callback to call the ask_agent API."""
+            assert self._api_client is not None
             return await self._api_client.ask_agent(conv_id, question)
 
         self._btw_interceptor = BtwInterceptor(
