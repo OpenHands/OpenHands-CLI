@@ -3,7 +3,8 @@ revision = 3
 requires-python = "==3.12.*"
 
 [options]
-exclude-newer = "2026-04-13T19:47:40Z"
+exclude-newer = "2026-04-08T13:22:04.171477384Z"
+exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
 openhands-tools = false
@@ -1668,7 +1669,6 @@ dependencies = [
     { name = "openhands-sdk" },
     { name = "openhands-tools" },
     { name = "openhands-workspace" },
-    { name = "prompt-toolkit" },
     { name = "pydantic" },
     { name = "pyperclip" },
     { name = "rich" },
@@ -1708,7 +1708,6 @@ requires-dist = [
     { name = "openhands-sdk", specifier = "==1.17.0" },
     { name = "openhands-tools", specifier = "==1.17.0" },
     { name = "openhands-workspace", specifier = "==1.11.1" },
-    { name = "prompt-toolkit", specifier = ">=3" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyperclip", specifier = ">=1.9.0" },
     { name = "rich", specifier = "<14.3.0" },
