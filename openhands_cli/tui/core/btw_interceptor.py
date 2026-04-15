@@ -50,6 +50,14 @@ class BtwInterceptor:
         self._ask_agent_callback = ask_agent_callback
         self._get_btw_store = get_btw_store
 
+    def set_conversation_id(self, conversation_id: str | None) -> None:
+        """Update the conversation ID.
+
+        Args:
+            conversation_id: The new conversation ID.
+        """
+        self._conversation_id = conversation_id
+
     def process(self, message: str) -> BtwResult:
         """Process a message to check if it's a BTW command.
 

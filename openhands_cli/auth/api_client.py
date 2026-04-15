@@ -97,6 +97,7 @@ class OpenHandsApiClient(BaseHttpClient):
             self._headers,
             json_data={"question": question},
         )
+        response.raise_for_status()
         return response.json()
 
     async def get_conversation_info(
