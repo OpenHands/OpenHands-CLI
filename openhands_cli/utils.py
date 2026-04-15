@@ -8,8 +8,7 @@ from argparse import Namespace
 from pathlib import Path
 from typing import Any
 
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import HTML
+from rich.console import Console
 
 from openhands.sdk import LLM, Agent, ImageContent, TextContent
 from openhands.sdk.event import SystemPromptEvent
@@ -211,7 +210,11 @@ def create_seeded_instructions_from_args(args: Namespace) -> list[str] | None:
         try:
             content = path.read_text(encoding="utf-8")
         except OSError as exc:
-            print_formatted_text(HTML(f"<red>Failed to read file {path}: {exc}</red>"))
+            Console(highlight=False, soft_wrap=True).print(
+                f"Failed to read file {path}: {exc}",
+                style="red",
+                markup=False,
+            )
             raise SystemExit(1)
 
         initial_message = (

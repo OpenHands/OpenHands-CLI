@@ -6,7 +6,6 @@ import os
 import re
 from typing import Any
 
-from prompt_toolkit import HTML, print_formatted_text
 from pydantic import BaseModel, SecretStr
 from rich.console import Console
 
@@ -38,6 +37,10 @@ from openhands_cli.utils import (
     get_os_description,
     should_set_litellm_extra_body,
 )
+
+
+console = Console(highlight=False, soft_wrap=True)
+stderr_console = Console(stderr=True, highlight=False, soft_wrap=True)
 
 
 def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
@@ -273,8 +276,10 @@ class AgentStore:
         except FileNotFoundError:
             return None
         except Exception:
-            print_formatted_text(
-                HTML("\n<red>Agent configuration file is corrupted!</red>")
+            console.print(
+                "\nAgent configuration file is corrupted!",
+                style="red",
+                markup=False,
             )
             return None
 
