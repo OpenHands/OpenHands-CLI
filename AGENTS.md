@@ -18,7 +18,7 @@ This repo contains the current CLI UX, including the Textual TUI and a browser-s
 - `.agents/skills/`: agent guidance for this repo.
 
 ## Setup, Build, and Development Commands
-This repository uses **uv** for dependency management and running tooling (such as in `Makefile`, CI workflows, and `uv.lock`). Use `uv` 0.11.6 or newer for local development; older versions can serialize `uv.lock` differently around relative `exclude-newer`, and contributors should keep `uv` updated for security fixes. Avoid using `pip install ...` directly if possible.
+This repository uses **uv** for dependency management and running tooling (such as in `Makefile`, CI workflows, and `uv.lock`). Use `uv` 0.11.6 or newer for local development; older versions can serialize `uv.lock` differently around relative `exclude-newer`. Avoid using `pip install ...` directly if possible.
 
 - minimum supported `uv` version: `0.11.6`
 - install dependencies: `make install` (runs `uv sync`)
