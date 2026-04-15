@@ -9,11 +9,17 @@ RED := \033[31m
 CYAN := \033[36m
 UNDERLINE := \033[4m
 RESET := \033[0m
+REQUIRED_UV_VERSION := 0.11.6
 
-.PHONY: help install install-dev test format clean run run-watch check-uv-version build
+.PHONY: help install install-dev test test-snapshots test-binary format clean run run-watch check-uv-version build install-uv lint pre-commit
 
 check-uv-version:
 	@$(ECHO) "$(YELLOW)Checking uv version...$(RESET)"
+	@if ! command -v uv >/dev/null 2>&1; then \
+		$(ECHO) "$(RED)Error: uv is not installed$(RESET)"; \
+		$(ECHO) "$(YELLOW)Install uv first with: make install-uv$(RESET)"; \
+		exit 1; \
+	fi
 	@UV_VERSION=$$(uv --version | cut -d' ' -f2); \
 	REQUIRED_VERSION=$(REQUIRED_UV_VERSION); \
 	if [ "$$(printf '%s\n' "$$REQUIRED_VERSION" "$$UV_VERSION" | sort -V | head -n1)" != "$$REQUIRED_VERSION" ]; then \
@@ -52,44 +58,44 @@ help:
 	@$(ECHO) "  $(CYAN)run$(RESET)               Run the CLI"
 	@$(ECHO) "  $(CYAN)run-watch$(RESET)         Run CLI with auto-restart on file changes"
 
-install:
+install: check-uv-version
 	@$(ECHO) "$(YELLOW)Installing the package...$(RESET)"
 	uv sync
 	@$(ECHO) "$(GREEN)Package installed successfully.$(RESET)"
 
-install-dev:
+install-dev: check-uv-version
 	@$(ECHO) "$(YELLOW)Installing dev dependencies...$(RESET)"
 	uv sync --group dev
 	@$(ECHO) "$(GREEN)Dev dependencies installed successfully.$(RESET)"
 
-test:
+test: check-uv-version
 	@$(ECHO) "$(YELLOW)Run tests...$(RESET)"
 	uv run pytest --ignore=tests/snapshots
 	@$(ECHO) "$(GREEN)Tests completed.$(RESET)"
 
-test-snapshots:
+test-snapshots: check-uv-version
 	@$(ECHO) "$(YELLOW)Run snapshots tests...$(RESET)"
 	uv run pytest tests/snapshots -v
 	@$(ECHO) "$(GREEN)Snapshots tests completed.$(RESET)"
 
-test-binary:
+test-binary: check-uv-version
 	@$(ECHO) "$(YELLOW)Run end-to-end tests...$(RESET)"
 	uv run pytest tui_e2e
 	@$(ECHO) "$(GREEN)End-to-end tests completed.$(RESET)"
 
 test-all: test test-snapshots
 
-lint:
+lint: check-uv-version
 	@$(ECHO) "$(YELLOW)Linting code with uv format...$(RESET)"
 	uv run ruff check openhands_cli/ --fix
 	@$(ECHO) "$(GREEN)Code linted successfully.$(RESET)"
 
-format:
+format: check-uv-version
 	@$(ECHO) "$(YELLOW)Formatting code with uv format...$(RESET)"
 	uv run ruff format openhands_cli/
 	@$(ECHO) "$(GREEN)Code formatted successfully.$(RESET)"
 
-pre-commit:
+pre-commit: check-uv-version
 	@$(ECHO) "$(YELLOW)Run pre-commit...$(RESET)"
 	uv run pre-commit run --all-files
 	@$(ECHO) "$(GREEN)Pre-commit run successfully.$(RESET)"
