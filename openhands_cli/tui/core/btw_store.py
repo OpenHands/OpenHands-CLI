@@ -12,6 +12,7 @@ from enum import Enum
 
 class BtwStatus(Enum):
     """Status of a BTW entry."""
+
     PENDING = "pending"
     DONE = "done"
     ERROR = "error"
@@ -20,6 +21,7 @@ class BtwStatus(Enum):
 @dataclass
 class BtwEntry:
     """A single BTW entry representing a side-channel question."""
+
     id: str
     question: str
     response: str | None = None
@@ -50,7 +52,9 @@ class BtwStore:
 
         entry_id = str(uuid.uuid4())
         entries = self._entries_by_conversation.setdefault(conversation_id, [])
-        entries.append(BtwEntry(id=entry_id, question=question, status=BtwStatus.PENDING))
+        entries.append(
+            BtwEntry(id=entry_id, question=question, status=BtwStatus.PENDING)
+        )
         return entry_id
 
     def resolve(self, conversation_id: str, entry_id: str, response: str) -> None:

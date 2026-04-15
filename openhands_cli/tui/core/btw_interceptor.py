@@ -7,7 +7,7 @@ through the ask_agent side-channel without disrupting the main task flow.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from openhands_cli.tui.core.btw_store import BtwEntry
@@ -21,6 +21,7 @@ BTW_PREFIX = f"{BTW_COMMAND} "
 @dataclass
 class BtwResult:
     """Result of processing a message through the BTW interceptor."""
+
     is_btw: bool
     question: str | None = None
     entry_id: str | None = None
@@ -36,8 +37,8 @@ class BtwInterceptor:
     def __init__(
         self,
         conversation_id: str | None,
-        ask_agent_callback: callable,
-        get_btw_store: callable,
+        ask_agent_callback: Callable[[str, str], Any],
+        get_btw_store: Callable[[], Any],
     ) -> None:
         """Initialize the BTW interceptor.
 
@@ -75,7 +76,7 @@ class BtwInterceptor:
             return BtwResult(is_btw=False)
 
         # Extract the question
-        question = trimmed[len(BTW_COMMAND):].strip()
+        question = trimmed[len(BTW_COMMAND) :].strip()
         if not question:
             # /btw with no question - ignore
             return BtwResult(is_btw=False)

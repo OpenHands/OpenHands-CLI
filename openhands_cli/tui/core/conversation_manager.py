@@ -18,6 +18,10 @@ from textual.message import Message
 
 from openhands.sdk.security.confirmation_policy import ConfirmationPolicyBase
 from openhands_cli.conversations.protocols import ConversationStore
+from openhands_cli.tui.core.btw_interceptor import (
+    BtwInterceptor,
+    get_btw_store,
+)
 from openhands_cli.tui.core.confirmation_flow_controller import (
     ConfirmationFlowController,
 )
@@ -39,11 +43,6 @@ from openhands_cli.tui.messages import (
     CriticResultReceived,
     SendMessage,
     SendRefinementMessage,
-)
-from openhands_cli.tui.core.btw_interceptor import (
-    BTW_COMMAND,
-    BtwInterceptor,
-    get_btw_store,
 )
 
 
@@ -186,17 +185,19 @@ class ConversationManager(Container):
         self._btw_interceptor: BtwInterceptor | None = None
         self._api_client = None
 
-    def set_api_client(self, api_client, server_url: str | None = None) -> None:
+    def set_api_client(self, api_client, server_url: str | None = None) -> None:  # noqa: ARG002
         """Set the API client for BTW functionality.
 
         Args:
             api_client: The API client instance for making requests.
-            server_url: Optional server URL for the API.
+            server_url: Optional server URL for the API (unused, kept for API compatibility).
         """
         self._api_client = api_client
 
         # Create the BTW interceptor with the conversation ID from state
-        conversation_id = str(self._state.conversation_id) if self._state.conversation_id else None
+        conversation_id = (
+            str(self._state.conversation_id) if self._state.conversation_id else None
+        )
 
         async def ask_agent_callback(conv_id: str, question: str) -> dict:
             """Callback to call the ask_agent API."""
@@ -247,20 +248,24 @@ class ConversationManager(Container):
         if self._btw_interceptor is not None:
             # Update conversation ID in case it changed
             self._btw_interceptor.set_conversation_id(
-                str(self._state.conversation_id) if self._state.conversation_id else None
+                str(self._state.conversation_id)
+                if self._state.conversation_id
+                else None
             )
             result = self._btw_interceptor.process(event.content)
 
             if result.is_btw and result.entry_id:
                 # Handle BTW command - call the API asynchronously
-                self._handle_btw_message(event.content, result.question, result.entry_id)
+                self._handle_btw_message(
+                    event.content, result.question, result.entry_id
+                )
                 return  # Don't process as regular message
 
         await self._message_controller.handle_user_message(event.content)
 
     async def _handle_btw_message(
         self,
-        original_message: str,
+        original_message: str,  # noqa: ARG002
         question: str | None,
         entry_id: str,
     ) -> None:
@@ -274,8 +279,17 @@ class ConversationManager(Container):
         if self._btw_interceptor is None:
             return
 
+        # Ensure question is not None at this point
+        if question is None:
+            await self._btw_interceptor.fail(entry_id, "No question provided")
+            return
+
         try:
-            conversation_id = str(self._state.conversation_id) if self._state.conversation_id else None
+            conversation_id = (
+                str(self._state.conversation_id)
+                if self._state.conversation_id
+                else None
+            )
             if not conversation_id:
                 await self._btw_interceptor.fail(entry_id, "No conversation ID")
                 return
@@ -312,9 +326,7 @@ class ConversationManager(Container):
         api_key = token_storage.get_api_key()
 
         if not api_key:
-            raise RuntimeError(
-                "Not authenticated. Please run 'openhands login' first."
-            )
+            raise RuntimeError("Not authenticated. Please run 'openhands login' first.")
 
         # Get server URL from environment or use default
         server_url = os.getenv("OPENHANDS_CLOUD_URL", "https://app.all-hands.dev")
@@ -323,7 +335,9 @@ class ConversationManager(Container):
         self._api_client = OpenHandsApiClient(server_url, api_key)
 
         # Initialize BTW interceptor with the api_client
-        conversation_id = str(self._state.conversation_id) if self._state.conversation_id else None
+        conversation_id = (
+            str(self._state.conversation_id) if self._state.conversation_id else None
+        )
 
         async def ask_agent_callback(conv_id: str, question: str) -> dict:
             """Callback to call the ask_agent API."""
