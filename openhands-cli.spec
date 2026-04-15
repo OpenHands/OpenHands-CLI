@@ -46,7 +46,6 @@ a = Analysis(
     hiddenimports=[
         # Explicitly include modules that might not be detected automatically
         *collect_submodules('openhands_cli'),
-        *collect_submodules('prompt_toolkit'),
         # Include OpenHands SDK submodules explicitly to avoid resolution issues
         *collect_submodules('openhands.sdk'),
         *collect_submodules('openhands.tools'),
