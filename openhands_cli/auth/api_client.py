@@ -79,6 +79,26 @@ class OpenHandsApiClient(BaseHttpClient):
     ) -> httpx.Response:
         return await self.post("/api/v1/app-conversations", self._headers, json_data)
 
+    async def ask_agent(
+        self, conversation_id: str, question: str
+    ) -> dict[str, Any]:
+        """Ask the agent a side question without queuing a full turn.
+
+        Args:
+            conversation_id: The conversation ID.
+            question: The side question to ask.
+
+        Returns:
+            Dict containing the agent's response with key "response".
+        """
+        path = f"/api/conversations/{conversation_id}/ask_agent"
+        response = await self.post(
+            path,
+            self._headers,
+            json_data={"question": question},
+        )
+        return response.json()
+
     async def get_conversation_info(
         self, conversation_id: str, endpoint: str = ""
     ) -> dict[str, Any] | None:

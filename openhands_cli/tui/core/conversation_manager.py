@@ -40,6 +40,11 @@ from openhands_cli.tui.messages import (
     SendMessage,
     SendRefinementMessage,
 )
+from openhands_cli.tui.core.btw_interceptor import (
+    BTW_COMMAND,
+    BtwInterceptor,
+    get_btw_store,
+)
 
 
 if TYPE_CHECKING:
@@ -176,6 +181,33 @@ class ConversationManager(Container):
             run_worker=self.run_worker,
         )
 
+        # Initialize BTW interceptor for side-channel questions
+        # Note: api_client will be set when needed via set_api_client()
+        self._btw_interceptor: BtwInterceptor | None = None
+        self._api_client = None
+
+    def set_api_client(self, api_client, server_url: str | None = None) -> None:
+        """Set the API client for BTW functionality.
+
+        Args:
+            api_client: The API client instance for making requests.
+            server_url: Optional server URL for the API.
+        """
+        self._api_client = api_client
+
+        # Create the BTW interceptor with the conversation ID from state
+        conversation_id = str(self._state.conversation_id) if self._state.conversation_id else None
+
+        async def ask_agent_callback(conv_id: str, question: str) -> dict:
+            """Callback to call the ask_agent API."""
+            return await api_client.ask_agent(conv_id, question)
+
+        self._btw_interceptor = BtwInterceptor(
+            conversation_id=conversation_id,
+            ask_agent_callback=ask_agent_callback,
+            get_btw_store=get_btw_store,
+        )
+
     # ---- Properties ----
 
     @property
@@ -195,12 +227,65 @@ class ConversationManager(Container):
         """Handle SendMessage - the primary entry point for user messages.
 
         This handler:
-        1. Resets the refinement iteration counter (new user turn)
-        2. Delegates to UserMessageController for rendering and processing
+        1. Checks for /btw (side-channel) commands and handles them separately
+        2. Resets the refinement iteration counter (new user turn)
+        3. Delegates to UserMessageController for rendering and processing
         """
         event.stop()
         self._refinement_controller.reset_iteration()
+
+        # Check for BTW (side-channel) command
+        if self._btw_interceptor is not None:
+            # Update conversation ID in case it changed
+            self._btw_interceptor._conversation_id = (
+                str(self._state.conversation_id) if self._state.conversation_id else None
+            )
+            result = self._btw_interceptor.process(event.content)
+
+            if result.is_btw and result.entry_id:
+                # Handle BTW command - call the API asynchronously
+                self._handle_btw_message(event.content, result.question, result.entry_id)
+                return  # Don't process as regular message
+
         await self._message_controller.handle_user_message(event.content)
+
+    async def _handle_btw_message(
+        self,
+        original_message: str,
+        question: str | None,
+        entry_id: str,
+    ) -> None:
+        """Handle a BTW (side-channel) message by calling the ask_agent API.
+
+        Args:
+            original_message: The original user message.
+            question: The extracted question.
+            entry_id: The BTW entry ID.
+        """
+        if self._btw_interceptor is None:
+            return
+
+        try:
+            conversation_id = str(self._state.conversation_id) if self._state.conversation_id else None
+            if not conversation_id:
+                await self._btw_interceptor.fail(entry_id, "No conversation ID")
+                return
+
+            response = await self._api_client.ask_agent(conversation_id, question)
+            await self._btw_interceptor.resolve(entry_id, response.get("response", ""))
+
+            # Notify user that BTW response is available
+            self.notify(
+                f"BTW response: {response.get('response', '')}",
+                title="Side Channel Response",
+            )
+        except Exception as e:
+            await self._btw_interceptor.fail(entry_id, str(e))
+            self.notify(
+                f"BTW failed: {e}",
+                title="Error",
+                severity="error",
+            )
 
     @on(SendRefinementMessage)
     async def _on_send_refinement_message(self, event: SendRefinementMessage) -> None:
