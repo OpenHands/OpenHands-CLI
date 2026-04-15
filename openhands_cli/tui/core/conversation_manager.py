@@ -18,10 +18,8 @@ from textual.message import Message
 
 from openhands.sdk.security.confirmation_policy import ConfirmationPolicyBase
 from openhands_cli.conversations.protocols import ConversationStore
-from openhands_cli.tui.core.btw_interceptor import (
-    BtwInterceptor,
-    get_btw_store,
-)
+from openhands_cli.tui.core.btw_interceptor import BtwInterceptor
+from openhands_cli.tui.core.btw_store import get_btw_store
 from openhands_cli.tui.core.confirmation_flow_controller import (
     ConfirmationFlowController,
 )
@@ -48,7 +46,6 @@ from openhands_cli.tui.messages import (
 
 if TYPE_CHECKING:
     from openhands_cli.auth.api_client import OpenHandsApiClient
-    from openhands_cli.tui.core.btw_store import BtwStore
     from openhands_cli.tui.core.conversation_runner import ConversationRunner
     from openhands_cli.tui.core.state import ConversationContainer
 
