@@ -42,6 +42,9 @@ class SettingsScreen(ModalScreen):
     BINDINGS: ClassVar = [
         ("escape", "cancel", "Cancel"),
         ("tab", "focus_next", "Navigate"),
+        ("ctrl+c", "force_quit", "Quit"),
+        ("ctrl+q", "force_quit", "Quit"),
+        ("ctrl+d", "force_quit", "Quit"),
     ]
 
     CSS_PATH = "settings_screen.tcss"
@@ -412,6 +415,10 @@ class SettingsScreen(ModalScreen):
     def action_cancel(self) -> None:
         """Handle escape key to cancel settings."""
         self._handle_cancel()
+
+    def action_force_quit(self) -> None:
+        """Handle Ctrl+C/Ctrl+Q/Ctrl+D to exit the application."""
+        self.app.exit()
 
     def _handle_cancel(self) -> None:
         """Handle cancel action - delegate to appropriate callback."""

@@ -1,6 +1,7 @@
 """Confirmation settings modal for OpenHands CLI."""
 
 from collections.abc import Callable
+from typing import ClassVar
 
 from textual.app import ComposeResult
 from textual.containers import Container, Vertical
@@ -32,6 +33,12 @@ class ConfirmationSettingsModal(ModalScreen):
     """Modal screen for selecting confirmation settings."""
 
     CSS_PATH = "confirmation_modal.tcss"
+
+    BINDINGS: ClassVar = [
+        ("ctrl+c", "force_quit", "Quit"),
+        ("ctrl+q", "force_quit", "Quit"),
+        ("ctrl+d", "force_quit", "Quit"),
+    ]
 
     def __init__(
         self,
@@ -137,6 +144,10 @@ class ConfirmationSettingsModal(ModalScreen):
         # Show notification
         policy_name = get_policy_display_name(policy)
         self.app.notify(f"Confirmation policy set to: {policy_name}")
+
+    def action_force_quit(self) -> None:
+        """Handle Ctrl+C/Ctrl+Q/Ctrl+D to exit the application."""
+        self.app.exit()
 
     def key_escape(self) -> None:
         """Handle Escape key to close modal without changes."""

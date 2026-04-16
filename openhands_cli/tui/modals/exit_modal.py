@@ -1,6 +1,7 @@
 """Exit confirmation modal for OpenHands CLI."""
 
 from collections.abc import Callable
+from typing import ClassVar
 
 from textual.app import ComposeResult
 from textual.containers import Grid
@@ -12,6 +13,12 @@ class ExitConfirmationModal(ModalScreen):
     """Screen with a dialog to confirm exit."""
 
     CSS_PATH = "exit_modal.tcss"
+
+    BINDINGS: ClassVar = [
+        ("ctrl+c", "force_quit", "Quit"),
+        ("ctrl+q", "force_quit", "Quit"),
+        ("ctrl+d", "force_quit", "Quit"),
+    ]
 
     def __init__(
         self,
@@ -36,6 +43,10 @@ class ExitConfirmationModal(ModalScreen):
             Button("No, dismiss", variant="primary", id="no"),
             id="dialog",
         )
+
+    def action_force_quit(self) -> None:
+        """Handle Ctrl+C/Ctrl+Q/Ctrl+D to exit the application."""
+        self.app.exit()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss()
