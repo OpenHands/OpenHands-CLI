@@ -45,8 +45,10 @@ class ExitConfirmationModal(ModalScreen):
         )
 
     def action_force_quit(self) -> None:
-        """Handle Ctrl+C/Ctrl+Q/Ctrl+D to exit the application."""
-        self.app.exit()
+        """Treat force quit as confirming exit."""
+        self.dismiss()
+        if self.on_exit_confirmed:
+            self.on_exit_confirmed()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss()
