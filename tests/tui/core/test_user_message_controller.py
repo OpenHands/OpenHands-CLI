@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import uuid
+from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from openhands_cli.tui.core.user_message_controller import UserMessageController
+
+
+if TYPE_CHECKING:
+    from openhands_cli.tui.core.runner_registry import RunnerRegistry
 
 
 class _FakeRunner:
@@ -62,7 +67,7 @@ async def test_handle_user_message_queues_until_runner_is_ready() -> None:
     runners = _FakeRunners(runner)
     controller = UserMessageController(
         state=state,
-        runners=runners,
+        runners=cast("RunnerRegistry", runners),
         run_worker=run_worker,
         headless_mode=False,
     )
@@ -87,7 +92,7 @@ async def test_handle_user_message_starts_processing_when_runner_is_ready() -> N
     runners = _FakeRunners(runner)
     controller = UserMessageController(
         state=state,
-        runners=runners,
+        runners=cast("RunnerRegistry", runners),
         run_worker=run_worker,
         headless_mode=False,
     )
@@ -114,7 +119,7 @@ async def test_flush_pending_messages_starts_batch_processing() -> None:
     runners.pending_messages[conversation_id] = ["one", "two"]
     controller = UserMessageController(
         state=state,
-        runners=runners,
+        runners=cast("RunnerRegistry", runners),
         run_worker=run_worker,
         headless_mode=True,
     )
