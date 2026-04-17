@@ -33,6 +33,7 @@ class WorkingStatusLine(Static):
     running: var[bool] = var(False)
     elapsed_seconds: var[int] = var(0)
     critic_settings: var[CriticSettings] = var(CriticSettings())
+    startup_status: var[str | None] = var(None)
 
     def __init__(self, **kwargs) -> None:
         super().__init__("", id="working_status_line", markup=True, **kwargs)
@@ -59,6 +60,10 @@ class WorkingStatusLine(Static):
 
     def watch_critic_settings(self, _settings: CriticSettings) -> None:
         """React to critic settings changes from ConversationContainer."""
+        self._update_text()
+
+    def watch_startup_status(self, _status: str | None) -> None:
+        """React to startup preparation status changes."""
         self._update_text()
 
     # ----- Internal helpers -----
@@ -103,6 +108,8 @@ class WorkingStatusLine(Static):
         working_text = self._get_working_text()
         if working_text:
             parts.append(working_text)
+        elif self.startup_status:
+            parts.append(self.startup_status)
 
         # Join parts with separator
         if parts:

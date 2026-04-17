@@ -22,6 +22,7 @@ from openhands_cli.user_actions.types import UserConfirmation
 
 if TYPE_CHECKING:
     from openhands.sdk.event import ActionEvent
+    from openhands_cli.tui.content.resources import LoadedResourcesInfo
 
 
 class RequestSwitchConfirmation(Message):
@@ -65,3 +66,27 @@ class ConfirmationDecision(Message):
     def __init__(self, decision: UserConfirmation) -> None:
         super().__init__()
         self.decision = decision
+
+
+class ConversationWarmupCompleted(Message):
+    """Background conversation warmup completed for a conversation."""
+
+    def __init__(
+        self,
+        conversation_id: uuid.UUID,
+        has_critic: bool,
+        loaded_resources: "LoadedResourcesInfo",
+    ) -> None:
+        super().__init__()
+        self.conversation_id = conversation_id
+        self.has_critic = has_critic
+        self.loaded_resources = loaded_resources
+
+
+class ConversationWarmupFailed(Message):
+    """Background conversation warmup failed for a conversation."""
+
+    def __init__(self, conversation_id: uuid.UUID, error: str) -> None:
+        super().__init__()
+        self.conversation_id = conversation_id
+        self.error = error

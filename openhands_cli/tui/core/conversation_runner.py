@@ -1,6 +1,7 @@
 """Conversation runner with confirmation mode support."""
 
 import asyncio
+import threading
 import uuid
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -54,6 +55,7 @@ class ConversationRunner:
         *,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
+        initialize: bool = True,
     ) -> None:
         """Initialize the conversation runner.
 
@@ -69,17 +71,14 @@ class ConversationRunner:
             critic_disabled: If True, critic functionality will be disabled.
         """
         self.visualizer = visualizer
+        self._conversation_id = conversation_id
+        self._event_callback = event_callback
+        self._env_overrides_enabled = env_overrides_enabled
+        self._critic_disabled = critic_disabled
 
-        # Create conversation with policy from state
-        self.conversation: BaseConversation = setup_conversation(
-            conversation_id,
-            confirmation_policy=state.confirmation_policy,
-            visualizer=visualizer,
-            event_callback=event_callback,
-            env_overrides_enabled=env_overrides_enabled,
-            critic_disabled=critic_disabled,
-        )
-
+        self.conversation: BaseConversation | None = None
+        self._initialization_lock = threading.Lock()
+        self._warming_up = False
         self._running = False
 
         # State for reading (is_confirmation_active) and updating (set_running)
@@ -88,52 +87,106 @@ class ConversationRunner:
         self._message_pump = message_pump
         self._notification_callback = notification_callback
 
+        if initialize:
+            self.ensure_initialized()
+
     @property
     def is_confirmation_mode_active(self) -> bool:
         return self._state.is_confirmation_active
 
+    @property
+    def is_ready(self) -> bool:
+        """Check whether the conversation has been initialized."""
+        return self.conversation is not None
+
+    @property
+    def is_warming_up(self) -> bool:
+        """Check whether background conversation warmup is in progress."""
+        return self._warming_up
+
+    def ensure_initialized(self) -> BaseConversation | None:
+        """Initialize the conversation on demand.
+
+        This is safe to call from multiple threads; only one initialization will run.
+        """
+        if self.conversation is not None:
+            return self.conversation
+
+        with self._initialization_lock:
+            if self.conversation is not None:
+                return self.conversation
+
+            self._warming_up = True
+            try:
+                self.conversation = setup_conversation(
+                    self._conversation_id,
+                    confirmation_policy=self._state.confirmation_policy,
+                    visualizer=self.visualizer,
+                    event_callback=self._event_callback,
+                    env_overrides_enabled=self._env_overrides_enabled,
+                    critic_disabled=self._critic_disabled,
+                )
+            finally:
+                self._warming_up = False
+
+        return self.conversation
+
     async def queue_message(self, user_input: str) -> None:
-        """Queue a message for a running conversation"""
-        assert self.conversation is not None, "Conversation should be running"
+        """Queue a message for a running conversation."""
         assert user_input
+        conversation = self.ensure_initialized()
+        assert conversation is not None
         message = Message(
             role="user",
             content=[TextContent(text=user_input)],
         )
 
-        # This doesn't block - it just adds the message to the queue
-        # The running conversation will process it when ready
         loop = asyncio.get_running_loop()
-        # Run send_message in the same thread pool, not on the UI loop
-        await loop.run_in_executor(None, self.conversation.send_message, message)
+        await loop.run_in_executor(None, conversation.send_message, message)
 
     async def process_message_async(
         self, user_input: str, headless: bool = False
     ) -> None:
-        """Process a user message asynchronously to keep UI unblocked.
-
-        Args:
-            user_input: The user's message text
-        """
-        # Create message from user input
-        message = Message(
-            role="user",
-            content=[TextContent(text=user_input)],
-        )
-
-        # Run conversation processing in a separate thread to avoid blocking UI
+        """Process a single user message asynchronously to keep UI unblocked."""
         await asyncio.get_event_loop().run_in_executor(
-            None, self._run_conversation_sync, message, headless
+            None, self._run_conversation_batch_sync, [user_input], headless
         )
+
+    async def process_pending_messages_async(
+        self, user_inputs: list[str], headless: bool = False
+    ) -> None:
+        """Process multiple pre-rendered messages after background warmup completes."""
+        if not user_inputs:
+            return
+
+        await asyncio.get_event_loop().run_in_executor(
+            None, self._run_conversation_batch_sync, user_inputs, headless
+        )
+
+    def _run_conversation_batch_sync(
+        self, user_inputs: list[str], headless: bool = False
+    ) -> None:
+        """Run one or more messages synchronously in a worker thread."""
+        conversation = self.ensure_initialized()
+        if conversation is None:
+            return
+
+        for user_input in user_inputs:
+            message = Message(
+                role="user",
+                content=[TextContent(text=user_input)],
+            )
+            conversation.send_message(message)
+
+        self._execute_conversation(headless=headless)
 
     def _run_conversation_sync(self, message: Message, headless: bool = False) -> None:
-        """Run the conversation synchronously in a thread.
+        """Compatibility wrapper for tests and existing sync call sites."""
+        conversation = self.ensure_initialized()
+        if conversation is None:
+            return
 
-        Args:
-            message: The message to process
-            headless: If True, print status to console
-        """
-        self.conversation.send_message(message)
+        conversation.send_message(message)
         self._execute_conversation(headless=headless)
 
     def _execute_conversation(
@@ -192,8 +245,12 @@ class ConversationRunner:
 
     def _request_confirmation(self) -> None:
         """Post ShowConfirmationPanel message for pending actions."""
+        conversation = self.conversation
+        if conversation is None:
+            return
+
         pending_actions = SDKConversationState.get_unmatched_actions(
-            self.conversation.state.events
+            conversation.state.events
         )
         if pending_actions:
             self._message_pump.post_message(ShowConfirmationPanel(pending_actions))
@@ -212,12 +269,16 @@ class ConversationRunner:
     async def pause(self) -> None:
         """Pause the running conversation."""
         if self._running:
+            conversation = self.conversation
+            if conversation is None:
+                return
+
             self._notification_callback(
                 "Pausing conversation",
                 "Pausing conversation, this make take a few seconds...",
                 "information",
             )
-            await asyncio.to_thread(self.conversation.pause)
+            await asyncio.to_thread(conversation.pause)
         else:
             self._notification_callback(
                 "No running conversation", "No running conversation to pause", "warning"
@@ -234,6 +295,10 @@ class ConversationRunner:
             return
 
         try:
+            conversation = self.ensure_initialized()
+            if conversation is None:
+                return
+
             # Notify user that condensation is starting
             self._notification_callback(
                 "Condensation Started",
@@ -242,7 +307,7 @@ class ConversationRunner:
             )
 
             # Run condensation in a separate thread to avoid blocking UI
-            await asyncio.to_thread(self.conversation.condense)
+            await asyncio.to_thread(conversation.condense)
 
             # Notify user of successful completion
             self._notification_callback(

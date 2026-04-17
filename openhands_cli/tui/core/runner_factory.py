@@ -81,8 +81,7 @@ class RunnerFactory:
             event_callback=event_callback,
             env_overrides_enabled=self._env_overrides_enabled,
             critic_disabled=self._critic_disabled,
+            initialize=False,
         )
 
-        # Attach conversation to state for metrics reading
-        self._state.attach_conversation_state(runner.conversation.state)
         return runner

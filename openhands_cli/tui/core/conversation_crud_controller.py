@@ -45,6 +45,7 @@ class ConversationCrudController:
         # Reset state - triggers reactive UI updates
         self._state.reset_conversation_state()
         self._state.conversation_id = UUID(new_id)
+        self._runners.start_prewarm(UUID(new_id))
 
         self._notify(
             "Started a new conversation",

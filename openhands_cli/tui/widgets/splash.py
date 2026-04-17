@@ -25,7 +25,6 @@ Example:
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
 from textual.containers import Container
@@ -33,11 +32,15 @@ from textual.reactive import var
 from textual.widgets import Static
 
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.splash import get_conversation_text, get_splash_content
-
-
-if TYPE_CHECKING:
-    from openhands_cli.tui.content.resources import LoadedResourcesInfo
+from openhands_cli.tui.content.resources import LoadedResourcesInfo
+from openhands_cli.tui.content.splash import (
+    get_conversation_text,
+    get_critic_notice,
+    get_splash_content,
+    get_update_notice,
+    get_version_text,
+)
+from openhands_cli.version_check import VersionInfo
 
 
 class SplashContent(Container):
@@ -68,12 +71,14 @@ class SplashContent(Container):
     conversation_id: var[uuid.UUID | None] = var(None)
 
     # Reactive property bound from ConversationContainer for loaded resources
-    # None indicates resources not yet loaded
-    loaded_resources: var[LoadedResourcesInfo | None] = var(None)
+    loaded_resources: var[LoadedResourcesInfo] = var(LoadedResourcesInfo())
+
+    # Reactive properties for asynchronously loaded splash metadata
+    version_info: var[VersionInfo | None] = var(None)
+    has_critic: var[bool] = var(False)
 
     # Internal state (not in ConversationContainer - widget owns its initialization)
     _is_initialized: bool = False
-    _has_critic: bool = False
 
     def __init__(self, **kwargs) -> None:
         """Initialize the splash content container."""
@@ -96,41 +101,57 @@ class SplashContent(Container):
         yield Static(id="splash_update_notice", classes="splash-update-notice")
         yield Static(id="splash_critic_notice", classes="splash-critic-notice")
 
-    def initialize(self, *, has_critic: bool = False) -> None:
+    def initialize(self) -> None:
         """Initialize and show the splash content.
 
         Called by OpenHandsApp during UI setup. This is a one-time
-        operation that populates all splash widgets and makes them visible.
-
-        Note: Loaded resources are handled reactively via data_bind to
-        loaded_resources. When ConversationContainer.loaded_resources is set,
-        watch_loaded_resources will automatically add the collapsible.
-
-        Args:
-            has_critic: Whether the agent has a critic configured.
+        operation that populates the static splash widgets immediately.
+        Asynchronous metadata such as version info, critic availability,
+        and loaded resources update reactively when background warmup
+        completes.
         """
         if self._is_initialized:
             return
 
-        self._has_critic = has_critic
         self._populate_content()
         self._is_initialized = True
 
     def watch_loaded_resources(
         self,
-        _old_value: LoadedResourcesInfo | None,
-        new_value: LoadedResourcesInfo | None,
+        _old_value: LoadedResourcesInfo,
+        new_value: LoadedResourcesInfo,
     ) -> None:
-        """Handle loaded_resources changes reactively.
-
-        When resources are set on ConversationContainer, this watcher
-        automatically adds or updates the loaded resources collapsible.
-        """
+        """Handle loaded_resources changes reactively."""
         if not self._is_initialized:
             return
 
-        if new_value and new_value.has_resources():
+        if new_value.has_resources():
             self._add_or_update_loaded_resources_collapsible(new_value)
+        else:
+            self._remove_loaded_resources_collapsible()
+
+    def watch_version_info(
+        self, _old_value: VersionInfo | None, new_value: VersionInfo | None
+    ) -> None:
+        """Update version text and update notice when background check completes."""
+        if not self._is_initialized:
+            return
+
+        self.query_one("#splash_version", Static).update(get_version_text(new_value))
+        self._update_notice_widget(
+            widget_id="#splash_update_notice",
+            content=get_update_notice(theme=OPENHANDS_THEME, version_info=new_value),
+        )
+
+    def watch_has_critic(self, _old_value: bool, new_value: bool) -> None:
+        """Update critic notice when background warmup completes."""
+        if not self._is_initialized:
+            return
+
+        self._update_notice_widget(
+            widget_id="#splash_critic_notice",
+            content=get_critic_notice(theme=OPENHANDS_THEME, has_critic=new_value),
+        )
 
     def _add_or_update_loaded_resources_collapsible(
         self, loaded_resources: LoadedResourcesInfo
@@ -158,6 +179,12 @@ class SplashContent(Container):
             )
             self.mount(collapsible)
 
+    def _remove_loaded_resources_collapsible(self) -> None:
+        """Remove the loaded resources collapsible when nothing is loaded."""
+        existing = self.query("#loaded_resources_collapsible")
+        if existing:
+            existing.first().remove()
+
     @property
     def is_initialized(self) -> bool:
         """Check if splash content has been initialized."""
@@ -180,15 +207,14 @@ class SplashContent(Container):
 
     def _populate_content(self) -> None:
         """Populate splash content widgets with actual content."""
-        # Use empty string if conversation_id is None (shouldn't happen during init)
         conv_id_hex = self.conversation_id.hex if self.conversation_id else ""
         splash_content = get_splash_content(
             conversation_id=conv_id_hex,
             theme=OPENHANDS_THEME,
-            has_critic=self._has_critic,
+            has_critic=self.has_critic,
+            version_info=self.version_info,
         )
 
-        # Update individual splash widgets
         self.query_one("#splash_banner", Static).update(splash_content["banner"])
         self.query_one("#splash_version", Static).update(splash_content["version"])
         self.query_one("#splash_status", Static).update(splash_content["status_text"])
@@ -199,22 +225,22 @@ class SplashContent(Container):
             splash_content["instructions_header"]
         )
 
-        # Join instructions into a single string
         instructions_text = "\n".join(splash_content["instructions"])
         self.query_one("#splash_instructions", Static).update(instructions_text)
+        self._update_notice_widget(
+            widget_id="#splash_update_notice",
+            content=splash_content["update_notice"],
+        )
+        self._update_notice_widget(
+            widget_id="#splash_critic_notice",
+            content=splash_content["critic_notice"],
+        )
 
-        # Update notice (show only if content exists)
-        update_notice_widget = self.query_one("#splash_update_notice", Static)
-        if splash_content["update_notice"]:
-            update_notice_widget.update(splash_content["update_notice"])
-            update_notice_widget.display = True
+    def _update_notice_widget(self, *, widget_id: str, content: str | None) -> None:
+        """Show or hide a conditional splash notice widget."""
+        notice_widget = self.query_one(widget_id, Static)
+        if content:
+            notice_widget.update(content)
+            notice_widget.display = True
         else:
-            update_notice_widget.display = False
-
-        # Update critic notice (show only if content exists)
-        critic_notice_widget = self.query_one("#splash_critic_notice", Static)
-        if splash_content["critic_notice"]:
-            critic_notice_widget.update(splash_content["critic_notice"])
-            critic_notice_widget.display = True
-        else:
-            critic_notice_widget.display = False
+            notice_widget.display = False

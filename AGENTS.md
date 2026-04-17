@@ -180,6 +180,11 @@ To view the generated SVG snapshots in a browser:
 - Commit SVG snapshots.
 - Review snapshot diffs carefully.
 
+### Startup UX note
+- Keep the initial TUI render non-blocking: splash/UI should appear before version checks, MCP/resource discovery, or conversation runner warmup finish.
+- `ConversationRunner` now supports lazy initialization; direct construction stays eager by default for compatibility/tests, while `RunnerFactory` opts into `initialize=False` so app startup can prewarm in the background.
+- If startup/warmup data arrives later (version info, critic/resources), prefer updating reactive splash/status state instead of rebuilding the initial UI.
+
 
 ## Commit & Pull Request Guidelines
 - Follow the repo’s pattern: `<scope>: <concise message> (#NNN)` (see `git log`), where scope is the touched area (e.g., `auth`, `tui`, `fix`).

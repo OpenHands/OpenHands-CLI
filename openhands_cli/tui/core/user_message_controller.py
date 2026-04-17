@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING
 
 
@@ -75,18 +76,35 @@ class UserMessageController:
         await self._process_message(runner, content)
 
     async def _process_message(self, runner: ConversationRunner, content: str) -> None:
-        """Process a message by queuing or starting a new run.
-
-        Args:
-            runner: The conversation runner to use.
-            content: The message content to process.
-        """
+        """Process a message by queuing, warming up, or starting a run."""
+        if self._state.conversation_id is None:
+            return
 
         if runner.is_running:
             await runner.queue_message(content)
             return
 
+        if runner.is_warming_up or not runner.is_ready:
+            self._runners.enqueue_pending_message(self._state.conversation_id, content)
+            self._runners.start_prewarm(self._state.conversation_id)
+            return
+
         self._run_worker(
             runner.process_message_async(content, self._headless_mode),
             name="process_message",
+        )
+
+    async def flush_pending_messages(self, conversation_id: uuid.UUID) -> None:
+        """Flush any pre-rendered messages once warmup completes."""
+        pending_messages = self._runners.pop_pending_messages(conversation_id)
+        if not pending_messages:
+            return
+
+        runner = self._runners.get_or_create(conversation_id)
+        self._run_worker(
+            runner.process_pending_messages_async(
+                pending_messages,
+                self._headless_mode,
+            ),
+            name="process_pending_messages",
         )

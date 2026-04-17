@@ -30,7 +30,12 @@ from openhands_cli.tui.core.conversation_crud_controller import (
 from openhands_cli.tui.core.conversation_switch_controller import (
     ConversationSwitchController,
 )
-from openhands_cli.tui.core.events import ConfirmationDecision, ShowConfirmationPanel
+from openhands_cli.tui.core.events import (
+    ConfirmationDecision,
+    ConversationWarmupCompleted,
+    ConversationWarmupFailed,
+    ShowConfirmationPanel,
+)
 from openhands_cli.tui.core.refinement_controller import RefinementController
 from openhands_cli.tui.core.runner_factory import RunnerFactory
 from openhands_cli.tui.core.runner_registry import RunnerRegistry
@@ -136,6 +141,8 @@ class ConversationManager(Container):
             state=self._state,
             message_pump=self,
             notification_callback=notification_callback,
+            run_worker=self.run_worker,
+            call_from_thread=lambda func, *args: self.app.call_from_thread(func, *args),
         )
 
         self._policy_service = ConfirmationPolicyService(
@@ -183,6 +190,13 @@ class ConversationManager(Container):
         """Get the conversation state."""
         return self._state
 
+    def start_prewarm(self, conversation_id: uuid.UUID | None = None) -> None:
+        """Start warming a conversation runner in the background."""
+        target_id = conversation_id or self._state.conversation_id
+        if target_id is None:
+            return
+        self._runners.start_prewarm(target_id)
+
     @property
     def current_runner(self) -> "ConversationRunner | None":
         """Get the current conversation runner."""
@@ -211,6 +225,37 @@ class ConversationManager(Container):
         """
         event.stop()
         await self._message_controller.handle_refinement_message(event.content)
+
+    @on(ConversationWarmupCompleted)
+    async def _on_conversation_warmup_completed(
+        self, event: ConversationWarmupCompleted
+    ) -> None:
+        """Update reactive startup state and flush queued messages."""
+        if event.conversation_id != self._state.conversation_id:
+            return
+
+        self._state.set_startup_status(None)
+        self._state.set_has_critic(event.has_critic)
+        self._state.set_loaded_resources(event.loaded_resources)
+
+        runner = self._runners.get_or_create(event.conversation_id)
+        if runner.conversation is not None:
+            self._state.attach_conversation_state(runner.conversation.state)
+
+        await self._message_controller.flush_pending_messages(event.conversation_id)
+
+    @on(ConversationWarmupFailed)
+    def _on_conversation_warmup_failed(self, event: ConversationWarmupFailed) -> None:
+        """Surface background warmup errors without blocking the UI."""
+        if event.conversation_id != self._state.conversation_id:
+            return
+
+        self._state.set_startup_status(None)
+        self.notify(
+            event.error,
+            title="Conversation Startup Error",
+            severity="error",
+        )
 
     @on(CriticResultReceived)
     def _on_critic_result_received(self, event: CriticResultReceived) -> None:

@@ -42,6 +42,8 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands_cli.shared import extract_conversation_summary
 from openhands_cli.stores import CriticSettings
+from openhands_cli.tui.content.resources import LoadedResourcesInfo
+from openhands_cli.version_check import VersionInfo
 
 
 if TYPE_CHECKING:
@@ -49,7 +51,6 @@ if TYPE_CHECKING:
 
     from openhands.sdk.conversation.base import ConversationStateProtocol
     from openhands.sdk.event import ActionEvent
-    from openhands_cli.tui.content.resources import LoadedResourcesInfo
     from openhands_cli.tui.widgets.input_area import InputAreaContainer
     from openhands_cli.tui.widgets.main_display import ScrollableContent
 
@@ -125,9 +126,20 @@ class ConversationContainer(Container):
     metrics: var[Metrics | None] = var(None)
     """Combined metrics from conversation stats."""
 
+    # ---- Startup Status ----
+    startup_status: var[str | None] = var(None)
+    """Transient status shown while preparing a conversation in the background."""
+
+    # ---- Version / Splash State ----
+    version_info: var[VersionInfo | None] = var(None)
+    """Version information for the splash screen, populated asynchronously."""
+
     # ---- Loaded Resources ----
-    loaded_resources: var["LoadedResourcesInfo | None"] = var(None)
+    loaded_resources: var[LoadedResourcesInfo] = var(LoadedResourcesInfo())
     """Loaded skills, hooks, and MCPs for the current conversation."""
+
+    has_critic: var[bool] = var(False)
+    """Whether the current conversation's agent has a critic configured."""
 
     # ---- Critic Settings ----
     critic_settings: var[CriticSettings] = var(CriticSettings())
@@ -189,6 +201,8 @@ class ConversationContainer(Container):
             yield SplashContent(id="splash_content").data_bind(
                 conversation_id=ConversationContainer.conversation_id,
                 loaded_resources=ConversationContainer.loaded_resources,
+                version_info=ConversationContainer.version_info,
+                has_critic=ConversationContainer.has_critic,
             )
 
         # Input area docked to bottom
@@ -199,6 +213,7 @@ class ConversationContainer(Container):
                 running=ConversationContainer.running,
                 elapsed_seconds=ConversationContainer.elapsed_seconds,
                 critic_settings=ConversationContainer.critic_settings,
+                startup_status=ConversationContainer.startup_status,
             )
             yield InputField(
                 placeholder="Type your message, @mention a file, or / for commands"
@@ -369,9 +384,21 @@ class ConversationContainer(Container):
         """Set pending switch confirmation target. Thread-safe."""
         self._schedule_update("switch_confirmation_target", target_id)
 
-    def set_loaded_resources(self, resources: "LoadedResourcesInfo") -> None:
+    def set_startup_status(self, status: str | None) -> None:
+        """Set the transient startup status message. Thread-safe."""
+        self._schedule_update("startup_status", status)
+
+    def set_version_info(self, version_info: VersionInfo | None) -> None:
+        """Set asynchronously loaded version information. Thread-safe."""
+        self._schedule_update("version_info", version_info)
+
+    def set_loaded_resources(self, resources: LoadedResourcesInfo) -> None:
         """Set loaded resources (skills, hooks, MCPs). Thread-safe."""
         self._schedule_update("loaded_resources", resources)
+
+    def set_has_critic(self, value: bool) -> None:
+        """Set whether the current conversation has a critic configured."""
+        self._schedule_update("has_critic", value)
 
     def set_critic_settings(self, settings: CriticSettings) -> None:
         """Set critic settings for iterative refinement. Thread-safe."""
@@ -423,8 +450,11 @@ class ConversationContainer(Container):
         self.running = False
         self.elapsed_seconds = 0
         self.metrics = None
+        self.startup_status = None
         self.conversation_title = None
         self.pending_action_count = 0
+        self.loaded_resources = LoadedResourcesInfo()
+        self.has_critic = False
         self.refinement_iteration = 0
         self.switch_confirmation_target = None
         self._conversation_start_time = None

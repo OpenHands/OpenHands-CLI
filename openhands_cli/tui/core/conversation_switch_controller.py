@@ -67,7 +67,9 @@ class ConversationSwitchController:
                 try:
                     runner = self._runners.current
                     if runner is not None and runner.is_running:
-                        runner.conversation.pause()
+                        conversation = runner.conversation
+                        if conversation is not None:
+                            conversation.pause()
                 except Exception as exc:  # pragma: no cover - UI error handling
                     self._call_from_thread(self._handle_switch_error, exc, previous_id)
                     return
@@ -110,6 +112,7 @@ class ConversationSwitchController:
 
         self._runners.clear_current()
         self._runners.get_or_create(target_id)
+        self._runners.start_prewarm(target_id)
 
         self._state.finish_switching(target_id)
         self._state.set_switch_confirmation_target(None)

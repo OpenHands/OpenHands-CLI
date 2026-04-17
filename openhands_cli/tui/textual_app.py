@@ -57,14 +57,9 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.risk import SecurityRisk
 from openhands_cli.conversations.store.local import LocalFileStore
-from openhands_cli.locations import get_conversations_dir, get_work_dir
-from openhands_cli.stores import (
-    AgentStore,
-    CliSettings,
-    MissingEnvironmentVariablesError,
-)
+from openhands_cli.locations import get_conversations_dir
+from openhands_cli.stores import CliSettings, MissingEnvironmentVariablesError
 from openhands_cli.theme import OPENHANDS_THEME
-from openhands_cli.tui.content.resources import collect_loaded_resources
 from openhands_cli.tui.core import (
     ConversationContainer,
     ConversationFinished,
@@ -87,6 +82,7 @@ from openhands_cli.tui.widgets.collapsible import (
     CollapsibleTitle,
 )
 from openhands_cli.tui.widgets.splash import SplashContent
+from openhands_cli.version_check import check_for_updates
 
 
 class OpenHandsApp(CollapsibleNavigationMixin, App):
@@ -413,51 +409,32 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
                 timeout=10.0,
             )
 
-    def _initialize_main_ui(self) -> None:
-        """Initialize the main UI components.
+    def _start_background_version_check(self) -> None:
+        """Load version information without blocking the initial UI render."""
 
-        This method is responsible for:
-        1. Checking if the agent has a critic configured
-        2. Collecting and displaying loaded resources (skills, hooks, MCPs)
-        3. Initializing the splash content (one-time setup)
-        4. Processing any queued inputs
+        def worker() -> None:
+            self.conversation_state.set_version_info(check_for_updates())
 
-        UI lifecycle is owned by OpenHandsApp, not ConversationContainer. The splash
-        content initialization is a direct method call, not a reactive
-        state change, because it's a one-time operation.
-        """
-
-        splash_content = self.query_one("#splash_content", SplashContent)
-
-        # Check if agent has critic configured and collect resources
-        has_critic = False
-        agent = None
-        try:
-            agent_store = AgentStore()
-            agent = agent_store.load_or_create(
-                env_overrides_enabled=self.env_overrides_enabled,
-                critic_disabled=self.critic_disabled,
-            )
-            if agent:
-                has_critic = agent.critic is not None
-        except Exception:
-            # If we can't load agent, just continue without critic notice
-            pass
-
-        # Collect loaded resources info using the utility function
-        loaded_resources = collect_loaded_resources(
-            agent=agent,
-            working_dir=get_work_dir(),
+        self.run_worker(
+            worker,
+            name="version_check",
+            group="startup_version_check",
+            exclusive=True,
+            thread=True,
+            exit_on_error=False,
         )
 
-        # Initialize splash content (resources are handled reactively)
-        splash_content.initialize(has_critic=has_critic)
+    def _initialize_main_ui(self) -> None:
+        """Initialize the main UI components without blocking on startup work."""
+        splash_content = self.query_one("#splash_content", SplashContent)
+        splash_content.initialize()
 
-        # Set loaded resources on ConversationContainer - triggers reactive update
-        # in SplashContent via data_bind
-        self.conversation_state.set_loaded_resources(loaded_resources)
+        if self.conversation_state.conversation_id is not None:
+            self.conversation_manager.start_prewarm(
+                self.conversation_state.conversation_id
+            )
 
-        # Process any queued inputs
+        self._start_background_version_check()
         self._process_queued_inputs()
 
     def _process_queued_inputs(self) -> None:
