@@ -338,10 +338,24 @@ class InputField(Container):
                 self.action_toggle_input_mode()
                 # Use the same submission logic as single-line mode
                 if is_valid_command(content):
-                    command = content[1:]  # Remove leading "/"
-                    self.post_message(SlashCommandSubmitted(command=command))
+                    command, args = self._parse_command(content)
+                    self.post_message(SlashCommandSubmitted(command=command, args=args))
                 else:
                     self.post_message(SendMessage(content=content))
+
+    @staticmethod
+    def _parse_command(content: str) -> tuple[str, str]:
+        """Parse a slash command into (command, args).
+
+        Examples:
+            "/help"           -> ("help", "")
+            "/skill install x" -> ("skill", "install x")
+        """
+        without_slash = content[1:]  # Remove leading "/"
+        parts = without_slash.split(None, 1)
+        command = parts[0] if parts else ""
+        args = parts[1] if len(parts) > 1 else ""
+        return command, args
 
     def _submit_current_content(self) -> None:
         """Submit current content and clear input.
@@ -358,9 +372,9 @@ class InputField(Container):
 
         # Check if this is a valid slash command
         if is_valid_command(content):
-            # Extract command name (without the leading slash)
-            command = content[1:]  # Remove leading "/"
-            self.post_message(SlashCommandSubmitted(command=command))
+            # Extract command name and args (without the leading slash)
+            command, args = self._parse_command(content)
+            self.post_message(SlashCommandSubmitted(command=command, args=args))
         else:
             # Regular user input
             self.post_message(SendMessage(content=content))
