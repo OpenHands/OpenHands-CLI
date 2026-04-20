@@ -8,14 +8,13 @@ from acp.schema import (
 )
 
 from openhands.sdk import Action, BaseConversation
-from openhands.sdk.llm.utils.metrics import TokenUsage
 from openhands.tools.delegate.definition import DelegateAction
 from openhands.tools.file_editor.definition import (
     FileEditorAction,
 )
 from openhands.tools.terminal import TerminalAction
 from openhands_cli.shared.delegate_formatter import format_delegate_title
-from openhands_cli.utils import abbreviate_number, format_cost
+from openhands_cli.utils import format_metrics_status_line
 
 
 # Shared mapping from tool names to ACP ToolKind values
@@ -24,41 +23,6 @@ TOOL_KIND_MAPPING: dict[str, ToolKind] = {
     "browser_use": "fetch",
     "browser": "fetch",
 }
-
-
-def _format_status_line(usage: TokenUsage, cost: float) -> str:
-    """Format metrics as a status line string.
-
-    Constructs a human-readable status line similar to the SDK's visualizer title,
-    giving clients flexibility in how to display metrics.
-
-    Args:
-        usage: Token usage object with prompt_tokens, completion_tokens, etc.
-        cost: Accumulated cost
-
-    Returns:
-        Formatted status line string
-        (e.g., "↑ input 1.2K • cache hit 50.00% • ↓ output 500 • $ 0.0050")
-    """
-    input_tokens = abbreviate_number(usage.prompt_tokens or 0)
-    output_tokens = abbreviate_number(usage.completion_tokens or 0)
-
-    # Calculate cache hit rate (convert to int to handle mock objects safely)
-    prompt = int(usage.prompt_tokens or 0)
-    cache_read = int(usage.cache_read_tokens or 0)
-    cache_rate = f"{(cache_read / prompt * 100):.2f}%" if prompt > 0 else "N/A"
-    reasoning_tokens = int(usage.reasoning_tokens or 0)
-
-    # Build status line
-    parts: list[str] = []
-    parts.append(f"↑ input {input_tokens}")
-    parts.append(f"cache hit {cache_rate}")
-    if reasoning_tokens > 0:
-        parts.append(f"reasoning {abbreviate_number(reasoning_tokens)}")
-    parts.append(f"↓ output {output_tokens}")
-    parts.append(f"$ {format_cost(float(cost or 0))}")
-
-    return " • ".join(parts)
 
 
 def get_metadata(
@@ -94,7 +58,7 @@ def get_metadata(
             "cache_read_tokens": usage.cache_read_tokens or 0,
             "reasoning_tokens": usage.reasoning_tokens or 0,
             "cost": cost,
-            "status_line": _format_status_line(usage, cost),
+            "status_line": format_metrics_status_line(usage, cost),
         }
     }
 
