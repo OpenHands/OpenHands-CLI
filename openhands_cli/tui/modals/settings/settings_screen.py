@@ -41,7 +41,6 @@ class SettingsScreen(ModalScreen):
 
     BINDINGS: ClassVar = [
         ("escape", "cancel", "Cancel"),
-        ("tab", "focus_next", "Navigate"),
     ]
 
     CSS_PATH = "settings_screen.tcss"
