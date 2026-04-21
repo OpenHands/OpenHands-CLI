@@ -8,6 +8,8 @@ from pydantic import SecretStr
 
 from openhands.sdk import LLM
 from openhands_cli.stores.agent_store import (
+    ENV_DATABRICKS_HOST,
+    ENV_DATABRICKS_TOKEN,
     ENV_LLM_API_KEY,
     ENV_LLM_BASE_URL,
     ENV_LLM_MODEL,
@@ -94,6 +96,8 @@ class TestLLMEnvOverrides:
         assert overrides.api_key is None
         assert overrides.base_url is None
         assert overrides.model is None
+        assert overrides.databricks_host is None
+        assert overrides.databricks_token is None
 
     def test_partial_fields(self) -> None:
         """Should allow setting only some fields."""
@@ -124,6 +128,10 @@ class TestLLMEnvOverrides:
         assert LLMEnvOverrides(api_key=SecretStr("key")).has_overrides() is True
         assert LLMEnvOverrides(base_url="url").has_overrides() is True
         assert LLMEnvOverrides(model="model").has_overrides() is True
+        assert (
+            LLMEnvOverrides(databricks_host="https://adb.example.net").has_overrides()
+            is True
+        )
 
     def test_model_dump_excludes_none_fields(self) -> None:
         """model_dump(exclude_none=True) should only include set fields."""
@@ -148,12 +156,20 @@ class TestLLMEnvOverrides:
     def test_from_env_with_no_env_vars(self) -> None:
         """from_env should return empty overrides when no env vars set."""
         with patch.dict(os.environ, {}, clear=True):
-            for key in [ENV_LLM_API_KEY, ENV_LLM_BASE_URL, ENV_LLM_MODEL]:
+            for key in [
+                ENV_LLM_API_KEY,
+                ENV_LLM_BASE_URL,
+                ENV_LLM_MODEL,
+                ENV_DATABRICKS_HOST,
+                ENV_DATABRICKS_TOKEN,
+            ]:
                 os.environ.pop(key, None)
             overrides = LLMEnvOverrides.from_env(enabled=True)
             assert overrides.api_key is None
             assert overrides.base_url is None
             assert overrides.model is None
+            assert overrides.databricks_host is None
+            assert overrides.databricks_token is None
 
     def test_from_env_with_all_env_vars(self) -> None:
         """from_env should read all env vars when enabled."""
@@ -592,6 +608,74 @@ class TestAgentCreationFromEnvVars:
 
             # Should return None since env overrides are disabled
             assert agent is None
+
+    def test_agent_databricks_headless_pat_without_llm_api_key(self, tmp_path) -> None:
+        """Databricks model + host + DATABRICKS_TOKEN should not require LLM_API_KEY."""
+        pytest.importorskip(
+            "openhands.sdk.llm.providers.databricks.llm", reason="Databricks SDK extra"
+        )
+        from openhands_cli.stores import AgentStore
+
+        conversations_dir = tmp_path / "conversations"
+        conversations_dir.mkdir(exist_ok=True)
+
+        env_vars = {
+            ENV_LLM_MODEL: "databricks/databricks-meta-llama-3-3-70b-instruct",
+            ENV_DATABRICKS_HOST: "https://adb-1234567890.azuredatabricks.net",
+            ENV_DATABRICKS_TOKEN: "dapi-test-token",
+        }
+
+        with (
+            patch(
+                "openhands_cli.stores.agent_store.get_persistence_dir",
+                return_value=str(tmp_path),
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_conversations_dir",
+                return_value=str(conversations_dir),
+            ),
+            patch.dict(os.environ, env_vars, clear=False),
+        ):
+            os.environ.pop(ENV_LLM_API_KEY, None)
+            store = AgentStore()
+            agent = store.load_or_create(env_overrides_enabled=True)
+            assert agent is not None
+            assert agent.llm.model == env_vars[ENV_LLM_MODEL]
+            assert agent.llm.api_key is not None
+            assert agent.llm.api_key.get_secret_value() == "dapi-test-token"
+
+    def test_agent_databricks_headless_raises_without_host(self, tmp_path) -> None:
+        """Databricks headless should require host when overrides are enabled."""
+        from openhands_cli.stores import AgentStore, MissingEnvironmentVariablesError
+
+        conversations_dir = tmp_path / "conversations"
+        conversations_dir.mkdir(exist_ok=True)
+
+        env_vars = {
+            ENV_LLM_MODEL: "databricks/databricks-meta-llama-3-3-70b-instruct",
+            ENV_LLM_API_KEY: "dapi-x",
+        }
+
+        with (
+            patch(
+                "openhands_cli.stores.agent_store.get_persistence_dir",
+                return_value=str(tmp_path),
+            ),
+            patch(
+                "openhands_cli.stores.agent_store.get_conversations_dir",
+                return_value=str(conversations_dir),
+            ),
+            patch.dict(os.environ, env_vars, clear=False),
+        ):
+            os.environ.pop(ENV_DATABRICKS_HOST, None)
+            os.environ.pop(ENV_LLM_BASE_URL, None)
+            store = AgentStore()
+            with pytest.raises(MissingEnvironmentVariablesError) as exc:
+                store.load_or_create(env_overrides_enabled=True)
+            assert any(
+                ENV_DATABRICKS_HOST in v or ENV_LLM_BASE_URL in v
+                for v in exc.value.missing_vars
+            )
 
 
 class TestCriticBehaviorInAgentCreation:

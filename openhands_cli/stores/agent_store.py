@@ -15,6 +15,7 @@ from openhands.sdk import (
     AgentContext,
     LLMSummarizingCondenser,
     LocalFileStore,
+    create_llm,
 )
 from openhands.sdk.context import load_project_skills
 from openhands.sdk.conversation.persistence_const import BASE_STATE
@@ -132,6 +133,8 @@ DEFAULT_LLM_BASE_URL = "https://llm-proxy.app.all-hands.dev/"
 ENV_LLM_API_KEY = "LLM_API_KEY"
 ENV_LLM_BASE_URL = "LLM_BASE_URL"
 ENV_LLM_MODEL = "LLM_MODEL"
+ENV_DATABRICKS_HOST = "DATABRICKS_HOST"
+ENV_DATABRICKS_TOKEN = "DATABRICKS_TOKEN"
 
 
 class MissingEnvironmentVariablesError(Exception):
@@ -165,6 +168,10 @@ def check_and_warn_env_vars() -> None:
         env_vars_set.append(ENV_LLM_BASE_URL)
     if os.environ.get(ENV_LLM_MODEL):
         env_vars_set.append(ENV_LLM_MODEL)
+    if os.environ.get(ENV_DATABRICKS_HOST):
+        env_vars_set.append(ENV_DATABRICKS_HOST)
+    if os.environ.get(ENV_DATABRICKS_TOKEN):
+        env_vars_set.append(ENV_DATABRICKS_TOKEN)
 
     if env_vars_set:
         console = Console(stderr=True)
@@ -184,6 +191,10 @@ class LLMEnvOverrides(BaseModel):
     Environment variables take precedence over stored settings and are
     NOT persisted to disk (temporary override only).
 
+    Databricks: ``DATABRICKS_HOST`` / ``DATABRICKS_TOKEN`` supplement ``LLM_*``.
+    M2M (``DATABRICKS_CLIENT_ID`` / ``DATABRICKS_CLIENT_SECRET``) is read only by
+    the SDK from the process environment, not through this model.
+
     Use the `from_env()` class method to load values from environment
     variables when env overrides are enabled.
     """
@@ -191,6 +202,8 @@ class LLMEnvOverrides(BaseModel):
     api_key: SecretStr | None = None
     base_url: str | None = None
     model: str | None = None
+    databricks_host: str | None = None
+    databricks_token: str | None = None
 
     @classmethod
     def from_env(cls, enabled: bool = False) -> LLMEnvOverrides:
@@ -221,10 +234,48 @@ class LLMEnvOverrides(BaseModel):
         if model:
             result["model"] = model
 
+        db_host = os.environ.get(ENV_DATABRICKS_HOST) or None
+        if db_host:
+            result["databricks_host"] = db_host.strip().rstrip("/")
+
+        db_tok = os.environ.get(ENV_DATABRICKS_TOKEN) or None
+        if db_tok:
+            result["databricks_token"] = db_tok
+
         return cls(**result)
 
+    def to_llm_kwargs(self) -> dict[str, Any]:
+        """Map overrides to ``create_llm()`` / ``LLM`` kwargs."""
+        kwargs: dict[str, Any] = {}
+        is_db = (self.model or "").startswith("databricks/")
+        if self.model:
+            kwargs["model"] = self.model
+        if self.api_key is not None:
+            kwargs["api_key"] = self.api_key
+        elif is_db and self.databricks_token:
+            kwargs["api_key"] = SecretStr(self.databricks_token)
+        merged_base = self.base_url or self.databricks_host
+        if merged_base:
+            kwargs["base_url"] = merged_base
+        if self.databricks_host:
+            kwargs["databricks_host"] = self.databricks_host
+        return kwargs
+
     def require_for_headless(self) -> None:
-        missing: list[str] = []
+        """Validate env overrides for headless agent creation."""
+        is_databricks = (self.model or "").startswith("databricks/")
+        has_host = bool(self.databricks_host or self.base_url)
+        if is_databricks:
+            missing: list[str] = []
+            if self.model is None:
+                missing.append(ENV_LLM_MODEL)
+            if not has_host:
+                missing.append(f"{ENV_DATABRICKS_HOST} or {ENV_LLM_BASE_URL}")
+            if missing:
+                raise MissingEnvironmentVariablesError(missing)
+            return
+
+        missing = []
         if self.api_key is None:
             missing.append(ENV_LLM_API_KEY)
         if self.model is None:
@@ -234,11 +285,22 @@ class LLMEnvOverrides(BaseModel):
 
     def has_overrides(self) -> bool:
         """Check if any overrides are set."""
-        return any([self.api_key, self.base_url, self.model])
+        return any(
+            [
+                self.api_key,
+                self.base_url,
+                self.model,
+                self.databricks_host,
+                self.databricks_token,
+            ]
+        )
 
 
 def apply_llm_overrides(llm: LLM, overrides: LLMEnvOverrides) -> LLM:
     """Apply environment variable overrides to an LLM instance.
+
+    Rebuilds via ``create_llm`` for Databricks native models so private client
+    state is not stale (``model_copy`` skips ``DatabricksLLM`` init).
 
     Args:
         llm: The LLM instance to update
@@ -250,7 +312,39 @@ def apply_llm_overrides(llm: LLM, overrides: LLMEnvOverrides) -> LLM:
     if not overrides.has_overrides():
         return llm
 
-    return llm.model_copy(update=overrides.model_dump(exclude_none=True))
+    kw = overrides.to_llm_kwargs()
+    target_model = kw.get("model", llm.model)
+
+    is_databricks_model = isinstance(target_model, str) and target_model.startswith(
+        "databricks/"
+    )
+    is_databricks_instance = False
+    try:
+        from openhands.sdk.llm.providers.databricks.llm import DatabricksLLM
+
+        is_databricks_instance = isinstance(llm, DatabricksLLM)
+    except ImportError:
+        pass
+
+    if is_databricks_instance or is_databricks_model:
+        base = llm.model_dump(exclude_none=True)
+        base.pop("provider", None)
+        for key, val in kw.items():
+            if val is not None:
+                base[key] = val
+        filtered = {k: v for k, v in base.items() if v is not None}
+        return create_llm(**filtered)
+
+    patch: dict[str, Any] = {}
+    if overrides.api_key is not None:
+        patch["api_key"] = overrides.api_key
+    if overrides.base_url is not None:
+        patch["base_url"] = overrides.base_url
+    if overrides.model is not None:
+        patch["model"] = overrides.model
+    if not patch:
+        return llm
+    return llm.model_copy(update=patch)
 
 
 class AgentStore:
@@ -289,15 +383,9 @@ class AgentStore:
 
         # In env override mode, require enough info to create an agent.
         overrides.require_for_headless()
-        assert overrides.api_key is not None
-        assert overrides.model is not None
-
-        llm = LLM(
-            model=overrides.model,
-            api_key=overrides.api_key.get_secret_value(),
-            base_url=overrides.base_url,
-            usage_id="agent",
-        )
+        llm_kwargs = overrides.to_llm_kwargs()
+        llm_kwargs["usage_id"] = "agent"
+        llm = create_llm(**llm_kwargs)
         return get_default_cli_agent(llm)
 
     def _apply_env_overrides(self, agent: Agent, overrides: LLMEnvOverrides) -> Agent:
@@ -493,19 +581,37 @@ class AgentStore:
         model = settings.get("llm_model", default_model)
         base_url = settings.get("llm_base_url")
 
-        llm = LLM(
-            model=model,
-            api_key=llm_api_key,
-            base_url=base_url,
-            usage_id="agent",
-        )
+        if isinstance(model, str) and model.startswith("databricks/"):
+            from types import SimpleNamespace
 
-        condenser_llm = LLM(
-            model=model,
-            api_key=llm_api_key,
-            base_url=base_url,
-            usage_id="condenser",
-        )
+            from openhands.sdk.llm.providers.databricks.settings_bridge import (
+                kwargs_from_settings,
+            )
+
+            db_settings = SimpleNamespace(
+                model=model,
+                api_key=llm_api_key if llm_api_key else None,
+                base_url=base_url,
+                databricks_host=base_url if base_url else None,
+            )
+            llm = create_llm(**kwargs_from_settings(db_settings, usage_id="agent"))
+            condenser_llm = create_llm(
+                **kwargs_from_settings(db_settings, usage_id="condenser")
+            )
+        else:
+            llm = LLM(
+                model=model,
+                api_key=llm_api_key,
+                base_url=base_url,
+                usage_id="agent",
+            )
+
+            condenser_llm = LLM(
+                model=model,
+                api_key=llm_api_key,
+                base_url=base_url,
+                usage_id="condenser",
+            )
 
         condenser = LLMSummarizingCondenser(llm=condenser_llm)
 

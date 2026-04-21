@@ -243,6 +243,29 @@ def test_missing_api_key_errors_when_no_existing_agent() -> None:
     assert "API Key is required" in str(exc.value)
 
 
+def test_databricks_basic_allows_missing_api_key_on_resolve() -> None:
+    """Databricks FMAPI can use M2M / CLI auth without a UI PAT.
+
+    AI Gateway host is still required (it's the FM endpoint for every
+    invocation regardless of auth method); workspace host is supplied
+    here so M2M-style validation paths work too.
+    """
+    model_id = "databricks/databricks-meta-llama-3-3-70b-instruct"
+    data = settings_utils.SettingsFormData(
+        mode="basic",
+        provider="databricks",
+        model=model_id,
+        custom_model=None,
+        base_url=None,
+        api_key_input=None,
+        databricks_ai_gateway_host="https://adb-1234.cloud.databricks.com",
+        databricks_host="https://adb-1234.cloud.databricks.com",
+        memory_condensation_enabled=False,
+    )
+    data.resolve_data_fields(existing_agent=None)
+    assert data.get_full_model_name() == model_id
+
+
 def test_save_settings_wraps_errors_into_result(deps: FakeAgentStore) -> None:
     """save_settings should surface resolver errors as success=False."""
     # Invalid: advanced mode with missing custom_model/base_url

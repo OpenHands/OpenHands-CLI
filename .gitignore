@@ -195,3 +195,6 @@ $RECYCLE.BIN/
 .pytest_cache/
 software-agent-sdk/
 snapshot_report.html
+
+# Local developer overrides (never commit)
+.local.env
