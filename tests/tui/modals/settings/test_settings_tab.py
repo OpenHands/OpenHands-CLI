@@ -143,18 +143,21 @@ class TestSettingsTab:
                 model_recommendations.CLOUD_MODELS + model_recommendations.LOCAL_MODELS
             )
             for model in all_models:
-                model_display = model.format_display_name()
-                # Find the widget text that contains this model
-                matching_text = next(
-                    (text for text in model_name_texts if model_display in text), None
+                # ``format_display_name`` already returns the exact widget text
+                # (bullet + provider/name, optionally suffixed with the
+                # Recommended indicator). Use equality rather than a substring
+                # check so prefix-collision models like ``databricks-gpt-5`` vs
+                # ``databricks-gpt-5-mini`` don't match each other.
+                expected = model.format_display_name()
+                assert expected in model_name_texts, (
+                    f"Model {model.name} not found (looked for {expected!r})"
                 )
-                assert matching_text is not None, f"Model {model.name} not found"
 
                 if model.is_recommended:
-                    assert (
-                        model_recommendations.RECOMMENDED_INDICATOR in matching_text
-                    ), f"Recommended model {model.name} missing indicator"
+                    assert model_recommendations.RECOMMENDED_INDICATOR in expected, (
+                        f"Recommended model {model.name} missing indicator"
+                    )
                 else:
                     assert (
-                        model_recommendations.RECOMMENDED_INDICATOR not in matching_text
+                        model_recommendations.RECOMMENDED_INDICATOR not in expected
                     ), f"Non-recommended model {model.name} has indicator"
