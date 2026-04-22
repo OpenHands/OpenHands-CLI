@@ -217,6 +217,74 @@ class TestExitConfirmationModal:
 
             assert call_order == ["dismiss", "exit_cancelled"]
 
+    async def test_modal_focuses_non_destructive_button_on_mount(self):
+        """The modal should focus the non-destructive action first."""
+        from textual.app import App
+
+        class TestApp(App):
+            def on_mount(self):
+                self.push_screen(ExitConfirmationModal())
+
+        app = TestApp()
+
+        async with app.run_test() as pilot:
+            modal = pilot.app.screen
+            assert isinstance(modal, ExitConfirmationModal)
+
+            no_button = modal.query_one("#no", Button)
+            await pilot.pause()
+
+            assert pilot.app.focused == no_button
+
+    async def test_arrow_keys_move_focus_between_choices(self):
+        """Left and right arrows should move focus between the two buttons."""
+        from textual.app import App
+
+        class TestApp(App):
+            def on_mount(self):
+                self.push_screen(ExitConfirmationModal())
+
+        app = TestApp()
+
+        async with app.run_test() as pilot:
+            modal = pilot.app.screen
+            assert isinstance(modal, ExitConfirmationModal)
+
+            yes_button = modal.query_one("#yes", Button)
+            no_button = modal.query_one("#no", Button)
+            await pilot.pause()
+
+            assert pilot.app.focused == no_button
+
+            await pilot.press("left")
+            assert pilot.app.focused == yes_button
+
+            await pilot.press("right")
+            assert pilot.app.focused == no_button
+
+    async def test_escape_triggers_cancel_callback(self):
+        """Escape should dismiss the modal via the cancel path."""
+        from textual.app import App
+
+        mock_exit_cancelled = mock.MagicMock()
+
+        class TestApp(App):
+            def on_mount(self):
+                self.push_screen(
+                    ExitConfirmationModal(on_exit_cancelled=mock_exit_cancelled)
+                )
+
+        app = TestApp()
+
+        async with app.run_test() as pilot:
+            modal = pilot.app.screen
+            assert isinstance(modal, ExitConfirmationModal)
+
+            await pilot.press("escape")
+            await pilot.pause()
+
+            mock_exit_cancelled.assert_called_once()
+
     async def test_modal_keyboard_navigation(self):
         """Test that the modal supports proper keyboard navigation."""
         from textual.app import App
