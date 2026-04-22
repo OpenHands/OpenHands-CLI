@@ -84,7 +84,7 @@ jobs:
                   EXISTING_PR=$(curl -s \
                     -H "Authorization: token ${{ secrets.OPENHANDS_BOT_GITHUB_PAT_PUBLIC }}" \
                     -H "Accept: application/vnd.github.v3+json" \
-                    "https://api.github.com/repos/All-Hands-AI/install-openhands-website/pulls?state=open&head=update-version-${{ steps.extract_version.outputs.version }}" \
+                    "https://api.github.com/repos/OpenHands/install-openhands-website/pulls?state=open&head=update-version-${{ steps.extract_version.outputs.version }}" \
                     | jq -r '.[0].html_url // "null"')
 
                   if [ "$EXISTING_PR" != "null" ]; then
