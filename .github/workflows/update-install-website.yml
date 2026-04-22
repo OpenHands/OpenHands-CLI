@@ -41,6 +41,7 @@ jobs:
 
             - name: Clone install-openhands-website repository
               run: |
+                  # Use PAT_TOKEN to clone the repository
                   git clone https://${{ secrets.OPENHANDS_BOT_GITHUB_PAT_INSTALL_WEBSITE }}@github.com/OpenHands/install-openhands-website.git website-repo
                   cd website-repo
                   git config user.name "github-actions[bot]"
