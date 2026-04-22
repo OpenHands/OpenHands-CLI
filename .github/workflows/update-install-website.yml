@@ -1,5 +1,8 @@
 ---
 # Workflow that updates the install-openhands-website repository when a release is published
+# TODO: Once All-Hands-AI/install-openhands-website is migrated to the OpenHands org,
+#       replace secrets.PAT_TOKEN here with secrets.OPENHANDS_BOT_GITHUB_PAT_PUBLIC
+#       and add the new repo to the PAT's allowlist. Tracked in OpenHands/OpenHands-CLI#689.
 name: Update Install Website Version
 
 # Trigger when a release is published (not draft) or manually
@@ -133,3 +136,4 @@ jobs:
                   else
                     echo "ℹ️ No changes needed - version ${{ steps.extract_version.outputs.version }} is already up to date in install-openhands-website"
                   fi
+
