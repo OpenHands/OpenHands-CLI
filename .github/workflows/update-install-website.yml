@@ -45,7 +45,7 @@ jobs:
             - name: Clone install-openhands-website repository
               run: |
                   # Use OPENHANDS_BOT_GITHUB_PAT_PUBLIC to clone the repository
-                  git clone https://${{ secrets.OPENHANDS_BOT_GITHUB_PAT_PUBLIC }}@github.com/All-Hands-AI/install-openhands-website.git website-repo
+                  git clone https://${{ secrets.OPENHANDS_BOT_GITHUB_PAT_PUBLIC }}@github.com/OpenHands/install-openhands-website.git website-repo
                   cd website-repo
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
