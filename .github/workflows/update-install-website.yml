@@ -44,8 +44,8 @@ jobs:
 
             - name: Clone install-openhands-website repository
               run: |
-                  # Use PAT_TOKEN to clone the repository
-                  git clone https://${{ secrets.PAT_TOKEN }}@github.com/All-Hands-AI/install-openhands-website.git website-repo
+                  # Use OPENHANDS_BOT_GITHUB_PAT_PUBLIC to clone the repository
+                  git clone https://${{ secrets.OPENHANDS_BOT_GITHUB_PAT_PUBLIC }}@github.com/All-Hands-AI/install-openhands-website.git website-repo
                   cd website-repo
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -82,7 +82,7 @@ jobs:
               run: |
                   # Check if a PR already exists for this version
                   EXISTING_PR=$(curl -s \
-                    -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+                    -H "Authorization: token ${{ secrets.OPENHANDS_BOT_GITHUB_PAT_PUBLIC }}" \
                     -H "Accept: application/vnd.github.v3+json" \
                     "https://api.github.com/repos/All-Hands-AI/install-openhands-website/pulls?state=open&head=update-version-${{ steps.extract_version.outputs.version }}" \
                     | jq -r '.[0].html_url // "null"')
@@ -104,7 +104,7 @@ jobs:
 
                   # Create PR using GitHub API
                   curl -X POST \
-                    -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+                    -H "Authorization: token ${{ secrets.OPENHANDS_BOT_GITHUB_PAT_PUBLIC }}" \
                     -H "Accept: application/vnd.github.v3+json" \
                     https://api.github.com/repos/All-Hands-AI/install-openhands-website/pulls \
                     -d '{
