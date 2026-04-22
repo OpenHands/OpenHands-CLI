@@ -1,8 +1,4 @@
 ---
-# Workflow that updates the install-openhands-website repository when a release is published
-# TODO: Once All-Hands-AI/install-openhands-website is migrated to the OpenHands org,
-#       replace secrets.PAT_TOKEN here with secrets.OPENHANDS_BOT_GITHUB_PAT_PUBLIC
-#       and add the new repo to the PAT's allowlist. Tracked in OpenHands/OpenHands-CLI#689.
 name: Update Install Website Version
 
 # Trigger when a release is published (not draft) or manually
@@ -16,8 +12,6 @@ on:
                 required: true
                 type: string
 
-# Note: This workflow requires PAT_TOKEN secret to have access to the All-Hands-AI/install-openhands-website repository
-# Create a Personal Access Token (PAT) with repo permissions and store it as PAT_TOKEN in repository secrets
 permissions:
     contents: read
 
@@ -47,8 +41,7 @@ jobs:
 
             - name: Clone install-openhands-website repository
               run: |
-                  # Use OPENHANDS_BOT_GITHUB_PAT_PUBLIC to clone the repository
-                  git clone https://${{ secrets.OPENHANDS_BOT_GITHUB_PAT_PUBLIC }}@github.com/OpenHands/install-openhands-website.git website-repo
+                  git clone https://${{ secrets.OPENHANDS_BOT_GITHUB_PAT_INSTALL_WEBSITE }}@github.com/OpenHands/install-openhands-website.git website-repo
                   cd website-repo
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -85,7 +78,7 @@ jobs:
               run: |
                   # Check if a PR already exists for this version
                   EXISTING_PR=$(curl -s \
-                    -H "Authorization: token ${{ secrets.OPENHANDS_BOT_GITHUB_PAT_PUBLIC }}" \
+                    -H "Authorization: token ${{ secrets.OPENHANDS_BOT_GITHUB_PAT_INSTALL_WEBSITE }}" \
                     -H "Accept: application/vnd.github.v3+json" \
                     "https://api.github.com/repos/OpenHands/install-openhands-website/pulls?state=open&head=update-version-${{ steps.extract_version.outputs.version }}" \
                     | jq -r '.[0].html_url // "null"')
@@ -107,14 +100,26 @@ jobs:
 
                   # Create PR using GitHub API
                   curl -X POST \
-                    -H "Authorization: token ${{ secrets.OPENHANDS_BOT_GITHUB_PAT_PUBLIC }}" \
+                    -H "Authorization: token ${{ secrets.OPENHANDS_BOT_GITHUB_PAT_INSTALL_WEBSITE }}" \
                     -H "Accept: application/vnd.github.v3+json" \
                     https://api.github.com/repos/OpenHands/install-openhands-website/pulls \
                     -d '{
                       "title": "Update OpenHands CLI version to ${{ steps.extract_version.outputs.version }}",
                       "head": "'"$BRANCH_NAME"'",
                       "base": "main",
-                      "body": "This PR updates the OpenHands CLI version in the install script to v${{ steps.extract_version.outputs.version }}.\n\n**Changes:**\n- Updated `VERSION` in `public/install.sh` from the previous version to `${{ steps.extract_version.outputs.version }}`\n\n**Context:**\n'"$(if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "This update was manually triggered via workflow dispatch."; else echo "This update was automatically triggered by the release of [OpenHands CLI v${{ steps.extract_version.outputs.version }}](${{ github.event.release.html_url }}) in the [OpenHands-CLI repository](https://github.com/OpenHands/OpenHands-CLI)."; fi)"'\n\n**Testing:**\nAfter merging, users will be able to install the latest version using:\n```bash\ncurl -fsSL https://install.openhands.dev/install.sh | sh\n```",
+                      "body": "This PR updates the OpenHands CLI version in the install script to v${{ steps.extract_version.outputs.version }}.
+
+**Changes:**
+- Updated `VERSION` in `public/install.sh` from the previous version to `${{ steps.extract_version.outputs.version }}`
+
+**Context:**
+'"$(if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "This update was manually triggered via workflow dispatch."; else echo "This update was automatically triggered by the release of [OpenHands CLI v${{ steps.extract_version.outputs.version }}](${{ github.event.release.html_url }}) in the [OpenHands-CLI repository](https://github.com/OpenHands/OpenHands-CLI)."; fi)"'
+
+**Testing:**
+After merging, users will be able to install the latest version using:
+```bash
+curl -fsSL https://install.openhands.dev/install.sh | sh
+```",
                       "draft": false
                     }' | jq -r '.html_url' > pr_url.txt
 
@@ -136,4 +141,3 @@ jobs:
                   else
                     echo "ℹ️ No changes needed - version ${{ steps.extract_version.outputs.version }} is already up to date in install-openhands-website"
                   fi
-
