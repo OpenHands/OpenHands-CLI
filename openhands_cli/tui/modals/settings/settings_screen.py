@@ -6,7 +6,7 @@ LLM provider, model, API keys, and advanced options.
 """
 
 from collections.abc import Callable
-from typing import ClassVar, Literal, cast
+from typing import TYPE_CHECKING, ClassVar, Literal, cast
 
 from textual import getters
 from textual.app import ComposeResult
@@ -36,12 +36,16 @@ from openhands_cli.tui.modals.settings.components import (
 from openhands_cli.tui.modals.settings.utils import SettingsFormData, save_settings
 
 
+if TYPE_CHECKING:
+    from openhands_cli.tui.textual_app import OpenHandsApp
+
+
 class SettingsScreen(ModalScreen):
     """A modal screen for configuring settings."""
 
     BINDINGS: ClassVar = [
         ("escape", "cancel", "Cancel"),
-        ("tab", "focus_next", "Navigate"),
+        ("ctrl+c", "request_quit", "Exit"),
     ]
 
     CSS_PATH = "settings_screen.tcss"
@@ -412,6 +416,11 @@ class SettingsScreen(ModalScreen):
     def action_cancel(self) -> None:
         """Handle escape key to cancel settings."""
         self._handle_cancel()
+
+    def action_request_quit(self) -> None:
+        """Handle ctrl+c - delegate to app's request_quit."""
+        app = cast("OpenHandsApp", self.app)
+        app.action_request_quit()
 
     def _handle_cancel(self) -> None:
         """Handle cancel action - delegate to appropriate callback."""
