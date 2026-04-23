@@ -9,6 +9,10 @@ from textual.widgets import Label, Static, Switch
 from openhands_cli.stores.cli_settings import CliSettings
 
 
+class CliSettingsScroll(VerticalScroll, can_focus=False):
+    pass
+
+
 class SettingsSwitch(Container):
     """Reusable switch component for settings forms."""
 
@@ -57,7 +61,7 @@ class CliSettingsTab(Container):
 
     def compose(self) -> ComposeResult:
         """Compose the CLI settings tab content."""
-        with VerticalScroll(id="cli_settings_content"):
+        with CliSettingsScroll(id="cli_settings_content"):
             yield Static("CLI Settings", classes="form_section_title")
 
             yield SettingsSwitch(

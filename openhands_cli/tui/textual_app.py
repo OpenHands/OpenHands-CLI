@@ -45,7 +45,7 @@ from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
 from textual.binding import Binding
 from textual.containers import Horizontal
-from textual.screen import Screen
+from textual.screen import ModalScreen, Screen
 from textual.widgets import Footer, Input, ListView, TextArea
 from textual_autocomplete import AutoComplete
 
@@ -528,6 +528,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         - When Tab is pressed from input area, focus the most recent (last) cell
           instead of the first one (unless autocomplete is showing)
         """
+        if isinstance(self.screen, ModalScreen):
+            return
+
         # Handle Tab from input area - focus most recent cell
         # Skip if autocomplete dropdown is visible (Tab is used for selection)
         if event.key == "tab" and isinstance(self.focused, Input | TextArea):

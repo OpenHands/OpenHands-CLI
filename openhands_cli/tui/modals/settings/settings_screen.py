@@ -45,7 +45,6 @@ class SettingsScreen(ModalScreen):
 
     BINDINGS: ClassVar = [
         ("escape", "cancel", "Cancel"),
-        ("tab", "focus_next", "Navigate"),
         ("ctrl+c", "request_quit", "Exit"),
     ]
 
