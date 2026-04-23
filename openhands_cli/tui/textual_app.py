@@ -46,7 +46,7 @@ from textual.app import App, ComposeResult, SystemCommand
 from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.screen import Screen
-from textual.widgets import Footer, Input, TextArea
+from textual.widgets import Footer, Input, ListView, TextArea
 from textual_autocomplete import AutoComplete
 
 from openhands.sdk import BaseConversation
@@ -532,6 +532,16 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Skip if autocomplete dropdown is visible (Tab is used for selection)
         if event.key == "tab" and isinstance(self.focused, Input | TextArea):
             if not self._is_autocomplete_showing():
+                history_panels = self.query(HistorySidePanel)
+                if len(history_panels) > 0 and history_panels.first().display:
+                    history_list = history_panels.first().query_one(
+                        "#history-list", ListView
+                    )
+                    history_list.focus()
+                    event.stop()
+                    event.prevent_default()
+                    return
+
                 collapsibles = list(self.scroll_view.query(Collapsible))
                 if collapsibles:
                     # Focus the last (most recent) collapsible's title
