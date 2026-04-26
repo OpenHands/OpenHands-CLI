@@ -70,17 +70,17 @@ install-dev: check-uv-version
 
 test: check-uv-version
 	@$(ECHO) "$(YELLOW)Run tests...$(RESET)"
-	uv run env HOME="$$(mktemp -d)" pytest --ignore=tests/snapshots
+	uv run pytest --ignore=tests/snapshots
 	@$(ECHO) "$(GREEN)Tests completed.$(RESET)"
 
 test-snapshots: check-uv-version
 	@$(ECHO) "$(YELLOW)Run snapshots tests...$(RESET)"
-	uv run env HOME="$$(mktemp -d)" pytest tests/snapshots -v
+	uv run pytest tests/snapshots -v
 	@$(ECHO) "$(GREEN)Snapshots tests completed.$(RESET)"
 
 test-binary: check-uv-version
 	@$(ECHO) "$(YELLOW)Run end-to-end tests...$(RESET)"
-	uv run env HOME="$$(mktemp -d)" pytest tui_e2e
+	uv run pytest tui_e2e
 	@$(ECHO) "$(GREEN)End-to-end tests completed.$(RESET)"
 
 test-all: test test-snapshots
