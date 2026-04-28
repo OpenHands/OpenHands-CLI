@@ -235,6 +235,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def _run_on_main_thread(self, func, *args) -> None:
         """Run a function on the main thread via call_from_thread if needed."""
         import asyncio
+
         has_loop = False
         try:
             asyncio.get_running_loop()

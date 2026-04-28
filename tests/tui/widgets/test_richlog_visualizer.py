@@ -978,6 +978,7 @@ class TestThreadSafety:
     def mock_visualizer(self):
         """Create a visualizer with a mocked app for thread safety testing."""
         from unittest.mock import MagicMock
+
         app = MagicMock()
         container = VerticalScroll()
         vis = ConversationVisualizer(container, app)
@@ -985,7 +986,6 @@ class TestThreadSafety:
 
     def test_run_on_main_thread_direct_call(self, mock_visualizer):
         """Test direct call when on main thread with a running loop."""
-        import asyncio
         import threading
         from unittest.mock import MagicMock
 
@@ -999,7 +999,9 @@ class TestThreadSafety:
         mock_func.assert_called_once_with("arg1")
         mock_visualizer._app.call_from_thread.assert_not_called()
 
-    def test_run_on_main_thread_via_call_from_thread_when_no_loop(self, mock_visualizer):
+    def test_run_on_main_thread_via_call_from_thread_when_no_loop(
+        self, mock_visualizer
+    ):
         """Test call via call_from_thread when on main thread but NO running loop."""
         import threading
         from unittest.mock import MagicMock
@@ -1016,7 +1018,9 @@ class TestThreadSafety:
         # Should be called via app.call_from_thread
         mock_visualizer._app.call_from_thread.assert_called_once_with(mock_func, "arg1")
 
-    def test_run_on_main_thread_via_call_from_thread_when_wrong_thread(self, mock_visualizer):
+    def test_run_on_main_thread_via_call_from_thread_when_wrong_thread(
+        self, mock_visualizer
+    ):
         """Test call via call_from_thread when on a different thread."""
         from unittest.mock import MagicMock
 
