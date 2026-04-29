@@ -63,13 +63,6 @@ allow-direct-references = true
 [tool.hatch.build.targets.wheel]
 packages = [ "openhands_cli" ]
 
-# uv source pins for internal packages
-
-[tool.uv.sources]
-openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "f9f089e5a99c04e40ce444be207420d094558024" }
-openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "f9f089e5a99c04e40ce444be207420d094558024" }
-openhands-workspace = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-workspace", rev = "f9f089e5a99c04e40ce444be207420d094558024" }
-
 # Ruff configuration
 [tool.ruff]
 target-version = "py312"
