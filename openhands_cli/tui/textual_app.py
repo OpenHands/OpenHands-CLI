@@ -43,9 +43,10 @@ from typing import ClassVar
 
 from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
+from textual.binding import Binding
 from textual.containers import Horizontal
-from textual.screen import Screen
-from textual.widgets import Footer, Input, TextArea
+from textual.screen import ModalScreen, Screen
+from textual.widgets import Footer, Input, ListView, TextArea
 from textual_autocomplete import AutoComplete
 
 from openhands.sdk import BaseConversation
@@ -97,8 +98,14 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         ("ctrl+l", "toggle_input_mode", "Toggle single/multi-line input"),
         ("ctrl+o", "toggle_cells", "Toggle Cells"),
         ("ctrl+j", "submit_textarea", "Submit multi-line input"),
+        ("tab", "focus_next", "Navigate"),
         ("escape", "pause_conversation", "Pause the conversation"),
-        ("ctrl+q", "request_quit", "Quit the application"),
+        # use priority=True for quit keys to work in Input widget
+        # as well as all modals.
+        Binding("ctrl+q", "request_quit", "Quit the application", priority=True),
+        # ctrl+c is left as priority=False so that selected text in Input
+        # widgets can be copied. Modals will need to add their own
+        # ctrl+c binding and own request_quit.
         ("ctrl+c", "request_quit", "Quit the application"),
         ("ctrl+d", "request_quit", "Quit the application"),
     ]
@@ -478,11 +485,25 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         self.conversation_manager.post_message(SendMessage(user_input))
 
     def action_request_quit(self) -> None:
-        """Action to handle Ctrl+Q key binding.
+        """Action to handle Ctrl+Q/Ctrl+C key binding.
 
-        Delegates to InputAreaContainer's _command_exit() for consistent behavior.
+        If the exit confirmation modal is already shown, exit immediately.
+        Otherwise, show the confirmation modal.
+        Uses priority=True to work in Input widgets.
         """
-        self.conversation_state.input_area._command_exit()
+        from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
+
+        # Check if ExitConfirmationModal is already displayed
+        if isinstance(self.screen, ExitConfirmationModal):
+            # Modal is already up - this is a 2nd tap, so exit immediately
+            self._exit_application()
+        else:
+            # First tap - delegate to exit flow which shows the modal
+            self.conversation_state.input_area._command_exit()
+
+    def _exit_application(self) -> None:
+        """Exit the application immediately (used for double-tap quit)."""
+        self.exit()
 
     def action_toggle_cells(self) -> None:
         """Action to handle Ctrl+O key binding.
@@ -506,10 +527,23 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         - When Tab is pressed from input area, focus the most recent (last) cell
           instead of the first one (unless autocomplete is showing)
         """
+        if isinstance(self.screen, ModalScreen):
+            return
+
         # Handle Tab from input area - focus most recent cell
         # Skip if autocomplete dropdown is visible (Tab is used for selection)
         if event.key == "tab" and isinstance(self.focused, Input | TextArea):
             if not self._is_autocomplete_showing():
+                history_panels = self.query(HistorySidePanel)
+                if len(history_panels) > 0 and history_panels.first().display:
+                    history_list = history_panels.first().query_one(
+                        "#history-list", ListView
+                    )
+                    history_list.focus()
+                    event.stop()
+                    event.prevent_default()
+                    return
+
                 collapsibles = list(self.scroll_view.query(Collapsible))
                 if collapsibles:
                     # Focus the last (most recent) collapsible's title

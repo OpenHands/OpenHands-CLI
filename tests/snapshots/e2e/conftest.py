@@ -273,7 +273,7 @@ def patch_deterministic_paths(monkeypatch: pytest.MonkeyPatch) -> None:
         from openhands_cli.stores.agent_store import AgentStore
 
         def patched_build_agent_context(self) -> AgentContext:
-            from openhands.sdk.context.skills.skill import load_project_skills
+            from openhands.sdk.skills import load_project_skills
             from openhands_cli.locations import get_work_dir
             from openhands_cli.utils import get_os_description
 

@@ -6,23 +6,19 @@ import subprocess
 import sys
 from pathlib import Path
 
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import HTML
+from rich.console import Console
+from rich.markup import escape
 
 from openhands_cli.locations import get_persistence_dir
 
 
+console = Console(highlight=False, soft_wrap=True)
+
+
 def _format_docker_command_for_logging(cmd: list[str]) -> str:
-    """Format a Docker command for logging with grey color.
-
-    Args:
-        cmd (list[str]): The Docker command as a list of strings
-
-    Returns:
-        str: The formatted command string in grey HTML color
-    """
+    """Format a Docker command for logging."""
     cmd_str = " ".join(cmd)
-    return f"<grey>Running Docker command: {cmd_str}</grey>"
+    return f"Running Docker command: {cmd_str}"
 
 
 def check_docker_requirements() -> bool:
@@ -33,13 +29,15 @@ def check_docker_requirements() -> bool:
     """
     # Check if Docker is installed
     if not shutil.which("docker"):
-        print_formatted_text(
-            HTML("<ansired>❌ Docker is not installed or not in PATH.</ansired>")
+        console.print(
+            "❌ Docker is not installed or not in PATH.",
+            style="red",
+            markup=False,
         )
-        print_formatted_text(
-            HTML(
-                "<grey>Please install Docker first: https://docs.docker.com/get-docker/</grey>"
-            )
+        console.print(
+            "Please install Docker first: https://docs.docker.com/get-docker/",
+            style="grey50",
+            markup=False,
         )
         return False
 
@@ -49,18 +47,24 @@ def check_docker_requirements() -> bool:
             ["docker", "info"], capture_output=True, text=True, timeout=10
         )
         if result.returncode != 0:
-            print_formatted_text(
-                HTML("<ansired>❌ Docker daemon is not running.</ansired>")
+            console.print(
+                "❌ Docker daemon is not running.",
+                style="red",
+                markup=False,
             )
-            print_formatted_text(
-                HTML("<grey>Please start Docker and try again.</grey>")
+            console.print(
+                "Please start Docker and try again.",
+                style="grey50",
+                markup=False,
             )
             return False
     except (subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
-        print_formatted_text(
-            HTML("<ansired>❌ Failed to check Docker status.</ansired>")
+        console.print(
+            "❌ Failed to check Docker status.",
+            style="red",
+            markup=False,
         )
-        print_formatted_text(HTML(f"<grey>Error: {e}</grey>"))
+        console.print(f"Error: {e}", style="grey50", markup=False)
         return False
 
     return True
@@ -92,10 +96,8 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
         gpu: If True, enable GPU support by mounting all GPUs into the
             container via nvidia-docker.
     """
-    print_formatted_text(
-        HTML("<ansiblue>🚀 Launching OpenHands GUI server...</ansiblue>")
-    )
-    print_formatted_text("")
+    console.print("🚀 Launching OpenHands GUI server...", style="blue", markup=False)
+    console.print()
 
     # Check Docker requirements
     if not check_docker_requirements():
@@ -113,14 +115,14 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
     # tested and compatible with that specific app version. Setting these env vars
     # could cause version mismatches between the app and agent server.
 
-    print_formatted_text(
-        HTML("<ansigreen>✅ Starting OpenHands GUI server...</ansigreen>")
+    console.print("✅ Starting OpenHands GUI server...", style="green", markup=False)
+    console.print(
+        "The server will be available at: http://localhost:3000",
+        style="grey50",
+        markup=False,
     )
-    print_formatted_text(
-        HTML("<grey>The server will be available at: http://localhost:3000</grey>")
-    )
-    print_formatted_text(HTML("<grey>Press Ctrl+C to stop the server.</grey>"))
-    print_formatted_text("")
+    console.print("Press Ctrl+C to stop the server.", style="grey50", markup=False)
+    console.print()
 
     # Build the Docker command
     docker_cmd = [
@@ -139,8 +141,10 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
 
     # Add GPU support if requested
     if gpu:
-        print_formatted_text(
-            HTML("<ansigreen>🖥️ Enabling GPU support via nvidia-docker...</ansigreen>")
+        console.print(
+            "🖥️ Enabling GPU support via nvidia-docker...",
+            style="green",
+            markup=False,
         )
         # Add the --gpus all flag to enable all GPUs
         docker_cmd.insert(2, "--gpus")
@@ -156,7 +160,8 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
     # Add current working directory mount if requested
     if mount_cwd:
         cwd = Path.cwd()
-        # Following the documentation at https://docs.all-hands.dev/usage/runtimes/docker#connecting-to-your-filesystem
+        # Following the documentation at
+        # https://docs.openhands.dev/usage/runtimes/docker#connecting-to-your-filesystem
         docker_cmd.extend(
             [
                 "-e",
@@ -173,12 +178,10 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
                 # If 'id' command fails or doesn't exist, skip setting user ID
                 pass
         # Print the folder that will be mounted to inform the user
-        print_formatted_text(
-            HTML(
-                f"<ansigreen>📂 Mounting current directory:</ansigreen> "
-                f"<ansiyellow>{cwd}</ansiyellow> <ansigreen>to</ansigreen> "
-                f"<ansiyellow>/workspace</ansiyellow>"
-            )
+        console.print(
+            f"[green]📂 Mounting current directory:[/green] "
+            f"[yellow]{escape(str(cwd))}[/yellow] "
+            f"[green]to[/green] [yellow]/workspace[/yellow]"
         )
 
     docker_cmd.extend(
@@ -195,18 +198,26 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
 
     try:
         # Log and run the Docker command
-        print_formatted_text(HTML(_format_docker_command_for_logging(docker_cmd)))
+        console.print(
+            _format_docker_command_for_logging(docker_cmd),
+            style="grey50",
+            markup=False,
+        )
         subprocess.run(docker_cmd, check=True)
     except subprocess.CalledProcessError as e:
-        print_formatted_text("")
-        print_formatted_text(
-            HTML("<ansired>❌ Failed to start OpenHands GUI server.</ansired>")
+        console.print()
+        console.print(
+            "❌ Failed to start OpenHands GUI server.",
+            style="red",
+            markup=False,
         )
-        print_formatted_text(HTML(f"<grey>Error: {e}</grey>"))
+        console.print(f"Error: {e}", style="grey50", markup=False)
         sys.exit(1)
     except KeyboardInterrupt:
-        print_formatted_text("")
-        print_formatted_text(
-            HTML("<ansigreen>✓ OpenHands GUI server stopped successfully.</ansigreen>")
+        console.print()
+        console.print(
+            "✓ OpenHands GUI server stopped successfully.",
+            style="green",
+            markup=False,
         )
         sys.exit(0)

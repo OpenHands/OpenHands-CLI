@@ -4,20 +4,28 @@ import json
 import os
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from openhands.sdk.settings import VerificationSettings
 
 
-CriticSettings = VerificationSettings
+class CriticSettings(VerificationSettings):
+    issue_threshold: float = 0.75
+
+    @field_validator("issue_threshold")
+    @classmethod
+    def validate_issue_threshold(cls, value: float) -> float:
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"Threshold must be between 0.0 and 1.0, got {value}")
+        return value
+
+
 DEFAULT_CRITIC_THRESHOLD = float(
-    VerificationSettings.model_fields["critic_threshold"].default
+    CriticSettings.model_fields["critic_threshold"].default
 )
-DEFAULT_ISSUE_THRESHOLD = float(
-    VerificationSettings.model_fields["issue_threshold"].default
-)
+DEFAULT_ISSUE_THRESHOLD = float(CriticSettings.model_fields["issue_threshold"].default)
 DEFAULT_MAX_REFINEMENT_ITERATIONS = int(
-    VerificationSettings.model_fields["max_refinement_iterations"].default
+    CriticSettings.model_fields["max_refinement_iterations"].default
 )
 
 
@@ -85,10 +93,21 @@ class CliSettings(BaseModel):
         except (json.JSONDecodeError, ValueError):
             return cls()
 
-    def save(self) -> None:
-        """Save CLI-owned settings to file."""
+    def save(self, *, include_critic: bool = False) -> None:
+        """Save CLI settings to file.
+
+        Args:
+            include_critic: When True, also persist the compatibility critic block.
+        """
         config_path = self.get_config_path()
         config_path.parent.mkdir(parents=True, exist_ok=True)
 
+        payload = {
+            "default_cells_expanded": self.default_cells_expanded,
+            "auto_open_plan_panel": self.auto_open_plan_panel,
+        }
+        if include_critic and self.critic is not None:
+            payload["critic"] = self.critic.model_dump(exclude_none=True)
+
         with open(config_path, "w") as f:
-            json.dump(self.model_dump(exclude_none=True), f, indent=2)
+            json.dump(payload, f, indent=2)

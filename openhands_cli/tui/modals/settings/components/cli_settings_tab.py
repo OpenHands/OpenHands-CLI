@@ -10,6 +10,10 @@ from openhands_cli.stores.cli_settings import CliSettings
 from openhands_cli.stores.programmatic_settings import CliProgrammaticSettings
 
 
+class CliSettingsScroll(VerticalScroll, can_focus=False):
+    pass
+
+
 class SettingsSwitch(Container):
     """Reusable switch component for settings forms."""
 
@@ -65,7 +69,7 @@ class CliSettingsTab(Container):
             for field in section.fields
         ]
 
-        with VerticalScroll(id="cli_settings_content"):
+        with CliSettingsScroll(id="cli_settings_content"):
             yield Static("CLI Settings", classes="form_section_title")
             for field in cli_fields:
                 leaf_key = field.key.split(".")[-1]

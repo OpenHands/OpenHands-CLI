@@ -441,7 +441,13 @@ def test_handle_cloud_command_with_task(monkeypatch):
     ) as mock_create_seeded:
         mock_create_seeded.return_value = ["Test task"]
 
-        with patch("asyncio.run") as mock_asyncio_run:
+        def _run(coro):
+            coro.close()
+            return None
+
+        with patch(
+            "openhands_cli.cloud.command.asyncio.run", side_effect=_run
+        ) as mock_asyncio_run:
             with patch("openhands_cli.cloud.command.console_print") as mock_print:
                 handle_cloud_command(args)
 
@@ -453,11 +459,12 @@ def test_handle_cloud_command_with_task(monkeypatch):
 
                 # Verify success message was printed
                 success_calls = [
-                    call
-                    for call in mock_print.call_args_list
-                    if "successfully" in str(call)
+                    str(call.args[0]) for call in mock_print.call_args_list if call.args
                 ]
-                assert len(success_calls) > 0
+                assert any(
+                    "Cloud conversation created successfully!" in call
+                    for call in success_calls
+                )
 
 
 def test_handle_cloud_command_no_initial_message(monkeypatch):

@@ -11,6 +11,8 @@ Test flow:
 
 from typing import TYPE_CHECKING
 
+from openhands_cli.tui.textual_app import OpenHandsApp
+
 from .helpers import type_text, wait_for_app_ready, wait_for_idle
 
 
@@ -48,9 +50,21 @@ async def _open_history_panel(pilot: "Pilot") -> None:
     await pilot.wait_for_scheduled_animations()
 
 
+async def _focus_prompt_input(pilot: "Pilot") -> None:
+    """Return focus to the prompt input before typing follow-up commands.
+    This works around on_key() currently refocusing to prompt input but
+    also losing that 1st character being typed.
+    """
+    app = pilot.app
+    assert isinstance(app, OpenHandsApp)
+    app.input_field.focus_input()
+    await pilot.pause()
+
+
 async def _run_first_conversation(pilot: "Pilot") -> None:
     """Phase 2: Open history panel and run first conversation."""
     await _open_history_panel(pilot)
+    await _focus_prompt_input(pilot)
 
     # Run first conversation
     await type_text(pilot, "echo hello world")
@@ -69,6 +83,7 @@ async def _run_first_conversation(pilot: "Pilot") -> None:
 async def _start_new_conversation(pilot: "Pilot") -> None:
     """Phase 3: Run first conversation, then start new conversation with /new."""
     await _run_first_conversation(pilot)
+    await _focus_prompt_input(pilot)
 
     # Start new conversation
     await type_text(pilot, "/new")
@@ -82,6 +97,7 @@ async def _start_new_conversation(pilot: "Pilot") -> None:
 async def _run_second_conversation(pilot: "Pilot") -> None:
     """Phase 4: Start new conversation, then run second conversation."""
     await _start_new_conversation(pilot)
+    await _focus_prompt_input(pilot)
 
     # Run second conversation
     await type_text(pilot, "second conversation message")
@@ -91,18 +107,19 @@ async def _run_second_conversation(pilot: "Pilot") -> None:
 
 async def _click_previous_conversation(pilot: "Pilot") -> None:
     """Phase 5: Run second conversation, then click previous conversation."""
-    from openhands_cli.tui.panels.history_side_panel import HistoryItem
+    from textual.widgets import ListView
 
     await _run_second_conversation(pilot)
 
     # Click on the previous (older) conversation
     # The history panel shows conversations with the newest first,
     # so we want to click on the second item (index 1) which is the older one
-    history_items = list(pilot.app.query(HistoryItem))
-    if len(history_items) >= 2:
-        # Click on the second item (the older conversation)
-        # Use on_click() method directly since pilot.click requires a selector
-        history_items[1].on_click()
+    list_view = pilot.app.query_one("#history-list", ListView)
+    if len(list_view.children) >= 2:
+        # Select the second item (the older conversation)
+        list_view.index = 1
+        # Trigger the selection action (Enter key)
+        list_view.action_select_cursor()
         await pilot.wait_for_scheduled_animations()
 
 

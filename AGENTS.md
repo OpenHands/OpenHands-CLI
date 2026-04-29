@@ -22,8 +22,9 @@ This repo contains the current CLI UX, including the Textual TUI and a browser-s
 - `CliSettings.critic` is only a legacy compatibility shim for old `cli_config.json` files and should not be used as the source of truth for new verification behavior.
 
 ## Setup, Build, and Development Commands
-This repository uses **uv** for dependency management and running tooling (such as in `Makefile`, CI workflows, and `uv.lock`). Avoid using `pip install ...` directly if possible.
+This repository uses **uv** for dependency management and running tooling (such as in `Makefile`, CI workflows, and `uv.lock`). Use `uv` 0.11.6 or newer for local development; older versions can serialize `uv.lock` differently around relative `exclude-newer`. Avoid using `pip install ...` directly if possible.
 
+- minimum supported `uv` version: `0.11.6`
 - install dependencies: `make install` (runs `uv sync`)
 - install dev dependencies: `make install-dev` (runs `uv sync --group dev`)
 - install pre-commit hooks: `uv run pre-commit install` (included in `make build`)

@@ -10,12 +10,11 @@ from openhands.sdk.settings import (
     AgentSettings,
     SettingProminence,
     SettingsSectionMetadata,
-    VerificationSettings,
     field_meta,
 )
 from openhands_cli.locations import PROGRAMMATIC_SETTINGS_PATH
 from openhands_cli.stores.agent_store import AgentStore
-from openhands_cli.stores.cli_settings import CliSettings
+from openhands_cli.stores.cli_settings import CliSettings, CriticSettings
 from openhands_cli.utils import get_default_cli_agent
 
 
@@ -39,8 +38,8 @@ class CliInterfaceSettings(BaseModel):
 
 
 class CliProgrammaticSettings(AgentSettings):
-    verification: VerificationSettings = Field(  # pyright: ignore[reportIncompatibleVariableOverride]
-        default_factory=VerificationSettings,
+    verification: CriticSettings = Field(  # pyright: ignore[reportIncompatibleVariableOverride]
+        default_factory=CriticSettings,
         description="Verification settings for the CLI agent.",
         json_schema_extra=AgentSettings.model_fields["verification"].json_schema_extra,
     )
@@ -114,7 +113,8 @@ class CliProgrammaticSettings(AgentSettings):
         CliSettings(
             default_cells_expanded=self.cli.default_cells_expanded,
             auto_open_plan_panel=self.cli.auto_open_plan_panel,
-        ).save()
+            critic=self.verification,
+        ).save(include_critic=True)
 
 
 def _load_agent_settings_snapshot(
@@ -164,10 +164,10 @@ def _agent_settings_from_agent(agent: Agent) -> AgentSettings:
     return AgentSettings.model_validate(data)
 
 
-def _verification_from_agent(agent: Agent) -> VerificationSettings:
+def _verification_from_agent(agent: Agent) -> CriticSettings:
     critic = agent.critic
     if critic is None:
-        return VerificationSettings(critic_enabled=False)
+        return CriticSettings(critic_enabled=False)
 
     data: dict[str, object] = {
         "critic_enabled": True,
@@ -180,10 +180,12 @@ def _verification_from_agent(agent: Agent) -> VerificationSettings:
             {
                 "enable_iterative_refinement": True,
                 "critic_threshold": iterative_refinement.success_threshold,
-                "issue_threshold": iterative_refinement.issue_threshold,
                 "max_refinement_iterations": iterative_refinement.max_iterations,
             }
         )
+        issue_threshold = getattr(iterative_refinement, "issue_threshold", None)
+        if isinstance(issue_threshold, int | float):
+            data["issue_threshold"] = float(issue_threshold)
 
     server_url = getattr(critic, "server_url", None)
     if isinstance(server_url, str):
@@ -193,7 +195,7 @@ def _verification_from_agent(agent: Agent) -> VerificationSettings:
     if isinstance(model_name, str):
         data["critic_model_name"] = model_name
 
-    return VerificationSettings.model_validate(data)
+    return CriticSettings.model_validate(data)
 
 
 def _update_agent_from_settings(

@@ -4,11 +4,13 @@ import json
 from argparse import Namespace
 from unittest.mock import patch
 
+import pytest
 from acp.schema import EnvVariable, McpServerStdio
 
 from openhands.sdk.event import MessageEvent, SystemPromptEvent
 from openhands.sdk.llm import Message, TextContent
 from openhands_cli.acp_impl.utils import convert_acp_mcp_servers_to_agent_format
+from openhands_cli.deprecated_utils import conversation_has_delegate_tool
 from openhands_cli.utils import (
     create_seeded_instructions_from_args,
     get_default_cli_tools,
@@ -17,9 +19,16 @@ from openhands_cli.utils import (
 )
 
 
-def test_get_default_cli_tools_returns_expected_tools():
-    """Test that get_default_cli_tools returns exactly the expected tools."""
+def test_get_default_cli_tools_returns_task_tool_set_by_default():
+    """Test get_default_cli_tools uses TaskToolSet by default for new conversations."""
     tools = get_default_cli_tools()
+    tool_names = {t.name for t in tools}
+    assert tool_names == {"terminal", "file_editor", "task_tracker", "task_tool_set"}
+
+
+def test_get_default_cli_tools_returns_delegate_when_requested():
+    """Test that get_default_cli_tools uses DelegateTool when use_delegate_tool=True."""
+    tools = get_default_cli_tools(use_delegate_tool=True)
     tool_names = {t.name for t in tools}
     assert tool_names == {"terminal", "file_editor", "task_tracker", "delegate"}
 
@@ -226,3 +235,92 @@ class TestJsonCallback:
             assert isinstance(content, list)
             assert len(content) > 0
             assert content[0]["text"] == "Hello, this is a test message"
+
+
+@pytest.mark.parametrize(
+    ("setup", "expected"),
+    [
+        # No events directory at all
+        (None, False),
+        # Empty events directory — no SystemPromptEvent
+        (None, False),
+        # SystemPromptEvent without delegate tool
+        (
+            {
+                "id": "abc",
+                "kind": "SystemPromptEvent",
+                "tools": [
+                    {"title": "terminal"},
+                    {"title": "file_editor"},
+                    {"title": "task_tool_set"},
+                ],
+            },
+            False,
+        ),
+        # SystemPromptEvent with delegate tool
+        (
+            {
+                "id": "abc",
+                "kind": "SystemPromptEvent",
+                "tools": [
+                    {"title": "terminal"},
+                    {"title": "file_editor"},
+                    {"title": "delegate"},
+                ],
+            },
+            True,
+        ),
+        # SystemPromptEvent with no tools field
+        (
+            {"id": "abc", "kind": "SystemPromptEvent"},
+            False,
+        ),
+    ],
+    ids=[
+        "no_events_dir",
+        "empty_events_dir",
+        "tools_without_delegate",
+        "tools_with_delegate",
+        "no_tools_field",
+    ],
+)
+def test_conversation_has_delegate_tool(tmp_path, monkeypatch, setup, expected):
+    """Detect DelegateTool from SystemPromptEvent's tools list."""
+    monkeypatch.setattr(
+        "openhands_cli.deprecated_utils.get_conversations_dir", lambda: str(tmp_path)
+    )
+    conv_id = "testconv"
+
+    if setup is not None:
+        events_dir = tmp_path / conv_id / "events"
+        events_dir.mkdir(parents=True)
+        event_file = events_dir / "event-00000-abc123.json"
+        event_file.write_text(json.dumps(setup))
+
+    assert conversation_has_delegate_tool(conv_id) is expected
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        # Invalid JSON in SystemPromptEvent — returns False
+        ("not valid json", False),
+        # Broken JSON — returns False
+        ("{broken json", False),
+    ],
+    ids=["invalid_json", "broken_json"],
+)
+def test_conversation_has_delegate_handles_invalid_json(
+    tmp_path, monkeypatch, content, expected
+):
+    """Gracefully handle invalid JSON in SystemPromptEvent."""
+    monkeypatch.setattr(
+        "openhands_cli.deprecated_utils.get_conversations_dir", lambda: str(tmp_path)
+    )
+    conv_id = "testconvinvalid"
+    events_dir = tmp_path / conv_id / "events"
+    events_dir.mkdir(parents=True)
+
+    (events_dir / "event-00000-abc.json").write_text(content)
+
+    assert conversation_has_delegate_tool(conv_id) is expected
