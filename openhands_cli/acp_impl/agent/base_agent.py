@@ -29,15 +29,21 @@ from acp.schema import (
     AuthMethod,
     AvailableCommandsUpdate,
     ForkSessionResponse,
+    HttpMcpServer,
     Implementation,
     ListSessionsResponse,
     LoadSessionResponse,
     McpCapabilities,
+    McpServerStdio,
     PromptCapabilities,
     ResumeSessionResponse,
+    SessionConfigOption,
+    SessionConfigOptionSelect,
+    SessionConfigSelectOption,
     SetSessionConfigOptionResponse,
     SetSessionModelResponse,
     SetSessionModeResponse,
+    SseMcpServer,
     TextContentBlock,
 )
 
@@ -67,6 +73,11 @@ from openhands_cli.acp_impl.utils import (
 )
 from openhands_cli.auth.token_storage import TokenStorage
 from openhands_cli.setup import MissingAgentSpec
+from openhands_cli.shared.settings_commands import (
+    get_programmatic_setting_fields,
+    get_programmatic_setting_value,
+    handle_programmatic_setting_command,
+)
 from openhands_cli.utils import extract_text_from_message_content
 
 
@@ -221,6 +232,49 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
 
         return response_text
 
+    def _get_session_config_options(self) -> list[SessionConfigOption]:
+        # Import here to avoid a circular dependency through the stores package.
+        from openhands_cli.stores.programmatic_settings import CliProgrammaticSettings
+
+        settings = CliProgrammaticSettings.load()
+        config_options: list[SessionConfigOption] = []
+
+        for field in get_programmatic_setting_fields():
+            current_setting_value = get_programmatic_setting_value(settings, field.key)
+            if field.widget == "boolean":
+                current_value = "true" if current_setting_value else "false"
+                options = [
+                    SessionConfigSelectOption(name="Enabled", value="true"),
+                    SessionConfigSelectOption(name="Disabled", value="false"),
+                ]
+            elif field.widget == "select":
+                current_value = str(current_setting_value)
+                options = [
+                    SessionConfigSelectOption(
+                        name=choice.label,
+                        value=str(choice.value),
+                    )
+                    for choice in field.choices
+                ]
+            else:
+                continue
+
+            config_options.append(
+                SessionConfigOption(
+                    root=SessionConfigOptionSelect(
+                        type="select",
+                        id=field.key,
+                        name=field.label,
+                        description=field.description,
+                        category=field.section_label,
+                        current_value=current_value,
+                        options=options,
+                    )
+                )
+            )
+
+        return config_options
+
     async def initialize(
         self,
         protocol_version: int,
@@ -340,33 +394,43 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
 
     async def set_config_option(
         self,
-        config_id: str,  # noqa: ARG002
+        config_id: str,
         session_id: str,  # noqa: ARG002
-        value: str,  # noqa: ARG002
+        value: str,
         **_kwargs: Any,
     ) -> SetSessionConfigOptionResponse | None:
-        """Set config option (not supported)."""
-        return None
+        """Set a schema-driven session configuration option."""
+        logger.info(f"Set config option requested: {config_id}={value}")
 
-    async def fork_session(
-        self,
-        cwd: str,  # noqa: ARG002
-        session_id: str,  # noqa: ARG002
-        mcp_servers: list[Any] | None = None,  # noqa: ARG002
-        **_kwargs: Any,
-    ) -> ForkSessionResponse:
-        """Fork a session (not supported)."""
-        raise RequestError.method_not_found("session/fork")
+        field = next(
+            (
+                field
+                for field in get_programmatic_setting_fields()
+                if field.key == config_id
+            ),
+            None,
+        )
+        if field is None or field.widget not in {"boolean", "select"}:
+            raise RequestError.invalid_params(
+                {"reason": f"Unsupported config option: {config_id}"}
+            )
 
-    async def resume_session(
-        self,
-        cwd: str,  # noqa: ARG002
-        session_id: str,  # noqa: ARG002
-        mcp_servers: list[Any] | None = None,  # noqa: ARG002
-        **_kwargs: Any,
-    ) -> ResumeSessionResponse:
-        """Resume a session (not supported)."""
-        raise RequestError.method_not_found("session/resume")
+        assert field.slash_command is not None
+        try:
+            result = handle_programmatic_setting_command(field.slash_command, value)
+        except ValueError as exc:
+            raise RequestError.invalid_params(
+                {"reason": str(exc), "configId": config_id, "value": value}
+            ) from exc
+
+        if result is None:
+            raise RequestError.invalid_params(
+                {"reason": f"Unknown config option: {config_id}"}
+            )
+
+        return SetSessionConfigOptionResponse(
+            config_options=self._get_session_config_options()
+        )
 
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         """Extension method (not supported)."""
@@ -430,7 +494,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
     async def new_session(
         self,
         cwd: str,  # noqa: ARG002
-        mcp_servers: list[Any] | None = None,
+        mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None,
         working_dir: str | None = None,
         **_kwargs: Any,
     ) -> NewSessionResponse:
@@ -473,6 +537,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             response = NewSessionResponse(
                 session_id=session_id,
                 modes=get_session_mode_state(current_mode),
+                config_options=self._get_session_config_options(),
             )
 
             if is_resuming and conversation.state.events:
@@ -548,7 +613,12 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                 elif command == "confirm":
                     response_text = await self._cmd_confirm(session_id, argument)
                 else:
-                    response_text = get_unknown_command_text(command)
+                    response_text = handle_programmatic_setting_command(
+                        command,
+                        argument,
+                    )
+                    if response_text is None:
+                        response_text = get_unknown_command_text(command)
 
                 # Send response to client
                 await self._conn.session_update(
@@ -601,7 +671,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         self,
         cwd: str,  # noqa: ARG002
         session_id: str,
-        mcp_servers: list[Any] | None = None,  # noqa: ARG002
+        mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None,  # noqa: ARG002
         **_kwargs: Any,
     ) -> LoadSessionResponse | None:
         """Load an existing session and replay conversation history.
@@ -630,7 +700,10 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                     f"Session {session_id} has no history (new or empty session)"
                 )
                 current_mode = get_confirmation_mode_from_conversation(conversation)
-                return LoadSessionResponse(modes=get_session_mode_state(current_mode))
+                return LoadSessionResponse(
+                    modes=get_session_mode_state(current_mode),
+                    config_options=self._get_session_config_options(),
+                )
 
             # Stream conversation history to client
             logger.info(
@@ -649,7 +722,10 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             # Get current confirmation mode for this session
             current_mode = get_confirmation_mode_from_conversation(conversation)
 
-            return LoadSessionResponse(modes=get_session_mode_state(current_mode))
+            return LoadSessionResponse(
+                modes=get_session_mode_state(current_mode),
+                config_options=self._get_session_config_options(),
+            )
 
         except RequestError:
             raise
@@ -658,3 +734,37 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             raise RequestError.internal_error(
                 {"reason": "Failed to load session", "details": str(e)}
             )
+
+    async def fork_session(
+        self,
+        cwd: str,  # noqa: ARG002
+        session_id: str,  # noqa: ARG002
+        mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None,  # noqa: ARG002
+        **_kwargs: Any,
+    ) -> ForkSessionResponse:
+        """Forking sessions is not supported by the CLI ACP agent."""
+        raise RequestError.invalid_request({"reason": "fork_session is not supported"})
+
+    async def resume_session(
+        self,
+        cwd: str,
+        session_id: str,
+        mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None,
+        **_kwargs: Any,
+    ) -> ResumeSessionResponse:
+        """Resume a session by loading its state and replaying history."""
+        response = await self.load_session(
+            cwd=cwd,
+            session_id=session_id,
+            mcp_servers=mcp_servers,
+            **_kwargs,
+        )
+        if response is None:
+            raise RequestError.invalid_params(
+                {"reason": "Session not found", "sessionId": session_id}
+            )
+        return ResumeSessionResponse(
+            modes=response.modes,
+            models=response.models,
+            config_options=response.config_options,
+        )

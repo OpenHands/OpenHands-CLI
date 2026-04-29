@@ -18,7 +18,7 @@ class TestRefinementController:
         """Create a mock ConversationContainer with critic settings."""
         state = MagicMock()
         state.critic_settings = CriticSettings(
-            enable_critic=True,
+            critic_enabled=True,
             enable_iterative_refinement=True,
             critic_threshold=0.6,
             max_refinement_iterations=3,
@@ -82,7 +82,7 @@ class TestRefinementController:
     ):
         """When refinement is disabled, should not trigger."""
         mock_state.critic_settings = CriticSettings(
-            enable_critic=True,
+            critic_enabled=True,
             enable_iterative_refinement=False,  # Disabled
             critic_threshold=0.6,
         )
@@ -104,7 +104,7 @@ class TestRefinementController:
     ):
         """Should not trigger when max iterations reached."""
         mock_state.critic_settings = CriticSettings(
-            enable_critic=True,
+            critic_enabled=True,
             enable_iterative_refinement=True,
             critic_threshold=0.6,
             max_refinement_iterations=3,

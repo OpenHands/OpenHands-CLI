@@ -32,7 +32,7 @@ class TestCriticSettingsTab:
     def test_init_accepts_initial_settings(self):
         """Verify tab accepts initial_settings CriticSettings object."""
         initial = CriticSettings(
-            enable_critic=True,
+            critic_enabled=True,
             enable_iterative_refinement=True,
             critic_threshold=0.7,
             issue_threshold=0.8,
@@ -47,14 +47,14 @@ class TestCriticSettingsTab:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("initial_value", [True, False])
-    async def test_compose_renders_enable_critic_switch(self, initial_value: bool):
-        """Verify the enable_critic switch is rendered with correct value."""
-        initial = CriticSettings(enable_critic=initial_value)
+    async def test_compose_renders_critic_enabled_switch(self, initial_value: bool):
+        """Verify the critic_enabled switch is rendered with correct value."""
+        initial = CriticSettings(critic_enabled=initial_value)
         app = _TestApp(initial_settings=initial)
 
         async with app.run_test():
             tab = app.query_one(CriticSettingsTab)
-            switch = tab.query_one("#enable_critic_switch", Switch)
+            switch = tab.query_one("#critic_enabled_switch", Switch)
             assert switch.value is initial_value
 
     @pytest.mark.asyncio
@@ -151,7 +151,7 @@ class TestCriticSettingsTab:
     async def test_get_updated_fields_returns_all_fields(self):
         """Verify get_updated_fields() returns all critic settings fields."""
         initial = CriticSettings(
-            enable_critic=True,
+            critic_enabled=True,
             enable_iterative_refinement=True,
             critic_threshold=0.6,
             issue_threshold=0.75,
@@ -163,7 +163,7 @@ class TestCriticSettingsTab:
             result = tab.get_updated_fields()
 
             assert set(result.keys()) == {
-                "enable_critic",
+                "critic_enabled",
                 "enable_iterative_refinement",
                 "critic_threshold",
                 "issue_threshold",
@@ -172,12 +172,15 @@ class TestCriticSettingsTab:
     @pytest.mark.asyncio
     async def test_get_updated_fields_reflects_switch_changes(self):
         """Verify get_updated_fields() captures switch changes."""
-        initial = CriticSettings(enable_critic=False, enable_iterative_refinement=False)
+        initial = CriticSettings(
+            critic_enabled=False,
+            enable_iterative_refinement=False,
+        )
         app = _TestApp(initial_settings=initial)
 
         async with app.run_test():
             tab = app.query_one(CriticSettingsTab)
-            critic_switch = tab.query_one("#enable_critic_switch", Switch)
+            critic_switch = tab.query_one("#critic_enabled_switch", Switch)
             refinement_switch = tab.query_one(
                 "#enable_iterative_refinement_switch", Switch
             )
@@ -187,7 +190,7 @@ class TestCriticSettingsTab:
             refinement_switch.value = True
 
             result = tab.get_updated_fields()
-            assert result["enable_critic"] is True
+            assert result["critic_enabled"] is True
             assert result["enable_iterative_refinement"] is True
 
     @pytest.mark.asyncio

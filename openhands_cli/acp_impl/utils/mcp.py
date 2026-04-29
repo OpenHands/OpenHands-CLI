@@ -62,8 +62,8 @@ def convert_acp_mcp_servers_to_agent_format(
         if "env" in server_config:
             server_config["env"] = _convert_env_to_dict(server_config["env"])
 
-        # Add transport type based on server class
-        # StdioMcpServer -> stdio, HttpMcpServer -> http, SseMcpServer -> sse
+        # Add transport type based on server class.
+        # McpServerStdio -> stdio, HttpMcpServer -> http, SseMcpServer -> sse
         if isinstance(server, McpServerStdio):
             server_config["transport"] = "stdio"
         elif isinstance(server, HttpMcpServer):

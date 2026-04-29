@@ -4,59 +4,58 @@ import json
 import os
 from pathlib import Path
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
+
+from openhands.sdk.settings import VerificationSettings
+from openhands_cli.tui.utils.critic.refinement import CliIterativeRefinementConfig
 
 
-# Refinement triggers when predicted success probability falls below this threshold
-# Default: 0.6 (60%) - agent is prompted to review work when critic scores < 60%
-DEFAULT_CRITIC_THRESHOLD = 0.6
+class CriticSettings(VerificationSettings):
+    issue_threshold: float = 0.75
 
-# Individual issue detection threshold - refinement triggers when any specific
-# issue (e.g., insufficient_testing) has probability >= this value
-# Default: 0.75 (75%) - even if overall score is good
-DEFAULT_ISSUE_THRESHOLD = 0.75
-
-# Default maximum number of refinement iterations per user turn
-DEFAULT_MAX_REFINEMENT_ITERATIONS = 3
-
-
-class CriticSettings(BaseModel):
-    """Model for critic-related settings."""
-
-    enable_critic: bool = True
-    enable_iterative_refinement: bool = False
-    critic_threshold: float = DEFAULT_CRITIC_THRESHOLD
-    issue_threshold: float = DEFAULT_ISSUE_THRESHOLD
-    max_refinement_iterations: int = DEFAULT_MAX_REFINEMENT_ITERATIONS
-
-    @field_validator("critic_threshold", "issue_threshold")
+    @field_validator("issue_threshold")
     @classmethod
-    def validate_threshold(cls, v: float) -> float:
-        """Validate that threshold is between 0.0 and 1.0."""
-        if not 0.0 <= v <= 1.0:
-            raise ValueError(f"Threshold must be between 0.0 and 1.0, got {v}")
-        return v
+    def validate_issue_threshold(cls, value: float) -> float:
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"Threshold must be between 0.0 and 1.0, got {value}")
+        return value
 
-    @field_validator("max_refinement_iterations")
-    @classmethod
-    def validate_max_iterations(cls, v: int) -> int:
-        """Validate that max iterations is between 1 and 10."""
-        if not 1 <= v <= 10:
-            raise ValueError(f"Max iterations must be between 1 and 10, got {v}")
-        return v
+    def build_iterative_refinement_config(
+        self,
+    ) -> CliIterativeRefinementConfig | None:
+        if not self.enable_iterative_refinement:
+            return None
+        return CliIterativeRefinementConfig(
+            success_threshold=self.critic_threshold,
+            max_iterations=self.max_refinement_iterations,
+            issue_threshold=self.issue_threshold,
+        )
+
+
+DEFAULT_CRITIC_THRESHOLD = float(
+    CriticSettings.model_fields["critic_threshold"].default
+)
+DEFAULT_ISSUE_THRESHOLD = float(CriticSettings.model_fields["issue_threshold"].default)
+DEFAULT_MAX_REFINEMENT_ITERATIONS = int(
+    CriticSettings.model_fields["max_refinement_iterations"].default
+)
 
 
 class CliSettings(BaseModel):
-    """Model for CLI-level settings."""
+    """Model for CLI-owned UI settings.
+
+    The ``critic`` field is a compatibility shim for older ``cli_config.json``
+    files that persisted agent-behavior settings before they moved into the SDK's
+    ``VerificationSettings`` model. It is intentionally excluded from new writes.
+    """
 
     default_cells_expanded: bool = False
     auto_open_plan_panel: bool = True
-    critic: CriticSettings = CriticSettings()
+    critic: CriticSettings | None = Field(default=None, exclude=True)
 
     @classmethod
     def get_config_path(cls) -> Path:
         """Get the path to the CLI configuration file."""
-        # Use environment variable if set, otherwise use default
         persistence_dir = os.environ.get(
             "PERSISTENCE_DIR", os.path.expanduser("~/.openhands")
         )
@@ -64,53 +63,36 @@ class CliSettings(BaseModel):
 
     @classmethod
     def _migrate_legacy_settings(cls, data: dict) -> tuple[dict, bool]:
-        """Migrate legacy settings format to current format.
-
-        Handles migration from old format where `enable_critic` was at the top level
-        to new format where critic settings are nested under `critic`.
-
-        Args:
-            data: Raw settings data from config file
-
-        Returns:
-            Tuple of (migrated settings data, bool indicating if migration occurred)
-        """
+        """Migrate legacy critic settings into the compatibility field."""
         migrated = False
 
-        # Check for legacy top-level enable_critic (pre-nested format)
-        if "enable_critic" in data and "critic" not in data:
-            # Migrate enable_critic to nested critic.enable_critic
-            data["critic"] = {"enable_critic": data.pop("enable_critic")}
-            migrated = True
+        if "critic" not in data:
+            if "enable_critic" in data:
+                data["critic"] = {"critic_enabled": data.pop("enable_critic")}
+                migrated = True
+            elif "critic_enabled" in data:
+                data["critic"] = {"critic_enabled": data.pop("critic_enabled")}
+                migrated = True
 
-        # Also migrate other legacy top-level critic fields if present
-        legacy_critic_fields = [
-            "enable_iterative_refinement",
-            "critic_threshold",
-            "issue_threshold",
-            "max_refinement_iterations",
-        ]
-        for field in legacy_critic_fields:
-            if field in data:
+        legacy_critic_fields = {
+            "enable_iterative_refinement": "enable_iterative_refinement",
+            "critic_threshold": "critic_threshold",
+            "issue_threshold": "issue_threshold",
+            "max_refinement_iterations": "max_refinement_iterations",
+        }
+        for legacy_key, verification_key in legacy_critic_fields.items():
+            if legacy_key in data:
                 if "critic" not in data:
                     data["critic"] = {}
-                data["critic"][field] = data.pop(field)
+                data["critic"][verification_key] = data.pop(legacy_key)
                 migrated = True
 
         return data, migrated
 
     @classmethod
     def load(cls) -> "CliSettings":
-        """Load CLI settings from file.
-
-        Automatically migrates legacy settings format if detected.
-
-        Returns:
-            CliSettings instance with loaded settings, or defaults if file doesn't
-            exist
-        """
+        """Load CLI settings from file."""
         config_path = cls.get_config_path()
-
         if not config_path.exists():
             return cls()
 
@@ -118,26 +100,26 @@ class CliSettings(BaseModel):
             with open(config_path) as f:
                 data = json.load(f)
 
-            # Migrate legacy settings format if needed
-            migrated_data, was_migrated = cls._migrate_legacy_settings(data)
-
-            settings = cls.model_validate(migrated_data)
-
-            # Save migrated settings back to disk if migration occurred
-            if was_migrated:
-                settings.save()
-
-            return settings
+            migrated_data, _ = cls._migrate_legacy_settings(data)
+            return cls.model_validate(migrated_data)
         except (json.JSONDecodeError, ValueError):
-            # If file is corrupted, return defaults
             return cls()
 
-    def save(self) -> None:
-        """Save CLI settings to file."""
-        config_path = self.get_config_path()
+    def save(self, *, include_critic: bool = False) -> None:
+        """Save CLI settings to file.
 
-        # Ensure the persistence directory exists
+        Args:
+            include_critic: When True, also persist the compatibility critic block.
+        """
+        config_path = self.get_config_path()
         config_path.parent.mkdir(parents=True, exist_ok=True)
 
+        payload: dict[str, object] = {
+            "default_cells_expanded": self.default_cells_expanded,
+            "auto_open_plan_panel": self.auto_open_plan_panel,
+        }
+        if include_critic and self.critic is not None:
+            payload["critic"] = self.critic.model_dump(exclude_none=True)
+
         with open(config_path, "w") as f:
-            json.dump(self.model_dump(), f, indent=2)
+            json.dump(payload, f, indent=2)

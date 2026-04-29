@@ -24,7 +24,12 @@ from textual.widgets import (
 from textual.widgets._select import NoSelection
 
 from openhands.sdk import LLMSummarizingCondenser
-from openhands_cli.stores import AgentStore, CliSettings, CriticSettings
+from openhands_cli.stores import (
+    AgentStore,
+    CliProgrammaticSettings,
+    CliSettings,
+    CriticSettings,
+)
 from openhands_cli.tui.modals.settings.choices import (
     get_model_options,
 )
@@ -106,8 +111,8 @@ class SettingsScreen(ModalScreen):
 
     def compose(self) -> ComposeResult:
         """Create the settings form with tabs."""
-        # Load CLI settings once for initializing both tabs
         cli_settings = CliSettings.load()
+        programmatic_settings = CliProgrammaticSettings.load()
 
         with Container(id="settings_container"):
             yield Static("Settings", id="settings_title")
@@ -129,7 +134,9 @@ class SettingsScreen(ModalScreen):
 
                     # Critic Settings Tab - only show if not first-time setup
                     with TabPane("Critic", id="critic_settings_tab"):
-                        yield CriticSettingsTab(initial_settings=cli_settings.critic)
+                        yield CriticSettingsTab(
+                            initial_settings=programmatic_settings.verification
+                        )
 
             # Buttons
             with Horizontal(id="button_container"):
@@ -523,23 +530,20 @@ class SettingsScreen(ModalScreen):
                 critic_settings_tab = self.query_one("#critic_settings_tab", TabPane)
                 critic_tab = critic_settings_tab.query_one(CriticSettingsTab)
 
-                # Load base settings and merge fields from both tabs
-                base_settings = CliSettings.load()
-
-                # Update the nested critic settings
-
-                updated_critic = base_settings.critic.model_copy(
+                base_settings = CliProgrammaticSettings.load()
+                updated_critic = base_settings.verification.model_copy(
                     update=critic_tab.get_updated_fields()
                 )
-
-                merged_settings = base_settings.model_copy(
-                    update={
-                        **cli_tab.get_updated_fields(),
-                        "critic": updated_critic,
-                    }
+                updated_cli = base_settings.cli.model_copy(
+                    update=cli_tab.get_updated_fields()
                 )
 
-                merged_settings.save()
+                base_settings.model_copy(
+                    update={
+                        "verification": updated_critic,
+                        "cli": updated_cli,
+                    }
+                ).save()
 
                 # Update reactive state to refresh UI components
                 self._update_critic_settings(updated_critic)

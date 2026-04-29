@@ -30,7 +30,7 @@ from openhands.tools.file_editor.definition import FileEditorAction
 from openhands.tools.task_tracker.definition import TaskTrackerObservation
 from openhands.tools.terminal.definition import TerminalAction
 from openhands_cli.shared.delegate_formatter import format_delegate_title
-from openhands_cli.stores import CliSettings
+from openhands_cli.stores import CliProgrammaticSettings, CliSettings, CriticSettings
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.widgets.collapsible import (
     Collapsible,
@@ -114,8 +114,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._name = name
         # Store the main thread ID for thread safety checks
         self._main_thread_id = threading.get_ident()
-        # Cache CLI settings to avoid repeated file system reads
+        # Cache settings to avoid repeated file system reads
         self._cli_settings: CliSettings | None = None
+        self._critic_settings: CriticSettings | None = None
         # Track pending actions by tool_call_id for action-observation pairing
         self._pending_actions: dict[str, tuple[ActionEvent, Collapsible]] = {}
 
@@ -125,9 +126,16 @@ class ConversationVisualizer(ConversationVisualizerBase):
             self._cli_settings = CliSettings.load()
         return self._cli_settings
 
+    @property
+    def critic_settings(self) -> CriticSettings:
+        if self._critic_settings is None:
+            self._critic_settings = CliProgrammaticSettings.load().verification
+        return self._critic_settings
+
     def reload_configuration(self) -> None:
-        """Reload CLI settings from disk."""
+        """Reload cached settings from disk."""
         self._cli_settings = CliSettings.load()
+        self._critic_settings = None
 
     def create_sub_visualizer(self, agent_id: str) -> "ConversationVisualizer":
         """Create a visualizer for a sub-agent during delegation.
@@ -325,10 +333,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
         )
         from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
 
-        critic_settings = self.cli_settings.critic
+        critic_settings = self.critic_settings
 
         # Skip display if critic is disabled
-        if not critic_settings.enable_critic:
+        if not critic_settings.critic_enabled:
             return
 
         # Get agent model for tracking

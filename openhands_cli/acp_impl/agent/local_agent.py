@@ -7,6 +7,7 @@ from typing import Any
 from uuid import UUID
 
 from acp import Client, NewSessionResponse, RequestError
+from acp.schema import HttpMcpServer, McpServerStdio, SseMcpServer
 
 from openhands.sdk import (
     BaseConversation,
@@ -195,7 +196,7 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
     async def new_session(
         self,
         cwd: str,
-        mcp_servers: list[Any] | None = None,
+        mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None,
         working_dir: str | None = None,
         **_kwargs: Any,
     ) -> NewSessionResponse:

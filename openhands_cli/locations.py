@@ -32,6 +32,7 @@ def get_work_dir() -> str:
 
 # Static configuration values (don't need to be dynamic)
 AGENT_SETTINGS_PATH = "agent_settings.json"
+PROGRAMMATIC_SETTINGS_PATH = "programmatic_settings.json"
 
 # MCP configuration file (relative to persistence dir)
 MCP_CONFIG_FILE = "mcp.json"

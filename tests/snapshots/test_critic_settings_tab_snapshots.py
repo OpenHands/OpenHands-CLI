@@ -46,7 +46,7 @@ class TestCriticSettingsTabSnapshots:
             def compose(self) -> ComposeResult:
                 yield CriticSettingsTab(
                     initial_settings=CriticSettings(
-                        enable_critic=True,
+                        critic_enabled=True,
                         enable_iterative_refinement=False,
                         critic_threshold=DEFAULT_CRITIC_THRESHOLD,
                         issue_threshold=DEFAULT_ISSUE_THRESHOLD,
@@ -76,7 +76,7 @@ class TestCriticSettingsTabSnapshots:
             def compose(self) -> ComposeResult:
                 yield CriticSettingsTab(
                     initial_settings=CriticSettings(
-                        enable_critic=True,
+                        critic_enabled=True,
                         enable_iterative_refinement=True,
                         critic_threshold=0.7,
                         issue_threshold=0.8,
@@ -106,7 +106,7 @@ class TestCriticSettingsTabSnapshots:
             def compose(self) -> ComposeResult:
                 yield CriticSettingsTab(
                     initial_settings=CriticSettings(
-                        enable_critic=False,
+                        critic_enabled=False,
                         enable_iterative_refinement=False,
                         critic_threshold=DEFAULT_CRITIC_THRESHOLD,
                         issue_threshold=DEFAULT_ISSUE_THRESHOLD,
@@ -136,7 +136,7 @@ class TestCriticSettingsTabSnapshots:
             def compose(self) -> ComposeResult:
                 yield CriticSettingsTab(
                     initial_settings=CriticSettings(
-                        enable_critic=True,
+                        critic_enabled=True,
                         enable_iterative_refinement=False,
                         critic_threshold=DEFAULT_CRITIC_THRESHOLD,
                         issue_threshold=DEFAULT_ISSUE_THRESHOLD,
@@ -173,7 +173,7 @@ class TestCriticSettingsTabSnapshots:
             def compose(self) -> ComposeResult:
                 yield CriticSettingsTab(
                     initial_settings=CriticSettings(
-                        enable_critic=True,
+                        critic_enabled=True,
                         enable_iterative_refinement=True,
                         critic_threshold=DEFAULT_CRITIC_THRESHOLD,
                         issue_threshold=DEFAULT_ISSUE_THRESHOLD,

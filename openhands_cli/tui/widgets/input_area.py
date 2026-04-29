@@ -28,6 +28,7 @@ from textual import on
 from textual.containers import Container
 from textual.reactive import var
 
+from openhands_cli.shared.settings_commands import handle_programmatic_setting_command
 from openhands_cli.tui.core.commands import show_help, show_skills
 from openhands_cli.tui.messages import SlashCommandSubmitted
 
@@ -93,11 +94,22 @@ class InputAreaContainer(Container):
             case "exit":
                 self._command_exit()
             case _:
-                self.app.notify(
-                    title="Unknown Command",
-                    message=f"Unknown command: /{event.command}",
-                    severity="warning",
+                message = handle_programmatic_setting_command(
+                    event.command,
+                    event.args,
                 )
+                if message is None:
+                    self.app.notify(
+                        title="Unknown Command",
+                        message=f"Unknown command: /{event.command}",
+                        severity="warning",
+                    )
+                else:
+                    self.app.notify(
+                        title="Settings Updated",
+                        message=message,
+                        severity="information",
+                    )
 
     # ---- Command Methods ----
 

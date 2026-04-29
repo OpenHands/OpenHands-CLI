@@ -7,6 +7,7 @@ from textual.containers import Container, Horizontal, VerticalScroll
 from textual.widgets import Label, Static, Switch
 
 from openhands_cli.stores.cli_settings import CliSettings
+from openhands_cli.stores.programmatic_settings import CliProgrammaticSettings
 
 
 class CliSettingsScroll(VerticalScroll, can_focus=False):
@@ -61,42 +62,35 @@ class CliSettingsTab(Container):
 
     def compose(self) -> ComposeResult:
         """Compose the CLI settings tab content."""
+        cli_fields = [
+            field
+            for section in CliProgrammaticSettings.export_schema().sections
+            if section.key == "cli"
+            for field in section.fields
+        ]
+
         with CliSettingsScroll(id="cli_settings_content"):
             yield Static("CLI Settings", classes="form_section_title")
-
-            yield SettingsSwitch(
-                label="Default Cells Expanded",
-                description=(
-                    "When enabled, new action/observation cells will be expanded "
-                    "by default. When disabled, cells will be collapsed showing "
-                    "only the title. Use Ctrl+O to toggle all cells at any time."
-                ),
-                switch_id="default_cells_expanded_switch",
-                value=self._initial_settings.default_cells_expanded,
-            )
-
-            yield SettingsSwitch(
-                label="Auto-open Plan Panel",
-                description=(
-                    "When enabled, the plan panel will automatically open on the "
-                    "right side when the agent first uses the task tracker. "
-                    "You can toggle it anytime via the command palette."
-                ),
-                switch_id="auto_open_plan_panel_switch",
-                value=self._initial_settings.auto_open_plan_panel,
-            )
+            for field in cli_fields:
+                leaf_key = field.key.split(".")[-1]
+                yield SettingsSwitch(
+                    label=field.label,
+                    description=field.description or "",
+                    switch_id=f"{leaf_key}_switch",
+                    value=bool(getattr(self._initial_settings, leaf_key)),
+                )
 
     def get_updated_fields(self) -> dict[str, Any]:
-        """Return only the fields this tab manages.
-
-        Returns:
-            Dict with 'default_cells_expanded' and 'auto_open_plan_panel' values.
-        """
+        """Return only the fields this tab manages."""
+        cli_fields = [
+            field
+            for section in CliProgrammaticSettings.export_schema().sections
+            if section.key == "cli"
+            for field in section.fields
+        ]
         return {
-            "default_cells_expanded": self.query_one(
-                "#default_cells_expanded_switch", Switch
-            ).value,
-            "auto_open_plan_panel": self.query_one(
-                "#auto_open_plan_panel_switch", Switch
-            ).value,
+            field.key.split(".")[-1]: self.query_one(
+                f"#{field.key.split('.')[-1]}_switch", Switch
+            ).value
+            for field in cli_fields
         }

@@ -140,7 +140,7 @@ class CriticSettingsTab(Container):
 
     def compose(self) -> ComposeResult:
         """Compose the Critic settings tab content."""
-        enable_critic = self._initial_settings.enable_critic
+        critic_enabled = self._initial_settings.critic_enabled
         enable_refinement = self._initial_settings.enable_iterative_refinement
         threshold = self._initial_settings.critic_threshold
         issue_threshold = self._initial_settings.issue_threshold
@@ -157,8 +157,8 @@ class CriticSettingsTab(Container):
                     "We collect anonymized data (IDs, critic response, feedback) to "
                     "evaluate accuracy. See: https://openhands.dev/privacy"
                 ),
-                switch_id="enable_critic_switch",
-                value=enable_critic,
+                switch_id="critic_enabled_switch",
+                value=critic_enabled,
             )
 
             yield SettingsSwitch(
@@ -231,10 +231,10 @@ class CriticSettingsTab(Container):
         """Return only the fields this tab manages.
 
         Returns:
-            Dict with 'enable_critic', 'enable_iterative_refinement',
+            Dict with 'critic_enabled', 'enable_iterative_refinement',
             'critic_threshold', and 'issue_threshold' values.
         """
-        enable_critic_switch = self.query_one("#enable_critic_switch", Switch)
+        critic_enabled_switch = self.query_one("#critic_enabled_switch", Switch)
         enable_refinement_switch = self.query_one(
             "#enable_iterative_refinement_switch", Switch
         )
@@ -250,7 +250,7 @@ class CriticSettingsTab(Container):
         )
 
         return {
-            "enable_critic": enable_critic_switch.value,
+            "critic_enabled": critic_enabled_switch.value,
             "enable_iterative_refinement": enable_refinement_switch.value,
             "critic_threshold": threshold,
             "issue_threshold": issue_threshold,
