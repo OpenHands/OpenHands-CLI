@@ -457,6 +457,42 @@ async def test_save_button_error_flow(app):
     screen.dismiss.assert_not_called()
 
 
+@pytest.mark.asyncio
+async def test_model_change_clears_stale_max_tokens_input(
+    app, fake_agent_store: InMemoryAgentStore
+) -> None:
+    app_obj, _ = app
+    gemini_llm = LLM(
+        model="gemini/gemini-2.5-pro",
+        api_key="sk-gemini",
+        base_url="https://llm-proxy.example.com/v1beta",
+        usage_id="agent",
+        max_input_tokens=1_000_000,
+    )
+    fake_agent_store.save(Agent(llm=gemini_llm))
+
+    screen = app_obj.settings_screen
+    assert screen is not None
+    screen.current_agent = fake_agent_store.load_from_disk()
+
+    with patch.object(ss, "get_model_options") as mock_get_options:
+        mock_get_options.return_value = [("gpt-5.3-codex", "gpt-5.3-codex")]
+        screen._load_current_settings()
+
+    assert screen.max_tokens_input.value == "1000000"
+
+    screen.mode_select.value = "basic"
+    screen._update_advanced_visibility()
+    screen.provider_select.set_options([("LiteLLM Proxy", "litellm_proxy")])
+    screen.provider_select.value = "litellm_proxy"
+    screen._update_model_options("litellm_proxy")
+    screen.model_select.set_options([("gpt-5.3-codex", "gpt-5.3-codex")])
+    screen.model_select.value = "gpt-5.3-codex"
+    screen._reset_max_tokens_if_model_changed()
+
+    assert screen.max_tokens_input.value == ""
+
+
 #
 # 6. Cancel handling (button + escape)
 #

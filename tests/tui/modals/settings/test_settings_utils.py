@@ -383,10 +383,19 @@ def test_litellm_metadata_is_added_when_required(
     assert saved_agent.condenser.llm.litellm_extra_body["metadata"]["foo"] == "bar"
 
 
-def test_model_change_resets_max_input_tokens(
-    deps: FakeAgentStore,
+def test_model_change_does_not_pass_stale_max_input_tokens(
+    monkeypatch, deps: FakeAgentStore
 ) -> None:
-    """When model changes, max_input_tokens is reset to SDK auto-lookup."""
+    """When the model changes, stale max_tokens input is not passed to LLM."""
+    captured_kwargs: dict[str, object] = {}
+    real_llm = settings_utils.LLM
+
+    def spy_llm(*args, **kwargs):
+        captured_kwargs.update(kwargs)
+        return real_llm(*args, **kwargs)
+
+    monkeypatch.setattr(settings_utils, "LLM", spy_llm)
+
     existing_agent = Agent(
         llm=LLM(
             model="gemini/gemini-2.5-pro",
@@ -402,7 +411,6 @@ def test_model_change_resets_max_input_tokens(
         custom_model=None,
         base_url=None,
         api_key_input="sk-new",
-        max_tokens="1048576",  # Stale value from disabled field
         memory_condensation_enabled=False,
     )
 
@@ -411,8 +419,7 @@ def test_model_change_resets_max_input_tokens(
     assert result.success is True
     saved_agent = deps.saved_agents[-1]
     assert saved_agent.llm.model == "openai/gpt-5.3-codex"
-    # Stale value should be ignored; SDK auto-lookup gives 272000
-    assert saved_agent.llm.max_input_tokens == 272000
+    assert captured_kwargs["max_input_tokens"] is None
 
 
 def test_user_supplied_max_tokens_is_preserved(

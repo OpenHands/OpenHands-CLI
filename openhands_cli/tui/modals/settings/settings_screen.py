@@ -248,6 +248,41 @@ class SettingsScreen(ModalScreen):
         # Update field dependencies after loading all values
         self._update_field_dependencies()
 
+    def _get_selected_model_identity(self) -> tuple[str | None, str | None]:
+        """Return the currently selected model/base_url identity from the form."""
+        mode = self.mode_select.value if hasattr(self.mode_select, "value") else None
+
+        if mode == "advanced":
+            custom_model = self.custom_model_input.value.strip()
+            base_url = self.base_url_input.value.strip()
+            return (custom_model or None, base_url or None)
+
+        if mode == "basic":
+            provider = self.provider_select.value
+            model = self.model_select.value
+            if (
+                provider
+                and model
+                and not isinstance(provider, NoSelection)
+                and not isinstance(model, NoSelection)
+            ):
+                return (f"{provider}/{model}", None)
+
+        return (None, None)
+
+    def _reset_max_tokens_if_model_changed(self) -> None:
+        """Clear stale max token overrides when switching to a different model."""
+        if self.current_agent is None:
+            return
+
+        selected_model, selected_base_url = self._get_selected_model_identity()
+        current_llm = self.current_agent.llm
+        current_model = current_llm.model or None
+        current_base_url = current_llm.base_url or None
+
+        if (selected_model, selected_base_url) != (current_model, current_base_url):
+            self.max_tokens_input.value = ""
+
     def _update_model_options(self, provider: str) -> None:
         """Update model select options based on provider."""
         # Store current selection to preserve it if possible
@@ -266,6 +301,8 @@ class SettingsScreen(ModalScreen):
                     self.model_select.value = current_selection
         else:
             self.model_select.set_options([("No models available", "")])
+
+        self._reset_max_tokens_if_model_changed()
 
     def _update_advanced_visibility(self) -> None:
         """Show/hide basic and advanced sections based on mode."""
@@ -389,6 +426,7 @@ class SettingsScreen(ModalScreen):
         if event.select.id == "mode_select":
             self.is_advanced_mode = event.value == "advanced"
             self._update_advanced_visibility()
+            self._reset_max_tokens_if_model_changed()
             self._update_field_dependencies()
             self._clear_message()
         elif event.select.id == "provider_select":
@@ -397,12 +435,17 @@ class SettingsScreen(ModalScreen):
             self._update_field_dependencies()
             self._clear_message()
         elif event.select.id == "model_select":
+            self._reset_max_tokens_if_model_changed()
             self._update_field_dependencies()
             self._clear_message()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle input field changes."""
-        if event.input.id in ["custom_model_input", "api_key_input"]:
+        if event.input.id in ["custom_model_input", "base_url_input"]:
+            self._reset_max_tokens_if_model_changed()
+            self._update_field_dependencies()
+            self._clear_message()
+        elif event.input.id in ["api_key_input"]:
             self._update_field_dependencies()
             self._clear_message()
 
