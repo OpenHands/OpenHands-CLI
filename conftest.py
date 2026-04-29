@@ -6,7 +6,7 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def isolate_test_persistence(tmp_path_factory, monkeypatch):
+def isolate_test_persistence(tmp_path, monkeypatch):
     """Ensure all tests use isolated temp directories instead of ~/.openhands/.
 
     This autouse fixture runs BEFORE every test and sets environment variables
@@ -20,7 +20,8 @@ def isolate_test_persistence(tmp_path_factory, monkeypatch):
     - PERSISTENCE_DIR -> isolated temp dir (legacy env var)
     - os.path.expanduser("~") -> isolated temp home (fallback when env not checked)
     """
-    home_dir = tmp_path_factory.mktemp("test_home")
+    home_dir = tmp_path / "home"
+    home_dir.mkdir()
     persistence_dir = home_dir / ".openhands"
     persistence_dir.mkdir(exist_ok=True)
     conversations_dir = persistence_dir / "conversations"
@@ -38,8 +39,6 @@ def isolate_test_persistence(tmp_path_factory, monkeypatch):
             return str(home_dir)
         elif path_str.startswith("~/"):
             return str(home_dir / path_str[2:])
-        elif path_str.startswith("~"):
-            return original_expanduser(path_str)
         return original_expanduser(path_str)
 
     monkeypatch.setattr(os.path, "expanduser", mock_expanduser)
