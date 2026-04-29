@@ -7,6 +7,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, field_validator
 
 from openhands.sdk.settings import VerificationSettings
+from openhands_cli.tui.utils.critic.refinement import CliIterativeRefinementConfig
 
 
 class CriticSettings(VerificationSettings):
@@ -18,6 +19,17 @@ class CriticSettings(VerificationSettings):
         if not 0.0 <= value <= 1.0:
             raise ValueError(f"Threshold must be between 0.0 and 1.0, got {value}")
         return value
+
+    def build_iterative_refinement_config(
+        self,
+    ) -> CliIterativeRefinementConfig | None:
+        if not self.enable_iterative_refinement:
+            return None
+        return CliIterativeRefinementConfig(
+            success_threshold=self.critic_threshold,
+            max_iterations=self.max_refinement_iterations,
+            issue_threshold=self.issue_threshold,
+        )
 
 
 DEFAULT_CRITIC_THRESHOLD = float(
@@ -102,7 +114,7 @@ class CliSettings(BaseModel):
         config_path = self.get_config_path()
         config_path.parent.mkdir(parents=True, exist_ok=True)
 
-        payload = {
+        payload: dict[str, object] = {
             "default_cells_expanded": self.default_cells_expanded,
             "auto_open_plan_panel": self.auto_open_plan_panel,
         }

@@ -7,15 +7,15 @@ from textual.app import App
 from textual.containers import VerticalScroll
 
 from openhands.sdk import Message, TextContent
-from openhands.sdk.critic.refinement import (
-    build_refinement_message,
-    evaluate_iterative_refinement,
-    get_high_probability_issues,
-)
 from openhands.sdk.critic.result import CriticResult
 from openhands.sdk.event import MessageEvent
 from openhands_cli.stores import CliProgrammaticSettings, CriticSettings
 from openhands_cli.tui.core.conversation_manager import CriticResultReceived
+from openhands_cli.tui.utils.critic.refinement import (
+    build_refinement_message,
+    evaluate_iterative_refinement,
+    get_high_probability_issues,
+)
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 
 
