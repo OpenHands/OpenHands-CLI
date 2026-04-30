@@ -60,11 +60,11 @@ class TestToolFix:
             assert loaded_agent is not None
 
             # Verify that tools are replaced with default CLI tools
-            # (terminal, file_editor, task_tracker, delegate)
+            # (terminal, file_editor, task_tracker, task_tool_set)
             assert len(loaded_agent.tools) == 4
 
             tool_names = [tool.name for tool in loaded_agent.tools]
             assert "terminal" in tool_names
             assert "file_editor" in tool_names
             assert "task_tracker" in tool_names
-            assert "delegate" in tool_names
+            assert "task_tool_set" in tool_names  # TaskToolSet for new conversations

@@ -23,14 +23,16 @@ class TestFormatDockerCommand:
         [
             (
                 ["docker", "run", "hello-world"],
-                "<grey>Running Docker command: docker run hello-world</grey>",
+                "Running Docker command: docker run hello-world",
             ),
             (
                 ["docker", "run", "-it", "--rm", "-p", "3000:3000", "openhands:latest"],
-                "<grey>Running Docker command: docker run -it --rm -p 3000:3000 "
-                "openhands:latest</grey>",
+                (
+                    "Running Docker command: docker run -it --rm -p 3000:3000 "
+                    "openhands:latest"
+                ),
             ),
-            ([], "<grey>Running Docker command: </grey>"),
+            ([], "Running Docker command: "),
         ],
     )
     def test_format_docker_command(self, cmd, expected):
@@ -74,7 +76,7 @@ class TestCheckDockerRequirements:
             else:
                 mock_run.return_value = run_side_effect
 
-        with patch("openhands_cli.gui_launcher.print_formatted_text") as mock_print:
+        with patch("openhands_cli.gui_launcher.console.print") as mock_print:
             result = check_docker_requirements()
 
         assert result is expected_result
@@ -103,7 +105,7 @@ class TestLaunchGuiServer:
     """Test GUI server launching."""
 
     @patch("openhands_cli.gui_launcher.check_docker_requirements")
-    @patch("openhands_cli.gui_launcher.print_formatted_text")
+    @patch("openhands_cli.gui_launcher.console.print")
     def test_launch_gui_server_docker_not_available(
         self, mock_print, mock_check_docker
     ):
@@ -134,7 +136,7 @@ class TestLaunchGuiServer:
     @patch("subprocess.run")
     @patch("subprocess.check_output")
     @patch("pathlib.Path.cwd")
-    @patch("openhands_cli.gui_launcher.print_formatted_text")
+    @patch("openhands_cli.gui_launcher.console.print")
     def test_launch_gui_server_scenarios(
         self,
         mock_print,

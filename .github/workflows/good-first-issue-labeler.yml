@@ -13,7 +13,7 @@ permissions:
 jobs:
     label-good-first-issues:
         if: github.repository == 'OpenHands/OpenHands-CLI'
-        runs-on: blacksmith-2vcpu-ubuntu-2404
+        runs-on: ubuntu-24.04
 
         steps:
             - name: Checkout repository

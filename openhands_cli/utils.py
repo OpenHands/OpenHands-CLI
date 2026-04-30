@@ -8,13 +8,13 @@ from argparse import Namespace
 from pathlib import Path
 from typing import Any
 
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import HTML
+from rich.console import Console
 
 from openhands.sdk import LLM, Agent, ImageContent, TextContent
 from openhands.sdk.event import SystemPromptEvent
 from openhands.sdk.event.base import Event
 from openhands.sdk.tool import Tool
+from openhands.tools import TaskToolSet
 from openhands.tools.delegate import DelegateTool
 from openhands.tools.file_editor import FileEditorTool
 from openhands.tools.preset.default import get_default_condenser
@@ -160,13 +160,28 @@ def get_llm_metadata(
     return metadata
 
 
-def get_default_cli_tools() -> list[Tool]:
-    """Get the default tool specifications for CLI mode (browser disabled)."""
+def get_default_cli_tools(*, use_delegate_tool: bool = False) -> list[Tool]:
+    """Get the default tool specifications for CLI mode (browser disabled).
+
+    Args:
+        use_delegate_tool: If True, use DelegateTool instead of TaskToolSet.
+            This is used for backward compatibility with conversations that
+            already have DelegateTool events. Defaults to False (use TaskToolSet).
+
+    Returns:
+        List of Tool specifications for the CLI agent.
+
+    Note:
+        DelegateTool is deprecated in favor of TaskToolSet for new conversations.
+        Existing conversations with DelegateTool events will continue to use
+        DelegateTool to maintain backward compatibility.
+    """
+    task_tool_name = DelegateTool.name if use_delegate_tool else TaskToolSet.name
     return [
         Tool(name=TerminalTool.name),
         Tool(name=FileEditorTool.name),
         Tool(name=TaskTrackerTool.name),
-        Tool(name=DelegateTool.name),
+        Tool(name=task_tool_name),
     ]
 
 
@@ -195,7 +210,11 @@ def create_seeded_instructions_from_args(args: Namespace) -> list[str] | None:
         try:
             content = path.read_text(encoding="utf-8")
         except OSError as exc:
-            print_formatted_text(HTML(f"<red>Failed to read file {path}: {exc}</red>"))
+            Console(highlight=False, soft_wrap=True).print(
+                f"Failed to read file {path}: {exc}",
+                style="red",
+                markup=False,
+            )
             raise SystemExit(1)
 
         initial_message = (

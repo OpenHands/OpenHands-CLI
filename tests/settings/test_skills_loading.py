@@ -116,9 +116,7 @@ This is a user microagent for testing.
         # Mock the USER_SKILLS_DIRS constant to point to our temp directory
         mock_user_dirs = [user_skills_temp]
 
-        with patch(
-            "openhands.sdk.context.skills.skill.USER_SKILLS_DIRS", mock_user_dirs
-        ):
+        with patch("openhands.sdk.skills.skill.USER_SKILLS_DIRS", mock_user_dirs):
             from openhands_cli.stores import AgentStore
 
             agent_store = AgentStore()
