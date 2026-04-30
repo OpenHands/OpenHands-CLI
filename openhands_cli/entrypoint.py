@@ -13,6 +13,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from rich.console import Console
+from rich.markup import escape as rich_escape
 
 from openhands_cli.argparsers.main_parser import create_main_parser
 from openhands_cli.stores import (
@@ -243,7 +244,11 @@ def main() -> None:
         console.print("\nGoodbye! 👋", style=OPENHANDS_THEME.warning)
     except MissingEnvironmentVariablesError as e:
         # Display clean error message for missing env vars
-        console.print(f"[{OPENHANDS_THEME.error}]Error:[/{OPENHANDS_THEME.error}] {e}")
+        console.print(
+            f"[{OPENHANDS_THEME.error}]Error:[/{OPENHANDS_THEME.error}]"
+            f" {rich_escape(str(e))}",
+            highlight=False,
+        )
         sys.exit(1)
     except Exception as e:
         console.print(f"Error: {str(e)}", style=OPENHANDS_THEME.error, markup=False)
