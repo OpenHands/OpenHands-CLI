@@ -219,9 +219,13 @@ class TestLoginCommand:
         """Test synchronous wrapper for login command - success case."""
         server_url = "https://api.example.com"
 
-        with patch("openhands_cli.auth.login_command.asyncio.run") as mock_run:
-            mock_run.return_value = True
+        def _run(coro):
+            coro.close()
+            return True
 
+        with patch(
+            "openhands_cli.auth.login_command.asyncio.run", side_effect=_run
+        ) as mock_run:
             result = run_login_command(server_url)
 
             assert result is True
@@ -231,26 +235,36 @@ class TestLoginCommand:
         """Test synchronous wrapper for login command - keyboard interrupt."""
         server_url = "https://api.example.com"
 
-        with patch("openhands_cli.auth.login_command.asyncio.run") as mock_run:
-            with patch("openhands_cli.auth.login_command.console_print") as mock_print:
-                mock_run.side_effect = KeyboardInterrupt()
+        def _run(coro):
+            coro.close()
+            raise KeyboardInterrupt()
 
+        with patch(
+            "openhands_cli.auth.login_command.asyncio.run", side_effect=_run
+        ) as mock_run:
+            with patch("openhands_cli.auth.login_command.console_print") as mock_print:
                 result = run_login_command(server_url)
 
                 assert result is False
                 print_calls = [call[0][0] for call in mock_print.call_args_list]
                 assert any("cancelled by user" in call for call in print_calls)
+                mock_run.assert_called_once()
 
     def test_run_login_command_failure(self):
         """Test synchronous wrapper for login command - failure case."""
         server_url = "https://api.example.com"
 
-        with patch("openhands_cli.auth.login_command.asyncio.run") as mock_run:
-            mock_run.return_value = False
+        def _run(coro):
+            coro.close()
+            return False
 
+        with patch(
+            "openhands_cli.auth.login_command.asyncio.run", side_effect=_run
+        ) as mock_run:
             result = run_login_command(server_url)
 
             assert result is False
+            mock_run.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_login_command_with_successful_token_storage_and_fetch(self):

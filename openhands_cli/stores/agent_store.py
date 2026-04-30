@@ -6,7 +6,6 @@ import os
 import re
 from typing import Any
 
-from prompt_toolkit import HTML, print_formatted_text
 from pydantic import BaseModel, SecretStr
 from rich.console import Console
 
@@ -22,6 +21,7 @@ from openhands.sdk.conversation.persistence_const import BASE_STATE
 from openhands.sdk.critic.base import CriticBase
 from openhands.sdk.critic.impl.api import APIBasedCritic
 from openhands.sdk.tool import Tool
+from openhands_cli.deprecated_utils import conversation_has_delegate_tool
 from openhands_cli.locations import (
     AGENT_SETTINGS_PATH,
     get_conversations_dir,
@@ -39,6 +39,10 @@ from openhands_cli.utils import (
 )
 
 
+console = Console(highlight=False, soft_wrap=True)
+stderr_console = Console(stderr=True, highlight=False, soft_wrap=True)
+
+
 def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
     """Get tools from a persisted conversation's base_state.json.
 
@@ -54,7 +58,10 @@ def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
         List of Tool objects from the persisted conversation, or None if
         the conversation doesn't exist or can't be read
     """
-    conversation_dir = os.path.join(get_conversations_dir(), conversation_id)
+    # Normalize: directory names use hex (no dashes), but callers may pass
+    # str(UUID) which includes dashes.
+    normalized_id = conversation_id.replace("-", "")
+    conversation_dir = os.path.join(get_conversations_dir(), normalized_id)
     base_state_path = os.path.join(conversation_dir, BASE_STATE)
 
     if not os.path.exists(base_state_path):
@@ -363,8 +370,10 @@ class AgentStore:
         except FileNotFoundError:
             return None
         except Exception:
-            print_formatted_text(
-                HTML("\n<red>Agent configuration file is corrupted!</red>")
+            console.print(
+                "\nAgent configuration file is corrupted!",
+                style="red",
+                markup=False,
             )
             return None
 
@@ -474,8 +483,25 @@ class AgentStore:
         )
 
     def _resolve_tools(self, session_id: str | None) -> list[Tool]:
-        tools = get_persisted_conversation_tools(session_id) if session_id else None
-        return tools or get_default_cli_tools()
+        """Resolve tools for a conversation, with backward compatibility.
+
+        For persisted conversations:
+        1. First try to load tools from base_state.json
+        2. If not available, check if the conversation has DelegateTool events
+           and use DelegateTool for backward compatibility
+
+        For new conversations:
+        - Use TaskToolSet (the default for new conversations)
+        """
+        if not session_id:
+            return get_default_cli_tools()
+
+        if tools := get_persisted_conversation_tools(session_id):
+            return tools
+
+        # Check if conversation's SystemPromptEvent lists DelegateTool
+        use_delegate = conversation_has_delegate_tool(session_id)
+        return get_default_cli_tools(use_delegate_tool=use_delegate)
 
     def _with_llm_metadata(
         self, llm: LLM, *, session_id: str | None, llm_type: str

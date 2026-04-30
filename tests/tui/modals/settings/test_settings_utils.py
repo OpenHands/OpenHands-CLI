@@ -381,3 +381,74 @@ def test_litellm_metadata_is_added_when_required(
     assert isinstance(saved_agent.condenser, LLMSummarizingCondenser)
     assert saved_agent.condenser.llm.litellm_extra_body is not None
     assert saved_agent.condenser.llm.litellm_extra_body["metadata"]["foo"] == "bar"
+
+
+def test_model_change_does_not_pass_stale_max_input_tokens(
+    monkeypatch, deps: FakeAgentStore
+) -> None:
+    """When the model changes, stale max_tokens input is not passed to LLM."""
+    captured_kwargs: dict[str, object] = {}
+    real_llm = settings_utils.LLM
+
+    def spy_llm(*args, **kwargs):
+        captured_kwargs.update(kwargs)
+        return real_llm(*args, **kwargs)
+
+    monkeypatch.setattr(settings_utils, "LLM", spy_llm)
+
+    existing_agent = Agent(
+        llm=LLM(
+            model="gemini/gemini-2.5-pro",
+            api_key="sk-old",
+            max_input_tokens=1048576,
+        )
+    )
+
+    data = settings_utils.SettingsFormData(
+        mode="basic",
+        provider="openai",
+        model="gpt-5.3-codex",
+        custom_model=None,
+        base_url=None,
+        api_key_input="sk-new",
+        memory_condensation_enabled=False,
+    )
+
+    result = settings_utils.save_settings(data, existing_agent=existing_agent)
+
+    assert result.success is True
+    saved_agent = deps.saved_agents[-1]
+    assert saved_agent.llm.model == "openai/gpt-5.3-codex"
+    assert captured_kwargs["max_input_tokens"] is None
+
+
+def test_user_supplied_max_tokens_is_preserved(
+    deps: FakeAgentStore,
+) -> None:
+    """User-supplied max_tokens value is preserved, not overridden."""
+    existing_agent = Agent(
+        llm=LLM(
+            model="openai/gpt-4o",
+            api_key="sk-old",
+            max_input_tokens=128000,
+        )
+    )
+
+    data = settings_utils.SettingsFormData(
+        mode="basic",
+        provider="openai",
+        model="gpt-4o",
+        custom_model=None,
+        base_url=None,
+        api_key_input="sk-new",
+        max_tokens="64000",  # User explicitly set this
+        memory_condensation_enabled=False,
+    )
+
+    result = settings_utils.save_settings(data, existing_agent=existing_agent)
+
+    assert result.success is True
+    saved_agent = deps.saved_agents[-1]
+    assert saved_agent.llm.model == "openai/gpt-4o"
+    # User-supplied value should be used, not SDK auto-lookup
+    assert saved_agent.llm.max_input_tokens == 64000
