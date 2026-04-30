@@ -32,7 +32,7 @@ Run OpenHands agent inside your terminal, favorite IDE, CI pipelines, local brow
 
 ### Using uv (Recommended)
 
-Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/) 0.11.6 or newer.
 
 ```bash
 uv tool install openhands --python 3.12

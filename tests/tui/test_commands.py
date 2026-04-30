@@ -7,6 +7,7 @@ from unittest import mock
 
 import pytest
 from textual.containers import VerticalScroll
+from textual.widgets import ListView
 from textual_autocomplete import DropdownItem
 
 from openhands.sdk.security.confirmation_policy import AlwaysConfirm
@@ -19,8 +20,12 @@ from openhands_cli.tui.modals.confirmation_modal import (
 )
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
 from openhands_cli.tui.modals.switch_conversation_modal import SwitchConversationModal
-from openhands_cli.tui.panels.history_side_panel import HistoryItem, HistorySidePanel
+from openhands_cli.tui.panels.history_side_panel import (
+    HistoryItemContent,
+    HistorySidePanel,
+)
 from openhands_cli.tui.textual_app import OpenHandsApp
+from openhands_cli.tui.widgets.collapsible import Collapsible
 
 
 class TestCommands:
@@ -685,6 +690,94 @@ class TestOpenHandsAppCommands:
                 assert panels.first().display is False or initial_visible
 
     @pytest.mark.asyncio
+    async def test_tab_from_input_focuses_history_list_when_panel_open(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Tab from the input should focus the history list when it is open."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+        existing_id = uuid.uuid4().hex
+        monkeypatch.setattr(
+            LocalFileStore,
+            "list_conversations",
+            lambda self, limit=100: [
+                ConversationMetadata(
+                    id=existing_id,
+                    created_at=datetime(2025, 1, 1, tzinfo=UTC),
+                    title="old chat",
+                )
+            ],
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            oh_app.scroll_view.mount(Collapsible("Content", title="Cell 1"))
+            await pilot.pause()
+
+            oh_app.conversation_state.input_area._command_history()
+            await pilot.pause()
+
+            history_list = oh_app.query_one("#history-list", ListView)
+
+            oh_app.input_field.focus_input()
+            await pilot.pause()
+            assert oh_app.focused is not history_list
+
+            await pilot.press("tab")
+            await pilot.pause()
+
+            assert oh_app.focused == history_list
+
+    @pytest.mark.asyncio
+    async def test_shift_tab_from_history_list_returns_to_input(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Shift+Tab from the history list should skip the close button."""
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+        existing_id = uuid.uuid4().hex
+        monkeypatch.setattr(
+            LocalFileStore,
+            "list_conversations",
+            lambda self, limit=100: [
+                ConversationMetadata(
+                    id=existing_id,
+                    created_at=datetime(2025, 1, 1, tzinfo=UTC),
+                    title="old chat",
+                )
+            ],
+        )
+
+        app = OpenHandsApp(exit_confirmation=False)
+
+        async with app.run_test() as pilot:
+            oh_app = cast(OpenHandsApp, pilot.app)
+
+            oh_app.conversation_state.input_area._command_history()
+            await pilot.pause()
+
+            history_list = oh_app.query_one("#history-list", ListView)
+            close_button = oh_app.query_one("#history-close-btn")
+            assert oh_app.focused == history_list
+
+            await pilot.press("shift+tab")
+            await pilot.pause()
+
+            assert oh_app.focused == oh_app.input_field.active_input_widget
+            assert oh_app.focused is not close_button
+
+    @pytest.mark.asyncio
     async def test_new_command_updates_history_panel(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -718,7 +811,7 @@ class TestOpenHandsAppCommands:
             await pilot.pause()
 
             panel = oh_app.query_one(HistorySidePanel)
-            items_before = panel.query(HistoryItem)
+            items_before = panel.query(HistoryItemContent)
             count_before = len(items_before)
 
             oh_app.conversation_state.input_area._command_new()
@@ -726,57 +819,9 @@ class TestOpenHandsAppCommands:
 
             assert oh_app.conversation_id != original_id
 
-            items_after = panel.query(HistoryItem)
+            items_after = panel.query(HistoryItemContent)
             assert len(items_after) == count_before + 1
             assert panel.current_conversation_id == oh_app.conversation_id
-
-    @pytest.mark.asyncio
-    async def test_history_panel_selection_triggers_switch(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        setup_test_agent_config,
-    ) -> None:
-        """Selecting a conversation in history panel should post SwitchConversation."""
-        monkeypatch.setattr(
-            SettingsScreen,
-            "is_initial_setup_required",
-            lambda env_overrides_enabled=False: False,
-        )
-        conv1_id = uuid.uuid4().hex
-        conv2_id = uuid.uuid4().hex
-        conv2_uuid = uuid.UUID(conv2_id)
-        monkeypatch.setattr(
-            LocalFileStore,
-            "list_conversations",
-            lambda self, limit=100: [
-                ConversationMetadata(
-                    id=conv1_id,
-                    created_at=datetime(2025, 1, 2, tzinfo=UTC),
-                    title="chat 1",
-                ),
-                ConversationMetadata(
-                    id=conv2_id,
-                    created_at=datetime(2025, 1, 1, tzinfo=UTC),
-                    title="chat 2",
-                ),
-            ],
-        )
-
-        app = OpenHandsApp(exit_confirmation=False)
-
-        async with app.run_test() as pilot:
-            oh_app = cast(OpenHandsApp, pilot.app)
-
-            oh_app.conversation_state.input_area._command_history()
-            await pilot.pause()
-
-            panel = oh_app.query_one(HistorySidePanel)
-
-            # Call _handle_select and verify it updates selected_conversation_id
-            panel._handle_select(conv2_id)
-
-            # Verify the selected conversation ID was set to the chosen conversation
-            assert panel.selected_conversation_id == conv2_uuid
 
     @pytest.mark.asyncio
     async def test_history_switch_shows_modal_when_agent_running(

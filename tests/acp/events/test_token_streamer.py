@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 from acp.schema import (
@@ -663,10 +663,19 @@ class TestScheduleUpdate:
 
         update = update_agent_message_text("test")
 
+        def _run_coroutine_threadsafe(coro, running_loop):
+            coro.close()
+            future = MagicMock()
+            future.result.return_value = None
+            return future
+
         with patch.object(loop, "is_running", return_value=True):
-            with patch("asyncio.run_coroutine_threadsafe") as mock_rcts:
+            with patch(
+                "openhands_cli.acp_impl.events.token_streamer.asyncio.run_coroutine_threadsafe",
+                side_effect=_run_coroutine_threadsafe,
+            ) as mock_rcts:
                 subscriber._schedule_update(update)
-                mock_rcts.assert_called_once()
+                mock_rcts.assert_called_once_with(ANY, loop)
 
         loop.close()
 

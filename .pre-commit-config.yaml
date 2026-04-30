@@ -9,7 +9,7 @@ repos:
           - id: ruff-format
             name: Ruff format
             entry: uv
-            args: [run, ruff, format]
+            args: [run, --frozen, ruff, format]
             language: system
             types: [python]
             pass_filenames: true
@@ -17,7 +17,7 @@ repos:
           - id: ruff-check
             name: Ruff lint
             entry: uv
-            args: [run, ruff, check, --fix, --exit-non-zero-on-fix]
+            args: [run, --frozen, ruff, check, --fix, --exit-non-zero-on-fix]
             language: system
             types: [python]
             pass_filenames: true
@@ -25,7 +25,7 @@ repos:
           - id: pycodestyle
             name: PEP8 style check (pycodestyle)
             entry: uv
-            args: [run, pycodestyle, --max-line-length=88, '--ignore=E203,E501,W503,E704']
+            args: [run, --frozen, pycodestyle, --max-line-length=88, '--ignore=E203,E501,W503,E704']
             language: system
             types: [python]
             pass_filenames: true
@@ -33,7 +33,7 @@ repos:
           - id: pyright
             name: Type check with pyright
             entry: uv
-            args: [run, pyright]
+            args: [run, --frozen, pyright]
             language: system
             types: [python]
             pass_filenames: true

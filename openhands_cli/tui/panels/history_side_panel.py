@@ -13,14 +13,13 @@ ConversationManager.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, VerticalScroll
+from textual.containers import Container, Horizontal
 from textual.css.query import NoMatches
-from textual.widgets import Button, Static
+from textual.widgets import Button, ListItem, ListView, Static
 
 from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.conversations.store.local import LocalFileStore
@@ -37,23 +36,20 @@ def _escape_rich_markup(text: str) -> str:
     return text.replace("[", r"\[").replace("]", r"\]")
 
 
-class HistoryItem(Static):
-    """A clickable conversation item in the history panel."""
+class HistoryItemContent(Static):
+    """Content widget for a conversation item in the history panel."""
 
     def __init__(
         self,
         conversation: ConversationMetadata,
         is_current: bool,
-        is_selected: bool,
-        on_select: Callable[[str], None],
         **kwargs,
     ):
-        """Initialize history item.
+        """Initialize history item content.
 
         Args:
             conversation: The conversation metadata to display
             is_current: Whether this is the currently active conversation
-            on_select: Callback when this item is selected
         """
         # Build the content string - show title, id as secondary
         time_str = _format_time(conversation.created_at)
@@ -72,33 +68,16 @@ class HistoryItem(Static):
         self._created_at = conversation.created_at
         self._has_title = has_title
         self.is_current = is_current
-        self.is_selected = is_selected
-        self._on_select = on_select
 
         # Add appropriate class for styling
-        self.add_class("history-item")
-        self._apply_state_classes()
-
-    def _apply_state_classes(self) -> None:
-        """Apply CSS classes based on current/selected state."""
-        if self.is_current:
+        self.add_class("history-item-content")
+        if is_current:
             self.add_class("history-item-current")
-        else:
-            self.remove_class("history-item-current")
-
-        if self.is_selected and not self.is_current:
-            self.add_class("history-item-selected")
-        else:
-            self.remove_class("history-item-selected")
 
     @property
     def has_title(self) -> bool:
         """Check if this item already has a user-provided title."""
         return self._has_title
-
-    def on_click(self) -> None:
-        """Handle click on history item."""
-        self._on_select(self.conversation_id)
 
     def set_title(self, title: str) -> None:
         """Update the displayed title for this history item."""
@@ -112,13 +91,17 @@ class HistoryItem(Static):
         """Set current flag and update styles."""
         self.is_current = is_current
         if is_current:
-            self.is_selected = False
-        self._apply_state_classes()
+            self.add_class("history-item-current")
+        else:
+            self.remove_class("history-item-current")
 
-    def set_selected(self, is_selected: bool) -> None:
-        """Set selected flag and update styles."""
-        self.is_selected = is_selected
-        self._apply_state_classes()
+
+# Keep the close button out of the focus order so reverse traversal matches
+# the app-level Tab override which makes button unreachable using tab only.
+# That makes /history or pallete menu the only way to close the panel from
+# the keyboard.
+class HistoryCloseButton(Button, can_focus=False):
+    pass
 
 
 class HistorySidePanel(Container):
@@ -183,8 +166,10 @@ class HistorySidePanel(Container):
         """Compose the history side panel content."""
         with Horizontal(classes="history-header-row"):
             yield Static("Conversations", classes="history-header", id="history-header")
-            yield Button("✕", id="history-close-btn", classes="history-close-btn")
-        yield VerticalScroll(id="history-list")
+            yield HistoryCloseButton(
+                "✕", id="history-close-btn", classes="history-close-btn"
+            )
+        yield ListView(id="history-list")
 
     def on_mount(self) -> None:
         """Called when the panel is mounted.
@@ -198,20 +183,27 @@ class HistorySidePanel(Container):
         self.selected_conversation_id = self.current_conversation_id
         self._previous_switch_confirmation_target = state.switch_confirmation_target
 
+        # Load and render conversations first
+        self.refresh_content()
+
         # Watch ConversationContainer for changes
-        self.watch(state, "conversation_id", self._on_conversation_id_changed)
-        self.watch(state, "conversation_title", self._on_conversation_title_changed)
+        # (init=False prevents immediate callback during setup)
+        self.watch(
+            state, "conversation_id", self._on_conversation_id_changed, init=False
+        )
+        self.watch(
+            state, "conversation_title", self._on_conversation_title_changed, init=False
+        )
         self.watch(
             state,
             "switch_confirmation_target",
             self._on_switch_confirmation_target_changed,
+            init=False,
         )
 
-        # Load and render conversations
-        self.refresh_content()
-        # Ensure current conversation is visible even if not yet persisted
-        if self.current_conversation_id is not None:
-            self.ensure_conversation_visible(self.current_conversation_id)
+        # Focus the ListView to enable keyboard navigation
+        list_view = self.query_one("#history-list", ListView)
+        list_view.focus()
 
     # --- ConversationContainer Watchers ---
 
@@ -266,19 +258,37 @@ class HistorySidePanel(Container):
     def refresh_content(self) -> None:
         """Reload conversations and render the list."""
         self._local_rows = self._store.list_conversations()
+
+        if self.current_conversation_id is not None and not any(
+            row.id == self.current_conversation_id.hex for row in self._local_rows
+        ):
+            # Synthesize a placeholder row for the active conversation so the
+            # history panel can show and focus it before persistence catches up.
+            self._local_rows.insert(
+                0,
+                ConversationMetadata(
+                    id=self.current_conversation_id.hex,
+                    created_at=datetime.now(),
+                    title=None,
+                ),
+            )
+
         self._render_list()
 
     def _render_list(self) -> None:
         """Render the conversation list."""
-        list_container = self.query_one("#history-list", VerticalScroll)
-        list_container.remove_children()
+        list_view = self.query_one("#history-list", ListView)
+        list_view.clear()
 
         if not self._local_rows:
-            list_container.mount(
-                Static(
-                    f"[{OPENHANDS_THEME.warning}]No conversations yet.\n"
-                    f"Start typing to begin![/{OPENHANDS_THEME.warning}]",
-                    classes="history-empty",
+            # Render the "No conversations yet" empty state.
+            list_view.mount(
+                ListItem(
+                    Static(
+                        f"[{OPENHANDS_THEME.warning}]No conversations yet.\n"
+                        f"Start typing to begin![/{OPENHANDS_THEME.warning}]",
+                        classes="history-empty",
+                    )
                 )
             )
             return
@@ -286,44 +296,59 @@ class HistorySidePanel(Container):
         current_id_str = (
             self.current_conversation_id.hex if self.current_conversation_id else None
         )
-        selected_id_str = (
-            self.selected_conversation_id.hex if self.selected_conversation_id else None
-        )
 
-        for conv in self._local_rows:
+        # Track which index should be initially highlighted
+        initial_index = 0
+        for i, conv in enumerate(self._local_rows):
             is_current = conv.id == current_id_str
-            is_selected = conv.id == selected_id_str and selected_id_str is not None
-            list_container.mount(
-                HistoryItem(
-                    conversation=conv,
-                    is_current=is_current,
-                    is_selected=is_selected,
-                    on_select=self._handle_select,
-                )
-            )
+            if is_current:
+                initial_index = i
 
-    def _handle_select(self, conversation_id: str) -> None:
-        """Handle conversation selection by posting SwitchConversation."""
+            content = HistoryItemContent(
+                conversation=conv,
+                is_current=is_current,
+            )
+            list_view.mount(ListItem(content, id=f"history-item-{conv.id}"))
+
+        # Set initial highlight to current conversation
+        if self._local_rows:
+            list_view.index = initial_index
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        """Handle ListView selection (Enter key or click).
+        Posts SwitchConversation."""
         from openhands_cli.tui.core import SwitchConversation
 
-        self.selected_conversation_id = uuid.UUID(conversation_id)
+        if event.item is None or event.item.id is None:
+            return
+
+        # Extract conversation ID from the ListItem id.
+        # Format: "history-item-{conv_id}"
+        item_id = event.item.id
+        if not item_id.startswith("history-item-"):
+            return
+
+        conversation_id_str = item_id.replace("history-item-", "")
+        conversation_id = uuid.UUID(conversation_id_str)
+
+        self.selected_conversation_id = conversation_id
         self._update_highlights()
 
         # Message bubbles up to ConversationManager (ancestor via content_area)
-        self.post_message(SwitchConversation(uuid.UUID(conversation_id)))
+        self.post_message(SwitchConversation(conversation_id))
 
     def _update_highlights(self) -> None:
         """Update current/selected highlights without reloading the list."""
         current_hex = (
             self.current_conversation_id.hex if self.current_conversation_id else None
         )
-        selected_hex = (
-            self.selected_conversation_id.hex if self.selected_conversation_id else None
-        )
-        list_container = self.query_one("#history-list", VerticalScroll)
-        for item in list_container.query(HistoryItem):
-            item.set_current(item.conversation_id == current_hex)
-            item.set_selected(item.conversation_id == selected_hex)
+        list_view = self.query_one("#history-list", ListView)
+        for list_item in list_view.query(ListItem):
+            # Get the HistoryItemContent from the ListItem
+            content_widgets = list_item.query(HistoryItemContent)
+            if content_widgets:
+                content = content_widgets.first()
+                content.set_current(content.conversation_id == current_hex)
 
     def set_current_conversation(self, conversation_id: uuid.UUID) -> None:
         """Set current conversation and update highlights in-place."""
@@ -345,14 +370,37 @@ class HistorySidePanel(Container):
         immediately show and select them.
         """
         conv_hex = conversation_id.hex
+        # Check if already in the local rows
         if any(row.id == conv_hex for row in self._local_rows):
             return
 
-        self._local_rows.insert(
-            0,
-            ConversationMetadata(id=conv_hex, created_at=datetime.now(), title=None),
+        # Add to local rows
+        new_conv = ConversationMetadata(
+            id=conv_hex, created_at=datetime.now(), title=None
         )
-        self._render_list()
+        self._local_rows.insert(0, new_conv)
+
+        # Replace the empty-state row before prepending a real history item.
+        list_view = self.query_one("#history-list", ListView)
+        if (
+            len(list_view.query(HistoryItemContent)) == 0
+            and len(list_view.children) > 0
+        ):
+            self.call_after_refresh(self._render_list)
+            return
+
+        content = HistoryItemContent(
+            conversation=new_conv,
+            is_current=(
+                conv_hex
+                == (
+                    self.current_conversation_id.hex
+                    if self.current_conversation_id
+                    else None
+                )
+            ),
+        )
+        list_view.mount(ListItem(content, id=f"history-item-{conv_hex}"), before=0)
 
     def update_conversation_title_if_needed(
         self,
@@ -377,11 +425,15 @@ class HistorySidePanel(Container):
                 break
 
         # 2. Update UI widget in-place if it exists (Source of Truth vs UI)
-        for item in self.query(HistoryItem):
-            if item.conversation_id == conv_hex:
-                if not item.has_title:
-                    item.set_title(title)
-                break
+        list_view = self.query_one("#history-list", ListView)
+        for list_item in list_view.query(ListItem):
+            content_widgets = list_item.query(HistoryItemContent)
+            if content_widgets:
+                content = content_widgets.first()
+                if content.conversation_id == conv_hex:
+                    if not content.has_title:
+                        content.set_title(title)
+                    break
 
 
 def _format_time(dt: datetime) -> str:
