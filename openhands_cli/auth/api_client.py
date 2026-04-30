@@ -77,15 +77,16 @@ class OpenHandsApiClient(BaseHttpClient):
     async def create_conversation(
         self, json_data: dict[str, Any] | None = None
     ) -> httpx.Response:
-        return await self.post("/api/conversations", self._headers, json_data)
+        return await self.post("/api/v1/app-conversations", self._headers, json_data)
 
     async def get_conversation_info(
-        self, conversation_id: str
+        self, conversation_id: str, endpoint: str = ""
     ) -> dict[str, Any] | None:
         """Get conversation information including sandbox_id.
 
         Args:
             conversation_id: The conversation ID to look up
+            endpoint: Optional sub-endpoint (e.g. "start-tasks")
 
         Returns:
             Conversation info dict if found, None if not found
@@ -94,7 +95,7 @@ class OpenHandsApiClient(BaseHttpClient):
             UnauthenticatedError: If the user is not authenticated (401 response)
             ApiClientError: For other API errors
         """
-        path = f"/api/v1/app-conversations?ids={conversation_id}"
+        path = self._v1_conversations_path(conversation_id, endpoint)
         try:
             response = await self.get(path, headers=self._headers)
         except AuthHttpError as e:
@@ -105,9 +106,24 @@ class OpenHandsApiClient(BaseHttpClient):
             raise ApiClientError(f"Request to {path!r} failed: {e}") from e
 
         data: list[dict[str, Any]] = response.json()
-        if len(data) > 0:
+        if data and data[0]:
             return data[0]
         return None
+
+    @staticmethod
+    def _v1_conversations_path(id: str, endpoint: str = "") -> str:
+        """Build a V1 app-conversations endpoint path."""
+        base = "/api/v1/app-conversations"
+        return f"{base}/{endpoint}?ids={id}" if endpoint else f"{base}?ids={id}"
+
+    async def get_start_task_status(self, task_id: str) -> dict[str, Any] | None:
+        """Poll the status of a conversation start-task.
+
+        After ``create_conversation`` the V1 API returns a start-task whose
+        ``app_conversation_id`` is initially None.  Call this method to check
+        whether the conversation has been provisioned.
+        """
+        return await self.get_conversation_info(task_id, endpoint="start-tasks")
 
 
 def _print_settings_summary(settings: dict[str, Any]) -> None:

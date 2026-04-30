@@ -143,6 +143,18 @@ class TestOpenHandsApiClient:
             ):
                 await client._get_json("/test")
 
+    def test_v1_conversations_path_without_endpoint(self):
+        assert (
+            OpenHandsApiClient._v1_conversations_path("abc")
+            == "/api/v1/app-conversations?ids=abc"
+        )
+
+    def test_v1_conversations_path_with_endpoint(self):
+        assert (
+            OpenHandsApiClient._v1_conversations_path("abc", "start-tasks")
+            == "/api/v1/app-conversations/start-tasks?ids=abc"
+        )
+
 
 class TestHelperFunctions:
     """Test cases for helper functions in api_client module."""

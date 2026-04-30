@@ -55,7 +55,7 @@ class ConversationRunner:
         *,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
-    ):
+    ) -> None:
         """Initialize the conversation runner.
 
         Args:
@@ -248,7 +248,7 @@ class ConversationRunner:
             await asyncio.to_thread(self.conversation.pause)
         else:
             self._notification_callback(
-                "No running converastion", "No running conversation to pause", "warning"
+                "No running conversation", "No running conversation to pause", "warning"
             )
 
     async def condense_async(self) -> None:

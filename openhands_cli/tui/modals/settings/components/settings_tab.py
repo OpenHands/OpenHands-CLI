@@ -12,12 +12,16 @@ from openhands_cli.tui.modals.settings.model_recommendations import (
 )
 
 
+class SettingsFormScroll(VerticalScroll, can_focus=False):
+    pass
+
+
 class SettingsTab(Container):
     """Settings tab component containing all agent configuration options."""
 
     def compose(self) -> ComposeResult:
         """Compose the settings tab content."""
-        with VerticalScroll(id="settings_form"):
+        with SettingsFormScroll(id="settings_form"):
             with Container(id="form_content"):
                 # Basic Settings Section
                 with Container(classes="form_group"):

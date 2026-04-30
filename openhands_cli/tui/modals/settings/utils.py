@@ -119,7 +119,7 @@ class SettingsFormData(BaseModel):
             return val if val > 30 else None
         return None
 
-    def resolve_data_fields(self, existing_agent: Agent | None):
+    def resolve_data_fields(self, existing_agent: Agent | None) -> None:
         # Check advance mode requirements
         if self.mode == "advanced":
             if not self.custom_model:
@@ -154,7 +154,7 @@ class SettingsFormData(BaseModel):
         if not self.api_key_input:
             raise Exception("API Key is required")
 
-    def get_full_model_name(self):
+    def get_full_model_name(self) -> str:
         if self.mode == "advanced":
             return str(self.custom_model)
 
@@ -185,6 +185,15 @@ def save_settings(
         if full_model.startswith("openhands/") and data.base_url is None:
             data.base_url = "https://llm-proxy.app.all-hands.dev/"
 
+        # Reset max_input_tokens when model changes so SDK auto-looks up
+        # from LiteLLM; preserve user-supplied value when model is unchanged.
+        max_input_tokens: int | None = None
+        if existing_agent is not None and full_model == existing_agent.llm.model:
+            if isinstance(data.max_tokens, str):
+                max_input_tokens = int(data.max_tokens)
+            elif isinstance(data.max_tokens, int):
+                max_input_tokens = data.max_tokens
+
         if should_set_litellm_extra_body(full_model, data.base_url):
             extra_kwargs["litellm_extra_body"] = {
                 "metadata": get_llm_metadata(model_name=full_model, llm_type="agent")
@@ -198,9 +207,7 @@ def save_settings(
             timeout=int(data.timeout)
             if isinstance(data.timeout, str)
             else data.timeout,
-            max_input_tokens=int(data.max_tokens)
-            if isinstance(data.max_tokens, str)
-            else data.max_tokens,
+            max_input_tokens=max_input_tokens,
             **extra_kwargs,
         )
 

@@ -11,7 +11,7 @@ from textual.containers import VerticalScroll
 from textual.widgets import Static
 
 from openhands.sdk import Action, MessageEvent, TextContent
-from openhands.sdk.event import ActionEvent
+from openhands.sdk.event import ActionEvent, AgentErrorEvent, UserRejectObservation
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.llm import MessageToolCall
 from openhands.tools.terminal.definition import TerminalAction
@@ -969,6 +969,155 @@ class TestMessageEventDelegation:
         assert "Child Agent" in markdown_content
         assert "Parent Agent" in markdown_content
         assert "→" in markdown_content
+
+
+class TestThreadSafety:
+    """Tests for thread-safe UI updates in ConversationVisualizer."""
+
+    @pytest.fixture
+    def mock_visualizer(self):
+        """Create a visualizer with a mocked app for thread safety testing."""
+        from unittest.mock import MagicMock
+
+        app = MagicMock()
+        container = VerticalScroll()
+        vis = ConversationVisualizer(container, app)
+        return vis
+
+    def test_run_on_main_thread_direct_call(self, mock_visualizer):
+        """Test direct call when on main thread with a running loop."""
+        import threading
+        from unittest.mock import MagicMock
+
+        mock_func = MagicMock()
+        mock_visualizer._main_thread_id = threading.get_ident()
+
+        # Simulate a running loop
+        with patch("asyncio.get_running_loop"):
+            mock_visualizer._run_on_main_thread(mock_func, "arg1")
+
+        mock_func.assert_called_once_with("arg1")
+        mock_visualizer._app.call_from_thread.assert_not_called()
+
+    def test_run_on_main_thread_via_call_from_thread_when_no_loop(
+        self, mock_visualizer
+    ):
+        """Test call via call_from_thread when on main thread but NO running loop."""
+        import threading
+        from unittest.mock import MagicMock
+
+        mock_func = MagicMock()
+        mock_visualizer._main_thread_id = threading.get_ident()
+
+        # Simulate NO running loop (asyncio.get_running_loop raises RuntimeError)
+        with patch("asyncio.get_running_loop", side_effect=RuntimeError("no loop")):
+            mock_visualizer._run_on_main_thread(mock_func, "arg1")
+
+        # Should NOT be called directly
+        mock_func.assert_not_called()
+        # Should be called via app.call_from_thread
+        mock_visualizer._app.call_from_thread.assert_called_once_with(mock_func, "arg1")
+
+    def test_run_on_main_thread_via_call_from_thread_when_wrong_thread(
+        self, mock_visualizer
+    ):
+        """Test call via call_from_thread when on a different thread."""
+        from unittest.mock import MagicMock
+
+        mock_func = MagicMock()
+        # Set main thread ID to something different
+        mock_visualizer._main_thread_id = -1
+
+        mock_visualizer._run_on_main_thread(mock_func, "arg1")
+
+        mock_func.assert_not_called()
+        mock_visualizer._app.call_from_thread.assert_called_once_with(mock_func, "arg1")
+
+    @pytest.mark.parametrize(
+        ("role", "expected_prefix"),
+        [
+            ("user", "**Parent Agent → Child Agent:**"),
+            ("assistant", "**Child Agent → Parent Agent:**"),
+        ],
+    )
+    def test_build_delegation_message_formats_sender_and_receiver(
+        self, role: str, expected_prefix: str
+    ):
+        """Delegation helper should keep arrow direction consistent by role."""
+        app = App()
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,  # type: ignore[arg-type]
+            name="child_agent",
+        )
+
+        content = visualizer._build_delegation_message(
+            sender="parent_agent",
+            role=role,
+            content="Check the result",
+        )
+
+        assert content.startswith(expected_prefix)
+        assert content.endswith("Check the result")
+
+    def test_create_titled_collapsible_adds_agent_prefix(self, mock_cli_settings):
+        """Shared collapsible helper should apply the delegated agent prefix."""
+        app: OpenHandsApp = cast(OpenHandsApp, App())
+        container = VerticalScroll()
+        visualizer = ConversationVisualizer(
+            container,
+            app,
+            name="code_reviewer",
+        )
+        event = ConversationErrorEvent(
+            source="agent",
+            code="test_error",
+            detail="Formatter failed",
+        )
+
+        with mock_cli_settings(visualizer=visualizer):
+            collapsible = visualizer._create_titled_collapsible(
+                event, "Conversation Error"
+            )
+
+        assert "(Code Reviewer Agent)" in str(collapsible.title)
+        assert "Conversation Error" in str(collapsible.title)
+
+    @pytest.mark.parametrize(
+        ("event", "expected_title"),
+        [
+            (
+                AgentErrorEvent(
+                    tool_name="terminal",
+                    tool_call_id="call_1",
+                    error="boom",
+                ),
+                "Agent Error",
+            ),
+            (
+                UserRejectObservation(
+                    tool_name="terminal",
+                    tool_call_id="call_2",
+                    action_id="action_2",
+                ),
+                "User Rejected Action",
+            ),
+        ],
+    )
+    def test_create_event_collapsible_uses_shared_fallback_titles(
+        self,
+        visualizer,
+        mock_cli_settings,
+        event,
+        expected_title: str,
+    ):
+        """Shared collapsible routing should preserve fallback titles."""
+        with mock_cli_settings(visualizer=visualizer):
+            collapsible = visualizer._create_event_collapsible(event)
+
+        assert collapsible is not None
+        assert expected_title in str(collapsible.title)
 
 
 class TestAgentMessageEventDisplay:

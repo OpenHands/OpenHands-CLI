@@ -19,7 +19,7 @@ concurrency:
 jobs:
     test-unit:
         name: Run unit tests (pytest)
-        runs-on: blacksmith-2vcpu-ubuntu-2404
+        runs-on: ubuntu-24.04
 
         steps:
             - name: Checkout repository
@@ -88,7 +88,7 @@ jobs:
 
     test-snapshots:
         name: Run snapshot tests
-        runs-on: blacksmith-2vcpu-ubuntu-2404
+        runs-on: ubuntu-24.04
 
         steps:
             - name: Checkout repository
@@ -124,7 +124,7 @@ jobs:
 
     coverage-report:
         name: Generate coverage report
-        runs-on: blacksmith-2vcpu-ubuntu-2404
+        runs-on: ubuntu-24.04
         needs: [test-unit]
         if: always() && github.event_name == 'pull_request'
 

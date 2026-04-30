@@ -18,8 +18,9 @@ This repo contains the current CLI UX, including the Textual TUI and a browser-s
 - `.agents/skills/`: agent guidance for this repo.
 
 ## Setup, Build, and Development Commands
-This repository uses **uv** for dependency management and running tooling (such as in `Makefile`, CI workflows, and `uv.lock`). Avoid using `pip install ...` directly if possible.
+This repository uses **uv** for dependency management and running tooling (such as in `Makefile`, CI workflows, and `uv.lock`). Use `uv` 0.11.6 or newer for local development; older versions can serialize `uv.lock` differently around relative `exclude-newer`. Avoid using `pip install ...` directly if possible.
 
+- minimum supported `uv` version: `0.11.6`
 - install dependencies: `make install` (runs `uv sync`)
 - install dev dependencies: `make install-dev` (runs `uv sync --group dev`)
 - install pre-commit hooks: `uv run pre-commit install` (included in `make build`)
@@ -28,6 +29,8 @@ This repository uses **uv** for dependency management and running tooling (such 
 - format: `make format`
 - run the Textual TUI (interactive; prefer running inside tmux so you can detach with `Ctrl+b d`): `make run` (or `uv run openhands`)
 - run the Textual TUI (automation-friendly; use for agent-driven runs): `uv run openhands --exit-without-confirmation` (quit with `Ctrl+Q`; `Ctrl+C` does not work once the TUI is running)
+- **fast TUI development** (see [Fast TUI Development Workflow](#fast-tui-development-workflow) below):
+  - `make run-watch` - Auto-restart on file changes (recommended for most development)
 
 - run the browser-served web app (Textual `textual-serve`): `openhands web`
 - run the Docker-based OpenHands GUI server: `openhands serve`
@@ -39,6 +42,18 @@ This repository uses **uv** for dependency management and running tooling (such 
 - build PyInstaller binaries: `./build.sh --install-pyinstaller`
 
 ## Development Guidelines
+
+### Fast TUI Development Workflow
+
+#### Auto-restart on file changes (recommended)
+
+The fastest way to iterate on TUI changes:
+
+```bash
+make run-watch
+```
+
+This watches `openhands_cli/` and automatically restarts the app when you save any `.py` or `.tcss` file. Just edit, save, and see your changes.
 
 ### Linting Requirements
 **Before any commit, run `make lint` and only commit after it passes.** Use `make lint` to run all pre-commit hooks on all files, and do it before every commit (not after) to avoid CI failures.
@@ -85,6 +100,8 @@ uv run pytest tests/snapshots/ --snapshot-update
 ### Snapshot Test Location
 - **Test files**: `tests/snapshots/test_app_snapshots.py`, `tests/snapshots/test_visualizer_snapshots.py`
 - **Generated snapshots**: `tests/snapshots/__snapshots__/test_app_snapshots/*.svg`, `tests/snapshots/__snapshots__/test_visualizer_snapshots/*.svg`
+- `tests/tui/widgets/test_richlog_visualizer.py` is the primary unit test suite for `richlog_visualizer.py`; for maintainability refactors there, prefer targeted unit coverage in that file plus snapshot tests only when rendered output changes visually.
+
 
 ### Writing Snapshot Tests
 Snapshot tests must be **synchronous** (not async). The `snap_compare` fixture handles async internally:
