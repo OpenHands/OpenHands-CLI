@@ -192,7 +192,8 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
         """Set up a conversation with OpenHands Cloud workspace."""
         # Register built-in subagent types (default, explore, bash) so the
         # delegate tool can spawn them.
-        register_builtins_agents()
+        # enable_browser=False because CLI mode doesn't provide browser tools.
+        register_builtins_agents(enable_browser=False)
 
         try:
             agent = load_agent_specs(
