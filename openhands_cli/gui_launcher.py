@@ -90,7 +90,9 @@ def get_openhands_version() -> str:
 
 
 def launch_gui_server(
-    mount_cwd: bool = False, gpu: bool = False, bind_address: str = "127.0.0.1:3000"
+    mount_cwd: bool = False,
+    gpu: bool = False,
+    bind_address: tuple[str, int] = ("127.0.0.1", 3000),
 ) -> None:
     """Launch the OpenHands GUI server using Docker.
 
@@ -98,7 +100,7 @@ def launch_gui_server(
         mount_cwd: If True, mount the current working directory into the container.
         gpu: If True, enable GPU support by mounting all GPUs into the
             container via nvidia-docker.
-        bind_address: The IP address or IP:port to bind the server to.
+        bind_address: A tuple of (host, port) to bind the server to.
     """
     console.print("🚀 Launching OpenHands GUI server...", style="blue", markup=False)
     console.print()
@@ -119,14 +121,12 @@ def launch_gui_server(
     # tested and compatible with that specific app version. Setting these env vars
     # could cause version mismatches between the app and agent server.
 
-    # Parse bind address to get host IP and port using urllib.parse.urlsplit
-    parts = urlsplit(f"//{bind_address}")
-    host_ip = parts.hostname or "127.0.0.1"
-    host_port = str(parts.port or "3000")
+    # Extract host IP and port from bind_address tuple
+    host_ip, host_port_int = bind_address
+    host_port = str(host_port_int)
 
     # If it's an IPv6 address, we need to wrap it in brackets for the Docker port mapping
     # and the URL display, but only if it's not already bracketed.
-    # urlsplit.hostname returns the IP without brackets.
     if ":" in host_ip and not host_ip.startswith("["):
         host_ip = f"[{host_ip}]"
 

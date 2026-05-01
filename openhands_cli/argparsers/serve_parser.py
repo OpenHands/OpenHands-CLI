@@ -5,8 +5,8 @@ import ipaddress
 from urllib.parse import urlsplit
 
 
-def validate_bind_address(value: str) -> str:
-    """Validate that the bind address is a valid IP or IP:port combination.
+def parse_bind_address(value: str) -> tuple[str, int]:
+    """Parse and validate that the bind address is a valid IP or IP:port combination.
 
     Supports:
     - IPv4 (e.g., 127.0.0.1)
@@ -18,7 +18,7 @@ def validate_bind_address(value: str) -> str:
         value: The string to validate
 
     Returns:
-        The validated string
+        A tuple of (host, port)
 
     Raises:
         argparse.ArgumentTypeError: If the value is invalid
@@ -26,12 +26,20 @@ def validate_bind_address(value: str) -> str:
     if not value:
         raise argparse.ArgumentTypeError("Bind address cannot be empty")
 
+    # First, try to parse as a bare IP address (no port)
+    try:
+        ipaddress.ip_address(value)
+        return value, 3000
+    except ValueError:
+        # Not a bare IP, might be IP:port or [IPv6]:port
+        pass
+
     try:
         # urlsplit requires a scheme-like start to parse netloc correctly
         # We use // as a prefix to treat it as a network location
         parts = urlsplit(f"//{value}")
         host = parts.hostname
-        port = parts.port
+        port = parts.port or 3000
 
         if not host:
             raise ValueError("Could not parse host from bind address")
@@ -39,12 +47,11 @@ def validate_bind_address(value: str) -> str:
         # Validate IP
         ipaddress.ip_address(host)
 
-        # Validate Port if present
-        if port is not None:
-            if not (1 <= port <= 65535):
-                raise ValueError(f"Port {port} out of range")
+        # Validate Port
+        if not (1 <= port <= 65535):
+            raise ValueError(f"Port {port} out of range")
 
-        return value
+        return host, port
     except ValueError as e:
         raise argparse.ArgumentTypeError(
             f"Invalid bind address: '{value}'. {str(e)}. "
@@ -80,7 +87,7 @@ def add_serve_parser(subparsers: argparse._SubParsersAction) -> argparse.Argumen
     serve_parser.add_argument(
         "--bind",
         help="Bind the GUI server to a specific IP or IP:port (e.g., 127.0.0.1 or 127.0.0.1:3000)",
-        type=validate_bind_address,
+        type=parse_bind_address,
         default="127.0.0.1:3000",
     )
     return serve_parser

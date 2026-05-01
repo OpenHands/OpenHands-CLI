@@ -126,24 +126,24 @@ class TestLaunchGuiServer:
                 1,
                 False,
                 False,
-                "127.0.0.1:3000",
+                ("127.0.0.1", 3000),
                 "127.0.0.1:3000:3000",
             ),
             # KeyboardInterrupt during run
-            (KeyboardInterrupt(), 0, False, False, "127.0.0.1:3000", "127.0.0.1:3000:3000"),
+            (KeyboardInterrupt(), 0, False, False, ("127.0.0.1", 3000), "127.0.0.1:3000:3000"),
             # Success with mount_cwd
-            (MagicMock(returncode=0), None, True, False, "127.0.0.1:3000", "127.0.0.1:3000:3000"),
+            (MagicMock(returncode=0), None, True, False, ("127.0.0.1", 3000), "127.0.0.1:3000:3000"),
             # Success with GPU
-            (MagicMock(returncode=0), None, False, True, "127.0.0.1:3000", "127.0.0.1:3000:3000"),
+            (MagicMock(returncode=0), None, False, True, ("127.0.0.1", 3000), "127.0.0.1:3000:3000"),
             # Success with custom bind IP
-            (MagicMock(returncode=0), None, False, False, "0.0.0.0", "0.0.0.0:3000:3000"),
+            (MagicMock(returncode=0), None, False, False, ("0.0.0.0", 3000), "0.0.0.0:3000:3000"),
             # Success with custom bind IP:port
             (
                 MagicMock(returncode=0),
                 None,
                 False,
                 False,
-                "192.168.1.100:8080",
+                ("192.168.1.100", 8080),
                 "192.168.1.100:8080:3000",
             ),
             # Success with bare IPv6
@@ -152,8 +152,8 @@ class TestLaunchGuiServer:
                 None,
                 False,
                 False,
-                "::1",
-                "::1:3000:3000",
+                ("::1", 3000),
+                "[::1]:3000:3000",
             ),
             # Success with bracketed IPv6:port
             (
@@ -161,7 +161,7 @@ class TestLaunchGuiServer:
                 None,
                 False,
                 False,
-                "[::1]:8080",
+                ("[::1]", 8080),
                 "[::1]:8080:3000",
             ),
         ],
