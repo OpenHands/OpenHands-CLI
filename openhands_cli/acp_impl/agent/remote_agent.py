@@ -10,6 +10,7 @@ from acp.schema import LoadSessionResponse
 
 from openhands.sdk import BaseConversation, Conversation, Event, RemoteConversation
 from openhands.sdk.hooks import HookConfig
+from openhands.tools.preset.default import register_builtins_agents
 from openhands.workspace import OpenHandsCloudWorkspace
 from openhands_cli.acp_impl.agent.base_agent import BaseOpenHandsACPAgent
 from openhands_cli.acp_impl.agent.util import AgentType, get_session_mode_state
@@ -189,6 +190,11 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
         sandbox_id: str | None = None,
     ) -> tuple[RemoteConversation, OpenHandsCloudWorkspace]:
         """Set up a conversation with OpenHands Cloud workspace."""
+        # Register built-in subagent types (default, explore, bash) so the
+        # delegate tool can spawn them.
+        # enable_browser=False because CLI mode doesn't provide browser tools.
+        register_builtins_agents(enable_browser=False)
+
         try:
             agent = load_agent_specs(
                 conversation_id=session_id,
