@@ -123,7 +123,9 @@ def main() -> None:
             # Import gui_launcher only when needed
             from openhands_cli.gui_launcher import launch_gui_server
 
-            launch_gui_server(mount_cwd=args.mount_cwd, gpu=args.gpu)
+            launch_gui_server(
+                mount_cwd=args.mount_cwd, gpu=args.gpu, bind_address=args.bind
+            )
         elif args.command == "web":
             # Import web server launcher only when needed
             from openhands_cli.tui.serve import launch_web_server
