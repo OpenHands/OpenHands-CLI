@@ -75,16 +75,24 @@ class BtwInterceptor:
 
     async def resolve(self, entry_id: str, response: str) -> None:
         """Resolve a BTW entry with the agent's response."""
+        if self._conversation_id is None:
+            return
         self._store.resolve(self._conversation_id, entry_id, response)
 
     async def fail(self, entry_id: str, error: str) -> None:
         """Mark a BTW entry as failed."""
+        if self._conversation_id is None:
+            return
         self._store.fail(self._conversation_id, entry_id, error)
 
     def get_entries(self) -> list[BtwEntry]:
         """Get all BTW entries for the current conversation."""
+        if self._conversation_id is None:
+            return []
         return self._store.get_entries(self._conversation_id)
 
     def dismiss(self, entry_id: str) -> None:
         """Dismiss a BTW entry."""
+        if self._conversation_id is None:
+            return
         self._store.dismiss(self._conversation_id, entry_id)

@@ -212,16 +212,12 @@ class ConversationManager(Container):
 
         # Check for BTW (side-channel) command
         self._btw_interceptor.set_conversation_id(
-            str(self._state.conversation_id)
-            if self._state.conversation_id
-            else None
+            str(self._state.conversation_id) if self._state.conversation_id else None
         )
         result = self._btw_interceptor.process(event.content)
 
         if result.is_btw and result.entry_id:
-            self.run_worker(
-                self._handle_btw_message(result.question, result.entry_id)
-            )
+            self.run_worker(self._handle_btw_message(result.question, result.entry_id))
             return  # Don't process as regular message
 
         await self._message_controller.handle_user_message(event.content)
@@ -255,9 +251,7 @@ class ConversationManager(Container):
             await self._btw_interceptor.resolve(entry_id, response_text)
 
             display_text = (
-                response_text[:200] + "…"
-                if len(response_text) > 200
-                else response_text
+                response_text[:200] + "…" if len(response_text) > 200 else response_text
             )
             self.notify(
                 f"BTW response: {display_text}",
