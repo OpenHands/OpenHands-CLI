@@ -115,7 +115,7 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
         """Set up a local conversation with event streaming support."""
         # Register built-in subagent types (default, explore, bash) so the
         # delegate tool can spawn them.
-        register_builtins_agents(cli_mode=True)
+        register_builtins_agents()
 
         try:
             agent = load_agent_specs(

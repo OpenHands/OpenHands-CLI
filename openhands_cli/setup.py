@@ -126,7 +126,7 @@ def setup_conversation(
     # Register built-in subagent types (default, explore, bash) so the
     # delegate tool can spawn them.  Uses register_agent_if_absent, so
     # user/project-level definitions still take priority.
-    register_builtins_agents(cli_mode=True)
+    register_builtins_agents()
 
     agent = load_agent_specs(
         str(conversation_id),
