@@ -88,12 +88,24 @@ class OpenHandsApiClient(BaseHttpClient):
 
         Returns:
             Dict containing the agent's response with key "response".
+
+        Raises:
+            ValueError: If the question is empty or exceeds the length limit.
         """
+        stripped = question.strip()
+        if not stripped:
+            raise ValueError("Question cannot be empty.")
+        max_length = 4096
+        if len(stripped) > max_length:
+            raise ValueError(
+                f"Question exceeds maximum length of {max_length} characters."
+            )
+
         path = f"/api/conversations/{conversation_id}/ask_agent"
         response = await self.post(
             path,
             self._headers,
-            json_data={"question": question},
+            json_data={"question": stripped},
         )
         response.raise_for_status()
         return response.json()

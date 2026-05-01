@@ -19,7 +19,7 @@ from textual.message import Message
 from openhands.sdk.security.confirmation_policy import ConfirmationPolicyBase
 from openhands_cli.conversations.protocols import ConversationStore
 from openhands_cli.tui.core.btw_interceptor import BtwInterceptor
-from openhands_cli.tui.core.btw_store import get_btw_store
+from openhands_cli.tui.core.btw_store import BtwStore
 from openhands_cli.tui.core.confirmation_flow_controller import (
     ConfirmationFlowController,
 )
@@ -179,34 +179,10 @@ class ConversationManager(Container):
             run_worker=self.run_worker,
         )
 
-        # Initialize BTW interceptor for side-channel questions
-        # Note: api_client will be lazily initialized on first /btw use
-        self._btw_interceptor: BtwInterceptor | None = None
+        # BTW side-channel: interceptor is created eagerly, API client lazily
+        self._btw_store = BtwStore()
+        self._btw_interceptor = BtwInterceptor(store=self._btw_store)
         self._api_client: OpenHandsApiClient | None = None
-
-    def set_api_client(self, api_client, server_url: str | None = None) -> None:  # noqa: ARG002
-        """Set the API client for BTW functionality.
-
-        Args:
-            api_client: The API client instance for making requests.
-            server_url: Optional server URL (unused, kept for API compatibility).
-        """
-        self._api_client = api_client
-
-        # Create the BTW interceptor with the conversation ID from state
-        conversation_id = (
-            str(self._state.conversation_id) if self._state.conversation_id else None
-        )
-
-        async def ask_agent_callback(conv_id: str, question: str) -> dict:
-            """Callback to call the ask_agent API."""
-            return await api_client.ask_agent(conv_id, question)
-
-        self._btw_interceptor = BtwInterceptor(
-            conversation_id=conversation_id,
-            ask_agent_callback=ask_agent_callback,
-            get_btw_store=get_btw_store,
-        )
 
     # ---- Properties ----
 
@@ -235,52 +211,27 @@ class ConversationManager(Container):
         self._refinement_controller.reset_iteration()
 
         # Check for BTW (side-channel) command
-        # Initialize lazily if not done yet
-        if self._btw_interceptor is None:
-            # Try to initialize API client (will fail if not authenticated)
-            try:
-                self._init_api_client()
-            except RuntimeError:
-                # Not authenticated, skip BTW handling
-                pass
+        self._btw_interceptor.set_conversation_id(
+            str(self._state.conversation_id)
+            if self._state.conversation_id
+            else None
+        )
+        result = self._btw_interceptor.process(event.content)
 
-        if self._btw_interceptor is not None:
-            # Update conversation ID in case it changed
-            self._btw_interceptor.set_conversation_id(
-                str(self._state.conversation_id)
-                if self._state.conversation_id
-                else None
+        if result.is_btw and result.entry_id:
+            self.run_worker(
+                self._handle_btw_message(result.question, result.entry_id)
             )
-            result = self._btw_interceptor.process(event.content)
-
-            if result.is_btw and result.entry_id:
-                # Handle BTW command - run asynchronously without blocking
-                self.run_worker(
-                    self._handle_btw_message(
-                        event.content, result.question, result.entry_id
-                    )
-                )
-                return  # Don't process as regular message
+            return  # Don't process as regular message
 
         await self._message_controller.handle_user_message(event.content)
 
     async def _handle_btw_message(
         self,
-        original_message: str,  # noqa: ARG002
         question: str | None,
         entry_id: str,
     ) -> None:
-        """Handle a BTW (side-channel) message by calling the ask_agent API.
-
-        Args:
-            original_message: The original user message.
-            question: The extracted question.
-            entry_id: The BTW entry ID.
-        """
-        if self._btw_interceptor is None:
-            return
-
-        # Ensure question is not None at this point
+        """Handle a BTW (side-channel) message by calling the ask_agent API."""
         if question is None:
             await self._btw_interceptor.fail(entry_id, "No question provided")
             return
@@ -295,17 +246,21 @@ class ConversationManager(Container):
                 await self._btw_interceptor.fail(entry_id, "No conversation ID")
                 return
 
-            # Lazy initialization of API client if not set
             if self._api_client is None:
-                self._init_api_client()
+                self._ensure_api_client()
 
             assert self._api_client is not None
             response = await self._api_client.ask_agent(conversation_id, question)
-            await self._btw_interceptor.resolve(entry_id, response.get("response", ""))
+            response_text = response.get("response", "")
+            await self._btw_interceptor.resolve(entry_id, response_text)
 
-            # Notify user that BTW response is available
+            display_text = (
+                response_text[:200] + "…"
+                if len(response_text) > 200
+                else response_text
+            )
             self.notify(
-                f"BTW response: {response.get('response', '')}",
+                f"BTW response: {display_text}",
                 title="Side Channel Response",
             )
         except Exception as e:
@@ -316,41 +271,21 @@ class ConversationManager(Container):
                 severity="error",
             )
 
-    def _init_api_client(self) -> None:
-        """Initialize the API client lazily on first use."""
+    def _ensure_api_client(self) -> None:
+        """Initialize the API client lazily on first /btw use."""
         import os
 
         from openhands_cli.auth.api_client import OpenHandsApiClient
         from openhands_cli.auth.token_storage import TokenStorage
 
-        # Get credentials
         token_storage = TokenStorage()
         api_key = token_storage.get_api_key()
 
         if not api_key:
             raise RuntimeError("Not authenticated. Please run 'openhands login' first.")
 
-        # Get server URL from environment or use default
         server_url = os.getenv("OPENHANDS_CLOUD_URL", "https://app.all-hands.dev")
-
-        # Create API client
         self._api_client = OpenHandsApiClient(server_url, api_key)
-
-        # Initialize BTW interceptor with the api_client
-        conversation_id = (
-            str(self._state.conversation_id) if self._state.conversation_id else None
-        )
-
-        async def ask_agent_callback(conv_id: str, question: str) -> dict:
-            """Callback to call the ask_agent API."""
-            assert self._api_client is not None
-            return await self._api_client.ask_agent(conv_id, question)
-
-        self._btw_interceptor = BtwInterceptor(
-            conversation_id=conversation_id,
-            ask_agent_callback=ask_agent_callback,
-            get_btw_store=get_btw_store,
-        )
 
     @on(SendRefinementMessage)
     async def _on_send_refinement_message(self, event: SendRefinementMessage) -> None:

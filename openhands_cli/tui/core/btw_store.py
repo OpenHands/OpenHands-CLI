@@ -121,15 +121,3 @@ class BtwStore:
             self._entries_by_conversation.clear()
         elif conversation_id in self._entries_by_conversation:
             del self._entries_by_conversation[conversation_id]
-
-
-# Global singleton instance
-_btw_store: BtwStore | None = None
-
-
-def get_btw_store() -> BtwStore:
-    """Get the global BTW store instance."""
-    global _btw_store
-    if _btw_store is None:
-        _btw_store = BtwStore()
-    return _btw_store
