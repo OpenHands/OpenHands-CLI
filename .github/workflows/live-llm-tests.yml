@@ -1,0 +1,148 @@
+---
+# Live LLM integration tests — runs the real CLI against a real LLM.
+# Trigger: PR label "run-live-llm", manual dispatch, or nightly schedule.
+name: Live LLM Integration Tests
+
+on:
+    pull_request:
+        types: [labeled]
+    workflow_dispatch:
+        inputs:
+            reason:
+                description: Reason for manual trigger
+                required: false
+                default: ''
+
+permissions:
+    contents: read
+    pull-requests: write
+    issues: write
+
+concurrency:
+    group: ${{ github.workflow }}-${{ (github.head_ref && github.ref) || github.run_id }}
+    cancel-in-progress: true
+
+jobs:
+    live-llm-tests:
+        if: >-
+            github.event.label.name == 'run-live-llm'
+            || github.event_name == 'workflow_dispatch'
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+        timeout-minutes: 30
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v3
+              with:
+                  version: latest
+
+            - name: Install dependencies
+              run: uv sync --group dev
+
+            - name: Run live LLM integration tests
+              env:
+                  LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+                  LLM_MODEL: ${{ vars.LIVE_LLM_MODEL || 'openhands/claude-haiku-4-5-20251001' }}
+                  LLM_BASE_URL: ${{ vars.LIVE_LLM_BASE_URL || 'https://llm-proxy.app.all-hands.dev' }}
+                  LIVE_LLM_TIMEOUT: '300'
+              run: |
+                  RESULTS_DIR=".live-llm-results"
+                  rm -rf "$RESULTS_DIR"
+                  mkdir -p "$RESULTS_DIR"
+
+                  EXIT_CODE=0
+                  uv run pytest tests/live_llm/ \
+                      --run-live-llm \
+                      --live-llm-results-dir "$RESULTS_DIR" \
+                      -v --tb=long \
+                      2>&1 | tee live-llm-output.log || EXIT_CODE=$?
+
+                  echo "EXIT_CODE=$EXIT_CODE" >> "$GITHUB_ENV"
+                  exit 0  # Don't fail yet — comment first
+
+            - name: Build PR comment
+              if: github.event_name == 'pull_request'
+              id: build_comment
+              run: |
+                  RESULTS_DIR=".live-llm-results"
+                  MODEL="${LLM_MODEL:-unknown}"
+                  WORKFLOW_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+                  {
+                    echo "## 🧪 Live LLM Integration Tests"
+                    echo ""
+                    echo "**Model:** \`${MODEL}\`"
+                    echo "**Workflow:** [View run](${WORKFLOW_URL})"
+                    echo ""
+
+                    # Parse JSON results
+                    TOTAL=0
+                    PASSED=0
+                    FAILED=0
+                    DETAILS=""
+
+                    for f in "$RESULTS_DIR"/*.json; do
+                      [ -f "$f" ] || continue
+                      TOTAL=$((TOTAL + 1))
+                      STATUS=$(jq -r '.status' "$f")
+                      TEST=$(jq -r '.test' "$f")
+                      DURATION=$(jq -r '.duration_seconds' "$f")
+                      DURATION_FMT=$(printf "%.1f" "$DURATION")
+
+                      if [ "$STATUS" = "passed" ]; then
+                        PASSED=$((PASSED + 1))
+                        DETAILS="${DETAILS}| ✅ | \`${TEST}\` | ${DURATION_FMT}s |\n"
+                      else
+                        FAILED=$((FAILED + 1))
+                        TIMED_OUT=$(jq -r '.timed_out' "$f")
+                        REASON="exit code $(jq -r '.returncode' "$f")"
+                        [ "$TIMED_OUT" = "true" ] && REASON="timed out"
+                        DETAILS="${DETAILS}| ❌ | \`${TEST}\` | ${DURATION_FMT}s (${REASON}) |\n"
+                      fi
+                    done
+
+                    if [ "$TOTAL" -eq 0 ]; then
+                      echo "⚠️ No test results found."
+                    else
+                      echo "**Results:** ${PASSED}/${TOTAL} passed"
+                      echo ""
+                      echo "| Status | Test | Duration |"
+                      echo "|--------|------|----------|"
+                      echo -e "$DETAILS"
+                    fi
+
+                    echo ""
+                    echo "<details><summary>Full log (last 100 lines)</summary>"
+                    echo ""
+                    echo '```'
+                    tail -100 live-llm-output.log
+                    echo '```'
+                    echo "</details>"
+                  } > comment_body.md
+
+                  # Store for the next step
+                  echo "comment_path=comment_body.md" >> "$GITHUB_OUTPUT"
+              env:
+                  LLM_MODEL: ${{ vars.LIVE_LLM_MODEL || 'openhands/claude-haiku-4-5-20251001' }}
+
+            - name: Post/update PR comment
+              if: github.event_name == 'pull_request'
+              uses: marocchino/sticky-pull-request-comment@v2
+              with:
+                  header: live-llm-tests
+                  path: comment_body.md
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Fail if tests failed
+              if: env.EXIT_CODE != '0'
+              run: exit 1
