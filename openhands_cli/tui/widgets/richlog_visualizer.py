@@ -14,6 +14,7 @@ from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBas
 from openhands.sdk.event import (
     ActionEvent,
     AgentErrorEvent,
+    HookExecutionEvent,
     MessageEvent,
     ObservationEvent,
     PauseEvent,
@@ -52,6 +53,26 @@ ELLIPSIS = "..."
 DEFAULT_AGENT_NAME = "OpenHands Agent"
 
 
+def _is_hook_rejection(
+    event: UserRejectObservation | AgentErrorEvent | HookExecutionEvent,
+) -> bool:
+    """Check if a rejection event originated from a hook."""
+    if isinstance(event, HookExecutionEvent):
+        return event.blocked
+    if isinstance(event, UserRejectObservation):
+        return event.rejection_source == "hook"
+    return False
+
+
+def _get_rejection_title(
+    event: UserRejectObservation | AgentErrorEvent | HookExecutionEvent,
+) -> str:
+    """Get the appropriate title for a rejection event."""
+    if _is_hook_rejection(event):
+        return "Hook Blocked Action"
+    return "User Rejected Action"
+
+
 if TYPE_CHECKING:
     from textual.containers import VerticalScroll
     from textual.widget import Widget
@@ -75,6 +96,10 @@ def _get_event_symbol_color(event: Event) -> str:
             return OPENHANDS_THEME.primary
         else:
             return OPENHANDS_THEME.accent or DEFAULT_COLOR
+    elif isinstance(event, HookExecutionEvent):
+        if event.blocked:
+            return OPENHANDS_THEME.error or DEFAULT_COLOR
+        return DEFAULT_COLOR
     elif isinstance(event, AgentErrorEvent):
         return OPENHANDS_THEME.error or DEFAULT_COLOR
     elif isinstance(event, ConversationErrorEvent):
@@ -823,9 +848,17 @@ class ConversationVisualizer(ConversationVisualizerBase):
             self._pending_actions[event.tool_call_id] = (event, collapsible)
             return collapsible
 
+        # UserRejectObservation needs dynamic title based on rejection_source
+        if isinstance(event, UserRejectObservation):
+            return self._create_titled_collapsible(event, _get_rejection_title(event))
+
+        # HookExecutionEvent: dynamic title based on blocked status
+        if isinstance(event, HookExecutionEvent):
+            title = _get_rejection_title(event) if event.blocked else "Hook Executed"
+            return self._create_titled_collapsible(event, title)
+
         fallback_titles: list[tuple[type[Event], str]] = [
             (ObservationEvent, "Observation"),
-            (UserRejectObservation, "User Rejected Action"),
             (AgentErrorEvent, "Agent Error"),
             (ConversationErrorEvent, "Conversation Error"),
             (PauseEvent, "User Paused"),

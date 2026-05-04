@@ -23,6 +23,7 @@ from openhands.sdk.event import (
     Condensation,
     CondensationRequest,
     Event,
+    HookExecutionEvent,
     ObservationEvent,
     PauseEvent,
     SystemPromptEvent,
@@ -48,10 +49,22 @@ logger = get_logger(__name__)
 # Formatting constants for consistent headers across streaming and non-streaming modes
 REASONING_HEADER = "**Reasoning**:\n"
 THOUGHT_HEADER = "\n**Thought**:\n"
+HOOK_BLOCKED_HEADER = "**Hook Blocked Action**:\n"
 
 
 def _event_visualize_to_plain(event: Event) -> str:
     return str(event.visualize.plain)
+
+
+def _is_hook_rejection(
+    event: UserRejectObservation | AgentErrorEvent | HookExecutionEvent,
+) -> bool:
+    """Check if a rejection event originated from a hook."""
+    if isinstance(event, HookExecutionEvent):
+        return event.blocked
+    if isinstance(event, UserRejectObservation):
+        return event.rejection_source == "hook"
+    return False
 
 
 class _ACPContext(Protocol):
@@ -106,6 +119,14 @@ class SharedEventHandler:
     ) -> None:
         await self.send_thought(ctx, str(event.visualize.plain))
 
+    async def handle_hook_execution(
+        self, ctx: _ACPContext, event: HookExecutionEvent
+    ) -> None:
+        text = _event_visualize_to_plain(event)
+        if event.blocked:
+            text = f"{HOOK_BLOCKED_HEADER}{text}"
+        await self.send_thought(ctx, text)
+
     async def handle_condensation(self, ctx: _ACPContext, event: Condensation) -> None:
         await self.send_thought(ctx, _event_visualize_to_plain(event))
 
@@ -117,11 +138,15 @@ class SharedEventHandler:
     async def handle_user_reject_or_agent_error(
         self, ctx: _ACPContext, event: UserRejectObservation | AgentErrorEvent
     ) -> None:
+        text = _event_visualize_to_plain(event)
+        # Prepend hook blocked header for hook rejections
+        if _is_hook_rejection(event):
+            text = f"{HOOK_BLOCKED_HEADER}{text}"
         await self.send_tool_progress(
             ctx,
             tool_call_id=event.tool_call_id,
             status="failed",
-            text=_event_visualize_to_plain(event),
+            text=text,
             raw_output=event.model_dump(),
         )
 

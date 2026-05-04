@@ -210,6 +210,97 @@ To view the generated SVG snapshots in a browser:
 - Do not embed API keys or endpoints in code; rely on runtime configuration/env vars when integrating new services.
 - When packaging, verify no sensitive files are included in `dist/`; adjust `openhands-cli.spec` if new assets are added.
 
+## Headless/JSON Mode for E2E Testing
+
+The CLI supports a headless JSON output mode useful for automated E2E testing without the TUI. This is particularly helpful for testing event flows (e.g., hook rejections) programmatically.
+
+### Running Headless Mode
+
+```bash
+# Basic headless run with JSON event output
+LLM_API_KEY=$LLM_API_KEY LLM_BASE_URL=https://llm-proxy.eval.all-hands.dev \
+  uv run openhands --headless --json --override-with-envs \
+  -t "Your task prompt here" > output.log 2>stderr.log &
+```
+
+- `--headless`: Runs without the TUI (no interactive UI)
+- `--json`: Outputs each event as a JSON object separated by `--JSON Event--` markers
+- `--override-with-envs`: Uses `LLM_API_KEY`/`LLM_BASE_URL` env vars instead of stored settings
+- `-t "..."`: The task/prompt to send to the agent
+- Run in background (`&`) so you can monitor logs with `grep`/`tail`
+
+### Analyzing JSON Output
+
+```bash
+# Count events
+grep -c "JSON Event" output.log
+
+# Search for specific event types
+grep '"kind": "HookExecutionEvent"' output.log
+grep '"blocked": true' output.log
+
+# View a specific event with context
+grep -B2 -A20 '"kind": "HookExecutionEvent"' output.log
+```
+
+### Using tmux for Interactive TUI Testing
+
+When you need to observe the actual TUI (not headless), use tmux:
+
+```bash
+# Start a tmux session
+tmux new-session -d -s test-cli -x 120 -y 40
+
+# Send the CLI command to tmux
+tmux send-keys -t test-cli 'cd /path/to/workspace && uv run openhands' Enter
+
+# Wait for startup, then send a task
+tmux send-keys -t test-cli 'your task prompt' Enter
+
+# Capture the screen to check output
+tmux capture-pane -t test-cli -p
+
+# Detach: Ctrl+b d (or programmatically)
+tmux detach -s test-cli
+
+# Kill when done
+tmux kill-session -t test-cli
+```
+
+### Testing Against the SDK Repo (Hook Testing)
+
+The `OpenHands/software-agent-sdk` repo has pre-commit hooks configured, making it a good workspace for testing hook behavior:
+
+```bash
+# Clone the SDK repo
+git clone https://github.com/OpenHands/software-agent-sdk.git /path/to/sdk
+
+# Run CLI in that workspace to trigger hooks
+cd /path/to/sdk
+LLM_API_KEY=$LLM_API_KEY LLM_BASE_URL=https://llm-proxy.eval.all-hands.dev \
+  /path/to/cli/.venv/bin/openhands --headless --json --override-with-envs \
+  -t "break the pre-commit and return finish" > /tmp/test.log 2>&1 &
+```
+
+### LLM Configuration for E2E Tests
+
+Agent settings are stored in `~/.openhands/agent_settings.json`. For E2E testing:
+- Use `--override-with-envs` flag with `LLM_API_KEY` and `LLM_BASE_URL` env vars
+- Or modify `~/.openhands/agent_settings.json` directly (remember to restore after)
+
+## SDK Event Flow: Hooks
+
+Understanding how the SDK emits events for different hook types is critical for CLI event handling:
+
+- **Stop hooks** (on finish): Emit `HookExecutionEvent` (with `blocked=true/false`) + `MessageEvent` with feedback. They do **not** produce `UserRejectObservation`.
+- **PreToolUse hooks** (before tool calls): Emit `HookExecutionEvent` + `UserRejectObservation(rejection_source="hook")` when blocked.
+- **Successful hooks** (not blocked): Emit `HookExecutionEvent` with `blocked=false`, `success=true`. These are typically hidden in the UI.
+
+Key SDK source locations:
+- `openhands-sdk/openhands/sdk/agent/agent.py`: `_ActionBatch` class creates `UserRejectObservation` with `rejection_source="hook"` for PreToolUse blocks (around L168-173)
+- `openhands-sdk/openhands/sdk/hook/hook_manager.py`: Hook execution and `HookExecutionEvent` emission
+- `openhands-sdk/openhands/sdk/event/event.py`: `HookExecutionEvent` class definition (fields: `hook_event_type`, `blocked`, `success`, `exit_code`, `reason`, `stdout`, `stderr`)
+
 ## TUI State Management Architecture
 
 The TUI uses a reactive state management pattern with clear separation of concerns. Key files are in `openhands_cli/tui/core/`.

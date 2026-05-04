@@ -34,6 +34,7 @@ from openhands.sdk.event import (
     Condensation,
     CondensationRequest,
     ConversationStateUpdateEvent,
+    HookExecutionEvent,
     ObservationEvent,
     PauseEvent,
     SystemPromptEvent,
@@ -172,6 +173,8 @@ class TokenBasedEventSubscriber:
             await self.shared_events_handler.handle_system_prompt(self, event)
         elif isinstance(event, PauseEvent):
             await self.shared_events_handler.handle_pause(self, event)
+        elif isinstance(event, HookExecutionEvent):
+            await self.shared_events_handler.handle_hook_execution(self, event)
         elif isinstance(event, Condensation):
             await self.shared_events_handler.handle_condensation(self, event)
         elif isinstance(event, CondensationRequest):
