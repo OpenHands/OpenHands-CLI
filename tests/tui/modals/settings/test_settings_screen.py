@@ -245,10 +245,10 @@ async def test_memory_condensation_enabled_with_existing_api_key(
 
 
 @pytest.mark.asyncio
-async def test_memory_condensation_disabled_without_api_key(
+async def test_memory_condensation_enabled_without_api_key(
     app, fake_agent_store: InMemoryAgentStore, test_agent_no_api_key: Agent
 ):
-    """Memory condensation disabled when no API key in saved agent."""
+    """Memory condensation remains editable without a saved API key."""
     app_obj, _ = app
     fake_agent_store.save(test_agent_no_api_key)
     screen = app_obj.settings_screen
@@ -261,14 +261,14 @@ async def test_memory_condensation_disabled_without_api_key(
         screen._load_current_settings()
     assert screen.api_key_input.value == ""
     assert "Current:" not in screen.api_key_input.placeholder
-    assert screen.memory_select.disabled is True
+    assert screen.memory_select.disabled is False
 
 
 @pytest.mark.asyncio
-async def test_memory_condensation_disabled_when_no_api_key(
+async def test_memory_condensation_enabled_when_no_api_key(
     app, fake_agent_store: InMemoryAgentStore
 ):
-    """Memory condensation disabled when API key input empty and no existing agent."""
+    """Memory condensation becomes editable once an LLM is configured."""
     app_obj, _ = app
     screen = app_obj.settings_screen
     screen.current_agent = None
@@ -280,7 +280,7 @@ async def test_memory_condensation_disabled_when_no_api_key(
     screen.model_select.value = "openai/gpt-4o"
     screen.api_key_input.value = ""
     screen._update_field_dependencies()
-    assert screen.memory_select.disabled is True
+    assert screen.memory_select.disabled is False
 
 
 #
@@ -333,7 +333,7 @@ async def test_cli_settings_tab_not_shown_during_initial_setup(fake_agent_store)
 
 @pytest.mark.asyncio
 async def test_basic_mode_dependency_chain(app):
-    """Provider -> model -> API key -> memory enabled chain in basic mode."""
+    """Provider -> model enables the remaining basic-mode controls."""
     app_obj, _ = app
     screen = app_obj.settings_screen
     assert screen is not None
@@ -347,7 +347,7 @@ async def test_basic_mode_dependency_chain(app):
     )
     screen.model_select.value = "openai/gpt-4o"
 
-    screen.api_key_input.value = "sk-123"
+    screen.api_key_input.value = ""
 
     screen._update_field_dependencies()
 
@@ -355,18 +355,21 @@ async def test_basic_mode_dependency_chain(app):
     assert screen.model_select.disabled is False
     assert screen.api_key_input.disabled is False
     assert screen.memory_select.disabled is False
+    assert screen.timeout_input.disabled is True
+    assert screen.max_tokens_input.disabled is True
+    assert screen.max_size_input.disabled is True
 
 
 @pytest.mark.asyncio
 async def test_advanced_mode_dependency_chain(app):
-    """Custom model drives base_url + API key + memory in advanced mode."""
+    """Advanced controls do not require an API key to become editable."""
     app_obj, _ = app
     screen = app_obj.settings_screen
     assert screen is not None
 
     screen.mode_select.value = "advanced"
     screen.custom_model_input.value = "my/custom"
-    screen.api_key_input.value = "sk-123"
+    screen.api_key_input.value = ""
 
     screen._update_field_dependencies()
 
@@ -374,6 +377,9 @@ async def test_advanced_mode_dependency_chain(app):
     assert screen.base_url_input.disabled is False
     assert screen.api_key_input.disabled is False
     assert screen.memory_select.disabled is False
+    assert screen.timeout_input.disabled is False
+    assert screen.max_tokens_input.disabled is False
+    assert screen.max_size_input.disabled is False
 
 
 #

@@ -313,29 +313,18 @@ class SettingsScreen(ModalScreen):
             self.basic_section.display = True
             self.advanced_section.display = False
 
-    def _has_existing_api_key(self) -> bool:
-        """Check if there's an existing API key in the agent."""
-        return bool(
-            self.current_agent
-            and self.current_agent.llm
-            and self.current_agent.llm.api_key
-        )
-
     def _update_field_dependencies(self) -> None:
         """Update field enabled/disabled state based on dependency chain."""
         try:
             mode = (
                 self.mode_select.value if hasattr(self.mode_select, "value") else None
             )
-            api_key = (
-                self.api_key_input.value.strip()
-                if hasattr(self.api_key_input, "value")
-                else ""
-            )
 
             # Dependency chain logic
             is_basic_mode = mode == "basic"
             is_advanced_mode = mode == "advanced"
+            basic_model_selected = False
+            advanced_model_configured = False
 
             # Basic mode fields
             if is_basic_mode:
@@ -354,15 +343,15 @@ class SettingsScreen(ModalScreen):
                     # Provider is always enabled in basic mode
                     self.provider_select.disabled = False
 
-                    # Model select: enabled when provider is selected
-                    self.model_select.disabled = not (
+                    provider_selected = bool(
                         provider and not isinstance(provider, NoSelection)
                     )
+                    self.model_select.disabled = not provider_selected
 
-                    # API Key: enabled when model is selected
-                    self.api_key_input.disabled = not (
+                    basic_model_selected = bool(
                         model and not isinstance(model, NoSelection)
                     )
+                    self.api_key_input.disabled = not basic_model_selected
                 except Exception:
                     pass
 
@@ -378,23 +367,16 @@ class SettingsScreen(ModalScreen):
                     # Custom model: always enabled in Advanced mode
                     self.custom_model_input.disabled = False
 
-                    # Base URL: enabled when custom model is entered
-                    self.base_url_input.disabled = not custom_model
-
-                    # API Key: enabled when custom model is entered
-                    self.api_key_input.disabled = not custom_model
+                    advanced_model_configured = bool(custom_model)
+                    self.base_url_input.disabled = not advanced_model_configured
+                    self.api_key_input.disabled = not advanced_model_configured
                 except Exception:
                     pass
 
-            # Memory Condensation: enabled when API key is provided
-            # or when there's an existing API key in the agent
-            self.memory_select.disabled = not (api_key or self._has_existing_api_key())
+            llm_config_ready = basic_model_selected or advanced_model_configured
+            self.memory_select.disabled = not llm_config_ready
 
-            # Advanced LLM settings (timeout, max_tokens, max_size):
-            # Only enabled in Advanced mode and when API key is provided
-            advanced_settings_enabled = is_advanced_mode and (
-                api_key or self._has_existing_api_key()
-            )
+            advanced_settings_enabled = is_advanced_mode and advanced_model_configured
             self.timeout_input.disabled = not advanced_settings_enabled
             self.max_tokens_input.disabled = not advanced_settings_enabled
             self.max_size_input.disabled = not advanced_settings_enabled
