@@ -192,6 +192,7 @@ class TestCliSettings:
                 critic_threshold=0.6,
                 issue_threshold=0.75,
                 max_refinement_iterations=3,
+                model_name="critic",
             ),
         )
 
@@ -208,6 +209,7 @@ class TestCliSettings:
                     "critic_threshold": 0.6,
                     "issue_threshold": 0.75,
                     "max_refinement_iterations": 3,
+                    "model_name": "critic",
                 },
             },
             indent=2,

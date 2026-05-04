@@ -28,6 +28,9 @@ class CriticSettings(BaseModel):
     critic_threshold: float = DEFAULT_CRITIC_THRESHOLD
     issue_threshold: float = DEFAULT_ISSUE_THRESHOLD
     max_refinement_iterations: int = DEFAULT_MAX_REFINEMENT_ITERATIONS
+    # Model name for the critic when using OpenAI-compatible endpoints
+    # (e.g., llama-server). Default: "critic"
+    model_name: str = "critic"
 
     @field_validator("critic_threshold", "issue_threshold")
     @classmethod
@@ -89,6 +92,7 @@ class CliSettings(BaseModel):
             "critic_threshold",
             "issue_threshold",
             "max_refinement_iterations",
+            "model_name",
         ]
         for field in legacy_critic_fields:
             if field in data:
