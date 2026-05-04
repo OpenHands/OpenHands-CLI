@@ -29,7 +29,7 @@ from openhands_cli.auth.api_client import (
 from openhands_cli.auth.utils import is_token_valid
 from openhands_cli.locations import MCP_CONFIG_FILE
 from openhands_cli.mcp.mcp_utils import MCPConfigurationError
-from openhands_cli.setup import load_agent_specs
+from openhands_cli.setup import load_agent_specs, strip_stop_hooks
 
 
 logger = logging.getLogger(__name__)
@@ -244,6 +244,10 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
         hook_config = HookConfig.load()
         if not hook_config.is_empty():
             logger.info("Hooks loaded from hooks.json")
+
+        # Strip stop hooks — they cause infinite loops and block pause when
+        # executed inside the SDK's run-loop state lock.
+        hook_config, _stop_matchers = strip_stop_hooks(hook_config)
 
         conversation = Conversation(
             agent=agent,
