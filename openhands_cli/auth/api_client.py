@@ -1,6 +1,7 @@
 """API client for fetching user data after OAuth authentication."""
 
 import html
+import json
 from typing import Any
 
 import httpx
@@ -31,6 +32,27 @@ def get_settings_path() -> str:
     return f"{get_persistence_dir()}/{AGENT_SETTINGS_PATH}"
 
 
+def _flatten_v1_settings(payload: dict[str, Any]) -> dict[str, Any]:
+    """Surface V1 nested settings fields under the legacy flat keys.
+
+    The /api/v1/settings response nests agent/LLM data under
+    ``agent_settings``, but the rest of the CLI still consumes the flat
+    keys (``llm_model``, ``llm_base_url``, ``agent``). Promote those without
+    discarding the original payload.
+    """
+    if not isinstance(payload, dict):
+        return payload
+    flat = dict(payload)
+    agent_settings = payload.get("agent_settings")
+    if isinstance(agent_settings, dict):
+        flat.setdefault("agent", agent_settings.get("agent"))
+        llm = agent_settings.get("llm")
+        if isinstance(llm, dict):
+            flat.setdefault("llm_model", llm.get("model"))
+            flat.setdefault("llm_base_url", llm.get("base_url"))
+    return flat
+
+
 class OpenHandsApiClient(BaseHttpClient):
     """Client for making authenticated API calls to OpenHands server."""
 
@@ -53,7 +75,16 @@ class OpenHandsApiClient(BaseHttpClient):
                     f"Authentication failed for {path!r}: {e}"
                 ) from e
             raise ApiClientError(f"Request to {path!r} failed: {e}") from e
-        return response.json()
+        try:
+            return response.json()
+        except json.JSONDecodeError as e:
+            # The SaaS server returns the SPA index.html (HTTP 200) for
+            # unknown API paths, which yields an opaque JSONDecodeError.
+            # Surface a useful message naming the path and status instead.
+            raise ApiClientError(
+                f"Request to {path!r} returned a non-JSON response "
+                f"(HTTP {response.status_code})"
+            ) from e
 
     async def get_user_info(self) -> dict[str, Any]:
         """Get user information from the API.
@@ -65,14 +96,15 @@ class OpenHandsApiClient(BaseHttpClient):
             UnauthenticatedError: If the user is not authenticated (401 response)
             ApiClientError: For other API errors
         """
-        return await self._get_json("/api/user/info")
+        return await self._get_json("/api/v1/users/me")
 
     async def get_llm_api_key(self) -> str | None:
         result = await self._get_json("/api/keys/llm/byor")
         return result.get("key")
 
     async def get_user_settings(self) -> dict[str, Any]:
-        return await self._get_json("/api/settings")
+        payload = await self._get_json("/api/v1/settings")
+        return _flatten_v1_settings(payload)
 
     async def create_conversation(
         self, json_data: dict[str, Any] | None = None
