@@ -426,8 +426,15 @@ class TestDeviceFlowClient:
                 mock_poll.side_effect = DeviceFlowError("Polling failed")
 
                 with patch("openhands_cli.auth.device_flow.console_print"):
-                    with pytest.raises(DeviceFlowError, match="Polling failed"):
-                        await client.authenticate()
+                    with patch(
+                        "openhands_cli.auth.device_flow.webbrowser.open"
+                    ) as mock_open:
+                        with pytest.raises(DeviceFlowError, match="Polling failed"):
+                            await client.authenticate()
+
+                        mock_open.assert_called_once_with(
+                            "https://example.com/device?user_code=USER123"
+                        )
 
 
 @pytest.mark.asyncio
