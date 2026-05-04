@@ -22,6 +22,27 @@ Widget Hierarchy:
         ├── WorkingStatusLine
         ├── InputField
         └── InfoStatusLine
+
+State Transitions:
+    The key state variables and their transitions:
+
+    conversation_id:
+        None ──[create/switch]──> UUID ──[switch]──> None (briefly) ──> UUID
+
+    running:
+        False ──[user_message]──> True ──[finish/error]──> False
+                                       ──[pause]──> False
+
+    pending_action_count:
+        0 ──[actions_pending]──> N ──[approve/reject]──> 0
+
+    Typical flow:
+        1. App starts: conversation_id=None, running=False
+        2. User sends message: running=True
+        3. Agent runs: pending_action_count may increase if policy requires confirmation
+        4. User approves/rejects: pending_action_count=0
+        5. Agent finishes: running=False
+        6. Switch conversation: conversation_id=None briefly, then new UUID
 """
 
 import threading
