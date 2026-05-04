@@ -319,6 +319,7 @@ class AgentStore:
         *,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
+        plugins_dirs: list[str] | None = None,
     ) -> Agent | None:
         """Load an Agent and apply runtime configuration.
 
@@ -339,6 +340,7 @@ class AgentStore:
                 LLM metadata tagging.
             env_overrides_enabled: Whether env overrides are enabled.
             critic_disabled: If True, do not configure a critic.
+            plugins_dirs: Optional list of directories to load plugins (skills) from.
 
         Returns:
             A fully configured Agent, or None if no persisted agent exists and
@@ -364,6 +366,7 @@ class AgentStore:
             agent,
             session_id,
             critic_disabled=critic_disabled,
+            plugins_dirs=plugins_dirs,
         )
 
     def _resolve_tools(self, session_id: str | None) -> list[Tool]:
@@ -406,6 +409,7 @@ class AgentStore:
 
     def _build_agent_context(self) -> AgentContext:
         skills = load_project_skills(get_work_dir())
+
         system_suffix = "\n".join(
             [
                 f"Your current working directory is: {get_work_dir()}",
@@ -439,6 +443,7 @@ class AgentStore:
         session_id: str | None = None,
         *,
         critic_disabled: bool = False,
+        plugins_dirs: list[str] | None = None,
     ) -> Agent:
         updated_tools = self._resolve_tools(session_id)
         updated_llm = self._with_llm_metadata(
@@ -447,8 +452,22 @@ class AgentStore:
 
         agent_context = self._build_agent_context()
 
+        # Start with enabled MCP servers from global config
         enabled_servers = list_enabled_servers()
-        mcp_config = {"mcpServers": enabled_servers} if enabled_servers else {}
+        mcp_config: dict[str, Any] = (
+            {"mcpServers": enabled_servers} if enabled_servers else {}
+        )
+
+        # Load and merge plugins from custom directories
+        if plugins_dirs:
+            from openhands_cli.plugins import load_plugins_from_dirs
+
+            plugins = load_plugins_from_dirs(plugins_dirs)
+            for plugin in plugins:
+                # Merge skills into agent context
+                agent_context = plugin.add_skills_to(agent_context)
+                # Merge MCP config (plugin config takes precedence)
+                mcp_config = plugin.add_mcp_config_to(mcp_config)
 
         condenser = self._maybe_build_condenser(agent, session_id=session_id)
 

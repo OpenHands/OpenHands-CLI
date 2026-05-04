@@ -139,6 +139,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         json_mode: bool = False,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
+        plugins_dirs: list[str] | None = None,
         **kwargs,
     ) -> None:
         """Initialize the app with custom OpenHands theme.
@@ -155,6 +156,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             env_overrides_enabled: If True, environment variables will override
                                    stored LLM settings.
             critic_disabled: If True, critic functionality will be disabled.
+            plugins_dirs: Optional list of directories to load plugins (skills) from.
         """
         super().__init__(**kwargs)
 
@@ -184,6 +186,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             json_mode=json_mode,
             env_overrides_enabled=env_overrides_enabled,
             critic_disabled=critic_disabled,
+            plugins_dirs=plugins_dirs,
         )
 
         self.conversation_manager = ConversationManager(
@@ -690,6 +693,7 @@ def main(
     json_mode: bool = False,
     env_overrides_enabled: bool = False,
     critic_disabled: bool = False,
+    plugins_dirs: list[str] | None = None,
 ) -> uuid.UUID | None:
     """Run the textual app.
 
@@ -704,6 +708,7 @@ def main(
         env_overrides_enabled: If True, environment variables will override
             stored LLM settings.
         critic_disabled: If True, critic functionality will be disabled.
+        plugins_dirs: Optional list of directories to load plugins (skills) from.
 
     Raises:
         MissingEnvironmentVariablesError: If env_overrides_enabled is True but
@@ -739,6 +744,7 @@ def main(
         json_mode=json_mode,
         env_overrides_enabled=env_overrides_enabled,
         critic_disabled=critic_disabled,
+        plugins_dirs=plugins_dirs,
     )
 
     app.run(headless=headless)
