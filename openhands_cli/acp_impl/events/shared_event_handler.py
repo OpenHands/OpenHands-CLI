@@ -55,6 +55,17 @@ def _event_visualize_to_plain(event: Event) -> str:
 
 
 class _ACPContext(Protocol):
+    """Protocol defining the context required for ACP event handling.
+
+    This protocol abstracts the session context needed by SharedEventHandler
+    to send updates to ACP clients. Implementations must provide:
+
+    Attributes:
+        session_id: Unique identifier for the current ACP session.
+        conn: ACP Client connection for sending session updates.
+        conversation: The active conversation, or None if not yet initialized.
+    """
+
     session_id: str
     conn: Client
     conversation: BaseConversation | None
