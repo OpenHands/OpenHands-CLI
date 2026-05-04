@@ -22,10 +22,14 @@ COMMANDS = [
     DropdownItem(main="/settings - Open settings"),
     DropdownItem(main="/confirm - Configure confirmation settings"),
     DropdownItem(main="/condense - Condense conversation history"),
+    DropdownItem(main="/skill - Manage installed skills (install/enable/disable/...)"),
     DropdownItem(main="/skills - View loaded skills, hooks, and MCPs"),
     DropdownItem(main="/feedback - Send anonymous feedback about CLI"),
     DropdownItem(main="/exit - Exit the application"),
 ]
+
+# Commands that accept subcommands/arguments (prefix-matched)
+PREFIX_COMMANDS = {"/skill"}
 
 
 def get_valid_commands() -> set[str]:
@@ -47,15 +51,24 @@ def get_valid_commands() -> set[str]:
 
 
 def is_valid_command(user_input: str) -> bool:
-    """Check if user input is an exact match for a valid command.
+    """Check if user input is a valid command.
+
+    Supports exact matches (e.g. /help) and prefix matches for commands
+    that accept subcommands (e.g. /skill install foo).
 
     Args:
         user_input: The user's input string
 
     Returns:
-        True if input exactly matches a valid command, False otherwise
+        True if input matches a valid command, False otherwise
     """
-    return user_input in get_valid_commands()
+    if user_input in get_valid_commands():
+        return True
+    # Check prefix commands (e.g. "/skill install foo" starts with "/skill ")
+    for prefix in PREFIX_COMMANDS:
+        if user_input.startswith(prefix + " ") or user_input == prefix:
+            return True
+    return False
 
 
 def show_help(scroll_view: VerticalScroll) -> None:
@@ -77,6 +90,7 @@ def show_help(scroll_view: VerticalScroll) -> None:
   [{secondary}]/settings[/{secondary}] - Open settings
   [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
   [{secondary}]/condense[/{secondary}] - Condense conversation history
+  [{secondary}]/skill[/{secondary}] - Manage installed skills
   [{secondary}]/skills[/{secondary}] - View loaded skills, hooks, and MCPs
   [{secondary}]/feedback[/{secondary}] - Send anonymous feedback about CLI
   [{secondary}]/exit[/{secondary}] - Exit the application

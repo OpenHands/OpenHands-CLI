@@ -36,6 +36,7 @@ a = Analysis(
         *collect_data_files('openhands.sdk'),
         *collect_data_files('openhands.tools'),
         *collect_data_files('browser_use'),
+        *collect_data_files('binaryornot'),
         # Include all data files from openhands_cli package
         *collect_data_files('openhands_cli'),
         # Include package metadata for importlib.metadata
