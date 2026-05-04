@@ -11,7 +11,7 @@ import logging
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from acp import (
     Agent as ACPAgent,
@@ -45,6 +45,11 @@ from openhands.sdk import (
     BaseConversation,
     Message,
 )
+
+
+if TYPE_CHECKING:
+    from openhands.sdk import LocalConversation
+
 from openhands_cli import __version__
 from openhands_cli.acp_impl.agent.util import AgentType, get_session_mode_state
 from openhands_cli.acp_impl.confirmation import ConfirmationMode
@@ -58,6 +63,7 @@ from openhands_cli.acp_impl.slash_commands import (
     get_confirmation_mode_from_conversation,
     get_unknown_command_text,
     handle_confirm_argument,
+    handle_model_argument,
     parse_slash_command,
     validate_confirmation_mode,
 )
@@ -66,6 +72,7 @@ from openhands_cli.acp_impl.utils import (
     convert_acp_prompt_to_message_content,
 )
 from openhands_cli.auth.token_storage import TokenStorage
+from openhands_cli.locations import get_profiles_dir
 from openhands_cli.setup import MissingAgentSpec
 from openhands_cli.utils import extract_text_from_message_content
 
@@ -184,9 +191,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             ),
         )
 
-    async def _set_confirmation_mode(
-        self, session_id: str, mode: ConfirmationMode
-    ) -> None:
+    def _set_confirmation_mode(self, session_id: str, mode: ConfirmationMode) -> None:
         """Set confirmation mode for a session."""
         if session_id in self._active_sessions:
             conversation = self._active_sessions[session_id]
@@ -198,7 +203,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                 "session not found"
             )
 
-    async def _cmd_confirm(self, session_id: str, argument: str) -> str:
+    def _cmd_confirm(self, session_id: str, argument: str) -> str:
         """Handle /confirm command.
 
         Args:
@@ -217,8 +222,61 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
 
         response_text, new_mode = handle_confirm_argument(current_mode, argument)
         if new_mode is not None:
-            await self._set_confirmation_mode(session_id, new_mode)
+            self._set_confirmation_mode(session_id, new_mode)
 
+        return response_text
+
+    def _get_local_conversation(self, session_id: str) -> LocalConversation | None:
+        """Return the ``LocalConversation`` for *session_id*, or ``None``."""
+        from openhands.sdk import LocalConversation
+
+        conversation = self._active_sessions.get(session_id)
+        if isinstance(conversation, LocalConversation):
+            return conversation
+        return None
+
+    def _get_current_model(self, session_id: str) -> str:
+        """Return the active model identifier for a session, or ``'unknown'``."""
+        conversation = self._get_local_conversation(session_id)
+        if conversation is None:
+            return "unknown"
+        model = conversation.agent.llm.model
+        return model if model.strip() else "unknown"
+
+    def _switch_session_model(self, session_id: str, profile_name: str) -> None:
+        """Switch the LLM for an active session to a saved profile.
+
+        Loads the named profile via ``LocalConversation.switch_profile``.
+        The profile must already exist in ``~/.openhands/profiles/``.
+        """
+        conversation = self._get_local_conversation(session_id)
+        if conversation is None:
+            logger.warning(
+                "Cannot switch model: session %s not found",
+                session_id,
+            )
+            return
+
+        conversation.switch_profile(profile_name)
+        logger.info(
+            "Switched session %s to profile %s",
+            session_id,
+            profile_name,
+        )
+
+    def _cmd_model(self, session_id: str, argument: str) -> str:
+        """Handle /model command."""
+        current_model = self._get_current_model(session_id)
+        response_text, new_model = handle_model_argument(current_model, argument)
+        if new_model is not None:
+            try:
+                self._switch_session_model(session_id, new_model)
+            except FileNotFoundError:
+                profiles_dir = get_profiles_dir()
+                return (
+                    f"Profile '{new_model}' not found.\n\n"
+                    f"Profiles live in {profiles_dir}/<name>.json"
+                )
         return response_text
 
     async def initialize(
@@ -319,7 +377,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             )
 
         confirmation_mode: ConfirmationMode = cast(ConfirmationMode, mode_id)
-        await self._set_confirmation_mode(session_id, confirmation_mode)
+        self._set_confirmation_mode(session_id, confirmation_mode)
 
         await self._conn.session_update(
             session_id=session_id,
@@ -330,12 +388,14 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
 
     async def set_session_model(
         self,
-        model_id: str,  # noqa: ARG002
+        model_id: str,
         session_id: str,
         **_kwargs: Any,
     ) -> SetSessionModelResponse | None:
-        """Set session model (no-op for now)."""
-        logger.info(f"Set session model requested: {session_id}")
+        """Set session model for an active conversation."""
+        logger.info(f"Set session model requested: {session_id} -> {model_id}")
+        if model_id.strip():
+            self._switch_session_model(session_id=session_id, profile_name=model_id)
         return SetSessionModelResponse()
 
     async def set_config_option(
@@ -546,7 +606,9 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                 if command == "help":
                     response_text = create_help_text()
                 elif command == "confirm":
-                    response_text = await self._cmd_confirm(session_id, argument)
+                    response_text = self._cmd_confirm(session_id, argument)
+                elif command == "model":
+                    response_text = self._cmd_model(session_id, argument)
                 else:
                     response_text = get_unknown_command_text(command)
 

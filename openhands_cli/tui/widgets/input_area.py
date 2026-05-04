@@ -29,7 +29,7 @@ from textual.containers import Container
 from textual.reactive import var
 
 from openhands_cli.tui.core.commands import show_help, show_skills
-from openhands_cli.tui.messages import SlashCommandSubmitted
+from openhands_cli.tui.messages import SendMessage, SlashCommandSubmitted
 
 
 if TYPE_CHECKING:
@@ -92,6 +92,11 @@ class InputAreaContainer(Container):
                 self._command_feedback()
             case "exit":
                 self._command_exit()
+            case "model":
+                # Forwarded to ACP as a regular message; ACP handles
+                # slash-command parsing and profile switching.
+                self.post_message(SendMessage(content=f"/{event.command}"))
+                return
             case _:
                 self.app.notify(
                     title="Unknown Command",

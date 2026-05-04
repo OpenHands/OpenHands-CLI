@@ -1,10 +1,11 @@
-"""Integration tests for confirmation mode switching in ACP agent."""
+"""Integration tests for confirmation mode and model switching in ACP agent."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from acp.schema import TextContentBlock
 
+from openhands.sdk import LocalConversation
 from openhands.sdk.security.confirmation_policy import (
     AlwaysConfirm,
     NeverConfirm,
@@ -491,3 +492,79 @@ class TestSlashCommandIntegration:
                 get_confirmation_mode_from_conversation(conversation)
                 == "always-approve"
             )
+
+    @pytest.mark.asyncio
+    async def test_model_command_delegates_to_switch_session_model(
+        self, acp_agent, tmp_path
+    ):
+        """Test that /model delegates to _switch_session_model via SDK API."""
+        with (
+            patch(
+                "openhands_cli.acp_impl.agent.local_agent.load_agent_specs"
+            ) as mock_load,
+            patch("openhands_cli.acp_impl.agent.local_agent.Conversation") as mock_conv,
+            patch.object(acp_agent, "_switch_session_model") as mock_switch,
+        ):
+            mock_agent = MagicMock()
+            mock_agent.llm.model = "test-model"
+            mock_load.return_value = mock_agent
+
+            mock_conversation = create_mock_conversation_with_policy()
+            mock_conv.return_value = mock_conversation
+
+            response = await acp_agent.new_session(cwd=str(tmp_path), mcp_servers=[])
+            session_id = response.session_id
+
+            await acp_agent.prompt(
+                session_id=session_id,
+                prompt=[
+                    TextContentBlock(
+                        type="text",
+                        text="/model anthropic/claude-opus-4-6",
+                    )
+                ],
+            )
+
+            mock_switch.assert_called_once_with(session_id, "anthropic/claude-opus-4-6")
+
+
+class TestSwitchSessionModel:
+    """Unit tests for _switch_session_model (profile-based switching)."""
+
+    @pytest.fixture
+    def acp_agent(self):
+        conn = AsyncMock()
+        return LocalOpenHandsACPAgent(conn, "always-ask")
+
+    def test_switches_to_profile(self, acp_agent):
+        """Verify switch_profile is called with the profile name."""
+        mock_conversation = MagicMock(spec=LocalConversation)
+        mock_conversation.agent = MagicMock()
+        acp_agent._active_sessions["s1"] = mock_conversation
+
+        acp_agent._switch_session_model("s1", "my-fast-profile")
+
+        mock_conversation.switch_profile.assert_called_once_with("my-fast-profile")
+
+    def test_skips_when_session_not_found(self, acp_agent):
+        """Verify no-op when session is not in _active_sessions."""
+        acp_agent._switch_session_model("missing", "some-profile")
+
+    def test_skips_when_conversation_is_not_local(self, acp_agent):
+        """Verify no-op when conversation is not a LocalConversation."""
+        acp_agent._active_sessions["s1"] = MagicMock()
+        acp_agent._switch_session_model("s1", "some-profile")
+
+    def test_missing_profile_returns_error_text(self, acp_agent):
+        """_cmd_model returns helpful message when profile not found."""
+        mock_conversation = MagicMock(spec=LocalConversation)
+        mock_conversation.agent = MagicMock()
+        mock_conversation.agent.llm.model = "current-model"
+        mock_conversation.switch_profile.side_effect = FileNotFoundError
+        acp_agent._active_sessions["s1"] = mock_conversation
+
+        result = acp_agent._cmd_model("s1", "nope")
+
+        assert "not found" in result
+        assert "nope" in result
+        assert "profiles" in result

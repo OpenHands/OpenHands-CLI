@@ -1,6 +1,7 @@
 """Slash commands implementation for ACP."""
 
 import logging
+from pathlib import Path
 
 from acp.schema import AvailableCommand, AvailableCommandInput, UnstructuredCommandInput
 
@@ -12,6 +13,7 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
 from openhands_cli.acp_impl.confirmation import CONFIRMATION_MODES, ConfirmationMode
+from openhands_cli.locations import get_profiles_dir
 from openhands_cli.shared.slash_commands import (
     parse_slash_command as parse_slash_command,
 )
@@ -49,6 +51,13 @@ def get_available_slash_commands() -> list[AvailableCommand]:
             description=f"Control confirmation mode ({mode_list})",
             input=AvailableCommandInput(
                 root=UnstructuredCommandInput(hint=mode_options),
+            ),
+        ),
+        AvailableCommand(
+            name="model",
+            description="Show or set current session model",
+            input=AvailableCommandInput(
+                root=UnstructuredCommandInput(hint="profile-name"),
             ),
         ),
     ]
@@ -119,6 +128,86 @@ def get_confirm_success_text(mode: ConfirmationMode) -> str:
         Formatted success text
     """
     return f"Confirmation mode set to: {mode}\n\n{CONFIRMATION_MODES[mode]['long']}"
+
+
+def _list_profile_names() -> list[str]:
+    """Return sorted profile names from the profiles directory."""
+    profile_dir = Path(get_profiles_dir())
+    if not profile_dir.is_dir():
+        logger.debug("Profiles directory does not exist: %s", profile_dir)
+        return []
+    try:
+        return sorted(
+            p.stem for p in profile_dir.glob("*.json") if not p.stem.startswith(".")
+        )
+    except (OSError, PermissionError):
+        logger.warning(
+            "Unable to read profiles directory: %s",
+            profile_dir,
+            exc_info=True,
+        )
+        return []
+
+
+def get_model_help_text(current_model: str) -> str:
+    """Get help text for /model command.
+
+    Args:
+        current_model: Current model id
+
+    Returns:
+        Formatted help text
+    """
+    profiles = _list_profile_names()
+    profiles_dir = get_profiles_dir()
+    if profiles:
+        profile_list = "\n".join(f"  - {p}" for p in profiles)
+    else:
+        profile_list = "  (no profiles saved)"
+    return (
+        f"Current model: {current_model}\n\n"
+        f"Usage: /model <profile>\n"
+        f"Example: /model my-fast-profile\n\n"
+        f"Profiles in {profiles_dir}:\n"
+        f"{profile_list}"
+    )
+
+
+def get_model_success_text(previous_model: str, new_model: str) -> str:
+    """Get success text after changing model.
+
+    Args:
+        previous_model: Previous model id
+        new_model: New model id
+
+    Returns:
+        Formatted success text
+    """
+    if previous_model == new_model:
+        return f"Model unchanged: {new_model}"
+
+    return f"Model set to: {new_model}\nPrevious model: {previous_model}"
+
+
+def handle_model_argument(current_model: str, argument: str) -> tuple[str, str | None]:
+    """Handle /model command and return response.
+
+    This is a pure function that computes the response text and new model
+    without any side effects.
+
+    Args:
+        current_model: Current model id for the session
+        argument: Command argument (model id to set, or empty for help)
+
+    Returns:
+        Tuple of (response_text, new_model_or_none). new_model is None if
+        no model change should occur (help text).
+    """
+    new_model = argument.strip()
+    if not new_model:
+        return get_model_help_text(current_model), None
+
+    return get_model_success_text(current_model, new_model), new_model
 
 
 def validate_confirmation_mode(mode_str: str) -> ConfirmationMode | None:
