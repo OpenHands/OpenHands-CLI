@@ -13,6 +13,7 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands_cli.acp_impl.confirmation import ask_user_confirmation_acp
+from openhands_cli.shared import handle_confirmation_decision
 from openhands_cli.user_actions.types import UserConfirmation
 
 
@@ -109,17 +110,15 @@ async def _handle_confirmation_request(
     decision = result.decision
     policy_change = result.policy_change
 
-    # Handle user's decision
-    if decision == UserConfirmation.REJECT:
-        logger.info("User rejected pending actions")
-        conversation.reject_pending_actions(
-            result.reason or "User rejected the actions"
+    # Handle user's decision (reject/defer)
+    if decision in (UserConfirmation.REJECT, UserConfirmation.DEFER):
+        if decision == UserConfirmation.REJECT:
+            logger.info("User rejected pending actions")
+        else:
+            logger.info("User deferred decision, pausing conversation")
+        handle_confirmation_decision(
+            conversation, decision, result.reason or "User rejected the actions"
         )
-        return decision
-
-    if decision == UserConfirmation.DEFER:
-        logger.info("User deferred decision, pausing conversation")
-        conversation.pause()
         return decision
 
     # Handle policy changes
