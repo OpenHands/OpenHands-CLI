@@ -7,11 +7,29 @@ preservation logic, and verifying that the saved `Agent` retains the original
 timeout.
 """
 
+import pytest
+
+import openhands_cli.tui.modals.settings.utils as settings_utils
 from openhands.sdk import LLM, Agent
 from openhands_cli.tui.modals.settings.utils import SettingsFormData, save_settings
 
 
-def test_invalid_timeout_keeps_existing_value():
+class FakeAgentStore:
+    def __init__(self) -> None:
+        self.saved_agents: list[Agent] = []
+
+    def save(self, agent: Agent) -> None:
+        self.saved_agents.append(agent)
+
+
+@pytest.fixture
+def deps(monkeypatch) -> FakeAgentStore:
+    fake_store = FakeAgentStore()
+    monkeypatch.setattr(settings_utils, "agent_store", fake_store)
+    return fake_store
+
+
+def test_invalid_timeout_keeps_existing_value(deps: FakeAgentStore):
     # Existing agent with a known timeout (e.g., 120 seconds)
     existing_llm = LLM(
         model="openai/gpt-4o",
@@ -41,4 +59,6 @@ def test_invalid_timeout_keeps_existing_value():
     assert result.success
     # The saved agent should retain the original timeout (120 seconds)
     assert result.error_message is None
+    assert deps.saved_agents
+    assert deps.saved_agents[-1].llm.timeout == 120
     assert existing_agent.llm.timeout == 120
