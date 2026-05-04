@@ -1500,3 +1500,67 @@ class TestDefaultAgentPrefixBehavior:
         assert "(Code Reviewer Agent)" in title
         # Should contain the command
         assert "git diff" in title
+
+
+class TestRichTextPreservation:
+    """Tests that Rich Text styling is preserved through the rendering pipeline.
+
+    Relates to: https://github.com/OpenHands/OpenHands-CLI/issues/308
+    """
+
+    def test_build_observation_content_returns_text_object(self, visualizer):
+        """_build_observation_content should return Text, not str."""
+        event = AgentErrorEvent(
+            tool_name="terminal",
+            tool_call_id="call_1",
+            error="test error",
+        )
+        result = visualizer._build_observation_content(event)
+        assert isinstance(result, Text)
+
+    def test_build_observation_content_preserves_styles(self, visualizer):
+        """_build_observation_content should preserve Rich Text spans/styles."""
+        event = AgentErrorEvent(
+            tool_name="terminal",
+            tool_call_id="call_1",
+            error="test error",
+        )
+        result = visualizer._build_observation_content(event)
+        # The Text object should have style spans (bold "Tool:", etc.)
+        assert isinstance(result, Text)
+        assert len(result._spans) > 0, "Text object should have style spans"
+
+    def test_create_titled_collapsible_passes_text_object(
+        self, visualizer, mock_cli_settings
+    ):
+        """_create_titled_collapsible should pass Text to collapsible, not str."""
+        event = ConversationErrorEvent(
+            source="agent",
+            code="test_error",
+            detail="Test error",
+        )
+        with mock_cli_settings(visualizer=visualizer):
+            collapsible = visualizer._create_titled_collapsible(event, "Test Error")
+        # Content widget should have received a Text object, not plain str
+        content = collapsible._content_widget._Static__content
+        assert isinstance(content, Text)
+
+    def test_create_event_collapsible_action_preserves_text(
+        self, visualizer, mock_cli_settings
+    ):
+        """Action collapsible content should be Text, not escaped str."""
+        action = RichLogMockAction(command="test")
+        tool_call = create_tool_call("call_1", "test")
+        event = ActionEvent(
+            thought=[TextContent(text="testing")],
+            action=action,
+            tool_name="test",
+            tool_call_id="call_1",
+            tool_call=tool_call,
+            llm_response_id="resp_1",
+        )
+        with mock_cli_settings(visualizer=visualizer):
+            collapsible = visualizer._create_event_collapsible(event)
+        assert collapsible is not None
+        # Verify it was stored in pending actions
+        assert "call_1" in visualizer._pending_actions
