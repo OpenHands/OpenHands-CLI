@@ -19,11 +19,8 @@ from openhands_cli.shared.slash_commands import (
 
 logger = logging.getLogger(__name__)
 
-VALID_CONFIRMATION_MODE: list[ConfirmationMode] = [
-    "always-ask",
-    "always-approve",
-    "llm-approve",
-]
+# Valid modes are CONFIRMATION_MODES keys
+VALID_CONFIRMATION_MODE: list[ConfirmationMode] = list(CONFIRMATION_MODES.keys())
 
 
 def get_available_slash_commands() -> list[AvailableCommand]:
