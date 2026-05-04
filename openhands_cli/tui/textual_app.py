@@ -558,7 +558,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         # Auto-focus input when user types printable characters
         if event.is_printable and not isinstance(self.focused, Input | TextArea):
+            # Store the character before changing focus so it can be inserted
+            char = event.character
             self.input_field.focus_input()
+            if char:
+                self.input_field.active_input_widget.insert(char)
+            # Prevent the key from being processed elsewhere
+            event.stop()
 
     def _is_autocomplete_showing(self) -> bool:
         """Check if the autocomplete dropdown is currently visible.
