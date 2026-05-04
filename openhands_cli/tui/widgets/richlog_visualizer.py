@@ -276,6 +276,10 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
     def on_event(self, event: Event) -> None:
         """Main event handler that creates widgets for events."""
+        # Dismiss any pending critic feedback widgets when new events arrive,
+        # since the agent has continued working (user didn't interact with them)
+        self._run_on_main_thread(self._dismiss_pending_feedback_widgets)
+
         # Check for TaskTrackerObservation to update/open the plan panel
         if isinstance(event, ObservationEvent) and isinstance(
             event.observation, TaskTrackerObservation

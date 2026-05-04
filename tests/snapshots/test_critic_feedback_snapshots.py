@@ -13,7 +13,7 @@ from typing import ClassVar
 from unittest.mock import MagicMock
 
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal
+from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Button, Footer, Static
 
 from openhands_cli.theme import OPENHANDS_THEME
@@ -122,5 +122,50 @@ class TestCriticFeedbackWidgetSnapshots:
 
         assert snap_compare(
             CriticFeedbackTestApp(),
+            terminal_size=(100, 20),
+        )
+
+    def test_critic_feedback_widget_inside_vertical_scroll(self, snap_compare):
+        """Snapshot test: feedback widget inside VerticalScroll (real app context).
+
+        In the real app, CriticFeedbackWidget is mounted inside a VerticalScroll
+        container. This test reproduces the layout context to verify all 5 buttons
+        are visible.
+
+        Relates to: https://github.com/OpenHands/OpenHands-CLI/issues/641
+        """
+
+        class CriticFeedbackInScrollApp(App):
+            CSS = """
+            Screen {
+                background: $background;
+            }
+            #scroll_view {
+                width: 100%;
+                height: 1fr;
+            }
+            #content {
+                width: 100%;
+                height: auto;
+                padding: 1;
+            }
+            """
+
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+                self.register_theme(OPENHANDS_THEME)
+                self.theme = OPENHANDS_THEME.name
+
+            def compose(self) -> ComposeResult:
+                with VerticalScroll(id="scroll_view"):
+                    yield Static(
+                        "Sample conversation content above the widget",
+                        id="content",
+                    )
+                    yield MockCriticFeedbackWidget()
+                yield Footer()
+
+        assert snap_compare(
+            CriticFeedbackInScrollApp(),
             terminal_size=(100, 20),
         )

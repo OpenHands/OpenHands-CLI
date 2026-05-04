@@ -1,7 +1,7 @@
 """Tests for ConversationVisualizer and Chinese character markup handling."""
 
 from typing import TYPE_CHECKING, cast
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from rich.errors import MarkupError
@@ -1258,8 +1258,6 @@ class TestRenderUserMessage:
 
     def test_render_user_message_creates_static_widget(self):
         """render_user_message should create a Static widget with user message."""
-        from unittest.mock import MagicMock
-
         app = MagicMock()
         container = MagicMock()
         visualizer = ConversationVisualizer(container, app)
@@ -1283,8 +1281,6 @@ class TestRenderUserMessage:
 
     def test_render_user_message_format(self):
         """render_user_message should prefix content with '> '."""
-        from unittest.mock import MagicMock
-
         app = MagicMock()
         container = MagicMock()
         visualizer = ConversationVisualizer(container, app)
@@ -1500,3 +1496,86 @@ class TestDefaultAgentPrefixBehavior:
         assert "(Code Reviewer Agent)" in title
         # Should contain the command
         assert "git diff" in title
+
+
+# ============================================================================
+# Tests for critic feedback widget dismissal on new events (GitHub issue #641)
+# ============================================================================
+
+
+class TestCriticFeedbackDismissalOnNewEvent:
+    """Tests that CriticFeedbackWidget is dismissed when new events arrive.
+
+    Relates to: https://github.com/OpenHands/OpenHands-CLI/issues/641
+    The critic feedback buttons ("[1] Accurate", etc.) should not remain visible
+    when subsequent events/actions appear in the conversation history.
+    """
+
+    async def test_feedback_widget_removed_from_dom_on_new_event(
+        self, mock_cli_settings
+    ):
+        """CriticFeedbackWidget should be removed from the DOM when on_event fires.
+
+        Scenario:
+        1. A CriticFeedbackWidget is mounted in a VerticalScroll container
+        2. A new action event arrives via on_event()
+        3. The feedback widget should be removed from the container
+
+        This is an integration test using Textual's async test framework
+        to verify actual DOM state, not just method calls.
+        """
+        from textual.app import ComposeResult
+
+        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
+
+        # Create a mock CriticResult
+        mock_result = MagicMock()
+        mock_result.score = 0.65
+        mock_result.success = True
+        mock_result.metadata = {"event_ids": ["test-event-1"]}
+
+        class FeedbackTestApp(App):
+            """Minimal app to test feedback widget dismissal."""
+
+            def compose(self) -> ComposeResult:
+                yield VerticalScroll(id="scroll_view")
+
+        app = FeedbackTestApp()
+
+        async with app.run_test() as pilot:
+            container = pilot.app.query_one("#scroll_view", VerticalScroll)
+
+            # Mount a CriticFeedbackWidget (simulating what the visualizer does)
+            feedback_widget = CriticFeedbackWidget(
+                critic_result=mock_result,
+                conversation_id="test-conv-123",
+            )
+            await container.mount(feedback_widget)
+            await pilot.pause()
+
+            # Verify the feedback widget is in the DOM
+            feedback_widgets = container.query(CriticFeedbackWidget)
+            assert len(feedback_widgets) == 1, (
+                "CriticFeedbackWidget should be mounted in the container"
+            )
+
+            # Create a visualizer pointing at the same container
+            visualizer = ConversationVisualizer(container, pilot.app)  # type: ignore[arg-type]
+            # Run on main thread directly (we're already in the event loop)
+            visualizer._run_on_main_thread = lambda func, *args: func(*args)  # type: ignore[method-assign]
+            # Prevent actual widget mounting in on_event
+            visualizer._add_widget_to_ui = MagicMock()  # type: ignore[method-assign]
+
+            # Fire a new event — this should dismiss the feedback widget
+            event = create_terminal_action_event("echo hello", "Say hello")
+            with mock_cli_settings(visualizer=visualizer):
+                visualizer.on_event(event)
+
+            await pilot.pause()
+
+            # The feedback widget should now be removed from the DOM
+            remaining = container.query(CriticFeedbackWidget)
+            assert len(remaining) == 0, (
+                "CriticFeedbackWidget should be removed after a new event arrives, "
+                f"but {len(remaining)} widget(s) still present"
+            )
