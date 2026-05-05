@@ -93,7 +93,7 @@ class InputField(Container):
         Binding(
             "ctrl+x", "open_external_editor", "Open external editor", priority=True
         ),
-        Binding("ctrl+r", "search_history", "Search prompt history"),
+        Binding("ctrl+r", "search_history", "Reverse search history"),
     ]
 
     # Reactive properties bound from ConversationContainer
