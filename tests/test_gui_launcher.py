@@ -26,10 +26,18 @@ class TestFormatDockerCommand:
                 "Running Docker command: docker run hello-world",
             ),
             (
-                ["docker", "run", "-it", "--rm", "-p", "3000:3000", "openhands:latest"],
+                [
+                    "docker",
+                    "run",
+                    "-it",
+                    "--rm",
+                    "-p",
+                    "127.0.0.1:3000:3000",
+                    "openhands:latest",
+                ],
                 (
-                    "Running Docker command: docker run -it --rm -p 3000:3000 "
-                    "openhands:latest"
+                    "Running Docker command: docker run -it --rm -p "
+                    "127.0.0.1:3000:3000 openhands:latest"
                 ),
             ),
             ([], "Running Docker command: "),
@@ -183,6 +191,7 @@ class TestLaunchGuiServer:
             assert run_cmd[0:2] == ["docker", "run"]
             # Verify --pull=always is in the command
             assert "--pull=always" in run_cmd
+            assert run_cmd[run_cmd.index("-p") + 1] == "127.0.0.1:3000:3000"
 
             if mount_cwd:
                 assert "SANDBOX_VOLUMES=/current/dir:/workspace:rw" in " ".join(run_cmd)
