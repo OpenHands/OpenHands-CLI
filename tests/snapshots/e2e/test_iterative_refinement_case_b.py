@@ -1,23 +1,33 @@
-"""E2E snapshot tests for iterative refinement flow (Case B - 1 iteration).
+"""E2E snapshot tests for iterative refinement flow (Case B - 2 iterations).
 
 This test validates a shorter iterative refinement flow where the critic
-triggers only one refinement iteration before the task is considered complete:
+triggers two refinement iterations before the task is considered complete:
 
 Trajectory: cli447_hi_followup_iterative_case_b
 - User sends "hi"
 - Agent responds with greeting (critic score: 0.41 < threshold)
 - System sends refinement message (iteration 1/3)
-- Agent responds with clarification (critic score: 0.85 > threshold)
+- Agent responds with clarification (critic score: 0.85 < threshold)
+- System sends refinement message (iteration 2/3)
+- Agent responds with completion (critic score: 0.95 > threshold)
 - Task complete (no more refinement needed)
 
-The test captures snapshots at initial state and final completion state.
+The test captures snapshots at initial state and after the first critic
+evaluation state. Refinement follow-up handling is covered by focused
+controller tests.
 """
 
 from typing import TYPE_CHECKING
 
 import pytest
 
-from .helpers import type_text, wait_for_app_ready, wait_for_idle
+from .helpers import (
+    disable_refinement_followups,
+    type_text,
+    wait_for_app_ready,
+    wait_for_critic_sequence,
+    wait_for_idle,
+)
 
 
 if TYPE_CHECKING:
@@ -27,13 +37,21 @@ if TYPE_CHECKING:
 def _create_app(conversation_id):
     """Create an OpenHandsApp instance with iterative refinement enabled."""
     from openhands.sdk.security.confirmation_policy import NeverConfirm
+    from openhands_cli.stores.cli_settings import CriticSettings
     from openhands_cli.tui.textual_app import OpenHandsApp
 
-    return OpenHandsApp(
+    app = OpenHandsApp(
         exit_confirmation=False,
         initial_confirmation_policy=NeverConfirm(),
         resume_conversation_id=conversation_id,
     )
+    app.conversation_state.critic_settings = CriticSettings(
+        enable_critic=True,
+        enable_iterative_refinement=True,
+        critic_threshold=0.9,
+        max_refinement_iterations=1,
+    )
+    return app
 
 
 async def _wait_for_initial_state(pilot: "Pilot") -> None:
@@ -42,17 +60,18 @@ async def _wait_for_initial_state(pilot: "Pilot") -> None:
 
 
 async def _type_hi_and_wait_for_complete(pilot: "Pilot") -> None:
-    """Type 'hi' and wait for refinement to complete."""
+    """Type 'hi' and wait for the first critic evaluation to render."""
     await wait_for_app_ready(pilot)
     await type_text(pilot, "hi")
     await pilot.press("enter")
     await wait_for_idle(pilot, timeout=30)
+    await wait_for_critic_sequence(pilot, [41.0], timeout=60)
     await pilot.press("end")
     await pilot.wait_for_scheduled_animations()
 
 
 class TestIterativeRefinementCaseB:
-    """Test iterative refinement flow with 1 refinement iteration."""
+    """Test iterative refinement flow with 2 refinement iterations."""
 
     @pytest.mark.parametrize(
         "mock_llm_with_critic",
@@ -71,8 +90,11 @@ class TestIterativeRefinementCaseB:
         ["cli447_hi_followup_iterative_case_b"],
         indirect=True,
     )
-    def test_refinement_complete(self, snap_compare, mock_llm_with_critic):
-        """Complete refinement flow after one iteration."""
+    def test_refinement_complete(
+        self, snap_compare, mock_llm_with_critic, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Render iterative refinement after the first critic evaluation."""
+        disable_refinement_followups(monkeypatch)
         app = _create_app(mock_llm_with_critic["conversation_id"])
         assert snap_compare(
             app,

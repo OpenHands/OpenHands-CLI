@@ -5,13 +5,26 @@ repeated pilot.pause() calls.
 """
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, cast
 
 from textual.widgets import Input, TextArea
 
+from openhands.sdk.event import ActionEvent, MessageEvent
+
 
 if TYPE_CHECKING:
+    import pytest
     from textual.pilot import Pilot
+
+    from openhands.sdk.critic.result import CriticResult
+    from openhands_cli.tui.core import ConversationManager
+    from openhands_cli.tui.core.refinement_controller import RefinementController
+
+
+class AppWithConversationManager(Protocol):
+    """Textual app shape used by iterative refinement snapshot helpers."""
+
+    conversation_manager: "ConversationManager"
 
 
 def disable_cursor_blink(pilot: "Pilot") -> None:
@@ -31,6 +44,18 @@ def disable_cursor_blink(pilot: "Pilot") -> None:
     for widget in pilot.app.query(Input):
         widget.cursor_blink = False
         widget._cursor_visible = True
+
+
+def disable_refinement_followups(monkeypatch: "pytest.MonkeyPatch") -> None:
+    """Keep refinement snapshots focused on first critic-result rendering."""
+    from openhands_cli.tui.core.refinement_controller import RefinementController
+
+    def no_refinement(
+        self: "RefinementController", critic_result: "CriticResult"
+    ) -> None:
+        return None
+
+    monkeypatch.setattr(RefinementController, "handle_critic_result", no_refinement)
 
 
 async def wait_for_app_ready(pilot: "Pilot") -> None:
@@ -72,6 +97,91 @@ async def wait_for_idle(pilot: "Pilot", timeout: float = 30.0) -> None:
 
     # Then wait for any animations triggered by worker completion
     await pilot.wait_for_scheduled_animations()
+
+
+async def wait_for_critic_score(
+    pilot: "Pilot", score_percent: float, timeout: float = 30.0
+) -> None:
+    """Wait until a specific critic score appears in conversation events."""
+    deadline = asyncio.get_running_loop().time() + timeout
+
+    while True:
+        app = cast("AppWithConversationManager", pilot.app)
+
+        runner = app.conversation_manager.current_runner
+        if runner is not None and runner.conversation is not None:
+            for event in runner.conversation.state.events:
+                if isinstance(event, MessageEvent | ActionEvent):
+                    critic_result = event.critic_result
+                    if (
+                        critic_result is not None
+                        and round(critic_result.score * 100, 1) == score_percent
+                    ):
+                        await pilot.pause(0.1)
+                        await pilot.wait_for_scheduled_animations()
+                        return
+
+        remaining = deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            raise TimeoutError(f"Timed out waiting for critic score: {score_percent}")
+
+        await wait_for_idle(pilot, timeout=min(remaining, 5.0))
+        await pilot.pause(min(remaining, 0.1))
+
+
+async def wait_for_refinement_iteration(
+    pilot: "Pilot", iteration: int, timeout: float = 30.0
+) -> None:
+    """Wait until the refinement controller has processed a critic result."""
+    deadline = asyncio.get_running_loop().time() + timeout
+
+    while True:
+        app = cast("AppWithConversationManager", pilot.app)
+        if app.conversation_manager.state.refinement_iteration >= iteration:
+            await pilot.pause(0.1)
+            await pilot.wait_for_scheduled_animations()
+            return
+
+        remaining = deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            raise TimeoutError(
+                f"Timed out waiting for refinement iteration: {iteration}"
+            )
+
+        await wait_for_idle(pilot, timeout=min(remaining, 5.0))
+        await pilot.pause(min(remaining, 0.1))
+
+
+async def wait_for_critic_sequence(
+    pilot: "Pilot",
+    score_percentages: list[float],
+    *,
+    timeout: float = 60.0,
+) -> None:
+    """Wait for critic scores and refinement turns in deterministic order."""
+    deadline = asyncio.get_running_loop().time() + timeout
+
+    for index, score_percent in enumerate(score_percentages):
+        remaining = deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            raise TimeoutError("Timed out waiting for critic score sequence")
+
+        await wait_for_critic_score(
+            pilot,
+            score_percent,
+            timeout=remaining,
+        )
+
+        if index < len(score_percentages) - 1:
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                raise TimeoutError("Timed out waiting for critic score sequence")
+
+            await wait_for_refinement_iteration(
+                pilot,
+                index + 1,
+                timeout=remaining,
+            )
 
 
 async def type_text(pilot: "Pilot", text: str) -> None:
