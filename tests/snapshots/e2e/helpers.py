@@ -9,6 +9,9 @@ from typing import TYPE_CHECKING
 
 from textual.widgets import Input, TextArea
 
+from openhands.sdk.event import ActionEvent, MessageEvent
+from openhands_cli.tui.textual_app import OpenHandsApp
+
 
 if TYPE_CHECKING:
     from textual.pilot import Pilot
@@ -72,6 +75,37 @@ async def wait_for_idle(pilot: "Pilot", timeout: float = 30.0) -> None:
 
     # Then wait for any animations triggered by worker completion
     await pilot.wait_for_scheduled_animations()
+
+
+async def wait_for_critic_score(
+    pilot: "Pilot", score_percent: float, timeout: float = 30.0
+) -> None:
+    """Wait until a specific critic score appears in conversation events."""
+    deadline = asyncio.get_running_loop().time() + timeout
+
+    while True:
+        app = pilot.app
+        assert isinstance(app, OpenHandsApp)
+
+        runner = app.conversation_manager.current_runner
+        if runner is not None and runner.conversation is not None:
+            for event in runner.conversation.state.events:
+                if isinstance(event, MessageEvent | ActionEvent):
+                    critic_result = event.critic_result
+                    if (
+                        critic_result is not None
+                        and round(critic_result.score * 100, 1) == score_percent
+                    ):
+                        await pilot.pause(0.1)
+                        await pilot.wait_for_scheduled_animations()
+                        return
+
+        remaining = deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            raise TimeoutError(f"Timed out waiting for critic score: {score_percent}")
+
+        await wait_for_idle(pilot, timeout=min(remaining, 5.0))
+        await pilot.pause(min(remaining, 0.1))
 
 
 async def type_text(pilot: "Pilot", text: str) -> None:

@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from .helpers import type_text, wait_for_app_ready, wait_for_idle
+from .helpers import type_text, wait_for_app_ready, wait_for_critic_score, wait_for_idle
 
 
 if TYPE_CHECKING:
@@ -52,6 +52,7 @@ async def _type_hi_and_wait_for_complete(pilot: "Pilot") -> None:
     await type_text(pilot, "hi")
     await pilot.press("enter")
     await wait_for_idle(pilot, timeout=60)
+    await wait_for_critic_score(pilot, 83.1, timeout=60)
     await pilot.press("end")
     await pilot.wait_for_scheduled_animations()
 

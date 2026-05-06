@@ -1,13 +1,15 @@
-"""E2E snapshot tests for iterative refinement flow (Case B - 1 iteration).
+"""E2E snapshot tests for iterative refinement flow (Case B - 2 iterations).
 
 This test validates a shorter iterative refinement flow where the critic
-triggers only one refinement iteration before the task is considered complete:
+triggers two refinement iterations before the task is considered complete:
 
 Trajectory: cli447_hi_followup_iterative_case_b
 - User sends "hi"
 - Agent responds with greeting (critic score: 0.41 < threshold)
 - System sends refinement message (iteration 1/3)
-- Agent responds with clarification (critic score: 0.85 > threshold)
+- Agent responds with clarification (critic score: 0.85 < threshold)
+- System sends refinement message (iteration 2/3)
+- Agent responds with completion (critic score: 0.95 > threshold)
 - Task complete (no more refinement needed)
 
 The test captures snapshots at initial state and final completion state.
@@ -17,7 +19,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from .helpers import type_text, wait_for_app_ready, wait_for_idle
+from .helpers import type_text, wait_for_app_ready, wait_for_critic_score, wait_for_idle
 
 
 if TYPE_CHECKING:
@@ -47,12 +49,13 @@ async def _type_hi_and_wait_for_complete(pilot: "Pilot") -> None:
     await type_text(pilot, "hi")
     await pilot.press("enter")
     await wait_for_idle(pilot, timeout=30)
+    await wait_for_critic_score(pilot, 95.0, timeout=60)
     await pilot.press("end")
     await pilot.wait_for_scheduled_animations()
 
 
 class TestIterativeRefinementCaseB:
-    """Test iterative refinement flow with 1 refinement iteration."""
+    """Test iterative refinement flow with 2 refinement iterations."""
 
     @pytest.mark.parametrize(
         "mock_llm_with_critic",
