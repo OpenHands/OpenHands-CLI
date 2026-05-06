@@ -5,16 +5,23 @@ repeated pilot.pause() calls.
 """
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, cast
 
 from textual.widgets import Input, TextArea
 
 from openhands.sdk.event import ActionEvent, MessageEvent
-from openhands_cli.tui.textual_app import OpenHandsApp
 
 
 if TYPE_CHECKING:
     from textual.pilot import Pilot
+
+    from openhands_cli.tui.core import ConversationManager
+
+
+class AppWithConversationManager(Protocol):
+    """Textual app shape used by iterative refinement snapshot helpers."""
+
+    conversation_manager: "ConversationManager"
 
 
 def disable_cursor_blink(pilot: "Pilot") -> None:
@@ -84,8 +91,7 @@ async def wait_for_critic_score(
     deadline = asyncio.get_running_loop().time() + timeout
 
     while True:
-        app = pilot.app
-        assert isinstance(app, OpenHandsApp)
+        app = cast("AppWithConversationManager", pilot.app)
 
         runner = app.conversation_manager.current_runner
         if runner is not None and runner.conversation is not None:
