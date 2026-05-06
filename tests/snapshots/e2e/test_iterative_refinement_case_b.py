@@ -29,13 +29,21 @@ if TYPE_CHECKING:
 def _create_app(conversation_id):
     """Create an OpenHandsApp instance with iterative refinement enabled."""
     from openhands.sdk.security.confirmation_policy import NeverConfirm
+    from openhands_cli.stores.cli_settings import CriticSettings
     from openhands_cli.tui.textual_app import OpenHandsApp
 
-    return OpenHandsApp(
+    app = OpenHandsApp(
         exit_confirmation=False,
         initial_confirmation_policy=NeverConfirm(),
         resume_conversation_id=conversation_id,
     )
+    app.conversation_state.critic_settings = CriticSettings(
+        enable_critic=True,
+        enable_iterative_refinement=True,
+        critic_threshold=0.9,
+        max_refinement_iterations=3,
+    )
+    return app
 
 
 async def _wait_for_initial_state(pilot: "Pilot") -> None:
