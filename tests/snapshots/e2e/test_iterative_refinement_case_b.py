@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from .helpers import (
+    disable_refinement_followups,
     type_text,
     wait_for_app_ready,
     wait_for_critic_sequence,
@@ -47,7 +48,7 @@ def _create_app(conversation_id):
     app.conversation_state.critic_settings = CriticSettings(
         enable_critic=True,
         enable_iterative_refinement=True,
-        critic_threshold=0.3,
+        critic_threshold=0.9,
         max_refinement_iterations=1,
     )
     return app
@@ -89,8 +90,11 @@ class TestIterativeRefinementCaseB:
         ["cli447_hi_followup_iterative_case_b"],
         indirect=True,
     )
-    def test_refinement_complete(self, snap_compare, mock_llm_with_critic):
+    def test_refinement_complete(
+        self, snap_compare, mock_llm_with_critic, monkeypatch: pytest.MonkeyPatch
+    ):
         """Render iterative refinement after the first critic evaluation."""
+        disable_refinement_followups(monkeypatch)
         app = _create_app(mock_llm_with_critic["conversation_id"])
         assert snap_compare(
             app,

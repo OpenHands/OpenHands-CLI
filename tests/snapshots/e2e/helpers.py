@@ -13,9 +13,12 @@ from openhands.sdk.event import ActionEvent, MessageEvent
 
 
 if TYPE_CHECKING:
+    import pytest
     from textual.pilot import Pilot
 
+    from openhands.sdk.critic.result import CriticResult
     from openhands_cli.tui.core import ConversationManager
+    from openhands_cli.tui.core.refinement_controller import RefinementController
 
 
 class AppWithConversationManager(Protocol):
@@ -41,6 +44,18 @@ def disable_cursor_blink(pilot: "Pilot") -> None:
     for widget in pilot.app.query(Input):
         widget.cursor_blink = False
         widget._cursor_visible = True
+
+
+def disable_refinement_followups(monkeypatch: "pytest.MonkeyPatch") -> None:
+    """Keep refinement snapshots focused on first critic-result rendering."""
+    from openhands_cli.tui.core.refinement_controller import RefinementController
+
+    def no_refinement(
+        self: "RefinementController", critic_result: "CriticResult"
+    ) -> None:
+        return None
+
+    monkeypatch.setattr(RefinementController, "handle_critic_result", no_refinement)
 
 
 async def wait_for_app_ready(pilot: "Pilot") -> None:
