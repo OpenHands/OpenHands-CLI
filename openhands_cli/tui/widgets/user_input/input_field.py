@@ -15,8 +15,10 @@ from textual.reactive import reactive
 from textual.signal import Signal
 from textual.widgets import TextArea
 
+from openhands_cli.stores.prompt_history import PromptHistoryStore
 from openhands_cli.tui.core.commands import COMMANDS, is_valid_command
 from openhands_cli.tui.messages import SendMessage, SlashCommandSubmitted
+from openhands_cli.tui.modals.history_search import HistorySearchScreen
 from openhands_cli.tui.widgets.user_input.autocomplete_dropdown import (
     AutoCompleteDropdown,
 )
@@ -91,6 +93,7 @@ class InputField(Container):
         Binding(
             "ctrl+x", "open_external_editor", "Open external editor", priority=True
         ),
+        Binding("ctrl+r", "search_history", "Reverse search history"),
     ]
 
     # Reactive properties bound from ConversationContainer
@@ -165,6 +168,12 @@ class InputField(Container):
             self.single_line_widget
         )
 
+        # Prompt history state
+        self.history_store = PromptHistoryStore()
+        self.history_index: int = -1  # -1 means not navigating history
+        self._history_cache: list[str] = []
+        self._input_before_history: str = ""
+
     def compose(self) -> ComposeResult:
         """Create the input widgets."""
         yield self.autocomplete
@@ -197,6 +206,36 @@ class InputField(Container):
 
     def focus_input(self) -> None:
         self.active_input_widget.focus()
+
+    def action_search_history(self) -> None:
+        """Open the history search modal."""
+
+        def handle_search_result(selected_text: str | None) -> None:
+            if selected_text:
+                # If current input is empty or we're replacing, update text
+                # We also auto-toggle to multiline mode if selected text is multiline
+                if "\n" in selected_text and not self.is_multiline_mode:
+                    self.action_toggle_input_mode()
+
+                self.active_input_widget.text = selected_text
+                self.active_input_widget.move_cursor(
+                    self.active_input_widget.document.end
+                )
+
+                # Sync history index so Up/Down arrows work contextually
+                self._history_cache = self.history_store.load()
+                try:
+                    self.history_index = self._history_cache.index(selected_text)
+                    self._input_before_history = (
+                        ""  # Clear WIP as we are now "in" history
+                    )
+                except ValueError:
+                    # If for some reason it's not in cache, reset to bottom
+                    self.history_index = -1
+
+                self.focus_input()
+
+        self.app.push_screen(HistorySearchScreen(), handle_search_result)
 
     @property
     def is_multiline_mode(self) -> bool:
@@ -294,13 +333,99 @@ class InputField(Container):
         self.autocomplete.update_candidates()
 
     def on_key(self, event: events.Key) -> None:
-        """Handle key events for autocomplete navigation."""
-        if self.is_multiline_mode:
-            return
-
-        if self.autocomplete.process_key(event.key):
+        """Handle key events for autocomplete and history navigation."""
+        # Autocomplete takes priority (only in single-line mode)
+        if not self.is_multiline_mode and self.autocomplete.process_key(event.key):
             event.prevent_default()
             event.stop()
+            return
+
+        # History navigation (Arrows)
+        if event.key in ("up", "down"):
+            if self._handle_history_navigation(event.key):
+                event.prevent_default()
+                event.stop()
+
+    def _handle_history_navigation(self, direction: str) -> bool:
+        """Handle up/down arrow for prompt history navigation.
+
+        Returns:
+            bool: True if navigation happened and event should be stopped.
+        """
+        # Autocomplete check
+        if not self.is_multiline_mode and self.autocomplete.is_visible:
+            return False
+
+        # In multiline mode, only navigate if cursor is at the boundary
+        if self.is_multiline_mode:
+            cursor_line, _ = self.active_input_widget.cursor_location
+            if direction == "up" and cursor_line > 0:
+                return False
+            if direction == "down":
+                last_line = self.active_input_widget.document.line_count - 1
+                if cursor_line < last_line:
+                    return False
+
+        # Load history on first 'up'
+        if not self._history_cache:
+            self._history_cache = self.history_store.load()
+            if not self._history_cache:
+                return False
+
+        if direction == "up":
+            # If starting navigation, save current input
+            if self.history_index == -1:
+                self._input_before_history = self._get_current_text()
+
+            if self.history_index < len(self._history_cache) - 1:
+                self.history_index += 1
+                self._apply_history_item(direction)
+                return True
+
+        elif direction == "down":
+            if self.history_index > -1:
+                self.history_index -= 1
+                if self.history_index == -1:
+                    # Restore what was there before navigation
+                    self._restore_original_input()
+                else:
+                    self._apply_history_item(direction)
+                return True
+
+        return False
+
+    def _apply_history_item(self, direction: str) -> None:
+        """Apply the current history item and adjust input mode if needed."""
+        if 0 <= self.history_index < len(self._history_cache):
+            text = self._history_cache[self.history_index]
+            is_item_multiline = "\n" in text
+
+            # Sync mode if necessary
+            if is_item_multiline != self.is_multiline_mode:
+                self.action_toggle_input_mode()
+
+            self.active_input_widget.text = text
+
+            # Place cursor contextually:
+            # If moving UP, go to the START of the prompt (to allow continued scrolling)
+            # If moving DOWN, go to the END of the prompt
+            if direction == "up":
+                self.active_input_widget.move_cursor((0, 0))
+            else:
+                self.active_input_widget.move_cursor(
+                    self.active_input_widget.document.end
+                )
+
+    def _restore_original_input(self) -> None:
+        """Restore the input that was there before history navigation started."""
+        text = self._input_before_history
+        is_text_multiline = "\n" in text
+
+        if is_text_multiline != self.is_multiline_mode:
+            self.action_toggle_input_mode()
+
+        self.active_input_widget.text = text
+        self.active_input_widget.move_cursor(self.active_input_widget.document.end)
 
     @on(SingleLineInputWithWrapping.EnterPressed)
     def _on_enter_pressed(
@@ -334,14 +459,11 @@ class InputField(Container):
         if self.is_multiline_mode:
             content = self._get_current_text().strip()
             if content:
-                self._clear_current()
-                self.action_toggle_input_mode()
-                # Use the same submission logic as single-line mode
-                if is_valid_command(content):
-                    command = content[1:]  # Remove leading "/"
-                    self.post_message(SlashCommandSubmitted(command=command))
-                else:
-                    self.post_message(SendMessage(content=content))
+                # Store the content before clearing/toggling
+                self._submit_current_content()
+                # If we're still in multiline mode, toggle back to single line
+                if self.is_multiline_mode:
+                    self.action_toggle_input_mode()
 
     def _submit_current_content(self) -> None:
         """Submit current content and clear input.
@@ -355,6 +477,11 @@ class InputField(Container):
             return
 
         self._clear_current()
+        self.history_index = -1
+        self._history_cache = []
+
+        # Save to history before processing
+        self.history_store.append(content)
 
         # Check if this is a valid slash command
         if is_valid_command(content):

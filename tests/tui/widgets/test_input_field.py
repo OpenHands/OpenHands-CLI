@@ -258,6 +258,155 @@ class TestInputField:
         assert isinstance(msg, InputField.Submitted)
 
 
+class TestInputFieldHistory:
+    """Tests for history navigation in InputField."""
+
+    def test_history_navigation_up_down(self, field_with_mocks: InputField) -> None:
+        """Test up/down arrow navigation through history with WIP preservation."""
+        # Mock history store
+        field_with_mocks.history_store = MagicMock()
+        field_with_mocks.history_store.load.return_value = ["second", "first"]
+
+        # Mock autocomplete
+        field_with_mocks.autocomplete = MagicMock()
+        field_with_mocks.autocomplete.is_visible = False
+
+        # Set cursor locations
+        field_with_mocks.single_line_widget.cursor_location = (0, 0)
+        field_with_mocks.multiline_widget.cursor_location = (0, 0)
+
+        # Initial state: some WIP text
+        field_with_mocks.single_line_widget.text = "current WIP"
+        field_with_mocks.history_index = -1
+        field_with_mocks._history_cache = []
+
+        # Press UP -> should show "second" (most recent)
+        navigated = field_with_mocks._handle_history_navigation("up")
+        assert navigated is True
+        assert field_with_mocks.history_index == 0
+        assert field_with_mocks.active_input_widget.text == "second"
+        assert field_with_mocks._input_before_history == "current WIP"
+
+        # Press UP again -> should show "first"
+        navigated = field_with_mocks._handle_history_navigation("up")
+        assert navigated is True
+        assert field_with_mocks.history_index == 1
+        assert field_with_mocks.active_input_widget.text == "first"
+
+        # Press UP at boundary -> should stay at "first" and return False
+        navigated = field_with_mocks._handle_history_navigation("up")
+        assert navigated is False
+        assert field_with_mocks.history_index == 1
+
+        # Press DOWN -> should show "second"
+        navigated = field_with_mocks._handle_history_navigation("down")
+        assert navigated is True
+        assert field_with_mocks.history_index == 0
+        assert field_with_mocks.active_input_widget.text == "second"
+
+        # Press DOWN -> should restore WIP
+        navigated = field_with_mocks._handle_history_navigation("down")
+        assert navigated is True
+        assert field_with_mocks.history_index == -1
+        assert field_with_mocks.active_input_widget.text == "current WIP"
+
+    def test_history_navigation_toggles_multiline(
+        self, field_with_mocks: InputField
+    ) -> None:
+        """Test history navigation automatically toggles multiline mode."""
+        field_with_mocks.history_store = MagicMock()
+        field_with_mocks.history_store.load.return_value = ["line1\nline2", "single"]
+
+        # Mock autocomplete
+        field_with_mocks.autocomplete = MagicMock()
+        field_with_mocks.autocomplete.is_visible = False
+
+        # Set cursor locations
+        field_with_mocks.single_line_widget.cursor_location = (0, 0)
+        field_with_mocks.multiline_widget.cursor_location = (0, 0)
+
+        # Mock action_toggle_input_mode to actually change the mode
+        def toggle():
+            if isinstance(
+                field_with_mocks.active_input_widget, SingleLineInputWithWrapping
+            ):
+                field_with_mocks.active_input_widget = field_with_mocks.multiline_widget
+            else:
+                field_with_mocks.active_input_widget = (
+                    field_with_mocks.single_line_widget
+                )
+
+        field_with_mocks.action_toggle_input_mode = MagicMock(side_effect=toggle)
+
+        # Start in single line mode
+        field_with_mocks.active_input_widget = field_with_mocks.single_line_widget
+
+        # Press UP -> "line1\nline2" -> should toggle to multiline
+        field_with_mocks._handle_history_navigation("up")
+        assert field_with_mocks.is_multiline_mode is True
+        assert field_with_mocks.multiline_widget.text == "line1\nline2"
+
+        # Press UP again -> "single" -> should toggle back to single line
+        field_with_mocks._handle_history_navigation("up")
+        assert field_with_mocks.is_multiline_mode is False
+        assert field_with_mocks.single_line_widget.text == "single"
+
+    def test_history_navigation_multiline_boundaries(
+        self, field_with_mocks: InputField
+    ) -> None:
+        """Test history navigation boundaries in multiline mode."""
+        field_with_mocks.history_store = MagicMock()
+        field_with_mocks.history_store.load.return_value = ["prev history"]
+
+        # Mock autocomplete
+        field_with_mocks.autocomplete = MagicMock()
+        field_with_mocks.autocomplete.is_visible = False
+
+        # Set up multiline mode with 3 lines of text
+        field_with_mocks.active_input_widget = field_with_mocks.multiline_widget
+        field_with_mocks.multiline_widget.text = "line 0\nline 1\nline 2"
+
+        # Mock line_count property on the document instance
+        # We mock the attribute directly on the instance to ensure it returns an int
+        field_with_mocks.multiline_widget.document.line_count = 3  # type: ignore
+
+        # Cursor in the middle (line 1) -> UP should NOT navigate history
+        field_with_mocks.multiline_widget.cursor_location = (1, 0)
+        navigated = field_with_mocks._handle_history_navigation("up")
+        assert navigated is False
+        assert field_with_mocks.history_index == -1
+
+        # Cursor at top (line 0) -> UP SHOULD navigate history
+        field_with_mocks.multiline_widget.cursor_location = (0, 0)
+        navigated = field_with_mocks._handle_history_navigation("up")
+        assert navigated is True
+        assert field_with_mocks.history_index == 0
+        assert field_with_mocks.active_input_widget.text == "prev history"
+
+        # Let's test DOWN boundary
+        field_with_mocks.history_index = -1
+        field_with_mocks.active_input_widget = field_with_mocks.multiline_widget
+        field_with_mocks.multiline_widget.text = "line 0\nline 1\nline 2"
+        field_with_mocks._input_before_history = "some WIP"
+
+        # If we are already in history (index 0)
+        field_with_mocks.history_index = 0
+        field_with_mocks._history_cache = ["item 0"]
+
+        # Cursor in middle -> DOWN should NOT navigate
+        field_with_mocks.multiline_widget.cursor_location = (1, 0)
+        navigated = field_with_mocks._handle_history_navigation("down")
+        assert navigated is False
+        assert field_with_mocks.history_index == 0
+
+        # Cursor at bottom -> DOWN SHOULD navigate
+        field_with_mocks.multiline_widget.cursor_location = (2, 0)
+        navigated = field_with_mocks._handle_history_navigation("down")
+        assert navigated is True
+        assert field_with_mocks.history_index == -1
+        assert field_with_mocks.active_input_widget.text == "some WIP"
+
+
 # Single shared app for all integration tests
 class InputFieldTestApp(App):
     def compose(self):
