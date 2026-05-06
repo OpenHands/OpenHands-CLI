@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 from openhands_cli.locations import get_project_id, get_prompt_history_path
 from openhands_cli.stores.prompt_history import PromptHistoryStore
@@ -61,3 +62,79 @@ def test_prompt_history_file_content(mock_locations):
     assert len(data) == 1
     assert data[0]["text"] == "test prompt"
     assert "timestamp" in data[0]
+
+
+def test_prompt_history_corrupt_json(mock_locations):
+    """Test handling of corrupt JSON in history file."""
+    path = Path(get_prompt_history_path())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("invalid json", encoding="utf-8")
+
+    store = PromptHistoryStore()
+    entries = store.load_entries()
+    assert entries == []
+
+
+def test_prompt_history_invalid_format(mock_locations):
+    """Test handling of unexpected JSON format (not a list)."""
+    path = Path(get_prompt_history_path())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"not": "a list"}), encoding="utf-8")
+
+    store = PromptHistoryStore()
+    entries = store.load_entries()
+    assert entries == []
+
+
+def test_prompt_history_read_error(mock_locations):
+    """Test handling of OSError during reading."""
+    path = Path(get_prompt_history_path())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch()
+
+    store = PromptHistoryStore()
+    with patch("builtins.open", side_effect=OSError("Read failed")):
+        entries = store.load_entries()
+        assert entries == []
+
+
+def test_prompt_history_permission_error(mock_locations):
+    """Test handling of PermissionError during reading."""
+    path = Path(get_prompt_history_path())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch()
+
+    store = PromptHistoryStore()
+    with patch("builtins.open", side_effect=PermissionError("Permission denied")):
+        entries = store.load_entries()
+        assert entries == []
+
+
+def test_prompt_history_write_error(mock_locations):
+    """Test handling of OSError during writing."""
+    store = PromptHistoryStore()
+
+    # Mock open to fail only on write
+    original_open = open
+
+    def side_effect(file, mode="r", *args, **kwargs):
+        if "w" in mode:
+            raise OSError("Write failed")
+        return original_open(file, mode, *args, **kwargs)
+
+    with patch("builtins.open", side_effect=side_effect):
+        # Should not raise exception
+        store.append("new prompt")
+
+
+def test_prompt_history_append_corrupt_load(mock_locations):
+    """Test that append handles corrupt existing file by overwriting."""
+    path = Path(get_prompt_history_path())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("invalid json", encoding="utf-8")
+
+    store = PromptHistoryStore()
+    store.append("new prompt")
+
+    # Should have recovered and saved the new prompt
+    assert store.load() == ["new prompt"]

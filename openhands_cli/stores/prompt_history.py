@@ -34,10 +34,13 @@ class PromptHistoryStore:
             with open(self.path, encoding="utf-8") as f:
                 entries: list[PromptHistoryEntry] = json.load(f)
 
+            if not isinstance(entries, list):
+                return []
+
             # Reverse so that index 0 is the most recent
             return list(reversed(entries))
 
-        except (json.JSONDecodeError, KeyError, OSError):
+        except (json.JSONDecodeError, KeyError, TypeError, OSError):
             return []
 
     def load(self) -> list[str]:
@@ -55,11 +58,13 @@ class PromptHistoryStore:
             try:
                 with open(self.path, encoding="utf-8") as f:
                     entries = json.load(f)
+                if not isinstance(entries, list):
+                    entries = []
             except (json.JSONDecodeError, OSError):
                 entries = []
 
         # Don't add if it's identical to the last entry
-        if entries and entries[-1]["text"] == text:
+        if entries and entries[-1].get("text") == text:
             return
 
         new_entry: PromptHistoryEntry = {
@@ -72,8 +77,10 @@ class PromptHistoryStore:
         if len(entries) > self.max_entries:
             entries = entries[-self.max_entries :]
 
-        # Ensure parent directory exists
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(self.path, "w", encoding="utf-8") as f:
-            json.dump(entries, f, indent=2)
+        # Ensure parent directory exists and write to file
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.path, "w", encoding="utf-8") as f:
+                json.dump(entries, f, indent=2)
+        except OSError:
+            pass
