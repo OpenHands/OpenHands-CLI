@@ -148,6 +148,13 @@ openhands --resume --last       # resume most recent
 
 For complete documentation, visit https://docs.openhands.dev/openhands/usage/cli.
 
+## Contributing
+
+Want to contribute to OpenHands CLI?
+
+- Start with [CONTRIBUTING.md](CONTRIBUTING.md) for the high-level contribution process.
+- Use [Development.md](Development.md) for local setup, TUI workflows, snapshot testing, and binary validation.
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
