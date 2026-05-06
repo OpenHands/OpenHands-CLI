@@ -114,6 +114,61 @@ async def wait_for_critic_score(
         await pilot.pause(min(remaining, 0.1))
 
 
+async def wait_for_refinement_iteration(
+    pilot: "Pilot", iteration: int, timeout: float = 30.0
+) -> None:
+    """Wait until the refinement controller has processed a critic result."""
+    deadline = asyncio.get_running_loop().time() + timeout
+
+    while True:
+        app = cast("AppWithConversationManager", pilot.app)
+        if app.conversation_manager.state.refinement_iteration >= iteration:
+            await pilot.pause(0.1)
+            await pilot.wait_for_scheduled_animations()
+            return
+
+        remaining = deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            raise TimeoutError(
+                f"Timed out waiting for refinement iteration: {iteration}"
+            )
+
+        await wait_for_idle(pilot, timeout=min(remaining, 5.0))
+        await pilot.pause(min(remaining, 0.1))
+
+
+async def wait_for_critic_sequence(
+    pilot: "Pilot",
+    score_percentages: list[float],
+    *,
+    timeout: float = 60.0,
+) -> None:
+    """Wait for critic scores and refinement turns in deterministic order."""
+    deadline = asyncio.get_running_loop().time() + timeout
+
+    for index, score_percent in enumerate(score_percentages):
+        remaining = deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            raise TimeoutError("Timed out waiting for critic score sequence")
+
+        await wait_for_critic_score(
+            pilot,
+            score_percent,
+            timeout=remaining,
+        )
+
+        if index < len(score_percentages) - 1:
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                raise TimeoutError("Timed out waiting for critic score sequence")
+
+            await wait_for_refinement_iteration(
+                pilot,
+                index + 1,
+                timeout=remaining,
+            )
+
+
 async def type_text(pilot: "Pilot", text: str) -> None:
     """Type text character by character.
 

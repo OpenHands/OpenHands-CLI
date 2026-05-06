@@ -14,15 +14,20 @@ Trajectory: cli447_hi_followup_iterative_case_a
 - System sends refinement message (iteration 3/3)
 - Agent calls finish (critic score: 0.83 > threshold)
 
-The test captures snapshots at initial state and after the first critic
-evaluation state. Later refinement turns are covered by focused controller tests.
+The test captures snapshots at initial state and final completion state.
+Intermediate phases execute too quickly to produce distinct visual states.
 """
 
 from typing import TYPE_CHECKING
 
 import pytest
 
-from .helpers import type_text, wait_for_app_ready, wait_for_critic_score, wait_for_idle
+from .helpers import (
+    type_text,
+    wait_for_app_ready,
+    wait_for_critic_sequence,
+    wait_for_idle,
+)
 
 
 if TYPE_CHECKING:
@@ -55,12 +60,12 @@ async def _wait_for_initial_state(pilot: "Pilot") -> None:
 
 
 async def _type_hi_and_wait_for_complete(pilot: "Pilot") -> None:
-    """Type 'hi' and wait for the first critic evaluation to render."""
+    """Type 'hi' and wait for all refinement iterations to complete."""
     await wait_for_app_ready(pilot)
     await type_text(pilot, "hi")
     await pilot.press("enter")
     await wait_for_idle(pilot, timeout=60)
-    await wait_for_critic_score(pilot, 37.8, timeout=60)
+    await wait_for_critic_sequence(pilot, [37.8, 82.2, 88.0, 83.1], timeout=60)
     await pilot.press("end")
     await pilot.wait_for_scheduled_animations()
 
@@ -86,7 +91,7 @@ class TestIterativeRefinementCaseA:
         indirect=True,
     )
     def test_refinement_complete(self, snap_compare, mock_llm_with_critic):
-        """Render iterative refinement after the first critic evaluation."""
+        """Complete iterative refinement flow ending with agent finish."""
         app = _create_app(mock_llm_with_critic["conversation_id"])
         assert snap_compare(
             app,
