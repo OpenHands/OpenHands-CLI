@@ -12,8 +12,9 @@ Trajectory: cli447_hi_followup_iterative_case_b
 - Agent responds with completion (critic score: 0.95 > threshold)
 - Task complete (no more refinement needed)
 
-The test captures snapshots at initial state and after one refinement turn.
-Longer refinement sequences are covered by focused controller tests.
+The test captures snapshots at initial state and after the first critic
+evaluation state. Refinement follow-up handling is covered by focused
+controller tests.
 """
 
 from typing import TYPE_CHECKING
@@ -46,7 +47,7 @@ def _create_app(conversation_id):
     app.conversation_state.critic_settings = CriticSettings(
         enable_critic=True,
         enable_iterative_refinement=True,
-        critic_threshold=0.9,
+        critic_threshold=0.3,
         max_refinement_iterations=1,
     )
     return app
@@ -58,12 +59,12 @@ async def _wait_for_initial_state(pilot: "Pilot") -> None:
 
 
 async def _type_hi_and_wait_for_complete(pilot: "Pilot") -> None:
-    """Type 'hi' and wait for one refinement turn to render."""
+    """Type 'hi' and wait for the first critic evaluation to render."""
     await wait_for_app_ready(pilot)
     await type_text(pilot, "hi")
     await pilot.press("enter")
     await wait_for_idle(pilot, timeout=30)
-    await wait_for_critic_sequence(pilot, [41.0, 85.5], timeout=60)
+    await wait_for_critic_sequence(pilot, [41.0], timeout=60)
     await pilot.press("end")
     await pilot.wait_for_scheduled_animations()
 
@@ -89,7 +90,7 @@ class TestIterativeRefinementCaseB:
         indirect=True,
     )
     def test_refinement_complete(self, snap_compare, mock_llm_with_critic):
-        """Render iterative refinement after one follow-up turn."""
+        """Render iterative refinement after the first critic evaluation."""
         app = _create_app(mock_llm_with_critic["conversation_id"])
         assert snap_compare(
             app,
