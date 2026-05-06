@@ -117,17 +117,24 @@ uv run pre-commit run --all-files
 
 Notes:
 
-- `make lint` runs the repo lint target and should be part of your normal
-  pre-PR validation.
-- `make format` formats code under `openhands_cli/`.
-- `pre-commit` is the broadest local check and is useful before pushing.
+- `make lint` is a fast Ruff-only pass over `openhands_cli/`.
+- `make format` formats Python files under `openhands_cli/`.
+- `uv run pre-commit run --all-files` is the closest local match to the lint CI
+  job and is the better final check before pushing, especially when you touch
+  files outside `openhands_cli/`.
 
 ### Typing
+
+```bash
+uv run pyright
+```
 
 Use modern Python typing in new code where practical:
 
 - prefer `X | None` over `Optional[X]`
 - add type hints on new public functions and interfaces
+- run `uv run pyright` for Python feature work, refactors, and bug fixes that
+  could affect typed interfaces
 
 ## Testing
 
@@ -182,18 +189,33 @@ When adding new snapshot tests:
 
 ### Binary end-to-end tests
 
+For authoritative binary validation, use the build script:
+
 ```bash
-make test-binary
+./build.sh --install-pyinstaller
 ```
 
-These tests cover the packaged executable in `tui_e2e/` and are the right check
-for changes that affect:
+That command builds the standalone executable and then runs the `tui_e2e`
+runner against the built `dist/` binary. It is the right check for changes that
+affect:
 
 - packaging or startup
 - ACP flows
 - auth and connection flows
 - end-to-end CLI behavior
 - code paths that differ between source execution and the frozen binary
+
+If you already have a fresh `dist/` build and only want to rerun the binary test
+runner, use:
+
+```bash
+uv run python build.py --no-build
+```
+
+`make test-binary` currently runs `pytest tui_e2e`, which is useful while
+editing the `tui_e2e` modules themselves, but it is not the best pass/fail gate
+for feature or bug-fix validation because the authoritative binary checks live
+in `build.py`.
 
 Binary tests can use a mock OpenAI-compatible LLM server for deterministic test
 runs. When configuring the mock model, use `openai/gpt-4o-mock` so LiteLLM sees
@@ -203,12 +225,11 @@ an explicit provider prefix.
 
 As a rule of thumb:
 
-- docs-only changes: run `uv run pre-commit run --files ...` on the changed docs
-- Python logic changes: run `make test`
-- TUI or styling changes: run `make test` and `make test-snapshots`
-- binary, ACP, auth, or packaging changes: run `make test` and `make test-binary`
-- broad changes: run `make test-all` and add any extra targeted checks that fit
-  the affected area
+- docs-only changes: run `uv run pre-commit run --files <changed-docs>`
+- Python logic changes: run `make test` and `uv run pyright`
+- TUI or styling changes: run `make test`, `make test-snapshots`, and `uv run pyright`
+- binary, ACP, auth, or packaging changes: run `make test`, `uv run pyright`, and `./build.sh --install-pyinstaller`
+- broad changes: run the relevant checks above rather than relying on a single catch-all command
 
 ## Building the standalone executable
 
