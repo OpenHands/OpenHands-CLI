@@ -194,12 +194,9 @@ class TestJsonCallback:
         with patch("builtins.print") as mock_print:
             json_callback(message_event)
 
-            # Should have two print calls: header and JSON
-            assert mock_print.call_count == 2
-            mock_print.assert_any_call("--JSON Event--")
-
-            # Verify valid JSON output
-            json_output = mock_print.call_args_list[1][0][0]
+            # Should emit a single JSONL line per event
+            mock_print.assert_called_once()
+            json_output = mock_print.call_args[0][0]
             parsed_json = json.loads(json_output)
             assert isinstance(parsed_json, dict)
 
@@ -216,11 +213,8 @@ class TestJsonCallback:
             json_callback(event)
 
             # Verify the output structure
-            assert mock_print.call_count == 2
-            mock_print.assert_any_call("--JSON Event--")
-
-            # Get and validate the JSON output
-            json_output = mock_print.call_args_list[1][0][0]
+            mock_print.assert_called_once()
+            json_output = mock_print.call_args[0][0]
             parsed_json = json.loads(json_output)
 
             # Verify essential fields are present

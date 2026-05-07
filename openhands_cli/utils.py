@@ -264,6 +264,4 @@ def json_callback(event: Event) -> None:
         return
 
     data = event.model_dump()
-    pretty_json = json.dumps(data, indent=2, sort_keys=True)
-    print("--JSON Event--")
-    print(pretty_json)
+    print(json.dumps(data))
