@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import TYPE_CHECKING
 
 from textual.reactive import var
 from textual.timer import Timer
@@ -12,12 +13,16 @@ from openhands_cli.stores import CriticSettings
 from openhands_cli.utils import abbreviate_number, format_cost
 
 
+if TYPE_CHECKING:
+    from openhands_cli.tui.core.state import AgentMode
+
+
 class WorkingStatusLine(Static):
-    """Status line showing conversation timer and working indicator (above input).
+    """Status line showing timer, working indicator, and mode (above input).
 
     This widget uses data_bind() to bind to ConversationContainer reactive properties.
-    When ConversationContainer.running, elapsed_seconds, or critic_settings change,
-    this widget's corresponding properties are automatically updated.
+    When ConversationContainer.running, elapsed_seconds, critic_settings, or agent_mode
+    change, this widget's corresponding properties are automatically updated.
     """
 
     DEFAULT_CSS = """
@@ -33,6 +38,7 @@ class WorkingStatusLine(Static):
     running: var[bool] = var(False)
     elapsed_seconds: var[int] = var(0)
     critic_settings: var[CriticSettings] = var(CriticSettings())
+    agent_mode: var[AgentMode] = var("code")
 
     def __init__(self, **kwargs) -> None:
         super().__init__("", id="working_status_line", markup=True, **kwargs)
@@ -59,6 +65,10 @@ class WorkingStatusLine(Static):
 
     def watch_critic_settings(self, _settings: CriticSettings) -> None:
         """React to critic settings changes from ConversationContainer."""
+        self._update_text()
+
+    def watch_agent_mode(self, _mode: AgentMode) -> None:
+        """React to agent mode changes from ConversationContainer."""
         self._update_text()
 
     # ----- Internal helpers -----
@@ -90,9 +100,25 @@ class WorkingStatusLine(Static):
             )
         return ""
 
+    def _get_mode_indicator(self) -> str:
+        """Return the mode indicator based on current agent mode.
+
+        In planning mode, shows a blue-colored indicator.
+        In code mode (default), returns empty string (no indicator needed).
+        """
+        if self.agent_mode == "plan":
+            # Use accent color (#277dff) for planning mode - matches GUI blue
+            return "[bold #277dff]📋 Planning Mode[/bold #277dff]"
+        return ""
+
     def _update_text(self) -> None:
-        """Rebuild the working status text with refinement indicator."""
+        """Rebuild the working status text with mode and refinement indicators."""
         parts = []
+
+        # Add mode indicator (shows for planning mode)
+        mode_indicator = self._get_mode_indicator()
+        if mode_indicator:
+            parts.append(mode_indicator)
 
         # Add refinement indicator (always show when enabled in settings)
         refinement_indicator = self._get_refinement_indicator()

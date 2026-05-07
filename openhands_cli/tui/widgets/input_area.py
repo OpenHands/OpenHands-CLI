@@ -78,6 +78,10 @@ class InputAreaContainer(Container):
                 self._command_help()
             case "new":
                 self._command_new()
+            case "plan":
+                self._command_plan()
+            case "code":
+                self._command_code()
             case "history":
                 self._command_history()
             case "settings":
@@ -111,6 +115,20 @@ class InputAreaContainer(Container):
 
         # Message bubbles up to ConversationManager (ancestor)
         self.post_message(CreateConversation())
+
+    def _command_plan(self) -> None:
+        """Handle the /plan command to switch to Planning Mode."""
+        from openhands_cli.tui.core import SetAgentMode
+
+        # Message bubbles up to ConversationManager (ancestor)
+        self.post_message(SetAgentMode("plan"))
+
+    def _command_code(self) -> None:
+        """Handle the /code command to switch to Code Mode."""
+        from openhands_cli.tui.core import SetAgentMode
+
+        # Message bubbles up to ConversationManager (ancestor)
+        self.post_message(SetAgentMode("code"))
 
     def _command_history(self) -> None:
         """Handle the /history command to show conversation history panel."""
