@@ -86,7 +86,8 @@ def add_serve_parser(subparsers: argparse._SubParsersAction) -> argparse.Argumen
     )
     serve_parser.add_argument(
         "--bind",
-        help="Bind the GUI server to a specific IP or IP:port (e.g., 127.0.0.1 or 127.0.0.1:3000)",
+        help="Bind the GUI server to a specific IP or IP:port (e.g., 127.0.0.1 "
+        "or 127.0.0.1:3000)",
         type=parse_bind_address,
         default="127.0.0.1:3000",
     )

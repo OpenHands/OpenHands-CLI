@@ -5,7 +5,6 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import urlsplit
 
 from rich.console import Console
 from rich.markup import escape
@@ -125,8 +124,8 @@ def launch_gui_server(
     host_ip, host_port_int = bind_address
     host_port = str(host_port_int)
 
-    # If it's an IPv6 address, we need to wrap it in brackets for the Docker port mapping
-    # and the URL display, but only if it's not already bracketed.
+    # If it's an IPv6 address, we need to wrap it in brackets for the Docker port
+    # mapping and the URL display, but only if it's not already bracketed.
     if ":" in host_ip and not host_ip.startswith("["):
         host_ip = f"[{host_ip}]"
 
