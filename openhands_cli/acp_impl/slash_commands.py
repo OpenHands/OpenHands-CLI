@@ -51,6 +51,13 @@ def get_available_slash_commands() -> list[AvailableCommand]:
                 root=UnstructuredCommandInput(hint=mode_options),
             ),
         ),
+        AvailableCommand(
+            name="btw",
+            description="Ask the agent a side question without derailing the main task",
+            input=AvailableCommandInput(
+                root=UnstructuredCommandInput(hint="Your question"),
+            ),
+        ),
     ]
 
 

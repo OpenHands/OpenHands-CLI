@@ -78,11 +78,11 @@ class TestSlashCommandFunctions:
     def test_get_available_commands(self):
         """Test getting available slash commands."""
         commands = get_available_slash_commands()
-        assert len(commands) == 2
+        assert len(commands) == 3
 
-        # Check that both commands are present (without "/" prefix per ACP spec)
+        # Check that all commands are present (without "/" prefix per ACP spec)
         command_names = {cmd.name for cmd in commands}
-        assert command_names == {"help", "confirm"}
+        assert command_names == {"help", "confirm", "btw"}
 
         # Check that descriptions exist
         help_cmd = next(cmd for cmd in commands if cmd.name == "help")

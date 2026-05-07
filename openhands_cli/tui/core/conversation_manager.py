@@ -18,6 +18,8 @@ from textual.message import Message
 
 from openhands.sdk.security.confirmation_policy import ConfirmationPolicyBase
 from openhands_cli.conversations.protocols import ConversationStore
+from openhands_cli.tui.core.btw_interceptor import BtwInterceptor
+from openhands_cli.tui.core.btw_store import BtwStore
 from openhands_cli.tui.core.confirmation_flow_controller import (
     ConfirmationFlowController,
 )
@@ -43,6 +45,7 @@ from openhands_cli.tui.messages import (
 
 
 if TYPE_CHECKING:
+    from openhands_cli.auth.api_client import OpenHandsApiClient
     from openhands_cli.tui.core.conversation_runner import ConversationRunner
     from openhands_cli.tui.core.state import ConversationContainer
 
@@ -176,6 +179,11 @@ class ConversationManager(Container):
             run_worker=self.run_worker,
         )
 
+        # BTW side-channel: interceptor is created eagerly, API client lazily
+        self._btw_store = BtwStore()
+        self._btw_interceptor = BtwInterceptor(store=self._btw_store)
+        self._api_client: OpenHandsApiClient | None = None
+
     # ---- Properties ----
 
     @property
@@ -195,12 +203,83 @@ class ConversationManager(Container):
         """Handle SendMessage - the primary entry point for user messages.
 
         This handler:
-        1. Resets the refinement iteration counter (new user turn)
-        2. Delegates to UserMessageController for rendering and processing
+        1. Checks for /btw (side-channel) commands and handles them separately
+        2. Resets the refinement iteration counter (new user turn)
+        3. Delegates to UserMessageController for rendering and processing
         """
         event.stop()
         self._refinement_controller.reset_iteration()
+
+        # Check for BTW (side-channel) command
+        self._btw_interceptor.set_conversation_id(
+            str(self._state.conversation_id) if self._state.conversation_id else None
+        )
+        result = self._btw_interceptor.process(event.content)
+
+        if result.is_btw and result.entry_id:
+            self.run_worker(self._handle_btw_message(result.question, result.entry_id))
+            return  # Don't process as regular message
+
         await self._message_controller.handle_user_message(event.content)
+
+    async def _handle_btw_message(
+        self,
+        question: str | None,
+        entry_id: str,
+    ) -> None:
+        """Handle a BTW (side-channel) message by calling the ask_agent API."""
+        if question is None:
+            await self._btw_interceptor.fail(entry_id, "No question provided")
+            return
+
+        try:
+            conversation_id = (
+                str(self._state.conversation_id)
+                if self._state.conversation_id
+                else None
+            )
+            if not conversation_id:
+                await self._btw_interceptor.fail(entry_id, "No conversation ID")
+                return
+
+            if self._api_client is None:
+                self._ensure_api_client()
+
+            assert self._api_client is not None
+            response = await self._api_client.ask_agent(conversation_id, question)
+            response_text = response.get("response", "")
+            await self._btw_interceptor.resolve(entry_id, response_text)
+
+            display_text = (
+                response_text[:200] + "…" if len(response_text) > 200 else response_text
+            )
+            self.notify(
+                f"BTW response: {display_text}",
+                title="Side Channel Response",
+            )
+        except Exception as e:
+            await self._btw_interceptor.fail(entry_id, str(e))
+            self.notify(
+                f"BTW failed: {e}",
+                title="Error",
+                severity="error",
+            )
+
+    def _ensure_api_client(self) -> None:
+        """Initialize the API client lazily on first /btw use."""
+        import os
+
+        from openhands_cli.auth.api_client import OpenHandsApiClient
+        from openhands_cli.auth.token_storage import TokenStorage
+
+        token_storage = TokenStorage()
+        api_key = token_storage.get_api_key()
+
+        if not api_key:
+            raise RuntimeError("Not authenticated. Please run 'openhands login' first.")
+
+        server_url = os.getenv("OPENHANDS_CLOUD_URL", "https://app.all-hands.dev")
+        self._api_client = OpenHandsApiClient(server_url, api_key)
 
     @on(SendRefinementMessage)
     async def _on_send_refinement_message(self, event: SendRefinementMessage) -> None:
