@@ -311,12 +311,21 @@ def test_main_cli_file_takes_precedence_over_task(monkeypatch, tmp_path):
 @pytest.mark.parametrize(
     "argv,expected_kwargs",
     [
-        (["openhands", "serve"], {"mount_cwd": False, "gpu": False}),
-        (["openhands", "serve", "--mount-cwd"], {"mount_cwd": True, "gpu": False}),
-        (["openhands", "serve", "--gpu"], {"mount_cwd": False, "gpu": True}),
+        (
+            ["openhands", "serve"],
+            {"mount_cwd": False, "gpu": False, "bind_address": ("127.0.0.1", 3000)},
+        ),
+        (
+            ["openhands", "serve", "--mount-cwd"],
+            {"mount_cwd": True, "gpu": False, "bind_address": ("127.0.0.1", 3000)},
+        ),
+        (
+            ["openhands", "serve", "--gpu"],
+            {"mount_cwd": False, "gpu": True, "bind_address": ("127.0.0.1", 3000)},
+        ),
         (
             ["openhands", "serve", "--mount-cwd", "--gpu"],
-            {"mount_cwd": True, "gpu": True},
+            {"mount_cwd": True, "gpu": True, "bind_address": ("127.0.0.1", 3000)},
         ),
     ],
 )
