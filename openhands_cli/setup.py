@@ -12,6 +12,7 @@ from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
 )
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
+from openhands.tools.preset.default import register_builtins_agents
 
 # Register tools on import
 from openhands_cli.locations import get_conversations_dir, get_work_dir
@@ -121,6 +122,12 @@ def setup_conversation(
     if console is None:
         console = Console()
     console.print("Initializing agent...", style="white")
+
+    # Register built-in subagent types (default, explore, bash) so the
+    # delegate tool can spawn them.  Uses register_agent_if_absent, so
+    # user/project-level definitions still take priority.
+    # enable_browser=False because CLI mode doesn't provide browser tools.
+    register_builtins_agents(enable_browser=False)
 
     agent = load_agent_specs(
         str(conversation_id),

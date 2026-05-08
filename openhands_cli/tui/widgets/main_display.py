@@ -27,7 +27,7 @@ from textual.containers import VerticalScroll
 from textual.reactive import var
 
 
-class ScrollableContent(VerticalScroll):
+class ScrollableContent(VerticalScroll, can_focus=False):
     """Scrollable container for conversation content.
 
     This widget holds:
