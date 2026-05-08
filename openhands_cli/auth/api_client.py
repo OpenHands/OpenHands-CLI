@@ -327,14 +327,22 @@ async def fetch_user_data_after_oauth(
 
         # Fetch user settings
         console_print("• Getting user settings...", style=OPENHANDS_THEME.secondary)
-        settings = await client.get_user_settings()
-
-        if settings:
-            _print_settings_summary(settings)
-        else:
+        settings: dict[str, Any] | None
+        try:
+            settings = await client.get_user_settings()
+        except ApiClientError as e:
+            settings = None
             console_print(
-                "  ! No user settings available", style=OPENHANDS_THEME.warning
+                f"  ! Could not fetch user settings: {e}",
+                style=OPENHANDS_THEME.warning,
             )
+        else:
+            if settings:
+                _print_settings_summary(settings)
+            else:
+                console_print(
+                    "  ! No user settings available", style=OPENHANDS_THEME.warning
+                )
 
         user_data = {
             "llm_api_key": llm_api_key,
