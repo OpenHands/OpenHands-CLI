@@ -263,4 +263,4 @@ def json_callback(event: Event) -> None:
     if isinstance(event, SystemPromptEvent):
         return
 
-    print(json.dumps(event.model_dump()))
+    print(json.dumps(event.model_dump(), ensure_ascii=False))

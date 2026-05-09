@@ -232,6 +232,23 @@ class TestJsonCallback:
             assert len(content) > 0
             assert content[0]["text"] == "Hello, this is a test message"
 
+    def test_json_callback_preserves_unicode_characters(self):
+        """Test json_callback emits readable UTF-8 JSON instead of ASCII escapes."""
+        event = MessageEvent(
+            llm_message=Message(role="user", content=[TextContent(text="你好，世界")]),
+            source="user",
+        )
+
+        with patch("builtins.print") as mock_print:
+            json_callback(event)
+
+            assert mock_print.call_count == 1
+            json_output = mock_print.call_args_list[0][0][0]
+            assert "\\u4f60\\u597d" not in json_output
+            assert "你好，世界" in json_output
+            parsed_json = json.loads(json_output)
+            assert parsed_json["llm_message"]["content"][0]["text"] == "你好，世界"
+
 
 @pytest.mark.parametrize(
     ("setup", "expected"),
