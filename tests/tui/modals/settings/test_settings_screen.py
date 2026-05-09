@@ -283,6 +283,44 @@ async def test_memory_condensation_disabled_when_no_api_key(
     assert screen.memory_select.disabled is True
 
 
+@pytest.mark.asyncio
+async def test_memory_condensation_enabled_for_ollama_without_api_key(app):
+    """Local providers should unlock optional fields without an API key."""
+    app_obj, _ = app
+    screen = app_obj.settings_screen
+    screen.current_agent = None
+    screen.mode_select.value = "basic"
+    screen.provider_select.value = "ollama"
+    screen.model_select.set_options([("llama3.3", "llama3.3")])
+    screen.model_select.value = "llama3.3"
+    screen.api_key_input.value = ""
+
+    screen._update_field_dependencies()
+
+    assert screen.api_key_input.disabled is False
+    assert screen.memory_select.disabled is False
+
+
+@pytest.mark.asyncio
+async def test_advanced_settings_enabled_for_local_base_url_without_api_key(app):
+    """Advanced local endpoints should not lock optional settings behind an API key."""
+    app_obj, _ = app
+    screen = app_obj.settings_screen
+    screen.current_agent = None
+    screen.mode_select.value = "advanced"
+    screen.custom_model_input.value = "gpt-4o-mini"
+    screen.base_url_input.value = "http://localhost:11434/v1"
+    screen.api_key_input.value = ""
+
+    screen._update_field_dependencies()
+
+    assert screen.api_key_input.disabled is False
+    assert screen.memory_select.disabled is False
+    assert screen.timeout_input.disabled is False
+    assert screen.max_tokens_input.disabled is False
+    assert screen.max_size_input.disabled is False
+
+
 #
 # 3. Basic ↔ Advanced visibility toggling
 #

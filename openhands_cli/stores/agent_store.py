@@ -5,6 +5,7 @@ import json
 import os
 import re
 from typing import Any
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, SecretStr
 from rich.console import Console
@@ -134,6 +135,51 @@ ENV_LLM_BASE_URL = "LLM_BASE_URL"
 ENV_LLM_MODEL = "LLM_MODEL"
 
 
+_PROVIDERS_WITH_OPTIONAL_API_KEYS = {
+    "bedrock",
+    "ollama",
+    "sagemaker",
+    "vertex_ai",
+    "vertex_ai_beta",
+}
+_LOCAL_BASE_URL_HOSTS = {
+    "0.0.0.0",
+    "127.0.0.1",
+    "::1",
+    "host.docker.internal",
+    "localhost",
+}
+
+
+def base_url_uses_local_llm(base_url: str | None) -> bool:
+    """Return True when the base URL targets a local LLM endpoint."""
+    if not base_url:
+        return False
+
+    try:
+        parsed = urlparse(base_url)
+    except ValueError:
+        return False
+
+    hostname = parsed.hostname
+    if hostname is None:
+        return False
+
+    return hostname.lower() in _LOCAL_BASE_URL_HOSTS
+
+
+def model_requires_api_key(model: str | None, base_url: str | None = None) -> bool:
+    """Return whether the given model/base_url combination requires an API key."""
+    if base_url_uses_local_llm(base_url):
+        return False
+
+    if not model:
+        return True
+
+    provider = model.split("/", 1)[0].lower()
+    return provider not in _PROVIDERS_WITH_OPTIONAL_API_KEYS
+
+
 class MissingEnvironmentVariablesError(Exception):
     """Raised when required environment variables are missing for headless mode.
 
@@ -225,10 +271,10 @@ class LLMEnvOverrides(BaseModel):
 
     def require_for_headless(self) -> None:
         missing: list[str] = []
-        if self.api_key is None:
-            missing.append(ENV_LLM_API_KEY)
         if self.model is None:
             missing.append(ENV_LLM_MODEL)
+        elif model_requires_api_key(self.model, self.base_url) and self.api_key is None:
+            missing.append(ENV_LLM_API_KEY)
         if missing:
             raise MissingEnvironmentVariablesError(missing)
 
@@ -289,12 +335,15 @@ class AgentStore:
 
         # In env override mode, require enough info to create an agent.
         overrides.require_for_headless()
-        assert overrides.api_key is not None
         assert overrides.model is not None
 
         llm = LLM(
             model=overrides.model,
-            api_key=overrides.api_key.get_secret_value(),
+            api_key=(
+                overrides.api_key.get_secret_value()
+                if overrides.api_key is not None
+                else None
+            ),
             base_url=overrides.base_url,
             usage_id="agent",
         )

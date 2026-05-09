@@ -243,6 +243,38 @@ def test_missing_api_key_errors_when_no_existing_agent() -> None:
     assert "API Key is required" in str(exc.value)
 
 
+def test_missing_api_key_allowed_for_ollama_provider() -> None:
+    """Ollama models should not require an API key in basic mode."""
+    data = settings_utils.SettingsFormData(
+        mode="basic",
+        provider="ollama",
+        model="llama3.3:70b",
+        custom_model=None,
+        base_url=None,
+        api_key_input=None,
+        memory_condensation_enabled=True,
+    )
+
+    data.resolve_data_fields(existing_agent=None)
+    assert data.api_key_input is None
+
+
+def test_missing_api_key_allowed_for_local_base_url() -> None:
+    """Local OpenAI-compatible endpoints should not require an API key."""
+    data = settings_utils.SettingsFormData(
+        mode="advanced",
+        provider=None,
+        model=None,
+        custom_model="gpt-4o-mini",
+        base_url="http://localhost:11434/v1",
+        api_key_input=None,
+        memory_condensation_enabled=True,
+    )
+
+    data.resolve_data_fields(existing_agent=None)
+    assert data.api_key_input is None
+
+
 def test_save_settings_wraps_errors_into_result(deps: FakeAgentStore) -> None:
     """save_settings should surface resolver errors as success=False."""
     # Invalid: advanced mode with missing custom_model/base_url
