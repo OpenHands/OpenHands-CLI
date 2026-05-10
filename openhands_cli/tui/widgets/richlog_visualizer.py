@@ -528,7 +528,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         if not critic_widgets:
             return current_anchor
 
-        self._emit_critic_result_side_effects(critic_result)
+        # Skip side effects (PostHog, CriticResultReceived) during replay
         for critic_widget in critic_widgets:
             self._add_widget_after(current_anchor, critic_widget)
             current_anchor = critic_widget

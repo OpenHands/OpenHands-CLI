@@ -389,6 +389,44 @@ class TestReplayHistoryLoading:
                 assert SUCCESS_ICON in str(collapsible.title)
                 assert history_widget_labels(container)[1:] == ["> msg2", "> msg3"]
 
+    @pytest.mark.asyncio
+    async def test_replay_does_not_emit_critic_side_effects(self, mock_cli_settings):
+        """Replaying history should render critic widgets but NOT emit side effects.
+
+        Side effects include PostHog analytics events and CriticResultReceived
+        messages. These must only fire on the live path, not during replay.
+        """
+        from openhands.sdk.critic.result import CriticResult
+
+        # Create a MessageEvent with a critic_result attached
+        message = Message(role="assistant", content=[TextContent(text="analysis")])
+        event = MessageEvent(llm_message=message, source="agent")
+        event = event.model_copy(
+            update={"critic_result": CriticResult(score=0.85, message="Good: 0.85")}
+        )
+
+        events = [create_user_message_event("hi"), event]
+        app = ReplayHistoryTestApp(events)
+
+        async with app.run_test() as pilot:
+            container = app.query_one("#scroll_view", VerticalScroll)
+            visualizer = ConversationVisualizer(container, cast(OpenHandsApp, app))
+
+            with mock_cli_settings(visualizer=visualizer, default_cells_expanded=True):
+                with patch.object(
+                    visualizer, "_emit_critic_result_side_effects"
+                ) as mock_emit:
+                    # Replay all events via _render_history_event
+                    anchor = container
+                    for ev in events:
+                        if ConversationVisualizer.is_user_initiated_message(ev):
+                            visualizer.render_user_message(str(ev.visualize).strip())
+                        else:
+                            anchor = visualizer._render_history_event(ev, anchor)
+                    await pilot.pause()
+
+                    mock_emit.assert_not_called()
+
 
 class TestVisualizerWithoutEscaping:
     """Tests that demonstrate what happens WITHOUT the escaping fix.
