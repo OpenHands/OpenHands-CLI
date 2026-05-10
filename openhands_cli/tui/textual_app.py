@@ -203,6 +203,9 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
             get_conversations_dir(), initial_conversation_id
         )
 
+        # Track whether this is a resumed conversation
+        self._is_resuming = resume_conversation_id is not None
+
         # Store queued inputs (copy to prevent mutating caller's list)
         self.pending_inputs = list(queued_inputs) if queued_inputs else []
 
@@ -426,7 +429,8 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         1. Checking if the agent has a critic configured
         2. Collecting and displaying loaded resources (skills, hooks, MCPs)
         3. Initializing the splash content (one-time setup)
-        4. Processing any queued inputs
+        4. Replaying conversation history when resuming
+        5. Processing any queued inputs
 
         UI lifecycle is owned by OpenHandsApp, not ConversationContainer. The splash
         content initialization is a direct method call, not a reactive
@@ -463,8 +467,24 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # in SplashContent via data_bind
         self.conversation_state.set_loaded_resources(loaded_resources)
 
+        # When resuming, eagerly create the runner and replay persisted events.
+        # Skip when agent is unavailable (first-time user with no config yet).
+        if self._is_resuming and agent is not None:
+            self._replay_conversation_history()
+
         # Process any queued inputs
         self._process_queued_inputs()
+
+    def _replay_conversation_history(self) -> None:
+        """Create the runner and replay persisted events for a resumed conversation."""
+        conversation_id = self.conversation_state.conversation_id
+        if conversation_id is None:
+            return
+
+        try:
+            self.conversation_manager.replay_history(conversation_id)
+        except Exception as e:
+            self.notify(f"Resume error: {e}", severity="error")
 
     def _process_queued_inputs(self) -> None:
         """Process any queued inputs from --task or --file arguments.

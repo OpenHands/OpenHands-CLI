@@ -305,6 +305,11 @@ class ConversationManager(Container):
         """Pause the current conversation."""
         self.post_message(PauseConversation())
 
+    def replay_history(self, conversation_id: uuid.UUID) -> None:
+        """Create (or retrieve) a runner for the conversation and replay its events."""
+        runner = self._runners.get_or_create(conversation_id)
+        runner.replay_events()
+
     def reload_visualizer_configuration(self) -> None:
         """Reload the visualizer configuration for the current conversation."""
         runner = self._runners.current

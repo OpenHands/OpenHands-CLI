@@ -298,6 +298,14 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if critic_result is not None:
                 self._handle_critic_result(critic_result)
 
+    def scroll_to_bottom(self) -> None:
+        """Schedule a scroll-to-bottom on the main thread."""
+        self._run_on_main_thread(self._do_scroll_to_bottom)
+
+    def _do_scroll_to_bottom(self) -> None:
+        """Scroll the container to the bottom (must be called from main thread)."""
+        self._container.scroll_end(animate=False)
+
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
         self._container.mount(widget)
