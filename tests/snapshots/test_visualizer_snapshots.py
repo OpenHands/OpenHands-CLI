@@ -5,7 +5,7 @@ proper padding alignment with user messages.
 """
 
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
@@ -15,6 +15,7 @@ from openhands.sdk.event import ActionEvent
 from openhands.sdk.llm import MessageToolCall
 from openhands.sdk.tool.builtins.finish import FinishAction
 from openhands.sdk.tool.builtins.think import ThinkAction
+from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.panels.plan_side_panel import PlanSidePanel
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
@@ -48,6 +49,12 @@ class VisualizerTestApp(App):
         margin-bottom: 1;
         background: $background;
         color: $primary;
+    }
+    .replay-summary {
+        padding: 0 1;
+        margin-top: 1;
+        color: $primary;
+        text-style: underline;
     }
     """
 
@@ -119,6 +126,63 @@ def _create_think_action_event(thought: str) -> ActionEvent:
         action=ThinkAction(thought=thought),
         summary="Think about the problem",
     )
+
+
+class TestReplaySummaryBannerSnapshots:
+    """Snapshot tests for the replay summary banner."""
+
+    def test_replay_banner_with_messages(self, snap_compare):
+        """Verify replay banner appears above replayed user messages."""
+
+        class ReplayBannerApp(VisualizerTestApp):
+            def __init__(self):
+                super().__init__(events=[])
+
+            def compose(self) -> ComposeResult:
+                yield VerticalScroll(id="scroll_view")
+
+            def on_mount(self) -> None:
+                container = self.query_one("#scroll_view", VerticalScroll)
+                self.visualizer = ConversationVisualizer(
+                    container, cast("OpenHandsApp", self)
+                )
+                settings = CliSettings(default_cells_expanded=True)
+                self.visualizer._cli_settings = settings
+                self.visualizer.render_replay_summary(100)
+                self.visualizer.render_user_message("What is the status?")
+                self.visualizer.render_user_message("Please continue.")
+
+        assert snap_compare(ReplayBannerApp(), terminal_size=(80, 14))
+
+    def test_replay_banner_after_load_all(self, snap_compare):
+        """Verify banner is removed after all events are loaded."""
+
+        class LoadAllApp(VisualizerTestApp):
+            def __init__(self):
+                super().__init__(events=[])
+
+            def compose(self) -> ComposeResult:
+                yield VerticalScroll(id="scroll_view")
+
+            def on_mount(self) -> None:
+                container = self.query_one("#scroll_view", VerticalScroll)
+                self.visualizer = ConversationVisualizer(
+                    container, cast("OpenHandsApp", self)
+                )
+                settings = CliSettings(default_cells_expanded=True)
+                self.visualizer._cli_settings = settings
+                with patch.object(ConversationVisualizer, "MAX_REPLAY_EVENTS", 2):
+                    self.visualizer.render_replay_summary(2)
+                self.visualizer.render_user_message("Hello")
+                self.visualizer.render_user_message("World")
+
+        async def load_all(pilot):
+            app = pilot.app
+            with patch.object(ConversationVisualizer, "MAX_REPLAY_EVENTS", 2):
+                app.visualizer.load_more_events()
+            await pilot.pause()
+
+        assert snap_compare(LoadAllApp(), terminal_size=(80, 14), run_before=load_all)
 
 
 class TestVisualizerSnapshots:

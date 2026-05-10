@@ -21,7 +21,6 @@ from openhands.sdk.conversation.state import (
     ConversationState as SDKConversationState,
 )
 from openhands.sdk.event.base import Event
-from openhands.sdk.event.llm_convertible.message import MessageEvent
 from openhands_cli.setup import setup_conversation
 from openhands_cli.shared import extract_conversation_summary
 from openhands_cli.tui.core.events import ShowConfirmationPanel
@@ -106,13 +105,13 @@ class ConversationRunner:
         """
         events = self.conversation.state.events
         start = max(0, len(events) - self.MAX_REPLAY_EVENTS)
+
+        # Render summary banner if events were truncated
+        if start > 0:
+            self.visualizer.render_replay_summary(start)
+
         for event in events[start:]:
-            if (
-                isinstance(event, MessageEvent)
-                and event.llm_message
-                and event.llm_message.role == "user"
-                and not event.sender
-            ):
+            if ConversationVisualizer.is_user_initiated_message(event):
                 text = str(event.visualize)
                 if text.strip():
                     self.visualizer.render_user_message(text)
