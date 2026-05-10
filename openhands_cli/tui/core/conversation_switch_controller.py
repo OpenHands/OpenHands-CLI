@@ -109,7 +109,10 @@ class ConversationSwitchController:
         self._state.reset_conversation_state()
 
         self._runners.clear_current()
-        self._runners.get_or_create(target_id)
+        runner = self._runners.get_or_create(target_id)
+
+        # Replay persisted events so history is visible in the UI
+        runner.replay_events()
 
         self._state.finish_switching(target_id)
         self._state.set_switch_confirmation_target(None)
