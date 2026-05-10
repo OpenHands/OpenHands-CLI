@@ -1,7 +1,9 @@
 """Tests for ConversationVisualizer and Chinese character markup handling."""
 
+from collections.abc import Sequence
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from rich.errors import MarkupError
@@ -10,16 +12,22 @@ from textual.app import App
 from textual.containers import VerticalScroll
 from textual.widgets import Static
 
-from openhands.sdk import Action, MessageEvent, TextContent
-from openhands.sdk.event import ActionEvent, AgentErrorEvent, UserRejectObservation
+from openhands.sdk import Action, Message, MessageEvent, TextContent
+from openhands.sdk.event import (
+    ActionEvent,
+    AgentErrorEvent,
+    ObservationEvent,
+    UserRejectObservation,
+)
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.llm import MessageToolCall
-from openhands.tools.terminal.definition import TerminalAction
+from openhands.tools.terminal.definition import TerminalAction, TerminalObservation
 from openhands_cli.stores import CliSettings
 from openhands_cli.tui.textual_app import OpenHandsApp
 from openhands_cli.tui.widgets.richlog_visualizer import (
     ELLIPSIS,
     MAX_LINE_LENGTH,
+    SUCCESS_ICON,
     ConversationVisualizer,
 )
 
@@ -108,6 +116,69 @@ def create_terminal_action_event(
         llm_response_id="response_1",
         summary=summary,
     )
+
+
+def create_user_message_event(content: str) -> MessageEvent:
+    return MessageEvent(
+        llm_message=Message(role="user", content=[TextContent(text=content)]),
+        source="user",
+    )
+
+
+def create_terminal_observation_event(
+    action_event: ActionEvent, content: str = "done"
+) -> ObservationEvent:
+    observation = TerminalObservation(
+        command=cast(TerminalAction, action_event.action).command,
+        exit_code=0,
+        timeout=False,
+        content=[TextContent(text=content)],
+    )
+    return ObservationEvent(
+        tool_name=action_event.tool_name,
+        tool_call_id=action_event.tool_call_id,
+        observation=observation,
+        action_id=action_event.id,
+    )
+
+
+class ReplayHistoryTestApp(App):
+    def __init__(self, events: Sequence[object]) -> None:
+        super().__init__()
+        self.plan_panel = MagicMock()
+        self.plan_panel.is_on_screen = False
+        self.plan_panel.user_dismissed = True
+        self.conversation_id = "test-conversation"
+        self.conversation_manager = SimpleNamespace(
+            current_runner=SimpleNamespace(
+                conversation=SimpleNamespace(state=SimpleNamespace(events=events))
+            ),
+            post_message=MagicMock(),
+        )
+        self.notifications: list[str] = []
+
+    def compose(self):
+        yield VerticalScroll(id="scroll_view")
+
+    def notify(self, message: str, *args, **kwargs) -> None:
+        self.notifications.append(message)
+
+
+def history_widget_labels(container: VerticalScroll) -> list[str]:
+    labels: list[str] = []
+    for child in container.children:
+        if child.id == "replay-summary-banner":
+            labels.append(str(child.render()).replace("\n", " ").strip())
+            continue
+
+        if isinstance(child, Static):
+            rendered = str(child.render())
+            labels.append(rendered.replace("\n", " ").strip())
+            continue
+
+        title = getattr(child, "title", None)
+        labels.append(str(title) if title is not None else child.__class__.__name__)
+    return labels
 
 
 class TestChineseCharacterMarkupHandling:
@@ -225,6 +296,98 @@ class TestChineseCharacterMarkupHandling:
         widget = Static(safe_content, markup=True)
         rendered = widget.render()
         assert rendered is not None
+
+
+class TestReplayHistoryLoading:
+    @pytest.mark.asyncio
+    async def test_load_more_events_preserves_chronological_order(
+        self, mock_cli_settings
+    ):
+        events = [create_user_message_event(f"msg{i}") for i in range(6)]
+        app = ReplayHistoryTestApp(events)
+
+        async with app.run_test() as pilot:
+            container = app.query_one("#scroll_view", VerticalScroll)
+            visualizer = ConversationVisualizer(container, cast(OpenHandsApp, app))
+
+            with patch.object(ConversationVisualizer, "MAX_REPLAY_EVENTS", 2):
+                with mock_cli_settings(
+                    visualizer=visualizer, default_cells_expanded=True
+                ):
+                    visualizer.render_replay_summary(4)
+                    visualizer.render_user_message("msg4")
+                    visualizer.render_user_message("msg5")
+                    await pilot.pause()
+
+                    assert history_widget_labels(container) == [
+                        "Load 2 earlier events",
+                        "> msg4",
+                        "> msg5",
+                    ]
+
+                    visualizer.load_more_events()
+                    await pilot.pause()
+
+                    assert history_widget_labels(container) == [
+                        "Load 2 earlier events",
+                        "> msg2",
+                        "> msg3",
+                        "> msg4",
+                        "> msg5",
+                    ]
+
+                    visualizer.load_more_events()
+                    await pilot.pause()
+
+                    assert history_widget_labels(container) == [
+                        "> msg0",
+                        "> msg1",
+                        "> msg2",
+                        "> msg3",
+                        "> msg4",
+                        "> msg5",
+                    ]
+
+    @pytest.mark.asyncio
+    async def test_load_more_events_pairs_action_and_observation(
+        self, mock_cli_settings
+    ):
+        from openhands_cli.tui.widgets.collapsible import Collapsible
+
+        action_event = create_terminal_action_event("echo older", "Run older command")
+        observation_event = create_terminal_observation_event(
+            action_event, "older output"
+        )
+        later_events = [
+            create_user_message_event("msg2"),
+            create_user_message_event("msg3"),
+        ]
+        events = [action_event, observation_event, *later_events]
+        app = ReplayHistoryTestApp(events)
+
+        async with app.run_test() as pilot:
+            container = app.query_one("#scroll_view", VerticalScroll)
+            visualizer = ConversationVisualizer(container, cast(OpenHandsApp, app))
+
+            with patch.object(ConversationVisualizer, "MAX_REPLAY_EVENTS", 2):
+                with mock_cli_settings(
+                    visualizer=visualizer, default_cells_expanded=True
+                ):
+                    visualizer.render_replay_summary(2)
+                    visualizer.render_user_message("msg2")
+                    visualizer.render_user_message("msg3")
+                    await pilot.pause()
+
+                    visualizer.load_more_events()
+                    await pilot.pause()
+
+                collapsibles = list(container.query(Collapsible))
+                assert len(collapsibles) == 1
+                collapsible = cast(Collapsible, collapsibles[0])
+                assert len(container.children) == 3
+                assert "Run older command" in str(collapsible.title)
+                assert SUCCESS_ICON in str(collapsible.title)
+                assert history_widget_labels(container)[1:] == ["> msg2", "> msg3"]
 
 
 class TestVisualizerWithoutEscaping:

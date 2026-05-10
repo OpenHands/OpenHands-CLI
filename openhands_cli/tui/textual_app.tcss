@@ -39,6 +39,13 @@ Screen {
     color: $primary;
 }
 
+.replay-summary {
+    padding: 0 1;
+    margin-top: 1;
+    color: $primary;
+    text-style: underline;
+}
+
 .help-message, .error-message, .status-message {
     padding: 0 1;
     background: $background;
