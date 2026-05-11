@@ -21,6 +21,7 @@ from openhands.sdk.conversation.state import (
     ConversationState as SDKConversationState,
 )
 from openhands.sdk.event.base import Event
+from openhands.sdk.event.llm_convertible.message import MessageEvent
 from openhands_cli.setup import setup_conversation
 from openhands_cli.shared import extract_conversation_summary
 from openhands_cli.tui.core.events import ShowConfirmationPanel
@@ -91,6 +92,33 @@ class ConversationRunner:
     @property
     def is_confirmation_mode_active(self) -> bool:
         return self._state.is_confirmation_active
+
+    # Maximum number of events to replay on resume/switch to avoid
+    # O(n) memory and rendering cost for long conversations.
+    MAX_REPLAY_EVENTS = 50
+
+    def replay_events(self) -> None:
+        """Replay the tail of persisted events through the visualizer.
+
+        Only the last MAX_REPLAY_EVENTS are replayed to avoid loading
+        unbounded history into memory. User messages are rendered via
+        render_user_message since on_event skips them.
+        """
+        events = self.conversation.state.events
+        total = len(events)
+        start = max(0, total - self.MAX_REPLAY_EVENTS)
+        for event in events[start:]:
+            if (
+                isinstance(event, MessageEvent)
+                and event.llm_message
+                and event.llm_message.role == "user"
+                and not event.sender
+            ):
+                text = str(event.visualize)
+                if text.strip():
+                    self.visualizer.render_user_message(text)
+                continue
+            self.visualizer.on_event(event)
 
     async def queue_message(self, user_input: str) -> None:
         """Queue a message for a running conversation"""
