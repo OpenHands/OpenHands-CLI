@@ -12,8 +12,11 @@ from openhands_cli.acp_impl.slash_commands import (
     get_confirm_error_text,
     get_confirm_help_text,
     get_confirm_success_text,
+    get_model_help_text,
+    get_model_success_text,
     get_unknown_command_text,
     handle_confirm_argument,
+    handle_model_argument,
     parse_slash_command,
     validate_confirmation_mode,
 )
@@ -78,11 +81,11 @@ class TestSlashCommandFunctions:
     def test_get_available_commands(self):
         """Test getting available slash commands."""
         commands = get_available_slash_commands()
-        assert len(commands) == 2
+        assert len(commands) == 3
 
         # Check that both commands are present (without "/" prefix per ACP spec)
         command_names = {cmd.name for cmd in commands}
-        assert command_names == {"help", "confirm"}
+        assert command_names == {"help", "confirm", "model"}
 
         # Check that descriptions exist
         help_cmd = next(cmd for cmd in commands if cmd.name == "help")
@@ -97,6 +100,7 @@ class TestSlashCommandFunctions:
         assert "Available slash commands" in help_text
         assert "/help" in help_text
         assert "/confirm" in help_text
+        assert "/model" in help_text
 
 
 class TestConfirmationModeValidation:
@@ -193,12 +197,58 @@ class TestTextGeneration:
             assert f"Confirmation mode set to: {mode}" in success_text
             assert CONFIRMATION_MODES[mode]["long"] in success_text  # type: ignore[index]
 
+    def test_get_model_help_text(self):
+        """Test model help text generation."""
+        help_text = get_model_help_text("openai/gpt-4o")
+        assert "Current model: openai/gpt-4o" in help_text
+        assert "/model <profile>" in help_text
+        assert "profiles" in help_text.lower()
+        assert "no profiles saved" in help_text.lower() or "-" in help_text
+
+    def test_get_model_success_text(self):
+        """Test model success text generation."""
+        success_text = get_model_success_text(
+            "openai/gpt-4o", "anthropic/claude-opus-4-6"
+        )
+        assert "Model set to: anthropic/claude-opus-4-6" in success_text
+        assert "Previous model: openai/gpt-4o" in success_text
+
+    def test_get_model_success_text_unchanged(self):
+        """Test unchanged model success text."""
+        success_text = get_model_success_text("openai/gpt-4o", "openai/gpt-4o")
+        assert success_text == "Model unchanged: openai/gpt-4o"
+
     def test_get_unknown_command_text(self):
         """Test unknown command text generation."""
         error_text = get_unknown_command_text("badcmd")
         assert "Unknown command: /badcmd" in error_text
         assert "/help" in error_text
         assert "/confirm" in error_text
+        assert "/model" in error_text
+
+
+class TestModelCommandHandling:
+    """Test /model command handling logic."""
+
+    def test_model_without_argument_shows_help(self):
+        """Test /model with no argument shows help."""
+        response, new_model = handle_model_argument("openai/gpt-4o", "")
+        assert new_model is None
+        assert "Current model: openai/gpt-4o" in response
+
+    def test_model_with_whitespace_only_shows_help(self):
+        """Test /model with whitespace shows help."""
+        response, new_model = handle_model_argument("openai/gpt-4o", "   ")
+        assert new_model is None
+        assert "Current model: openai/gpt-4o" in response
+
+    def test_model_with_valid_argument_returns_new_model(self):
+        """Test /model with argument returns a model update."""
+        response, new_model = handle_model_argument(
+            "openai/gpt-4o", "anthropic/claude-opus-4-6"
+        )
+        assert new_model == "anthropic/claude-opus-4-6"
+        assert "Model set to: anthropic/claude-opus-4-6" in response
 
 
 class TestExtractTextFromMessageContent:

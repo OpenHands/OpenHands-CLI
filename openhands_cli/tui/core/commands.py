@@ -21,6 +21,7 @@ COMMANDS = [
     DropdownItem(main="/history - Toggle conversation history"),
     DropdownItem(main="/settings - Open settings"),
     DropdownItem(main="/confirm - Configure confirmation settings"),
+    DropdownItem(main="/model - Switch LLM profile"),
     DropdownItem(main="/condense - Condense conversation history"),
     DropdownItem(main="/skills - View loaded skills, hooks, and MCPs"),
     DropdownItem(main="/feedback - Send anonymous feedback about CLI"),
@@ -76,6 +77,7 @@ def show_help(scroll_view: VerticalScroll) -> None:
   [{secondary}]/history[/{secondary}] - Toggle conversation history
   [{secondary}]/settings[/{secondary}] - Open settings
   [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
+  [{secondary}]/model[/{secondary}] - Switch LLM profile
   [{secondary}]/condense[/{secondary}] - Condense conversation history
   [{secondary}]/skills[/{secondary}] - View loaded skills, hooks, and MCPs
   [{secondary}]/feedback[/{secondary}] - Send anonymous feedback about CLI

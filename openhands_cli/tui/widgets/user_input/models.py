@@ -10,6 +10,7 @@ class CompletionType(str, Enum):
 
     COMMAND = "command"
     FILE = "file"
+    PROFILE = "profile"
     NONE = "none"
 
 

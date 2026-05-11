@@ -1,4 +1,6 @@
-from typing import ClassVar
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, ClassVar
 
 from textual import on
 from textual.binding import Binding
@@ -6,6 +8,12 @@ from textual.content import Content
 from textual.events import Paste
 from textual.message import Message
 from textual.widgets import TextArea
+
+
+if TYPE_CHECKING:
+    from openhands_cli.tui.widgets.user_input.autocomplete_dropdown import (
+        AutoCompleteDropdown,
+    )
 
 
 class SingleLineInputWithWrapping(TextArea):
@@ -32,6 +40,9 @@ class SingleLineInputWithWrapping(TextArea):
 
     class EnterPressed(Message):
         """Message sent when Enter is pressed (for submission)."""
+
+    autocomplete: AutoCompleteDropdown | None = None
+    """Set by ``InputField`` so the widget can defer Tab/Enter to the dropdown."""
 
     def __init__(
         self,
@@ -67,9 +78,18 @@ class SingleLineInputWithWrapping(TextArea):
             )
 
     async def _on_key(self, event) -> None:
-        """Intercept Enter key before TextArea processes it."""
+        """Intercept keys, deferring to autocomplete when visible."""
+        # Let autocomplete handle navigation/selection first.
+        if (
+            self.autocomplete is not None
+            and self.autocomplete.is_visible
+            and self.autocomplete.process_key(event.key)
+        ):
+            event.prevent_default()
+            event.stop()
+            return
+
         if event.key == "enter":
-            # Post message to parent and prevent default newline insertion
             self.post_message(self.EnterPressed())
             event.prevent_default()
             event.stop()

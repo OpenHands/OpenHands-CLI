@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Final
 
@@ -7,7 +8,7 @@ from textual.containers import Container
 from textual.widgets import OptionList
 from textual.widgets.option_list import Option
 
-from openhands_cli.locations import get_work_dir
+from openhands_cli.locations import get_profiles_dir, get_work_dir
 from openhands_cli.tui.widgets.user_input.models import (
     CompletionItem,
     CompletionType,
@@ -17,12 +18,22 @@ from openhands_cli.tui.widgets.user_input.single_line_input import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+# Slash commands whose arguments trigger sub-completions, mapped to
+# the ``CompletionType`` used for their candidates.
+_ARG_COMPLETABLE_COMMANDS: Final[dict[str, CompletionType]] = {
+    "/model": CompletionType.PROFILE,
+}
+
+
 class AutoCompleteDropdown(Container):
     """Custom autocomplete dropdown for text input.
 
     This is a lightweight alternative to textual-autocomplete that works
-    with TextArea instead of Input widgets. It handles both command (/)
-    and file path (@) completions.
+    with TextArea instead of Input widgets. It handles command (/),
+    file path (@), and command-argument completions (e.g. profile names
+    after ``/model``).
     """
 
     # Min spaces between command name and description
@@ -73,12 +84,14 @@ class AutoCompleteDropdown(Container):
         """Detect the type of completion based on input text."""
         stripped = text.lstrip()
         if stripped.startswith("/"):
-            # Check if there's a space (command already typed)
-            if " " in stripped:
-                return CompletionType.NONE
-            return CompletionType.COMMAND
+            if " " not in stripped:
+                return CompletionType.COMMAND
+            # Command already typed -- check for argument completion.
+            cmd = stripped.split()[0]
+            if cmd in _ARG_COMPLETABLE_COMMANDS:
+                return _ARG_COMPLETABLE_COMMANDS[cmd]
+            return CompletionType.NONE
         elif "@" in text:
-            # Check if there's a space after the last @
             at_index = text.rfind("@")
             path_part = text[at_index + 1 :]
             if " " in path_part:
@@ -261,6 +274,39 @@ class AutoCompleteDropdown(Container):
 
         return candidates
 
+    def _get_profile_candidates(self, text: str) -> list[CompletionItem]:
+        """Get LLM profile candidates for ``/model`` argument."""
+        parts = text.lstrip().split(None, 1)
+        search = parts[1].lower() if len(parts) > 1 else ""
+
+        profile_dir = Path(get_profiles_dir())
+        if not profile_dir.is_dir():
+            return []
+
+        candidates: list[CompletionItem] = []
+        try:
+            for path in sorted(profile_dir.glob("*.json")):
+                name = path.stem
+                if name.startswith("."):
+                    continue
+                if not name.lower().startswith(search):
+                    continue
+                candidates.append(
+                    CompletionItem(
+                        display_text=name,
+                        completion_value=name,
+                        completion_type=CompletionType.PROFILE,
+                    )
+                )
+        except (OSError, PermissionError):
+            logger.warning(
+                "Unable to read profiles directory: %s",
+                profile_dir,
+                exc_info=True,
+            )
+
+        return candidates
+
     def update_candidates(self) -> None:
         """Update candidates based on current input text."""
 
@@ -273,6 +319,8 @@ class AutoCompleteDropdown(Container):
             candidates = self._get_command_candidates(text)
         elif completion_type == CompletionType.FILE:
             candidates = self._get_file_candidates(text)
+        elif completion_type == CompletionType.PROFILE:
+            candidates = self._get_profile_candidates(text)
 
         if candidates:
             self.show_dropdown(candidates)
@@ -290,6 +338,10 @@ class AutoCompleteDropdown(Container):
             at_index = current_text.rfind("@")
             prefix = current_text[:at_index] if at_index >= 0 else ""
             self.single_line_widget.text = prefix + completion_value + " "
+        elif item.completion_type == CompletionType.PROFILE:
+            # Keep the command prefix, replace only the argument.
+            cmd = current_text.lstrip().split()[0]
+            self.single_line_widget.text = cmd + " " + completion_value
 
         # Move cursor to end
         self.single_line_widget.move_cursor(self.single_line_widget.document.end)
