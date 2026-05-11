@@ -34,7 +34,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 9
+        assert len(COMMANDS) == 10
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -52,6 +52,7 @@ class TestCommands:
             ("/settings", "Open settings"),
             ("/confirm", "Configure confirmation settings"),
             ("/condense", "Condense conversation history"),
+            ("/skill", "Manage installed skills"),
             ("/skills", "View loaded skills, hooks, and MCPs"),
             ("/feedback", "Send anonymous feedback about CLI"),
             ("/exit", "Exit the application"),
@@ -92,6 +93,7 @@ class TestCommands:
             "/settings",
             "/confirm",
             "/condense",
+            "/skill",
             "/skills",
             "/feedback",
             "/exit",
@@ -101,6 +103,7 @@ class TestCommands:
             "Open settings",
             "Configure confirmation settings",
             "Condense conversation history",
+            "Manage installed skills",
             "View loaded skills, hooks, and MCPs",
             "Send anonymous feedback about CLI",
             "Exit the application",
@@ -168,6 +171,8 @@ class TestCommands:
             ("/settings", True),
             ("/confirm", True),
             ("/condense", True),
+            ("/skill", True),
+            ("/skill install foo", True),
             ("/skills", True),
             ("/feedback", True),
             ("/exit", True),
@@ -191,8 +196,9 @@ class TestCommands:
         assert "/help" in command_names
         assert "/new" in command_names
         assert "/settings" in command_names
+        assert "/skill" in command_names
         assert "/skills" in command_names
-        assert len(COMMANDS) == 9
+        assert len(COMMANDS) == 10
 
     def test_all_commands_included_in_help(self):
         """Test that all commands from COMMANDS list are included in help text.

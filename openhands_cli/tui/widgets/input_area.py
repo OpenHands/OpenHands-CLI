@@ -29,6 +29,7 @@ from textual.containers import Container
 from textual.reactive import var
 
 from openhands_cli.tui.core.commands import show_help, show_skills
+from openhands_cli.tui.core.skill_commands import handle_skill_command
 from openhands_cli.tui.messages import SlashCommandSubmitted
 
 
@@ -88,6 +89,8 @@ class InputAreaContainer(Container):
                 self._command_condense()
             case "skills":
                 self._command_skills()
+            case "skill":
+                self._command_skill(event.args)
             case "feedback":
                 self._command_feedback()
             case "exit":
@@ -158,6 +161,10 @@ class InputAreaContainer(Container):
         if self.loaded_resources:
             show_skills(self.scroll_view, self.loaded_resources)
             self.scroll_view.scroll_end(animate=False)
+
+    def _command_skill(self, args: str) -> None:
+        """Handle the /skill command for skill lifecycle management."""
+        handle_skill_command(self.scroll_view, args)
 
     def _command_feedback(self) -> None:
         """Handle the /feedback command to open feedback form in browser."""
