@@ -19,7 +19,8 @@ def get_provider_options() -> list[tuple[str, str]]:
     - UNVERIFIED providers that are known to litellm (filters out invalid
       "providers" like 'meta-llama', 'Qwen' which are vendor names)
 
-    Sorted alphabetically.
+    'openhands' is always listed first; remaining providers are sorted
+    alphabetically.
     """
     # Verified providers always included (includes custom like 'openhands')
     verified_providers = set(VERIFIED_MODELS.keys())
@@ -28,8 +29,11 @@ def get_provider_options() -> list[tuple[str, str]]:
     unverified_providers = set(UNVERIFIED_MODELS_EXCLUDING_BEDROCK.keys())
     valid_unverified = unverified_providers & _VALID_LITELLM_PROVIDERS
 
-    # Combine and sort
+    # Combine and sort alphabetically, then pin 'openhands' to the top
     all_valid_providers = sorted(verified_providers | valid_unverified)
+    if "openhands" in all_valid_providers:
+        all_valid_providers.remove("openhands")
+        all_valid_providers.insert(0, "openhands")
 
     return [(provider, provider) for provider in all_valid_providers]
 
