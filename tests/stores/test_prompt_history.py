@@ -163,4 +163,3 @@ def test_prompt_history_ignores_malformed_entries(mock_locations):
         {"text": "first prompt", "timestamp": "2026-05-01T10:00:00"},
     ]
     assert store.load() == ["latest prompt", "first prompt"]
-
