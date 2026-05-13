@@ -90,23 +90,36 @@ class TestOpenHandsApiClient:
             assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_user_settings_success(self):
-        """Test successful user settings retrieval."""
+    async def test_get_user_settings_flattens_v1_payload(self):
+        """`/api/v1/settings` returns nested agent_settings; the client should
+        surface the legacy flat keys consumed by the rest of the CLI."""
         client = OpenHandsApiClient("https://api.example.com", "test-key")
 
-        expected_settings = {
-            "llm_model": "gpt-4o-mini",
-            "agent": "CodeActAgent",
+        v1_payload = {
             "language": "en",
+            "llm_api_key_set": True,
+            "agent_settings": {
+                "agent": "CodeActAgent",
+                "llm": {
+                    "model": "gpt-4o-mini",
+                    "base_url": "https://llm-proxy.example.com",
+                },
+            },
         }
 
         with patch.object(client, "_get_json") as mock_get_json:
-            mock_get_json.return_value = expected_settings
+            mock_get_json.return_value = v1_payload
 
             result = await client.get_user_settings()
 
-            assert result == expected_settings
-            mock_get_json.assert_called_once_with("/api/settings")
+            mock_get_json.assert_called_once_with("/api/v1/settings")
+            assert result["llm_model"] == "gpt-4o-mini"
+            assert result["llm_base_url"] == "https://llm-proxy.example.com"
+            assert result["agent"] == "CodeActAgent"
+            assert result["language"] == "en"
+            assert result["llm_api_key_set"] is True
+            # Nested payload preserved for callers that need full data.
+            assert result["agent_settings"] == v1_payload["agent_settings"]
 
     @pytest.mark.asyncio
     async def test_get_user_info_success(self):
@@ -125,7 +138,25 @@ class TestOpenHandsApiClient:
             result = await client.get_user_info()
 
             assert result == expected_user_info
-            mock_get_json.assert_called_once_with("/api/user/info")
+            mock_get_json.assert_called_once_with("/api/v1/users/me")
+
+    @pytest.mark.asyncio
+    async def test_get_json_non_json_response(self):
+        """A 2xx response with a non-JSON body (e.g. SPA HTML fallback) must
+        raise ApiClientError, not leak the raw JSONDecodeError."""
+        client = OpenHandsApiClient("https://api.example.com", "test-key")
+
+        mock_response = httpx.Response(status_code=200)
+        mock_response._content = b"<!doctype html><html></html>"
+
+        with patch.object(client, "get") as mock_get:
+            mock_get.return_value = mock_response
+
+            with pytest.raises(
+                ApiClientError,
+                match=r"Request to '/test' returned a non-JSON response \(HTTP 200\)",
+            ):
+                await client._get_json("/test")
 
     @pytest.mark.asyncio
     async def test_get_json_401_error(self):

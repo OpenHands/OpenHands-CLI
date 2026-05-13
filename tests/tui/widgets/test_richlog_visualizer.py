@@ -971,8 +971,67 @@ class TestMessageEventDelegation:
         assert "→" in markdown_content
 
 
-class TestRenderingHelpers:
-    """Tests for extracted richlog rendering helpers."""
+class TestThreadSafety:
+    """Tests for thread-safe UI updates in ConversationVisualizer."""
+
+    @pytest.fixture
+    def mock_visualizer(self):
+        """Create a visualizer with a mocked app for thread safety testing."""
+        from unittest.mock import MagicMock
+
+        app = MagicMock()
+        container = VerticalScroll()
+        vis = ConversationVisualizer(container, app)
+        return vis
+
+    def test_run_on_main_thread_direct_call(self, mock_visualizer):
+        """Test direct call when on main thread with a running loop."""
+        import threading
+        from unittest.mock import MagicMock
+
+        mock_func = MagicMock()
+        mock_visualizer._main_thread_id = threading.get_ident()
+
+        # Simulate a running loop
+        with patch("asyncio.get_running_loop"):
+            mock_visualizer._run_on_main_thread(mock_func, "arg1")
+
+        mock_func.assert_called_once_with("arg1")
+        mock_visualizer._app.call_from_thread.assert_not_called()
+
+    def test_run_on_main_thread_via_call_from_thread_when_no_loop(
+        self, mock_visualizer
+    ):
+        """Test call via call_from_thread when on main thread but NO running loop."""
+        import threading
+        from unittest.mock import MagicMock
+
+        mock_func = MagicMock()
+        mock_visualizer._main_thread_id = threading.get_ident()
+
+        # Simulate NO running loop (asyncio.get_running_loop raises RuntimeError)
+        with patch("asyncio.get_running_loop", side_effect=RuntimeError("no loop")):
+            mock_visualizer._run_on_main_thread(mock_func, "arg1")
+
+        # Should NOT be called directly
+        mock_func.assert_not_called()
+        # Should be called via app.call_from_thread
+        mock_visualizer._app.call_from_thread.assert_called_once_with(mock_func, "arg1")
+
+    def test_run_on_main_thread_via_call_from_thread_when_wrong_thread(
+        self, mock_visualizer
+    ):
+        """Test call via call_from_thread when on a different thread."""
+        from unittest.mock import MagicMock
+
+        mock_func = MagicMock()
+        # Set main thread ID to something different
+        mock_visualizer._main_thread_id = -1
+
+        mock_visualizer._run_on_main_thread(mock_func, "arg1")
+
+        mock_func.assert_not_called()
+        mock_visualizer._app.call_from_thread.assert_called_once_with(mock_func, "arg1")
 
     @pytest.mark.parametrize(
         ("role", "expected_prefix"),
