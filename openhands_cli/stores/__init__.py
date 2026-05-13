@@ -8,6 +8,10 @@ from openhands_cli.stores.cli_settings import (
     CliSettings,
     CriticSettings,
 )
+from openhands_cli.stores.prompt_history import (
+    PromptHistoryEntry,
+    PromptHistoryStore,
+)
 
 
 __all__ = [
@@ -16,5 +20,7 @@ __all__ = [
     "CriticSettings",
     "DEFAULT_MAX_REFINEMENT_ITERATIONS",
     "MissingEnvironmentVariablesError",
+    "PromptHistoryEntry",
+    "PromptHistoryStore",
     "check_and_warn_env_vars",
 ]
