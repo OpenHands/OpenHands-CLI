@@ -32,15 +32,24 @@ class PromptHistoryStore:
 
         try:
             with open(self.path, encoding="utf-8") as f:
-                entries: list[PromptHistoryEntry] = json.load(f)
+                raw_entries = json.load(f)
 
-            if not isinstance(entries, list):
+            if not isinstance(raw_entries, list):
                 return []
 
-            # Reverse so that index 0 is the most recent
-            return list(reversed(entries))
+            entries: list[PromptHistoryEntry] = []
+            for entry in reversed(raw_entries):
+                if not isinstance(entry, dict):
+                    continue
 
-        except (json.JSONDecodeError, KeyError, TypeError, OSError):
+                text = entry.get("text")
+                timestamp = entry.get("timestamp")
+                if isinstance(text, str) and isinstance(timestamp, str):
+                    entries.append({"text": text, "timestamp": timestamp})
+
+            return entries
+
+        except (json.JSONDecodeError, OSError):
             return []
 
     def load(self) -> list[str]:

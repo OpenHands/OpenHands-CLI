@@ -138,3 +138,29 @@ def test_prompt_history_append_corrupt_load(mock_locations):
 
     # Should have recovered and saved the new prompt
     assert store.load() == ["new prompt"]
+
+
+def test_prompt_history_ignores_malformed_entries(mock_locations):
+    """Test malformed list items are skipped instead of crashing callers."""
+    path = Path(get_prompt_history_path())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            [
+                {"text": "first prompt", "timestamp": "2026-05-01T10:00:00"},
+                42,
+                {"text": "missing timestamp"},
+                {"text": "latest prompt", "timestamp": "2026-05-02T10:00:00"},
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    store = PromptHistoryStore()
+
+    assert store.load_entries() == [
+        {"text": "latest prompt", "timestamp": "2026-05-02T10:00:00"},
+        {"text": "first prompt", "timestamp": "2026-05-01T10:00:00"},
+    ]
+    assert store.load() == ["latest prompt", "first prompt"]
+
