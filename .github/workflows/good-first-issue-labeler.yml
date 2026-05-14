@@ -33,16 +33,11 @@ jobs:
                   # Disable uv caching to reduce cross-workflow cache poisoning risk.
                   enable-cache: false
 
-            - name: Install dependencies
-              run: |
-                  uv sync --group dev
-
-            - name: Run OpenHands labeler
+            - name: Run labeler
               env:
                   LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
                   LLM_BASE_URL: https://llm-proxy.app.all-hands.dev
                   LLM_MODEL: litellm_proxy/gpt-5.2
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
-                  uv run openhands --headless --always-approve --override-with-envs \
-                    --file .github/prompts/good-first-issue-labeler.md || echo "OpenHands labeling completed"
+                  uv run .github/scripts/good_first_issue_labeler.py
