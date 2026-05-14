@@ -3,6 +3,7 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #   "openhands-sdk",
+#   "openhands-tools",
 #   "httpx",
 # ]
 # ///
