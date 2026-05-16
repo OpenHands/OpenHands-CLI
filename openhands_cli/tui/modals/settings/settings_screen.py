@@ -495,14 +495,28 @@ class SettingsScreen(ModalScreen):
             "Requires:  pip install databricks-sdk\n"
             "Verify profiles with: databricks auth profiles"
         ),
-        "u2m": (
-            "Browser SSO auth: no password is entered here — the agent uses tokens "
-            "cached by the Databricks CLI.\n"
-            "Step 1:  pip install databricks-sdk\n"
-            "Step 2:  databricks auth login --host <workspace_host>\n"
-            "Run both steps in your terminal before starting the agent."
-        ),
+        # u2m hint is built dynamically in _build_u2m_hint() using the host field.
     }
+
+    def _build_u2m_hint(self) -> str:
+        """Return a U2M hint with the exact login command for the entered host."""
+        try:
+            host = self.databricks_host_input.value.strip()
+        except Exception:
+            host = ""
+        if host:
+            login_cmd = f"databricks auth login --host {host}"
+        else:
+            login_cmd = "databricks auth login --host <workspace_host>"
+        return (
+            "Browser SSO auth: no password is entered here — the agent uses tokens\n"
+            "cached by the Databricks CLI. Run these commands in a terminal first:\n"
+            "\n"
+            f"  Step 1:  pip install databricks-sdk\n"
+            f"  Step 2:  {login_cmd}\n"
+            "\n"
+            "Then come back here and press Save."
+        )
 
     def _update_databricks_visibility(self) -> None:
         """Show the Databricks auth section only for Databricks models.
@@ -534,8 +548,13 @@ class SettingsScreen(ModalScreen):
             # would confuse users and the validator would wrongly block saving.
             self.api_key_group.display = method == "pat"
 
-            # Update the inline hint below the auth method dropdown
-            hint = self._AUTH_METHOD_HINTS.get(str(method), "")
+            # Update the inline hint below the auth method dropdown.
+            # U2M hint is built dynamically so it shows the exact login command
+            # for whatever host the user has typed into the host field.
+            if method == "u2m":
+                hint = self._build_u2m_hint()
+            else:
+                hint = self._AUTH_METHOD_HINTS.get(str(method), "")
             self.databricks_auth_method_help.update(hint)
         except Exception:
             pass
@@ -707,10 +726,18 @@ class SettingsScreen(ModalScreen):
         if event.input.id == "custom_model_input":
             self._update_databricks_visibility()
         if event.input.id == "databricks_host_input":
+            host = event.value.strip()
+            # Refresh the U2M hint immediately so the login command always
+            # shows the current workspace host as the user types.
+            try:
+                method = self.databricks_auth_method_select.value
+                if str(method) == "u2m":
+                    self.databricks_auth_method_help.update(self._build_u2m_hint())
+            except Exception:
+                pass
             # Re-discover models once the host looks like a complete URL.
             # Avoid firing on every keystroke — only when the value ends
             # with a TLD-like suffix (e.g. ".com", ".net", ".io").
-            host = event.value.strip()
             if host.startswith("https://") and "." in host.split("://", 1)[-1]:
                 self._refresh_databricks_models()
 
