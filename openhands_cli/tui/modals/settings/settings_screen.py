@@ -261,9 +261,21 @@ class SettingsScreen(ModalScreen):
                 self._update_model_options(provider)
                 # Databricks options use full FMAPI ids as values; other providers
                 # use the short model name only.
-                self.model_select.value = (
-                    llm.model if provider == "databricks" else model
-                )
+                target_value = llm.model if provider == "databricks" else model
+                try:
+                    self.model_select.value = target_value
+                except Exception:
+                    # The saved model is not yet in the option list — this happens
+                    # when a discovered-only model was saved and credentials are
+                    # not yet resolved at load time. Show it as the sole option so
+                    # the user sees their current selection without crashing.
+                    # _refresh_databricks_models() will repopulate the full list
+                    # once the workspace host and auth fields are filled in.
+                    short_label = target_value.split("/", 1)[-1]
+                    self.model_select.set_options(
+                        [(f"{short_label} (saved — re-enter credentials to refresh)", target_value)]
+                    )
+                    self.model_select.value = target_value
 
         # API Key (show masked version)
         if llm.api_key:
