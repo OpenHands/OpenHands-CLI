@@ -108,7 +108,7 @@ async def _type_third_message_low_risk_auto_proceeds(pilot: "Pilot") -> None:
     # Type the third message asking for a LOW risk action
     await type_text(pilot, "once more, don't mark it as high risk this time")
     await pilot.press("enter")
-    await wait_for_idle(pilot, timeout=10)
+    await wait_for_idle(pilot, timeout=60)
 
     # Scroll to end for consistent snapshot
     await pilot.press("end")

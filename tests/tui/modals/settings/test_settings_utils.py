@@ -383,10 +383,10 @@ def test_litellm_metadata_is_added_when_required(
     assert saved_agent.condenser.llm.litellm_extra_body["metadata"]["foo"] == "bar"
 
 
-def test_model_change_does_not_pass_stale_max_input_tokens(
+def test_model_change_without_max_tokens_uses_sdk_default(
     monkeypatch, deps: FakeAgentStore
 ) -> None:
-    """When the model changes, stale max_tokens input is not passed to LLM."""
+    """When the current form value is empty, the SDK can discover token limits."""
     captured_kwargs: dict[str, object] = {}
     real_llm = settings_utils.LLM
 
@@ -411,6 +411,7 @@ def test_model_change_does_not_pass_stale_max_input_tokens(
         custom_model=None,
         base_url=None,
         api_key_input="sk-new",
+        max_tokens=None,
         memory_condensation_enabled=False,
     )
 
@@ -422,22 +423,31 @@ def test_model_change_does_not_pass_stale_max_input_tokens(
     assert captured_kwargs["max_input_tokens"] is None
 
 
-def test_user_supplied_max_tokens_is_preserved(
-    deps: FakeAgentStore,
+def test_model_change_preserves_user_supplied_max_tokens(
+    monkeypatch, deps: FakeAgentStore
 ) -> None:
-    """User-supplied max_tokens value is preserved, not overridden."""
+    """User-supplied max_tokens is an explicit override, even for a new model."""
+    captured_kwargs: dict[str, object] = {}
+    real_llm = settings_utils.LLM
+
+    def spy_llm(*args, **kwargs):
+        captured_kwargs.update(kwargs)
+        return real_llm(*args, **kwargs)
+
+    monkeypatch.setattr(settings_utils, "LLM", spy_llm)
+
     existing_agent = Agent(
         llm=LLM(
-            model="openai/gpt-4o",
+            model="gemini/gemini-2.5-pro",
             api_key="sk-old",
-            max_input_tokens=128000,
+            max_input_tokens=1048576,
         )
     )
 
     data = settings_utils.SettingsFormData(
         mode="basic",
         provider="openai",
-        model="gpt-4o",
+        model="gpt-5.3-codex",
         custom_model=None,
         base_url=None,
         api_key_input="sk-new",
@@ -449,6 +459,6 @@ def test_user_supplied_max_tokens_is_preserved(
 
     assert result.success is True
     saved_agent = deps.saved_agents[-1]
-    assert saved_agent.llm.model == "openai/gpt-4o"
-    # User-supplied value should be used, not SDK auto-lookup
+    assert saved_agent.llm.model == "openai/gpt-5.3-codex"
+    assert captured_kwargs["max_input_tokens"] == 64000
     assert saved_agent.llm.max_input_tokens == 64000
