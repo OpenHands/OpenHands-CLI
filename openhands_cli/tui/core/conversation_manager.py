@@ -129,7 +129,7 @@ class ConversationManager(Container):
         def notification_callback(
             title: str, message: str, severity: SeverityLevel
         ) -> None:
-            self.notify(message, title=title, severity=severity)
+            self.notify(message, title=title, severity=severity, markup=False)
 
         self._runners = RunnerRegistry(
             factory=runner_factory,
