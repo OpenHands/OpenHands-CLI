@@ -1562,5 +1562,8 @@ class TestRichTextPreservation:
         with mock_cli_settings(visualizer=visualizer):
             collapsible = visualizer._create_event_collapsible(event)
         assert collapsible is not None
+        # Verify content is a Text object, not plain str
+        content = collapsible._content_widget._Static__content
+        assert isinstance(content, Text)
         # Verify it was stored in pending actions
         assert "call_1" in visualizer._pending_actions
