@@ -2,6 +2,26 @@
 
 This module provides the abstract base class for ACP agents, implementing
 common functionality shared between local and cloud agents.
+
+Note on ``**_kwargs: Any`` Parameters
+-------------------------------------
+Many methods in this module accept ``**_kwargs: Any`` parameters. This pattern
+is intentional for ACP protocol forward compatibility:
+
+1. **Protocol Evolution**: The ACP protocol may introduce new parameters in
+   future versions. Using ``**_kwargs`` allows this implementation to accept
+   those parameters without breaking, even before explicit support is added.
+
+2. **Compatibility**: Different ACP clients may send additional parameters
+   that this implementation doesn't currently handle. Accepting them silently
+   ensures graceful operation.
+
+3. **Abstract Base Class**: Subclasses may need different parameter sets.
+   The ``**_kwargs`` pattern provides flexibility while maintaining a
+   consistent interface.
+
+The underscore prefix (``_kwargs``) combined with ``# noqa: ARG002`` indicates
+these parameters are intentionally unused in the current implementation.
 """
 
 from __future__ import annotations
