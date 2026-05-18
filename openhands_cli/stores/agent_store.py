@@ -133,23 +133,73 @@ ENV_LLM_API_KEY = "LLM_API_KEY"
 ENV_LLM_BASE_URL = "LLM_BASE_URL"
 ENV_LLM_MODEL = "LLM_MODEL"
 
+# AWS credential environment variables (standard AWS SDK names)
+ENV_AWS_ACCESS_KEY_ID = "AWS_ACCESS_KEY_ID"
+ENV_AWS_SECRET_ACCESS_KEY = "AWS_SECRET_ACCESS_KEY"
+ENV_AWS_REGION_NAME = "AWS_REGION_NAME"
+
+# Model prefixes that use AWS IAM authentication instead of API key
+AWS_AUTH_MODEL_PREFIXES = ("bedrock/", "bedrock_converse/", "sagemaker/")
+
+
+def is_aws_auth_model(model: str | None) -> bool:
+    """Check if the model uses AWS IAM authentication instead of API key.
+
+    AWS Bedrock and SageMaker models use IAM credentials from:
+    - Explicit env vars: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION_NAME
+    - Default AWS credential chain (boto3): ~/.aws/credentials, IAM roles, etc.
+
+    Args:
+        model: The model string (e.g., "bedrock/anthropic.claude-3-sonnet")
+
+    Returns:
+        True if the model uses AWS authentication, False otherwise.
+    """
+    if model is None:
+        return False
+    return model.startswith(AWS_AUTH_MODEL_PREFIXES)
+
 
 class MissingEnvironmentVariablesError(Exception):
     """Raised when required environment variables are missing for headless mode.
 
     This exception is raised when --override-with-envs is enabled but required
-    environment variables (LLM_API_KEY and LLM_MODEL) are not set.
+    environment variables (LLM_API_KEY and LLM_MODEL, or AWS credentials for
+    AWS-authenticated models) are not set.
     """
 
-    def __init__(self, missing_vars: list[str]) -> None:
+    def __init__(self, missing_vars: list[str], *, is_aws_model: bool = False) -> None:
         self.missing_vars = missing_vars
+        self.is_aws_model = is_aws_model
         vars_str = ", ".join(missing_vars)
-        super().__init__(
-            f"Missing required environment variable(s): {vars_str}\n"
-            f"When using --override-with-envs, you must set:\n"
-            f"  - {ENV_LLM_API_KEY}: Your LLM API key\n"
-            f"  - {ENV_LLM_MODEL}: The model to use (e.g., claude-sonnet-4-5-20250929)"
-        )
+
+        if is_aws_model:
+            # AWS model - API key not required, but model is
+            super().__init__(
+                f"Missing required environment variable(s): {vars_str}\n"
+                "When using --override-with-envs with AWS Bedrock/SageMaker:\n"
+                f"  - {ENV_LLM_MODEL}: The model to use "
+                "(e.g., bedrock/anthropic.claude-3-sonnet)\n"
+                "\n"
+                "AWS credentials are obtained from the standard credential chain:\n"
+                "  - Environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,\n"
+                "    AWS_REGION_NAME\n"
+                "  - AWS credentials file: ~/.aws/credentials\n"
+                "  - IAM roles (for EC2, ECS, Lambda, etc.)"
+            )
+        else:
+            # Standard model - API key required
+            super().__init__(
+                f"Missing required environment variable(s): {vars_str}\n"
+                "When using --override-with-envs, you must set:\n"
+                f"  - {ENV_LLM_API_KEY}: Your LLM API key\n"
+                f"  - {ENV_LLM_MODEL}: The model to use "
+                "(e.g., claude-sonnet-4-5-20250929)\n"
+                "\n"
+                "For AWS Bedrock/SageMaker models, LLM_API_KEY is not required.\n"
+                "Use a model prefix like 'bedrock/' "
+                "(e.g., bedrock/anthropic.claude-3-sonnet)."
+            )
 
 
 def check_and_warn_env_vars() -> None:
@@ -186,11 +236,19 @@ class LLMEnvOverrides(BaseModel):
 
     Use the `from_env()` class method to load values from environment
     variables when env overrides are enabled.
+
+    For AWS Bedrock/SageMaker models:
+    - api_key is not required
+    - AWS credentials can be provided via env vars or the default AWS credential chain
     """
 
     api_key: SecretStr | None = None
     base_url: str | None = None
     model: str | None = None
+    # AWS credentials - optional, boto3 uses default credential chain if not set
+    aws_access_key_id: SecretStr | None = None
+    aws_secret_access_key: SecretStr | None = None
+    aws_region_name: str | None = None
 
     @classmethod
     def from_env(cls, enabled: bool = False) -> LLMEnvOverrides:
@@ -221,20 +279,56 @@ class LLMEnvOverrides(BaseModel):
         if model:
             result["model"] = model
 
+        # AWS credentials (optional - boto3 uses default credential chain if not set)
+        aws_access_key_id = os.environ.get(ENV_AWS_ACCESS_KEY_ID) or None
+        if aws_access_key_id:
+            result["aws_access_key_id"] = SecretStr(aws_access_key_id)
+
+        aws_secret_access_key = os.environ.get(ENV_AWS_SECRET_ACCESS_KEY) or None
+        if aws_secret_access_key:
+            result["aws_secret_access_key"] = SecretStr(aws_secret_access_key)
+
+        aws_region_name = os.environ.get(ENV_AWS_REGION_NAME) or None
+        if aws_region_name:
+            result["aws_region_name"] = aws_region_name
+
         return cls(**result)
 
     def require_for_headless(self) -> None:
+        """Validate required environment variables for headless mode.
+
+        For AWS-authenticated models (bedrock/, sagemaker/):
+        - Only LLM_MODEL is required
+        - LLM_API_KEY is NOT required (uses AWS IAM credentials)
+        - AWS credentials can come from env vars or default credential chain
+
+        For standard models:
+        - Both LLM_MODEL and LLM_API_KEY are required
+        """
         missing: list[str] = []
-        if self.api_key is None:
-            missing.append(ENV_LLM_API_KEY)
+
+        # Model is always required
         if self.model is None:
             missing.append(ENV_LLM_MODEL)
+
+        # API key is only required for non-AWS models
+        uses_aws_auth = is_aws_auth_model(self.model)
+        if not uses_aws_auth and self.api_key is None:
+            missing.append(ENV_LLM_API_KEY)
+
         if missing:
-            raise MissingEnvironmentVariablesError(missing)
+            raise MissingEnvironmentVariablesError(missing, is_aws_model=uses_aws_auth)
 
     def has_overrides(self) -> bool:
         """Check if any overrides are set."""
-        return any([self.api_key, self.base_url, self.model])
+        return any([
+            self.api_key,
+            self.base_url,
+            self.model,
+            self.aws_access_key_id,
+            self.aws_secret_access_key,
+            self.aws_region_name,
+        ])
 
 
 def apply_llm_overrides(llm: LLM, overrides: LLMEnvOverrides) -> LLM:
@@ -289,15 +383,35 @@ class AgentStore:
 
         # In env override mode, require enough info to create an agent.
         overrides.require_for_headless()
-        assert overrides.api_key is not None
         assert overrides.model is not None
 
-        llm = LLM(
-            model=overrides.model,
-            api_key=overrides.api_key.get_secret_value(),
-            base_url=overrides.base_url,
-            usage_id="agent",
-        )
+        # Build LLM kwargs - api_key is optional for AWS-authenticated models
+        llm_kwargs: dict[str, Any] = {
+            "model": overrides.model,
+            "usage_id": "agent",
+        }
+
+        if overrides.api_key is not None:
+            llm_kwargs["api_key"] = overrides.api_key.get_secret_value()
+
+        if overrides.base_url is not None:
+            llm_kwargs["base_url"] = overrides.base_url
+
+        # Add AWS credentials if provided (boto3 uses default chain if not set)
+        if overrides.aws_access_key_id is not None:
+            llm_kwargs["aws_access_key_id"] = (
+                overrides.aws_access_key_id.get_secret_value()
+            )
+
+        if overrides.aws_secret_access_key is not None:
+            llm_kwargs["aws_secret_access_key"] = (
+                overrides.aws_secret_access_key.get_secret_value()
+            )
+
+        if overrides.aws_region_name is not None:
+            llm_kwargs["aws_region_name"] = overrides.aws_region_name
+
+        llm = LLM(**llm_kwargs)
         return get_default_cli_agent(llm)
 
     def _apply_env_overrides(self, agent: Agent, overrides: LLMEnvOverrides) -> Agent:
@@ -327,8 +441,10 @@ class AgentStore:
             * Load it from disk.
             * Apply any env overrides that are present (even partial).
         - If no persisted agent exists:
-            * Require a full env spec (LLM_API_KEY + LLM_MODEL) to create
-                a default Agent.
+            * For standard models: Require LLM_API_KEY + LLM_MODEL to create
+              a default Agent.
+            * For AWS Bedrock/SageMaker models: Only LLM_MODEL is required;
+              AWS credentials come from env vars or the default credential chain.
             * Otherwise, raise an error.
 
         Runtime configuration (tools, context, MCP, metadata, critic) is
