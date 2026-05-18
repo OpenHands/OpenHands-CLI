@@ -88,13 +88,18 @@ def get_openhands_version() -> str:
     return os.environ.get("OPENHANDS_VERSION", "latest")
 
 
-def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
+def launch_gui_server(
+    mount_cwd: bool = False,
+    gpu: bool = False,
+    bind_address: tuple[str, int] = ("127.0.0.1", 3000),
+) -> None:
     """Launch the OpenHands GUI server using Docker.
 
     Args:
         mount_cwd: If True, mount the current working directory into the container.
         gpu: If True, enable GPU support by mounting all GPUs into the
             container via nvidia-docker.
+        bind_address: A tuple of (host, port) to bind the server to.
     """
     console.print("🚀 Launching OpenHands GUI server...", style="blue", markup=False)
     console.print()
@@ -115,9 +120,18 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
     # tested and compatible with that specific app version. Setting these env vars
     # could cause version mismatches between the app and agent server.
 
+    # Extract host IP and port from bind_address tuple
+    host_ip, host_port_int = bind_address
+    host_port = str(host_port_int)
+
+    # If it's an IPv6 address, we need to wrap it in brackets for the Docker port
+    # mapping and the URL display, but only if it's not already bracketed.
+    if ":" in host_ip and not host_ip.startswith("["):
+        host_ip = f"[{host_ip}]"
+
     console.print("✅ Starting OpenHands GUI server...", style="green", markup=False)
     console.print(
-        "The server will be available at: http://localhost:3000",
+        f"The server will be available at: http://{host_ip}:{host_port}",
         style="grey50",
         markup=False,
     )
@@ -187,7 +201,7 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
     docker_cmd.extend(
         [
             "-p",
-            "3000:3000",
+            f"{host_ip}:{host_port}:3000",
             "--add-host",
             "host.docker.internal:host-gateway",
             "--name",
