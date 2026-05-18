@@ -307,6 +307,33 @@ class TestHelperFunctions:
                 assert result == expected_result
 
     @pytest.mark.asyncio
+    async def test_fetch_user_data_after_oauth_settings_api_error_is_nonfatal(self):
+        """Settings sync failures should not fail the completed login flow."""
+        server_url = "https://api.example.com"
+        api_key = "test-api-key"
+
+        with patch(
+            "openhands_cli.auth.api_client.OpenHandsApiClient"
+        ) as mock_client_class:
+            with patch(
+                "openhands_cli.auth.api_client.create_and_save_agent_configuration"
+            ) as mock_create_and_save:
+                with patch("openhands_cli.auth.api_client.console_print"):
+                    mock_client = AsyncMock()
+                    mock_client_class.return_value = mock_client
+
+                    mock_client.get_llm_api_key.return_value = "llm-key-123"
+                    mock_client.get_user_settings.side_effect = ApiClientError(
+                        "Request to '/api/v1/settings' returned a non-JSON response"
+                    )
+
+                    result = await fetch_user_data_after_oauth(server_url, api_key)
+
+                    expected_result = {"llm_api_key": "llm-key-123", "settings": None}
+                    assert result == expected_result
+                    mock_create_and_save.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_fetch_user_data_after_oauth_agent_creation_error(self):
         """Test user data fetching when agent creation fails."""
         server_url = "https://api.example.com"
