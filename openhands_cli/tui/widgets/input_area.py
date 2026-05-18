@@ -33,6 +33,7 @@ from openhands_cli.tui.messages import SlashCommandSubmitted
 
 
 if TYPE_CHECKING:
+    from openhands.sdk.security.confirmation_policy import ConfirmationPolicyBase
     from openhands_cli.tui.content.resources import LoadedResourcesInfo
     from openhands_cli.tui.textual_app import OpenHandsApp
     from openhands_cli.tui.widgets.main_display import ScrollableContent
@@ -136,7 +137,7 @@ class InputAreaContainer(Container):
         current_policy = app.conversation_state.confirmation_policy
 
         # Callback posts message that bubbles up to ConversationManager
-        def on_policy_selected(policy):
+        def on_policy_selected(policy: ConfirmationPolicyBase) -> None:
             self.post_message(SetConfirmationPolicy(policy))
 
         confirmation_modal = ConfirmationSettingsModal(
