@@ -33,7 +33,11 @@ from openhands_cli.tui.modals.settings.components import (
     CriticSettingsTab,
     SettingsTab,
 )
-from openhands_cli.tui.modals.settings.utils import SettingsFormData, save_settings
+from openhands_cli.tui.modals.settings.utils import (
+    SettingsFormData,
+    model_requires_api_key,
+    save_settings,
+)
 
 
 if TYPE_CHECKING:
@@ -215,9 +219,10 @@ class SettingsScreen(ModalScreen):
             self.api_key_input.placeholder = (
                 f"Current: {key_value[:3]}*** (leave empty to keep current)"
             )
-        else:
-            # No API key set
+        elif model_requires_api_key(llm.model, llm.base_url):
             self.api_key_input.placeholder = "Enter your API key"
+        else:
+            self.api_key_input.placeholder = "Optional for local or IAM-backed models"
 
         # Memory Condensation
         self.memory_select.value = bool(self.current_agent.condenser)
@@ -321,6 +326,11 @@ class SettingsScreen(ModalScreen):
             and self.current_agent.llm.api_key
         )
 
+    def _selected_model_requires_api_key(self) -> bool:
+        """Return whether the currently selected model requires an API key."""
+        model, base_url = self._get_selected_model_identity()
+        return model_requires_api_key(model, base_url)
+
     def _update_field_dependencies(self) -> None:
         """Update field enabled/disabled state based on dependency chain."""
         try:
@@ -386,15 +396,21 @@ class SettingsScreen(ModalScreen):
                 except Exception:
                     pass
 
-            # Memory Condensation: enabled when API key is provided
-            # or when there's an existing API key in the agent
-            self.memory_select.disabled = not (api_key or self._has_existing_api_key())
+            selected_model_requires_api_key = self._selected_model_requires_api_key()
+            has_required_auth = (
+                api_key
+                or self._has_existing_api_key()
+                or not selected_model_requires_api_key
+            )
+
+            # Memory Condensation: enabled when auth is satisfied for the
+            # selected model, whether via API key, stored credentials, or a
+            # local/IAM-backed provider that does not need an API key.
+            self.memory_select.disabled = not has_required_auth
 
             # Advanced LLM settings (timeout, max_tokens, max_size):
-            # Only enabled in Advanced mode and when API key is provided
-            advanced_settings_enabled = is_advanced_mode and (
-                api_key or self._has_existing_api_key()
-            )
+            # Only enabled in Advanced mode once auth requirements are satisfied.
+            advanced_settings_enabled = is_advanced_mode and has_required_auth
             self.timeout_input.disabled = not advanced_settings_enabled
             self.max_tokens_input.disabled = not advanced_settings_enabled
             self.max_size_input.disabled = not advanced_settings_enabled

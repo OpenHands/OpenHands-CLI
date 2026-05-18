@@ -15,6 +15,7 @@ from openhands_cli.stores.agent_store import (
     MissingEnvironmentVariablesError,
     apply_llm_overrides,
     check_and_warn_env_vars,
+    model_requires_api_key,
 )
 
 
@@ -192,6 +193,42 @@ class TestLLMEnvOverrides:
         assert overrides.api_key is not None
         assert overrides.api_key.get_secret_value() == "explicit-key"
         assert overrides.model == "explicit-model"
+
+
+class TestHeadlessAuthRequirements:
+    """Tests for API-key requirements in headless mode."""
+
+    @pytest.mark.parametrize(
+        ("model", "base_url"),
+        [
+            ("ollama/llama3.3", None),
+            ("openai/gpt-4o-mini", "http://localhost:11434/v1"),
+            ("bedrock/anthropic.claude-sonnet-4-5", None),
+        ],
+    )
+    def test_require_for_headless_allows_no_api_key_for_supported_models(
+        self, model: str, base_url: str | None
+    ) -> None:
+        overrides = LLMEnvOverrides(model=model, base_url=base_url)
+        overrides.require_for_headless()
+
+    def test_require_for_headless_still_requires_api_key_for_remote_models(
+        self,
+    ) -> None:
+        overrides = LLMEnvOverrides(model="openai/gpt-4o")
+
+        with pytest.raises(MissingEnvironmentVariablesError) as exc_info:
+            overrides.require_for_headless()
+
+        assert exc_info.value.missing_vars == [ENV_LLM_API_KEY]
+
+    def test_model_requires_api_key_for_local_and_optional_auth_models(self) -> None:
+        assert model_requires_api_key("ollama/llama3.3") is False
+        assert (
+            model_requires_api_key("openai/gpt-4o-mini", "http://localhost:11434/v1")
+            is False
+        )
+        assert model_requires_api_key("openai/gpt-4o") is True
 
 
 class TestApplyLlmOverrides:
@@ -562,7 +599,6 @@ class TestAgentCreationFromEnvVars:
             with pytest.raises(MissingEnvironmentVariablesError) as exc_info:
                 store.load_or_create(env_overrides_enabled=True)
 
-            assert ENV_LLM_API_KEY in exc_info.value.missing_vars
             assert ENV_LLM_MODEL in exc_info.value.missing_vars
 
     def test_agent_returns_none_when_env_overrides_disabled(self, tmp_path) -> None:
@@ -592,6 +628,39 @@ class TestAgentCreationFromEnvVars:
 
             # Should return None since env overrides are disabled
             assert agent is None
+
+    def test_ensure_agent_allows_local_model_without_api_key(self, tmp_path) -> None:
+        """Headless agent creation should allow local models without LLM_API_KEY."""
+        from openhands_cli.stores import AgentStore
+
+        with patch(
+            "openhands_cli.stores.agent_store.get_persistence_dir",
+            return_value=str(tmp_path),
+        ):
+            store = AgentStore()
+
+        overrides = LLMEnvOverrides(model="ollama/llama3.3")
+
+        with (
+            patch(
+                "openhands_cli.stores.agent_store.LLM",
+                return_value="fake-llm",
+            ) as mock_llm,
+            patch(
+                "openhands_cli.stores.agent_store.get_default_cli_agent",
+                return_value="fake-agent",
+            ) as mock_get_default_cli_agent,
+        ):
+            agent = store._ensure_agent(None, overrides)
+
+        assert agent == "fake-agent"
+        mock_llm.assert_called_once_with(
+            model="ollama/llama3.3",
+            api_key=None,
+            base_url=None,
+            usage_id="agent",
+        )
+        mock_get_default_cli_agent.assert_called_once_with("fake-llm")
 
 
 class TestCriticBehaviorInAgentCreation:

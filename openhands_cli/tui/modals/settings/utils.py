@@ -4,6 +4,7 @@ from pydantic import BaseModel, SecretStr, field_validator
 
 from openhands.sdk import LLM, Agent, LLMSummarizingCondenser
 from openhands_cli.stores import AgentStore
+from openhands_cli.stores.agent_store import model_requires_api_key
 from openhands_cli.utils import (
     get_default_cli_agent,
     get_llm_metadata,
@@ -151,8 +152,9 @@ class SettingsFormData(BaseModel):
             )
             self.api_key_input = existing_llm_api_key
 
-        if not self.api_key_input:
-            raise Exception("API Key is required")
+        if model_requires_api_key(self.get_full_model_name(), self.base_url):
+            if not self.api_key_input:
+                raise Exception("API Key is required")
 
     def get_full_model_name(self) -> str:
         if self.mode == "advanced":
