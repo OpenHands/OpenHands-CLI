@@ -1,6 +1,7 @@
 """Conversation runner with confirmation mode support."""
 
 import asyncio
+import logging
 import uuid
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -21,8 +22,11 @@ from openhands.sdk.conversation.state import (
     ConversationState as SDKConversationState,
 )
 from openhands.sdk.event.base import Event
+from openhands.sdk.hooks import HookMatcher
+from openhands_cli.locations import get_work_dir
 from openhands_cli.setup import setup_conversation
 from openhands_cli.shared import extract_conversation_summary
+from openhands_cli.stop_hooks import run_stop_hooks
 from openhands_cli.tui.core.events import ShowConfirmationPanel
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
 from openhands_cli.user_actions.types import UserConfirmation
@@ -30,6 +34,8 @@ from openhands_cli.user_actions.types import UserConfirmation
 
 if TYPE_CHECKING:
     from openhands_cli.tui.core.state import ConversationContainer
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationRunner:
@@ -69,9 +75,11 @@ class ConversationRunner:
             critic_disabled: If True, critic functionality will be disabled.
         """
         self.visualizer = visualizer
+        self._conversation_id = conversation_id
 
-        # Create conversation with policy from state
-        self.conversation: BaseConversation = setup_conversation(
+        # Create conversation with policy from state; stop hooks are stripped
+        # from the SDK's HookConfig and returned for CLI-level handling.
+        conversation, stop_matchers = setup_conversation(
             conversation_id,
             confirmation_policy=state.confirmation_policy,
             visualizer=visualizer,
@@ -79,6 +87,8 @@ class ConversationRunner:
             env_overrides_enabled=env_overrides_enabled,
             critic_disabled=critic_disabled,
         )
+        self.conversation: BaseConversation = conversation
+        self._stop_matchers: list[HookMatcher] = stop_matchers
 
         self._running = False
 
@@ -172,6 +182,27 @@ class ConversationRunner:
                 console.print("Agent finished")
             else:
                 self.conversation.run()
+
+            # Handle stop hooks at CLI level (outside the SDK's state lock).
+            # This runs after conversation.run() returns with FINISHED status.
+            if (
+                self._stop_matchers
+                and self.conversation.state.execution_status
+                == ConversationExecutionStatus.FINISHED
+            ):
+                should_stop, feedback = run_stop_hooks(
+                    stop_matchers=self._stop_matchers,
+                    session_id=str(self._conversation_id),
+                    working_dir=get_work_dir(),
+                )
+                if not should_stop and feedback:
+                    logger.info("Stop hook denied agent stopping, sending feedback")
+                    feedback_message = Message(
+                        role="user",
+                        content=[TextContent(text=f"[Stop hook feedback] {feedback}")],
+                    )
+                    self.conversation.send_message(feedback_message)
+                    self.conversation.run()
 
             # Check if confirmation needed (only in confirmation mode)
             if (

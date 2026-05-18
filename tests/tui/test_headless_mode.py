@@ -317,7 +317,7 @@ class TestHeadlessRunnerOutput:
 
         with patch(
             "openhands_cli.tui.core.conversation_runner.setup_conversation",
-            return_value=mock_conversation,
+            return_value=(mock_conversation, []),
         ):
             runner = ConversationRunner(
                 conversation_id=uuid.uuid4(),
@@ -391,7 +391,7 @@ class TestConversationSummary:
 
         with patch(
             "openhands_cli.tui.core.conversation_runner.setup_conversation",
-            return_value=mock_conversation,
+            return_value=(mock_conversation, []),
         ):
             runner = ConversationRunner(
                 conversation_id=uuid.uuid4(),
@@ -419,7 +419,7 @@ class TestConversationSummary:
 
         with patch(
             "openhands_cli.tui.core.conversation_runner.setup_conversation",
-            return_value=None,
+            return_value=(None, []),
         ):
             runner = ConversationRunner(
                 conversation_id=uuid.uuid4(),

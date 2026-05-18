@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable
 from typing import Any
 from uuid import UUID
@@ -7,7 +8,7 @@ from rich.console import Console
 from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, Workspace
 from openhands.sdk.context import Skill
 from openhands.sdk.event.base import Event
-from openhands.sdk.hooks import HookConfig
+from openhands.sdk.hooks import HookConfig, HookMatcher
 from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
 )
@@ -18,6 +19,9 @@ from openhands.tools.preset.default import register_builtins_agents
 from openhands_cli.locations import get_conversations_dir, get_work_dir
 from openhands_cli.stores import AgentStore
 from openhands_cli.tui.widgets.richlog_visualizer import ConversationVisualizer
+
+
+logger = logging.getLogger(__name__)
 
 
 class MissingAgentSpec(Exception):
@@ -91,6 +95,30 @@ def load_agent_specs(
     return agent
 
 
+def strip_stop_hooks(hook_config: HookConfig) -> tuple[HookConfig, list[HookMatcher]]:
+    """Strip stop hooks from a HookConfig and return them separately.
+
+    Stop hooks are handled at the CLI level rather than inside the SDK's run loop
+    to avoid two issues:
+    1. The SDK executes stop hooks while holding the state lock, which blocks pause
+    2. A missing hook script exits with code 2 (Python's "file not found"), which
+       the SDK interprets as "block the stop" — causing an infinite loop
+
+    Returns:
+        Tuple of (hook_config_without_stop, stop_matchers).
+    """
+    stop_matchers = hook_config.stop
+    if not stop_matchers:
+        return hook_config, []
+
+    config_without_stop = hook_config.model_copy(update={"stop": []})
+    logger.debug(
+        "Stripped %d stop hook matcher(s) from HookConfig for CLI-level handling",
+        len(stop_matchers),
+    )
+    return config_without_stop, stop_matchers
+
+
 def setup_conversation(
     conversation_id: UUID,
     confirmation_policy: ConfirmationPolicyBase,
@@ -100,7 +128,7 @@ def setup_conversation(
     *,
     env_overrides_enabled: bool = False,
     critic_disabled: bool = False,
-) -> BaseConversation:
+) -> tuple[BaseConversation, list[HookMatcher]]:
     """
     Setup the conversation with agent.
 
@@ -115,6 +143,10 @@ def setup_conversation(
             stored LLM settings, and agent can be created from env vars if no
             disk config exists.
         critic_disabled: If True, critic functionality will be disabled.
+
+    Returns:
+        Tuple of (conversation, stop_hook_matchers). Stop hooks are stripped from
+        the SDK's HookConfig and returned separately for CLI-level handling.
 
     Raises:
         MissingAgentSpec: If agent specification is not found or invalid.
@@ -143,6 +175,10 @@ def setup_conversation(
     if not hook_config.is_empty():
         console.print("✓ Hooks loaded", style="green")
 
+    # Strip stop hooks — they'll be handled at the CLI level to avoid
+    # the SDK's state lock blocking pause and exit-code-2 infinite loops.
+    hook_config, stop_matchers = strip_stop_hooks(hook_config)
+
     # Create conversation - agent context is now set in AgentStore.load()
     conversation: BaseConversation = Conversation(
         agent=agent,
@@ -160,4 +196,4 @@ def setup_conversation(
 
     console.print(f"✓ Agent initialized with model: {agent.llm.model}", style="green")
 
-    return conversation
+    return conversation, stop_matchers
