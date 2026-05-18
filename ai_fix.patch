@@ -1,0 +1,13 @@
+diff --git a/openhands_cli/tui/textual_app.py b/openhands_cli/tui/textual_app.py
+index 2b37cd8..64631df 100644
+--- a/openhands_cli/tui/textual_app.py
++++ b/openhands_cli/tui/textual_app.py
+@@ -279,7 +279,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
+         )
+         yield SystemCommand("Settings", "Configure settings", self.action_open_settings)
+ 
+-    def on_mount(self) -> None:
++    def on_mount(self, show_cli_tab=None) -> None:
+         """Called when app starts."""
+         from openhands_cli.stores import MissingEnvironmentVariablesError
+ 

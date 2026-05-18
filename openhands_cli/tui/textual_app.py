@@ -279,7 +279,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         )
         yield SystemCommand("Settings", "Configure settings", self.action_open_settings)
 
-    def on_mount(self) -> None:
+    def on_mount(self, show_cli_tab=None) -> None:
         """Called when app starts."""
         from openhands_cli.stores import MissingEnvironmentVariablesError
 
