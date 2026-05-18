@@ -122,20 +122,15 @@ class SettingsTab(Container):
                             disabled=True,
                         )
 
-                # Databricks-only: workspace host + optional AI Gateway
-                # override + auth method + conditional credential inputs.
-                # The whole block is hidden unless the active provider /
-                # custom model is Databricks; see
+                # Databricks-only: workspace host + auth method + conditional
+                # credential inputs. The whole block is hidden unless the
+                # active provider / custom model is Databricks; see
                 # ``_update_databricks_visibility`` in settings_screen.py.
                 #
-                # Architecture: the workspace host is the canonical URL the
-                # SDK uses for every FM invocation (it derives
-                # ``<host>/ai-gateway/<route>`` from it), for auth (OAuth
-                # flows mint tokens here), and for discovery / metadata
-                # probes. The AI Gateway host is an *optional override* for
-                # split deployments where the gateway has a dedicated
-                # hostname (e.g. ``*.ai-gateway.cloud.databricks.com``);
-                # leave it blank for the typical single-URL workspace.
+                # Note: a separate AI Gateway host override is supported via
+                # the DATABRICKS_AI_GATEWAY_HOST environment variable for
+                # split-hostname deployments, but is intentionally not
+                # surfaced in the UI to keep the form simple.
                 with Container(id="databricks_auth_section", classes="form_group"):
                     with Container(classes="form_group"):
                         yield Label(
@@ -148,34 +143,9 @@ class SettingsTab(Container):
                             classes="form_input",
                         )
                         yield Static(
-                            "Required. Hostname only (no path). Used for "
-                            "Foundation Model invocations (the SDK derives "
-                            "/ai-gateway/<route> from this), OAuth token "
-                            "minting, and model discovery / /api/2.0/* "
-                            "metadata calls.",
-                            classes="form_help",
-                        )
-
-                    with Container(classes="form_group"):
-                        yield Label(
-                            "Databricks AI Gateway Host (optional override):",
-                            classes="form_label",
-                        )
-                        yield Input(
-                            placeholder=(
-                                "https://<workspace_id>.ai-gateway.cloud.databricks.com"
-                                "  (leave blank for typical workspaces)"
-                            ),
-                            id="databricks_ai_gateway_host_input",
-                            classes="form_input",
-                        )
-                        yield Static(
-                            "Optional. Only set this for split deployments "
-                            "with a dedicated AI Gateway hostname. When set, "
-                            "Foundation Model invocations route through this "
-                            "host instead of the workspace URL. Discovery, "
-                            "auth, and metadata probes still go to the "
-                            "workspace host.",
+                            "Required. Your Databricks workspace URL. Used for "
+                            "Foundation Model invocations, OAuth token "
+                            "minting, and model discovery.",
                             classes="form_help",
                         )
 
