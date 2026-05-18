@@ -327,6 +327,13 @@ def apply_llm_overrides(llm: LLM, overrides: LLMEnvOverrides) -> LLM:
         pass
 
     if is_databricks_instance or is_databricks_model:
+        if is_databricks_instance:
+            # Close the existing httpx client before discarding the instance to
+            # prevent connection pool leaks (model_copy skips __init__).
+            try:
+                llm.close()  # type: ignore[union-attr]
+            except Exception:
+                pass
         base = llm.model_dump(exclude_none=True)
         base.pop("provider", None)
         for key, val in kw.items():
