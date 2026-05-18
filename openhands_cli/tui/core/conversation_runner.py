@@ -92,6 +92,35 @@ class ConversationRunner:
     def is_confirmation_mode_active(self) -> bool:
         return self._state.is_confirmation_active
 
+    # Maximum number of events to replay on resume/switch to avoid
+    # O(n) memory and rendering cost for long conversations.
+    MAX_REPLAY_EVENTS = 50
+
+    def replay_events(self) -> None:
+        """Replay the tail of persisted events through the visualizer.
+
+        Only the last MAX_REPLAY_EVENTS are replayed to avoid loading
+        unbounded history into memory. User messages are rendered via
+        render_user_message since on_event skips them.
+        """
+        events = self.conversation.state.events
+        start = max(0, len(events) - self.MAX_REPLAY_EVENTS)
+
+        # Render summary banner if events were truncated
+        if start > 0:
+            self.visualizer.render_replay_summary(start)
+
+        for event in events[start:]:
+            if ConversationVisualizer.is_user_initiated_message(event):
+                text = str(event.visualize)
+                if text.strip():
+                    self.visualizer.render_user_message(text)
+                continue
+            self.visualizer.on_event(event)
+
+        # Scroll to the most recent content so it's visible on load
+        self.visualizer.scroll_to_bottom()
+
     async def queue_message(self, user_input: str) -> None:
         """Queue a message for a running conversation"""
         assert self.conversation is not None, "Conversation should be running"

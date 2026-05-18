@@ -8,7 +8,8 @@ import threading
 from typing import TYPE_CHECKING
 
 from rich.text import Text
-from textual.widgets import Markdown
+from textual import events
+from textual.widgets import Markdown, Static
 
 from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
 from openhands.sdk.event import (
@@ -94,6 +95,19 @@ class ConversationVisualizer(ConversationVisualizerBase):
     container. Supports delegate visualization by tracking agent identity.
     """
 
+    # Maximum number of events to load per "load more" click
+    MAX_REPLAY_EVENTS = 50
+
+    @staticmethod
+    def is_user_initiated_message(event: Event) -> bool:
+        """Return True if *event* is a user-typed message (not a delegation message)."""
+        return (
+            isinstance(event, MessageEvent)
+            and event.llm_message is not None
+            and event.llm_message.role == "user"
+            and not event.sender
+        )
+
     def __init__(
         self,
         container: "VerticalScroll",
@@ -118,6 +132,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._cli_settings: CliSettings | None = None
         # Track pending actions by tool_call_id for action-observation pairing
         self._pending_actions: dict[str, tuple[ActionEvent, Collapsible]] = {}
+        # Track replay state for load-more functionality
+        self._replay_offset = 0
+        self._load_more_widget: Static | None = None
 
     @property
     def cli_settings(self) -> CliSettings:
@@ -298,11 +315,23 @@ class ConversationVisualizer(ConversationVisualizerBase):
             if critic_result is not None:
                 self._handle_critic_result(critic_result)
 
+    def scroll_to_bottom(self) -> None:
+        """Schedule a scroll-to-bottom on the main thread."""
+        self._run_on_main_thread(self._do_scroll_to_bottom)
+
+    def _do_scroll_to_bottom(self) -> None:
+        """Scroll the container to the bottom (must be called from main thread)."""
+        self._container.scroll_end(animate=False)
+
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
         self._container.mount(widget)
         if self._container.is_vertical_scroll_end:
             self._container.scroll_end(animate=False)
+
+    def _add_widget_after(self, anchor: "Widget", widget: "Widget") -> None:
+        """Add a widget after an existing widget in the UI."""
+        self._container.mount(widget, after=anchor)
 
     def _handle_critic_result(self, critic_result: "CriticResult") -> None:
         """Handle a critic result by displaying widgets and notifying controller.
@@ -318,47 +347,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
         Args:
             critic_result: The critic evaluation result to handle.
         """
-        from openhands_cli.tui.messages import CriticResultReceived
-        from openhands_cli.tui.utils.critic import (
-            create_critic_collapsible,
-            send_critic_inference_event,
-        )
-        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
-
-        critic_settings = self.cli_settings.critic
-
-        # Skip display if critic is disabled
-        if not critic_settings.enable_critic:
+        critic_widgets = self._build_critic_widgets(critic_result)
+        if not critic_widgets:
             return
 
-        # Get agent model for tracking
-        agent_model = self._get_agent_model()
-        conversation_id = str(self._app.conversation_id)
-
-        # Send critic inference event to PostHog
-        send_critic_inference_event(
-            critic_result=critic_result,
-            conversation_id=conversation_id,
-            agent_model=agent_model,
-        )
-
-        # Display critic score collapsible
-        critic_widget = create_critic_collapsible(critic_result)
-        self._run_on_main_thread(self._add_widget_to_ui, critic_widget)
-
-        # Add feedback widget after critic collapsible
-        feedback_widget = CriticFeedbackWidget(
-            critic_result=critic_result,
-            conversation_id=conversation_id,
-            agent_model=agent_model,
-        )
-        self._run_on_main_thread(self._add_widget_to_ui, feedback_widget)
-
-        # Notify RefinementController to evaluate and potentially trigger refinement
-        self._app.call_from_thread(
-            self._app.conversation_manager.post_message,
-            CriticResultReceived(critic_result),
-        )
+        self._emit_critic_result_side_effects(critic_result)
+        for widget in critic_widgets:
+            self._run_on_main_thread(self._add_widget_to_ui, widget)
 
     def _dismiss_pending_feedback_widgets(self) -> None:
         """Dismiss any pending feedback widgets.
@@ -377,12 +372,12 @@ class ConversationVisualizer(ConversationVisualizerBase):
         Args:
             content: The message text to display.
         """
-        from textual.widgets import Static
 
-        user_message_widget = Static(
-            f"> {content}", classes="user-message", markup=False
-        )
+        user_message_widget = self._create_user_message_widget(content)
         self._run_on_main_thread(self._add_widget_to_ui, user_message_widget)
+
+    def _create_user_message_widget(self, content: str) -> Static:
+        return Static(f"> {content}", classes="user-message", markup=False)
 
     def render_user_message(self, content: str) -> None:
         """Render a user message to the UI.
@@ -414,6 +409,174 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """
         self._dismiss_pending_feedback_widgets()
         self._render_message_widget(content)
+
+    def _replay_banner_text(self, remaining_hidden_count: int) -> str:
+        batch_count = min(self.MAX_REPLAY_EVENTS, remaining_hidden_count)
+        return f"[u]Load {batch_count:,} earlier events[/]"
+
+    def render_replay_summary(self, hidden_count: int) -> None:
+        """Render a replay summary banner when history is truncated.
+
+        Displays a clickable banner to load more events.
+        This is called during replay when the event history exceeds
+        MAX_REPLAY_EVENTS.
+
+        Args:
+            hidden_count: Start index of the shown events (i.e. how many
+                events precede the displayed tail).
+        """
+        if hidden_count <= 0:
+            return
+
+        # Track replay state
+        self._replay_offset = hidden_count
+
+        # Capture visualizer reference for the click handler
+        visualizer = self
+
+        class ClickableBanner(Static):
+            """A clickable banner to load more history."""
+
+            async def _on_click(self, _event: events.Click) -> None:  # type: ignore[override]
+                """Handle click to load more history."""
+                visualizer.load_more_events()
+
+        banner = ClickableBanner(
+            self._replay_banner_text(hidden_count),
+            id="replay-summary-banner",
+            classes="replay-summary",
+            markup=True,
+        )
+
+        self._load_more_widget = banner
+        self._run_on_main_thread(self._add_widget_to_ui, banner)
+
+    def _build_critic_widgets(self, critic_result: "CriticResult") -> list["Widget"]:
+        from openhands_cli.tui.utils.critic import create_critic_collapsible
+        from openhands_cli.tui.utils.critic.feedback import CriticFeedbackWidget
+
+        critic_settings = self.cli_settings.critic
+        if not critic_settings.enable_critic:
+            return []
+
+        conversation_id = str(self._app.conversation_id)
+        agent_model = self._get_agent_model()
+        return [
+            create_critic_collapsible(critic_result),
+            CriticFeedbackWidget(
+                critic_result=critic_result,
+                conversation_id=conversation_id,
+                agent_model=agent_model,
+            ),
+        ]
+
+    def _emit_critic_result_side_effects(self, critic_result: "CriticResult") -> None:
+        from openhands_cli.tui.messages import CriticResultReceived
+        from openhands_cli.tui.utils.critic import send_critic_inference_event
+
+        critic_settings = self.cli_settings.critic
+        if not critic_settings.enable_critic:
+            return
+
+        agent_model = self._get_agent_model()
+        conversation_id = str(self._app.conversation_id)
+
+        send_critic_inference_event(
+            critic_result=critic_result,
+            conversation_id=conversation_id,
+            agent_model=agent_model,
+        )
+
+        self._app.call_from_thread(
+            self._app.conversation_manager.post_message,
+            CriticResultReceived(critic_result),
+        )
+
+    def _render_history_event(
+        self,
+        event: Event,
+        anchor: "Widget",
+    ) -> "Widget":
+        # Note: unlike on_event(), this intentionally skips TaskTrackerObservation
+        # plan-panel refresh since replayed history should not trigger side-effects.
+        if isinstance(
+            event,
+            ObservationEvent | UserRejectObservation | AgentErrorEvent,
+        ):
+            if self._handle_observation_event(event):
+                return anchor
+
+        if self.is_user_initiated_message(event):
+            text = str(event.visualize)
+            if not text.strip():
+                return anchor
+            widget: Widget | None = self._create_user_message_widget(text)
+        else:
+            widget = self._create_event_widget(event)
+
+        if widget is None:
+            return anchor
+
+        self._add_widget_after(anchor, widget)
+        current_anchor: Widget = widget
+
+        critic_result = getattr(event, "critic_result", None)
+        if critic_result is None:
+            return current_anchor
+
+        critic_widgets = self._build_critic_widgets(critic_result)
+        if not critic_widgets:
+            return current_anchor
+
+        # Skip side effects (PostHog, CriticResultReceived) during replay
+        for critic_widget in critic_widgets:
+            self._add_widget_after(current_anchor, critic_widget)
+            current_anchor = critic_widget
+        return current_anchor
+
+    def load_more_events(self) -> None:
+        """Load the next batch of events from history.
+
+        Called when user clicks the 'load more' banner.
+        Loads exactly MAX_REPLAY_EVENTS events at a time.
+        """
+        if self._load_more_widget is None:
+            return
+
+        # Calculate how many more events to load
+        start = max(0, self._replay_offset - self.MAX_REPLAY_EVENTS)
+        end = self._replay_offset
+
+        if start >= end:
+            return
+
+        # Get conversation via current_runner (like other code does)
+        runner = self._app.conversation_manager.current_runner  # type: ignore[union-attr]
+        if runner is None:
+            return
+        event_log = runner.conversation.state.events  # type: ignore[union-attr]
+
+        current_anchor: Widget = self._load_more_widget
+        for event in event_log[start:end]:
+            current_anchor = self._render_history_event(event, current_anchor)
+
+        # Update replay state
+        self._replay_offset = start
+
+        # Update or remove the banner
+        if start > 0:
+            # There are 'start' events remaining to load
+            remaining = start
+            # Update existing banner text instead of creating new one
+            if self._load_more_widget:
+                self._load_more_widget.update(self._replay_banner_text(remaining))
+        else:
+            # No more to load - remove banner
+            if self._load_more_widget:
+                self._run_on_main_thread(self._load_more_widget.remove)
+                self._load_more_widget = None
+
+        self._app.notify(f"Loaded {end - start} more events")
 
     def _update_widget_in_ui(
         self, collapsible: Collapsible, new_title: str, new_content: str
