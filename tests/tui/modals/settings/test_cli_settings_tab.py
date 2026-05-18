@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import pytest
 from textual.app import App, ComposeResult
-from textual.widgets import Switch
+from textual.widgets import Select, Switch
 
 from openhands_cli.stores.cli_settings import CliSettings
 from openhands_cli.tui.modals.settings.components.cli_settings_tab import (
     CliSettingsTab,
+    _get_theme_options,
 )
 
 
@@ -21,6 +22,30 @@ class _TestApp(App):
 
     def compose(self) -> ComposeResult:
         yield CliSettingsTab(initial_settings=self.initial_settings)
+
+
+class TestGetThemeOptions:
+    """Tests for the _get_theme_options helper."""
+
+    def test_openhands_is_first(self):
+        options = _get_theme_options("openhands")
+        assert options[0] == ("openhands", "openhands")
+
+    def test_includes_builtin_themes(self):
+        options = _get_theme_options("openhands")
+        values = [v for _, v in options]
+        assert "dracula" in values
+        assert "textual-dark" in values
+
+    def test_includes_current_theme(self):
+        options = _get_theme_options("my-custom")
+        values = [v for _, v in options]
+        assert "my-custom" in values
+
+    def test_remaining_sorted(self):
+        options = _get_theme_options("openhands")
+        remaining = [v for _, v in options[1:]]
+        assert remaining == sorted(remaining)
 
 
 class TestCliSettingsTab:
@@ -114,6 +139,31 @@ class TestCliSettingsTab:
             assert result["auto_open_plan_panel"] is new_value
 
     @pytest.mark.asyncio
+    async def test_compose_renders_theme_select_with_initial_value(self):
+        """Verify the theme select is rendered with the configured theme."""
+        initial = CliSettings(theme="dracula")
+        app = _TestApp(initial_settings=initial)
+
+        async with app.run_test():
+            tab = app.query_one(CliSettingsTab)
+            select = tab.query_one("#theme_select", Select)
+            assert select.value == "dracula"
+
+    @pytest.mark.asyncio
+    async def test_get_updated_fields_reflects_theme(self):
+        """Verify get_updated_fields() captures theme select state."""
+        initial = CliSettings(theme="openhands")
+        app = _TestApp(initial_settings=initial)
+
+        async with app.run_test():
+            tab = app.query_one(CliSettingsTab)
+            select = tab.query_one("#theme_select", Select)
+            select.value = "dracula"
+
+            result = tab.get_updated_fields()
+            assert result["theme"] == "dracula"
+
+    @pytest.mark.asyncio
     async def test_get_updated_fields_returns_only_managed_fields(self):
         """Verify get_updated_fields() returns only the fields this tab manages."""
         initial = CliSettings(default_cells_expanded=True, auto_open_plan_panel=False)
@@ -123,8 +173,8 @@ class TestCliSettingsTab:
             tab = app.query_one(CliSettingsTab)
             result = tab.get_updated_fields()
 
-            # Should only contain the 2 fields this tab manages
             assert set(result.keys()) == {
+                "theme",
                 "default_cells_expanded",
                 "auto_open_plan_panel",
             }

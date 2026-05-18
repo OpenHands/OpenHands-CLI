@@ -51,6 +51,7 @@ class CliSettings(BaseModel):
 
     default_cells_expanded: bool = False
     auto_open_plan_panel: bool = True
+    theme: str = "openhands"
     critic: CriticSettings = CriticSettings()
 
     @classmethod

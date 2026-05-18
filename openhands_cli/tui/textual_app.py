@@ -216,11 +216,13 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
 
         self.plan_panel: PlanSidePanel = PlanSidePanel(self)
 
-        # Register the custom theme
+        # Register the custom theme and apply the user's preference
         self.register_theme(OPENHANDS_THEME)
-
-        # Set the theme as active
-        self.theme = "openhands"
+        self.theme = (
+            cli_settings.theme
+            if cli_settings.theme in self.available_themes
+            else "openhands"
+        )
 
     CSS_PATH = "textual_app.tcss"
 
