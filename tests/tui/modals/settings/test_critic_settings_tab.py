@@ -155,6 +155,7 @@ class TestCriticSettingsTab:
             enable_iterative_refinement=True,
             critic_threshold=0.6,
             issue_threshold=0.75,
+            model_name="critic",
         )
         app = _TestApp(initial_settings=initial)
 
@@ -167,6 +168,7 @@ class TestCriticSettingsTab:
                 "enable_iterative_refinement",
                 "critic_threshold",
                 "issue_threshold",
+                "model_name",
             }
 
     @pytest.mark.asyncio
