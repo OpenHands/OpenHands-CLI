@@ -187,7 +187,7 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
     docker_cmd.extend(
         [
             "-p",
-            "3000:3000",
+            "127.0.0.1:3000:3000",
             "--add-host",
             "host.docker.internal:host-gateway",
             "--name",
