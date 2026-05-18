@@ -93,9 +93,6 @@ class SettingsScreen(ModalScreen):
     databricks_host_input: getters.query_one[Input] = getters.query_one(
         "#databricks_host_input"
     )
-    databricks_ai_gateway_host_input: getters.query_one[Input] = getters.query_one(
-        "#databricks_ai_gateway_host_input"
-    )
     api_key_group: getters.query_one[Container] = getters.query_one("#api_key_group")
     databricks_auth_method_help: getters.query_one[Static] = getters.query_one(
         "#databricks_auth_method_help"
@@ -224,11 +221,6 @@ class SettingsScreen(ModalScreen):
             self.databricks_host_input.placeholder = (
                 "https://adb-1234567890.cloud.databricks.com"
             )
-            self.databricks_ai_gateway_host_input.value = ""
-            self.databricks_ai_gateway_host_input.placeholder = (
-                "https://<workspace_id>.ai-gateway.cloud.databricks.com  "
-                "(leave blank for typical workspaces)"
-            )
         except Exception:
             pass
 
@@ -323,9 +315,9 @@ class SettingsScreen(ModalScreen):
             db_client_id = getattr(llm, "databricks_client_id", None)
             db_client_secret = getattr(llm, "databricks_client_secret", None)
             db_host = getattr(llm, "databricks_host", None) or llm.base_url
-            # AI Gateway host is an optional override — only show what was
-            # explicitly set; never default it from the workspace host (the
-            # SDK derives ``<host>/ai-gateway/<route>`` automatically).
+            # Note: databricks_ai_gateway_host is set via env var only;
+            # not surfaced in the TUI. Still passed through SettingsFormData
+            # so the backend can read it if set.
             db_ai_gateway_host = getattr(llm, "databricks_ai_gateway_host", None) or ""
             api_key_set = bool(llm.api_key)
 
@@ -352,7 +344,6 @@ class SettingsScreen(ModalScreen):
             self.databricks_profile_input.value = db_profile or ""
             self.databricks_client_id_input.value = db_client_id or ""
             self.databricks_host_input.value = db_host or ""
-            self.databricks_ai_gateway_host_input.value = db_ai_gateway_host
             if db_client_secret:
                 # Never echo the secret; show a masked hint so the user can
                 # leave blank to keep it.
@@ -793,7 +784,8 @@ class SettingsScreen(ModalScreen):
         db_client_id = self.databricks_client_id_input.value or None
         db_client_secret = self.databricks_client_secret_input.value or None
         db_host = self.databricks_host_input.value or None
-        db_ai_gateway_host = self.databricks_ai_gateway_host_input.value or None
+        # AI Gateway host not collected from TUI; read from env var via backend.
+        db_ai_gateway_host = None
 
         form_data = SettingsFormData(
             mode=mode,
