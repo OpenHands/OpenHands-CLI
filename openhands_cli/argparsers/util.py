@@ -61,3 +61,22 @@ def add_resume_args(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Resume the most recent conversation (use with --resume)",
     )
+
+
+def add_plugins_dir_args(parser: argparse.ArgumentParser) -> None:
+    """Add plugins directory arguments to a parser.
+
+    Args:
+        parser: The argument parser to add plugins dir arguments to
+    """
+    parser.add_argument(
+        "--plugins-dir",
+        type=str,
+        action="append",
+        metavar="DIR",
+        help=(
+            "Load plugins (skills) from directories for this session only "
+            "(repeatable). Can specify a directory containing plugins or a "
+            "specific plugin directory."
+        ),
+    )

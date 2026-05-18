@@ -40,6 +40,7 @@ class RunnerFactory:
         json_mode: bool,
         env_overrides_enabled: bool,
         critic_disabled: bool,
+        plugins_dirs: list[str] | None = None,
     ) -> None:
         self._state = state
         self._app_provider = app_provider
@@ -47,6 +48,7 @@ class RunnerFactory:
         self._json_mode = json_mode
         self._env_overrides_enabled = env_overrides_enabled
         self._critic_disabled = critic_disabled
+        self._plugins_dirs = plugins_dirs
 
     def create(
         self,
@@ -81,6 +83,7 @@ class RunnerFactory:
             event_callback=event_callback,
             env_overrides_enabled=self._env_overrides_enabled,
             critic_disabled=self._critic_disabled,
+            plugins_dirs=self._plugins_dirs,
         )
 
         # Attach conversation to state for metrics reading
