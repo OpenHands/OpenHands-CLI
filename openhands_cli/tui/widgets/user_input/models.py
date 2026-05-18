@@ -1,11 +1,11 @@
 """Pydantic models for user input components."""
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel
 
 
-class CompletionType(str, Enum):
+class CompletionType(StrEnum):
     """Type of completion being performed."""
 
     COMMAND = "command"
