@@ -122,8 +122,82 @@ class SettingsTab(Container):
                             disabled=True,
                         )
 
-                # API Key (shown in both modes)
-                with Container(classes="form_group"):
+                # Databricks-only: workspace host + auth method + conditional
+                # credential inputs. The whole block is hidden unless the
+                # active provider / custom model is Databricks; see
+                # ``_update_databricks_visibility`` in settings_screen.py.
+                #
+                # Note: a separate AI Gateway host override is supported via
+                # the DATABRICKS_AI_GATEWAY_HOST environment variable for
+                # split-hostname deployments, but is intentionally not
+                # surfaced in the UI to keep the form simple.
+                with Container(id="databricks_auth_section", classes="form_group"):
+                    with Container(classes="form_group"):
+                        yield Label(
+                            "Databricks Workspace Host:",
+                            classes="form_label",
+                        )
+                        yield Input(
+                            placeholder=("https://adb-1234567890.cloud.databricks.com"),
+                            id="databricks_host_input",
+                            classes="form_input",
+                        )
+                        yield Static(
+                            "Required. Your Databricks workspace URL. Used for "
+                            "Foundation Model invocations, OAuth token "
+                            "minting, and model discovery.",
+                            classes="form_help",
+                        )
+
+                    with Container(classes="form_group"):
+                        yield Label("Databricks Auth Method:", classes="form_label")
+                        yield Select(
+                            [
+                                ("Personal Access Token (PAT)", "pat"),
+                                ("Service Principal (M2M)", "m2m"),
+                                ("CLI Profile (~/.databrickscfg)", "profile"),
+                                (
+                                    "Browser SSO via `databricks auth login` "
+                                    "(U2M / unified)",
+                                    "u2m",
+                                ),
+                            ],
+                            value="pat",
+                            id="databricks_auth_method_select",
+                            classes="form_select",
+                            type_to_search=False,
+                        )
+                        yield Static(
+                            "PAT: paste a Personal Access Token below.",
+                            id="databricks_auth_method_help",
+                            classes="form_help",
+                        )
+
+                    with Container(id="databricks_profile_group", classes="form_group"):
+                        yield Label("Databricks Profile Name:", classes="form_label")
+                        yield Input(
+                            placeholder="DEFAULT",
+                            id="databricks_profile_input",
+                            classes="form_input",
+                        )
+
+                    with Container(id="databricks_m2m_group", classes="form_group"):
+                        yield Label("Databricks Client ID:", classes="form_label")
+                        yield Input(
+                            placeholder="service-principal client id",
+                            id="databricks_client_id_input",
+                            classes="form_input",
+                        )
+                        yield Label("Databricks Client Secret:", classes="form_label")
+                        yield Input(
+                            placeholder="service-principal client secret",
+                            password=True,
+                            id="databricks_client_secret_input",
+                            classes="form_input",
+                        )
+
+                # API Key (shown in both modes; hidden for Databricks non-PAT auth)
+                with Container(id="api_key_group", classes="form_group"):
                     yield Label("API Key:", classes="form_label")
                     yield Input(
                         placeholder="Enter your API key",

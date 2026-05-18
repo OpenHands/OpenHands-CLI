@@ -104,6 +104,69 @@ CLOUD_MODELS: list[ModelRecommendation] = [
         provider="moonshot",
         use_cases="General coding tasks",
     ),
+    # --- Databricks AI Gateway — tier-1 curated set (Claude / GPT / Gemini).
+    # Mirrors CURATED_DATABRICKS_MODELS in the openhands-sdk Databricks
+    # provider. Llama / DBRX / legacy endpoints are intentionally omitted and
+    # instead surface via tier-2 dynamic discovery (list_chat_endpoints) once
+    # host + credentials are configured. One ``is_recommended`` pick per native
+    # API family — the fast-and-good default.
+    # Anthropic — native Anthropic Messages API
+    ModelRecommendation(
+        name="databricks-claude-sonnet-4-5",
+        provider="databricks",
+        is_recommended=True,
+        use_cases=(
+            "Databricks-hosted Claude Sonnet 4.5 (native Anthropic Messages API)"
+        ),
+        notes=(
+            "Set workspace URL as base URL or DATABRICKS_HOST; "
+            "PAT, profile, M2M, or U2M auth"
+        ),
+    ),
+    ModelRecommendation(
+        name="databricks-claude-opus-4-1",
+        provider="databricks",
+        use_cases=(
+            "Databricks-hosted Claude Opus 4.1 for long-context / reasoning tasks"
+        ),
+    ),
+    ModelRecommendation(
+        name="databricks-claude-haiku-4-5",
+        provider="databricks",
+        use_cases="Databricks-hosted Claude Haiku 4.5 for fast / cheap inference",
+    ),
+    # OpenAI — native Responses API for gpt-5, OpenAI Chat for gpt-oss
+    ModelRecommendation(
+        name="databricks-gpt-5-mini",
+        provider="databricks",
+        is_recommended=True,
+        use_cases="Databricks-hosted GPT-5 mini (native OpenAI Responses API)",
+    ),
+    ModelRecommendation(
+        name="databricks-gpt-5",
+        provider="databricks",
+        use_cases=(
+            "Databricks-hosted GPT-5 full "
+            "(native OpenAI Responses API; reasoning model)"
+        ),
+    ),
+    ModelRecommendation(
+        name="databricks-gpt-oss-120b",
+        provider="databricks",
+        use_cases="Databricks-hosted gpt-oss 120B via OpenAI Chat Completions",
+    ),
+    # Google — native Gemini generateContent
+    ModelRecommendation(
+        name="databricks-gemini-2-5-flash",
+        provider="databricks",
+        is_recommended=True,
+        use_cases="Databricks-hosted Gemini 2.5 Flash (native Google generateContent)",
+    ),
+    ModelRecommendation(
+        name="databricks-gemini-2-5-pro",
+        provider="databricks",
+        use_cases="Databricks-hosted Gemini 2.5 Pro for long-context reasoning",
+    ),
 ]
 
 # Local / Self-Hosted Models
