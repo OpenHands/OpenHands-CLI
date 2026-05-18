@@ -34,7 +34,7 @@ class TestCommands:
     def test_commands_list_structure(self):
         """Test that COMMANDS list has correct structure."""
         assert isinstance(COMMANDS, list)
-        assert len(COMMANDS) == 9
+        assert len(COMMANDS) == 11
 
         # Check that all items are DropdownItems
         for command in COMMANDS:
@@ -48,6 +48,8 @@ class TestCommands:
         [
             ("/help", "Display available commands"),
             ("/new", "Start a new conversation"),
+            ("/plan", "Switch to Planning Mode (generate PLAN.md)"),
+            ("/code", "Switch to Code Mode (normal execution)"),
             ("/history", "Toggle conversation history"),
             ("/settings", "Open settings"),
             ("/confirm", "Configure confirmation settings"),
@@ -190,9 +192,11 @@ class TestCommands:
         assert "/history" in command_names
         assert "/help" in command_names
         assert "/new" in command_names
+        assert "/plan" in command_names
+        assert "/code" in command_names
         assert "/settings" in command_names
         assert "/skills" in command_names
-        assert len(COMMANDS) == 9
+        assert len(COMMANDS) == 11
 
     def test_all_commands_included_in_help(self):
         """Test that all commands from COMMANDS list are included in help text.

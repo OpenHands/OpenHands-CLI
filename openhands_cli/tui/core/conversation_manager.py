@@ -16,7 +16,10 @@ from textual import on
 from textual.containers import Container
 from textual.message import Message
 
-from openhands.sdk.security.confirmation_policy import ConfirmationPolicyBase
+from openhands.sdk.security.confirmation_policy import (
+    AlwaysConfirm,
+    ConfirmationPolicyBase,
+)
 from openhands_cli.conversations.protocols import ConversationStore
 from openhands_cli.tui.core.confirmation_flow_controller import (
     ConfirmationFlowController,
@@ -79,6 +82,18 @@ class SetConfirmationPolicy(Message):
     def __init__(self, policy: ConfirmationPolicyBase) -> None:
         super().__init__()
         self.policy = policy
+
+
+class SetAgentMode(Message):
+    """Request to change the agent operating mode.
+
+    Args:
+        mode: The agent mode to set ('plan' or 'code')
+    """
+
+    def __init__(self, mode: str) -> None:
+        super().__init__()
+        self.mode = mode
 
 
 class SwitchConfirmed(Message):
@@ -276,6 +291,54 @@ class ConversationManager(Container):
         """Handle request to change confirmation policy."""
         event.stop()
         self._policy_service.set_policy(event.policy)
+
+    @on(SetAgentMode)
+    def _on_set_agent_mode(self, event: SetAgentMode) -> None:
+        """Handle request to change agent operating mode.
+
+        When entering plan mode:
+        1. Save the current confirmation policy
+        2. Switch to AlwaysConfirm so the user must approve every action
+        3. Update the UI mode indicator
+
+        When returning to code mode:
+        1. Restore the previously saved confirmation policy
+        2. Clear the mode indicator
+        """
+        event.stop()
+        mode = event.mode
+        if mode not in ("plan", "code"):
+            self.notify(
+                f"Invalid mode: {mode}. Use 'plan' or 'code'.",
+                title="Mode Error",
+                severity="error",
+            )
+            return
+
+        if mode == "plan":
+            # Save current policy and enforce AlwaysConfirm as a safety net.
+            # Even if the agent ignores prompt instructions, the user still
+            # gets a confirmation dialog before any action executes.
+            if not self._state.has_pre_plan_policy:
+                self._state.save_pre_plan_policy(
+                    self._state.confirmation_policy
+                )
+            self._policy_service.set_policy(AlwaysConfirm())
+            self._state.set_agent_mode("plan")
+            self.notify(
+                "Planning Mode — all actions require your approval",
+                severity="information",
+            )
+        else:
+            # Restore the user's previous confirmation policy
+            saved_policy = self._state.restore_pre_plan_policy()
+            if saved_policy is not None:
+                self._policy_service.set_policy(saved_policy)
+            self._state.set_agent_mode("code")
+            self.notify(
+                "Code Mode — confirmation policy restored",
+                severity="information",
+            )
 
     @on(ShowConfirmationPanel)
     def _on_show_confirmation_panel(self, event: ShowConfirmationPanel) -> None:

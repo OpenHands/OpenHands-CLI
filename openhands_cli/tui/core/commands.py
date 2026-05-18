@@ -18,6 +18,8 @@ from openhands_cli.tui.content.resources import LoadedResourcesInfo
 COMMANDS = [
     DropdownItem(main="/help - Display available commands"),
     DropdownItem(main="/new - Start a new conversation"),
+    DropdownItem(main="/plan - Switch to Planning Mode (generate PLAN.md)"),
+    DropdownItem(main="/code - Switch to Code Mode (normal execution)"),
     DropdownItem(main="/history - Toggle conversation history"),
     DropdownItem(main="/settings - Open settings"),
     DropdownItem(main="/confirm - Configure confirmation settings"),
@@ -73,6 +75,8 @@ def show_help(scroll_view: VerticalScroll) -> None:
 
   [{secondary}]/help[/{secondary}] - Display available commands
   [{secondary}]/new[/{secondary}] - Start a new conversation
+  [{secondary}]/plan[/{secondary}] - Switch to Planning Mode (generate PLAN.md)
+  [{secondary}]/code[/{secondary}] - Switch to Code Mode (normal execution)
   [{secondary}]/history[/{secondary}] - Toggle conversation history
   [{secondary}]/settings[/{secondary}] - Open settings
   [{secondary}]/confirm[/{secondary}] - Configure confirmation settings
