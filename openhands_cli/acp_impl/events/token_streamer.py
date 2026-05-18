@@ -73,7 +73,7 @@ class TokenBasedEventSubscriber:
         conn: Client,
         loop: asyncio.AbstractEventLoop,
         conversation: BaseConversation | None = None,
-    ):
+    ) -> None:
         self.session_id = session_id
         self.conn = conn
         self.loop = loop

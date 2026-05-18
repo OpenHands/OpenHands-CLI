@@ -23,7 +23,7 @@ class SettingsSwitch(Container):
         switch_id: str,
         value: bool = False,
         **kwargs,
-    ):
+    ) -> None:
         """Initialize the settings switch.
 
         Args:
@@ -49,7 +49,7 @@ class SettingsSwitch(Container):
 class CliSettingsTab(Container):
     """CLI Settings tab component containing CLI-specific settings."""
 
-    def __init__(self, initial_settings: CliSettings | None = None, **kwargs):
+    def __init__(self, initial_settings: CliSettings | None = None, **kwargs) -> None:
         """Initialize the CLI settings tab.
 
         Args:

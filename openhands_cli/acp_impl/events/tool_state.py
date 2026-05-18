@@ -18,7 +18,7 @@ class ToolCallState:
     returns True. Accessing them before raises ValueError.
     """
 
-    def __init__(self, tool_call_id: str, tool_name: str):
+    def __init__(self, tool_call_id: str, tool_name: str) -> None:
         self.tool_call_id = tool_call_id
         self.tool_name = tool_name
         self.is_think = tool_name == "think"

@@ -44,7 +44,7 @@ class HistoryItemContent(Static):
         conversation: ConversationMetadata,
         is_current: bool,
         **kwargs,
-    ):
+    ) -> None:
         """Initialize history item content.
 
         Args:
@@ -119,7 +119,7 @@ class HistorySidePanel(Container):
         app: OpenHandsApp,
         current_conversation_id: uuid.UUID | None = None,
         **kwargs,
-    ):
+    ) -> None:
         """Initialize the history side panel.
 
         Args:

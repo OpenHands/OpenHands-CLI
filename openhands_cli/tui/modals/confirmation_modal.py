@@ -38,7 +38,7 @@ class ConfirmationSettingsModal(ModalScreen):
         current_policy: ConfirmationPolicyBase,
         on_policy_selected: Callable[[ConfirmationPolicyBase], None],
         **kwargs,
-    ):
+    ) -> None:
         """Initialize the confirmation settings modal.
 
         Args:

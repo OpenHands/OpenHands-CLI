@@ -47,7 +47,7 @@ class EventSubscriber:
         session_id: str,
         conn: "Client",
         conversation: BaseConversation | None = None,
-    ):
+    ) -> None:
         """Initialize the event subscriber.
 
         Args:

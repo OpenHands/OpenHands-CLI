@@ -51,7 +51,7 @@ class PlanSidePanel(VerticalScroll):
 
     DEFAULT_CSS = PLAN_PANEL_STYLE
 
-    def __init__(self, app: OpenHandsApp, **kwargs):
+    def __init__(self, app: OpenHandsApp, **kwargs) -> None:
         """Initialize the Plan side panel."""
         super().__init__(**kwargs)
         self._task_list: list[TaskItem] = []

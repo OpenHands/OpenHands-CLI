@@ -31,7 +31,7 @@ class UnbufferedJsonRpcReader:
     that can cause messages to get stuck in buffers.
     """
 
-    def __init__(self, stdout):
+    def __init__(self, stdout) -> None:
         self.stdout = stdout
         self.buffer = b""
         self.fd = stdout.fileno()

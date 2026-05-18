@@ -22,7 +22,7 @@ class MCPSidePanel(VerticalScroll):
 
     DEFAULT_CSS = MCP_PANEL_STYLE
 
-    def __init__(self, agent: Agent | None = None, **kwargs):
+    def __init__(self, agent: Agent | None = None, **kwargs) -> None:
         """Initialize the MCP side panel.
 
         Args:
