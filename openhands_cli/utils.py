@@ -6,7 +6,7 @@ import platform
 import re
 from argparse import Namespace
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 
@@ -20,6 +20,10 @@ from openhands.tools.file_editor import FileEditorTool
 from openhands.tools.preset.default import get_default_condenser
 from openhands.tools.task_tracker import TaskTrackerTool
 from openhands.tools.terminal import TerminalTool
+
+
+if TYPE_CHECKING:
+    from openhands.sdk.llm.utils.metrics import TokenUsage
 
 
 def abbreviate_number(n: int | float) -> str:
@@ -51,6 +55,41 @@ def format_cost(cost: float) -> str:
     if cost <= 0:
         return "0.00"
     return f"{cost:.4f}"
+
+
+def format_metrics_status_line(usage: "TokenUsage", cost: float) -> str:
+    """Format metrics as a status line string.
+
+    Constructs a human-readable status line for token usage and cost,
+    suitable for display in both ACP and TUI contexts.
+
+    Args:
+        usage: Token usage object with prompt_tokens, completion_tokens, etc.
+        cost: Accumulated cost
+
+    Returns:
+        Formatted status line string
+        (e.g., "↑ input 1.2K • cache hit 50.00% • ↓ output 500 • $ 0.0050")
+    """
+    input_tokens = abbreviate_number(usage.prompt_tokens or 0)
+    output_tokens = abbreviate_number(usage.completion_tokens or 0)
+
+    # Calculate cache hit rate (convert to int to handle mock objects safely)
+    prompt = int(usage.prompt_tokens or 0)
+    cache_read = int(usage.cache_read_tokens or 0)
+    cache_rate = f"{(cache_read / prompt * 100):.2f}%" if prompt > 0 else "N/A"
+    reasoning_tokens = int(usage.reasoning_tokens or 0)
+
+    # Build status line
+    parts: list[str] = []
+    parts.append(f"↑ input {input_tokens}")
+    parts.append(f"cache hit {cache_rate}")
+    if reasoning_tokens > 0:
+        parts.append(f"reasoning {abbreviate_number(reasoning_tokens)}")
+    parts.append(f"↓ output {output_tokens}")
+    parts.append(f"$ {format_cost(float(cost or 0))}")
+
+    return " • ".join(parts)
 
 
 def get_os_description() -> str:
