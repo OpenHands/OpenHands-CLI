@@ -226,15 +226,6 @@ wheels = [
 ]
 
 [[package]]
-name = "bashlex"
-version = "0.18"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/76/60/aae0bb54f9af5e0128ba90eb83d8d0d506ee8f0475c4fdda3deeda20b1d2/bashlex-0.18.tar.gz", hash = "sha256:5bb03a01c6d5676338c36fd1028009c8ad07e7d61d8a1ce3f513b7fff52796ee", size = 68742, upload-time = "2023-01-18T15:21:26.402Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f4/be/6985abb1011fda8a523cfe21ed9629e397d6e06fb5bae99750402b25c95b/bashlex-0.18-py2.py3-none-any.whl", hash = "sha256:91d73a23a3e51711919c1c899083890cdecffc91d8c088942725ac13e9dcfffa", size = 69539, upload-time = "2023-01-18T15:21:24.167Z" },
-]
-
-[[package]]
 name = "beartype"
 version = "0.22.9"
 source = { registry = "https://pypi.org/simple" }
@@ -1224,6 +1215,18 @@ wheels = [
 ]
 
 [[package]]
+name = "joserfc"
+version = "1.6.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3b/dc/5f768c2e391e9afabe5d18e3221346deb5fb6338565f1ccc9e7c6d7befdd/joserfc-1.6.5.tar.gz", hash = "sha256:1482a7db78fb4602e44ed89e51b599d052e091288c7c532c5b694e20149dec48", size = 231881, upload-time = "2026-05-06T04:58:13.408Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/54/3b/ad1cb22e75c963b1f07c8a2329bf47227ce7e4361df5eb2fb101b2ce33ef/joserfc-1.6.5-py3-none-any.whl", hash = "sha256:e9878a0f8243fe7b95e11fdda81374ca9f7a689e302751579d3dfdeec559675e", size = 70464, upload-time = "2026-05-06T04:58:11.668Z" },
+]
+
+[[package]]
 name = "json-repair"
 version = "0.54.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1747,8 +1750,8 @@ dev = [
 requires-dist = [
     { name = "agent-client-protocol", specifier = ">=0.8.1,<0.9.0" },
     { name = "httpx", specifier = ">=0.25.0" },
-    { name = "openhands-sdk", specifier = "==1.21.0" },
-    { name = "openhands-tools", specifier = "==1.21.0" },
+    { name = "openhands-sdk", specifier = "==1.23.0" },
+    { name = "openhands-tools", specifier = "==1.23.0" },
     { name = "openhands-workspace", specifier = "==1.11.1" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyperclip", specifier = ">=1.9.0" },
@@ -1805,7 +1808,7 @@ wheels = [
 
 [[package]]
 name = "openhands-sdk"
-version = "1.21.0"
+version = "1.23.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "agent-client-protocol" },
@@ -1814,6 +1817,7 @@ dependencies = [
     { name = "fastmcp" },
     { name = "filelock" },
     { name = "httpx", extra = ["socks"] },
+    { name = "joserfc" },
     { name = "litellm" },
     { name = "lmnr" },
     { name = "pillow" },
@@ -1823,17 +1827,16 @@ dependencies = [
     { name = "tenacity" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/10/30/01ca207ba32cfc329fbf8cc152743589a00ecd79b1eed40bdd9ad77cb3ff/openhands_sdk-1.21.0.tar.gz", hash = "sha256:c93808a2bbbe4031895c926db7f9b40c7ec8fa44ea05e64968076773bc249b22", size = 431847, upload-time = "2026-05-07T19:03:49.506Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/75/a1/c2d87cfb4b5b5347906fd53b0df0c8e511f297d09cfe4665ad692f7eb6a2/openhands_sdk-1.23.0.tar.gz", hash = "sha256:55ada8958ef860f42ae8f6320f142987dbcb54bd50ade765289861ec9b92cba5", size = 455188, upload-time = "2026-05-20T23:52:49.464Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/94/63e7f502baa209e61e37e8b3e3d8aa7d41fc2866aa65c3b410e6eb2c823f/openhands_sdk-1.21.0-py3-none-any.whl", hash = "sha256:4bf77fe25c9dd4908f70fef2a2e90fede32ff555359ca08fe9f4f3a3acee930b", size = 537757, upload-time = "2026-05-07T19:03:45.387Z" },
+    { url = "https://files.pythonhosted.org/packages/43/f0/1efce05731d3d78447e59fa426af889c52b5f3d662daa52ec961ac03e748/openhands_sdk-1.23.0-py3-none-any.whl", hash = "sha256:50a1b47be246ba4dc89ac0d5df63d958aa1b39665e065476b7b6e9e159984acf", size = 563899, upload-time = "2026-05-20T23:52:46.128Z" },
 ]
 
 [[package]]
 name = "openhands-tools"
-version = "1.21.0"
+version = "1.23.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "bashlex" },
     { name = "binaryornot" },
     { name = "browser-use" },
     { name = "cachetools" },
@@ -1842,10 +1845,12 @@ dependencies = [
     { name = "openhands-sdk" },
     { name = "pydantic" },
     { name = "tom-swe" },
+    { name = "tree-sitter" },
+    { name = "tree-sitter-bash" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ce/c1/70c7262a8bb38d0b1268ea89eca114ad793a3961881fdf0b6fe70db024dc/openhands_tools-1.21.0.tar.gz", hash = "sha256:d98d732c4c3e02ba11e9e44a73736baa491882e9d9bc5cdc6b9acd5489d969cd", size = 132638, upload-time = "2026-05-07T19:03:51.686Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/44/68/fe8f21cd240f25f7f3943fb0440ee78bbd42d02517f2ef0832bf3cc7933a/openhands_tools-1.23.0.tar.gz", hash = "sha256:791385023765e7548e65433655fd2f344f448798d077241e2a63f717457fc527", size = 134587, upload-time = "2026-05-20T23:52:54.842Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/24/b9/c9e42b32d3f9a46f715c71f5c4b44d7586375ebb55d22e065f362c375118/openhands_tools-1.21.0-py3-none-any.whl", hash = "sha256:97a0a910388881525e964165686a114d48cdb70788797f7048584d5aa839a61a", size = 176279, upload-time = "2026-05-07T19:03:48.121Z" },
+    { url = "https://files.pythonhosted.org/packages/15/cd/a484a44f466710bf85e81331cea30a7e6f094baba793816bf4cffbe7cb63/openhands_tools-1.23.0-py3-none-any.whl", hash = "sha256:5923d11dfce7ad93c9883f1e8859e4eec82db02b8dc155ebd9322b9657157e4a", size = 178291, upload-time = "2026-05-20T23:52:51.067Z" },
 ]
 
 [[package]]
@@ -5486,6 +5491,37 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a8/4b/29b4ef32e036bb34e4ab51796dd745cdba7ed47ad142a9f4a1eb8e0c744d/tqdm-4.67.1.tar.gz", hash = "sha256:f8aef9c52c08c13a65f30ea34f4e5aac3fd1a34959879d7e59e63027286627f2", size = 169737, upload-time = "2024-11-24T20:12:22.481Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d0/30/dc54f88dd4a2b5dc8a0279bdd7270e735851848b762aeb1c1184ed1f6b14/tqdm-4.67.1-py3-none-any.whl", hash = "sha256:26445eca388f82e72884e0d580d5464cd801a3ea01e63e5601bdff9ba6a48de2", size = 78540, upload-time = "2024-11-24T20:12:19.698Z" },
+]
+
+[[package]]
+name = "tree-sitter"
+version = "0.25.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/66/7c/0350cfc47faadc0d3cf7d8237a4e34032b3014ddf4a12ded9933e1648b55/tree-sitter-0.25.2.tar.gz", hash = "sha256:fe43c158555da46723b28b52e058ad444195afd1db3ca7720c59a254544e9c20", size = 177961, upload-time = "2025-09-25T17:37:59.751Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3c/9e/20c2a00a862f1c2897a436b17edb774e831b22218083b459d0d081c9db33/tree_sitter-0.25.2-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:ddabfff809ffc983fc9963455ba1cecc90295803e06e140a4c83e94c1fa3d960", size = 146941, upload-time = "2025-09-25T17:37:34.813Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/04/8512e2062e652a1016e840ce36ba1cc33258b0dcc4e500d8089b4054afec/tree_sitter-0.25.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:c0c0ab5f94938a23fe81928a21cc0fac44143133ccc4eb7eeb1b92f84748331c", size = 137699, upload-time = "2025-09-25T17:37:36.349Z" },
+    { url = "https://files.pythonhosted.org/packages/47/8a/d48c0414db19307b0fb3bb10d76a3a0cbe275bb293f145ee7fba2abd668e/tree_sitter-0.25.2-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:dd12d80d91d4114ca097626eb82714618dcdfacd6a5e0955216c6485c350ef99", size = 607125, upload-time = "2025-09-25T17:37:37.725Z" },
+    { url = "https://files.pythonhosted.org/packages/39/d1/b95f545e9fc5001b8a78636ef942a4e4e536580caa6a99e73dd0a02e87aa/tree_sitter-0.25.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:b43a9e4c89d4d0839de27cd4d6902d33396de700e9ff4c5ab7631f277a85ead9", size = 635418, upload-time = "2025-09-25T17:37:38.922Z" },
+    { url = "https://files.pythonhosted.org/packages/de/4d/b734bde3fb6f3513a010fa91f1f2875442cdc0382d6a949005cd84563d8f/tree_sitter-0.25.2-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:fbb1706407c0e451c4f8cc016fec27d72d4b211fdd3173320b1ada7a6c74c3ac", size = 631250, upload-time = "2025-09-25T17:37:40.039Z" },
+    { url = "https://files.pythonhosted.org/packages/46/f2/5f654994f36d10c64d50a192239599fcae46677491c8dd53e7579c35a3e3/tree_sitter-0.25.2-cp312-cp312-win_amd64.whl", hash = "sha256:6d0302550bbe4620a5dc7649517c4409d74ef18558276ce758419cf09e578897", size = 127156, upload-time = "2025-09-25T17:37:41.132Z" },
+    { url = "https://files.pythonhosted.org/packages/67/23/148c468d410efcf0a9535272d81c258d840c27b34781d625f1f627e2e27d/tree_sitter-0.25.2-cp312-cp312-win_arm64.whl", hash = "sha256:0c8b6682cac77e37cfe5cf7ec388844957f48b7bd8d6321d0ca2d852994e10d5", size = 113984, upload-time = "2025-09-25T17:37:42.074Z" },
+]
+
+[[package]]
+name = "tree-sitter-bash"
+version = "0.25.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8e/0e/f0108be910f1eef6499eabce517e79fe3b12057280ed398da67ce2426cba/tree_sitter_bash-0.25.1.tar.gz", hash = "sha256:bfc0bdaa77bc1e86e3c6652e5a6e140c40c0a16b84185c2b63ad7cd809b88f14", size = 419703, upload-time = "2025-12-02T17:01:08.849Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/30/8e/37e7364d9c9c58da89e05c510671d8c45818afd7b31c6939ab72f8dc6c04/tree_sitter_bash-0.25.1-cp310-abi3-macosx_10_9_x86_64.whl", hash = "sha256:0e6235f59e366d220dde7d830196bed597d01e853e44d8ccd1a82c5dd2500acf", size = 194160, upload-time = "2025-12-02T17:00:59.047Z" },
+    { url = "https://files.pythonhosted.org/packages/23/bb/2d2cfbb1f89aaeb1ec892624f069d92d058d06bb66f16b9ec9fb5873ab60/tree_sitter_bash-0.25.1-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:f4a34a6504c7c5b2a9b8c5c4065531dea19ca2c35026e706cf2eeeebe2c92512", size = 202659, upload-time = "2025-12-02T17:01:00.275Z" },
+    { url = "https://files.pythonhosted.org/packages/25/f0/1bb25519be27460255d3899db677313cfa1e6306988fbf456a3d7e211bbb/tree_sitter_bash-0.25.1-cp310-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:e76c4cfb20b076552406782b7f8c2a3946835993df0a44df006de54b7030c7dc", size = 230596, upload-time = "2025-12-02T17:01:01.759Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/22/9f70bc3d3b942ab9fc0f89c1dc9e087519a3a94f64ae6b7377aae3a7a0f0/tree_sitter_bash-0.25.1-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:3f484c4bb8796cde7a87ca351e6116f09653edac0eb3c6d238566359dd28b117", size = 231981, upload-time = "2025-12-02T17:01:02.859Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/c3/f1540e42cd41b323c6821e45e52e1aed6ed386209aad52db996f05703963/tree_sitter_bash-0.25.1-cp310-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:5e76af6df46d958c7f5b6d5884c9743218e3902a00ccb493ec92728b1084430b", size = 228364, upload-time = "2025-12-02T17:01:03.997Z" },
+    { url = "https://files.pythonhosted.org/packages/f7/a0/c3050a6277dfcac8c480f514dc4fe49f3f65f0eac68b4702cbaca2584e85/tree_sitter_bash-0.25.1-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:a3332d71c7b7d5f78259b19d02d0ea111fcb82b72712ee4a93aaa5b226d3f0a8", size = 230074, upload-time = "2025-12-02T17:01:05.05Z" },
+    { url = "https://files.pythonhosted.org/packages/71/0f/203fe6b27211387f4b9ba8c4a321567ca4ded2624dae6ccdbd2b6e940e17/tree_sitter_bash-0.25.1-cp310-abi3-win_amd64.whl", hash = "sha256:52a6802d9218f86278aa3e8b459c3abdad67eed0fde1f9f13aca5b6c634217a6", size = 195574, upload-time = "2025-12-02T17:01:06.412Z" },
+    { url = "https://files.pythonhosted.org/packages/47/75/4ca1a9fabd8fb5aea78cea70f7837ce4dbf2afae115f62051e5fa99cba1c/tree_sitter_bash-0.25.1-cp310-abi3-win_arm64.whl", hash = "sha256:59115057ec2bae319e8082ff29559861045002964c3431ccb0fc92aa4bc9bccb", size = 191196, upload-time = "2025-12-02T17:01:07.486Z" },
 ]
 
 [[package]]
