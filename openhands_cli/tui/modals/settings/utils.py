@@ -63,6 +63,9 @@ class SettingsFormData(BaseModel):
     databricks_profile_name: str | None = None
     databricks_client_id: str | None = None
     databricks_client_secret_input: str | None = None
+    # U2M OAuth app credentials (separate from M2M service principal)
+    databricks_u2m_client_id: str | None = None
+    databricks_u2m_client_secret_input: str | None = None
     # Databricks workspace URL (e.g. ``https://adb-123.cloud.databricks.com``).
     # Canonical, required field. Used for:
     #   * FM invocations (the SDK derives ``<host>/ai-gateway/<route>`` from
@@ -101,6 +104,8 @@ class SettingsFormData(BaseModel):
         "databricks_profile_name",
         "databricks_client_id",
         "databricks_client_secret_input",
+        "databricks_u2m_client_id",
+        "databricks_u2m_client_secret_input",
         "databricks_host",
         "databricks_ai_gateway_host",
     )
@@ -371,6 +376,16 @@ def _build_databricks_settings(
         databricks_client_secret=(
             SecretStr(data.databricks_client_secret_input)
             if auth_method == "m2m" and data.databricks_client_secret_input
+            else None
+        ),
+        # U2M OAuth app credentials (stored alongside the LLM config so the web
+        # /prepare endpoint can read them from user settings if needed).
+        databricks_u2m_client_id=(
+            data.databricks_u2m_client_id if auth_method == "u2m" else None
+        ),
+        databricks_u2m_client_secret=(
+            SecretStr(data.databricks_u2m_client_secret_input)
+            if auth_method == "u2m" and data.databricks_u2m_client_secret_input
             else None
         ),
         timeout=timeout_val,

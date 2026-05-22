@@ -143,9 +143,11 @@ class SettingsTab(Container):
                             classes="form_input",
                         )
                         yield Static(
-                            "Required. Your Databricks workspace URL. Used for "
-                            "Foundation Model invocations, OAuth token "
-                            "minting, and model discovery.",
+                            "Required. Your Databricks workspace URL. "
+                            "OpenHands routes all AI calls through the "
+                            "Databricks AI Gateway at "
+                            "<workspace>/ai-gateway/... — no separate "
+                            "gateway URL needed for standard workspaces.",
                             classes="form_help",
                         )
 
@@ -153,22 +155,21 @@ class SettingsTab(Container):
                         yield Label("Databricks Auth Method:", classes="form_label")
                         yield Select(
                             [
+                                (
+                                    "Browser OAuth (U2M — recommended)",
+                                    "u2m",
+                                ),
                                 ("Personal Access Token (PAT)", "pat"),
                                 ("Service Principal (M2M)", "m2m"),
                                 ("CLI Profile (~/.databrickscfg)", "profile"),
-                                (
-                                    "Browser SSO via `databricks auth login` "
-                                    "(U2M / unified)",
-                                    "u2m",
-                                ),
                             ],
-                            value="pat",
+                            value="u2m",
                             id="databricks_auth_method_select",
                             classes="form_select",
                             type_to_search=False,
                         )
                         yield Static(
-                            "PAT: paste a Personal Access Token below.",
+                            "U2M: enter your OAuth App Client ID below, then sign in.",
                             id="databricks_auth_method_help",
                             classes="form_help",
                         )
@@ -194,6 +195,37 @@ class SettingsTab(Container):
                             password=True,
                             id="databricks_client_secret_input",
                             classes="form_input",
+                        )
+
+                    with Container(id="databricks_u2m_group", classes="form_group"):
+                        yield Label(
+                            "OAuth App Client ID:",
+                            classes="form_label",
+                        )
+                        yield Input(
+                            placeholder="e.g. 12345678-abcd-...",
+                            id="databricks_u2m_client_id_input",
+                            classes="form_input",
+                        )
+                        yield Static(
+                            "From Databricks account console → Settings → App connections. "
+                            "NOT the M2M service principal Client ID.",
+                            classes="form_help",
+                        )
+                        yield Label(
+                            "OAuth App Client Secret (optional):",
+                            classes="form_label",
+                        )
+                        yield Input(
+                            placeholder="Leave blank for public OAuth apps",
+                            password=True,
+                            id="databricks_u2m_client_secret_input",
+                            classes="form_input",
+                        )
+                        yield Static(
+                            "Required only if your App connections app has a "
+                            "client secret (confidential app). Leave blank otherwise.",
+                            classes="form_help",
                         )
 
                 # API Key (shown in both modes; hidden for Databricks non-PAT auth)

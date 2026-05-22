@@ -78,6 +78,9 @@ class SettingsScreen(ModalScreen):
     databricks_m2m_group: getters.query_one[Container] = getters.query_one(
         "#databricks_m2m_group"
     )
+    databricks_u2m_group: getters.query_one[Container] = getters.query_one(
+        "#databricks_u2m_group"
+    )
     databricks_auth_method_select: getters.query_one[Select] = getters.query_one(
         "#databricks_auth_method_select"
     )
@@ -89,6 +92,12 @@ class SettingsScreen(ModalScreen):
     )
     databricks_client_secret_input: getters.query_one[Input] = getters.query_one(
         "#databricks_client_secret_input"
+    )
+    databricks_u2m_client_id_input: getters.query_one[Input] = getters.query_one(
+        "#databricks_u2m_client_id_input"
+    )
+    databricks_u2m_client_secret_input: getters.query_one[Input] = getters.query_one(
+        "#databricks_u2m_client_secret_input"
     )
     databricks_host_input: getters.query_one[Input] = getters.query_one(
         "#databricks_host_input"
@@ -210,13 +219,15 @@ class SettingsScreen(ModalScreen):
         self.max_tokens_input.value = ""
         self.max_size_input.value = ""
         try:
-            self.databricks_auth_method_select.value = "pat"
+            self.databricks_auth_method_select.value = "u2m"
             self.databricks_profile_input.value = ""
             self.databricks_client_id_input.value = ""
             self.databricks_client_secret_input.value = ""
             self.databricks_client_secret_input.placeholder = (
                 "service-principal client secret"
             )
+            self.databricks_u2m_client_id_input.value = ""
+            self.databricks_u2m_client_secret_input.value = ""
             self.databricks_host_input.value = ""
             self.databricks_host_input.placeholder = (
                 "https://adb-1234567890.cloud.databricks.com"
@@ -314,6 +325,7 @@ class SettingsScreen(ModalScreen):
             db_profile = getattr(llm, "databricks_profile", None)
             db_client_id = getattr(llm, "databricks_client_id", None)
             db_client_secret = getattr(llm, "databricks_client_secret", None)
+            db_u2m_client_id = getattr(llm, "databricks_u2m_client_id", None)
             db_host = getattr(llm, "databricks_host", None) or llm.base_url
             # Note: databricks_ai_gateway_host is set via env var only;
             # not surfaced in the TUI. Still passed through SettingsFormData
@@ -335,14 +347,14 @@ class SettingsScreen(ModalScreen):
                 method = "profile"
             elif api_key_set:
                 method = "pat"
-            elif db_host:
-                method = "u2m"
             else:
-                method = "pat"
+                # Default to U2M (browser OAuth) — recommended ISV auth
+                method = "u2m"
 
             self.databricks_auth_method_select.value = method
             self.databricks_profile_input.value = db_profile or ""
             self.databricks_client_id_input.value = db_client_id or ""
+            self.databricks_u2m_client_id_input.value = db_u2m_client_id or ""
             self.databricks_host_input.value = db_host or ""
             if db_client_secret:
                 # Never echo the secret; show a masked hint so the user can
@@ -490,18 +502,13 @@ class SettingsScreen(ModalScreen):
     }
 
     def _build_u2m_hint(self) -> str:
-        """Return a U2M hint with the exact login command for the entered host."""
-        try:
-            host = self.databricks_host_input.value.strip()
-        except Exception:
-            host = ""
-        if host:
-            login_cmd = f"databricks auth login --host {host}"
-        else:
-            login_cmd = "databricks auth login --host <workspace_host>"
+        """Return a U2M OAuth app setup hint."""
         return (
-            "Browser SSO auth: no password is entered here — the agent uses tokens\n"
-            "cached by the Databricks CLI. Run these commands in a terminal first:\n"
+            "Browser OAuth (U2M): enter your OAuth App Client ID above.\n"
+            "Create the app at: https://accounts.cloud.databricks.com/settings/app-connections\n"
+            "Register redirect URI: http://localhost:8080/callback\n"
+            "Not the M2M service principal client ID — that is a separate app.\n\n"
+            "Legacy CLI path: if you prefer, run this instead:\n"
             "\n"
             f"  Step 1:  pip install databricks-sdk\n"
             f"  Step 2:  {login_cmd}\n"
@@ -513,10 +520,10 @@ class SettingsScreen(ModalScreen):
         """Show the Databricks auth section only for Databricks models.
 
         Auth-method-specific visibility:
+        - u2m:     show OAuth app client_id/secret group; hide API key field
         - PAT:     show API key field (the PAT is entered there)
-        - M2M:     show client-id/secret group; hide API key field
+        - M2M:     show service-principal client-id/secret group; hide API key
         - profile: show profile-name group; hide API key field
-        - u2m:     hide API key field (tokens come from `databricks auth login`)
         """
         try:
             is_db = self._is_databricks_selected()
@@ -524,7 +531,7 @@ class SettingsScreen(ModalScreen):
 
             method = self.databricks_auth_method_select.value
             if isinstance(method, NoSelection) or not method:
-                method = "pat"
+                method = "u2m"
 
             if not is_db:
                 # Non-Databricks provider: restore API key field visibility
@@ -533,6 +540,7 @@ class SettingsScreen(ModalScreen):
 
             self.databricks_profile_group.display = method == "profile"
             self.databricks_m2m_group.display = method == "m2m"
+            self.databricks_u2m_group.display = method == "u2m"
 
             # API key is only needed for PAT auth. For M2M, profile, and U2M
             # the connector uses other credential sources — showing the field
@@ -783,6 +791,8 @@ class SettingsScreen(ModalScreen):
         db_profile_name = self.databricks_profile_input.value or None
         db_client_id = self.databricks_client_id_input.value or None
         db_client_secret = self.databricks_client_secret_input.value or None
+        db_u2m_client_id = self.databricks_u2m_client_id_input.value or None
+        db_u2m_client_secret = self.databricks_u2m_client_secret_input.value or None
         db_host = self.databricks_host_input.value or None
         # AI Gateway host not collected from TUI; read from env var via backend.
         db_ai_gateway_host = None
@@ -804,6 +814,8 @@ class SettingsScreen(ModalScreen):
             databricks_profile_name=db_profile_name,
             databricks_client_id=db_client_id,
             databricks_client_secret_input=db_client_secret,
+            databricks_u2m_client_id=db_u2m_client_id,
+            databricks_u2m_client_secret_input=db_u2m_client_secret,
             databricks_host=db_host,
             databricks_ai_gateway_host=db_ai_gateway_host,
         )
