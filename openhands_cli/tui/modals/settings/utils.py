@@ -66,6 +66,8 @@ class SettingsFormData(BaseModel):
     # U2M OAuth app credentials (separate from M2M service principal)
     databricks_u2m_client_id: str | None = None
     databricks_u2m_client_secret_input: str | None = None
+    # Optional redirect URI — defaults to http://localhost:8080/callback
+    databricks_u2m_redirect_uri: str | None = None
     # Databricks workspace URL (e.g. ``https://adb-123.cloud.databricks.com``).
     # Canonical, required field. Used for:
     #   * FM invocations (the SDK derives ``<host>/ai-gateway/<route>`` from
@@ -106,6 +108,7 @@ class SettingsFormData(BaseModel):
         "databricks_client_secret_input",
         "databricks_u2m_client_id",
         "databricks_u2m_client_secret_input",
+        "databricks_u2m_redirect_uri",
         "databricks_host",
         "databricks_ai_gateway_host",
     )
@@ -387,6 +390,9 @@ def _build_databricks_settings(
             SecretStr(data.databricks_u2m_client_secret_input)
             if auth_method == "u2m" and data.databricks_u2m_client_secret_input
             else None
+        ),
+        databricks_u2m_redirect_uri=(
+            data.databricks_u2m_redirect_uri if auth_method == "u2m" else None
         ),
         timeout=timeout_val,
         max_input_tokens=max_in,

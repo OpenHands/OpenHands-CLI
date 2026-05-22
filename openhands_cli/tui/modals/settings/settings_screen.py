@@ -100,6 +100,9 @@ class SettingsScreen(ModalScreen):
     databricks_u2m_client_secret_input: getters.query_one[Input] = getters.query_one(
         "#databricks_u2m_client_secret_input"
     )
+    databricks_u2m_redirect_uri_input: getters.query_one[Input] = getters.query_one(
+        "#databricks_u2m_redirect_uri_input"
+    )
     databricks_host_input: getters.query_one[Input] = getters.query_one(
         "#databricks_host_input"
     )
@@ -229,6 +232,7 @@ class SettingsScreen(ModalScreen):
             )
             self.databricks_u2m_client_id_input.value = ""
             self.databricks_u2m_client_secret_input.value = ""
+            self.databricks_u2m_redirect_uri_input.value = ""
             self.databricks_host_input.value = ""
             self.databricks_host_input.placeholder = (
                 "https://adb-1234567890.cloud.databricks.com"
@@ -327,6 +331,7 @@ class SettingsScreen(ModalScreen):
             db_client_id = getattr(llm, "databricks_client_id", None)
             db_client_secret = getattr(llm, "databricks_client_secret", None)
             db_u2m_client_id = getattr(llm, "databricks_u2m_client_id", None)
+            db_u2m_redirect_uri = getattr(llm, "databricks_u2m_redirect_uri", None)
             db_host = getattr(llm, "databricks_host", None) or llm.base_url
             # Note: databricks_ai_gateway_host is set via env var only;
             # not surfaced in the TUI. Still passed through SettingsFormData
@@ -356,6 +361,7 @@ class SettingsScreen(ModalScreen):
             self.databricks_profile_input.value = db_profile or ""
             self.databricks_client_id_input.value = db_client_id or ""
             self.databricks_u2m_client_id_input.value = db_u2m_client_id or ""
+            self.databricks_u2m_redirect_uri_input.value = db_u2m_redirect_uri or ""
             self.databricks_host_input.value = db_host or ""
             if db_client_secret:
                 # Never echo the secret; show a masked hint so the user can
@@ -505,18 +511,21 @@ class SettingsScreen(ModalScreen):
     def _build_u2m_hint(self) -> str:
         """Return a U2M OAuth app setup hint."""
         host = ""
+        redirect_uri = ""
         try:
             host = self.databricks_host_input.value.strip()
+            redirect_uri = self.databricks_u2m_redirect_uri_input.value.strip()
         except Exception:
             pass
         host_display = host or "<workspace-host>"
+        redirect_display = redirect_uri or "http://localhost:8080/callback"
         return (
             "Browser OAuth (U2M): enter your OAuth App Client ID above, then click Save.\n"
             "After Save, a browser window will open for you to authenticate.\n\n"
             "To create an OAuth app:\n"
             "  1. Go to: https://accounts.cloud.databricks.com/settings/app-connections\n"
             "  2. Add connection → OAuth → set redirect URI:\n"
-            "        http://localhost:8080/callback\n"
+            f"        {redirect_display}\n"
             "  3. Copy the Client ID here. Client Secret is optional (public app).\n\n"
             f"Workspace host: {host_display}"
         )
@@ -733,16 +742,17 @@ class SettingsScreen(ModalScreen):
             self._clear_message()
         if event.input.id == "custom_model_input":
             self._update_databricks_visibility()
-        if event.input.id == "databricks_host_input":
-            host = event.value.strip()
-            # Refresh the U2M hint immediately so the login command always
-            # shows the current workspace host as the user types.
+        if event.input.id in ("databricks_host_input", "databricks_u2m_redirect_uri_input"):
+            # Refresh the U2M hint immediately so it always reflects the
+            # current workspace host and redirect URI as the user types.
             try:
                 method = self.databricks_auth_method_select.value
                 if str(method) == "u2m":
                     self.databricks_auth_method_help.update(self._build_u2m_hint())
             except Exception:
                 pass
+        if event.input.id == "databricks_host_input":
+            host = event.value.strip()
             # Re-discover models once the host looks like a complete URL.
             # Avoid firing on every keystroke — only when the value ends
             # with a TLD-like suffix (e.g. ".com", ".net", ".io").
@@ -802,6 +812,7 @@ class SettingsScreen(ModalScreen):
         db_client_secret = self.databricks_client_secret_input.value or None
         db_u2m_client_id = self.databricks_u2m_client_id_input.value or None
         db_u2m_client_secret = self.databricks_u2m_client_secret_input.value or None
+        db_u2m_redirect_uri = self.databricks_u2m_redirect_uri_input.value or None
         db_host = self.databricks_host_input.value or None
         # AI Gateway host not collected from TUI; read from env var via backend.
         db_ai_gateway_host = None
@@ -825,6 +836,7 @@ class SettingsScreen(ModalScreen):
             databricks_client_secret_input=db_client_secret,
             databricks_u2m_client_id=db_u2m_client_id,
             databricks_u2m_client_secret_input=db_u2m_client_secret,
+            databricks_u2m_redirect_uri=db_u2m_redirect_uri,
             databricks_host=db_host,
             databricks_ai_gateway_host=db_ai_gateway_host,
         )
@@ -890,6 +902,7 @@ class SettingsScreen(ModalScreen):
                 host=form_data.databricks_host,
                 client_id=form_data.databricks_u2m_client_id,
                 client_secret=form_data.databricks_u2m_client_secret_input or None,
+                redirect_uri=form_data.databricks_u2m_redirect_uri or None,
             )
             return  # _run_u2m_pkce_flow will dismiss after tokens are obtained
 
@@ -915,6 +928,7 @@ class SettingsScreen(ModalScreen):
         host: str,
         client_id: str,
         client_secret: str | None,
+        redirect_uri: str | None = None,
     ) -> None:
         """Start the browser PKCE flow as a background Textual worker.
 
@@ -922,12 +936,23 @@ class SettingsScreen(ModalScreen):
         access token and dismisses the settings screen. On failure, shows an
         error message so the user can try again.
         """
+        # Parse the port from a custom redirect URI, or default to 8080.
+        callback_port = 8080
+        if redirect_uri:
+            try:
+                from urllib.parse import urlparse as _urlparse
+                parsed = _urlparse(redirect_uri)
+                if parsed.port:
+                    callback_port = parsed.port
+            except Exception:
+                pass
         try:
             tokens = await run_browser_pkce_flow(
                 host,
                 client_id,
                 client_secret=client_secret,
-                callback_port=8080,
+                redirect_uri=redirect_uri,
+                callback_port=callback_port,
                 timeout_s=120.0,
             )
         except TimeoutError as exc:

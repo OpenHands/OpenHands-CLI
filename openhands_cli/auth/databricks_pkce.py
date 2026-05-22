@@ -134,6 +134,7 @@ async def run_browser_pkce_flow(
     client_id: str,
     *,
     client_secret: str | None = None,
+    redirect_uri: str | None = None,
     callback_port: int = 8080,
     timeout_s: float = 120.0,
 ) -> dict[str, Any]:
@@ -147,8 +148,11 @@ async def run_browser_pkce_flow(
         host: Databricks workspace URL (e.g. ``https://adb-xxx.cloud.databricks.com``).
         client_id: OAuth App client ID from Databricks account console.
         client_secret: Required only for confidential (non-public) OAuth apps.
-        callback_port: Local port to listen on (must match the redirect URI
-            registered in the Databricks OAuth app).
+        redirect_uri: Full callback URL registered in the Databricks OAuth app.
+            Defaults to ``http://localhost:<callback_port>/callback``.
+            When provided, ``callback_port`` is derived from the URI's port.
+        callback_port: Local port to listen on. Overridden by the port in
+            ``redirect_uri`` when that argument is supplied.
         timeout_s: Seconds to wait for the browser callback before timing out.
 
     Returns:
@@ -160,7 +164,18 @@ async def run_browser_pkce_flow(
         RuntimeError: If the OAuth server returns an error parameter.
         httpx.HTTPStatusError: If the token exchange fails.
     """
-    redirect_uri = f"http://localhost:{callback_port}/callback"
+    if redirect_uri:
+        # Extract port from the caller-supplied URI so the local server
+        # listens on the right port.
+        try:
+            parsed_port = urlparse(redirect_uri).port
+            if parsed_port:
+                callback_port = parsed_port
+        except Exception:
+            pass
+    else:
+        redirect_uri = f"http://localhost:{callback_port}/callback"
+
     verifier, challenge = _generate_pkce()
     state = secrets.token_urlsafe(16)
     authorize_url = _build_authorize_url(host, client_id, redirect_uri, state, challenge)

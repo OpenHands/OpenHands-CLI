@@ -227,6 +227,21 @@ class SettingsTab(Container):
                             "client secret (confidential app). Leave blank otherwise.",
                             classes="form_help",
                         )
+                        yield Label(
+                            "OAuth Redirect URI (optional):",
+                            classes="form_label",
+                        )
+                        yield Input(
+                            placeholder="http://localhost:8080/callback",
+                            id="databricks_u2m_redirect_uri_input",
+                            classes="form_input",
+                        )
+                        yield Static(
+                            "Defaults to http://localhost:8080/callback. "
+                            "Must exactly match the redirect URI registered in "
+                            "Databricks account console → App connections.",
+                            classes="form_help",
+                        )
 
                 # API Key (shown in both modes; hidden for Databricks non-PAT auth)
                 with Container(id="api_key_group", classes="form_group"):
