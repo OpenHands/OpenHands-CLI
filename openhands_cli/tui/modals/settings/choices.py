@@ -38,6 +38,28 @@ _VALID_LITELLM_PROVIDERS: set[str] = {
 _DATABRICKS_CACHE_TTL_S = 300
 _databricks_cache: dict[str, tuple[float, list[tuple[str, str]]]] = {}
 
+# Static curated list shown immediately (no network call required).
+# Ordered by family: Claude first (best for agentic tasks), then GPT, Gemini,
+# Llama, DBRX. Users see the full live list after authenticating.
+DATABRICKS_STATIC_MODELS: list[tuple[str, str]] = [
+    # Claude
+    ("databricks-claude-sonnet-4-5",          "databricks/databricks-claude-sonnet-4-5"),
+    ("databricks-claude-opus-4-5",            "databricks/databricks-claude-opus-4-5"),
+    ("databricks-claude-3-7-sonnet",          "databricks/databricks-claude-3-7-sonnet"),
+    ("databricks-claude-3-5-sonnet",          "databricks/databricks-claude-3-5-sonnet"),
+    # GPT / OpenAI
+    ("databricks-gpt-4o",                     "databricks/databricks-gpt-4o"),
+    ("databricks-gpt-4o-mini",                "databricks/databricks-gpt-4o-mini"),
+    # Gemini
+    ("databricks-gemini-2-0-flash",           "databricks/databricks-gemini-2-0-flash"),
+    ("databricks-gemini-1-5-pro",             "databricks/databricks-gemini-1-5-pro"),
+    # Meta Llama
+    ("databricks-meta-llama-3-3-70b-instruct","databricks/databricks-meta-llama-3-3-70b-instruct"),
+    ("databricks-meta-llama-3-1-405b-instruct","databricks/databricks-meta-llama-3-1-405b-instruct"),
+    # DBRX
+    ("databricks-dbrx-instruct",              "databricks/databricks-dbrx-instruct"),
+]
+
 
 def _resolve_databricks_credentials():
     """Best-effort credential resolution for dynamic discovery. Returns None on failure.
@@ -237,16 +259,19 @@ def get_model_options(provider: str, credentials=None) -> list[tuple[str, str]]:
     For most providers, returns the static VERIFIED + UNVERIFIED union (original
     order preserved, duplicates removed).
 
-    For ``databricks``, returns the **two-tier picker** (curated + live-discovered
-    AI Gateway endpoints). Falls back to the static ``VERIFIED_MODELS["databricks"]``
-    list if credentials aren't available or discovery fails — the picker is
-    never empty.
+    For ``databricks``:
+    - When ``credentials`` is None (no auth yet): returns ``DATABRICKS_STATIC_MODELS``
+      immediately with zero network I/O so the picker is always populated.
+    - When ``credentials`` is supplied (post-auth refresh): fetches the full live
+      list from the workspace AI Gateway and merges it with the curated set.
     """
     if provider == "databricks":
+        if credentials is None:
+            return DATABRICKS_STATIC_MODELS
         dynamic = _get_databricks_model_options(credentials=credentials)
         if dynamic:
             return dynamic
-        # Fall through to the static list below as a last-resort curated view.
+        # Fall through to the static list if live discovery failed.
 
     models = VERIFIED_MODELS.get(
         provider, []

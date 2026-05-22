@@ -132,6 +132,9 @@ class SettingsScreen(ModalScreen):
         self.current_agent = self.agent_store.load_from_disk()
         self.is_advanced_mode = False
         self.message_widget = None
+        # Suppress on_input_changed side-effects while _load_current_settings
+        # is programmatically populating form fields.
+        self._loading_settings = False
         self.is_initial_setup = SettingsScreen.is_initial_setup_required(
             env_overrides_enabled=env_overrides_enabled
         )
@@ -244,6 +247,14 @@ class SettingsScreen(ModalScreen):
         """Load current settings into the form."""
         if not self.current_agent:
             return
+        self._loading_settings = True
+        try:
+            self._load_current_settings_inner()
+        finally:
+            self._loading_settings = False
+
+    def _load_current_settings_inner(self) -> None:
+        """Inner implementation — called only while _loading_settings is True."""
 
         llm = self.current_agent.llm
 
@@ -431,44 +442,40 @@ class SettingsScreen(ModalScreen):
 
         self._reset_max_tokens_if_model_changed()
 
-    def _refresh_databricks_models(self) -> None:
-        """Re-discover models using the credentials currently shown in the form.
+    def _refresh_databricks_models_with_token(
+        self, host: str, access_token: str
+    ) -> None:
+        """Refresh the model dropdown after successful authentication.
 
-        Called when the user changes auth method or types a workspace host so
-        that the model dropdown immediately reflects the full endpoint list for
-        that specific workspace / auth combination — rather than relying on the
-        DEFAULT profile that was resolved at provider-select time.
-
-        Silently no-ops when Databricks is not selected, when the host field is
-        empty, or when credential resolution fails (e.g. no cached tokens yet).
+        Runs in a background thread so the TUI stays responsive during the
+        AI Gateway discovery call. Called from the PKCE worker after tokens
+        are obtained, or from a PAT save when an api_key is available.
         """
         try:
-            if not self._is_databricks_selected():
-                return
+            from openhands.sdk.llm.providers.databricks import (
+                AuthStrategy,
+                DatabricksCredentials,
+            )
+        except ImportError:
+            return
 
-            host = self.databricks_host_input.value.strip()
-            if not host:
-                return
+        host_snap = host.strip().rstrip("/")
+        token_snap = access_token
 
-            method = self.databricks_auth_method_select.value
-            if isinstance(method, NoSelection) or not method:
-                method = "pat"
-
-            extra: dict = {}
-            if method == "pat":
-                extra["api_key"] = self.api_key_input.value.strip()
-            elif method == "profile":
-                extra["profile"] = (
-                    self.databricks_profile_input.value.strip() or "DEFAULT"
+        def _discover() -> None:
+            try:
+                creds = DatabricksCredentials(
+                    host=host_snap,
+                    get_token=lambda t=token_snap: t,
+                    auth_method=AuthStrategy.PAT,
                 )
+                self.call_from_thread(
+                    self._update_model_options, "databricks", credentials=creds
+                )
+            except Exception:
+                pass
 
-            creds = _resolve_credentials_for_host(host, str(method), **extra)
-            if creds is None:
-                return  # can't resolve → keep existing list
-
-            self._update_model_options("databricks", credentials=creds)
-        except Exception:
-            pass
+        self.run_worker(_discover, thread=True, exclusive=True)
 
     def _update_advanced_visibility(self) -> None:
         """Show/hide basic and advanced sections based on mode."""
@@ -728,11 +735,14 @@ class SettingsScreen(ModalScreen):
             self._clear_message()
         elif event.select.id == "databricks_auth_method_select":
             self._update_databricks_visibility()
-            self._refresh_databricks_models()
             self._clear_message()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle input field changes."""
+        # Skip side-effects while _load_current_settings is running so
+        # programmatic field population doesn't trigger network calls.
+        if self._loading_settings:
+            return
         if event.input.id in ["custom_model_input", "base_url_input"]:
             self._reset_max_tokens_if_model_changed()
             self._update_field_dependencies()
@@ -751,13 +761,10 @@ class SettingsScreen(ModalScreen):
                     self.databricks_auth_method_help.update(self._build_u2m_hint())
             except Exception:
                 pass
-        if event.input.id == "databricks_host_input":
-            host = event.value.strip()
-            # Re-discover models once the host looks like a complete URL.
-            # Avoid firing on every keystroke — only when the value ends
-            # with a TLD-like suffix (e.g. ".com", ".net", ".io").
-            if host.startswith("https://") and "." in host.split("://", 1)[-1]:
-                self._refresh_databricks_models()
+        # Model discovery is intentionally NOT triggered on host / auth-method
+        # changes. The static curated list is shown until the user authenticates,
+        # at which point _refresh_databricks_models_with_token() is called with
+        # the real access token (see _run_u2m_pkce_flow / PAT save path).
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button presses."""
@@ -981,10 +988,16 @@ class SettingsScreen(ModalScreen):
             )
             return
 
-        self._show_message("Signed in to Databricks successfully!", is_error=False)
+        # Now that we have a real token, refresh the model dropdown with the
+        # full live list from this workspace.
+        self._refresh_databricks_models_with_token(host, tokens["access_token"])
+
+        self._show_message(
+            "Signed in to Databricks! Model list refreshed.", is_error=False
+        )
         import asyncio as _asyncio
 
-        await _asyncio.sleep(1.0)
+        await _asyncio.sleep(1.5)
         for callback in self.on_settings_saved:
             try:
                 callback()
