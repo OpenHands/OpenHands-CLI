@@ -8,7 +8,7 @@ LLM provider, model, API keys, and advanced options.
 from collections.abc import Callable
 from typing import TYPE_CHECKING, ClassVar, Literal, cast
 
-from textual import getters
+from textual import getters, work
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
@@ -24,6 +24,7 @@ from textual.widgets import (
 from textual.widgets._select import NoSelection
 
 from openhands.sdk import LLMSummarizingCondenser
+from openhands_cli.auth.databricks_pkce import run_browser_pkce_flow
 from openhands_cli.stores import AgentStore, CliSettings, CriticSettings
 from openhands_cli.tui.modals.settings.choices import (
     _resolve_credentials_for_host,
@@ -503,17 +504,21 @@ class SettingsScreen(ModalScreen):
 
     def _build_u2m_hint(self) -> str:
         """Return a U2M OAuth app setup hint."""
+        host = ""
+        try:
+            host = self.databricks_host_input.value.strip()
+        except Exception:
+            pass
+        host_display = host or "<workspace-host>"
         return (
-            "Browser OAuth (U2M): enter your OAuth App Client ID above.\n"
-            "Create the app at: https://accounts.cloud.databricks.com/settings/app-connections\n"
-            "Register redirect URI: http://localhost:8080/callback\n"
-            "Not the M2M service principal client ID — that is a separate app.\n\n"
-            "Legacy CLI path: if you prefer, run this instead:\n"
-            "\n"
-            f"  Step 1:  pip install databricks-sdk\n"
-            f"  Step 2:  {login_cmd}\n"
-            "\n"
-            "Then come back here and press Save."
+            "Browser OAuth (U2M): enter your OAuth App Client ID above, then click Save.\n"
+            "After Save, a browser window will open for you to authenticate.\n\n"
+            "To create an OAuth app:\n"
+            "  1. Go to: https://accounts.cloud.databricks.com/settings/app-connections\n"
+            "  2. Add connection → OAuth → set redirect URI:\n"
+            "        http://localhost:8080/callback\n"
+            "  3. Copy the Client ID here. Client Secret is optional (public app).\n\n"
+            f"Workspace host: {host_display}"
         )
 
     def _update_databricks_visibility(self) -> None:
@@ -546,6 +551,10 @@ class SettingsScreen(ModalScreen):
             # the connector uses other credential sources — showing the field
             # would confuse users and the validator would wrongly block saving.
             self.api_key_group.display = method == "pat"
+
+            # Always keep the workspace host field editable regardless of
+            # auth method; it is never gated on any other form field.
+            self.databricks_host_input.disabled = False
 
             # Update the inline hint below the auth method dropdown.
             # U2M hint is built dynamically so it shows the exact login command
@@ -865,6 +874,25 @@ class SettingsScreen(ModalScreen):
                 )
                 return
 
+        # If Databricks U2M with a client_id is configured, trigger the browser
+        # PKCE flow before dismissing so the access token is stored immediately.
+        if (
+            form_data.databricks_auth_method == "u2m"
+            and form_data.databricks_u2m_client_id
+            and form_data.databricks_host
+        ):
+            self._show_message(
+                "Opening browser for Databricks authentication… "
+                "(waiting up to 120 s for sign-in)",
+                is_error=False,
+            )
+            self._run_u2m_pkce_flow(
+                host=form_data.databricks_host,
+                client_id=form_data.databricks_u2m_client_id,
+                client_secret=form_data.databricks_u2m_client_secret_input or None,
+            )
+            return  # _run_u2m_pkce_flow will dismiss after tokens are obtained
+
         message = (
             "Settings saved successfully! Welcome to OpenHands CLI!"
             if self.is_initial_setup
@@ -879,6 +907,64 @@ class SettingsScreen(ModalScreen):
                 self.notify(
                     f"Error occurred when saving settings: {e}", severity="error"
                 )
+        self.dismiss(True)
+
+    @work(exclusive=True, thread=False)
+    async def _run_u2m_pkce_flow(
+        self,
+        host: str,
+        client_id: str,
+        client_secret: str | None,
+    ) -> None:
+        """Start the browser PKCE flow as a background Textual worker.
+
+        On success, updates the saved agent's ``api_key`` with the obtained
+        access token and dismisses the settings screen. On failure, shows an
+        error message so the user can try again.
+        """
+        try:
+            tokens = await run_browser_pkce_flow(
+                host,
+                client_id,
+                client_secret=client_secret,
+                callback_port=8080,
+                timeout_s=120.0,
+            )
+        except TimeoutError as exc:
+            self._show_message(str(exc), is_error=True)
+            return
+        except Exception as exc:
+            self._show_message(f"Authentication failed: {exc}", is_error=True)
+            return
+
+        # Update the saved agent's api_key with the short-lived access token.
+        # The access token works as a PAT for the duration of its lifetime
+        # (~1 h). The user can re-authenticate via Settings when it expires.
+        try:
+            from pydantic import SecretStr as _SecretStr
+
+            saved_agent = self.agent_store.load_from_disk()
+            if saved_agent is not None:
+                updated_llm = saved_agent.llm.model_copy(
+                    update={"api_key": _SecretStr(tokens["access_token"])}
+                )
+                updated_agent = saved_agent.model_copy(update={"llm": updated_llm})
+                self.agent_store.save(updated_agent)
+        except Exception as exc:
+            self._show_message(
+                f"Signed in but failed to persist token: {exc}", is_error=True
+            )
+            return
+
+        self._show_message("Signed in to Databricks successfully!", is_error=False)
+        import asyncio as _asyncio
+
+        await _asyncio.sleep(1.0)
+        for callback in self.on_settings_saved:
+            try:
+                callback()
+            except Exception:
+                pass
         self.dismiss(True)
 
     def _update_critic_settings(self, critic_settings: CriticSettings) -> None:
