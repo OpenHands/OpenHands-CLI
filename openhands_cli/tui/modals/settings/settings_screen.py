@@ -988,16 +988,33 @@ class SettingsScreen(ModalScreen):
             self._show_message(f"Authentication failed: {exc}", is_error=True)
             return
 
-        # Update the saved agent's api_key with the short-lived access token.
-        # The access token works as a PAT for the duration of its lifetime
-        # (~1 h). The user can re-authenticate via Settings when it expires.
+        # Rebuild DatabricksLLM with the access token as api_key.
+        #
+        # IMPORTANT: model_copy() does NOT re-run Pydantic model validators,
+        # so the private _db_credentials / _db_client attributes would be
+        # stale (built without a token). We must call create_llm() so that
+        # _init_databricks() runs fresh with api_key set → PAT auth path.
+        # Using model_copy would leave the old (no-token) credentials
+        # in _db_client, causing the base LLM to fall through to litellm.
         try:
             from pydantic import SecretStr as _SecretStr
+            from openhands.sdk import create_llm as _create_llm
 
             saved_agent = self.agent_store.load_from_disk()
             if saved_agent is not None:
-                updated_llm = saved_agent.llm.model_copy(
-                    update={"api_key": _SecretStr(tokens["access_token"])}
+                old_llm = saved_agent.llm
+                # Extract only the fields needed — avoids re-serialising
+                # potentially-redacted secret fields from model_dump().
+                databricks_host = (
+                    getattr(old_llm, "databricks_host", None)
+                    or getattr(old_llm, "base_url", None)
+                    or ""
+                )
+                updated_llm = _create_llm(
+                    model=old_llm.model,
+                    databricks_host=databricks_host,
+                    api_key=_SecretStr(tokens["access_token"]),
+                    usage_id="agent",
                 )
                 updated_agent = saved_agent.model_copy(update={"llm": updated_llm})
                 self.agent_store.save(updated_agent)
