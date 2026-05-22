@@ -388,6 +388,25 @@ class SettingsScreen(ModalScreen):
         self._update_databricks_visibility()
         self._update_field_dependencies()
 
+        # If we already have a saved Databricks token (from PAT or a previous
+        # PKCE sign-in), trigger a background model refresh so the live
+        # workspace list appears while the user is in settings — no blocking.
+        try:
+            is_databricks = getattr(self.current_agent.llm, "provider", None) == "databricks"
+            saved_host = getattr(self.current_agent.llm, "databricks_host", None) or \
+                         getattr(self.current_agent.llm, "base_url", None)
+            saved_key = self.current_agent.llm.api_key
+            if is_databricks and saved_host and saved_key:
+                token_val = (
+                    saved_key.get_secret_value()
+                    if hasattr(saved_key, "get_secret_value")
+                    else str(saved_key)
+                )
+                if token_val:
+                    self._refresh_databricks_models_with_token(saved_host, token_val)
+        except Exception:
+            pass
+
     def _get_selected_model_identity(self) -> tuple[str | None, str | None]:
         """Return the currently selected model/base_url identity from the form."""
         mode = self.mode_select.value if hasattr(self.mode_select, "value") else None
@@ -475,7 +494,7 @@ class SettingsScreen(ModalScreen):
             except Exception:
                 pass
 
-        self.run_worker(_discover, thread=True, exclusive=True)
+        self.run_worker(_discover, thread=True)
 
     def _update_advanced_visibility(self) -> None:
         """Show/hide basic and advanced sections based on mode."""
@@ -901,8 +920,8 @@ class SettingsScreen(ModalScreen):
             and form_data.databricks_host
         ):
             self._show_message(
-                "Opening browser for Databricks authentication… "
-                "(waiting up to 120 s for sign-in)",
+                "Settings saved. Opening browser for Databricks sign-in… "
+                "(waiting up to 120 s — no need to reselect model after)",
                 is_error=False,
             )
             self._run_u2m_pkce_flow(
@@ -988,22 +1007,25 @@ class SettingsScreen(ModalScreen):
             )
             return
 
-        # Now that we have a real token, refresh the model dropdown with the
-        # full live list from this workspace.
-        self._refresh_databricks_models_with_token(host, tokens["access_token"])
-
-        self._show_message(
-            "Signed in to Databricks! Model list refreshed.", is_error=False
-        )
+        self._show_message("Signed in to Databricks successfully!", is_error=False)
         import asyncio as _asyncio
 
-        await _asyncio.sleep(1.5)
+        await _asyncio.sleep(1.0)
+
+        # Invoke callbacks then close — dismiss must happen before kicking off
+        # the background model-refresh so no exclusive-worker conflict arises.
         for callback in self.on_settings_saved:
             try:
                 callback()
             except Exception:
                 pass
         self.dismiss(True)
+
+        # Refresh the model dropdown in the background AFTER dismissing so the
+        # live workspace list is ready if the user re-opens settings.
+        # Uses thread=True but NOT exclusive=True to avoid cancelling the PKCE
+        # worker that is still unwinding at this point.
+        self._refresh_databricks_models_with_token(host, tokens["access_token"])
 
     def _update_critic_settings(self, critic_settings: CriticSettings) -> None:
         """Update reactive critic settings in ConversationContainer.
