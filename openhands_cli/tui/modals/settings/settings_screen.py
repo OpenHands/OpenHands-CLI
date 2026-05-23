@@ -73,9 +73,6 @@ class SettingsScreen(ModalScreen):
     databricks_auth_section: getters.query_one[Container] = getters.query_one(
         "#databricks_auth_section"
     )
-    databricks_profile_group: getters.query_one[Container] = getters.query_one(
-        "#databricks_profile_group"
-    )
     databricks_m2m_group: getters.query_one[Container] = getters.query_one(
         "#databricks_m2m_group"
     )
@@ -84,9 +81,6 @@ class SettingsScreen(ModalScreen):
     )
     databricks_auth_method_select: getters.query_one[Select] = getters.query_one(
         "#databricks_auth_method_select"
-    )
-    databricks_profile_input: getters.query_one[Input] = getters.query_one(
-        "#databricks_profile_input"
     )
     databricks_client_id_input: getters.query_one[Input] = getters.query_one(
         "#databricks_client_id_input"
@@ -227,7 +221,6 @@ class SettingsScreen(ModalScreen):
         self.max_size_input.value = ""
         try:
             self.databricks_auth_method_select.value = "u2m"
-            self.databricks_profile_input.value = ""
             self.databricks_client_id_input.value = ""
             self.databricks_client_secret_input.value = ""
             self.databricks_client_secret_input.placeholder = (
@@ -338,38 +331,21 @@ class SettingsScreen(ModalScreen):
 
         # Databricks-specific fields: infer the method from the existing LLM.
         try:
-            db_profile = getattr(llm, "databricks_profile", None)
             db_client_id = getattr(llm, "databricks_client_id", None)
             db_client_secret = getattr(llm, "databricks_client_secret", None)
             db_u2m_client_id = getattr(llm, "databricks_u2m_client_id", None)
             db_u2m_redirect_uri = getattr(llm, "databricks_u2m_redirect_uri", None)
             db_host = getattr(llm, "databricks_host", None) or llm.base_url
-            # Note: databricks_ai_gateway_host is set via env var only;
-            # not surfaced in the TUI. Still passed through SettingsFormData
-            # so the backend can read it if set.
-            db_ai_gateway_host = getattr(llm, "databricks_ai_gateway_host", None) or ""
-            api_key_set = bool(llm.api_key)
 
-            # Prefer the explicit auth_method exposed by the SDK (set at
-            # construction by the credential resolver). Fall back to a
-            # heuristic for older agents that pre-date that property.
+            # Resolve auth method — only u2m and m2m are supported.
             sdk_auth_method = getattr(llm, "auth_method", None)
-            if sdk_auth_method in {"pat", "m2m", "profile", "u2m"}:
-                method = sdk_auth_method
-            elif sdk_auth_method == "unified":
-                method = "u2m"
-            elif db_client_id:
+            if sdk_auth_method == "m2m" or db_client_id:
                 method = "m2m"
-            elif db_profile:
-                method = "profile"
-            elif api_key_set:
-                method = "pat"
             else:
-                # Default to U2M (browser OAuth) — recommended ISV auth
+                # Default / fallback: U2M (browser OAuth)
                 method = "u2m"
 
             self.databricks_auth_method_select.value = method
-            self.databricks_profile_input.value = db_profile or ""
             self.databricks_client_id_input.value = db_client_id or ""
             self.databricks_u2m_client_id_input.value = db_u2m_client_id or ""
             self.databricks_u2m_redirect_uri_input.value = db_u2m_redirect_uri or ""
@@ -543,15 +519,9 @@ class SettingsScreen(ModalScreen):
             return False
 
     _AUTH_METHOD_HINTS: dict[str, str] = {
-        "pat": "Paste your Databricks Personal Access Token in the API Key field below.",
         "m2m": (
             "Service Principal auth: provide the Client ID and Secret below. "
             "No extra packages required."
-        ),
-        "profile": (
-            "CLI Profile auth: enter the profile name from ~/.databrickscfg below.\n"
-            "Requires:  pip install databricks-sdk\n"
-            "Verify profiles with: databricks auth profiles"
         ),
         # u2m hint is built dynamically in _build_u2m_hint() using the host field.
     }
@@ -581,11 +551,9 @@ class SettingsScreen(ModalScreen):
     def _update_databricks_visibility(self) -> None:
         """Show the Databricks auth section only for Databricks models.
 
-        Auth-method-specific visibility:
-        - u2m:     show OAuth app client_id/secret group; hide API key field
-        - PAT:     show API key field (the PAT is entered there)
-        - M2M:     show service-principal client-id/secret group; hide API key
-        - profile: show profile-name group; hide API key field
+        Only two auth methods are supported:
+        - u2m:  show OAuth app client_id/secret group; hide API key field
+        - m2m:  show service-principal client-id/secret group; hide API key
         """
         try:
             is_db = self._is_databricks_selected()
@@ -596,30 +564,18 @@ class SettingsScreen(ModalScreen):
                 method = "u2m"
 
             if not is_db:
-                # Non-Databricks provider: restore API key field visibility
                 self.api_key_group.display = True
                 return
 
-            self.databricks_profile_group.display = method == "profile"
             self.databricks_m2m_group.display = method == "m2m"
             self.databricks_u2m_group.display = method == "u2m"
 
-            # API key is only needed for PAT auth. For M2M, profile, and U2M
-            # the connector uses other credential sources — showing the field
-            # would confuse users and the validator would wrongly block saving.
-            self.api_key_group.display = method == "pat"
+            # Neither U2M nor M2M use the generic API key field.
+            self.api_key_group.display = False
 
-            # Always keep the workspace host field editable regardless of
-            # auth method; it is never gated on any other form field.
             self.databricks_host_input.disabled = False
 
-            # Update the inline hint below the auth method dropdown.
-            # U2M hint is built dynamically so it shows the exact login command
-            # for whatever host the user has typed into the host field.
-            if method == "u2m":
-                hint = self._build_u2m_hint()
-            else:
-                hint = self._AUTH_METHOD_HINTS.get(str(method), "")
+            hint = self._build_u2m_hint() if method == "u2m" else self._AUTH_METHOD_HINTS.get(str(method), "")
             self.databricks_auth_method_help.update(hint)
         except Exception:
             pass
@@ -633,20 +589,10 @@ class SettingsScreen(ModalScreen):
         )
 
     def _databricks_auth_needs_api_key(self) -> bool:
-        """Return True only when Databricks + PAT auth is active.
-
-        For M2M, profile, and U2M auth the API key field is hidden, so we
-        must not gate downstream fields (Memory Condensation, etc.) on it.
-        """
-        try:
-            if not self._is_databricks_selected():
-                return False
-            method = self.databricks_auth_method_select.value
-            if isinstance(method, NoSelection) or not method:
-                method = "pat"
-            return method == "pat"
-        except Exception:
-            return False
+        """Databricks never needs the generic API key field (U2M and M2M both
+        use their own credential fields). Always returns False so downstream
+        field-dependency checks don't gate on an invisible API key input."""
+        return False
 
     def _update_field_dependencies(self) -> None:
         """Update field enabled/disabled state based on dependency chain."""
@@ -858,7 +804,6 @@ class SettingsScreen(ModalScreen):
             if isinstance(db_auth_method_value, NoSelection)
             else str(db_auth_method_value)
         )
-        db_profile_name = self.databricks_profile_input.value or None
         db_client_id = self.databricks_client_id_input.value or None
         db_client_secret = self.databricks_client_secret_input.value or None
         db_u2m_client_id = self.databricks_u2m_client_id_input.value or None
@@ -882,7 +827,6 @@ class SettingsScreen(ModalScreen):
             max_tokens=self.max_tokens_input.value,
             max_size=self.max_size_input.value,
             databricks_auth_method=db_auth_method,  # type: ignore[arg-type]
-            databricks_profile_name=db_profile_name,
             databricks_client_id=db_client_id,
             databricks_client_secret_input=db_client_secret,
             databricks_u2m_client_id=db_u2m_client_id,

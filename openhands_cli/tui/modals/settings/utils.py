@@ -18,18 +18,19 @@ from openhands_cli.utils import (
 agent_store = AgentStore()
 
 
-DatabricksAuthMethod = Literal["pat", "m2m", "profile", "u2m"]
+DatabricksAuthMethod = Literal["m2m", "u2m"]
 """Auth strategies surfaced in the CLI settings TUI.
 
 Maps to the SDK's ``AuthStrategy`` enum as follows:
 
-- ``pat``     → SDK PAT (Personal Access Token via ``api_key``)
 - ``m2m``     → SDK M2M (service-principal client_id + client_secret)
-- ``profile`` → SDK PROFILE (named ``[profile]`` in ``~/.databrickscfg``)
-- ``u2m``     → SDK UNIFIED (relies on the databricks-sdk auth chain;
-                 picks up cached browser-OAuth tokens written by
-                 ``databricks auth login``). The CLI itself does NOT run an
-                 inline browser PKCE flow — that's web-only — so "U2M" here
+- ``u2m``     → Browser OAuth PKCE flow with a custom OAuth App.
+                 The CLI runs an inline PKCE flow and stores the token as
+                 ``stored_u2m_tokens``. The user authenticates once; the
+                 refresh_token is used to renew access automatically.
+
+                 Previously supported but removed: ``pat`` (Personal Access
+                 Token) and ``profile`` (~/.databrickscfg) — use M2M or U2M.
                  is shorthand for "log in once with the Databricks CLI,
                  then this option uses those creds for every call."
 
@@ -60,7 +61,6 @@ class SettingsFormData(BaseModel):
     # databricks/* model). See ``DatabricksAuthMethod`` above for what each
     # value maps to in the SDK.
     databricks_auth_method: DatabricksAuthMethod | None = None
-    databricks_profile_name: str | None = None
     databricks_client_id: str | None = None
     databricks_client_secret_input: str | None = None
     # U2M OAuth app credentials (separate from M2M service principal)
@@ -103,7 +103,6 @@ class SettingsFormData(BaseModel):
         "custom_model",
         "base_url",
         "api_key_input",
-        "databricks_profile_name",
         "databricks_client_id",
         "databricks_client_secret_input",
         "databricks_u2m_client_id",
@@ -218,14 +217,14 @@ class SettingsFormData(BaseModel):
         )
         is_databricks = is_databricks_basic or is_databricks_adv
 
-        # Default auth method for Databricks is PAT; ignore the field for
+        # Default auth method for Databricks is U2M; ignore the field for
         # non-Databricks providers so it doesn't leak into non-db code paths.
         if not is_databricks:
             self.databricks_auth_method = None
             self.databricks_host = None
             self.databricks_ai_gateway_host = None
         elif self.databricks_auth_method is None:
-            self.databricks_auth_method = "pat"
+            self.databricks_auth_method = "u2m"
 
         # Workspace host is the canonical, required URL. The SDK derives the
         # AI Gateway base from it (``<host>/ai-gateway/<route>``) for every
@@ -240,22 +239,9 @@ class SettingsFormData(BaseModel):
                 self.databricks_host = getattr(
                     existing_agent.llm, "databricks_host", None
                 ) or getattr(existing_agent.llm, "base_url", None)
-            # PAT users with a dedicated gateway can skip the workspace URL
-            # if they explicitly provided a gateway host; everyone else
-            # needs the workspace host.
-            if not self.databricks_host and not self.databricks_ai_gateway_host:
+            if not self.databricks_host:
                 raise Exception(
                     "Databricks Workspace Host is required (e.g., "
-                    "https://adb-1234.cloud.databricks.com)"
-                )
-            if not self.databricks_host and self.databricks_auth_method in (
-                "m2m",
-                "profile",
-                "u2m",
-            ):
-                raise Exception(
-                    "Databricks Workspace Host is required for "
-                    f"{self.databricks_auth_method.upper()} auth (e.g., "
                     "https://adb-1234.cloud.databricks.com)"
                 )
 
@@ -267,11 +253,6 @@ class SettingsFormData(BaseModel):
                 self.databricks_ai_gateway_host = getattr(
                     existing_agent.llm, "databricks_ai_gateway_host", None
                 )
-
-        # Normalise the Databricks profile name — empty → DEFAULT.
-        if is_databricks and self.databricks_auth_method == "profile":
-            if not self.databricks_profile_name:
-                self.databricks_profile_name = "DEFAULT"
 
         # M2M needs both halves of the client credential.
         if is_databricks and self.databricks_auth_method == "m2m":
@@ -362,17 +343,11 @@ def _build_databricks_settings(
 
     ns = SimpleNamespace(
         model=full_model,
-        api_key=api_key_val if (auth_method == "pat" and api_key_val) else None,
-        # ``base_url`` mirrors the workspace URL so any generic LLM-metadata
-        # logging still has a URL to surface. The SDK ignores it for FM
-        # routing — that's driven by ``databricks_host`` (default) or
-        # ``databricks_ai_gateway_host`` (override).
+        # Neither U2M nor M2M use the generic api_key field.
+        api_key=None,
         base_url=workspace_host or ai_gateway_host,
         databricks_host=workspace_host,
         databricks_ai_gateway_host=ai_gateway_host,
-        databricks_profile=(
-            data.databricks_profile_name if auth_method == "profile" else None
-        ),
         databricks_client_id=(
             data.databricks_client_id if auth_method == "m2m" else None
         ),
@@ -381,8 +356,6 @@ def _build_databricks_settings(
             if auth_method == "m2m" and data.databricks_client_secret_input
             else None
         ),
-        # U2M OAuth app credentials (stored alongside the LLM config so the web
-        # /prepare endpoint can read them from user settings if needed).
         databricks_u2m_client_id=(
             data.databricks_u2m_client_id if auth_method == "u2m" else None
         ),
@@ -397,10 +370,6 @@ def _build_databricks_settings(
         timeout=timeout_val,
         max_input_tokens=max_in,
     )
-    # ``u2m`` deliberately leaves api_key / profile / client_id / secret as
-    # None so the SDK's UNIFIED auth chain (``databricks-sdk``) is the only
-    # remaining path — it picks up whatever ``databricks auth login`` cached
-    # for this host. No extra namespace fields needed for that path.
     return ns
 
 

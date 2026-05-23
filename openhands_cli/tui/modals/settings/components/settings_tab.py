@@ -159,9 +159,7 @@ class SettingsTab(Container):
                                     "Browser OAuth (U2M — recommended)",
                                     "u2m",
                                 ),
-                                ("Personal Access Token (PAT)", "pat"),
                                 ("Service Principal (M2M)", "m2m"),
-                                ("CLI Profile (~/.databrickscfg)", "profile"),
                             ],
                             value="u2m",
                             id="databricks_auth_method_select",
@@ -172,14 +170,6 @@ class SettingsTab(Container):
                             "U2M: enter your OAuth App Client ID below, then sign in.",
                             id="databricks_auth_method_help",
                             classes="form_help",
-                        )
-
-                    with Container(id="databricks_profile_group", classes="form_group"):
-                        yield Label("Databricks Profile Name:", classes="form_label")
-                        yield Input(
-                            placeholder="DEFAULT",
-                            id="databricks_profile_input",
-                            classes="form_input",
                         )
 
                     with Container(id="databricks_m2m_group", classes="form_group"):
