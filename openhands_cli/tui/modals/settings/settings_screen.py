@@ -388,20 +388,27 @@ class SettingsScreen(ModalScreen):
         self._update_databricks_visibility()
         self._update_field_dependencies()
 
-        # If we already have a saved Databricks token (from PAT or a previous
-        # PKCE sign-in), trigger a background model refresh so the live
-        # workspace list appears while the user is in settings — no blocking.
+        # If we already have a saved Databricks token (from PAT, M2M, or a
+        # previous PKCE sign-in), trigger a background model refresh so the
+        # live workspace list appears while the user is in settings.
         try:
             is_databricks = getattr(self.current_agent.llm, "provider", None) == "databricks"
             saved_host = getattr(self.current_agent.llm, "databricks_host", None) or \
                          getattr(self.current_agent.llm, "base_url", None)
-            saved_key = self.current_agent.llm.api_key
-            if is_databricks and saved_host and saved_key:
-                token_val = (
-                    saved_key.get_secret_value()
-                    if hasattr(saved_key, "get_secret_value")
-                    else str(saved_key)
-                )
+            if is_databricks and saved_host:
+                token_val: str | None = None
+                # Priority: stored_u2m_tokens (from PKCE) > api_key (PAT/M2M)
+                stored = getattr(self.current_agent.llm, "stored_u2m_tokens", None)
+                if stored and getattr(stored, "access_token", None):
+                    token_val = stored.access_token
+                else:
+                    saved_key = self.current_agent.llm.api_key
+                    if saved_key:
+                        token_val = (
+                            saved_key.get_secret_value()
+                            if hasattr(saved_key, "get_secret_value")
+                            else str(saved_key)
+                        )
                 if token_val:
                     self._refresh_databricks_models_with_token(saved_host, token_val)
         except Exception:
@@ -1003,34 +1010,51 @@ class SettingsScreen(ModalScreen):
             self._show_message(f"Authentication failed: {exc}", is_error=True)
             return
 
-        # Rebuild DatabricksLLM with the access token as api_key.
+        # Rebuild DatabricksLLM using stored_u2m_tokens (not api_key).
         #
         # IMPORTANT: model_copy() does NOT re-run Pydantic model validators,
         # so the private _db_credentials / _db_client attributes would be
-        # stale (built without a token). We must call create_llm() so that
-        # _init_databricks() runs fresh with api_key set → PAT auth path.
-        # Using model_copy would leave the old (no-token) credentials
-        # in _db_client, causing the base LLM to fall through to litellm.
+        # stale. We call create_llm() so _init_databricks() runs fresh.
+        #
+        # We use stored_u2m_tokens (not api_key) so that:
+        # - resolve_credentials picks the U2M path → auth_method=="u2m"
+        # - Settings re-opens showing the U2M form (not PAT)
+        # - The U2M client ID / redirect URI are preserved for future re-auth
         try:
-            from pydantic import SecretStr as _SecretStr
             from openhands.sdk import create_llm as _create_llm
+            from openhands.sdk.llm.providers.databricks.models import (
+                StoredU2MTokens as _StoredU2MTokens,
+            )
 
             saved_agent = self.agent_store.load_from_disk()
             if saved_agent is not None:
                 old_llm = saved_agent.llm
-                # Extract only the fields needed — avoids re-serialising
-                # potentially-redacted secret fields from model_dump().
                 databricks_host = (
                     getattr(old_llm, "databricks_host", None)
                     or getattr(old_llm, "base_url", None)
                     or ""
                 )
-                updated_llm = _create_llm(
+                # Preserve U2M app credentials so settings re-open correctly.
+                # databricks_u2m_client_id / _redirect_uri are now fields on
+                # DatabricksLLM (added in the SDK), so they round-trip through
+                # model_dump / model_validate_json with the agent settings.
+                u2m_client_id = getattr(old_llm, "databricks_u2m_client_id", None)
+                u2m_redirect_uri = getattr(old_llm, "databricks_u2m_redirect_uri", None)
+
+                create_kwargs: dict = dict(
                     model=old_llm.model,
                     databricks_host=databricks_host,
-                    api_key=_SecretStr(tokens["access_token"]),
+                    stored_u2m_tokens=_StoredU2MTokens(
+                        access_token=tokens["access_token"],
+                        refresh_token=tokens.get("refresh_token", ""),
+                    ),
                     usage_id="agent",
                 )
+                if u2m_client_id:
+                    create_kwargs["databricks_u2m_client_id"] = u2m_client_id
+                if u2m_redirect_uri:
+                    create_kwargs["databricks_u2m_redirect_uri"] = u2m_redirect_uri
+                updated_llm = _create_llm(**create_kwargs)
                 updated_agent = saved_agent.model_copy(update={"llm": updated_llm})
                 self.agent_store.save(updated_agent)
         except Exception as exc:
