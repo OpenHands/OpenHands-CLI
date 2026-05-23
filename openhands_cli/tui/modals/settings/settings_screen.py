@@ -628,6 +628,12 @@ class SettingsScreen(ModalScreen):
 
             if not is_db:
                 self.api_key_group.display = True
+                # Hide Databricks-only controls for non-Databricks providers.
+                try:
+                    self.refresh_models_button.display = False
+                    self.model_refresh_status.display = False
+                except Exception:
+                    pass
                 return
 
             self.databricks_m2m_group.display = method == "m2m"
@@ -638,7 +644,7 @@ class SettingsScreen(ModalScreen):
 
             self.databricks_host_input.disabled = False
 
-            # Enable the refresh button only when Databricks is selected and
+            # Show the refresh button for Databricks; enable it only when
             # credentials are already saved (so there's a token to use).
             has_saved_creds = bool(
                 self.current_agent
@@ -648,7 +654,9 @@ class SettingsScreen(ModalScreen):
                     or self.current_agent.llm.api_key
                 )
             )
-            self.refresh_models_button.disabled = not (is_db and has_saved_creds)
+            self.refresh_models_button.display = True
+            self.model_refresh_status.display = True
+            self.refresh_models_button.disabled = not has_saved_creds
 
             hint = self._build_u2m_hint() if method == "u2m" else self._AUTH_METHOD_HINTS.get(str(method), "")
             self.databricks_auth_method_help.update(hint)
