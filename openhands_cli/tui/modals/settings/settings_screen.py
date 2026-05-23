@@ -466,35 +466,50 @@ class SettingsScreen(ModalScreen):
     ) -> None:
         """Refresh the model dropdown after successful authentication.
 
-        Runs in a background thread so the TUI stays responsive during the
-        AI Gateway discovery call. Called from the PKCE worker after tokens
+        The full get_picker_entries() network call happens inside the background
+        thread. Only the final list is posted to the main thread so the TUI
+        stays responsive throughout. Called from the PKCE worker after tokens
         are obtained, or from a PAT save when an api_key is available.
         """
-        try:
-            from openhands.sdk.llm.providers.databricks import (
-                AuthStrategy,
-                DatabricksCredentials,
-            )
-        except ImportError:
-            return
-
         host_snap = host.strip().rstrip("/")
         token_snap = access_token
 
         def _discover() -> None:
             try:
+                from openhands.sdk.llm.providers.databricks import (
+                    AuthStrategy,
+                    DatabricksCredentials,
+                )
                 creds = DatabricksCredentials(
                     host=host_snap,
                     get_token=lambda t=token_snap: t,
                     auth_method=AuthStrategy.PAT,
                 )
-                self.call_from_thread(
-                    self._update_model_options, "databricks", credentials=creds
-                )
+                # Heavy network call stays in the background thread.
+                model_options = get_model_options("databricks", credentials=creds)
+                if model_options:
+                    # Only the lightweight UI update runs on the main thread.
+                    self.call_from_thread(self._apply_model_options, model_options)
             except Exception:
                 pass
 
         self.run_worker(_discover, thread=True)
+
+    def _apply_model_options(self, model_options: list[tuple[str, str]]) -> None:
+        """Apply a pre-fetched model list to the dropdown (main-thread only).
+
+        Preserves the current selection so the user's choice survives a refresh.
+        """
+        try:
+            current_selection = self.model_select.value
+            self.model_select.set_options(model_options)
+            if current_selection and not isinstance(current_selection, NoSelection):
+                try:
+                    self.model_select.value = current_selection
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     def _update_advanced_visibility(self) -> None:
         """Show/hide basic and advanced sections based on mode."""
