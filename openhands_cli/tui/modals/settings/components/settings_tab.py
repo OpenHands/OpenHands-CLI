@@ -187,6 +187,7 @@ class SettingsTab(Container):
                         yield Label("Databricks Client ID:", classes="form_label")
                         yield Input(
                             placeholder="service-principal client id",
+                            password=True,
                             id="databricks_client_id_input",
                             classes="form_input",
                         )
@@ -205,6 +206,7 @@ class SettingsTab(Container):
                         )
                         yield Input(
                             placeholder="e.g. 12345678-abcd-...",
+                            password=True,
                             id="databricks_u2m_client_id_input",
                             classes="form_input",
                         )

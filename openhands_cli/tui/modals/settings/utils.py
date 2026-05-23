@@ -325,6 +325,7 @@ def _build_databricks_settings(
     api_key_val: str | None,
     timeout_val: int | None,
     max_in: int | None,
+    existing_agent: "Agent | None" = None,
 ) -> SimpleNamespace:
     """Assemble the Databricks-specific ``SimpleNamespace`` consumed by the
     ``kwargs_from_settings`` bridge.
@@ -334,12 +335,25 @@ def _build_databricks_settings(
     new field. The returned namespace always carries the fields for the
     currently selected auth method and leaves the unused ones as ``None``
     so the bridge drops them.
+
+    ``existing_agent`` is used to carry forward auth state that lives
+    outside the visible form fields:
+    - ``stored_u2m_tokens`` — U2M session survives a model switch so the
+      user doesn't need to re-authenticate just because they picked a
+      different model.
     """
     auth_method = data.databricks_auth_method or "pat"
     # ``resolve_data_fields`` guarantees ``databricks_host`` is set (or, for
     # PAT-only flows, ``databricks_ai_gateway_host`` is set as the override).
     workspace_host = data.databricks_host or None
     ai_gateway_host = data.databricks_ai_gateway_host or None
+
+    # Carry U2M session tokens forward when the user only changed the model.
+    # The PKCE flow in settings_screen.py bypasses save_settings entirely and
+    # writes tokens directly, so this path never overwrites a fresh token.
+    existing_u2m_tokens = None
+    if auth_method == "u2m" and existing_agent is not None:
+        existing_u2m_tokens = getattr(existing_agent.llm, "stored_u2m_tokens", None)
 
     ns = SimpleNamespace(
         model=full_model,
@@ -367,6 +381,11 @@ def _build_databricks_settings(
         databricks_u2m_redirect_uri=(
             data.databricks_u2m_redirect_uri if auth_method == "u2m" else None
         ),
+        # Carry the existing U2M session forward — avoids re-auth on model switch.
+        stored_u2m_tokens=existing_u2m_tokens,
+        # Use the metadata probe so the client gets authoritative api_types
+        # from /api/2.0/serving-endpoints/{name} instead of name-pattern guessing.
+        databricks_metadata_probe=True,
         timeout=timeout_val,
         max_input_tokens=max_in,
     )
@@ -413,6 +432,7 @@ def save_settings(
                 api_key_val=api_key_val,
                 timeout_val=timeout_val,
                 max_in=max_in,
+                existing_agent=existing_agent,
             )
             llm = create_llm(**kwargs_from_settings(db_settings, usage_id="agent"))
             condenser_llm = create_llm(
@@ -462,6 +482,7 @@ def save_settings(
                     api_key_val=api_key_val,
                     timeout_val=timeout_val,
                     max_in=max_in,
+                    existing_agent=existing_agent,
                 )
                 condenser_llm = create_llm(
                     **kwargs_from_settings(db_settings, usage_id="condenser")
