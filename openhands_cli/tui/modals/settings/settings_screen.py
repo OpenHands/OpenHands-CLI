@@ -352,8 +352,14 @@ class SettingsScreen(ModalScreen):
             db_host = getattr(llm, "databricks_host", None) or llm.base_url
 
             # Resolve auth method — only u2m and m2m are supported.
+            # Priority: active U2M session (stored tokens) > explicit M2M
+            # client_id > fallback U2M.  Checking stored_u2m_tokens first
+            # prevents stale M2M fields from overriding an active U2M session.
             sdk_auth_method = getattr(llm, "auth_method", None)
-            if sdk_auth_method == "m2m" or db_client_id:
+            stored_tokens = getattr(llm, "stored_u2m_tokens", None)
+            if stored_tokens:
+                method = "u2m"
+            elif sdk_auth_method == "m2m" or db_client_id:
                 method = "m2m"
             else:
                 # Default / fallback: U2M (browser OAuth)
@@ -362,13 +368,20 @@ class SettingsScreen(ModalScreen):
             self.databricks_auth_method_select.value = method
             self.databricks_client_id_input.value = db_client_id or ""
             self.databricks_u2m_client_id_input.value = db_u2m_client_id or ""
-            self.databricks_u2m_client_secret_input.value = db_u2m_client_secret or ""
             self.databricks_u2m_redirect_uri_input.value = db_u2m_redirect_uri or ""
             self.databricks_host_input.value = db_host or ""
             if db_client_secret:
                 # Never echo the secret; show a masked hint so the user can
                 # leave blank to keep it.
                 self.databricks_client_secret_input.placeholder = (
+                    "(leave empty to keep existing secret)"
+                )
+            # Never echo the U2M client secret into the input field — it
+            # would be visible in the TUI.  Show a placeholder instead and
+            # rely on resolve_data_fields carry-over to propagate the value.
+            self.databricks_u2m_client_secret_input.value = ""
+            if db_u2m_client_secret:
+                self.databricks_u2m_client_secret_input.placeholder = (
                     "(leave empty to keep existing secret)"
                 )
         except Exception:
@@ -987,10 +1000,23 @@ class SettingsScreen(ModalScreen):
                 "(waiting up to 120 s — no need to reselect model after)",
                 is_error=False,
             )
+            # When the U2M secret field is blank (masked placeholder in use),
+            # fall back to the carried-over value from resolve_data_fields,
+            # which populates form_data.databricks_u2m_client_secret_input.
+            # If that is also absent, read the secret from the current agent.
+            pkce_secret = form_data.databricks_u2m_client_secret_input or None
+            if pkce_secret is None and self.current_agent is not None:
+                _raw = getattr(
+                    self.current_agent.llm, "databricks_u2m_client_secret", None
+                )
+                if isinstance(_raw, SecretStr):
+                    pkce_secret = _raw.get_secret_value()
+                elif isinstance(_raw, str):
+                    pkce_secret = _raw
             self._run_u2m_pkce_flow(
                 host=form_data.databricks_host,
                 client_id=form_data.databricks_u2m_client_id,
-                client_secret=form_data.databricks_u2m_client_secret_input or None,
+                client_secret=pkce_secret,
                 redirect_uri=form_data.databricks_u2m_redirect_uri or None,
             )
             return  # _run_u2m_pkce_flow will dismiss after tokens are obtained
@@ -1076,11 +1102,21 @@ class SettingsScreen(ModalScreen):
                     or ""
                 )
                 # Preserve U2M app credentials so settings re-open correctly.
-                # databricks_u2m_client_id / _redirect_uri are now fields on
-                # DatabricksLLM (added in the SDK), so they round-trip through
-                # model_dump / model_validate_json with the agent settings.
+                # All three credential fields (client_id, redirect_uri,
+                # client_secret) are fields on DatabricksLLM and round-trip
+                # through model_dump / model_validate_json with the agent.
                 u2m_client_id = getattr(old_llm, "databricks_u2m_client_id", None)
                 u2m_redirect_uri = getattr(old_llm, "databricks_u2m_redirect_uri", None)
+                _raw_u2m_secret = getattr(old_llm, "databricks_u2m_client_secret", None)
+                u2m_client_secret: str | None = (
+                    _raw_u2m_secret.get_secret_value()
+                    if isinstance(_raw_u2m_secret, SecretStr)
+                    else _raw_u2m_secret
+                )
+                # Fall back to the caller-supplied secret (the form field value)
+                # in case the persisted agent doesn't have it yet.
+                if not u2m_client_secret:
+                    u2m_client_secret = client_secret
 
                 create_kwargs: dict = dict(
                     model=old_llm.model,
@@ -1098,8 +1134,38 @@ class SettingsScreen(ModalScreen):
                     create_kwargs["databricks_u2m_client_id"] = u2m_client_id
                 if u2m_redirect_uri:
                     create_kwargs["databricks_u2m_redirect_uri"] = u2m_redirect_uri
+                if u2m_client_secret:
+                    create_kwargs["databricks_u2m_client_secret"] = SecretStr(
+                        u2m_client_secret
+                    )
                 updated_llm = _create_llm(**create_kwargs)
-                updated_agent = saved_agent.model_copy(update={"llm": updated_llm})
+
+                # Also rebuild the condenser LLM so it uses the new tokens.
+                # If the condenser uses a different (non-Databricks) LLM we
+                # leave it untouched; only rebuild when it's the same provider.
+                updated_condenser = saved_agent.condenser
+                existing_condenser = saved_agent.condenser
+                if existing_condenser is not None:
+                    try:
+                        from openhands.sdk.condenser import LLMSummarizingCondenser as _LSC
+
+                        if isinstance(existing_condenser, _LSC):
+                            condenser_llm_provider = getattr(
+                                existing_condenser.llm, "provider", None
+                            )
+                            if condenser_llm_provider == "databricks":
+                                condenser_updated_llm = _create_llm(
+                                    **{**create_kwargs, "usage_id": "condenser"}
+                                )
+                                updated_condenser = existing_condenser.model_copy(
+                                    update={"llm": condenser_updated_llm}
+                                )
+                    except Exception:
+                        pass  # Non-critical; leave condenser unchanged
+
+                updated_agent = saved_agent.model_copy(
+                    update={"llm": updated_llm, "condenser": updated_condenser}
+                )
                 self.agent_store.save(updated_agent)
         except Exception as exc:
             self._show_message(

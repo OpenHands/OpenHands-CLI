@@ -273,10 +273,25 @@ class SettingsFormData(BaseModel):
                     "(M2M) auth"
                 )
 
-        # U2M: carry the client secret from the existing agent if not re-entered.
-        # The field is optional (public apps have no secret), so no error if absent.
-        if is_databricks and self.databricks_auth_method == "u2m":
-            if not self.databricks_u2m_client_secret_input and existing_agent:
+        # U2M: carry credentials from the existing agent if not re-entered.
+        # All three fields (client_id, redirect_uri, client_secret) are optional,
+        # so no error if absent — public PKCE apps omit client_secret entirely.
+        if is_databricks and self.databricks_auth_method == "u2m" and existing_agent:
+            if not self.databricks_u2m_client_id:
+                existing_id = getattr(
+                    existing_agent.llm, "databricks_u2m_client_id", None
+                )
+                if existing_id:
+                    self.databricks_u2m_client_id = existing_id
+
+            if not self.databricks_u2m_redirect_uri:
+                existing_uri = getattr(
+                    existing_agent.llm, "databricks_u2m_redirect_uri", None
+                )
+                if existing_uri:
+                    self.databricks_u2m_redirect_uri = existing_uri
+
+            if not self.databricks_u2m_client_secret_input:
                 existing = getattr(
                     existing_agent.llm, "databricks_u2m_client_secret", None
                 )
