@@ -740,7 +740,10 @@ class SettingsScreen(ModalScreen):
     def _show_message(self, message: str, is_error: bool = False) -> None:
         """Show a message to the user."""
         if self.message_widget:
-            self.message_widget.update(message)
+            # Escape Rich/Textual markup characters (e.g. { } from Pydantic
+            # validation errors) so they render as literal text, not markup.
+            from rich.markup import escape as _escape
+            self.message_widget.update(_escape(message))
             self.message_widget.add_class(
                 "error_message" if is_error else "success_message"
             )
@@ -1047,6 +1050,9 @@ class SettingsScreen(ModalScreen):
                     stored_u2m_tokens=_StoredU2MTokens(
                         access_token=tokens["access_token"],
                         refresh_token=tokens.get("refresh_token", ""),
+                        expires_at=tokens.get("expires_at", 0.0),
+                        client_id=tokens.get("client_id", u2m_client_id or ""),
+                        host=tokens.get("host", databricks_host),
                     ),
                     usage_id="agent",
                 )
