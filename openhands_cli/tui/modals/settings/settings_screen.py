@@ -73,6 +73,12 @@ class SettingsScreen(ModalScreen):
     databricks_auth_section: getters.query_one[Container] = getters.query_one(
         "#databricks_auth_section"
     )
+    refresh_models_button: getters.query_one[Button] = getters.query_one(
+        "#refresh_models_button"
+    )
+    model_refresh_status: getters.query_one[Static] = getters.query_one(
+        "#model_refresh_status"
+    )
     databricks_m2m_group: getters.query_one[Container] = getters.query_one(
         "#databricks_m2m_group"
     )
@@ -451,11 +457,17 @@ class SettingsScreen(ModalScreen):
 
         The full get_picker_entries() network call happens inside the background
         thread. Only the final list is posted to the main thread so the TUI
-        stays responsive throughout. Called from the PKCE worker after tokens
-        are obtained, or from a PAT save when an api_key is available.
+        stays responsive throughout.
         """
         host_snap = host.strip().rstrip("/")
         token_snap = access_token
+
+        # Show loading state on the button/status if the screen is mounted.
+        try:
+            self.refresh_models_button.disabled = True
+            self.model_refresh_status.update("⟳ Loading models from workspace…")
+        except Exception:
+            pass
 
         def _discover() -> None:
             try:
@@ -471,18 +483,24 @@ class SettingsScreen(ModalScreen):
                 # Heavy network call stays in the background thread.
                 model_options = get_model_options("databricks", credentials=creds)
                 if model_options:
-                    # Only the lightweight UI update runs on the main thread.
                     self.call_from_thread(self._apply_model_options, model_options)
-            except Exception:
-                pass
+                else:
+                    self.call_from_thread(
+                        self._set_refresh_status,
+                        "Could not load workspace models — showing defaults.",
+                        True,
+                    )
+            except Exception as exc:
+                self.call_from_thread(
+                    self._set_refresh_status,
+                    f"Model refresh failed: {exc}",
+                    True,
+                )
 
         self.run_worker(_discover, thread=True)
 
     def _apply_model_options(self, model_options: list[tuple[str, str]]) -> None:
-        """Apply a pre-fetched model list to the dropdown (main-thread only).
-
-        Preserves the current selection so the user's choice survives a refresh.
-        """
+        """Apply a pre-fetched model list to the dropdown (main-thread only)."""
         try:
             current_selection = self.model_select.value
             self.model_select.set_options(model_options)
@@ -491,8 +509,53 @@ class SettingsScreen(ModalScreen):
                     self.model_select.value = current_selection
                 except Exception:
                     pass
+            count = len(model_options)
+            self._set_refresh_status(f"✓ {count} models loaded from workspace.", False)
+        except Exception:
+            self._set_refresh_status("Model list updated.", False)
+
+    def _set_refresh_status(self, message: str, is_error: bool) -> None:
+        """Update the refresh status label and re-enable the button."""
+        try:
+            from rich.markup import escape as _escape
+            self.model_refresh_status.update(_escape(message))
+            self.refresh_models_button.disabled = not self._is_databricks_selected()
         except Exception:
             pass
+
+    def _trigger_manual_model_refresh(self) -> None:
+        """Explicit refresh — reads saved credentials from the current agent."""
+        try:
+            if not self._is_databricks_selected() or not self.current_agent:
+                return
+            llm = self.current_agent.llm
+            saved_host = (
+                getattr(llm, "databricks_host", None)
+                or getattr(llm, "base_url", None)
+                or ""
+            )
+            if not saved_host:
+                self._set_refresh_status("Workspace Host is required to refresh models.", True)
+                return
+            # Try stored_u2m_tokens first, then api_key.
+            stored = getattr(llm, "stored_u2m_tokens", None)
+            token_val: str | None = None
+            if stored and getattr(stored, "access_token", None):
+                token_val = stored.access_token
+            elif llm.api_key:
+                token_val = (
+                    llm.api_key.get_secret_value()
+                    if hasattr(llm.api_key, "get_secret_value")
+                    else str(llm.api_key)
+                )
+            if not token_val:
+                self._set_refresh_status(
+                    "No credentials saved — sign in first, then refresh.", True
+                )
+                return
+            self._refresh_databricks_models_with_token(saved_host, token_val)
+        except Exception as exc:
+            self._set_refresh_status(f"Refresh error: {exc}", True)
 
     def _update_advanced_visibility(self) -> None:
         """Show/hide basic and advanced sections based on mode."""
@@ -574,6 +637,18 @@ class SettingsScreen(ModalScreen):
             self.api_key_group.display = False
 
             self.databricks_host_input.disabled = False
+
+            # Enable the refresh button only when Databricks is selected and
+            # credentials are already saved (so there's a token to use).
+            has_saved_creds = bool(
+                self.current_agent
+                and self.current_agent.llm
+                and (
+                    getattr(self.current_agent.llm, "stored_u2m_tokens", None)
+                    or self.current_agent.llm.api_key
+                )
+            )
+            self.refresh_models_button.disabled = not (is_db and has_saved_creds)
 
             hint = self._build_u2m_hint() if method == "u2m" else self._AUTH_METHOD_HINTS.get(str(method), "")
             self.databricks_auth_method_help.update(hint)
@@ -762,6 +837,8 @@ class SettingsScreen(ModalScreen):
             self._save_settings()
         elif event.button.id == "cancel_button":
             self._handle_cancel()
+        elif event.button.id == "refresh_models_button":
+            self._trigger_manual_model_refresh()
 
     def action_cancel(self) -> None:
         """Handle escape key to cancel settings."""

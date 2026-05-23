@@ -2,7 +2,7 @@
 
 from textual.app import ComposeResult
 from textual.containers import Container, VerticalScroll
-from textual.widgets import Input, Label, Select, Static
+from textual.widgets import Button, Input, Label, Select, Static
 
 from openhands_cli.tui.modals.settings.choices import (
     provider_options,
@@ -58,6 +58,17 @@ class SettingsTab(Container):
                             type_to_search=True,
                             # Disabled until provider is selected
                             disabled=True,
+                        )
+                        yield Button(
+                            "↻ Refresh model list",
+                            id="refresh_models_button",
+                            classes="form_button_secondary",
+                            disabled=True,
+                        )
+                        yield Static(
+                            "",
+                            id="model_refresh_status",
+                            classes="form_help",
                         )
 
                 # Advanced Settings Section (shown in Advanced mode)
