@@ -40,24 +40,35 @@ _databricks_cache: dict[str, tuple[float, list[tuple[str, str]]]] = {}
 
 # Static curated list shown immediately (no network call required).
 # Ordered by family: Claude first (best for agentic tasks), then GPT, Gemini,
-# Llama, DBRX. Users see the full live list after authenticating.
+# Llama. Users see the full live list after authenticating.
+#
+# Last sync with Databricks FMAPI docs: May 2026.
 DATABRICKS_STATIC_MODELS: list[tuple[str, str]] = [
-    # Claude
-    ("databricks-claude-sonnet-4-5",          "databricks/databricks-claude-sonnet-4-5"),
-    ("databricks-claude-opus-4-5",            "databricks/databricks-claude-opus-4-5"),
-    ("databricks-claude-3-7-sonnet",          "databricks/databricks-claude-3-7-sonnet"),
-    ("databricks-claude-3-5-sonnet",          "databricks/databricks-claude-3-5-sonnet"),
-    # GPT / OpenAI
-    ("databricks-gpt-4o",                     "databricks/databricks-gpt-4o"),
-    ("databricks-gpt-4o-mini",                "databricks/databricks-gpt-4o-mini"),
-    # Gemini
-    ("databricks-gemini-2-0-flash",           "databricks/databricks-gemini-2-0-flash"),
-    ("databricks-gemini-1-5-pro",             "databricks/databricks-gemini-1-5-pro"),
-    # Meta Llama
-    ("databricks-meta-llama-3-3-70b-instruct","databricks/databricks-meta-llama-3-3-70b-instruct"),
-    ("databricks-meta-llama-3-1-405b-instruct","databricks/databricks-meta-llama-3-1-405b-instruct"),
-    # DBRX
-    ("databricks-dbrx-instruct",              "databricks/databricks-dbrx-instruct"),
+    # Claude (Anthropic Messages API)
+    ("databricks-claude-sonnet-4-6",           "databricks/databricks-claude-sonnet-4-6"),
+    ("databricks-claude-sonnet-4-5",           "databricks/databricks-claude-sonnet-4-5"),
+    ("databricks-claude-haiku-4-5",            "databricks/databricks-claude-haiku-4-5"),
+    ("databricks-claude-opus-4-7",             "databricks/databricks-claude-opus-4-7"),
+    ("databricks-claude-opus-4-5",             "databricks/databricks-claude-opus-4-5"),
+    ("databricks-claude-opus-4-1",             "databricks/databricks-claude-opus-4-1"),
+    # GPT-5 (OpenAI Responses API)
+    ("databricks-gpt-5-mini",                  "databricks/databricks-gpt-5-mini"),
+    ("databricks-gpt-5-5-pro",                 "databricks/databricks-gpt-5-5-pro"),
+    ("databricks-gpt-5-5",                     "databricks/databricks-gpt-5-5"),
+    ("databricks-gpt-5-4",                     "databricks/databricks-gpt-5-4"),
+    ("databricks-gpt-5-4-mini",                "databricks/databricks-gpt-5-4-mini"),
+    ("databricks-gpt-5",                       "databricks/databricks-gpt-5"),
+    ("databricks-gpt-oss-120b",                "databricks/databricks-gpt-oss-120b"),
+    # Gemini (Google generateContent)
+    ("databricks-gemini-3-5-flash",            "databricks/databricks-gemini-3-5-flash"),
+    ("databricks-gemini-3-flash",              "databricks/databricks-gemini-3-flash"),
+    ("databricks-gemini-3-pro",                "databricks/databricks-gemini-3-pro"),
+    ("databricks-gemini-2-5-flash",            "databricks/databricks-gemini-2-5-flash"),
+    ("databricks-gemini-2-5-pro",              "databricks/databricks-gemini-2-5-pro"),
+    # Meta Llama / Qwen (OpenAI Chat)
+    ("databricks-llama-4-maverick",            "databricks/databricks-llama-4-maverick"),
+    ("databricks-meta-llama-3-3-70b-instruct", "databricks/databricks-meta-llama-3-3-70b-instruct"),
+    ("databricks-qwen35-122b-a10b",            "databricks/databricks-qwen35-122b-a10b"),
 ]
 
 

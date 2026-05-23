@@ -106,17 +106,18 @@ CLOUD_MODELS: list[ModelRecommendation] = [
     ),
     # --- Databricks AI Gateway — tier-1 curated set (Claude / GPT / Gemini).
     # Mirrors CURATED_DATABRICKS_MODELS in the openhands-sdk Databricks
-    # provider. Llama / DBRX / legacy endpoints are intentionally omitted and
-    # instead surface via tier-2 dynamic discovery (list_chat_endpoints) once
-    # host + credentials are configured. One ``is_recommended`` pick per native
-    # API family — the fast-and-good default.
+    # provider. Llama / legacy endpoints surface via tier-2 dynamic discovery
+    # (list_chat_endpoints) once host + credentials are configured.
+    # One ``is_recommended`` pick per native API family.
+    # Last sync with Databricks FMAPI docs: May 2026.
+    #
     # Anthropic — native Anthropic Messages API
     ModelRecommendation(
-        name="databricks-claude-sonnet-4-5",
+        name="databricks-claude-sonnet-4-6",
         provider="databricks",
         is_recommended=True,
         use_cases=(
-            "Databricks-hosted Claude Sonnet 4.5 (native Anthropic Messages API)"
+            "Databricks-hosted Claude Sonnet 4.6 (native Anthropic Messages API)"
         ),
         notes=(
             "Set workspace URL as base URL or DATABRICKS_HOST; "
@@ -124,18 +125,26 @@ CLOUD_MODELS: list[ModelRecommendation] = [
         ),
     ),
     ModelRecommendation(
-        name="databricks-claude-opus-4-1",
+        name="databricks-claude-sonnet-4-5",
         provider="databricks",
-        use_cases=(
-            "Databricks-hosted Claude Opus 4.1 for long-context / reasoning tasks"
-        ),
+        use_cases="Databricks-hosted Claude Sonnet 4.5",
     ),
     ModelRecommendation(
         name="databricks-claude-haiku-4-5",
         provider="databricks",
-        use_cases="Databricks-hosted Claude Haiku 4.5 for fast / cheap inference",
+        use_cases="Databricks-hosted Claude Haiku 4.5 — fast / low-cost",
     ),
-    # OpenAI — native Responses API for gpt-5, OpenAI Chat for gpt-oss
+    ModelRecommendation(
+        name="databricks-claude-opus-4-7",
+        provider="databricks",
+        use_cases="Databricks-hosted Claude Opus 4.7 — long-context / reasoning",
+    ),
+    ModelRecommendation(
+        name="databricks-claude-opus-4-1",
+        provider="databricks",
+        use_cases="Databricks-hosted Claude Opus 4.1 — long-context / reasoning",
+    ),
+    # OpenAI — native Responses API (gpt-5 series), OpenAI Chat (gpt-oss)
     ModelRecommendation(
         name="databricks-gpt-5-mini",
         provider="databricks",
@@ -143,12 +152,19 @@ CLOUD_MODELS: list[ModelRecommendation] = [
         use_cases="Databricks-hosted GPT-5 mini (native OpenAI Responses API)",
     ),
     ModelRecommendation(
+        name="databricks-gpt-5-5-pro",
+        provider="databricks",
+        use_cases="Databricks-hosted GPT-5.5 Pro — flagship reasoning model",
+    ),
+    ModelRecommendation(
+        name="databricks-gpt-5-4",
+        provider="databricks",
+        use_cases="Databricks-hosted GPT-5.4 (native OpenAI Responses API)",
+    ),
+    ModelRecommendation(
         name="databricks-gpt-5",
         provider="databricks",
-        use_cases=(
-            "Databricks-hosted GPT-5 full "
-            "(native OpenAI Responses API; reasoning model)"
-        ),
+        use_cases="Databricks-hosted GPT-5 (native OpenAI Responses API)",
     ),
     ModelRecommendation(
         name="databricks-gpt-oss-120b",
@@ -157,15 +173,25 @@ CLOUD_MODELS: list[ModelRecommendation] = [
     ),
     # Google — native Gemini generateContent
     ModelRecommendation(
-        name="databricks-gemini-2-5-flash",
+        name="databricks-gemini-3-5-flash",
         provider="databricks",
         is_recommended=True,
-        use_cases="Databricks-hosted Gemini 2.5 Flash (native Google generateContent)",
+        use_cases="Databricks-hosted Gemini 3.5 Flash (native Google generateContent)",
+    ),
+    ModelRecommendation(
+        name="databricks-gemini-3-flash",
+        provider="databricks",
+        use_cases="Databricks-hosted Gemini 3 Flash",
+    ),
+    ModelRecommendation(
+        name="databricks-gemini-2-5-flash",
+        provider="databricks",
+        use_cases="Databricks-hosted Gemini 2.5 Flash",
     ),
     ModelRecommendation(
         name="databricks-gemini-2-5-pro",
         provider="databricks",
-        use_cases="Databricks-hosted Gemini 2.5 Pro for long-context reasoning",
+        use_cases="Databricks-hosted Gemini 2.5 Pro — long-context reasoning",
     ),
 ]
 
