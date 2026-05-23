@@ -8,6 +8,8 @@ LLM provider, model, API keys, and advanced options.
 from collections.abc import Callable
 from typing import TYPE_CHECKING, ClassVar, Literal, cast
 
+from pydantic import SecretStr
+
 from textual import getters, work
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
@@ -341,6 +343,12 @@ class SettingsScreen(ModalScreen):
             db_client_secret = getattr(llm, "databricks_client_secret", None)
             db_u2m_client_id = getattr(llm, "databricks_u2m_client_id", None)
             db_u2m_redirect_uri = getattr(llm, "databricks_u2m_redirect_uri", None)
+            _raw_u2m_secret = getattr(llm, "databricks_u2m_client_secret", None)
+            db_u2m_client_secret = (
+                _raw_u2m_secret.get_secret_value()
+                if isinstance(_raw_u2m_secret, SecretStr)
+                else _raw_u2m_secret
+            )
             db_host = getattr(llm, "databricks_host", None) or llm.base_url
 
             # Resolve auth method — only u2m and m2m are supported.
@@ -354,6 +362,7 @@ class SettingsScreen(ModalScreen):
             self.databricks_auth_method_select.value = method
             self.databricks_client_id_input.value = db_client_id or ""
             self.databricks_u2m_client_id_input.value = db_u2m_client_id or ""
+            self.databricks_u2m_client_secret_input.value = db_u2m_client_secret or ""
             self.databricks_u2m_redirect_uri_input.value = db_u2m_redirect_uri or ""
             self.databricks_host_input.value = db_host or ""
             if db_client_secret:

@@ -273,6 +273,18 @@ class SettingsFormData(BaseModel):
                     "(M2M) auth"
                 )
 
+        # U2M: carry the client secret from the existing agent if not re-entered.
+        # The field is optional (public apps have no secret), so no error if absent.
+        if is_databricks and self.databricks_auth_method == "u2m":
+            if not self.databricks_u2m_client_secret_input and existing_agent:
+                existing = getattr(
+                    existing_agent.llm, "databricks_u2m_client_secret", None
+                )
+                if isinstance(existing, SecretStr):
+                    self.databricks_u2m_client_secret_input = existing.get_secret_value()
+                elif isinstance(existing, str):
+                    self.databricks_u2m_client_secret_input = existing
+
         # PAT / non-databricks: API key is required. For PROFILE, M2M, and
         # U2M (unified chain) the api_key field isn't used by the connector,
         # so we skip the check.
