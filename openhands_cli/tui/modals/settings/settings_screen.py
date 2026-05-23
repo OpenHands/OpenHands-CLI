@@ -483,15 +483,15 @@ class SettingsScreen(ModalScreen):
                 # Heavy network call stays in the background thread.
                 model_options = get_model_options("databricks", credentials=creds)
                 if model_options:
-                    self.call_from_thread(self._apply_model_options, model_options)
+                    self.app.call_from_thread(self._apply_model_options, model_options)
                 else:
-                    self.call_from_thread(
+                    self.app.call_from_thread(
                         self._set_refresh_status,
                         "Could not load workspace models — showing defaults.",
                         True,
                     )
             except Exception as exc:
-                self.call_from_thread(
+                self.app.call_from_thread(
                     self._set_refresh_status,
                     f"Model refresh failed: {exc}",
                     True,
