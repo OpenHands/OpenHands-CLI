@@ -115,14 +115,19 @@ class TestChineseCharacterMarkupHandling:
     """Tests for handling Chinese characters with special markup symbols."""
 
     def test_escape_rich_markup_escapes_brackets(self, visualizer):
-        """Test that _escape_rich_markup properly escapes square brackets."""
+        """Test that escape_rich_markup neutralises Rich markup safely.
+
+        Rich's official ``rich.markup.escape`` only needs to escape the opening
+        ``[`` of a markup tag (a stand-alone ``]`` cannot start a tag).  These
+        cases verify the output is round-trippable via ``Text.from_markup``.
+        """
         test_cases = [
-            ("[test]", r"\[test\]"),
-            ("处于历史40%分位]", r"处于历史40%分位\]"),
-            ("[cyan]colored[/cyan]", r"\[cyan\]colored\[/cyan\]"),
+            ("[test]", r"\[test]"),
+            ("处于历史40%分位]", "处于历史40%分位]"),
+            ("[cyan]colored[/cyan]", r"\[cyan]colored\[/cyan]"),
             (
                 "+0.3%,月变化+0.8%,处于历史40%分位]",
-                r"+0.3%,月变化+0.8%,处于历史40%分位\]",
+                "+0.3%,月变化+0.8%,处于历史40%分位]",
             ),
         ]
 
@@ -132,17 +137,21 @@ class TestChineseCharacterMarkupHandling:
                 f"Failed to escape '{input_text}': expected '{expected_output}', "
                 f"got '{result}'"
             )
+            # The escaped form must round-trip through markup parsing
+            # without losing characters.
+            assert Text.from_markup(result).plain == input_text
 
     def test_safe_content_string_escapes_problematic_content(self, visualizer):
         """Test that escape_rich_markup escapes MarkupError content."""
         problematic_content = "+0.3%,月变化+0.8%,处于历史40%分位]"
         safe_content = escape_rich_markup(str(problematic_content))
 
-        # Verify brackets are escaped
-        assert r"\]" in safe_content
         # Verify Chinese characters are preserved
         assert "月变化" in safe_content
         assert "处于历史" in safe_content
+        # Stand-alone closing bracket is not markup so it does not need escaping
+        # — what matters is that the content round-trips cleanly.
+        assert Text.from_markup(safe_content).plain == problematic_content
 
     def test_unescaped_content_with_close_tag_causes_markup_error(self):
         """Verify that certain bracket patterns can cause MarkupError.
@@ -218,9 +227,9 @@ class TestChineseCharacterMarkupHandling:
         """Test that various patterns of Chinese text with special chars are handled."""
         safe_content = escape_rich_markup(str(test_content))
 
-        # Verify brackets are escaped
-        assert "[" not in safe_content or r"\[" in safe_content
-        assert "]" not in safe_content or r"\]" in safe_content
+        # The escaped content must round-trip cleanly through markup parsing,
+        # i.e. no styles get applied and no characters are dropped.
+        assert Text.from_markup(safe_content).plain == test_content
 
         # Should be able to create a Static widget without error
         widget = Static(safe_content, markup=True)
@@ -270,12 +279,15 @@ class TestVisualizerIntegration:
     def test_end_to_end_chinese_content_visualization(self, visualizer):
         """End-to-end test: create event with Chinese content and visualize it.
 
-        Uses TerminalAction since the title includes the command for terminal actions.
+        Uses TerminalAction since the title includes the command for terminal
+        actions. The command contains a ``[red]`` lookalike token so that the
+        escape logic must rewrite a bracket Rich would otherwise treat as a
+        style tag.
         """
         from openhands.tools.terminal.definition import TerminalAction
 
         action = TerminalAction(
-            command="分析结果: 增长率+0.3%,月变化+0.8%,处于历史40%分位]"
+            command="echo '分析结果: 增长率+0.3% [red]处于历史40%分位[/red]'"
         )
         tool_call = create_tool_call("call_test", "terminal")
 
@@ -288,16 +300,21 @@ class TestVisualizerIntegration:
             llm_response_id="resp_test",
         )
 
-        # This entire flow should work without errors
         collapsible = visualizer._create_event_collapsible(event)
         assert collapsible is not None
         assert collapsible.title is not None
 
-        # The title should contain escaped content
         title_str = str(collapsible.title)
-        # For terminal actions, the command is included in the title
-        # Brackets in the command should be escaped
-        assert r"\]" in title_str, f"Expected escaped bracket in title: {title_str}"
+        # The "[red]" / "[/red]" patterns from the command would be parsed as
+        # style tags by Rich, so the escape must have inserted '\[' before each.
+        assert r"\[red]" in title_str, (
+            f"Expected escaped opening bracket in title: {title_str}"
+        )
+        assert r"\[/red]" in title_str, (
+            f"Expected escaped closing-tag bracket in title: {title_str}"
+        )
+        # The full title must parse without raising a MarkupError.
+        Text.from_markup(title_str)
 
     def test_visualizer_handles_mistral_xml_function_call_syntax(self, visualizer):
         """Test that visualizer can handle ActionEvent with Mistral XML function call.
@@ -343,6 +360,72 @@ class TestVisualizerIntegration:
         # For non-terminal/file-editor actions without summary, title is just tool_name
         assert "execute_bash" in title_str  # The function name should be present
         assert len(title_str) > 0  # Title should not be empty
+
+
+class TestBackslashBracketEscaping:
+    """Regression tests for OpenHands/OpenHands-CLI#749.
+
+    The hand-rolled ``str.replace("[", r"\\[")`` escape doubled any backslash
+    already in the command (``\\[`` -> ``\\\\[``). Rich then interpreted
+    ``\\\\[name]`` as a style tag and raised ``MissingStyle: unable to parse
+    'name\\\\' as color``. ``rich.markup.escape`` doubles existing backslashes
+    correctly so the round-trip is safe.
+    """
+
+    def test_escape_preserves_backslash_bracket_sequences(self, visualizer):
+        """``rich.markup.escape`` round-trips ``\\[`` through markup parsing."""
+        # Command as the user typed it in the shell: grep "#\[cfg(test)\]"
+        command = 'grep "#\\[cfg(test)\\]"'
+
+        escaped = escape_rich_markup(command)
+
+        # Round-trip: parsing the escaped form must give back the original.
+        assert Text.from_markup(escaped).plain == command
+
+    def test_terminal_action_title_with_backslash_bracket_command(self, visualizer):
+        """Reproduces the exact title from #749 — must not raise MissingStyle.
+
+        With the hand-rolled escape, the title was
+        ``[dim]: $ grep -c "#\\\\[test\\\\]" ...[/dim]`` which Rich parsed as a
+        ``test\\`` style tag and raised ``StyleSyntaxError``/``MissingStyle``.
+        """
+        # The literal command from the bug report.
+        command = (
+            'grep -c "#\\[test\\]" '
+            "/Users/tomasic/proj/hypatia/crates/hypatia-parser/src/parser.rs"
+        )
+        event = create_terminal_action_event(command, summary="Counting tests")
+
+        title = visualizer._build_action_title(event)
+
+        # Must parse without raising — this is what was failing before the fix.
+        parsed = Text.from_markup(title)
+
+        # And the escaped bracketed pattern must survive round-trip
+        # rather than being silently truncated at the first stray bracket.
+        assert "#\\[test\\]" in parsed.plain, (
+            f"Backslash-escaped brackets were dropped from title: {parsed.plain!r}"
+        )
+
+    def test_terminal_action_title_with_backslash_bracket_no_style_error(
+        self, visualizer
+    ):
+        """Parse the title via Console rendering, which is where MissingStyle
+        actually surfaces (Text.from_markup is lenient about unknown styles)."""
+        from io import StringIO
+
+        from rich.console import Console
+
+        command = 'grep -c "#\\[cfg(test)\\]" src/lib.rs'
+        event = create_terminal_action_event(command, summary="Search")
+
+        title = visualizer._build_action_title(event)
+
+        # Rendering through a Console forces every span's style to be parsed,
+        # which is where the original bug raised
+        # ``StyleSyntaxError: unable to parse 'test\\\\' as color``.
+        console = Console(file=StringIO(), force_terminal=False, color_system=None)
+        console.print(title)  # must not raise
 
 
 class TestConversationErrorEventHandling:
