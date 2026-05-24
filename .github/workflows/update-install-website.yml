@@ -33,7 +33,7 @@ jobs:
                   RELEASE_TAG: ${{ github.event.release.tag_name }}
               run: |
                   # Extract version from tag (remove 'v' prefix if present) or use manual input
-                  if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+                  if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
                     VERSION="$VERSION_INPUT"
                     echo "Using manual input version: $VERSION"
                   else
@@ -110,7 +110,7 @@ jobs:
                   cd website-repo
                   BRANCH_NAME="update-version-$VERSION"
 
-                  if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+                  if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
                     CONTEXT="This update was manually triggered via workflow dispatch."
                   else
                     CONTEXT="This update was automatically triggered by the release of [OpenHands CLI v$VERSION]($RELEASE_URL) in the [OpenHands-CLI repository](https://github.com/OpenHands/OpenHands-CLI)."
