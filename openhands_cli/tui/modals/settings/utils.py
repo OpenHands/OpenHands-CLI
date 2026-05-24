@@ -1,3 +1,4 @@
+import time
 from types import SimpleNamespace
 from typing import Any, Literal
 
@@ -16,6 +17,28 @@ from openhands_cli.utils import (
 
 
 agent_store = AgentStore()
+
+
+def _check_databricks_endpoint_in_cache(host: str, qualified_model: str) -> bool | None:
+    """Return True/False if the live model cache has a fresh entry for the workspace,
+    or None if no cache entry exists (can't determine availability without a network call).
+
+    ``qualified_model`` is the ``databricks/<endpoint>`` string stored in settings.
+    """
+    try:
+        from openhands_cli.tui.modals.settings.choices import _databricks_cache
+
+        cache_key = host.strip().rstrip("/")
+        cached = _databricks_cache.get(cache_key)
+        if cached is None:
+            return None
+        expiry, options = cached
+        if expiry <= time.time():
+            return None  # Cache expired
+        live_values = {opt[1] for opt in options}
+        return qualified_model in live_values
+    except Exception:
+        return None
 
 
 DatabricksAuthMethod = Literal["m2m", "u2m"]
@@ -341,8 +364,12 @@ class SettingsFormData(BaseModel):
 class SettingsSaveResult(BaseModel):
     """Result of attempting to save settings."""
 
+    model_config = {"arbitrary_types_allowed": True}
+
     success: bool
     error_message: str | None = None
+    warning: str | None = None
+    agent: "Agent | None" = None
 
 
 def _build_databricks_settings(
@@ -544,6 +571,23 @@ def save_settings(
 
         agent_store.save(agent)
 
-        return SettingsSaveResult(success=True, error_message=None)
+        # Warn when the live workspace model list (cached from a previous
+        # refresh) doesn't include the selected endpoint.  This is a soft
+        # warning — the save still succeeds so the user can e.g. switch
+        # workspaces — but the hint surfaces before the first 404 mid-chat.
+        warning: str | None = None
+        if full_model.startswith("databricks/") and data.databricks_host:
+            in_live_list = _check_databricks_endpoint_in_cache(
+                data.databricks_host, full_model
+            )
+            if in_live_list is False:
+                short = full_model.replace("databricks/", "")
+                warning = (
+                    f"⚠ '{short}' was not found in your workspace's live endpoint list. "
+                    "It may require cross-geo routing or may not be available in your region. "
+                    "Use 'Refresh Models' in Settings to see what's available."
+                )
+
+        return SettingsSaveResult(success=True, error_message=None, agent=agent, warning=warning)
     except Exception as e:
         return SettingsSaveResult(success=False, error_message=str(e))

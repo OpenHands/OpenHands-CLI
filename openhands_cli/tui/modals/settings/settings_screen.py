@@ -522,17 +522,46 @@ class SettingsScreen(ModalScreen):
         self.run_worker(_discover, thread=True)
 
     def _apply_model_options(self, model_options: list[tuple[str, str]]) -> None:
-        """Apply a pre-fetched model list to the dropdown (main-thread only)."""
+        """Apply a pre-fetched model list to the dropdown (main-thread only).
+
+        When the previously-selected model is absent from the live workspace
+        list (e.g. the endpoint doesn't exist in this region) we surface a
+        visible warning so the user knows to pick a different model before
+        saving.  Silently swallowing the mismatch leads to 404 errors when
+        the conversation starts.
+        """
         try:
             current_selection = self.model_select.value
             self.model_select.set_options(model_options)
-            if current_selection and not isinstance(current_selection, NoSelection):
-                try:
-                    self.model_select.value = current_selection
-                except Exception:
-                    pass
             count = len(model_options)
-            self._set_refresh_status(f"✓ {count} models loaded from workspace.", False)
+            if current_selection and not isinstance(current_selection, NoSelection):
+                live_values = {opt[1] for opt in model_options}
+                if current_selection in live_values:
+                    try:
+                        self.model_select.value = current_selection
+                    except Exception:
+                        pass
+                    self._set_refresh_status(
+                        f"✓ {count} models loaded from workspace.", False
+                    )
+                else:
+                    # Model was in the static list but is not available in this
+                    # workspace — surface a clear warning so the user picks a
+                    # valid alternative before saving.
+                    short_name = (
+                        str(current_selection).replace("databricks/", "")
+                        if str(current_selection).startswith("databricks/")
+                        else str(current_selection)
+                    )
+                    self._set_refresh_status(
+                        f"⚠ '{short_name}' is not available in your workspace. "
+                        "Please select a different model.",
+                        True,
+                    )
+            else:
+                self._set_refresh_status(
+                    f"✓ {count} models loaded from workspace.", False
+                )
         except Exception:
             self._set_refresh_status("Model list updated.", False)
 
@@ -951,6 +980,16 @@ class SettingsScreen(ModalScreen):
         if not result.success:
             self._show_message(result.error_message or "Unknown error", is_error=True)
             return
+        # Keep self.current_agent in sync so that the PKCE flow (which runs
+        # after this point) reads the freshly-saved agent — including the
+        # newly-selected model — rather than a stale cached version from disk.
+        if result.agent is not None:
+            self.current_agent = result.agent
+        # Surface a soft warning when the live endpoint list (if cached) shows
+        # the selected model is not available in this workspace.
+        if result.warning:
+            self._show_message(result.warning, is_error=True)
+            return
 
         # Save CLI and Critic settings if not in initial setup mode
         if not self.is_initial_setup:
@@ -1087,13 +1126,18 @@ class SettingsScreen(ModalScreen):
         # - resolve_credentials picks the U2M path → auth_method=="u2m"
         # - Settings re-opens showing the U2M form (not PAT)
         # - The U2M client ID / redirect URI are preserved for future re-auth
+        #
+        # Use self.current_agent (updated in-memory by _on_save_clicked after
+        # save_settings) rather than reloading from disk. The disk-backed
+        # LocalFileStore in self.agent_store has a stale LRU cache from init
+        # time and would return the old agent (with the old model).
         try:
             from openhands.sdk import create_llm as _create_llm
             from openhands.sdk.llm.providers.databricks.models import (
                 StoredU2MTokens as _StoredU2MTokens,
             )
 
-            saved_agent = self.agent_store.load_from_disk()
+            saved_agent = self.current_agent
             if saved_agent is not None:
                 old_llm = saved_agent.llm
                 databricks_host = (

@@ -44,31 +44,54 @@ _databricks_cache: dict[str, tuple[float, list[tuple[str, str]]]] = {}
 #
 # Last sync with Databricks FMAPI docs: May 2026.
 DATABRICKS_STATIC_MODELS: list[tuple[str, str]] = [
-    # Claude (Anthropic Messages API)
+    # ── Claude (Anthropic Messages API) ─────────────────────────────────────
+    # Live-tested PASS: sonnet-4-6, sonnet-4-5, haiku-4-5, opus-4-5, opus-4-6
+    # Note: opus-4-7 / gpt-5-5 / gpt-5-5-pro are temporarily rate-limited
+    # (403) on some workspaces; they're valid endpoints when not throttled.
     ("databricks-claude-sonnet-4-6",           "databricks/databricks-claude-sonnet-4-6"),
     ("databricks-claude-sonnet-4-5",           "databricks/databricks-claude-sonnet-4-5"),
     ("databricks-claude-haiku-4-5",            "databricks/databricks-claude-haiku-4-5"),
     ("databricks-claude-opus-4-7",             "databricks/databricks-claude-opus-4-7"),
+    ("databricks-claude-opus-4-6",             "databricks/databricks-claude-opus-4-6"),
     ("databricks-claude-opus-4-5",             "databricks/databricks-claude-opus-4-5"),
     ("databricks-claude-opus-4-1",             "databricks/databricks-claude-opus-4-1"),
-    # GPT-5 (OpenAI Responses API)
+    # ── GPT-5 (OpenAI Responses API) ────────────────────────────────────────
+    # All live-tested PASS. gpt-5-5 / gpt-5-5-pro may be temporarily
+    # rate-limited (403) on some workspaces.
     ("databricks-gpt-5-mini",                  "databricks/databricks-gpt-5-mini"),
     ("databricks-gpt-5-5-pro",                 "databricks/databricks-gpt-5-5-pro"),
     ("databricks-gpt-5-5",                     "databricks/databricks-gpt-5-5"),
     ("databricks-gpt-5-4",                     "databricks/databricks-gpt-5-4"),
     ("databricks-gpt-5-4-mini",                "databricks/databricks-gpt-5-4-mini"),
+    ("databricks-gpt-5-4-nano",                "databricks/databricks-gpt-5-4-nano"),
+    ("databricks-gpt-5-3-codex",               "databricks/databricks-gpt-5-3-codex"),
+    ("databricks-gpt-5-2-codex",               "databricks/databricks-gpt-5-2-codex"),
+    ("databricks-gpt-5-2",                     "databricks/databricks-gpt-5-2"),
+    ("databricks-gpt-5-1",                     "databricks/databricks-gpt-5-1"),
+    ("databricks-gpt-5-nano",                  "databricks/databricks-gpt-5-nano"),
     ("databricks-gpt-5",                       "databricks/databricks-gpt-5"),
     ("databricks-gpt-oss-120b",                "databricks/databricks-gpt-oss-120b"),
-    # Gemini (Google generateContent)
+    # ── Gemini (Google generateContent) ─────────────────────────────────────
+    # Live-tested PASS: gemini-3-5-flash, gemini-3-1-flash-lite,
+    #   gemini-2-5-flash, gemini-2-5-pro
+    # gemini-3-flash / gemini-3-pro are NOT available in typical workspaces
+    # (global endpoint, requires cross-geo routing enabled by admin).
+    # gemini-3-1-flash-lite and gemini-3-5-flash also require cross-geo but
+    # were confirmed PASS on the tested workspace.
     ("databricks-gemini-3-5-flash",            "databricks/databricks-gemini-3-5-flash"),
-    ("databricks-gemini-3-flash",              "databricks/databricks-gemini-3-flash"),
-    ("databricks-gemini-3-pro",                "databricks/databricks-gemini-3-pro"),
+    ("databricks-gemini-3-1-flash-lite",       "databricks/databricks-gemini-3-1-flash-lite"),
     ("databricks-gemini-2-5-flash",            "databricks/databricks-gemini-2-5-flash"),
     ("databricks-gemini-2-5-pro",              "databricks/databricks-gemini-2-5-pro"),
-    # Meta Llama / Qwen (OpenAI Chat)
+    # ── Meta Llama / Qwen / OSS (OpenAI Chat / mlflow) ──────────────────────
+    # Live-tested PASS: llama-4-maverick, meta-llama-3-3-70b, meta-llama-3-1-8b,
+    #   qwen3-next-80b, qwen35-122b, gpt-oss-20b
+    # gemma-3-12b excluded: 8,192-token context window is below OpenHands' 16k minimum.
     ("databricks-llama-4-maverick",            "databricks/databricks-llama-4-maverick"),
     ("databricks-meta-llama-3-3-70b-instruct", "databricks/databricks-meta-llama-3-3-70b-instruct"),
+    ("databricks-meta-llama-3-1-8b-instruct",  "databricks/databricks-meta-llama-3-1-8b-instruct"),
+    ("databricks-qwen3-next-80b-a3b-instruct", "databricks/databricks-qwen3-next-80b-a3b-instruct"),
     ("databricks-qwen35-122b-a10b",            "databricks/databricks-qwen35-122b-a10b"),
+    ("databricks-gpt-oss-20b",                 "databricks/databricks-gpt-oss-20b"),
 ]
 
 

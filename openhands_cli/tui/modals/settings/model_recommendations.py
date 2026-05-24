@@ -178,11 +178,8 @@ CLOUD_MODELS: list[ModelRecommendation] = [
         is_recommended=True,
         use_cases="Databricks-hosted Gemini 3.5 Flash (native Google generateContent)",
     ),
-    ModelRecommendation(
-        name="databricks-gemini-3-flash",
-        provider="databricks",
-        use_cases="Databricks-hosted Gemini 3 Flash",
-    ),
+    # databricks-gemini-3-flash omitted: requires cross-geo routing (global
+    # endpoint) — not available in most workspaces by default.
     ModelRecommendation(
         name="databricks-gemini-2-5-flash",
         provider="databricks",
