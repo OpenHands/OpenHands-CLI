@@ -36,7 +36,7 @@ jobs:
 
             - name: Validate version format
               env:
-                INPUTS_VERSION: ${{ inputs.version }}
+                  INPUTS_VERSION: ${{ inputs.version }}
               run: |
                   VERSION="$INPUTS_VERSION"
                   if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -52,7 +52,7 @@ jobs:
 
             - name: Create branch and bump version
               env:
-                INPUTS_VERSION: ${{ inputs.version }}
+                  INPUTS_VERSION: ${{ inputs.version }}
               run: |
                   VERSION="$INPUTS_VERSION"
                   BRANCH_NAME="bump-version-${VERSION}"
@@ -93,7 +93,7 @@ jobs:
 
             - name: Update snapshot tests
               env:
-                INPUTS_VERSION: ${{ inputs.version }}
+                  INPUTS_VERSION: ${{ inputs.version }}
               run: |
                   # Update snapshot tests to reflect the new version
                   # The version appears in the splash screen SVG snapshots
@@ -106,7 +106,7 @@ jobs:
 
             - name: Commit and push changes
               env:
-                INPUTS_VERSION: ${{ inputs.version }}
+                  INPUTS_VERSION: ${{ inputs.version }}
               run: |
                   VERSION="$INPUTS_VERSION"
                   BRANCH_NAME="${{ env.branch_name }}"
@@ -136,7 +136,7 @@ jobs:
 
             - name: Check for existing PR
               env:
-                INPUTS_VERSION: ${{ inputs.version }}
+                  INPUTS_VERSION: ${{ inputs.version }}
               run: |
                   VERSION="$INPUTS_VERSION"
                   BRANCH_NAME="${{ env.branch_name }}"
@@ -160,7 +160,7 @@ jobs:
             - name: Create Draft Pull Request
               if: env.pr_exists == 'false'
               env:
-                INPUTS_VERSION: ${{ inputs.version }}
+                  INPUTS_VERSION: ${{ inputs.version }}
               run: |
                   VERSION="$INPUTS_VERSION"
                   BRANCH_NAME="${{ env.branch_name }}"
@@ -191,7 +191,7 @@ jobs:
 
             - name: Summary
               env:
-                INPUTS_VERSION: ${{ inputs.version }}
+                  INPUTS_VERSION: ${{ inputs.version }}
               run: |
                   VERSION="$INPUTS_VERSION"
                   if [ "${{ env.pr_exists }}" = "true" ]; then
