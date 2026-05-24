@@ -153,18 +153,13 @@ jobs:
                   fi
 
             - name: Summary
-              env:
-                  HAS_CHANGES: ${{ steps.check_changes.outputs.has_changes }}
-                  PR_EXISTS: ${{ env.pr_exists }}
-                  EXISTING_PR_URL: ${{ env.existing_pr_url }}
-                  PR_URL: ${{ env.pr_url }}
               run: |
-                  if [ "$HAS_CHANGES" = "true" ]; then
-                    if [ "$PR_EXISTS" = "true" ]; then
-                      echo "ℹ️ PR already exists for version $VERSION: $EXISTING_PR_URL"
+                  if [ "${{ steps.check_changes.outputs.has_changes }}" = "true" ]; then
+                    if [ "${{ env.pr_exists }}" = "true" ]; then
+                      echo "ℹ️ PR already exists for version $VERSION: ${{ env.existing_pr_url }}"
                     else
                       echo "✅ Successfully created PR to bump agent-sdk to version $VERSION"
-                      echo "PR URL: $PR_URL"
+                      echo "PR URL: ${{ env.pr_url }}"
                     fi
                   else
                     echo "ℹ️ No changes needed - version $VERSION is already set in pyproject.toml"
