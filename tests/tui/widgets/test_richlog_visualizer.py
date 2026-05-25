@@ -15,10 +15,10 @@ from openhands.sdk.event import ActionEvent, AgentErrorEvent, UserRejectObservat
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.llm import MessageToolCall
 from openhands.tools.terminal.definition import TerminalAction
+from openhands_cli.shared.text_utils import ELLIPSIS
 from openhands_cli.stores import CliSettings
 from openhands_cli.tui.textual_app import OpenHandsApp
 from openhands_cli.tui.widgets.richlog_visualizer import (
-    ELLIPSIS,
     MAX_LINE_LENGTH,
     ConversationVisualizer,
 )

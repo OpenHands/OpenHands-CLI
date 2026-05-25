@@ -23,6 +23,7 @@ from textual.widgets import Button, ListItem, ListView, Static
 
 from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.conversations.store.local import LocalFileStore
+from openhands_cli.shared.text_utils import truncate_text
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.panels.history_panel_style import HISTORY_PANEL_STYLE
 
@@ -58,7 +59,7 @@ class HistoryItemContent(Static):
         # Use title if available, otherwise use ID
         has_title = bool(conversation.title)
         if conversation.title:
-            title = _escape_rich_markup(_truncate(conversation.title, 100))
+            title = _escape_rich_markup(truncate_text(conversation.title, 100))
             content = f"{title}\n[dim]{conv_id} • {time_str}[/dim]"
         else:
             content = f"[dim]New conversation[/dim]\n[dim]{conv_id} • {time_str}[/dim]"
@@ -82,7 +83,7 @@ class HistoryItemContent(Static):
     def set_title(self, title: str) -> None:
         """Update the displayed title for this history item."""
         time_str = _format_time(self._created_at)
-        title_text = _escape_rich_markup(_truncate(title, 100))
+        title_text = _escape_rich_markup(truncate_text(title, 100))
         conv_id = _escape_rich_markup(self.conversation_id)
         self.update(f"{title_text}\n[dim]{conv_id} • {time_str}[/dim]")
         self._has_title = True
@@ -460,11 +461,3 @@ def _format_time(dt: datetime) -> str:
         return f"{diff.days}d ago"
     else:
         return dt.strftime("%Y-%m-%d")
-
-
-def _truncate(text: str, max_length: int) -> str:
-    """Truncate text for display."""
-    text = text.replace("\n", " ").replace("\r", " ")
-    if len(text) <= max_length:
-        return text
-    return text[: max_length - 3] + "..."
