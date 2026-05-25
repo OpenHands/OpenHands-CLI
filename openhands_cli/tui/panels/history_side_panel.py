@@ -23,17 +23,13 @@ from textual.widgets import Button, ListItem, ListView, Static
 
 from openhands_cli.conversations.models import ConversationMetadata
 from openhands_cli.conversations.store.local import LocalFileStore
+from openhands_cli.shared.rich_utils import escape_rich_markup
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.panels.history_panel_style import HISTORY_PANEL_STYLE
 
 
 if TYPE_CHECKING:
     from openhands_cli.tui.textual_app import OpenHandsApp
-
-
-def _escape_rich_markup(text: str) -> str:
-    """Escape Rich markup characters in text to prevent markup errors."""
-    return text.replace("[", r"\[").replace("]", r"\]")
 
 
 class HistoryItemContent(Static):
@@ -53,12 +49,12 @@ class HistoryItemContent(Static):
         """
         # Build the content string - show title, id as secondary
         time_str = _format_time(conversation.created_at)
-        conv_id = _escape_rich_markup(conversation.id)
+        conv_id = escape_rich_markup(conversation.id)
 
         # Use title if available, otherwise use ID
         has_title = bool(conversation.title)
         if conversation.title:
-            title = _escape_rich_markup(_truncate(conversation.title, 100))
+            title = escape_rich_markup(_truncate(conversation.title, 100))
             content = f"{title}\n[dim]{conv_id} • {time_str}[/dim]"
         else:
             content = f"[dim]New conversation[/dim]\n[dim]{conv_id} • {time_str}[/dim]"
@@ -82,8 +78,8 @@ class HistoryItemContent(Static):
     def set_title(self, title: str) -> None:
         """Update the displayed title for this history item."""
         time_str = _format_time(self._created_at)
-        title_text = _escape_rich_markup(_truncate(title, 100))
-        conv_id = _escape_rich_markup(self.conversation_id)
+        title_text = escape_rich_markup(_truncate(title, 100))
+        conv_id = escape_rich_markup(self.conversation_id)
         self.update(f"{title_text}\n[dim]{conv_id} • {time_str}[/dim]")
         self._has_title = True
 
