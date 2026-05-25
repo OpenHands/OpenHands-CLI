@@ -829,9 +829,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         title = self._extract_meaningful_title(
             event, f"UNKNOWN Event: {event.__class__.__name__}"
         )
-        content_string = (
-            f"{escape_rich_markup(str(content))}\n\nSource: {event.source}"
-        )
+        content_string = f"{escape_rich_markup(str(content))}\n\nSource: {event.source}"
         return self._make_collapsible(
             content_string,
             f"{self._get_agent_prefix()}{title}",
