@@ -1034,6 +1034,25 @@ class SettingsScreen(ModalScreen):
             and form_data.databricks_u2m_client_id
             and form_data.databricks_host
         ):
+            # Sanity-check: reject values that look like label text rather than
+            # a real UUID. Databricks OAuth App client IDs are always UUIDs
+            # (8-4-4-4-12 hex). A colon, spaces, or a very long value are
+            # telltale signs the user accidentally entered placeholder / label
+            # text (e.g. "OAuth App Client ID:") instead of the real value.
+            _cid = form_data.databricks_u2m_client_id.strip()
+            import re as _re
+            _uuid_re = _re.compile(
+                r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+                _re.IGNORECASE,
+            )
+            if not _uuid_re.match(_cid):
+                self._show_message(
+                    f"Invalid OAuth App Client ID: '{_cid}'\n"
+                    "It should be a UUID (e.g. 12345678-abcd-ef01-2345-6789abcdef01) "
+                    "from Databricks account console → Settings → App connections.",
+                    is_error=True,
+                )
+                return
             self._show_message(
                 "Settings saved. Opening browser for Databricks sign-in… "
                 "(waiting up to 120 s — no need to reselect model after)",
