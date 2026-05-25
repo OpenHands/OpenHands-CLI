@@ -21,7 +21,7 @@ import os
 import select
 import subprocess
 import time
-from typing import Any
+from typing import IO, Any
 
 
 class UnbufferedJsonRpcReader:
@@ -31,7 +31,7 @@ class UnbufferedJsonRpcReader:
     that can cause messages to get stuck in buffers.
     """
 
-    def __init__(self, stdout) -> None:
+    def __init__(self, stdout: IO[bytes]) -> None:
         self.stdout = stdout
         self.buffer = b""
         self.fd = stdout.fileno()
