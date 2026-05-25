@@ -456,7 +456,13 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             is_resuming = True
             logger.info(f"Resuming conversation: {session_id}")
         else:
-            session_id = str(uuid.uuid4())
+            # Allow clients to pass a custom session_id via ACP-standard _meta field.
+            # This enables deterministic conversation IDs for resume/persistence use cases.
+            _meta = _kwargs.get("_meta") or {}
+            custom_session_id = _meta.get("session_id")
+            session_id = str(custom_session_id) if custom_session_id else str(uuid.uuid4())
+            if custom_session_id:
+                logger.info(f"Using custom session ID: {session_id}")
 
         try:
             conversation = await self._get_or_create_conversation(
