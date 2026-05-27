@@ -15,11 +15,11 @@ from openhands.sdk.event import SystemPromptEvent
 from openhands.sdk.event.base import Event
 from openhands.sdk.tool import Tool
 from openhands.tools import TaskToolSet
-from openhands.tools.delegate import DelegateTool
 from openhands.tools.file_editor import FileEditorTool
 from openhands.tools.preset.default import get_default_condenser
 from openhands.tools.task_tracker import TaskTrackerTool
 from openhands.tools.terminal import TerminalTool
+from openhands_cli.legacy_delegate_tool import LEGACY_DELEGATE_TOOL_NAME
 
 
 def abbreviate_number(n: int | float) -> str:
@@ -176,7 +176,9 @@ def get_default_cli_tools(*, use_delegate_tool: bool = False) -> list[Tool]:
         Existing conversations with DelegateTool events will continue to use
         DelegateTool to maintain backward compatibility.
     """
-    task_tool_name = DelegateTool.name if use_delegate_tool else TaskToolSet.name
+    task_tool_name = (
+        LEGACY_DELEGATE_TOOL_NAME if use_delegate_tool else TaskToolSet.name
+    )
     return [
         Tool(name=TerminalTool.name),
         Tool(name=FileEditorTool.name),
