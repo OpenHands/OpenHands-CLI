@@ -111,6 +111,61 @@ def create_terminal_action_event(
     )
 
 
+class _TestContainer:
+    """Simple container used to validate render tree trimming behavior."""
+
+    def __init__(self) -> None:
+        self.children: list[object] = []
+        self.is_vertical_scroll_end = True
+        self._scroll_end_calls = 0
+
+    def mount(self, widget: object, before: int | None = None) -> None:
+        if before is None:
+            self.children.append(widget)
+        else:
+            self.children.insert(before, widget)
+        if hasattr(widget, "__dict__"):
+            setattr(widget, "_container", self)
+
+    def scroll_end(self, animate: bool = False) -> None:
+        self._scroll_end_calls += 1
+
+    def _remove_child(self, widget: object) -> None:
+        if widget in self.children:
+            self.children.remove(widget)
+
+    def query(self, _selector) -> list[object]:
+        return []
+
+
+class _StubWidget:
+    """Minimal renderable-like widget for container pruning tests."""
+
+    def __init__(self, text: str, classes: str = "") -> None:
+        self._text = text
+        self._classes = set(classes.split()) if classes else set()
+        self.removed = False
+
+    @property
+    def classes(self) -> str:
+        return " ".join(sorted(self._classes))
+
+    def has_class(self, class_name: str) -> bool:
+        return class_name in self._classes
+
+    def remove(self) -> None:
+        self.removed = True
+        container = getattr(self, "_container", None)
+        if container is not None:
+            container._remove_child(self)
+
+    def update(self, text: str) -> None:
+        self._text = text
+
+    def render(self) -> str:
+        return self._text
+
+
 class TestChineseCharacterMarkupHandling:
     """Tests for handling Chinese characters with special markup symbols."""
 
@@ -870,6 +925,73 @@ class TestSubVisualizerCreation:
         assert sub_vis._container is visualizer._container
         assert sub_vis._app is visualizer._app
 
+    def test_create_sub_visualizer_shares_render_cap_state(self) -> None:
+        """Parent and sub-visualizer share cap state when using same container."""
+        container = _TestContainer()
+        app = App()
+        parent = ConversationVisualizer(
+            container,
+            app,  # type: ignore[arg-type]
+            name="parent_agent",
+        )
+        child = parent.create_sub_visualizer("child_agent")
+
+        parent._max_rendered_events = 3
+        child._max_rendered_events = 3
+
+        parent._add_widget_to_ui(_StubWidget("parent-1"))
+        parent._add_widget_to_ui(_StubWidget("parent-2"))
+        child._add_widget_to_ui(_StubWidget("child-1"))
+        child._add_widget_to_ui(_StubWidget("child-2"))
+        child._add_widget_to_ui(_StubWidget("child-3"))
+
+        rendered = [w for w in container.children if hasattr(w, "has_class")]
+        event_widgets = [
+            w for w in rendered if not w.has_class("older-events-indicator")
+        ]
+        indicator_widgets = [
+            w for w in rendered if w.has_class("older-events-indicator")
+        ]
+
+        assert len(event_widgets) == 3
+        assert len(indicator_widgets) == 1
+        assert parent._hidden_events_count == 2
+        assert child._hidden_events_count == 2
+        assert child._render_cap_state is parent._render_cap_state
+        assert parent._hidden_events_indicator is child._hidden_events_indicator
+
+    def test_shared_pending_actions_are_pruned_consistently(self) -> None:
+        """Parent and child share pending-action state when pruning shared widgets."""
+        container = _TestContainer()
+        app = App()
+        parent = ConversationVisualizer(
+            container,
+            app,  # type: ignore[arg-type]
+            name="parent_agent",
+        )
+        child = parent.create_sub_visualizer("child_agent")
+
+        action_event = create_terminal_action_event("echo shared action")
+        pending_widget = _StubWidget("parent-action")
+        parent._pending_actions[action_event.tool_call_id] = (
+            action_event,
+            pending_widget,
+        )
+
+        parent._add_widget_to_ui(pending_widget)
+        assert child._pending_actions is parent._pending_actions
+        assert action_event.tool_call_id in parent._pending_actions
+
+        parent._max_rendered_events = 1
+        child._add_widget_to_ui(_StubWidget("child-event"))
+
+        assert parent._max_rendered_events == 1
+        assert len(container.children) == 2
+        assert action_event.tool_call_id not in parent._pending_actions
+        assert action_event.tool_call_id not in child._pending_actions
+        assert pending_widget not in container.children
+        assert isinstance(container.children[0], Static)
+
 
 class TestMessageEventDelegation:
     """Tests for MessageEvent handling in delegation context."""
@@ -1119,6 +1241,83 @@ class TestThreadSafety:
 
         assert collapsible is not None
         assert expected_title in str(collapsible.title)
+
+
+class TestRenderedEventCap:
+    """Tests for keeping a bounded number of rendered event widgets."""
+
+    def test_rendered_event_cap_shows_hidden_indicator(self) -> None:
+        """When limit is exceeded, oldest widgets are removed and indicator is shown."""
+        container = _TestContainer()
+        app = App()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+        visualizer._max_rendered_events = 3
+
+        for i in range(5):
+            visualizer._add_widget_to_ui(_StubWidget(f"event-{i}"))
+
+        rendered = [w for w in container.children if hasattr(w, "has_class")]
+        event_widgets = [
+            w for w in rendered if not w.has_class("older-events-indicator")
+        ]
+        indicator_widgets = [
+            w for w in rendered if w.has_class("older-events-indicator")
+        ]
+
+        assert len(event_widgets) == 3
+        assert len(indicator_widgets) == 1
+        assert visualizer._hidden_events_count == 2
+
+        event_texts = [str(widget.render()) for widget in event_widgets]
+        assert all("event-0" not in text for text in event_texts)
+        assert all("event-1" not in text for text in event_texts)
+        assert any("event-2" in text for text in event_texts)
+        assert any("event-3" in text for text in event_texts)
+        assert any("event-4" in text for text in event_texts)
+
+        indicator = indicator_widgets[0]
+        assert str(indicator.render()).endswith("older events hidden")
+        assert "2" in str(indicator.render())
+        assert container.children[0] is indicator
+
+    def test_rendered_event_cap_no_trim_when_under_limit(self) -> None:
+        """Under the cap, all widgets are retained and no indicator is shown."""
+        container = _TestContainer()
+        app = App()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+        visualizer._max_rendered_events = 10
+
+        for i in range(5):
+            visualizer._add_widget_to_ui(_StubWidget(f"event-{i}"))
+
+        rendered = [w for w in container.children if hasattr(w, "has_class")]
+        event_widgets = [
+            w for w in rendered if not w.has_class("older-events-indicator")
+        ]
+
+        assert len(event_widgets) == 5
+        assert visualizer._hidden_events_count == 0
+        assert not any(w.has_class("older-events-indicator") for w in rendered)
+
+    def test_rendered_event_indicator_updates_as_more_events_stream(self) -> None:
+        """Hidden-events indicator increments as more events exceed the cap."""
+        container = _TestContainer()
+        app = App()
+        visualizer = ConversationVisualizer(container, app)  # type: ignore[arg-type]
+        visualizer._max_rendered_events = 3
+
+        for i in range(6):
+            visualizer._add_widget_to_ui(_StubWidget(f"event-{i}"))
+
+        rendered = [w for w in container.children if hasattr(w, "has_class")]
+        event_widgets = [
+            w for w in rendered if not w.has_class("older-events-indicator")
+        ]
+        indicator = next(w for w in rendered if w.has_class("older-events-indicator"))
+
+        assert len(event_widgets) == 3
+        assert visualizer._hidden_events_count == 3
+        assert "3" in str(indicator.render())
 
 
 class TestAgentMessageEventDisplay:

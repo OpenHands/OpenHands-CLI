@@ -5,10 +5,11 @@ This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 
 import re
 import threading
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from rich.text import Text
-from textual.widgets import Markdown
+from textual.widgets import Markdown, Static
 
 from openhands.sdk.conversation.visualizer.base import ConversationVisualizerBase
 from openhands.sdk.event import (
@@ -48,9 +49,20 @@ AGENT_MESSAGE_PADDING = (1, 0, 1, 1)  # top, right, bottom, left
 # Maximum line length for truncating titles/commands in collapsed view
 MAX_LINE_LENGTH = 70
 ELLIPSIS = "..."
+DEFAULT_MAX_RENDERED_EVENTS = 250
 
 # Default agent name - don't show prefix for this agent
 DEFAULT_AGENT_NAME = "OpenHands Agent"
+
+
+@dataclass
+class _RenderCapState:
+    max_rendered_events: int = DEFAULT_MAX_RENDERED_EVENTS
+    hidden_events_count: int = 0
+    hidden_events_indicator: object | None = None
+    pending_actions: dict[str, tuple[ActionEvent, "Collapsible"]] = field(
+        default_factory=dict
+    )
 
 
 if TYPE_CHECKING:
@@ -100,6 +112,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         container: "VerticalScroll",
         app: "OpenHandsApp",
         name: str | None = None,
+        _render_cap_state: _RenderCapState | None = None,
     ) -> None:
         """Initialize the visualizer.
 
@@ -113,12 +126,41 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._container = container
         self._app = app
         self._name = name
+        self._render_cap_state = (
+            _render_cap_state if _render_cap_state is not None else _RenderCapState()
+        )
         # Store the main thread ID for thread safety checks
         self._main_thread_id = threading.get_ident()
         # Cache CLI settings to avoid repeated file system reads
         self._cli_settings: CliSettings | None = None
-        # Track pending actions by tool_call_id for action-observation pairing
-        self._pending_actions: dict[str, tuple[ActionEvent, Collapsible]] = {}
+
+    @property
+    def _max_rendered_events(self) -> int:
+        return self._render_cap_state.max_rendered_events
+
+    @_max_rendered_events.setter
+    def _max_rendered_events(self, value: int) -> None:
+        self._render_cap_state.max_rendered_events = value
+
+    @property
+    def _hidden_events_count(self) -> int:
+        return self._render_cap_state.hidden_events_count
+
+    @_hidden_events_count.setter
+    def _hidden_events_count(self, value: int) -> None:
+        self._render_cap_state.hidden_events_count = value
+
+    @property
+    def _hidden_events_indicator(self) -> object | None:
+        return self._render_cap_state.hidden_events_indicator
+
+    @_hidden_events_indicator.setter
+    def _hidden_events_indicator(self, value: object | None) -> None:
+        self._render_cap_state.hidden_events_indicator = value
+
+    @property
+    def _pending_actions(self) -> dict[str, tuple[ActionEvent, Collapsible]]:
+        return self._render_cap_state.pending_actions
 
     @property
     def cli_settings(self) -> CliSettings:
@@ -147,6 +189,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             container=self._container,
             app=self._app,
             name=agent_id,
+            _render_cap_state=self._render_cap_state,
         )
 
     @staticmethod
@@ -302,8 +345,77 @@ class ConversationVisualizer(ConversationVisualizerBase):
     def _add_widget_to_ui(self, widget: "Widget") -> None:
         """Add a widget to the UI (must be called from main thread)."""
         self._container.mount(widget)
+        self._prune_rendered_widgets()
         if self._container.is_vertical_scroll_end:
             self._container.scroll_end(animate=False)
+
+    def _is_hidden_events_indicator(self, widget: "Widget") -> bool:
+        """Check whether this widget is the hidden-events indicator."""
+        try:
+            return widget.has_class("older-events-indicator")
+        except Exception:
+            return False
+
+    def _remove_hidden_events_indicator(self) -> None:
+        """Remove the hidden-events indicator widget if present."""
+        indicator = self._hidden_events_indicator
+        self._hidden_events_indicator = None
+        if indicator is None:
+            return
+        if indicator in list(self._container.children):
+            indicator.remove()
+
+    def _ensure_hidden_events_indicator(self) -> None:
+        """Create/update the hidden-events indicator and pin it to the top."""
+        if self._hidden_events_count <= 0:
+            self._remove_hidden_events_indicator()
+            return
+
+        label = f"… {self._hidden_events_count} older events hidden"
+        if self._hidden_events_indicator is None:
+            self._hidden_events_indicator = Static(
+                label, classes="older-events-indicator"
+            )
+            self._container.mount(self._hidden_events_indicator, before=0)
+            return
+
+        if self._hidden_events_indicator not in list(self._container.children):
+            self._container.mount(self._hidden_events_indicator, before=0)
+
+        self._hidden_events_indicator.update(label)
+
+    def _remove_pending_action_if_widget_removed(self, widget: "Widget") -> None:
+        """Drop pending action state for widgets that are removed from the UI."""
+        stale_actions = [
+            tool_call_id
+            for tool_call_id, (_, pending_widget) in self._pending_actions.items()
+            if pending_widget is widget
+        ]
+        for tool_call_id in stale_actions:
+            self._pending_actions.pop(tool_call_id, None)
+
+    def _prune_rendered_widgets(self) -> None:
+        """Cap number of rendered widgets and show hidden-events indicator."""
+        if self._max_rendered_events <= 0:
+            self._hidden_events_count = 0
+            self._remove_hidden_events_indicator()
+            return
+
+        children = list(self._container.children)
+        visible_widgets = [
+            w for w in children if not self._is_hidden_events_indicator(w)
+        ]
+        excess = len(visible_widgets) - self._max_rendered_events
+        if excess <= 0:
+            self._ensure_hidden_events_indicator()
+            return
+
+        for widget in visible_widgets[:excess]:
+            widget.remove()
+            self._remove_pending_action_if_widget_removed(widget)
+            self._hidden_events_count += 1
+
+        self._ensure_hidden_events_indicator()
 
     def _handle_critic_result(self, critic_result: "CriticResult") -> None:
         """Handle a critic result by displaying widgets and notifying controller.
