@@ -9,6 +9,14 @@ from pydantic import ValidationError
 from openhands_cli.stores import CliSettings, CriticSettings
 
 
+@pytest.fixture(autouse=True)
+def clear_cli_settings_cache():
+    """Keep CliSettings cache isolated between tests."""
+    CliSettings.invalidate_cache()
+    yield
+    CliSettings.invalidate_cache()
+
+
 class TestCriticSettingsValidation:
     """Tests for CriticSettings field validators."""
 
@@ -212,6 +220,58 @@ class TestCliSettings:
             },
             indent=2,
         )
+
+    def test_load_uses_cache_until_invalidated(self, tmp_path: Path):
+        config_path = tmp_path / "cli_config.json"
+        config_path.write_text(json.dumps({"default_cells_expanded": True}))
+
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
+            first = CliSettings.load()
+            config_path.write_text(json.dumps({"default_cells_expanded": False}))
+            second = CliSettings.load()
+
+        assert first.default_cells_expanded is True
+        assert second.default_cells_expanded is True
+
+    def test_invalidate_cache_allows_external_file_changes(self, tmp_path: Path):
+        config_path = tmp_path / "cli_config.json"
+        config_path.write_text(json.dumps({"default_cells_expanded": True}))
+
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
+            assert CliSettings.load().default_cells_expanded is True
+            config_path.write_text(json.dumps({"default_cells_expanded": False}))
+
+            CliSettings.invalidate_cache()
+
+            assert CliSettings.load().default_cells_expanded is False
+
+    def test_save_invalidates_cached_settings(self, tmp_path: Path):
+        config_path = tmp_path / "cli_config.json"
+        config_path.write_text(json.dumps({"default_cells_expanded": True}))
+
+        with patch.object(CliSettings, "get_config_path", return_value=config_path):
+            assert CliSettings.load().default_cells_expanded is True
+            CliSettings(default_cells_expanded=False).save()
+
+            loaded = CliSettings.load()
+
+        assert loaded.default_cells_expanded is False
+
+    def test_cache_is_keyed_by_config_path(self, tmp_path: Path):
+        first_path = tmp_path / "first" / "cli_config.json"
+        second_path = tmp_path / "second" / "cli_config.json"
+        first_path.parent.mkdir()
+        second_path.parent.mkdir()
+        first_path.write_text(json.dumps({"default_cells_expanded": True}))
+        second_path.write_text(json.dumps({"default_cells_expanded": False}))
+
+        with patch.object(CliSettings, "get_config_path", return_value=first_path):
+            first = CliSettings.load()
+        with patch.object(CliSettings, "get_config_path", return_value=second_path):
+            second = CliSettings.load()
+
+        assert first.default_cells_expanded is True
+        assert second.default_cells_expanded is False
 
     def test_save_permission_error_propagates(self, tmp_path: Path):
         config_path = tmp_path / "cli_config.json"
