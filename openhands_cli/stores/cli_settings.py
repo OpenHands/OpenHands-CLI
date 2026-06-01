@@ -2,6 +2,7 @@
 
 import json
 import os
+from functools import lru_cache
 from pathlib import Path
 
 from pydantic import BaseModel, field_validator
@@ -101,7 +102,10 @@ class CliSettings(BaseModel):
 
     @classmethod
     def load(cls) -> "CliSettings":
-        """Load CLI settings from file.
+        """Load CLI settings from file (cached).
+
+        Uses caching to avoid repeated disk reads. The cache is keyed by the config
+        file path and automatically invalidated when save() is called.
 
         Automatically migrates legacy settings format if detected.
 
@@ -110,30 +114,18 @@ class CliSettings(BaseModel):
             exist
         """
         config_path = cls.get_config_path()
+        return _load_cli_settings(str(config_path))
 
-        if not config_path.exists():
-            return cls()
+    @classmethod
+    def invalidate_cache(cls) -> None:
+        """Invalidate the settings cache.
 
-        try:
-            with open(config_path) as f:
-                data = json.load(f)
-
-            # Migrate legacy settings format if needed
-            migrated_data, was_migrated = cls._migrate_legacy_settings(data)
-
-            settings = cls.model_validate(migrated_data)
-
-            # Save migrated settings back to disk if migration occurred
-            if was_migrated:
-                settings.save()
-
-            return settings
-        except (json.JSONDecodeError, ValueError):
-            # If file is corrupted, return defaults
-            return cls()
+        Call this after saving settings to ensure the next load() returns fresh data.
+        """
+        _load_cli_settings.cache_clear()
 
     def save(self) -> None:
-        """Save CLI settings to file."""
+        """Save CLI settings to file and invalidate the cache."""
         config_path = self.get_config_path()
 
         # Ensure the persistence directory exists
@@ -141,3 +133,43 @@ class CliSettings(BaseModel):
 
         with open(config_path, "w") as f:
             json.dump(self.model_dump(), f, indent=2)
+
+        # Invalidate cache so next load() returns fresh data
+        CliSettings.invalidate_cache()
+
+
+@lru_cache(maxsize=4)
+def _load_cli_settings(config_path_str: str) -> CliSettings:
+    """Load CLI settings from file (internal cached implementation).
+
+    Args:
+        config_path_str: String path to the config file (used as cache key).
+
+    Returns:
+        CliSettings instance with loaded settings, or defaults if file doesn't exist.
+
+    Note:
+        The cache is invalidated when save() is called.
+    """
+    config_path = Path(config_path_str)
+
+    if not config_path.exists():
+        return CliSettings()
+
+    try:
+        with open(config_path) as f:
+            data = json.load(f)
+
+        # Migrate legacy settings format if needed
+        migrated_data, was_migrated = CliSettings._migrate_legacy_settings(data)
+
+        settings = CliSettings.model_validate(migrated_data)
+
+        # Save migrated settings back to disk if migration occurred
+        if was_migrated:
+            settings.save()
+
+        return settings
+    except (json.JSONDecodeError, ValueError):
+        # If file is corrupted, return defaults
+        return CliSettings()
