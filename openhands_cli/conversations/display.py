@@ -2,13 +2,9 @@
 
 from datetime import datetime
 
-from rich.console import Console
-
 from openhands_cli.conversations.store.local import LocalFileStore
+from openhands_cli.shared.console import console
 from openhands_cli.theme import OPENHANDS_THEME
-
-
-console = Console()
 
 
 def display_recent_conversations(limit: int = 15) -> None:

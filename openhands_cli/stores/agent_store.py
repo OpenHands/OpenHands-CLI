@@ -7,7 +7,6 @@ import re
 from typing import Any
 
 from pydantic import BaseModel, SecretStr
-from rich.console import Console
 
 from openhands.sdk import (
     LLM,
@@ -29,6 +28,7 @@ from openhands_cli.locations import (
     get_work_dir,
 )
 from openhands_cli.mcp.mcp_utils import list_enabled_servers
+from openhands_cli.shared.console import console, stderr_console
 from openhands_cli.stores.cli_settings import CliSettings
 from openhands_cli.utils import (
     get_default_cli_agent,
@@ -37,10 +37,6 @@ from openhands_cli.utils import (
     get_os_description,
     should_set_litellm_extra_body,
 )
-
-
-console = Console(highlight=False, soft_wrap=True)
-stderr_console = Console(stderr=True, highlight=False, soft_wrap=True)
 
 
 def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
@@ -167,9 +163,8 @@ def check_and_warn_env_vars() -> None:
         env_vars_set.append(ENV_LLM_MODEL)
 
     if env_vars_set:
-        console = Console(stderr=True)
         vars_str = ", ".join(env_vars_set)
-        console.print(
+        stderr_console.print(
             f"[yellow]Warning:[/yellow] Environment variable(s) {vars_str} detected "
             "but will be ignored.\n"
             "Use [bold]--override-with-envs[/bold] flag to apply them.",

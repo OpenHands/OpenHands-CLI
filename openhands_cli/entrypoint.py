@@ -12,9 +12,9 @@ import warnings
 from pathlib import Path
 
 from dotenv import load_dotenv
-from rich.console import Console
 
 from openhands_cli.argparsers.main_parser import create_main_parser
+from openhands_cli.shared.console import console
 from openhands_cli.stores import (
     MissingEnvironmentVariablesError,
     check_and_warn_env_vars,
@@ -22,9 +22,6 @@ from openhands_cli.stores import (
 from openhands_cli.terminal_compat import check_terminal_compatibility
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.utils import create_seeded_instructions_from_args
-
-
-console = Console()
 
 
 env_path = Path.cwd() / ".env"

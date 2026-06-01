@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
-from rich.console import Console
-
 from openhands.sdk.conversation.visualizer import DefaultConversationVisualizer
 from openhands_cli.conversations.store.local import LocalFileStore
+from openhands_cli.shared.console import console
 from openhands_cli.theme import OPENHANDS_THEME
-
-
-console = Console()
 
 
 class ConversationViewer:

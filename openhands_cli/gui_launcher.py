@@ -6,13 +6,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-from rich.console import Console
 from rich.markup import escape
 
 from openhands_cli.locations import get_persistence_dir
-
-
-console = Console(highlight=False, soft_wrap=True)
+from openhands_cli.shared.console import console
 
 
 def _format_docker_command_for_logging(cmd: list[str]) -> str:

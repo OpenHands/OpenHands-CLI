@@ -7,7 +7,6 @@ through the command line interface.
 import argparse
 
 from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
-from rich.console import Console
 
 from openhands_cli.mcp.mcp_display_utils import mask_sensitive_value
 from openhands_cli.mcp.mcp_utils import (
@@ -20,10 +19,8 @@ from openhands_cli.mcp.mcp_utils import (
     list_servers,
     remove_server,
 )
+from openhands_cli.shared.console import console
 from openhands_cli.theme import OPENHANDS_THEME
-
-
-console = Console()
 
 
 def handle_mcp_add(args: argparse.Namespace) -> None:
