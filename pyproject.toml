@@ -152,5 +152,5 @@ typeCheckingMode = "standard"
 # Remove this section and restore the version constraint once the SDK PR is merged
 # and a new version is published to PyPI.
 [tool.uv.sources]
-openhands-sdk = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "d2e7fd85ea9f8874c26debe1bf83a3d3759e2c0c" }
-openhands-tools = { git = "https://github.com/OpenHands/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "d2e7fd85ea9f8874c26debe1bf83a3d3759e2c0c" }
+openhands-sdk = { git = "https://github.com/prasadkona/software-agent-sdk.git", subdirectory = "openhands-sdk", rev = "848bda301561c81915b3df31165593b43d3c40c4" }
+openhands-tools = { git = "https://github.com/prasadkona/software-agent-sdk.git", subdirectory = "openhands-tools", rev = "848bda301561c81915b3df31165593b43d3c40c4" }
