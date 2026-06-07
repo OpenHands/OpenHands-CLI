@@ -17,89 +17,19 @@ account console *must* match: ``http://localhost:<callback_port>/callback``.
 from __future__ import annotations
 
 import asyncio
-import base64
-import hashlib
 import secrets
-import time
 import webbrowser
 from typing import Any
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, urlparse
 
-import httpx
-
-
-# ---------------------------------------------------------------------------
-# PKCE primitives (mirrors openhands.app_server.auth.databricks_oauth)
-# ---------------------------------------------------------------------------
-
-
-def _generate_pkce() -> tuple[str, str]:
-    """Return (verifier, challenge). Challenge is S256 of verifier."""
-    verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).rstrip(b"=").decode()
-    digest = hashlib.sha256(verifier.encode()).digest()
-    challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
-    return verifier, challenge
-
-
-def _build_authorize_url(
-    host: str,
-    client_id: str,
-    redirect_uri: str,
-    state: str,
-    challenge: str,
-) -> str:
-    host = host.rstrip("/")
-    params = {
-        "response_type": "code",
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "scope": "all-apis offline_access",
-        "state": state,
-        "code_challenge": challenge,
-        "code_challenge_method": "S256",
-    }
-    return f"{host}/oidc/v1/authorize?{urlencode(params)}"
-
-
-def _exchange_code_for_tokens(
-    host: str,
-    client_id: str,
-    redirect_uri: str,
-    code: str,
-    verifier: str,
-    client_secret: str | None = None,
-) -> dict[str, Any]:
-    try:
-        from openhands.sdk.llm.providers.databricks.utils import USER_AGENT
-    except ImportError:
-        USER_AGENT = "OpenHandsOSS/unknown"
-
-    host = host.rstrip("/")
-    token_data: dict[str, str] = {
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": redirect_uri,
-        "client_id": client_id,
-        "code_verifier": verifier,
-    }
-    if client_secret:
-        token_data["client_secret"] = client_secret
-
-    resp = httpx.post(
-        f"{host}/oidc/v1/token",
-        data=token_data,
-        headers={"User-Agent": USER_AGENT},
-        timeout=15.0,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    return {
-        "access_token": data["access_token"],
-        "refresh_token": data.get("refresh_token", ""),
-        "expires_at": time.time() + data.get("expires_in", 3600),
-        "client_id": client_id,
-        "host": host,
-    }
+# PKCE primitives are shared with the web app + SDK — single source of truth in
+# ``openhands.sdk.llm.providers.databricks.pkce``. The CLI only adds the local
+# browser/callback-server orchestration below.
+from openhands.sdk.llm.providers.databricks.pkce import (
+    build_authorize_url as _build_authorize_url,
+    exchange_code_for_tokens as _exchange_code_for_tokens,
+    generate_pkce as _generate_pkce,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -178,7 +108,9 @@ async def run_browser_pkce_flow(
 
     verifier, challenge = _generate_pkce()
     state = secrets.token_urlsafe(16)
-    authorize_url = _build_authorize_url(host, client_id, redirect_uri, state, challenge)
+    authorize_url = _build_authorize_url(
+        host, client_id, redirect_uri, state, challenge
+    )
 
     # Event set when callback arrives; result stored here.
     code_event: asyncio.Event = asyncio.Event()
@@ -230,7 +162,7 @@ async def run_browser_pkce_flow(
     try:
         webbrowser.open(authorize_url)
         await asyncio.wait_for(code_event.wait(), timeout=timeout_s)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         raise TimeoutError(
             f"Browser authentication timed out after {timeout_s:.0f} seconds. "
             "Please complete sign-in in the browser window and try again."
