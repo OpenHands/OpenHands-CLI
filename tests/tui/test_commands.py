@@ -32,8 +32,8 @@ class TestCommands:
     """Tests for command definitions and handlers."""
 
     def test_commands_list_structure(self):
-        """Test that COMMANDS list has correct structure."""
-        assert isinstance(COMMANDS, list)
+        """Test that COMMANDS tuple has correct structure."""
+        assert isinstance(COMMANDS, tuple)
         assert len(COMMANDS) == 9
 
         # Check that all items are DropdownItems
