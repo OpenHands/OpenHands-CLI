@@ -50,7 +50,7 @@ CONFIRMATION_MODES: dict[ConfirmationMode, dict[str, str]] = {
 
 
 # Permission options for confirmation requests
-PERMISSION_OPTIONS = [
+PERMISSION_OPTIONS: tuple[PermissionOption, ...] = (
     PermissionOption(
         option_id="accept",
         name="Yes, proceed",
@@ -71,7 +71,7 @@ PERMISSION_OPTIONS = [
         name="Auto-confirm LOW/MEDIUM risk, ask for HIGH risk action",
         kind="allow_once",
     ),
-]
+)
 
 
 def get_available_modes() -> list[SessionMode]:
