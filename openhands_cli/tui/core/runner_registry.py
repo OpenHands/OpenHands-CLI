@@ -55,3 +55,16 @@ class RunnerRegistry:
 
         self._current_runner = runner
         return runner
+
+    def remove(self, conversation_id: uuid.UUID) -> None:
+        """Remove a runner from the registry to free memory.
+
+        If the runner being removed is the current runner, the current runner
+        reference is also cleared.
+
+        Args:
+            conversation_id: The ID of the conversation whose runner should be removed.
+        """
+        runner = self._runners.pop(conversation_id, None)
+        if runner is not None and self._current_runner is runner:
+            self._current_runner = None
