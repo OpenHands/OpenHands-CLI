@@ -225,7 +225,7 @@ async def test_handle_condensation_event(event_subscriber, mock_connection):
     # Create a Condensation event
     event = Condensation(
         source="environment",
-        forgotten_event_ids=["event1", "event2"],
+        forgotten_event_ids={"event1", "event2"},
         summary="Some events were forgotten",
         llm_response_id="response-123",
     )
