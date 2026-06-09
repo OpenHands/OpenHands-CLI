@@ -35,6 +35,7 @@ from openhands_cli.utils import (
     get_default_cli_tools,
     get_llm_metadata,
     get_os_description,
+    is_openhands_provider_model,
     should_set_litellm_extra_body,
 )
 
@@ -89,7 +90,7 @@ _LLM_PROXY_BASE_URL_PATTERN = r"^https?://llm-proxy\.[^./]+\.all-hands\.dev"
 
 def _resolve_critic_proxy_base_url(llm: LLM) -> str | None:
     base_url = llm.base_url
-    if llm.model.startswith("openhands/"):
+    if is_openhands_provider_model(llm.model):
         return base_url or DEFAULT_LLM_BASE_URL
     if base_url and re.match(_LLM_PROXY_BASE_URL_PATTERN, base_url):
         return base_url

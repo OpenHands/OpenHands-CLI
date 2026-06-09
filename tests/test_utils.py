@@ -40,6 +40,13 @@ def test_should_set_litellm_extra_body_for_openhands():
     assert should_set_litellm_extra_body("openhands/devstral-small-2507")
 
 
+def test_should_not_set_litellm_extra_body_for_openhands_substrings():
+    """Only the public openhands/ provider prefix should enable metadata."""
+    assert not should_set_litellm_extra_body("custom-openhands/model")
+    assert not should_set_litellm_extra_body("proxy/openhands/model")
+    assert not should_set_litellm_extra_body("litellm_proxy/openhands/model")
+
+
 def test_should_set_litellm_extra_body_for_llm_proxy_base_url():
     """Test that litellm_extra_body is set for models using llm-proxy base URLs."""
     # Any model using llm-proxy.*.all-hands.dev should get metadata

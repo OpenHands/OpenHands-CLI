@@ -29,6 +29,14 @@ def test_get_default_critic_uses_openhands_provider_default_proxy() -> None:
     assert critic.server_url == "https://llm-proxy.app.all-hands.dev/vllm"
 
 
+def test_get_default_critic_ignores_openhands_substring_models() -> None:
+    critic = get_default_critic(
+        LLM(model="custom-openhands/claude-opus-4-8", api_key=SecretStr("sk-test"))
+    )
+
+    assert critic is None
+
+
 class TestLLMEnvOverridesFromEnv:
     """Tests for LLMEnvOverrides.from_env() factory method."""
 

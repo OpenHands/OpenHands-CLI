@@ -73,9 +73,15 @@ def get_os_description() -> str:
     return platform.platform() or system
 
 
+OPENHANDS_PROVIDER_PREFIX = "openhands/"
+
 # Pattern to match OpenHands LLM proxy URLs (e.g., https://llm-proxy.app.all-hands.dev/)
 # Must match the host part of the URL, not arbitrary path components
 _LLM_PROXY_PATTERN = re.compile(r"^https?://llm-proxy\.[^.]+\.all-hands\.dev(?:/|$)")
+
+
+def is_openhands_provider_model(model_name: str) -> bool:
+    return model_name.startswith(OPENHANDS_PROVIDER_PREFIX)
 
 
 def should_set_litellm_extra_body(model_name: str, base_url: str | None = None) -> bool:
@@ -98,7 +104,7 @@ def should_set_litellm_extra_body(model_name: str, base_url: str | None = None) 
     Returns:
         True if litellm_extra_body should be set, False otherwise
     """
-    if model_name.startswith("openhands/"):
+    if is_openhands_provider_model(model_name):
         return True
 
     if base_url and _LLM_PROXY_PATTERN.match(base_url):
