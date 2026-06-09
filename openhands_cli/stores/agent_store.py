@@ -84,6 +84,18 @@ def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
         return None
 
 
+_LLM_PROXY_BASE_URL_PATTERN = r"^https?://llm-proxy\.[^./]+\.all-hands\.dev"
+
+
+def _resolve_critic_proxy_base_url(llm: LLM) -> str | None:
+    base_url = llm.base_url
+    if llm.model.startswith("openhands/"):
+        return base_url or DEFAULT_LLM_BASE_URL
+    if base_url and re.match(_LLM_PROXY_BASE_URL_PATTERN, base_url):
+        return base_url
+    return None
+
+
 def get_default_critic(llm: LLM, *, enable_critic: bool = True) -> CriticBase | None:
     """Auto-configure critic for OpenHands provider-backed models.
 
@@ -98,15 +110,7 @@ def get_default_critic(llm: LLM, *, enable_critic: bool = True) -> CriticBase | 
     if api_key is None:
         return None
 
-    base_url = llm.base_url
-    proxy_base_url: str | None = None
-    if llm.model.startswith("openhands/"):
-        proxy_base_url = base_url or DEFAULT_LLM_BASE_URL
-    elif base_url:
-        pattern = r"^https?://llm-proxy\.[^./]+\.all-hands\.dev"
-        if re.match(pattern, base_url):
-            proxy_base_url = base_url
-
+    proxy_base_url = _resolve_critic_proxy_base_url(llm)
     if proxy_base_url is None:
         return None
 
