@@ -8,8 +8,10 @@ import json
 from contextlib import suppress
 from pathlib import Path
 
-from openhands.tools.delegate import DelegateTool
 from openhands_cli.locations import get_conversations_dir
+
+
+LEGACY_DELEGATE_TOOL_NAME = "delegate"
 
 
 def conversation_has_delegate_tool(conversation_id: str) -> bool:
@@ -42,7 +44,10 @@ def conversation_has_delegate_tool(conversation_id: str) -> bool:
         with open(system_prompt_files[0], encoding="utf-8") as f:
             event_data = json.load(f)
         for tool in event_data.get("tools", []):
-            if isinstance(tool, dict) and tool.get("title") == DelegateTool.name:
+            if (
+                isinstance(tool, dict)
+                and tool.get("title") == LEGACY_DELEGATE_TOOL_NAME
+            ):
                 return True
 
     return False
