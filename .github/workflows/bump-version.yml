@@ -35,8 +35,10 @@ jobs:
                   version: latest
 
             - name: Validate version format
+              env:
+                  INPUTS_VERSION: ${{ inputs.version }}
               run: |
-                  VERSION="${{ inputs.version }}"
+                  VERSION="$INPUTS_VERSION"
                   if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                     echo "❌ Error: Invalid version format. Expected format: X.Y.Z (e.g., 1.10.0)"
                     exit 1
@@ -49,8 +51,10 @@ jobs:
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
             - name: Create branch and bump version
+              env:
+                  INPUTS_VERSION: ${{ inputs.version }}
               run: |
-                  VERSION="${{ inputs.version }}"
+                  VERSION="$INPUTS_VERSION"
                   BRANCH_NAME="bump-version-${VERSION}"
 
                   # Create new branch
@@ -88,10 +92,12 @@ jobs:
                   uv lock
 
             - name: Update snapshot tests
+              env:
+                  INPUTS_VERSION: ${{ inputs.version }}
               run: |
                   # Update snapshot tests to reflect the new version
                   # The version appears in the splash screen SVG snapshots
-                  echo "Updating snapshot tests for version ${{ inputs.version }}..."
+                  echo "Updating snapshot tests for version $INPUTS_VERSION..."
                   uv run pytest tests/snapshots/ --snapshot-update -v
 
                   # List the updated snapshot files
@@ -99,8 +105,10 @@ jobs:
                   git status --short tests/snapshots/
 
             - name: Commit and push changes
+              env:
+                  INPUTS_VERSION: ${{ inputs.version }}
               run: |
-                  VERSION="${{ inputs.version }}"
+                  VERSION="$INPUTS_VERSION"
                   BRANCH_NAME="${{ env.branch_name }}"
 
                   # Stage all changes (pyproject.toml, uv.lock, and snapshot files)
@@ -127,8 +135,10 @@ jobs:
                   git push origin "$BRANCH_NAME"
 
             - name: Check for existing PR
+              env:
+                  INPUTS_VERSION: ${{ inputs.version }}
               run: |
-                  VERSION="${{ inputs.version }}"
+                  VERSION="$INPUTS_VERSION"
                   BRANCH_NAME="${{ env.branch_name }}"
 
                   # Check if a PR already exists for this version
@@ -149,8 +159,10 @@ jobs:
 
             - name: Create Draft Pull Request
               if: env.pr_exists == 'false'
+              env:
+                  INPUTS_VERSION: ${{ inputs.version }}
               run: |
-                  VERSION="${{ inputs.version }}"
+                  VERSION="$INPUTS_VERSION"
                   BRANCH_NAME="${{ env.branch_name }}"
                   SNAPSHOT_COUNT="${{ env.snapshot_count }}"
 
@@ -178,8 +190,10 @@ jobs:
                   fi
 
             - name: Summary
+              env:
+                  INPUTS_VERSION: ${{ inputs.version }}
               run: |
-                  VERSION="${{ inputs.version }}"
+                  VERSION="$INPUTS_VERSION"
                   if [ "${{ env.pr_exists }}" = "true" ]; then
                     echo "ℹ️ PR already exists for version $VERSION: ${{ env.existing_pr_url }}"
                   else
