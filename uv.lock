@@ -1750,8 +1750,8 @@ dev = [
 requires-dist = [
     { name = "agent-client-protocol", specifier = ">=0.8.1,<0.9.0" },
     { name = "httpx", specifier = ">=0.25.0" },
-    { name = "openhands-sdk", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=11878e5ed8440df5bcb6b3c8d9b70848e4ead3f1" },
-    { name = "openhands-tools", git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=11878e5ed8440df5bcb6b3c8d9b70848e4ead3f1" },
+    { name = "openhands-sdk", specifier = "==1.27.0" },
+    { name = "openhands-tools", specifier = "==1.27.0" },
     { name = "openhands-workspace", specifier = "==1.11.1" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyperclip", specifier = ">=1.9.0" },
@@ -1809,7 +1809,7 @@ wheels = [
 [[package]]
 name = "openhands-sdk"
 version = "1.27.0"
-source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-sdk&rev=11878e5ed8440df5bcb6b3c8d9b70848e4ead3f1#11878e5ed8440df5bcb6b3c8d9b70848e4ead3f1" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "agent-client-protocol" },
     { name = "deprecation" },
@@ -1829,11 +1829,15 @@ dependencies = [
     { name = "tree-sitter-bash" },
     { name = "websockets" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/63/0e/726f88ddf74129cb4d7eda80c71f43de2d4a885b8c0bd3024108741e4384/openhands_sdk-1.27.0.tar.gz", hash = "sha256:2d8280a11cc34122b6a89a6992007b132154a2ef58adcfa0c6be28337dd8f010", size = 527602, upload-time = "2026-06-09T14:21:38.029Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cb/5c/80d90103fbfc57016848f83ccdb930cce23abb65c8ea832ab5b109de5e77/openhands_sdk-1.27.0-py3-none-any.whl", hash = "sha256:6a0fb0c664017757d25ab299c3581d400d7f9ce7a3ea3ad8b8f6ef00100ae7a8", size = 638870, upload-time = "2026-06-09T14:21:36.6Z" },
+]
 
 [[package]]
 name = "openhands-tools"
 version = "1.27.0"
-source = { git = "https://github.com/OpenHands/software-agent-sdk.git?subdirectory=openhands-tools&rev=11878e5ed8440df5bcb6b3c8d9b70848e4ead3f1#11878e5ed8440df5bcb6b3c8d9b70848e4ead3f1" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "binaryornot" },
     { name = "browser-use" },
@@ -1845,6 +1849,10 @@ dependencies = [
     { name = "tom-swe" },
     { name = "tree-sitter" },
     { name = "tree-sitter-bash" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e4/2e/5c292c04a218943d665fe0ceef59b9ff6cee7317f36e18f9db5d82ded078/openhands_tools-1.27.0.tar.gz", hash = "sha256:b3f2a8457fee14d085f026ca6dd280154380aebea4d0faafc7b4784689641c96", size = 141272, upload-time = "2026-06-09T14:21:40.856Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/78/30/459be71e9fef1f3f104afd32775dd016a8aa5bc683478f9770f2288584fd/openhands_tools-1.27.0-py3-none-any.whl", hash = "sha256:593a9e56aeb9175fed25985748f0048e1a69db4a906cb923e9cd6bda4ff738dc", size = 186309, upload-time = "2026-06-09T14:21:43.042Z" },
 ]
 
 [[package]]
