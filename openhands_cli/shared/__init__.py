@@ -3,6 +3,12 @@
 from openhands_cli.shared.conversation_summary import extract_conversation_summary
 from openhands_cli.shared.rich_utils import escape_rich_markup
 from openhands_cli.shared.slash_commands import parse_slash_command
+from openhands_cli.shared.tool_kinds import TOOL_KIND_MAPPING
 
 
-__all__ = ["escape_rich_markup", "extract_conversation_summary", "parse_slash_command"]
+__all__ = [
+    "TOOL_KIND_MAPPING",
+    "escape_rich_markup",
+    "extract_conversation_summary",
+    "parse_slash_command",
+]

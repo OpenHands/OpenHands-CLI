@@ -15,15 +15,8 @@ from openhands.tools.file_editor.definition import (
 )
 from openhands.tools.terminal import TerminalAction
 from openhands_cli.shared.delegate_formatter import format_delegate_title
+from openhands_cli.shared.tool_kinds import TOOL_KIND_MAPPING
 from openhands_cli.utils import abbreviate_number, format_cost
-
-
-# Shared mapping from tool names to ACP ToolKind values
-TOOL_KIND_MAPPING: dict[str, ToolKind] = {
-    "terminal": "execute",
-    "browser_use": "fetch",
-    "browser": "fetch",
-}
 
 
 def _format_status_line(usage: TokenUsage, cost: float) -> str:

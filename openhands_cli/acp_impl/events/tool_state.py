@@ -4,8 +4,8 @@ from acp.schema import ToolKind
 from streamingjson import Lexer
 
 from openhands_cli.acp_impl.events.shared_event_handler import THOUGHT_HEADER
-from openhands_cli.acp_impl.events.utils import TOOL_KIND_MAPPING
 from openhands_cli.shared.delegate_formatter import format_delegate_title
+from openhands_cli.shared.tool_kinds import TOOL_KIND_MAPPING
 
 
 class ToolCallState:
