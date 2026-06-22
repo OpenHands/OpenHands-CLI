@@ -18,6 +18,18 @@ class ToolCallState:
     returns True. Accessing them before raises ValueError.
     """
 
+    tool_call_id: str
+    tool_name: str
+    is_think: bool
+    args: str
+    lexer: Lexer
+    prev_emitted_thought_chunk: str
+    started: bool
+    thought_header_emitted: bool
+    summary: str
+    _valid_skeleton_cached: bool
+    _cached_kind: ToolKind | None
+
     def __init__(self, tool_call_id: str, tool_name: str) -> None:
         self.tool_call_id = tool_call_id
         self.tool_name = tool_name
@@ -28,10 +40,8 @@ class ToolCallState:
         self.started = False
         self.thought_header_emitted = False
         self._valid_skeleton_cached = False
-        # Kind is cached once skeleton is valid (depends only on command, not path)
-        self._cached_kind: ToolKind | None = None
-        # Incrementally streamed summary (from assistant content prior to tool call)
-        self.summary: str = ""
+        self._cached_kind = None
+        self.summary = ""
 
     def append_args(self, args_part: str) -> None:
         """Append new arguments part to the accumulated args and lexer."""
