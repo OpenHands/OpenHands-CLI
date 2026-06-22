@@ -21,7 +21,33 @@ import os
 import select
 import subprocess
 import time
-from typing import IO, Any
+from typing import IO, Any, NotRequired, TypedDict
+
+
+class JsonRpcError(TypedDict):
+    """JSON-RPC 2.0 error object."""
+
+    code: int
+    message: str
+    data: NotRequired[Any]
+
+
+class JsonRpcRequest(TypedDict):
+    """JSON-RPC 2.0 request message."""
+
+    jsonrpc: str
+    method: str
+    params: NotRequired[dict[str, Any] | list[Any]]
+    id: NotRequired[int | str]
+
+
+class JsonRpcResponse(TypedDict):
+    """JSON-RPC 2.0 response message."""
+
+    jsonrpc: str
+    id: int | str | None
+    result: NotRequired[Any]
+    error: NotRequired[JsonRpcError]
 
 
 class UnbufferedJsonRpcReader:
@@ -30,6 +56,10 @@ class UnbufferedJsonRpcReader:
     Uses raw bytes mode with os.read() to avoid Python's text buffering issues
     that can cause messages to get stuck in buffers.
     """
+
+    stdout: IO[bytes]
+    buffer: bytes
+    fd: int
 
     def __init__(self, stdout: IO[bytes]) -> None:
         self.stdout = stdout
@@ -72,12 +102,12 @@ class UnbufferedJsonRpcReader:
 
 
 def send_jsonrpc_and_wait(
-    proc: subprocess.Popen,
-    message: dict[str, Any],
+    proc: subprocess.Popen[bytes],
+    message: JsonRpcRequest,
     timeout: float = 5.0,
     verbose: bool = False,
     reader: UnbufferedJsonRpcReader | None = None,
-) -> tuple[bool, dict[str, Any] | None, str, UnbufferedJsonRpcReader | None]:
+) -> tuple[bool, JsonRpcResponse | None, str, UnbufferedJsonRpcReader | None]:
     """
     Send a JSON-RPC message and wait for response.
 
@@ -87,7 +117,7 @@ def send_jsonrpc_and_wait(
 
     Args:
         proc: The subprocess to communicate with
-        message: JSON-RPC message dict
+        message: JSON-RPC request message
         timeout: Timeout in seconds
         verbose: Print verbose output for debugging
         reader: Optional reader to reuse (for buffering between calls)
@@ -158,12 +188,12 @@ def send_jsonrpc_and_wait(
     return False, None, "Response timeout", reader
 
 
-def validate_jsonrpc_response(response: dict[str, Any]) -> tuple[bool, str]:
+def validate_jsonrpc_response(response: JsonRpcResponse) -> tuple[bool, str]:
     """
     Validate a JSON-RPC response for errors.
 
     Args:
-        response: The JSON-RPC response dict
+        response: The JSON-RPC response
 
     Returns:
         tuple of (is_valid: bool, error_message: str)
@@ -183,22 +213,22 @@ def validate_jsonrpc_response(response: dict[str, Any]) -> tuple[bool, str]:
 def test_jsonrpc_messages(
     executable_path: str,
     args: list[str],
-    messages: list[dict[str, Any]],
+    messages: list[JsonRpcRequest],
     timeout_per_message: float = 5.0,
     verbose: bool = True,
-) -> tuple[bool, list[dict[str, Any]]]:
+) -> tuple[bool, list[JsonRpcResponse]]:
     """
     Test a JSON-RPC server by sending messages and validating responses.
 
     Args:
         executable_path: Path to the executable
         args: Command-line arguments for the executable
-        messages: List of JSON-RPC messages to send
+        messages: List of JSON-RPC request messages to send
         timeout_per_message: Timeout in seconds for each message
         verbose: Print detailed output
 
     Returns:
-        tuple of (success: bool, responses: list[dict])
+        tuple of (success: bool, responses: list of JSON-RPC responses)
     """
     if verbose:
         print(f"🚀 Starting: {executable_path} {' '.join(args)}")
@@ -212,7 +242,7 @@ def test_jsonrpc_messages(
         bufsize=0,  # Unbuffered
     )
 
-    all_responses = []
+    all_responses: list[JsonRpcResponse] = []
     all_passed = True
     reader = None  # Reuse reader to maintain buffer between messages
 
