@@ -25,7 +25,7 @@ Example:
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from textual.app import ComposeResult
 from textual.containers import Container
@@ -75,7 +75,7 @@ class SplashContent(Container):
     _is_initialized: bool = False
     _has_critic: bool = False
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         """Initialize the splash content container."""
         super().__init__(**kwargs)
 

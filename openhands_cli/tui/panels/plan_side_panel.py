@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 from rich.markup import escape
@@ -51,7 +51,7 @@ class PlanSidePanel(VerticalScroll):
 
     DEFAULT_CSS = PLAN_PANEL_STYLE
 
-    def __init__(self, app: OpenHandsApp, **kwargs) -> None:
+    def __init__(self, app: OpenHandsApp, **kwargs: Any) -> None:
         """Initialize the Plan side panel."""
         super().__init__(**kwargs)
         self._task_list: list[TaskItem] = []

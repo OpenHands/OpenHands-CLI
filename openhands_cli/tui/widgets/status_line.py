@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from textual.reactive import var
 from textual.timer import Timer
@@ -34,7 +35,7 @@ class WorkingStatusLine(Static):
     elapsed_seconds: var[int] = var(0)
     critic_settings: var[CriticSettings] = var(CriticSettings())
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__("", id="working_status_line", markup=True, **kwargs)
         self._timer: Timer | None = None
         self._working_frame: int = 0
@@ -139,7 +140,7 @@ class InfoStatusLine(Static):
     # Local UI state - updated via Signal subscription to InputField
     is_multiline_mode: var[bool] = var(False)
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__("", id="info_status_line", markup=True, **kwargs)
         self.work_dir_display = self._get_work_dir_display()
 

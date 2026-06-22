@@ -39,7 +39,7 @@ Data Binding:
 
 import uuid
 from collections.abc import Iterable
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from textual import events, getters, on
 from textual.app import App, ComposeResult, SystemCommand
@@ -139,7 +139,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         json_mode: bool = False,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Initialize the app with custom OpenHands theme.
 

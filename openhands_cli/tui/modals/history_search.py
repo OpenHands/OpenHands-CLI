@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from rich.text import Text
 from textual import events, on
@@ -82,7 +82,7 @@ class HistorySearchScreen(ModalScreen[str | None]):
     }
     """
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.history_store = PromptHistoryStore()
         self._all_entries: list[PromptHistoryEntry] = []

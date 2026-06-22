@@ -141,7 +141,7 @@ class ConversationContainer(Container):
         self,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
         initial_critic_settings: CriticSettings | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         # Initialize internal state BEFORE calling super().__init__
         # because reactive watchers may be triggered during initialization

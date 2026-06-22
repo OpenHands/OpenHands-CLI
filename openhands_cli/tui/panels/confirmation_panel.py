@@ -1,6 +1,6 @@
 """Confirmation panel for displaying user confirmation options inline."""
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from textual.app import ComposeResult
 from textual.containers import Container, Vertical
@@ -16,7 +16,7 @@ from openhands_cli.user_actions.types import UserConfirmation
 class ConfirmationOption(Static):
     """A confirmation option that shows > when highlighted."""
 
-    def __init__(self, label: str, **kwargs) -> None:
+    def __init__(self, label: str, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.label = label
         self.is_highlighted = False
