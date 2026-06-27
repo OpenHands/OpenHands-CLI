@@ -182,9 +182,6 @@ def save_settings(
 
         full_model = data.get_full_model_name()
 
-        if full_model.startswith("openhands/") and data.base_url is None:
-            data.base_url = "https://llm-proxy.app.all-hands.dev/"
-
         max_input_tokens = (
             int(data.max_tokens)
             if isinstance(data.max_tokens, str)

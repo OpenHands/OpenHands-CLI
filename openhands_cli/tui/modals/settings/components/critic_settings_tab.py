@@ -44,7 +44,7 @@ class ThresholdInput(Container):
         value: float,
         disabled: bool = False,
         **kwargs,
-    ):
+    ) -> None:
         """Initialize the threshold input.
 
         Args:
@@ -128,7 +128,9 @@ class CriticSettingsTab(Container):
     }
     """
 
-    def __init__(self, initial_settings: CriticSettings | None = None, **kwargs):
+    def __init__(
+        self, initial_settings: CriticSettings | None = None, **kwargs
+    ) -> None:
         """Initialize the Critic settings tab.
 
         Args:

@@ -30,6 +30,7 @@ from openhands.tools.file_editor.definition import FileEditorAction
 from openhands.tools.task_tracker.definition import TaskTrackerObservation
 from openhands.tools.terminal.definition import TerminalAction
 from openhands_cli.shared.delegate_formatter import format_delegate_title
+from openhands_cli.shared.rich_utils import escape_rich_markup
 from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.widgets.collapsible import (
@@ -471,7 +472,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """
         agent_prefix = self._get_agent_prefix()
         summary = (
-            self._escape_rich_markup(str(event.summary).strip().replace("\n", " "))
+            escape_rich_markup(str(event.summary).strip().replace("\n", " "))
             if event.summary
             else ""
         )
@@ -479,7 +480,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
 
         # Terminal actions: show summary + command (truncated for display)
         if isinstance(action, TerminalAction) and action.command:
-            cmd = self._escape_rich_markup(action.command.strip().replace("\n", " "))
+            cmd = escape_rich_markup(action.command.strip().replace("\n", " "))
             cmd = self._truncate_for_display(cmd)
             if summary:
                 return f"{agent_prefix}[bold]{summary}[/bold][dim]: $ {cmd}[/dim]"
@@ -488,7 +489,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         # File operations: include path with Reading/Editing
         elif isinstance(action, FileEditorAction) and action.path:
             op = "Reading" if action.command == "view" else "Editing"
-            path = self._escape_rich_markup(action.path)
+            path = escape_rich_markup(action.path)
             if summary:
                 return f"{agent_prefix}[bold]{summary}[/bold][dim]: {op} {path}[/dim]"
             return f"{agent_prefix}[bold]{op}[/bold][dim] {path}[/dim]"
@@ -522,16 +523,6 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """
         return event.visualize
 
-    def _escape_rich_markup(self, text: str) -> str:
-        """Escape Rich markup characters in text to prevent markup errors.
-
-        This is needed to handle content with special characters (e.g., Chinese text
-        with brackets) that would otherwise cause MarkupError when rendered in
-        Collapsible widgets with markup=True.
-        """
-        # Escape square brackets which are used for Rich markup
-        return text.replace("[", r"\[").replace("]", r"\]")
-
     def _truncate_for_display(
         self, text: str, max_length: int = MAX_LINE_LENGTH, *, from_start: bool = True
     ) -> str:
@@ -554,7 +545,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         """Strip, collapse newlines, truncate, and escape Rich markup for display."""
         text = str(text).strip().replace("\n", " ")
         text = self._truncate_for_display(text, from_start=from_start)
-        return self._escape_rich_markup(text)
+        return escape_rich_markup(text)
 
     def _extract_meaningful_title(self, event, fallback_title: str) -> str:
         """Extract a meaningful title from an event, with fallback to truncated
@@ -634,7 +625,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
                 content_str = self._truncate_for_display(content_str)
 
                 if content_str.strip():
-                    return f"{fallback_title}: {self._escape_rich_markup(content_str)}"
+                    return f"{fallback_title}: {escape_rich_markup(content_str)}"
             except Exception:
                 pass
 

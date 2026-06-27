@@ -7,6 +7,7 @@ import pytest
 from pydantic import SecretStr
 
 from openhands.sdk import LLM
+from openhands.sdk.critic.impl.api import APIBasedCritic
 from openhands_cli.stores.agent_store import (
     ENV_LLM_API_KEY,
     ENV_LLM_BASE_URL,
@@ -15,7 +16,25 @@ from openhands_cli.stores.agent_store import (
     MissingEnvironmentVariablesError,
     apply_llm_overrides,
     check_and_warn_env_vars,
+    get_default_critic,
 )
+
+
+def test_get_default_critic_uses_openhands_provider_default_proxy() -> None:
+    critic = get_default_critic(
+        LLM(model="openhands/claude-opus-4-8", api_key=SecretStr("sk-test"))
+    )
+
+    assert isinstance(critic, APIBasedCritic)
+    assert critic.server_url == "https://llm-proxy.app.all-hands.dev/vllm"
+
+
+def test_get_default_critic_ignores_openhands_substring_models() -> None:
+    critic = get_default_critic(
+        LLM(model="custom-openhands/claude-opus-4-8", api_key=SecretStr("sk-test"))
+    )
+
+    assert critic is None
 
 
 class TestLLMEnvOverridesFromEnv:

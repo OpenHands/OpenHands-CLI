@@ -75,7 +75,7 @@ class SettingsScreen(ModalScreen):
         on_first_time_settings_cancelled: Callable[[], None] | None = None,
         env_overrides_enabled: bool = False,
         **kwargs,
-    ):
+    ) -> None:
         """Initialize the settings screen.
 
         Args:

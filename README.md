@@ -28,6 +28,14 @@
 
 Run OpenHands agent inside your terminal, favorite IDE, CI pipelines, local browser, or secure OpenHands Cloud sandboxes.
 
+## Project status
+
+OpenHands V1 CLI is **feature-complete** and primarily maintained for stability.
+Expect only major bug fixes and compatibility updates; new features are unlikely.
+
+For active feature development, see [OpenHands](https://github.com/OpenHands/OpenHands) or join the [Slack](https://dub.sh/openhands].
+
+
 ## Installation
 
 ### Using uv (Recommended)

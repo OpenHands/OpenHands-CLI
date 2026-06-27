@@ -15,6 +15,7 @@ from openhands.sdk.event import ActionEvent, AgentErrorEvent, UserRejectObservat
 from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.llm import MessageToolCall
 from openhands.tools.terminal.definition import TerminalAction
+from openhands_cli.shared.rich_utils import escape_rich_markup
 from openhands_cli.stores import CliSettings
 from openhands_cli.tui.textual_app import OpenHandsApp
 from openhands_cli.tui.widgets.richlog_visualizer import (
@@ -126,16 +127,16 @@ class TestChineseCharacterMarkupHandling:
         ]
 
         for input_text, expected_output in test_cases:
-            result = visualizer._escape_rich_markup(input_text)
+            result = escape_rich_markup(input_text)
             assert result == expected_output, (
                 f"Failed to escape '{input_text}': expected '{expected_output}', "
                 f"got '{result}'"
             )
 
     def test_safe_content_string_escapes_problematic_content(self, visualizer):
-        """Test that _escape_rich_markup escapes MarkupError content."""
+        """Test that escape_rich_markup escapes MarkupError content."""
         problematic_content = "+0.3%,月变化+0.8%,处于历史40%分位]"
-        safe_content = visualizer._escape_rich_markup(str(problematic_content))
+        safe_content = escape_rich_markup(str(problematic_content))
 
         # Verify brackets are escaped
         assert r"\]" in safe_content
@@ -161,7 +162,7 @@ class TestChineseCharacterMarkupHandling:
         This test demonstrates that the fix resolves the issue.
         """
         problematic_content = "+0.3%,月变化+0.8%,处于历史40%分位]"
-        safe_content = visualizer._escape_rich_markup(str(problematic_content))
+        safe_content = escape_rich_markup(str(problematic_content))
 
         # This should NOT raise an error
         widget = Static(safe_content, markup=True)
@@ -215,7 +216,7 @@ class TestChineseCharacterMarkupHandling:
     )
     def test_various_chinese_patterns_are_escaped(self, visualizer, test_content):
         """Test that various patterns of Chinese text with special chars are handled."""
-        safe_content = visualizer._escape_rich_markup(str(test_content))
+        safe_content = escape_rich_markup(str(test_content))
 
         # Verify brackets are escaped
         assert "[" not in safe_content or r"\[" in safe_content

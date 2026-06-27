@@ -16,7 +16,7 @@ from openhands_cli.user_actions.types import UserConfirmation
 class ConfirmationOption(Static):
     """A confirmation option that shows > when highlighted."""
 
-    def __init__(self, label: str, **kwargs):
+    def __init__(self, label: str, **kwargs) -> None:
         super().__init__(**kwargs)
         self.label = label
         self.is_highlighted = False
@@ -63,7 +63,7 @@ class InlineConfirmationPanel(Container):
         self,
         num_actions: int,
         **kwargs,
-    ):
+    ) -> None:
         """Initialize the inline confirmation panel.
 
         Args:

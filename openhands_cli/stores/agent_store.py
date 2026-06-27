@@ -35,6 +35,7 @@ from openhands_cli.utils import (
     get_default_cli_tools,
     get_llm_metadata,
     get_os_description,
+    is_openhands_provider_model,
     should_set_litellm_extra_body,
 )
 
@@ -84,39 +85,39 @@ def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
         return None
 
 
+_LLM_PROXY_BASE_URL_PATTERN = r"^https?://llm-proxy\.[^./]+\.all-hands\.dev"
+
+
+def _resolve_critic_proxy_base_url(llm: LLM) -> str | None:
+    base_url = llm.base_url
+    if is_openhands_provider_model(llm.model):
+        return base_url or DEFAULT_LLM_BASE_URL
+    if base_url and re.match(_LLM_PROXY_BASE_URL_PATTERN, base_url):
+        return base_url
+    return None
+
+
 def get_default_critic(llm: LLM, *, enable_critic: bool = True) -> CriticBase | None:
-    """Auto-configure critic for All-Hands LLM proxy.
+    """Auto-configure critic for OpenHands provider-backed models.
 
-    When the LLM base_url matches `llm-proxy.*.all-hands.dev`, returns an
-    APIBasedCritic configured with:
-    - server_url: {base_url}/vllm
-    - api_key: same as LLM
-    - model_name: "critic"
-
-    Returns None if base_url doesn't match, api_key is not set, or enable_critic
-    is False.
-
-    Args:
-        llm: The LLM configuration
-        enable_critic: Whether critic feature is enabled (from settings)
+    OpenHands provider models keep the public ``openhands/`` prefix in saved
+    config. The SDK derives the LiteLLM proxy base URL at transport time, so the
+    critic uses the same default when no explicit base_url is saved.
     """
-    # Check if critic is enabled in settings
     if not enable_critic:
         return None
 
-    base_url = llm.base_url
     api_key = llm.api_key
-    if base_url is None or api_key is None:
+    if api_key is None:
         return None
 
-    # Match: llm-proxy.{env}.all-hands.dev (e.g., staging, prod, eval, app)
-    pattern = r"^https?://llm-proxy\.[^./]+\.all-hands\.dev"
-    if not re.match(pattern, base_url):
+    proxy_base_url = _resolve_critic_proxy_base_url(llm)
+    if proxy_base_url is None:
         return None
 
     try:
         return APIBasedCritic(
-            server_url=f"{base_url.rstrip('/')}/vllm",
+            server_url=f"{proxy_base_url.rstrip('/')}/vllm",
             api_key=api_key,
             model_name="critic",
         )

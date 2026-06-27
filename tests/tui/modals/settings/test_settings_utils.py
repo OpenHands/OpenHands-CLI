@@ -220,6 +220,36 @@ def test_mode_specific_fields_cleared_and_not_saved(
     assert saved_agent.llm.base_url == expected_base_url
 
 
+def test_openhands_basic_mode_does_not_pass_proxy_base_url(
+    monkeypatch: pytest.MonkeyPatch,
+    deps: FakeAgentStore,
+) -> None:
+    captured_llm_kwargs: list[dict[str, object]] = []
+    real_llm = settings_utils.LLM
+
+    def capture_llm_kwargs(**kwargs):
+        captured_llm_kwargs.append(kwargs)
+        return real_llm(**kwargs)
+
+    monkeypatch.setattr(settings_utils, "LLM", capture_llm_kwargs)
+
+    data = settings_utils.SettingsFormData(
+        mode="basic",
+        provider="openhands",
+        model="claude-opus-4-8",
+        custom_model="should-be-cleared",
+        base_url="https://advanced.example",
+        api_key_input="sk-123",
+        memory_condensation_enabled=True,
+    )
+
+    result = settings_utils.save_settings(data, existing_agent=None)
+
+    assert result.success is True
+    assert captured_llm_kwargs[0]["model"] == "openhands/claude-opus-4-8"
+    assert captured_llm_kwargs[0]["base_url"] is None
+
+
 #
 # 3. API key required when there's no existing agent
 #

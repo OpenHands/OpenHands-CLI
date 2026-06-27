@@ -15,7 +15,6 @@ from openhands.sdk.event import SystemPromptEvent
 from openhands.sdk.event.base import Event
 from openhands.sdk.tool import Tool
 from openhands.tools import TaskToolSet
-from openhands.tools.delegate import DelegateTool
 from openhands.tools.file_editor import FileEditorTool
 from openhands.tools.preset.default import get_default_condenser
 from openhands.tools.task_tracker import TaskTrackerTool
@@ -73,9 +72,15 @@ def get_os_description() -> str:
     return platform.platform() or system
 
 
+OPENHANDS_PROVIDER_PREFIX = "openhands/"
+
 # Pattern to match OpenHands LLM proxy URLs (e.g., https://llm-proxy.app.all-hands.dev/)
 # Must match the host part of the URL, not arbitrary path components
 _LLM_PROXY_PATTERN = re.compile(r"^https?://llm-proxy\.[^.]+\.all-hands\.dev(?:/|$)")
+
+
+def is_openhands_provider_model(model_name: str) -> bool:
+    return model_name.startswith(OPENHANDS_PROVIDER_PREFIX)
 
 
 def should_set_litellm_extra_body(model_name: str, base_url: str | None = None) -> bool:
@@ -88,8 +93,8 @@ def should_set_litellm_extra_body(model_name: str, base_url: str | None = None) 
 
     This avoids issues with providers that don't support extra_body parameters.
 
-    The SDK internally translates "openhands/" prefix to "litellm_proxy/"
-    when making API calls.
+    The SDK translates "openhands/" models to the LiteLLM proxy only when
+    making transport calls.
 
     Args:
         model_name: Name of the LLM model
@@ -98,7 +103,7 @@ def should_set_litellm_extra_body(model_name: str, base_url: str | None = None) 
     Returns:
         True if litellm_extra_body should be set, False otherwise
     """
-    if "openhands/" in model_name:
+    if is_openhands_provider_model(model_name):
         return True
 
     if base_url and _LLM_PROXY_PATTERN.match(base_url):
@@ -160,23 +165,23 @@ def get_llm_metadata(
     return metadata
 
 
+LEGACY_DELEGATE_TOOL_NAME = "delegate"
+
+
 def get_default_cli_tools(*, use_delegate_tool: bool = False) -> list[Tool]:
     """Get the default tool specifications for CLI mode (browser disabled).
 
     Args:
-        use_delegate_tool: If True, use DelegateTool instead of TaskToolSet.
-            This is used for backward compatibility with conversations that
-            already have DelegateTool events. Defaults to False (use TaskToolSet).
+        use_delegate_tool: If True, use the legacy delegate tool name instead
+            of TaskToolSet. This supports existing conversation metadata that
+            already references delegate events. Defaults to False (use TaskToolSet).
 
     Returns:
         List of Tool specifications for the CLI agent.
-
-    Note:
-        DelegateTool is deprecated in favor of TaskToolSet for new conversations.
-        Existing conversations with DelegateTool events will continue to use
-        DelegateTool to maintain backward compatibility.
     """
-    task_tool_name = DelegateTool.name if use_delegate_tool else TaskToolSet.name
+    task_tool_name = (
+        LEGACY_DELEGATE_TOOL_NAME if use_delegate_tool else TaskToolSet.name
+    )
     return [
         Tool(name=TerminalTool.name),
         Tool(name=FileEditorTool.name),
@@ -263,4 +268,4 @@ def json_callback(event: Event) -> None:
     if isinstance(event, SystemPromptEvent):
         return
 
-    print(json.dumps(event.model_dump()))
+    print(json.dumps(event.model_dump(), ensure_ascii=False))

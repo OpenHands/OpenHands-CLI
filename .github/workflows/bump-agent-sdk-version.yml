@@ -17,6 +17,8 @@ jobs:
     bump-version:
         name: Bump agent-sdk version to ${{ inputs.version }}
         runs-on: ubuntu-24.04
+        env:
+            VERSION: ${{ inputs.version }}
 
         steps:
             - name: Checkout repository
@@ -26,7 +28,7 @@ jobs:
 
             - name: Validate version format
               run: |
-                  VERSION="${{ inputs.version }}"
+                  VERSION="$VERSION"
                   if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
                     echo "❌ ERROR: Invalid version format: $VERSION"
                     echo "Version must be in the format X.Y.Z or X.Y.Z-suffix (e.g., 1.8.3 or 1.8.3-alpha.1)"
@@ -44,7 +46,7 @@ jobs:
 
             - name: Update versions in pyproject.toml
               run: |
-                  VERSION="${{ inputs.version }}"
+                  VERSION="$VERSION"
                   echo "Updating openhands-sdk and openhands-tools to version $VERSION"
 
                   # Update openhands-sdk version
@@ -84,10 +86,10 @@ jobs:
             - name: Create branch and commit changes
               if: steps.check_changes.outputs.has_changes == 'true'
               run: |
-                  BRANCH_NAME="bump-agent-sdk-${{ inputs.version }}"
+                  BRANCH_NAME="bump-agent-sdk-$VERSION"
                   git checkout -b "$BRANCH_NAME"
                   git add pyproject.toml uv.lock
-                  git commit -m "Bump openhands-sdk and openhands-tools to ${{ inputs.version }}" \
+                  git commit -m "Bump openhands-sdk and openhands-tools to $VERSION" \
                              -m "Automated version bump triggered by workflow dispatch."
                   git push origin "$BRANCH_NAME"
                   echo "branch_name=$BRANCH_NAME" >> $GITHUB_ENV
@@ -95,7 +97,7 @@ jobs:
             - name: Check for existing PR
               if: steps.check_changes.outputs.has_changes == 'true'
               run: |
-                  BRANCH_NAME="bump-agent-sdk-${{ inputs.version }}"
+                  BRANCH_NAME="bump-agent-sdk-$VERSION"
                   EXISTING_PR=$(curl -s \
                     -H "Authorization: token ${{ secrets.OPENHANDS_BOT_GITHUB_PAT_PUBLIC }}" \
                     -H "Accept: application/vnd.github.v3+json" \
@@ -103,29 +105,42 @@ jobs:
                     | jq -r '.[0].html_url // "null"')
 
                   if [ "$EXISTING_PR" != "null" ]; then
-                    echo "PR already exists for version ${{ inputs.version }}: $EXISTING_PR"
+                    echo "PR already exists for version $VERSION: $EXISTING_PR"
                     echo "pr_exists=true" >> $GITHUB_ENV
                     echo "existing_pr_url=$EXISTING_PR" >> $GITHUB_ENV
                   else
-                    echo "No existing PR found for version ${{ inputs.version }}"
+                    echo "No existing PR found for version $VERSION"
                     echo "pr_exists=false" >> $GITHUB_ENV
                   fi
 
             - name: Create Pull Request
               if: steps.check_changes.outputs.has_changes == 'true' && env.pr_exists == 'false'
               run: |
-                  BRANCH_NAME="bump-agent-sdk-${{ inputs.version }}"
-                  PR_RESPONSE=$(curl -s -X POST \
-                    -H "Authorization: token ${{ secrets.OPENHANDS_BOT_GITHUB_PAT_PUBLIC }}" \
-                    -H "Accept: application/vnd.github.v3+json" \
-                    https://api.github.com/repos/${{ github.repository }}/pulls \
-                    -d '{
-                      "title": "Bump openhands-sdk and openhands-tools to ${{ inputs.version }}",
-                      "head": "'"$BRANCH_NAME"'",
-                      "base": "main",
-                      "body": "## Summary\nThis PR bumps the following packages to version `${{ inputs.version }}`:\n- `openhands-sdk`\n- `openhands-tools`\n\n## Changes\n- Updated `pyproject.toml` with new version constraints\n- Regenerated `uv.lock` with the new dependencies\n\n## Context\nThis update was automatically triggered via workflow dispatch.",
-                      "draft": false
-                    }')
+                  BRANCH_NAME="bump-agent-sdk-$VERSION"
+                  PR_BODY=$(cat <<EOF
+                  ## Summary
+                  This PR bumps the following packages to version \`$VERSION\`:
+                  - \`openhands-sdk\`
+                  - \`openhands-tools\`
+
+                  ## Changes
+                  - Updated \`pyproject.toml\` with new version constraints
+                  - Regenerated \`uv.lock\` with the new dependencies
+
+                  ## Context
+                  This update was automatically triggered via workflow dispatch.
+                  EOF
+                  )
+                  PR_RESPONSE=$(jq -n \
+                    --arg title "Bump openhands-sdk and openhands-tools to $VERSION" \
+                    --arg head "$BRANCH_NAME" \
+                    --arg body "$PR_BODY" \
+                    '{title: $title, head: $head, base: "main", body: $body, draft: false}' \
+                    | curl -s -X POST \
+                      -H "Authorization: token ${{ secrets.OPENHANDS_BOT_GITHUB_PAT_PUBLIC }}" \
+                      -H "Accept: application/vnd.github.v3+json" \
+                      https://api.github.com/repos/${{ github.repository }}/pulls \
+                      -d @-)
 
                   PR_URL=$(echo "$PR_RESPONSE" | jq -r '.html_url // "null"')
                   if [ "$PR_URL" != "null" ]; then
@@ -141,11 +156,11 @@ jobs:
               run: |
                   if [ "${{ steps.check_changes.outputs.has_changes }}" = "true" ]; then
                     if [ "${{ env.pr_exists }}" = "true" ]; then
-                      echo "ℹ️ PR already exists for version ${{ inputs.version }}: ${{ env.existing_pr_url }}"
+                      echo "ℹ️ PR already exists for version $VERSION: ${{ env.existing_pr_url }}"
                     else
-                      echo "✅ Successfully created PR to bump agent-sdk to version ${{ inputs.version }}"
+                      echo "✅ Successfully created PR to bump agent-sdk to version $VERSION"
                       echo "PR URL: ${{ env.pr_url }}"
                     fi
                   else
-                    echo "ℹ️ No changes needed - version ${{ inputs.version }} is already set in pyproject.toml"
+                    echo "ℹ️ No changes needed - version $VERSION is already set in pyproject.toml"
                   fi

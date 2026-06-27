@@ -11,6 +11,7 @@ Refactor: split token streaming into a dedicated class.
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 from acp import (
     Client,
@@ -73,7 +74,7 @@ class TokenBasedEventSubscriber:
         conn: Client,
         loop: asyncio.AbstractEventLoop,
         conversation: BaseConversation | None = None,
-    ):
+    ) -> None:
         self.session_id = session_id
         self.conn = conn
         self.loop = loop
@@ -238,7 +239,7 @@ class TokenBasedEventSubscriber:
         else:
             self.loop.run_until_complete(_send())
 
-    def _handle_tool_call_streaming(self, tool_call) -> None:
+    def _handle_tool_call_streaming(self, tool_call: Any) -> None:
         if not tool_call:
             return
 

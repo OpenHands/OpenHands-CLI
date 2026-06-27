@@ -24,7 +24,7 @@ class ExitConfirmationModal(ModalScreen):
         on_exit_confirmed: Callable[[], None] | None = None,
         on_exit_cancelled: Callable[[], None] | None = None,
         **kwargs,
-    ):
+    ) -> None:
         """Initialize the exit confirmation modal.
 
         Args:
