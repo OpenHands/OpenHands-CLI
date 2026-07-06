@@ -5,7 +5,8 @@ This replaces the Rich-based CLIVisualizer with a Textual-compatible version.
 
 import re
 import threading
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from rich.text import Text
 from textual.widgets import Markdown
@@ -233,7 +234,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             return f"({agent_name}) "
         return ""
 
-    def _run_on_main_thread(self, func, *args) -> None:
+    def _run_on_main_thread(self, func: Callable[..., Any], *args: Any) -> None:
         """Run a function on the main thread via call_from_thread if needed."""
         import asyncio
 
@@ -547,7 +548,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
         text = self._truncate_for_display(text, from_start=from_start)
         return escape_rich_markup(text)
 
-    def _extract_meaningful_title(self, event, fallback_title: str) -> str:
+    def _extract_meaningful_title(self, event: Event, fallback_title: str) -> str:
         """Extract a meaningful title from an event, with fallback to truncated
         content."""
         # For ActionEvents, prefer the LLM-generated summary if available
