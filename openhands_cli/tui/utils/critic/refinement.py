@@ -12,14 +12,26 @@ Refinement can be triggered in two ways:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypedDict
 
 
 if TYPE_CHECKING:
     from openhands.sdk.critic.result import CriticResult
 
 
-def _format_feature_for_prompt(feature: dict[str, Any]) -> str:
+class Feature(TypedDict, total=False):
+    """Type definition for critic feature dictionaries.
+
+    Represents a feature detected by the critic, such as an agent behavioral
+    issue (e.g., insufficient_testing, loop_behavior).
+    """
+
+    name: str
+    display_name: str
+    probability: float
+
+
+def _format_feature_for_prompt(feature: Feature) -> str:
     """Format a single feature for display in the refinement prompt.
 
     Args:
@@ -36,7 +48,7 @@ def _format_feature_for_prompt(feature: dict[str, Any]) -> str:
 def get_high_probability_issues(
     critic_result: CriticResult,
     issue_threshold: float,
-) -> list[dict[str, Any]]:
+) -> list[Feature]:
     """Extract issues with probability above the threshold.
 
     Looks for agent behavioral issues and other detected issues from the
@@ -47,7 +59,7 @@ def get_high_probability_issues(
         issue_threshold: Minimum probability to consider an issue significant
 
     Returns:
-        List of issue dicts with 'name', 'display_name', and 'probability'
+        List of Feature dicts with 'name', 'display_name', and 'probability'
     """
     if not critic_result.metadata:
         return []
@@ -56,7 +68,7 @@ def get_high_probability_issues(
     if not categorized:
         return []
 
-    high_prob_issues: list[dict[str, Any]] = []
+    high_prob_issues: list[Feature] = []
 
     # Check agent behavioral issues (e.g., insufficient_testing, loop_behavior)
     for issue in categorized.get("agent_behavioral_issues", []):
@@ -75,7 +87,7 @@ def build_refinement_message(
     max_iterations: int = 3,
     *,
     issue_threshold: float = 0.75,
-    triggered_issues: list[dict[str, Any]] | None = None,
+    triggered_issues: list[Feature] | None = None,
 ) -> str:
     """Build a follow-up message to send to the agent when refinement is needed.
 
@@ -132,7 +144,7 @@ def should_trigger_refinement(
     threshold: float,
     *,
     issue_threshold: float = 0.75,
-) -> tuple[bool, list[dict[str, Any]]]:
+) -> tuple[bool, list[Feature]]:
     """Check if iterative refinement should be triggered.
 
     Refinement is triggered when:
