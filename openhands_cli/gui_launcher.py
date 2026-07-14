@@ -88,13 +88,16 @@ def get_openhands_version() -> str:
     return os.environ.get("OPENHANDS_VERSION", "latest")
 
 
-def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
+def launch_gui_server(
+    mount_cwd: bool = False, gpu: bool = False, port: int = 3000
+) -> None:
     """Launch the OpenHands GUI server using Docker.
 
     Args:
         mount_cwd: If True, mount the current working directory into the container.
         gpu: If True, enable GPU support by mounting all GPUs into the
             container via nvidia-docker.
+        port: Host port to bind the GUI server to.
     """
     console.print("🚀 Launching OpenHands GUI server...", style="blue", markup=False)
     console.print()
@@ -117,7 +120,7 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
 
     console.print("✅ Starting OpenHands GUI server...", style="green", markup=False)
     console.print(
-        "The server will be available at: http://localhost:3000",
+        f"The server will be available at: http://localhost:{port}",
         style="grey50",
         markup=False,
     )
@@ -187,7 +190,7 @@ def launch_gui_server(mount_cwd: bool = False, gpu: bool = False) -> None:
     docker_cmd.extend(
         [
             "-p",
-            "3000:3000",
+            f"{port}:3000",
             "--add-host",
             "host.docker.internal:host-gateway",
             "--name",

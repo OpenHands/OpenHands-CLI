@@ -28,4 +28,10 @@ def add_serve_parser(subparsers: argparse._SubParsersAction) -> argparse.Argumen
         action="store_true",
         default=False,
     )
+    serve_parser.add_argument(
+        "--port",
+        help="Host port to bind the GUI server to (default: 3000)",
+        type=int,
+        default=3000,
+    )
     return serve_parser

@@ -192,3 +192,28 @@ class TestLaunchGuiServer:
                 assert "--gpus" in run_cmd
                 assert "all" in run_cmd
                 assert "SANDBOX_ENABLE_GPU=true" in " ".join(run_cmd)
+
+    @patch("openhands_cli.gui_launcher.check_docker_requirements")
+    @patch("openhands_cli.gui_launcher.ensure_config_dir_exists")
+    @patch("openhands_cli.gui_launcher.get_openhands_version")
+    @patch("subprocess.run")
+    @patch("openhands_cli.gui_launcher.console.print")
+    def test_launch_gui_server_custom_port(
+        self,
+        mock_print,
+        mock_run,
+        mock_version,
+        mock_config_dir,
+        mock_check_docker,
+    ):
+        """Test that a custom port maps host:port to the container's port 3000."""
+        mock_check_docker.return_value = True
+        mock_config_dir.return_value = Path("/home/user/.openhands")
+        mock_version.return_value = "latest"
+        mock_run.return_value = MagicMock(returncode=0)
+
+        launch_gui_server(port=4000)
+
+        docker_cmd = mock_run.call_args[0][0]
+        assert "-p" in docker_cmd
+        assert docker_cmd[docker_cmd.index("-p") + 1] == "4000:3000"
