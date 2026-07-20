@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+from typing import ClassVar
 
 from pydantic import BaseModel, field_validator
 
@@ -53,6 +54,9 @@ class CliSettings(BaseModel):
     auto_open_plan_panel: bool = True
     critic: CriticSettings = CriticSettings()
 
+    # Class-level cache: maps config_path -> settings (not a Pydantic field)
+    _cache: ClassVar[dict[Path, "CliSettings"]] = {}
+
     @classmethod
     def get_config_path(cls) -> Path:
         """Get the path to the CLI configuration file."""
@@ -100,10 +104,14 @@ class CliSettings(BaseModel):
         return data, migrated
 
     @classmethod
-    def load(cls) -> "CliSettings":
-        """Load CLI settings from file.
+    def load(cls, *, refresh: bool = False) -> "CliSettings":
+        """Load CLI settings from file with caching.
 
         Automatically migrates legacy settings format if detected.
+        Uses a class-level cache (keyed by config path) to avoid repeated disk I/O.
+
+        Args:
+            refresh: If True, force reload from disk and update the cache.
 
         Returns:
             CliSettings instance with loaded settings, or defaults if file doesn't
@@ -111,8 +119,13 @@ class CliSettings(BaseModel):
         """
         config_path = cls.get_config_path()
 
+        if not refresh and config_path in cls._cache:
+            return cls._cache[config_path]
+
         if not config_path.exists():
-            return cls()
+            settings = cls()
+            cls._cache[config_path] = settings
+            return settings
 
         try:
             with open(config_path) as f:
@@ -127,13 +140,29 @@ class CliSettings(BaseModel):
             if was_migrated:
                 settings.save()
 
+            cls._cache[config_path] = settings
             return settings
         except (json.JSONDecodeError, ValueError):
             # If file is corrupted, return defaults
-            return cls()
+            settings = cls()
+            cls._cache[config_path] = settings
+            return settings
+
+    @classmethod
+    def clear_cache(cls, path: Path | None = None) -> None:
+        """Clear the settings cache.
+
+        Args:
+            path: If provided, only clear cache for this path.
+                  If None, clear entire cache.
+        """
+        if path is not None:
+            cls._cache.pop(path, None)
+        else:
+            cls._cache.clear()
 
     def save(self) -> None:
-        """Save CLI settings to file."""
+        """Save CLI settings to file and update cache."""
         config_path = self.get_config_path()
 
         # Ensure the persistence directory exists
@@ -141,3 +170,6 @@ class CliSettings(BaseModel):
 
         with open(config_path, "w") as f:
             json.dump(self.model_dump(), f, indent=2)
+
+        # Update cache to reflect saved state
+        CliSettings._cache[config_path] = self
