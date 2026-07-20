@@ -31,6 +31,7 @@ from openhands.tools.task_tracker.definition import TaskTrackerObservation
 from openhands.tools.terminal.definition import TerminalAction
 from openhands_cli.shared.delegate_formatter import format_delegate_title
 from openhands_cli.shared.rich_utils import escape_rich_markup
+from openhands_cli.shared.text_utils import truncate_text
 from openhands_cli.stores import CliSettings
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.widgets.collapsible import (
@@ -534,12 +535,7 @@ class ConversationVisualizer(ConversationVisualizerBase):
             from_start: If True, keep the start and add ellipsis at end.
                        If False, keep the end and add ellipsis at start (for paths).
         """
-        if len(text) > max_length:
-            if from_start:
-                return text[: max_length - len(ELLIPSIS)] + ELLIPSIS
-            else:
-                return ELLIPSIS + text[-(max_length - len(ELLIPSIS)) :]
-        return text
+        return truncate_text(text, max_length, from_start=from_start, ellipsis=ELLIPSIS)
 
     def _clean_and_truncate(self, text: str, *, from_start: bool = True) -> str:
         """Strip, collapse newlines, truncate, and escape Rich markup for display."""

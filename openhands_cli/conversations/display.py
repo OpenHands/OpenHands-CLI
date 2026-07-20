@@ -5,6 +5,7 @@ from datetime import datetime
 from rich.console import Console
 
 from openhands_cli.conversations.store.local import LocalFileStore
+from openhands_cli.shared.text_utils import clean_for_display
 from openhands_cli.theme import OPENHANDS_THEME
 
 
@@ -106,10 +107,4 @@ def _truncate_prompt(prompt: str | None, max_length: int = 60) -> str:
     if not prompt:
         return ""
 
-    # Replace newlines with spaces for display
-    prompt = prompt.replace("\n", " ").replace("\r", " ")
-
-    if len(prompt) <= max_length:
-        return prompt
-
-    return prompt[: max_length - 3] + "..."
+    return clean_for_display(prompt, max_length)
