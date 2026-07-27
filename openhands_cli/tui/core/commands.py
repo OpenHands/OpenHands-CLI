@@ -15,7 +15,7 @@ from openhands_cli.tui.content.resources import LoadedResourcesInfo
 
 
 # Available commands with descriptions after the command
-COMMANDS = [
+COMMANDS = (
     DropdownItem(main="/help - Display available commands"),
     DropdownItem(main="/new - Start a new conversation"),
     DropdownItem(main="/history - Toggle conversation history"),
@@ -25,7 +25,7 @@ COMMANDS = [
     DropdownItem(main="/skills - View loaded skills, hooks, and MCPs"),
     DropdownItem(main="/feedback - Send anonymous feedback about CLI"),
     DropdownItem(main="/exit - Exit the application"),
-]
+)
 
 
 def get_valid_commands() -> set[str]:
