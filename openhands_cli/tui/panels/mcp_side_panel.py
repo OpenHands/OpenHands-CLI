@@ -1,18 +1,17 @@
 """MCP side panel widget for displaying MCP server information."""
 
 import json
-from typing import Any
 
-from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.widgets import Static
 
 from openhands.sdk import Agent
+from openhands.sdk.mcp.config import MCPServer, dump_mcp_config
 from openhands_cli.locations import MCP_CONFIG_FILE
-from openhands_cli.mcp.mcp_display_utils import normalize_server_object
 from openhands_cli.mcp.mcp_utils import get_config_status
+from openhands_cli.stores.agent_store import convert_mcp_servers
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.panels.mcp_panel_style import MCP_PANEL_STYLE
 
@@ -91,7 +90,8 @@ class MCPSidePanel(VerticalScroll):
 
         # Get MCP configuration status
         status = get_config_status()
-        current_servers = self.agent.mcp_config.get("mcpServers", {})
+        # agent.mcp_config is a flat {name: MCPServer} dict in openhands-sdk >= 1.32
+        current_servers = self.agent.mcp_config or {}
 
         # Build content string
         content_parts = []
@@ -171,43 +171,45 @@ class MCPSidePanel(VerticalScroll):
         content_text = "\n".join(content_parts)
         content_widget.update(content_text)
 
-    def _format_server_details(
-        self, server: StdioMCPServer | RemoteMCPServer | dict[str, Any]
-    ) -> list[str]:
-        """Format server specification details for display."""
+    def _format_server_details(self, server: MCPServer) -> list[str]:
+        """Format an ``MCPServer`` for display in the side panel."""
         details = []
 
-        # Convert to FastMCP object if needed
-        server_obj = normalize_server_object(server)
-
-        if isinstance(server_obj, StdioMCPServer):
+        if server.command or (server.transport or "").lower() == "stdio":
             details.append("Type: Command-based")
-            if server_obj.command or server_obj.args:
-                command_parts = [server_obj.command] if server_obj.command else []
-                if server_obj.args:
-                    command_parts.extend(server_obj.args)
+            if server.command or server.args:
+                command_parts = [server.command] if server.command else []
+                if server.args:
+                    command_parts.extend(server.args)
                 command_str = " ".join(command_parts)
                 if command_str:
                     details.append(f"Command: {command_str}")
-        elif isinstance(server_obj, RemoteMCPServer):
+        else:
             details.append("Type: URL-based")
-            if server_obj.url:
-                details.append(f"URL: {server_obj.url}")
-            details.append(f"Auth: {server_obj.auth or 'none'}")
+            if server.url:
+                details.append(f"URL: {server.url}")
+            auth_strategy = getattr(server.auth, "strategy", None)
+            if auth_strategy == "oauth2":
+                # Show the spelling used in mcp.json, not the SDK enum name
+                auth_strategy = "oauth"
+            details.append(f"Auth: {auth_strategy or 'none'}")
 
         return details
 
-    def _server_spec_to_dict(
-        self, server_spec: StdioMCPServer | RemoteMCPServer | dict
-    ) -> dict:
+    def _server_spec_to_dict(self, server_spec: MCPServer | dict) -> dict:
         """Convert a server specification to a dictionary for comparison.
 
-        Handles both Pydantic model objects (StdioMCPServer, RemoteMCPServer)
-        and plain dictionaries.
+        Current servers are SDK ``MCPServer`` objects; incoming servers from
+        ``mcp.json`` are raw dicts. Both are funneled through the same
+        coercion/dump pipeline so the comparison is apples-to-apples.
         """
-        if isinstance(server_spec, StdioMCPServer | RemoteMCPServer):
-            return server_spec.model_dump()
-        return server_spec
+        if not isinstance(server_spec, MCPServer):
+            try:
+                server_spec = convert_mcp_servers({"server": server_spec})["server"]
+            except Exception:
+                # Uncoercible spec: compare raw, which reports it as changed
+                return server_spec
+        return dump_mcp_config({"server": server_spec})["server"]
 
     def _check_server_specs_are_equal(
         self, first_server_spec, second_server_spec

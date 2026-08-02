@@ -8,6 +8,7 @@ from openhands.sdk import Agent, AgentContext, BaseConversation, Conversation, W
 from openhands.sdk.context import Skill
 from openhands.sdk.event.base import Event
 from openhands.sdk.hooks import HookConfig
+from openhands.sdk.mcp.config import MCPServer
 from openhands.sdk.security.confirmation_policy import (
     ConfirmationPolicyBase,
 )
@@ -65,12 +66,10 @@ def load_agent_specs(
     # If MCP servers are provided, augment the agent's MCP configuration
     if mcp_servers:
         # Merge with existing MCP configuration (provided servers take precedence)
-        mcp_config: dict[str, Any] = agent.mcp_config or {}
-        existing_servers: dict[str, dict[str, Any]] = mcp_config.get("mcpServers", {})
-        existing_servers.update(mcp_servers)
-        agent = agent.model_copy(
-            update={"mcp_config": {"mcpServers": existing_servers}}
-        )
+        existing_servers = dict(agent.mcp_config or {})
+        for name, server_spec in mcp_servers.items():
+            existing_servers[name] = MCPServer.model_validate(server_spec)
+        agent = agent.model_copy(update={"mcp_config": existing_servers})
 
     if skills:
         if agent.agent_context is not None:

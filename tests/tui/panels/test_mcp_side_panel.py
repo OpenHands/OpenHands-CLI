@@ -7,11 +7,12 @@ from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Static
 
+from openhands.sdk.mcp.config import MCPOAuthAuthCredential, MCPServer
+from openhands_cli.stores.agent_store import convert_mcp_servers
 from openhands_cli.tui.panels.mcp_side_panel import MCPSidePanel
 from tests.conftest import MockLocations
 
@@ -23,7 +24,7 @@ if TYPE_CHECKING:
 def _create_mock_agent(mcp_config: dict[str, Any] | None = None) -> Any:
     """Create a mock Agent with MCP configuration."""
     mock_agent = MagicMock()
-    mock_agent.mcp_config = mcp_config or {"mcpServers": {}}
+    mock_agent.mcp_config = mcp_config or {}
     return mock_agent
 
 
@@ -57,116 +58,66 @@ class MCPPanelTestApp(App):
 class TestCheckServerSpecsAreEqual:
     """Tests for MCPSidePanel._check_server_specs_are_equal method."""
 
-    def test_equal_dict_specs(self):
-        """Verify equal dict specs return True."""
-        mock_agent = _create_mock_agent()
-        panel = MCPSidePanel(agent=mock_agent)
+    def test_equal_mcp_server_objects(self):
+        """Verify equal MCPServer specs return True."""
+        panel = MCPSidePanel(agent=_create_mock_agent())
 
-        spec1 = {"url": "https://example.com", "transport": "http"}
-        spec2 = {"url": "https://example.com", "transport": "http"}
+        spec1 = MCPServer(url="https://example.com", transport="http")
+        spec2 = MCPServer(url="https://example.com", transport="http")
 
-        result = panel._check_server_specs_are_equal(spec1, spec2)
-        assert result is True
+        assert panel._check_server_specs_are_equal(spec1, spec2) is True
 
-    def test_different_dict_specs(self):
-        """Verify different dict specs return False."""
-        mock_agent = _create_mock_agent()
-        panel = MCPSidePanel(agent=mock_agent)
+    def test_different_mcp_server_objects(self):
+        """Verify different MCPServer specs return False."""
+        panel = MCPSidePanel(agent=_create_mock_agent())
 
-        spec1 = {"url": "https://example.com", "transport": "http"}
-        spec2 = {"url": "https://other.com", "transport": "http"}
+        spec1 = MCPServer(url="https://example.com", transport="http")
+        spec2 = MCPServer(url="https://other.com", transport="http")
 
-        result = panel._check_server_specs_are_equal(spec1, spec2)
-        assert result is False
+        assert panel._check_server_specs_are_equal(spec1, spec2) is False
 
-    def test_remote_mcp_server_objects_are_serializable(self):
-        """Test that RemoteMCPServer objects can be compared without JSON error.
+    def test_mcp_server_object_vs_raw_dict(self):
+        """Compare an MCPServer (current) with a raw mcp.json dict (incoming).
 
-        This test reproduces the bug from issue #362 where RemoteMCPServer
-        objects caused TypeError: Object of type RemoteMCPServer is not JSON
-        serializable.
+        This is the shape of the "Incoming on Restart" comparison: the
+        persisted agent holds MCPServer objects while get_config_status()
+        returns raw dicts. Equal configurations must compare equal.
         """
-        mock_agent = _create_mock_agent()
-        panel = MCPSidePanel(agent=mock_agent)
+        panel = MCPSidePanel(agent=_create_mock_agent())
 
-        # Create RemoteMCPServer objects (as they would be in agent.mcp_config)
-        server1 = RemoteMCPServer(
-            url="https://api.example.com",
-            transport="http",
-            headers={"Authorization": "Bearer token"},
-        )
-        server2 = RemoteMCPServer(
-            url="https://api.example.com",
-            transport="http",
-            headers={"Authorization": "Bearer token"},
-        )
+        current = MCPServer(url="https://api.example.com", transport="http")
+        incoming = {"url": "https://api.example.com", "transport": "http"}
 
-        # This should NOT raise TypeError
-        result = panel._check_server_specs_are_equal(server1, server2)
-        assert result is True
+        assert panel._check_server_specs_are_equal(current, incoming) is True
 
-    def test_stdio_mcp_server_objects_are_serializable(self):
-        """Test that StdioMCPServer objects can be compared without JSON error."""
-        mock_agent = _create_mock_agent()
-        panel = MCPSidePanel(agent=mock_agent)
+    def test_mcp_server_object_vs_changed_raw_dict(self):
+        """A modified incoming dict must compare unequal."""
+        panel = MCPSidePanel(agent=_create_mock_agent())
 
-        # Create StdioMCPServer objects
-        server1 = StdioMCPServer(
-            command="python",
-            args=["-m", "server"],
-            transport="stdio",
-            env={"API_KEY": "secret"},
-        )
-        server2 = StdioMCPServer(
-            command="python",
-            args=["-m", "server"],
-            transport="stdio",
-            env={"API_KEY": "secret"},
-        )
+        current = MCPServer(url="https://api.example.com", transport="http")
+        incoming = {"url": "https://api.example.com", "transport": "sse"}
 
-        # This should NOT raise TypeError
-        result = panel._check_server_specs_are_equal(server1, server2)
-        assert result is True
+        assert panel._check_server_specs_are_equal(current, incoming) is False
 
-    def test_mixed_server_and_dict_comparison(self):
-        """Test comparing a server object with a dict representation."""
-        mock_agent = _create_mock_agent()
-        panel = MCPSidePanel(agent=mock_agent)
+    def test_mcp_server_with_string_auth_vs_raw_dict(self):
+        """fastmcp-style string auth in mcp.json matches the coerced current."""
+        panel = MCPSidePanel(agent=_create_mock_agent())
 
-        # RemoteMCPServer object (from agent.mcp_config)
-        server_obj = RemoteMCPServer(
-            url="https://api.example.com",
-            transport="http",
-        )
+        current = convert_mcp_servers(
+            {"s": {"url": "https://mcp.notion.com/mcp", "auth": "oauth"}}
+        )["s"]
+        incoming = {"url": "https://mcp.notion.com/mcp", "auth": "oauth"}
 
-        # Dict representation (from get_config_status)
-        server_dict = {
-            "url": "https://api.example.com",
-            "transport": "http",
-        }
+        assert panel._check_server_specs_are_equal(current, incoming) is True
 
-        # This should NOT raise TypeError
-        result = panel._check_server_specs_are_equal(server_obj, server_dict)
-        # The result may be True or False depending on implementation,
-        # but it should not raise an exception
-        assert isinstance(result, bool)
+    def test_uncoercible_incoming_dict_does_not_raise(self):
+        """An invalid incoming spec is reported as changed, not an error."""
+        panel = MCPSidePanel(agent=_create_mock_agent())
 
-    def test_different_remote_mcp_servers(self):
-        """Test that different RemoteMCPServer objects return False."""
-        mock_agent = _create_mock_agent()
-        panel = MCPSidePanel(agent=mock_agent)
+        current = MCPServer(url="https://api.example.com", transport="http")
+        incoming = {"transport": "stdio"}  # missing required command
 
-        server1 = RemoteMCPServer(
-            url="https://api.example.com",
-            transport="http",
-        )
-        server2 = RemoteMCPServer(
-            url="https://other.example.com",
-            transport="http",
-        )
-
-        result = panel._check_server_specs_are_equal(server1, server2)
-        assert result is False
+        assert panel._check_server_specs_are_equal(current, incoming) is False
 
 
 # ============================================================================
@@ -198,14 +149,12 @@ class TestRefreshContentWithServerObjects:
         mcp_config_file = mock_locations.persistence_dir / "mcp.json"
         mcp_config_file.write_text(json.dumps(mcp_config_data))
 
-        # Create agent with RemoteMCPServer objects (as they would be loaded)
+        # Create agent with MCPServer objects (as they would be loaded from mcp.json)
         agent_mcp_config = {
-            "mcpServers": {
-                "test_server": RemoteMCPServer(
-                    url="https://api.example.com",
-                    transport="http",
-                )
-            }
+            "test_server": MCPServer(
+                url="https://api.example.com",
+                transport="http",
+            )
         }
         mock_agent = _create_mock_agent(agent_mcp_config)
 
@@ -257,18 +206,16 @@ class TestRefreshContentWithServerObjects:
         mcp_config_file = mock_locations.persistence_dir / "mcp.json"
         mcp_config_file.write_text(json.dumps(mcp_config_data))
 
-        # Create agent with RemoteMCPServer objects
+        # Create agent with MCPServer objects
         agent_mcp_config = {
-            "mcpServers": {
-                "enabled_server": RemoteMCPServer(
-                    url="https://enabled.example.com",
-                    transport="http",
-                ),
-                "disabled_server": RemoteMCPServer(
-                    url="https://disabled.example.com",
-                    transport="http",
-                ),
-            }
+            "enabled_server": MCPServer(
+                url="https://enabled.example.com",
+                transport="http",
+            ),
+            "disabled_server": MCPServer(
+                url="https://disabled.example.com",
+                transport="http",
+            ),
         }
         mock_agent = _create_mock_agent(agent_mcp_config)
 
@@ -293,6 +240,87 @@ class TestRefreshContentWithServerObjects:
 
             # This should NOT raise TypeError
             panel.refresh_content()
+
+
+# ============================================================================
+# Incoming on Restart section Tests
+# ============================================================================
+
+
+class TestIncomingOnRestart:
+    """Tests for the Incoming on Restart section of refresh_content."""
+
+    @pytest.mark.asyncio
+    async def test_incoming_section_shows_new_and_updated(
+        self, mock_locations: MockLocations
+    ):
+        """New and changed mcp.json servers are listed for the next restart."""
+        mcp_config_data = {
+            "mcpServers": {
+                "unchanged": {"url": "https://same.example.com", "transport": "http"},
+                "updated": {"url": "https://new-url.example.com", "transport": "http"},
+                "brand_new": {"command": "npx", "args": ["-y", "srv"]},
+            }
+        }
+        mcp_config_file = mock_locations.persistence_dir / "mcp.json"
+        mcp_config_file.write_text(json.dumps(mcp_config_data))
+
+        mock_agent = _create_mock_agent(
+            {
+                "unchanged": MCPServer(
+                    url="https://same.example.com", transport="http"
+                ),
+                "updated": MCPServer(
+                    url="https://old-url.example.com", transport="http"
+                ),
+            }
+        )
+
+        app = MCPPanelTestApp()
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+
+            panel = MCPSidePanel(agent=mock_agent)
+            content_area = app.query_one("#content_area", Horizontal)
+            content_area.mount(panel)
+            await pilot.pause()
+
+            content = str(app.query_one("#mcp-content", Static).content)
+            assert "Incoming on Restart:" in content
+            assert "New:" in content
+            assert "brand_new" in content
+            assert "Updated:" in content
+            assert "updated" in content
+
+    @pytest.mark.asyncio
+    async def test_incoming_section_all_match(self, mock_locations: MockLocations):
+        """Identical mcp.json servers report as matching current."""
+        mcp_config_data = {
+            "mcpServers": {
+                "same": {"url": "https://same.example.com", "transport": "http"},
+            }
+        }
+        mcp_config_file = mock_locations.persistence_dir / "mcp.json"
+        mcp_config_file.write_text(json.dumps(mcp_config_data))
+
+        mock_agent = _create_mock_agent(
+            {"same": MCPServer(url="https://same.example.com", transport="http")}
+        )
+
+        app = MCPPanelTestApp()
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+
+            panel = MCPSidePanel(agent=mock_agent)
+            content_area = app.query_one("#content_area", Horizontal)
+            content_area.mount(panel)
+            await pilot.pause()
+
+            content = str(app.query_one("#mcp-content", Static).content)
+            assert "Incoming on Restart:" in content
+            assert "All servers match current" in content
 
 
 # ============================================================================
@@ -360,15 +388,13 @@ class TestToggle:
         mcp_config_file = mock_locations.persistence_dir / "mcp.json"
         mcp_config_file.write_text(json.dumps(mcp_config_data))
 
-        # Create agent settings with RemoteMCPServer objects
+        # Create agent settings with MCPServer objects
         agent_mcp_config = {
-            "mcpServers": {
-                "notion": RemoteMCPServer(
-                    url="https://mcp.notion.com/mcp",
-                    transport="http",
-                    auth="oauth",
-                )
-            }
+            "notion": MCPServer(
+                url="https://mcp.notion.com/mcp",
+                transport="http",
+                auth=MCPOAuthAuthCredential(strategy="oauth2"),
+            )
         }
 
         # Create a mock agent that will be returned by AgentStore.load()
@@ -378,7 +404,7 @@ class TestToggle:
 
         with patch("openhands_cli.stores.AgentStore") as mock_agent_store_class:
             mock_agent_store = MagicMock()
-            mock_agent_store.load.return_value = mock_agent
+            mock_agent_store.load_from_disk.return_value = mock_agent
             mock_agent_store_class.return_value = mock_agent_store
 
             async with app.run_test() as pilot:

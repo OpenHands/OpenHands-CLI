@@ -43,7 +43,9 @@ def save_test_agent(
         model: LLM model identifier (default: openai/gpt-4o-mini)
         api_key: Mock API key (default: test-key)
         tools: List of tools (default: empty list)
-        mcp_config: MCP configuration dict (default: empty dict)
+        mcp_config: MCP configuration dict (default: empty dict).
+            Passed to Agent.mcp_config which expects the flat
+            ``{name: server_spec}`` format (openhands-sdk >= 1.32).
 
     Returns:
         The created Agent instance

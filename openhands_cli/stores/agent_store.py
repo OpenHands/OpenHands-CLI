@@ -6,7 +6,7 @@ import os
 import re
 from typing import Any
 
-from pydantic import BaseModel, SecretStr
+from pydantic import BaseModel, SecretStr, ValidationError
 from rich.console import Console
 
 from openhands.sdk import (
@@ -20,6 +20,7 @@ from openhands.sdk.context import load_project_skills
 from openhands.sdk.conversation.persistence_const import BASE_STATE
 from openhands.sdk.critic.base import CriticBase
 from openhands.sdk.critic.impl.api import APIBasedCritic
+from openhands.sdk.mcp.config import MCPServer, coerce_mcp_config
 from openhands.sdk.tool import Tool
 from openhands_cli.deprecated_utils import conversation_has_delegate_tool
 from openhands_cli.locations import (
@@ -42,6 +43,60 @@ from openhands_cli.utils import (
 
 console = Console(highlight=False, soft_wrap=True)
 stderr_console = Console(stderr=True, highlight=False, soft_wrap=True)
+
+
+def _auth_string_to_credential(auth: str) -> dict[str, Any]:
+    """Translate a fastmcp-style ``auth`` string to an SDK auth credential.
+
+    fastmcp's ``RemoteMCPServer.auth`` accepts plain strings (``"oauth"`` or a
+    bearer token); the SDK models auth as a discriminated credential union.
+    This is the inverse of the SDK's fastmcp export mapping.
+    """
+    if auth == "oauth":
+        return {"strategy": "oauth2"}
+    return {"strategy": "bearer", "value": auth}
+
+
+def convert_mcp_servers(
+    servers: dict[str, Any] | None,
+) -> dict[str, MCPServer]:
+    """Convert MCP server specs to the SDK's ``dict[str, MCPServer]`` format.
+
+    openhands-sdk >= 1.32 changed ``Agent.mcp_config`` from an opaque dict to
+    ``dict[str, MCPServer]`` (no ``"mcpServers"`` wrapper). This normalizes the
+    fastmcp server objects produced by :func:`list_enabled_servers` into that
+    format, and also tolerates the pre-1.32 wrapped dict found in persisted
+    agent settings.
+
+    Args:
+        servers: Mapping of server name to fastmcp server object, SDK
+            ``MCPServer``, or raw dict -- or a legacy ``{"mcpServers": ...}``
+            wrapper around such a mapping. ``None`` yields an empty dict.
+
+    Returns:
+        Mapping of server name to SDK ``MCPServer``.
+
+    Raises:
+        ValidationError: If a server spec cannot be validated as an
+            ``MCPServer``.
+    """
+    if not servers:
+        return {}
+    # Unwrap the pre-1.32 {"mcpServers": ...} container if that is all there is
+    if set(servers) == {"mcpServers"} and isinstance(servers["mcpServers"], dict):
+        servers = servers["mcpServers"]
+    raw: dict[str, Any] = {}
+    for name, server in servers.items():
+        if isinstance(server, MCPServer):
+            raw[name] = server
+            continue
+        data = server if isinstance(server, dict) else server.model_dump()
+        if isinstance(data.get("auth"), str):
+            data = {**data, "auth": _auth_string_to_credential(data["auth"])}
+        raw[name] = data
+    # The SDK's coercion drops fastmcp-only fields (`type`, `authentication`,
+    # ...) and normalizes transport spellings before validation.
+    return coerce_mcp_config(raw)
 
 
 def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
@@ -263,6 +318,12 @@ class AgentStore:
     def load_from_disk(self) -> Agent | None:
         """Load an agent configuration from disk storage.
 
+        A persisted ``mcp_config`` -- whether a stale flat dict or the pre-1.32
+        ``{"mcpServers": ...}`` wrapper -- is coerced to the flat
+        ``dict[str, MCPServer]`` format so validation succeeds. ``mcp.json``
+        remains the single source of truth for MCP servers (see
+        ``_apply_runtime_config``).
+
         This method only loads the persisted agent configuration. It does not
         apply runtime configuration or create agents from environment variables.
 
@@ -272,10 +333,35 @@ class AgentStore:
         """
         try:
             str_spec = self.file_store.read(AGENT_SETTINGS_PATH)
-            # Respects user choices persisted in agent_settings.json on disk.
-            return Agent.model_validate_json(str_spec)
         except FileNotFoundError:
             return None
+        try:
+            data = json.loads(str_spec)
+        except (ValueError, TypeError):
+            console.print(
+                "\nAgent configuration file is corrupted!",
+                style="red",
+                markup=False,
+            )
+            return None
+        if not isinstance(data, dict):
+            console.print(
+                "\nAgent configuration file is corrupted!",
+                style="red",
+                markup=False,
+            )
+            return None
+        # Coerce any persisted MCP config to the flat dict[str, MCPServer]
+        # format (dropping the pre-1.32 {"mcpServers": ...} wrapper). Note
+        # mcp.json remains the source of truth: _apply_runtime_config rebuilds
+        # mcp_config from it. A persisted MCP value that cannot be coerced is
+        # dropped rather than failing the whole load.
+        try:
+            data["mcp_config"] = convert_mcp_servers(data.get("mcp_config"))
+        except ValidationError:
+            data["mcp_config"] = {}
+        try:
+            return Agent.model_validate(data)
         except Exception:
             console.print(
                 "\nAgent configuration file is corrupted!",
@@ -449,7 +535,7 @@ class AgentStore:
         agent_context = self._build_agent_context()
 
         enabled_servers = list_enabled_servers()
-        mcp_config = {"mcpServers": enabled_servers} if enabled_servers else {}
+        mcp_config = convert_mcp_servers(enabled_servers)
 
         condenser = self._maybe_build_condenser(agent, session_id=session_id)
 

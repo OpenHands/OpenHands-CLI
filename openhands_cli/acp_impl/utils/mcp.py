@@ -18,7 +18,8 @@ def _convert_env_to_dict(env: Sequence[dict[str, str]]) -> dict[str, str]:
     Convert environment variables from serialized EnvVariable format to a dictionary.
 
     When Pydantic models are dumped to dict, EnvVariable objects become dicts
-    with 'name' and 'value' keys.
+    with 'name' and 'value' keys. ACP HTTP/SSE server headers use the same
+    serialized shape, so this helper converts those as well.
 
     Args:
         env: List of dicts with 'name' and 'value' keys (serialized EnvVariable objects)
@@ -52,15 +53,20 @@ def convert_acp_mcp_servers_to_agent_format(
 
     for server in mcp_servers:
         server_dict = server.model_dump()
-        server_name: str = server_dict["name"]
-        server_config: dict[str, Any] = {
-            k: v for k, v in server_dict.items() if k != "name"
-        }
+        server_name: str = server_dict.pop("name")
+        # Drop ACP schema metadata; the SDK's MCPServer model forbids extras
+        server_dict.pop("field_meta", None)
+        server_dict.pop("type", None)
+        server_config: dict[str, Any] = server_dict
 
         # Convert env from array to dict format if present
         # ACP sends env as array of EnvVariable objects, but Agent expects dict
         if "env" in server_config:
             server_config["env"] = _convert_env_to_dict(server_config["env"])
+
+        # ACP sends headers as an array of EnvVariable-shaped objects too
+        if "headers" in server_config:
+            server_config["headers"] = _convert_env_to_dict(server_config["headers"])
 
         # Add transport type based on server class
         # StdioMcpServer -> stdio, HttpMcpServer -> http, SseMcpServer -> sse
