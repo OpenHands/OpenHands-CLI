@@ -8,7 +8,7 @@ from acp.schema import (
     CreateTerminalResponse,
     DeniedOutcome,
     EnvVariable,
-    KillTerminalCommandResponse,
+    KillTerminalResponse,
     PermissionOption,
     ReadTextFileResponse,
     ReleaseTerminalResponse,
@@ -122,7 +122,7 @@ class MockACPConnection:
 
     async def kill_terminal(
         self, session_id: str, terminal_id: str, **kwargs: Any
-    ) -> KillTerminalCommandResponse | None:
+    ) -> KillTerminalResponse | None:
         """Stub method."""
         return None
 

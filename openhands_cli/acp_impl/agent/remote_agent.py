@@ -261,6 +261,7 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
     async def new_session(
         self,
         cwd: str,
+        additional_directories: list[str] | None = None,  # noqa: ARG002
         mcp_servers: list[Any] | None = None,
         working_dir: str | None = None,
         **_kwargs: Any,
@@ -274,11 +275,19 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
             )
 
         return await super().new_session(
-            cwd=cwd, mcp_servers=mcp_servers, working_dir=working_dir, **_kwargs
+            cwd=cwd,
+            additional_directories=additional_directories,
+            mcp_servers=mcp_servers,
+            working_dir=working_dir,
+            **_kwargs,
         )
 
     async def prompt(
-        self, prompt: list[Any], session_id: str, **_kwargs: Any
+        self,
+        prompt: list[Any],
+        session_id: str,
+        message_id: str | None = None,  # noqa: ARG002
+        **_kwargs: Any,
     ) -> PromptResponse:
         """Handle a prompt request with cloud workspace.
 
@@ -300,12 +309,13 @@ class OpenHandsCloudACPAgent(BaseOpenHandsACPAgent):
             )
 
         # Call base class prompt implementation
-        return await super().prompt(prompt, session_id, **_kwargs)
+        return await super().prompt(prompt, session_id, message_id, **_kwargs)
 
     async def load_session(
         self,
         cwd: str,  # noqa: ARG002
         session_id: str,
+        additional_directories: list[str] | None = None,  # noqa: ARG002
         mcp_servers: list[Any] | None = None,  # noqa: ARG002
         **_kwargs: Any,
     ) -> LoadSessionResponse | None:

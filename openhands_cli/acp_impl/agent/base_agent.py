@@ -26,8 +26,9 @@ from acp.schema import (
     AgentCapabilities,
     AgentMessageChunk,
     AuthenticateResponse,
-    AuthMethod,
+    AuthMethodAgent,
     AvailableCommandsUpdate,
+    EnvVarAuthMethod,
     ForkSessionResponse,
     Implementation,
     ListSessionsResponse,
@@ -38,6 +39,7 @@ from acp.schema import (
     SetSessionConfigOptionResponse,
     SetSessionModelResponse,
     SetSessionModeResponse,
+    TerminalAuthMethod,
     TextContentBlock,
 )
 
@@ -232,8 +234,8 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         logger.info(f"Initializing ACP with protocol version: {protocol_version}")
 
         # Always configure auth method
-        auth_methods = [
-            AuthMethod(
+        auth_methods: list[EnvVarAuthMethod | TerminalAuthMethod | AuthMethodAgent] = [
+            AuthMethodAgent(
                 description="Authenticate through agent",
                 id="oauth",
                 name="OAuth with OpenHands Cloud",
@@ -292,6 +294,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
 
     async def list_sessions(
         self,
+        additional_directories: list[str] | None = None,  # noqa: ARG002
         cursor: str | None = None,  # noqa: ARG002
         cwd: str | None = None,  # noqa: ARG002
         **_kwargs: Any,
@@ -342,7 +345,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         self,
         config_id: str,  # noqa: ARG002
         session_id: str,  # noqa: ARG002
-        value: str,  # noqa: ARG002
+        value: str | bool,  # noqa: ARG002
         **_kwargs: Any,
     ) -> SetSessionConfigOptionResponse | None:
         """Set config option (not supported)."""
@@ -352,6 +355,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         self,
         cwd: str,  # noqa: ARG002
         session_id: str,  # noqa: ARG002
+        additional_directories: list[str] | None = None,  # noqa: ARG002
         mcp_servers: list[Any] | None = None,  # noqa: ARG002
         **_kwargs: Any,
     ) -> ForkSessionResponse:
@@ -362,6 +366,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         self,
         cwd: str,  # noqa: ARG002
         session_id: str,  # noqa: ARG002
+        additional_directories: list[str] | None = None,  # noqa: ARG002
         mcp_servers: list[Any] | None = None,  # noqa: ARG002
         **_kwargs: Any,
     ) -> ResumeSessionResponse:
@@ -427,9 +432,15 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
                 {"reason": "Failed to cancel session", "details": str(e)}
             )
 
+    async def close_session(self, session_id: str, **_kwargs: Any) -> None:
+        """Close a session and clean up resources."""
+        logger.info(f"Closing session: {session_id}")
+        self._cleanup_session(session_id)
+
     async def new_session(
         self,
         cwd: str,  # noqa: ARG002
+        additional_directories: list[str] | None = None,  # noqa: ARG002
         mcp_servers: list[Any] | None = None,
         working_dir: str | None = None,
         **_kwargs: Any,
@@ -438,6 +449,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
 
         Args:
             cwd: Current working directory (from ACP protocol)
+            additional_directories: Additional directories (from ACP protocol)
             mcp_servers: ACP MCP servers configuration
             working_dir: Working directory override (for local sessions)
 
@@ -515,7 +527,11 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
             )
 
     async def prompt(
-        self, prompt: list[Any], session_id: str, **_kwargs: Any
+        self,
+        prompt: list[Any],
+        session_id: str,
+        message_id: str | None = None,  # noqa: ARG002
+        **_kwargs: Any,
     ) -> PromptResponse:
         """Handle a prompt request with slash command support.
 
@@ -601,6 +617,7 @@ class BaseOpenHandsACPAgent(ACPAgent, ABC):
         self,
         cwd: str,  # noqa: ARG002
         session_id: str,
+        additional_directories: list[str] | None = None,  # noqa: ARG002
         mcp_servers: list[Any] | None = None,  # noqa: ARG002
         **_kwargs: Any,
     ) -> LoadSessionResponse | None:
