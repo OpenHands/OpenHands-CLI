@@ -19,6 +19,7 @@ from openhands.tools.file_editor import FileEditorTool
 from openhands.tools.preset.default import get_default_condenser
 from openhands.tools.task_tracker import TaskTrackerTool
 from openhands.tools.terminal import TerminalTool
+from openhands_cli.deprecated_utils import LEGACY_DELEGATE_TOOL_NAME
 
 
 def abbreviate_number(n: int | float) -> str:
@@ -163,9 +164,6 @@ def get_llm_metadata(
     if user_id is not None:
         metadata["trace_user_id"] = user_id
     return metadata
-
-
-LEGACY_DELEGATE_TOOL_NAME = "delegate"
 
 
 def get_default_cli_tools(*, use_delegate_tool: bool = False) -> list[Tool]:
