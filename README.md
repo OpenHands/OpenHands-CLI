@@ -30,10 +30,9 @@ Run OpenHands agent inside your terminal, favorite IDE, CI pipelines, local brow
 
 ## Project status
 
-OpenHands V1 CLI is **feature-complete** and primarily maintained for stability.
-Expect only major bug fixes and compatibility updates; new features are unlikely.
+> ⚠️ **This project is no longer actively maintained.**
 
-For active feature development, see [OpenHands](https://github.com/OpenHands/OpenHands) or join the [Slack](https://dub.sh/openhands].
+We recommend using [Agent Canvas](https://github.com/OpenHands/OpenHands) for an entirely open source, customizable, and local AI coding agent experience. See the [Agent Canvas installation docs](https://docs.openhands.dev/openhands/usage/agent-canvas/overview) to get started.
 
 
 ## Installation
