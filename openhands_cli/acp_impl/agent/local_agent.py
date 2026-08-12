@@ -201,6 +201,7 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
     async def new_session(
         self,
         cwd: str,
+        additional_directories: list[str] | None = None,  # noqa: ARG002
         mcp_servers: list[Any] | None = None,
         working_dir: str | None = None,
         **_kwargs: Any,
@@ -218,6 +219,7 @@ class LocalOpenHandsACPAgent(BaseOpenHandsACPAgent):
 
         return await super().new_session(
             cwd=cwd,
+            additional_directories=additional_directories,
             mcp_servers=mcp_servers,
             working_dir=effective_working_dir,
             **_kwargs,

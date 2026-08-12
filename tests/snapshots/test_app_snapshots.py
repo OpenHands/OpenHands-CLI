@@ -18,11 +18,12 @@ import importlib.resources as resources
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
-from fastmcp.mcp_config import RemoteMCPServer, StdioMCPServer
+from pydantic import SecretStr
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Footer, Static
 
+from openhands.sdk.mcp.config import MCPOAuthAuthCredential, MCPServer
 from openhands.tools.task_tracker.definition import TaskItem
 from openhands_cli.theme import OPENHANDS_THEME
 from openhands_cli.tui.modals.exit_modal import ExitConfirmationModal
@@ -40,7 +41,7 @@ if TYPE_CHECKING:
 def _create_mock_agent(mcp_config: dict[str, Any] | None = None) -> Any:
     """Create a mock Agent with MCP configuration."""
     mock_agent = MagicMock()
-    mock_agent.mcp_config = mcp_config or {"mcpServers": {}}
+    mock_agent.mcp_config = mcp_config or {}
     return mock_agent
 
 
@@ -216,7 +217,7 @@ class TestMCPSidePanelSnapshots:
 
     def test_mcp_panel_empty_state(self, snap_compare):
         """Snapshot test for MCP panel with no servers configured."""
-        mock_agent = _create_mock_agent({"mcpServers": {}})
+        mock_agent = _create_mock_agent({})
 
         class MCPPanelEmptyApp(App):
             CSS = """
@@ -245,24 +246,22 @@ class TestMCPSidePanelSnapshots:
         assert snap_compare(MCPPanelEmptyApp(agent=mock_agent), terminal_size=(100, 30))
 
     def test_mcp_panel_with_remote_servers(self, snap_compare):
-        """Snapshot test for MCP panel with RemoteMCPServer objects.
+        """Snapshot test for MCP panel with MCPServer objects.
 
-        This test verifies the fix for issue #362 where RemoteMCPServer
+        This test verifies the fix for issue #362 where MCPServer
         objects caused a crash when opening the MCP menu.
         """
         mcp_config = {
-            "mcpServers": {
-                "notion": RemoteMCPServer(
-                    url="https://mcp.notion.com/mcp",
-                    transport="http",
-                    auth="oauth",
-                ),
-                "api_server": RemoteMCPServer(
-                    url="https://api.example.com/mcp",
-                    transport="http",
-                    headers={"Authorization": "Bearer token"},
-                ),
-            }
+            "notion": MCPServer(
+                url="https://mcp.notion.com/mcp",
+                transport="http",
+                auth=MCPOAuthAuthCredential(strategy="oauth2"),
+            ),
+            "api_server": MCPServer(
+                url="https://api.example.com/mcp",
+                transport="http",
+                headers={"Authorization": SecretStr("Bearer token")},
+            ),
         }
         mock_agent = _create_mock_agent(mcp_config)
 
@@ -295,16 +294,14 @@ class TestMCPSidePanelSnapshots:
         )
 
     def test_mcp_panel_with_stdio_servers(self, snap_compare):
-        """Snapshot test for MCP panel with StdioMCPServer objects."""
+        """Snapshot test for MCP panel with stdio MCPServer objects."""
         mcp_config = {
-            "mcpServers": {
-                "local_server": StdioMCPServer(
-                    command="python",
-                    args=["-m", "mcp_server"],
-                    transport="stdio",
-                    env={"API_KEY": "secret"},
-                ),
-            }
+            "local_server": MCPServer(
+                command="python",
+                args=["-m", "mcp_server"],
+                transport="stdio",
+                env={"API_KEY": SecretStr("secret")},
+            ),
         }
         mock_agent = _create_mock_agent(mcp_config)
 
@@ -339,18 +336,16 @@ class TestMCPSidePanelSnapshots:
     def test_mcp_panel_with_mixed_servers(self, snap_compare):
         """Snapshot test for MCP panel with both remote and stdio servers."""
         mcp_config = {
-            "mcpServers": {
-                "notion": RemoteMCPServer(
-                    url="https://mcp.notion.com/mcp",
-                    transport="http",
-                    auth="oauth",
-                ),
-                "local_tool": StdioMCPServer(
-                    command="npx",
-                    args=["@modelcontextprotocol/server-filesystem"],
-                    transport="stdio",
-                ),
-            }
+            "notion": MCPServer(
+                url="https://mcp.notion.com/mcp",
+                transport="http",
+                auth=MCPOAuthAuthCredential(strategy="oauth2"),
+            ),
+            "local_tool": MCPServer(
+                command="npx",
+                args=["@modelcontextprotocol/server-filesystem"],
+                transport="stdio",
+            ),
         }
         mock_agent = _create_mock_agent(mcp_config)
 

@@ -15,7 +15,7 @@ def test_agent_context_includes_os_info() -> None:
             "openhands_cli.stores.agent_store.get_os_description",
             return_value="TestOS 1.0",
         ),
-        patch("openhands_cli.stores.agent_store.list_enabled_servers", return_value=[]),
+        patch("openhands_cli.stores.agent_store.list_enabled_servers", return_value={}),
     ):
         mock_store_instance = MagicMock()
         mock_file_store.return_value = mock_store_instance

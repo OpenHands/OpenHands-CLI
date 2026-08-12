@@ -5,10 +5,11 @@ from argparse import Namespace
 from unittest.mock import patch
 
 import pytest
-from acp.schema import EnvVariable, McpServerStdio
+from acp.schema import EnvVariable, HttpHeader, HttpMcpServer, McpServerStdio
 
 from openhands.sdk.event import MessageEvent, SystemPromptEvent
 from openhands.sdk.llm import Message, TextContent
+from openhands.sdk.mcp.config import MCPServer
 from openhands_cli.acp_impl.utils import convert_acp_mcp_servers_to_agent_format
 from openhands_cli.deprecated_utils import conversation_has_delegate_tool
 from openhands_cli.utils import (
@@ -157,6 +158,54 @@ def test_convert_acp_mcp_servers_multiple_servers():
     assert "server2" in result
     assert result["server1"]["env"] == {}
     assert result["server2"]["env"] == {"KEY": "value"}
+
+
+def test_convert_acp_mcp_servers_stdio_validates_as_sdk_mcp_server():
+    """Converted stdio specs must validate against the SDK's MCPServer model.
+
+    ACP schema dumps include metadata fields (e.g. field_meta) that the SDK
+    model forbids; setup.py validates these dicts with MCPServer.
+    """
+    servers = [
+        McpServerStdio(
+            name="local",
+            command="/usr/bin/npx",
+            args=["-y", "srv"],
+            env=[EnvVariable(name="A", value="1")],
+        )
+    ]
+    result = convert_acp_mcp_servers_to_agent_format(servers)
+
+    validated = MCPServer.model_validate(result["local"])
+    assert validated.command == "/usr/bin/npx"
+    assert validated.transport == "stdio"
+    assert validated.env is not None
+    assert validated.env["A"].get_secret_value() == "1"
+
+
+def test_convert_acp_mcp_servers_http_headers_validate_as_sdk_mcp_server():
+    """ACP HTTP server headers convert from EnvVariable array to dict.
+
+    Regression test: the SDK's MCPServer requires headers as a dict and
+    forbids ACP metadata extras (field_meta, type).
+    """
+    servers = [
+        HttpMcpServer(
+            type="http",
+            name="remote",
+            url="https://mcp.example.com/mcp",
+            headers=[HttpHeader(name="Authorization", value="Bearer tok")],
+        )
+    ]
+    result = convert_acp_mcp_servers_to_agent_format(servers)
+
+    assert result["remote"]["headers"] == {"Authorization": "Bearer tok"}
+    assert result["remote"]["transport"] == "http"
+
+    validated = MCPServer.model_validate(result["remote"])
+    assert validated.url == "https://mcp.example.com/mcp"
+    assert validated.headers is not None
+    assert validated.headers["Authorization"].get_secret_value() == "Bearer tok"
 
 
 def test_seeded_instructions_task_only():
