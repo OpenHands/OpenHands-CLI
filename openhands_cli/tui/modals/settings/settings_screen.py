@@ -89,7 +89,7 @@ class SettingsScreen(ModalScreen):
         self.agent_store = AgentStore()
         self.current_agent = self.agent_store.load_from_disk()
         self.is_advanced_mode = False
-        self.message_widget = None
+        self.message_widget: Static | None = None
         self.is_initial_setup = SettingsScreen.is_initial_setup_required(
             env_overrides_enabled=env_overrides_enabled
         )
