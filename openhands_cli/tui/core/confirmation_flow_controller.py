@@ -42,7 +42,12 @@ class ConfirmationFlowController:
         if runner is None:
             return
 
-        if decision == UserConfirmation.ALWAYS_PROCEED:
+        if self._state.agent_mode == "plan" and decision in {
+            UserConfirmation.ALWAYS_PROCEED,
+            UserConfirmation.CONFIRM_RISKY,
+        }:
+            decision = UserConfirmation.ACCEPT
+        elif decision == UserConfirmation.ALWAYS_PROCEED:
             self._policy_service.set_policy(NeverConfirm())
         elif decision == UserConfirmation.CONFIRM_RISKY:
             self._policy_service.set_policy(ConfirmRisky())

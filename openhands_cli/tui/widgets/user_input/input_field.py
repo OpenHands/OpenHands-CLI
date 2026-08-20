@@ -101,6 +101,12 @@ class InputField(Container):
     conversation_id: reactive[uuid.UUID | None] = reactive(None)
     # >0 = waiting for user confirmation (input disabled)
     pending_action_count: reactive[int] = reactive(0)
+    # Agent operating mode ("plan" or "code")
+    agent_mode: reactive[str] = reactive("code")
+
+    # Color constants for mode indication
+    CODE_MODE_BORDER = "#fee165"  # Primary/logo color (yellow)
+    PLAN_MODE_BORDER = "#277dff"  # Accent color (blue)
 
     DEFAULT_CSS = """
     InputField {
@@ -115,11 +121,10 @@ class InputField(Container):
             max-height: 8;
             background: $background;
             color: $foreground;
-            border: round $primary !important;
+            border: round #fee165;
         }
 
         #single_line_input:focus {
-            border: round $primary !important;
             background: $background;
         }
 
@@ -128,12 +133,11 @@ class InputField(Container):
             height: 6;
             background: $background;
             color: $foreground;
-            border: round $primary;
+            border: round #fee165;
             display: none;
         }
 
         #multiline_input:focus {
-            border: round $primary;
             background: $background;
         }
     }
@@ -182,6 +186,7 @@ class InputField(Container):
 
     def on_mount(self) -> None:
         """Focus the input when mounted."""
+        self._update_border_color()
         self.focus_input()
 
     def watch_conversation_id(self, conversation_id: uuid.UUID | None) -> None:
@@ -197,6 +202,25 @@ class InputField(Container):
         if count == 0 and self.conversation_id is not None:
             # Re-enable and focus when confirmation is complete
             self.focus_input()
+
+    def watch_agent_mode(self, _mode: str) -> None:
+        """React to agent_mode changes - update border color."""
+        self._update_border_color()
+
+    def _update_border_color(self) -> None:
+        """Update the input border color based on the current agent mode.
+
+        Uses blue (#277dff) for planning mode, yellow (#fee165) for code mode.
+        """
+        from textual.color import Color
+
+        is_plan_mode = self.agent_mode == "plan"
+        border_color = self.PLAN_MODE_BORDER if is_plan_mode else self.CODE_MODE_BORDER
+        color = Color.parse(border_color)
+
+        # Update both single-line and multiline input borders
+        self.single_line_widget.styles.border = ("round", color)
+        self.multiline_widget.styles.border = ("round", color)
 
     def _update_disabled_state(self) -> None:
         """Update disabled state based on conversation_id and pending actions."""

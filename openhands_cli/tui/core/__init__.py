@@ -5,6 +5,7 @@ from openhands_cli.tui.core.conversation_manager import (
     ConversationManager,
     CreateConversation,
     PauseConversation,
+    SetAgentMode,
     SetConfirmationPolicy,
     SwitchConfirmed,
     SwitchConversation,
@@ -15,6 +16,7 @@ from openhands_cli.tui.core.events import (
     ShowConfirmationPanel,
 )
 from openhands_cli.tui.core.state import (
+    AgentMode,
     ConfirmationRequired,
     ConversationContainer,
     ConversationFinished,
@@ -27,6 +29,8 @@ __all__ = [
     "ConversationContainer",
     "ConversationFinished",
     "ConfirmationRequired",
+    # Types
+    "AgentMode",
     # Manager
     "ConversationManager",
     # Operation Messages (input to ConversationManager)
@@ -36,6 +40,7 @@ __all__ = [
     "PauseConversation",
     "CondenseConversation",
     "SetConfirmationPolicy",
+    "SetAgentMode",
     "SwitchConfirmed",
     # Events (App ↔ ConversationManager)
     "RequestSwitchConfirmation",

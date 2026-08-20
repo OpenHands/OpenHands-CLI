@@ -3,6 +3,7 @@
 This module provides:
 - ConversationContainer: UI container that owns and exposes reactive state
 - ConversationFinished: Message emitted when conversation finishes
+- AgentMode: Literal type for agent operating modes ("plan" or "code")
 
 Architecture:
     ConversationContainer holds reactive properties that UI components bind to.
@@ -27,7 +28,7 @@ Widget Hierarchy:
 import threading
 import time
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from textual.app import ComposeResult
 from textual.containers import Container
@@ -42,6 +43,11 @@ from openhands.sdk.security.confirmation_policy import (
 )
 from openhands_cli.shared import extract_conversation_summary
 from openhands_cli.stores import CriticSettings
+
+
+# Agent operating mode: "plan" focuses on read-only planning without code execution
+# "code" is the default mode for normal code-writing and execution
+AgentMode = Literal["plan", "code"]
 
 
 if TYPE_CHECKING:
@@ -137,6 +143,10 @@ class ConversationContainer(Container):
     refinement_iteration: var[int] = var(0)
     """Current refinement iteration within a user turn. Resets on new user message."""
 
+    # ---- Agent Mode ----
+    agent_mode: var[AgentMode] = var("code")
+    """Agent operating mode: 'plan' for planning-only or 'code' for normal execution."""
+
     def __init__(
         self,
         initial_confirmation_policy: ConfirmationPolicyBase | None = None,
@@ -148,6 +158,11 @@ class ConversationContainer(Container):
         self._conversation_start_time: float | None = None
         self._conversation_state: ConversationStateProtocol | None = None
         self._timer = None
+
+        # Store the user's confirmation policy before plan mode overrides it.
+        # None means plan mode hasn't overridden the policy.
+        self._pre_plan_confirmation_policy: ConfirmationPolicyBase | None = None
+        self._code_mode_notice_pending = False
 
         super().__init__(id="conversation_state", **kwargs)
 
@@ -199,12 +214,14 @@ class ConversationContainer(Container):
                 running=ConversationContainer.running,
                 elapsed_seconds=ConversationContainer.elapsed_seconds,
                 critic_settings=ConversationContainer.critic_settings,
+                agent_mode=ConversationContainer.agent_mode,
             )
             yield InputField(
                 placeholder="Type your message, @mention a file, or / for commands"
             ).data_bind(
                 conversation_id=ConversationContainer.conversation_id,
                 pending_action_count=ConversationContainer.pending_action_count,
+                agent_mode=ConversationContainer.agent_mode,
             )
             yield InfoStatusLine().data_bind(
                 running=ConversationContainer.running,
@@ -386,6 +403,15 @@ class ConversationContainer(Container):
         """
         self._schedule_update("refinement_iteration", iteration)
 
+    def set_agent_mode(self, mode: AgentMode) -> None:
+        """Set the agent operating mode. Thread-safe.
+
+        Args:
+            mode: 'plan' for read-only planning mode,
+                  'code' for normal code execution mode.
+        """
+        self._schedule_update("agent_mode", mode)
+
     # ---- Conversation Attachment (for metrics) ----
 
     def attach_conversation_state(
@@ -410,11 +436,48 @@ class ConversationContainer(Container):
             combined_metrics = stats.get_combined_metrics()
             self.metrics = combined_metrics
 
+    def save_pre_plan_policy(self, policy: ConfirmationPolicyBase) -> None:
+        """Save the user's confirmation policy before plan mode overrides it.
+
+        Called by ConversationManager when entering plan mode.
+        """
+        self._pre_plan_confirmation_policy = policy
+
+    def restore_pre_plan_policy(self) -> ConfirmationPolicyBase | None:
+        """Restore and clear the saved confirmation policy from before plan mode.
+
+        Returns:
+            The saved policy, or None if not in plan mode / no policy was saved.
+        """
+        policy = self._pre_plan_confirmation_policy
+        self._pre_plan_confirmation_policy = None
+        return policy
+
+    @property
+    def has_pre_plan_policy(self) -> bool:
+        """Check if a pre-plan confirmation policy is saved."""
+        return self._pre_plan_confirmation_policy is not None
+
+    def mark_code_mode_notice_pending(self) -> None:
+        """Mark that the next user message should tell the agent code mode resumed."""
+        self._code_mode_notice_pending = True
+
+    def clear_code_mode_transition_notice(self) -> None:
+        """Clear any pending code-mode transition notice."""
+        self._code_mode_notice_pending = False
+
+    def consume_code_mode_transition_notice(self) -> bool:
+        """Return and clear whether the next user message needs code-mode context."""
+        pending = self._code_mode_notice_pending
+        self._code_mode_notice_pending = False
+        return pending
+
     def reset_conversation_state(self) -> None:
         """Reset state for a new conversation.
 
         Resets: running, elapsed_seconds, metrics, conversation_title,
-                pending_action_count, refinement_iteration, internal state.
+                pending_action_count, refinement_iteration, agent_mode,
+                internal state.
         Preserves: confirmation_policy (persists across conversations),
                    conversation_id (set explicitly when switching).
 
@@ -426,6 +489,11 @@ class ConversationContainer(Container):
         self.conversation_title = None
         self.pending_action_count = 0
         self.refinement_iteration = 0
+        if self._pre_plan_confirmation_policy is not None:
+            self.confirmation_policy = self._pre_plan_confirmation_policy
+        self.agent_mode = "code"
         self.switch_confirmation_target = None
         self._conversation_start_time = None
         self._conversation_state = None
+        self._pre_plan_confirmation_policy = None
+        self._code_mode_notice_pending = False

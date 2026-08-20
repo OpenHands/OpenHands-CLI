@@ -2,7 +2,7 @@
 
 import asyncio
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING
 
 from rich.console import Console
@@ -21,6 +21,10 @@ from openhands.sdk.conversation.state import (
     ConversationState as SDKConversationState,
 )
 from openhands.sdk.event.base import Event
+from openhands.sdk.tool.builtins.finish import FinishAction
+from openhands.sdk.tool.builtins.think import ThinkAction
+from openhands.tools.file_editor.definition import FileEditorAction
+from openhands.tools.task_tracker.definition import TaskTrackerAction
 from openhands_cli.setup import setup_conversation
 from openhands_cli.shared import extract_conversation_summary
 from openhands_cli.tui.core.events import ShowConfirmationPanel
@@ -196,7 +200,54 @@ class ConversationRunner:
             self.conversation.state.events
         )
         if pending_actions:
+            if self._state.agent_mode == "plan":
+                blocked_actions = [
+                    action_event
+                    for action_event in pending_actions
+                    if not self._is_action_allowed_in_plan_mode(action_event)
+                ]
+                if blocked_actions:
+                    reason = self._format_plan_mode_block_reason(blocked_actions)
+                    self.conversation.reject_pending_actions(reason)
+                    self._notification_callback(
+                        "Planning Mode Blocked Action",
+                        reason,
+                        "warning",
+                    )
+                    return
+
             self._message_pump.post_message(ShowConfirmationPanel(pending_actions))
+
+    @staticmethod
+    def _is_action_allowed_in_plan_mode(action_event: Event) -> bool:
+        """Return whether a pending action is allowed while planning.
+
+        Planning mode is read-only for repository files. The only mutable state
+        it permits is the task tracker plan used by the Agent Plan side panel.
+        """
+        action = getattr(action_event, "action", None)
+        if isinstance(action, ThinkAction | FinishAction):
+            return True
+        if isinstance(action, TaskTrackerAction):
+            return action.command in {"view", "plan"}
+        if isinstance(action, FileEditorAction):
+            return action.command == "view"
+        return False
+
+    @staticmethod
+    def _format_plan_mode_block_reason(action_events: Sequence[Event]) -> str:
+        """Build a concise rejection reason for disallowed plan-mode actions."""
+        action_names = []
+        for action_event in action_events:
+            action = getattr(action_event, "action", None)
+            action_names.append(
+                type(action).__name__ if action is not None else "Action"
+            )
+        actions = ", ".join(action_names)
+        return (
+            "Planning Mode blocks non-read-only actions "
+            f"({actions}). Switch to /code to make repository changes or run commands."
+        )
 
     async def resume_after_confirmation(self, decision: UserConfirmation) -> None:
         """Resume conversation after user makes a confirmation decision."""
