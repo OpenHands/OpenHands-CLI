@@ -5,8 +5,6 @@ titles, used by both streaming (tool_state.py) and non-streaming (utils.py,
 richlog_visualizer.py) code paths.
 """
 
-from typing import Any
-
 from openhands.sdk.logger import get_logger
 
 
@@ -16,7 +14,7 @@ logger = get_logger(__name__)
 def format_delegate_title(
     command: str | None,
     ids: list[str] | None = None,
-    tasks: dict[str, Any] | None = None,
+    tasks: dict[str, str] | None = None,
     agent_types: list[str] | None = None,
     include_agent_types: bool = False,
 ) -> str:
@@ -64,7 +62,7 @@ def _format_spawn_title(
     return f"Spawning {len(ids)} sub-agent(s): {agents_str}"
 
 
-def _format_delegate_tasks_title(tasks: dict[str, Any] | None) -> str:
+def _format_delegate_tasks_title(tasks: dict[str, str] | None) -> str:
     """Format title for delegate command."""
     if not tasks:
         return "Delegating tasks"
