@@ -6,6 +6,7 @@ This is a simplified version that demonstrates the TUI functionality.
 
 import argparse
 import logging
+import multiprocessing
 import os
 import sys
 import warnings
@@ -25,11 +26,6 @@ from openhands_cli.utils import create_seeded_instructions_from_args
 
 
 console = Console()
-
-
-env_path = Path.cwd() / ".env"
-if env_path.is_file():
-    load_dotenv(dotenv_path=str(env_path), override=False)
 
 
 debug_env = os.getenv("DEBUG", "false").lower()
@@ -94,8 +90,14 @@ def main() -> None:
         ImportError: If agent chat dependencies are missing
         Exception: On other error conditions
     """
+    multiprocessing.freeze_support()
     parser = create_main_parser()
     args = parser.parse_args()
+
+    if args.command != "run":
+        env_path = Path.cwd() / ".env"
+        if env_path.is_file():
+            load_dotenv(dotenv_path=str(env_path), override=False)
 
     # Handle --json flag (only works with --headless)
     json_mode = args.json and args.headless
@@ -115,11 +117,15 @@ def main() -> None:
     critic_disabled = args.headless
 
     # Warn about env vars if they are set but not being used
-    if not env_overrides_enabled:
+    if args.command != "run" and not env_overrides_enabled:
         check_and_warn_env_vars()
 
     try:
-        if args.command == "serve":
+        if args.command == "run":
+            from openhands_cli.unattended import run_unattended
+
+            sys.exit(run_unattended(args))
+        elif args.command == "serve":
             # Import gui_launcher only when needed
             from openhands_cli.gui_launcher import launch_gui_server
 
