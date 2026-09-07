@@ -2,7 +2,7 @@
 
 import html
 import json
-from typing import Any
+from typing import Any, TypedDict
 
 import httpx
 
@@ -13,6 +13,24 @@ from openhands_cli.auth.utils import console_print
 from openhands_cli.locations import AGENT_SETTINGS_PATH, get_persistence_dir
 from openhands_cli.stores import AgentStore
 from openhands_cli.theme import OPENHANDS_THEME
+
+
+class UserSettingsResponse(TypedDict, total=False):
+    """TypedDict for user settings API response."""
+
+    llm_model: str | None
+    llm_base_url: str | None
+    agent: str | None
+    language: str | None
+    llm_api_key_set: bool
+    agent_settings: dict[str, Any]
+
+
+class UserDataResponse(TypedDict, total=False):
+    """TypedDict for combined user data after OAuth."""
+
+    llm_api_key: str | None
+    settings: UserSettingsResponse | None
 
 
 class ApiClientError(Exception):
@@ -102,9 +120,9 @@ class OpenHandsApiClient(BaseHttpClient):
         result = await self._get_json("/api/keys/llm/byor")
         return result.get("key")
 
-    async def get_user_settings(self) -> dict[str, Any]:
+    async def get_user_settings(self) -> UserSettingsResponse:
         payload = await self._get_json("/api/v1/settings")
-        return _flatten_v1_settings(payload)
+        return _flatten_v1_settings(payload)  # type: ignore[return-value]
 
     async def create_conversation(
         self, json_data: dict[str, Any] | None = None
@@ -158,12 +176,12 @@ class OpenHandsApiClient(BaseHttpClient):
         return await self.get_conversation_info(task_id, endpoint="start-tasks")
 
 
-def _print_settings_summary(settings: dict[str, Any]) -> None:
+def _print_settings_summary(settings: UserSettingsResponse) -> None:
     console_print("  ✓ User settings retrieved", style=OPENHANDS_THEME.success)
 
-    llm_model = settings.get("llm_model", "Not set")
-    agent_name = settings.get("agent", "Not set")
-    language = settings.get("language", "Not set")
+    llm_model = settings.get("llm_model") or "Not set"
+    agent_name = settings.get("agent") or "Not set"
+    language = settings.get("language") or "Not set"
     llm_api_key_set = settings.get("llm_api_key_set", False)
 
     console_print(f"    LLM Model: {llm_model}", style=OPENHANDS_THEME.secondary)
@@ -307,7 +325,7 @@ def create_and_save_agent_configuration(
 async def fetch_user_data_after_oauth(
     server_url: str,
     api_key: str,
-) -> dict[str, Any]:
+) -> UserDataResponse:
     """Fetch user data after OAuth and optionally create & save an Agent."""
     client = OpenHandsApiClient(server_url, api_key)
 
@@ -336,7 +354,7 @@ async def fetch_user_data_after_oauth(
                 "  ! No user settings available", style=OPENHANDS_THEME.warning
             )
 
-        user_data = {
+        user_data: UserDataResponse = {
             "llm_api_key": llm_api_key,
             "settings": settings,
         }
