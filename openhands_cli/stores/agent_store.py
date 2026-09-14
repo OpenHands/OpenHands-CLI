@@ -40,8 +40,8 @@ from openhands_cli.utils import (
 )
 
 
-console = Console(highlight=False, soft_wrap=True)
-stderr_console = Console(stderr=True, highlight=False, soft_wrap=True)
+console: Console = Console(highlight=False, soft_wrap=True)
+stderr_console: Console = Console(stderr=True, highlight=False, soft_wrap=True)
 
 
 def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
