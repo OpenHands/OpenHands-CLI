@@ -17,7 +17,7 @@ from rich.console import Console
 from openhands_cli.argparsers.main_parser import create_main_parser
 from openhands_cli.stores import (
     MissingEnvironmentVariablesError,
-    check_and_warn_env_vars,
+    get_ignored_env_vars,
 )
 from openhands_cli.terminal_compat import check_terminal_compatibility
 from openhands_cli.theme import OPENHANDS_THEME
@@ -25,6 +25,7 @@ from openhands_cli.utils import create_seeded_instructions_from_args
 
 
 console = Console()
+stderr_console = Console(stderr=True)
 
 
 env_path = Path.cwd() / ".env"
@@ -116,7 +117,15 @@ def main() -> None:
 
     # Warn about env vars if they are set but not being used
     if not env_overrides_enabled:
-        check_and_warn_env_vars()
+        ignored_vars = get_ignored_env_vars()
+        if ignored_vars:
+            vars_str = ", ".join(ignored_vars)
+            stderr_console.print(
+                f"[yellow]Warning:[/yellow] Environment variable(s) {vars_str} "
+                "detected but will be ignored.\n"
+                "Use [bold]--override-with-envs[/bold] flag to apply them.",
+                highlight=False,
+            )
 
     try:
         if args.command == "serve":

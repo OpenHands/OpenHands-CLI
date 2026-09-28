@@ -1,7 +1,7 @@
 from openhands_cli.stores.agent_store import (
     AgentStore,
     MissingEnvironmentVariablesError,
-    check_and_warn_env_vars,
+    get_ignored_env_vars,
 )
 from openhands_cli.stores.cli_settings import (
     DEFAULT_MAX_REFINEMENT_ITERATIONS,
@@ -22,5 +22,5 @@ __all__ = [
     "MissingEnvironmentVariablesError",
     "PromptHistoryEntry",
     "PromptHistoryStore",
-    "check_and_warn_env_vars",
+    "get_ignored_env_vars",
 ]

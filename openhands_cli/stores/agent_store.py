@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from typing import Any
 
 from pydantic import BaseModel, SecretStr
-from rich.console import Console
 
 from openhands.sdk import (
     LLM,
@@ -40,8 +40,7 @@ from openhands_cli.utils import (
 )
 
 
-console = Console(highlight=False, soft_wrap=True)
-stderr_console = Console(stderr=True, highlight=False, soft_wrap=True)
+logger = logging.getLogger(__name__)
 
 
 def get_persisted_conversation_tools(conversation_id: str) -> list[Tool] | None:
@@ -153,11 +152,14 @@ class MissingEnvironmentVariablesError(Exception):
         )
 
 
-def check_and_warn_env_vars() -> None:
-    """Check for LLM environment variables and warn if they are set but not used.
+def get_ignored_env_vars() -> list[str]:
+    """Get list of LLM environment variables that are set but would be ignored.
 
-    This function should be called when env overrides are disabled to inform
-    users that their environment variables are being ignored.
+    This function should be called when env overrides are disabled to determine
+    which environment variables the user has set that won't be used.
+
+    Returns:
+        List of environment variable names that are set.
     """
     env_vars_set = []
     if os.environ.get(ENV_LLM_API_KEY):
@@ -166,16 +168,7 @@ def check_and_warn_env_vars() -> None:
         env_vars_set.append(ENV_LLM_BASE_URL)
     if os.environ.get(ENV_LLM_MODEL):
         env_vars_set.append(ENV_LLM_MODEL)
-
-    if env_vars_set:
-        console = Console(stderr=True)
-        vars_str = ", ".join(env_vars_set)
-        console.print(
-            f"[yellow]Warning:[/yellow] Environment variable(s) {vars_str} detected "
-            "but will be ignored.\n"
-            "Use [bold]--override-with-envs[/bold] flag to apply them.",
-            highlight=False,
-        )
+    return env_vars_set
 
 
 class LLMEnvOverrides(BaseModel):
@@ -277,11 +270,7 @@ class AgentStore:
         except FileNotFoundError:
             return None
         except Exception:
-            console.print(
-                "\nAgent configuration file is corrupted!",
-                style="red",
-                markup=False,
-            )
+            logger.warning("Agent configuration file is corrupted")
             return None
 
     def _ensure_agent(self, agent: Agent | None, overrides: LLMEnvOverrides) -> Agent:
