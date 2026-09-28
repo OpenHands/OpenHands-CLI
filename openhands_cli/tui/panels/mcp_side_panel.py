@@ -210,7 +210,9 @@ class MCPSidePanel(VerticalScroll):
         return server_spec
 
     def _check_server_specs_are_equal(
-        self, first_server_spec, second_server_spec
+        self,
+        first_server_spec: StdioMCPServer | RemoteMCPServer | dict,
+        second_server_spec: StdioMCPServer | RemoteMCPServer | dict,
     ) -> bool:
         """Check if two server specifications are equal."""
         first_dict = self._server_spec_to_dict(first_server_spec)
