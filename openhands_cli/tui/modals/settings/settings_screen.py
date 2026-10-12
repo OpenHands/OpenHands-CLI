@@ -508,7 +508,7 @@ class SettingsScreen(ModalScreen):
         # (validator returned None)
         if form_data.timeout is None and self.current_agent:
             form_data.timeout = getattr(self.current_agent.llm, "timeout", None)
-        result = save_settings(form_data, self.current_agent)
+        result = save_settings(form_data, self.current_agent, self.agent_store)
         if not result.success:
             self._show_message(result.error_message or "Unknown error", is_error=True)
             return

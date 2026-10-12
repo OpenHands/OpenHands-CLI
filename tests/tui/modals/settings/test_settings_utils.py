@@ -27,9 +27,6 @@ def deps(monkeypatch) -> FakeAgentStore:
     """
     fake_store = FakeAgentStore()
 
-    # Use our fake store instead of the real AgentStore singleton
-    monkeypatch.setattr(settings_utils, "agent_store", fake_store)
-
     # When utils wants a default CLI agent, build a minimal real Agent from the LLM
     def _mock_get_default_cli_agent(llm: LLM) -> Agent:
         return Agent(llm=llm)
@@ -96,7 +93,7 @@ def test_preserves_existing_api_key_when_not_provided(
     assert data.api_key_input == existing_key_str
 
     # Now run through save_settings with that existing agent
-    result = settings_utils.save_settings(data, existing_agent)
+    result = settings_utils.save_settings(data, existing_agent, deps)
     assert result.success is True
     assert deps.saved_agents, "Expected agent_store.save to have been called"
 
@@ -213,7 +210,7 @@ def test_mode_specific_fields_cleared_and_not_saved(
     assert data.get_full_model_name() == expected_model
 
     # Run the full save and assert we built the LLM correctly
-    result = settings_utils.save_settings(data, existing_agent=None)
+    result = settings_utils.save_settings(data, existing_agent=None, agent_store=deps)
     assert result.success is True
     saved_agent = deps.saved_agents[-1]
     assert saved_agent.llm.model == expected_model
@@ -243,7 +240,7 @@ def test_openhands_basic_mode_does_not_pass_proxy_base_url(
         memory_condensation_enabled=True,
     )
 
-    result = settings_utils.save_settings(data, existing_agent=None)
+    result = settings_utils.save_settings(data, existing_agent=None, agent_store=deps)
 
     assert result.success is True
     assert captured_llm_kwargs[0]["model"] == "openhands/claude-opus-4-8"
@@ -286,7 +283,7 @@ def test_save_settings_wraps_errors_into_result(deps: FakeAgentStore) -> None:
         memory_condensation_enabled=True,
     )
 
-    result = settings_utils.save_settings(data, existing_agent=None)
+    result = settings_utils.save_settings(data, existing_agent=None, agent_store=deps)
     assert result.success is False
     # The error message should mention missing custom model/base url
     assert "Custom model is required" in (result.error_message or "")
@@ -316,7 +313,7 @@ def test_memory_condensation_toggle(deps: FakeAgentStore, enabled: bool) -> None
         memory_condensation_enabled=enabled,
     )
 
-    result = settings_utils.save_settings(data, existing_agent=existing_agent)
+    result = settings_utils.save_settings(data, existing_agent=existing_agent, agent_store=deps)
     assert result.success is True
     saved_agent = deps.saved_agents[-1]
 
@@ -350,7 +347,7 @@ def test_existing_condenser_llm_updated(deps: FakeAgentStore) -> None:
         memory_condensation_enabled=True,
     )
 
-    result = settings_utils.save_settings(data, existing_agent=existing_agent)
+    result = settings_utils.save_settings(data, existing_agent=existing_agent, agent_store=deps)
     assert result.success is True
     saved_agent = deps.saved_agents[-1]
 
@@ -398,7 +395,7 @@ def test_litellm_metadata_is_added_when_required(
         memory_condensation_enabled=True,
     )
 
-    result = settings_utils.save_settings(data, existing_agent=None)
+    result = settings_utils.save_settings(data, existing_agent=None, agent_store=deps)
     assert result.success is True
 
     saved_agent = deps.saved_agents[-1]
@@ -445,7 +442,7 @@ def test_model_change_without_max_tokens_uses_sdk_default(
         memory_condensation_enabled=False,
     )
 
-    result = settings_utils.save_settings(data, existing_agent=existing_agent)
+    result = settings_utils.save_settings(data, existing_agent=existing_agent, agent_store=deps)
 
     assert result.success is True
     saved_agent = deps.saved_agents[-1]
@@ -485,7 +482,7 @@ def test_model_change_preserves_user_supplied_max_tokens(
         memory_condensation_enabled=False,
     )
 
-    result = settings_utils.save_settings(data, existing_agent=existing_agent)
+    result = settings_utils.save_settings(data, existing_agent=existing_agent, agent_store=deps)
 
     assert result.success is True
     saved_agent = deps.saved_agents[-1]
