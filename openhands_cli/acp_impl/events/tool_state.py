@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 from acp.schema import ToolKind
 from streamingjson import Lexer
@@ -177,7 +178,7 @@ class ToolCallState:
         # Other tools: prefer summary if present
         return clean_summary or self.tool_name
 
-    def _parse_args(self) -> dict | None:
+    def _parse_args(self) -> dict[str, Any] | None:
         """Parse current args using lexer's best-effort completion."""
         try:
             args = json.loads(self.lexer.complete_json())
