@@ -1,6 +1,7 @@
 """Slash commands implementation for ACP."""
 
 import logging
+from typing import get_args
 
 from acp.schema import AvailableCommand, AvailableCommandInput, UnstructuredCommandInput
 
@@ -19,11 +20,8 @@ from openhands_cli.shared.slash_commands import (
 
 logger = logging.getLogger(__name__)
 
-VALID_CONFIRMATION_MODE: list[ConfirmationMode] = [
-    "always-ask",
-    "always-approve",
-    "llm-approve",
-]
+# Derive valid modes from ConfirmationMode type to keep list in sync with type
+VALID_CONFIRMATION_MODE: list[ConfirmationMode] = list(get_args(ConfirmationMode))
 
 
 def get_available_slash_commands() -> list[AvailableCommand]:
