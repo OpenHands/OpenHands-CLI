@@ -1,6 +1,5 @@
 """Utility functions for LLM configuration in OpenHands CLI."""
 
-import json
 import os
 import platform
 import re
@@ -268,4 +267,4 @@ def json_callback(event: Event) -> None:
     if isinstance(event, SystemPromptEvent):
         return
 
-    print(json.dumps(event.model_dump(), ensure_ascii=False))
+    print(event.model_dump_json())

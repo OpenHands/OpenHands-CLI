@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from acp.schema import EnvVariable, McpServerStdio
 
-from openhands.sdk.event import MessageEvent, SystemPromptEvent
+from openhands.sdk.event import Condensation, MessageEvent, SystemPromptEvent
 from openhands.sdk.llm import Message, TextContent
 from openhands_cli.acp_impl.utils import convert_acp_mcp_servers_to_agent_format
 from openhands_cli.deprecated_utils import conversation_has_delegate_tool
@@ -255,6 +255,27 @@ class TestJsonCallback:
             assert "你好，世界" in json_output
             parsed_json = json.loads(json_output)
             assert parsed_json["llm_message"]["content"][0]["text"] == "你好，世界"
+
+    def test_json_callback_serializes_sets(self):
+        """Test json_callback serializes Python-native types like sets.
+
+        For example, `Condensation.forgotten_event_ids` is a Python `set`,
+        which is not JSON serializable, so `json.dumps(event.model_dump())` would raise.
+        Instead, `json_callback()` must call `event.model_dump_json()`
+        to serialize the Python `set` as a JSON array.
+        """
+        event = Condensation(
+            forgotten_event_ids={"event-1", "event-2"},
+            llm_response_id="response-1",
+        )
+
+        with patch("builtins.print") as mock_print:
+            json_callback(event)
+
+            assert mock_print.call_count == 1
+            json_output = mock_print.call_args_list[0][0][0]
+            parsed_json = json.loads(json_output)
+            assert set(parsed_json["forgotten_event_ids"]) == {"event-1", "event-2"}
 
 
 @pytest.mark.parametrize(
