@@ -6,7 +6,7 @@ requires = [ "hatchling>=1.25" ]
 # Limit third-party package intake to versions released at least 7 days ago.
 exclude-newer = "7 days"
 # First-party packages exempt from 7-day freshness cutoff.
-exclude-newer-package = { "openhands-sdk" = false, "openhands-tools" = false }
+exclude-newer-package = { "openhands-sdk" = false, "openhands-tools" = false, "certifi" = false }
 
 [project]
 name = "openhands"
@@ -33,6 +33,7 @@ dependencies = [
   "textual-autocomplete>=4.0.6",
   "pyperclip>=1.9.0",
   "httpx>=0.25.0",
+  "certifi>=2026.10.19",  # eMudhra CA distrust: GHSA-6q48-6c7w-9gw2
   "textual-serve>=1.1.3",
   "streamingjson>=0.0.2",
 ]
