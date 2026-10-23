@@ -33,6 +33,11 @@ def load_agent_specs(
     *,
     env_overrides_enabled: bool = False,
     critic_disabled: bool = False,
+    ignore_persisted_agent: bool = False,
+    load_user_skills: bool = True,
+    load_public_skills: bool = True,
+    llm_timeout: int | None = None,
+    llm_num_retries: int | None = None,
 ) -> Agent:
     """Load agent specifications.
 
@@ -56,6 +61,11 @@ def load_agent_specs(
         session_id=conversation_id,
         env_overrides_enabled=env_overrides_enabled,
         critic_disabled=critic_disabled,
+        ignore_persisted_agent=ignore_persisted_agent,
+        load_user_skills=load_user_skills,
+        load_public_skills=load_public_skills,
+        llm_timeout=llm_timeout,
+        llm_num_retries=llm_num_retries,
     )
     if not agent:
         raise MissingAgentSpec(
@@ -100,6 +110,11 @@ def setup_conversation(
     *,
     env_overrides_enabled: bool = False,
     critic_disabled: bool = False,
+    ignore_persisted_agent: bool = False,
+    load_user_skills: bool = True,
+    load_public_skills: bool = True,
+    llm_timeout: int | None = None,
+    llm_num_retries: int | None = None,
 ) -> BaseConversation:
     """
     Setup the conversation with agent.
@@ -133,6 +148,11 @@ def setup_conversation(
         str(conversation_id),
         env_overrides_enabled=env_overrides_enabled,
         critic_disabled=critic_disabled,
+        ignore_persisted_agent=ignore_persisted_agent,
+        load_user_skills=load_user_skills,
+        load_public_skills=load_public_skills,
+        llm_timeout=llm_timeout,
+        llm_num_retries=llm_num_retries,
     )
 
     # Prepare callbacks list

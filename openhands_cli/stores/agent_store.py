@@ -320,6 +320,11 @@ class AgentStore:
         *,
         env_overrides_enabled: bool = False,
         critic_disabled: bool = False,
+        ignore_persisted_agent: bool = False,
+        load_user_skills: bool = True,
+        load_public_skills: bool = True,
+        llm_timeout: int | None = None,
+        llm_num_retries: int | None = None,
     ) -> Agent | None:
         """Load an Agent and apply runtime configuration.
 
@@ -350,7 +355,7 @@ class AgentStore:
                 required env variables are missing.
         """
 
-        agent = self.load_from_disk()
+        agent = None if ignore_persisted_agent else self.load_from_disk()
         overrides = LLMEnvOverrides.from_env(enabled=env_overrides_enabled)
 
         if env_overrides_enabled:
@@ -365,6 +370,10 @@ class AgentStore:
             agent,
             session_id,
             critic_disabled=critic_disabled,
+            load_user_skills=load_user_skills,
+            load_public_skills=load_public_skills,
+            llm_timeout=llm_timeout,
+            llm_num_retries=llm_num_retries,
         )
 
     def _resolve_tools(self, session_id: str | None) -> list[Tool]:
@@ -405,7 +414,12 @@ class AgentStore:
             }
         )
 
-    def _build_agent_context(self) -> AgentContext:
+    def _build_agent_context(
+        self,
+        *,
+        load_user_skills: bool = True,
+        load_public_skills: bool = True,
+    ) -> AgentContext:
         skills = load_project_skills(get_work_dir())
         system_suffix = "\n".join(
             [
@@ -416,12 +430,16 @@ class AgentStore:
         return AgentContext(
             skills=skills,
             system_message_suffix=system_suffix,
-            load_user_skills=True,
-            load_public_skills=True,
+            load_user_skills=load_user_skills,
+            load_public_skills=load_public_skills,
         )
 
     def _maybe_build_condenser(
-        self, agent: Agent, *, session_id: str | None
+        self,
+        agent: Agent,
+        *,
+        session_id: str | None,
+        llm_updates: dict[str, int],
     ) -> LLMSummarizingCondenser | None:
         if not (
             agent.condenser and isinstance(agent.condenser, LLMSummarizingCondenser)
@@ -431,6 +449,8 @@ class AgentStore:
         condenser_llm = self._with_llm_metadata(
             agent.condenser.llm, session_id=session_id, llm_type="condenser"
         )
+        if llm_updates:
+            condenser_llm = condenser_llm.model_copy(update=llm_updates)
 
         return agent.condenser.model_copy(update={"llm": condenser_llm})
 
@@ -440,18 +460,37 @@ class AgentStore:
         session_id: str | None = None,
         *,
         critic_disabled: bool = False,
+        load_user_skills: bool = True,
+        load_public_skills: bool = True,
+        llm_timeout: int | None = None,
+        llm_num_retries: int | None = None,
     ) -> Agent:
         updated_tools = self._resolve_tools(session_id)
         updated_llm = self._with_llm_metadata(
             agent.llm, session_id=session_id, llm_type="agent"
         )
+        llm_updates = {
+            key: value
+            for key, value in {
+                "timeout": llm_timeout,
+                "num_retries": llm_num_retries,
+            }.items()
+            if value is not None
+        }
+        if llm_updates:
+            updated_llm = updated_llm.model_copy(update=llm_updates)
 
-        agent_context = self._build_agent_context()
+        agent_context = self._build_agent_context(
+            load_user_skills=load_user_skills,
+            load_public_skills=load_public_skills,
+        )
 
         enabled_servers = list_enabled_servers()
         mcp_config = {"mcpServers": enabled_servers} if enabled_servers else {}
 
-        condenser = self._maybe_build_condenser(agent, session_id=session_id)
+        condenser = self._maybe_build_condenser(
+            agent, session_id=session_id, llm_updates=llm_updates
+        )
 
         critic = None
         if not critic_disabled:

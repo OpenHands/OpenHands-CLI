@@ -143,6 +143,41 @@ openhands --headless -f instructions.md  # or use a file
 openhands --headless --json -t "Create a Flask app"
 ```
 
+### Unattended automation
+
+Use `openhands run` for CI, benchmark harnesses, and other callers that need a
+noninteractive process contract. It never opens the TUI or onboarding, requires
+model configuration from the environment, streams JSONL on stdout, and
+continuously writes the same stream plus SDK conversation state under the
+selected output directory.
+
+```bash
+LLM_API_KEY="$PROVIDER_API_KEY" \
+LLM_MODEL="openai/model-name" \
+LLM_BASE_URL="https://provider.example/v1" \
+openhands run \
+  --task "Fix the failing test" \
+  --workspace /workspace \
+  --output-dir /logs/openhands \
+  --offline \
+  --no-user-skills
+```
+
+`--offline` disables optional startup fetches such as public skills. The output
+directory contains:
+
+- `events.jsonl`: a flushed event and lifecycle stream that matches stdout.
+- `run.json`: an atomically replaced summary with status, conversation ID,
+  workspace, timestamps, and exit code.
+- `conversations/<id>/`: the SDK's incrementally persisted conversation state
+  and individual event files.
+
+Exit codes are stable for automation: `0` completed, `2` command usage, `3`
+configuration, `4` model provider, `5` agent execution, and `6` internal CLI
+failure. Signals use the conventional `128 + signal` value (for example, `143`
+for `SIGTERM`). A supervisor process preserves the terminal summary and partial
+events when an in-flight provider request does not stop cooperatively.
+
 ### Resume Conversations
 
 ```bash
