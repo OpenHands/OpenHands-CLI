@@ -9,7 +9,6 @@ timeout.
 
 import pytest
 
-import openhands_cli.tui.modals.settings.utils as settings_utils
 from openhands.sdk import LLM, Agent
 from openhands_cli.tui.modals.settings.utils import SettingsFormData, save_settings
 
@@ -23,10 +22,8 @@ class FakeAgentStore:
 
 
 @pytest.fixture
-def deps(monkeypatch) -> FakeAgentStore:
-    fake_store = FakeAgentStore()
-    monkeypatch.setattr(settings_utils, "agent_store", fake_store)
-    return fake_store
+def deps() -> FakeAgentStore:
+    return FakeAgentStore()
 
 
 def test_invalid_timeout_keeps_existing_value(deps: FakeAgentStore):
@@ -55,7 +52,7 @@ def test_invalid_timeout_keeps_existing_value(deps: FakeAgentStore):
     if form_data.timeout is None:
         form_data.timeout = getattr(existing_agent.llm, "timeout", None)
 
-    result = save_settings(form_data, existing_agent)
+    result = save_settings(form_data, existing_agent, agent_store=deps)
     assert result.success
     # The saved agent should retain the original timeout (120 seconds)
     assert result.error_message is None

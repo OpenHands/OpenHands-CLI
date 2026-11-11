@@ -11,9 +11,6 @@ from openhands_cli.utils import (
 )
 
 
-agent_store = AgentStore()
-
-
 class SettingsFormData(BaseModel):
     """Raw values captured from the SettingsScreen UI."""
 
@@ -174,9 +171,13 @@ class SettingsSaveResult(BaseModel):
 
 
 def save_settings(
-    data: SettingsFormData, existing_agent: Agent | None
+    data: SettingsFormData,
+    existing_agent: Agent | None,
+    agent_store: AgentStore | None = None,
 ) -> SettingsSaveResult:
     try:
+        if agent_store is None:
+            agent_store = AgentStore()
         data.resolve_data_fields(existing_agent)
         extra_kwargs: dict[str, Any] = {}
 
