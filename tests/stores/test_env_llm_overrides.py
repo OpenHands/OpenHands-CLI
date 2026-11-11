@@ -15,8 +15,8 @@ from openhands_cli.stores.agent_store import (
     LLMEnvOverrides,
     MissingEnvironmentVariablesError,
     apply_llm_overrides,
-    check_and_warn_env_vars,
     get_default_critic,
+    get_ignored_env_vars,
 )
 
 
@@ -77,31 +77,35 @@ class TestLLMEnvOverridesFromEnv:
             assert overrides.api_key is None
 
 
-class TestCheckAndWarnEnvVars:
-    """Tests for check_and_warn_env_vars function."""
+class TestGetIgnoredEnvVars:
+    """Tests for get_ignored_env_vars function."""
 
-    def test_no_warning_when_no_env_vars(self, capsys) -> None:
-        """Should not warn when no env vars are set."""
+    def test_returns_empty_when_no_env_vars(self) -> None:
+        """Should return empty list when no env vars are set."""
         with patch.dict(os.environ, {}, clear=True):
             for key in [ENV_LLM_API_KEY, ENV_LLM_BASE_URL, ENV_LLM_MODEL]:
                 os.environ.pop(key, None)
-            check_and_warn_env_vars()
-            captured = capsys.readouterr()
-            assert "Warning" not in captured.err
+            result = get_ignored_env_vars()
+            assert result == []
 
-    def test_warning_when_env_vars_set(self, capsys) -> None:
-        """Should warn when env vars are set but not used."""
-        env_vars = {
+    def test_returns_set_env_vars(self) -> None:
+        """Should return list of env vars that are set."""
+        # Clear existing vars, then set only the ones we want to test
+        clean_env = {
             ENV_LLM_API_KEY: "test-key",
             ENV_LLM_MODEL: "test-model",
         }
-        with patch.dict(os.environ, env_vars, clear=False):
-            check_and_warn_env_vars()
-            captured = capsys.readouterr()
-            assert "Warning" in captured.err
-            assert "LLM_API_KEY" in captured.err
-            assert "LLM_MODEL" in captured.err
-            assert "--override-with-envs" in captured.err
+        # Remove any existing LLM env vars first, then set our test vars
+        with patch.dict(
+            os.environ,
+            {k: v for k, v in os.environ.items() if k not in [ENV_LLM_API_KEY, ENV_LLM_BASE_URL, ENV_LLM_MODEL]},
+            clear=True,
+        ):
+            os.environ.update(clean_env)
+            result = get_ignored_env_vars()
+            assert ENV_LLM_API_KEY in result
+            assert ENV_LLM_MODEL in result
+            assert len(result) == 2
 
 
 class TestLLMEnvOverrides:
