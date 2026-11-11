@@ -3,7 +3,7 @@ from typing import ClassVar
 from textual import on
 from textual.binding import Binding
 from textual.content import Content
-from textual.events import Paste
+from textual.events import Key, Paste
 from textual.message import Message
 from textual.widgets import TextArea
 
@@ -66,7 +66,7 @@ class SingleLineInputWithWrapping(TextArea):
                 else self._placeholder
             )
 
-    async def _on_key(self, event) -> None:
+    async def _on_key(self, event: Key) -> None:
         """Intercept Enter key before TextArea processes it."""
         if event.key == "enter":
             # Post message to parent and prevent default newline insertion
