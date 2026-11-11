@@ -95,6 +95,13 @@ class ConversationVisualizer(ConversationVisualizerBase):
     container. Supports delegate visualization by tracking agent identity.
     """
 
+    _container: "VerticalScroll"
+    _app: "OpenHandsApp"
+    _name: str | None
+    _main_thread_id: int
+    _cli_settings: CliSettings | None
+    _pending_actions: dict[str, tuple[ActionEvent, Collapsible]]
+
     def __init__(
         self,
         container: "VerticalScroll",
@@ -113,12 +120,9 @@ class ConversationVisualizer(ConversationVisualizerBase):
         self._container = container
         self._app = app
         self._name = name
-        # Store the main thread ID for thread safety checks
         self._main_thread_id = threading.get_ident()
-        # Cache CLI settings to avoid repeated file system reads
-        self._cli_settings: CliSettings | None = None
-        # Track pending actions by tool_call_id for action-observation pairing
-        self._pending_actions: dict[str, tuple[ActionEvent, Collapsible]] = {}
+        self._cli_settings = None
+        self._pending_actions = {}
 
     @property
     def cli_settings(self) -> CliSettings:

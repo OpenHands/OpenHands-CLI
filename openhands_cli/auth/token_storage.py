@@ -9,6 +9,9 @@ from openhands_cli.locations import get_persistence_dir
 class TokenStorage:
     """Simple local storage for API keys."""
 
+    config_dir: Path
+    api_key_file: Path
+
     def __init__(self, config_dir: Path | None = None) -> None:
         """Initialize token storage.
 
