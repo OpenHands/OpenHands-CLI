@@ -11,7 +11,11 @@ from openhands.sdk.security.confirmation_policy import (
     NeverConfirm,
 )
 from openhands.sdk.security.llm_analyzer import LLMSecurityAnalyzer
-from openhands_cli.acp_impl.confirmation import CONFIRMATION_MODES, ConfirmationMode
+from openhands_cli.shared.confirmation_modes import (
+    CONFIRMATION_MODES,
+    VALID_CONFIRMATION_MODES,
+    ConfirmationMode,
+)
 from openhands_cli.shared.slash_commands import (
     parse_slash_command as parse_slash_command,
 )
@@ -19,11 +23,8 @@ from openhands_cli.shared.slash_commands import (
 
 logger = logging.getLogger(__name__)
 
-VALID_CONFIRMATION_MODE: list[ConfirmationMode] = [
-    "always-ask",
-    "always-approve",
-    "llm-approve",
-]
+# Backward compatibility alias (deprecated, use VALID_CONFIRMATION_MODES)
+VALID_CONFIRMATION_MODE = VALID_CONFIRMATION_MODES
 
 
 def get_available_slash_commands() -> list[AvailableCommand]:
@@ -131,7 +132,7 @@ def validate_confirmation_mode(mode_str: str) -> ConfirmationMode | None:
         ConfirmationMode if valid, None otherwise
     """
     normalized = mode_str.lower().strip()
-    return normalized if normalized in VALID_CONFIRMATION_MODE else None
+    return normalized if normalized in VALID_CONFIRMATION_MODES else None
 
 
 def apply_confirmation_mode_to_conversation(
