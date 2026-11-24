@@ -575,3 +575,159 @@ class TestMissingEnvVarsErrorHandling:
             assert "LLM_API_KEY" in captured.out
             assert "LLM_MODEL" in captured.out
             assert "Missing required environment variable(s)" in captured.out
+
+
+class TestHeadlessFatalErrorExit:
+    """Tests for fatal error reporting and non-zero exit in headless mode."""
+
+    def test_runner_records_conversation_run_error_and_clears_on_next_run(self):
+        from openhands.sdk.conversation.exceptions import ConversationRunError
+        from openhands_cli.tui.core.conversation_runner import ConversationRunner
+        from openhands_cli.tui.core.state import ConversationContainer
+
+        mock_conversation = Mock()
+        mock_conversation.run = Mock(
+            side_effect=ConversationRunError(
+                uuid.uuid4(), RuntimeError("upstream HTTP 402 payment required")
+            )
+        )
+
+        mock_state = Mock(spec=ConversationContainer)
+        mock_state.confirmation_policy = NeverConfirm()
+        mock_state.is_confirmation_active = False
+
+        with patch(
+            "openhands_cli.tui.core.conversation_runner.setup_conversation",
+            return_value=mock_conversation,
+        ):
+            runner = ConversationRunner(
+                conversation_id=uuid.uuid4(),
+                state=mock_state,
+                message_pump=Mock(),
+                notification_callback=Mock(),
+                visualizer=Mock(),
+            )
+
+        runner._execute_conversation(headless=True)
+
+        assert mock_state.set_error.call_count == 2
+        assert mock_state.set_error.call_args_list[0].args == (None,)
+        recorded = mock_state.set_error.call_args_list[1].args[0]
+        assert isinstance(recorded, ConversationRunError)
+        assert "HTTP 402" in str(recorded)
+
+    def test_runner_records_unexpected_exception(self):
+        from openhands_cli.tui.core.conversation_runner import ConversationRunner
+        from openhands_cli.tui.core.state import ConversationContainer
+
+        mock_conversation = Mock()
+        mock_conversation.run = Mock(
+            side_effect=ValueError("Duplicate tool names found: {terminal}")
+        )
+
+        mock_state = Mock(spec=ConversationContainer)
+        mock_state.confirmation_policy = NeverConfirm()
+        mock_state.is_confirmation_active = False
+
+        with patch(
+            "openhands_cli.tui.core.conversation_runner.setup_conversation",
+            return_value=mock_conversation,
+        ):
+            runner = ConversationRunner(
+                conversation_id=uuid.uuid4(),
+                state=mock_state,
+                message_pump=Mock(),
+                notification_callback=Mock(),
+                visualizer=Mock(),
+            )
+
+        runner._execute_conversation(headless=True)
+
+        recorded = mock_state.set_error.call_args_list[1].args[0]
+        assert isinstance(recorded, ValueError)
+
+    def test_on_conversation_finished_exits_nonzero_and_emits_stderr_and_json(
+        self, monkeypatch, capsys
+    ):
+        import json as _json
+
+        from openhands.sdk.conversation.exceptions import ConversationRunError
+        from openhands_cli.tui.core.state import ConversationFinished
+
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+        app = OpenHandsApp(exit_confirmation=False, headless_mode=True, json_mode=True)
+        app.exit = MagicMock()
+        app._print_conversation_summary = MagicMock()
+        app.conversation_state.set_error(
+            ConversationRunError(
+                uuid.uuid4(), RuntimeError("Provider returned HTTP 402")
+            )
+        )
+
+        app.on_conversation_finished(ConversationFinished())
+
+        app.exit.assert_called_once_with(return_code=1)
+        app._print_conversation_summary.assert_not_called()
+
+        captured = capsys.readouterr()
+        assert "ConversationRunError" in captured.err
+        assert "HTTP 402" in captured.err
+        payload = _json.loads(captured.out.strip())
+        assert payload["kind"] == "ConversationErrorEvent"
+        assert payload["error_type"] == "ConversationRunError"
+        assert "HTTP 402" in payload["message"]
+
+    def test_on_conversation_finished_exits_zero_without_error(
+        self, monkeypatch, capsys
+    ):
+        from openhands_cli.tui.core.state import ConversationFinished
+
+        monkeypatch.setattr(
+            SettingsScreen,
+            "is_initial_setup_required",
+            lambda env_overrides_enabled=False: False,
+        )
+        app = OpenHandsApp(exit_confirmation=False, headless_mode=True, json_mode=True)
+        app.exit = MagicMock()
+        app._print_conversation_summary = MagicMock()
+
+        app.on_conversation_finished(ConversationFinished())
+
+        app._print_conversation_summary.assert_called_once()
+        app.exit.assert_called_once_with()
+        captured = capsys.readouterr()
+        assert captured.err == ""
+        assert captured.out == ""
+
+    def test_textual_main_propagates_nonzero_return_code_in_headless_mode(self):
+        with patch("openhands_cli.tui.textual_app.OpenHandsApp") as mock_app_cls:
+            mock_app = MagicMock()
+            mock_app.return_code = 1
+            mock_app_cls.return_value = mock_app
+
+            with pytest.raises(SystemExit) as exc:
+                textual_main(
+                    headless=True,
+                    exit_without_confirmation=True,
+                )
+            assert exc.value.code == 1
+
+    def test_textual_main_returns_conversation_id_when_return_code_is_zero_or_none(
+        self,
+    ):
+        conv_id = uuid.uuid4()
+        with patch("openhands_cli.tui.textual_app.OpenHandsApp") as mock_app_cls:
+            mock_app = MagicMock()
+            mock_app.return_code = None
+            mock_app.conversation_id = conv_id
+            mock_app_cls.return_value = mock_app
+
+            result = textual_main(
+                headless=True,
+                exit_without_confirmation=True,
+            )
+            assert result == conv_id

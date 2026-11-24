@@ -150,6 +150,7 @@ class ConversationRunner:
         if not self.conversation:
             return
 
+        self._state.set_error(None)
         self._update_run_status(True)
 
         try:
@@ -182,8 +183,10 @@ class ConversationRunner:
                 self._request_confirmation()
 
         except ConversationRunError as e:
+            self._state.set_error(e)
             self._notification_callback("Conversation Error", str(e), "error")
         except Exception as e:
+            self._state.set_error(e)
             self._notification_callback(
                 "Unexpected Error", f"{type(e).__name__}: {e}", "error"
             )
