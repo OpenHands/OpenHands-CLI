@@ -147,6 +147,7 @@ class ConversationContainer(Container):
         # because reactive watchers may be triggered during initialization
         self._conversation_start_time: float | None = None
         self._conversation_state: ConversationStateProtocol | None = None
+        self._last_error: BaseException | None = None
         self._timer = None
 
         super().__init__(id="conversation_state", **kwargs)
@@ -322,6 +323,15 @@ class ConversationContainer(Container):
         else:
             # Cross-thread call - use Textual's thread-safe mechanism
             self.app.call_from_thread(do_update)
+
+    @property
+    def last_error(self) -> BaseException | None:
+        """Return the fatal error recorded by the most recent run, if any."""
+        return self._last_error
+
+    def set_error(self, error: BaseException | None) -> None:
+        """Record or clear the fatal error from a conversation run."""
+        self._last_error = error
 
     def set_running(self, value: bool) -> None:
         """Set the running state. Thread-safe."""

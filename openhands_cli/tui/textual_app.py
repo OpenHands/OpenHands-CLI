@@ -37,6 +37,8 @@ Data Binding:
     updates to all bound UI components via data_bind() and watch().
 """
 
+import json
+import sys
 import uuid
 from collections.abc import Iterable
 from typing import ClassVar
@@ -173,6 +175,7 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
         # Store headless mode setting for auto-exit behavior
         self.headless_mode = headless_mode
 
+        self.json_mode = json_mode
         self.env_overrides_enabled = env_overrides_enabled
         self.critic_disabled = critic_disabled
 
@@ -344,8 +347,31 @@ class OpenHandsApp(CollapsibleNavigationMixin, App):
     def on_conversation_finished(self, _event: ConversationFinished) -> None:
         """Handle conversation finished."""
         if self.headless_mode:
+            last_error = self.conversation_state.last_error
+            if last_error is not None:
+                self._report_headless_error(last_error)
+                self.exit(return_code=1)
+                return
             self._print_conversation_summary()
             self.exit()
+
+    def _report_headless_error(self, error: BaseException) -> None:
+        """Emit fatal error details in headless/JSON mode before exiting non-zero."""
+        error_type = type(error).__name__
+        error_message = str(error)
+        if self.json_mode:
+            print(
+                json.dumps(
+                    {
+                        "kind": "ConversationErrorEvent",
+                        "error_type": error_type,
+                        "message": error_message,
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
+        print(f"Error ({error_type}): {error_message}", file=sys.stderr, flush=True)
 
     def _print_conversation_summary(self) -> None:
         """Print conversation summary for headless mode."""
@@ -748,6 +774,9 @@ def main(
     )
 
     app.run(headless=headless)
+
+    if headless and isinstance(app.return_code, int) and app.return_code != 0:
+        sys.exit(app.return_code)
 
     return app.conversation_id
 
